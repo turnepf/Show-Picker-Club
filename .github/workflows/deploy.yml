@@ -1,0 +1,74 @@
+name: Deploy to Cloudflare Pages
+
+# Auto-deploys `public/` + `functions/` to the `shows` Pages project on every
+# push to main. Replaces running `wrangler pages deploy` from a local Mac.
+#
+# Required repo secrets:
+#   CLOUDFLARE_API_TOKEN   — needs Pages:Edit + D1:Edit on the account
+#   CLOUDFLARE_ACCOUNT_ID  — 851a39c5483b9aef842112771b5f8542
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install wrangler
+        run: npm install -g wrangler@latest
+
+      - name: Deploy to Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          wrangler pages deploy public \
+            --project-name=shows \
+            --branch=main \
+            --commit-dirty=true
+
+      - name: Post-deploy smoke test
+        run: |
+          sleep 15  # let the deploy propagate
+          fail=0
+          # Leaked-path probe — must return SPA shell, not the real file.
+          size=$(curl -sS "https://showpicker.club/.env?nocache=$RANDOM" | wc -c | tr -d ' ')
+          if [ "$size" -lt 10000 ]; then
+            echo "::error::/.env probe returned $size bytes — secrets may be leaking"
+            fail=1
+          fi
+          # Security headers must be present.
+          headers=$(curl -sSI "https://showpicker.club/?nocache=$RANDOM")
+          for h in content-security-policy strict-transport-security x-frame-options permissions-policy; do
+            if ! echo "$headers" | grep -qi "^$h:"; then
+              echo "::error::missing header $h"
+              fail=1
+            fi
+          done
+          # Auth gates must return 401.
+          for probe in \
+            "POST /api/shows/share" \
+            "GET  /api/reporting" \
+            "POST /api/enrich" \
+            "POST /api/sync-urls"
+          do
+            method=$(echo "$probe" | awk '{print $1}')
+            path=$(echo "$probe" | awk '{print $2}')
+            code=$(curl -sS -o /dev/null -w "%{http_code}" -X "$method" \
+              -H "Content-Type: application/json" -d '{}' \
+              "https://showpicker.club${path}?nocache=$RANDOM")
+            if [ "$code" != "401" ]; then
+              echo "::error::$method $path returned $code, expected 401"
+              fail=1
+            fi
+          done
+          exit $fail
