@@ -386,7 +386,7 @@
       .show-actions-inline .btn-small { padding: 3px 6px; font-size: 10px; }
     }
 
-    .recs-section { margin-top: 28px; padding-top: 20px; border-top: 1px solid #ebe2d4; }
+    .recs-section { margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid #ebe2d4; }
     .recs-heading { font-size: 15px; color: #2C3E50; margin-bottom: 4px; text-align: center; }
     .recs-explainer { font-size: 12px; color: #888; text-align: center; margin-bottom: 12px; font-style: italic; padding: 0 16px; }
     .rec-row .rec-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
@@ -480,13 +480,13 @@
 
     <main>
       <div class="loading" id="loading">Loading shows...</div>
-      <div class="show-list" id="showList"></div>
-      <div class="empty hidden" id="empty">No shows in this list yet.</div>
       <div class="recs-section hidden" id="recsSection">
         <h3 class="recs-heading">&#9733; Picks for you</h3>
         <p class="recs-explainer" id="recsExplainer"></p>
         <div class="show-list" id="recsList" style="text-align: left;"></div>
       </div>
+      <div class="show-list" id="showList"></div>
+      <div class="empty hidden" id="empty">No shows in this list yet.</div>
     </main>
 
     <div style="text-align: center; margin-top: 24px;">
