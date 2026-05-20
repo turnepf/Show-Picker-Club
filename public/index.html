@@ -492,6 +492,7 @@
 
     <div style="text-align: center; margin-top: 24px;">
       <a href="/reporting" style="color: #95a5a6; font-size: 13px; text-decoration: none; font-style: italic;">Curious?</a>
+      <a id="calendarFeedLink" href="#" style="display:none; color: #95a5a6; font-size: 13px; text-decoration: none; font-style: italic; margin-left: 16px;" title="Subscribe in Calendar to keep upcoming season dates on your phone">📅 Calendar feed</a>
     </div>
 
     <footer style="text-align: center; padding: 24px 16px 32px; font-size: 12px; color: #95a5a6;">
@@ -871,6 +872,12 @@
     async function showMember(slug) {
       memberSlug = slug;
       document.getElementById('showPage').classList.remove('hidden');
+
+      const calLink = document.getElementById('calendarFeedLink');
+      if (calLink) {
+        calLink.href = `webcal://showpicker.club/calendar/${encodeURIComponent(slug)}.ics`;
+        calLink.style.display = 'inline';
+      }
 
       // Get member name
       try {
