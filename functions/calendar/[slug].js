@@ -42,12 +42,13 @@ export async function onRequestGet(context) {
   for (const s of results) {
     const url = isRealShowUrl(s.network_url) ? s.network_url : memberPageUrl;
     const desc = describeShow(s, slug, memberPageUrl);
+    const summary = s.network ? `${s.title} on ${s.network}` : s.title;
     if (s.next_season_date) {
       lines.push(...buildEvent({
         uid: `show-${s.id}-premiere@showpicker.club`,
         dtstamp,
         date: s.next_season_date,
-        summary: `${s.title} — next season${s.network ? ' on ' + s.network : ''}`,
+        summary,
         description: desc,
         url,
       }));
@@ -57,7 +58,7 @@ export async function onRequestGet(context) {
         uid: `show-${s.id}-finale@showpicker.club`,
         dtstamp,
         date: s.season_end_date,
-        summary: `${s.title} — season finale`,
+        summary,
         description: desc,
         url,
       }));
