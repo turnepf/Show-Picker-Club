@@ -761,7 +761,7 @@
       if (!opts.aggregate) {
         if (show.recommended_by && !opts.skipRecommender) lines.push(`Recommended by ${escapeHtml(show.recommended_by)}`);
         if (show.next_season_date && !opts.skipNextSeason) {
-          lines.push(`Next season: ${formatSeasonRange(show)}`);
+          lines.push(`Next up: ${formatSeasonRange(show)}`);
         }
         if (show.watching_with) lines.push(`Watching with ${escapeHtml(show.watching_with)}`);
         if (show.notes) lines.push(escapeHtml(show.notes));
@@ -1243,7 +1243,7 @@
         let alwaysMeta = '';
         const detailOpts = {};
         if (currentTab === 'waiting' && show.next_season_date) {
-          alwaysMeta = `<div class="show-meta">Next season: ${formatSeasonRange(show)}</div>`;
+          alwaysMeta = `<div class="show-meta">Next up: ${formatSeasonRange(show)}</div>`;
           detailOpts.skipNextSeason = true;
         } else if (currentTab === 'next' && show.recommended_by) {
           alwaysMeta = `<div class="show-meta">Recommended by ${escapeHtml(show.recommended_by)}</div>`;
