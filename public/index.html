@@ -1664,6 +1664,7 @@
             }
             const s = searchableShows.find(x => x.id === id);
             if (!s) return;
+            closeSearchModal();
             openAddMyList(s.title, s.network || '', s.network_url || '', s.movie || 0);
           });
         });
