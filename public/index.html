@@ -401,6 +401,9 @@
     <div class="landing">
       <h1>Show Picker Club</h1>
       <a id="myShowsLink" href="#" class="member-card hidden" style="display: inline-block; margin: 4px auto 20px;">My Shows &rarr;</a>
+      <div style="text-align: center; margin: 0 0 20px;">
+        <button class="btn btn-search" style="background: #ecf0f1; color: #2C3E50; border: 1px solid #d0d7de;" onclick="openLandingSearchModal()">Search all libraries</button>
+      </div>
       <div id="popularSection" id="popular" style="margin-top: 8px; margin-bottom: 24px; display: none;">
         <h3 id="popular" style="font-size: 15px; color: #2C3E50; margin-bottom: 8px; text-align: center;">What Members Are Watching</h3>
         <div id="popularList" class="show-list" style="text-align: left;"></div>
@@ -721,6 +724,7 @@
     let memberName = '';
     let editorName = '';
     let authMember = null;
+    let searchMode = 'member';
     let owners = '';
 
     function parseActors(raw) {
@@ -1550,6 +1554,7 @@
     let searchableShows = [];
 
     async function openSearchModal() {
+      searchMode = 'member';
       const overlay = document.getElementById('searchOverlay');
       document.getElementById('searchTitleInput').value = '';
       document.getElementById('searchActorInput').value = '';
@@ -1561,6 +1566,26 @@
 
       try {
         const res = await fetch(`/api/shows?member=${encodeURIComponent(memberSlug)}&include_archived=1`);
+        const data = await res.json();
+        searchableShows = data.shows || [];
+        renderSearchResults();
+      } catch (e) {
+        document.getElementById('searchResults').innerHTML = '<div class="search-empty" style="color:#c0392b;">Failed to load shows.</div>';
+      }
+      setTimeout(() => document.getElementById('searchTitleInput').focus(), 50);
+    }
+
+    async function openLandingSearchModal() {
+      searchMode = 'all';
+      const overlay = document.getElementById('searchOverlay');
+      document.getElementById('searchTitleInput').value = '';
+      document.getElementById('searchActorInput').value = '';
+      document.getElementById('searchModalTitle').textContent = 'Search all libraries';
+      document.getElementById('searchResults').innerHTML = '<div class="search-empty">Loading…</div>';
+      overlay.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/shows/all');
         const data = await res.json();
         searchableShows = data.shows || [];
         renderSearchResults();
@@ -1597,7 +1622,8 @@
       });
 
       if (matches.length === 0) {
-        container.innerHTML = '<div class="search-empty">No matches in this library.</div>';
+        const where = searchMode === 'all' ? 'across club libraries' : 'in this library';
+        container.innerHTML = `<div class="search-empty">No matches ${where}.</div>`;
         return;
       }
 
@@ -1610,16 +1636,38 @@
         const rating = show.rating ? ` <span class="show-rating"><span class="star">&#9733;</span>${escapeHtml(show.rating)}</span>` : '';
         const movieTag = show.movie ? ' <span class="show-movie">(Movie)</span>' : '';
         const series = show.full_series ? ' <span title="Series Complete">🎬</span>' : '';
-        const listLabel = `<span class="search-list-label">· ${escapeHtml(list)}</span>`;
+        const memberTag = searchMode === 'all'
+          ? ` · ${escapeHtml(show.member_first_name || (show.member_name || '').split(' ')[0] || show.member_slug)}`
+          : '';
+        const listLabel = `<span class="search-list-label">· ${escapeHtml(list)}${memberTag}</span>`;
         const details = buildDetailLines(show);
+        const addBtn = searchMode === 'all'
+          ? `<button class="share-btn" data-add-idx="${show.id}" title="Add to my list">+</button>`
+          : '';
         return `
           <div class="show-row">
+            ${addBtn}
             <span class="show-info">
               <span class="show-title clickable" onclick="toggleSearchExpand(${show.id})">${escapeHtml(show.title)}</span>${network}${rating}${series}${movieTag}${listLabel}
             </span>
           </div>
           <div class="show-actors" id="search-actors-${show.id}">${details}</div>`;
       }).join('');
+
+      if (searchMode === 'all') {
+        container.querySelectorAll('button[data-add-idx]').forEach(btn => {
+          const id = parseInt(btn.dataset.addIdx, 10);
+          btn.addEventListener('click', () => {
+            if (!authMember) {
+              alert('Log in on your member page first to add shows to your list.');
+              return;
+            }
+            const s = searchableShows.find(x => x.id === id);
+            if (!s) return;
+            openAddMyList(s.title, s.network || '', s.network_url || '', s.movie || 0);
+          });
+        });
+      }
     }
 
     function openSuggestModal() {
