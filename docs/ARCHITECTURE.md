@@ -161,7 +161,7 @@ The `[slug]` param matches the full final segment (including `.ics`); the handle
   - `last_activity_at`: `MAX(COALESCE(updated_at, created_at))` over the member's shows where `added_by != 'seed'`. Editing or archiving a seeded row doesn't count — only self-added, suggested-in, or shared-in shows register. NULL `added_by` predates the column and is treated as engaged since seeds always carry `added_by='seed'`.
   - `watching_count`: number of active shows on the member's Watching list.
 
-  Rows are ordered by `last_activity_at DESC NULLS LAST, name`. The home page and TV view feature up to 5 members who have both non-null `last_activity_at` and `watching_count >= 3` (the threshold keeps featured cards from leading to thin profiles); the rest go behind a "Browse all members" disclosure.
+  Rows are ordered by `last_activity_at DESC NULLS LAST, name`. The home page and TV view feature up to 5 members with `watching_count >= 5` (since `/setup` only places 2 seeds per list, that threshold itself implies the member has added their own shows); the rest go behind a "Browse all members" disclosure.
 - `GET /api/shows?member=<slug>&include_archived=1` — `include_archived=1` is set by the per-member search modal so archived rows can be found.
 
 ## Authentication

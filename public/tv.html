@@ -218,15 +218,15 @@
     };
 
     const FEATURED_COUNT = 5;
-    const MIN_WATCHING_TO_FEATURE = 3;
+    const MIN_WATCHING_TO_FEATURE = 5;
 
     function getPickerItems() {
-      // API returns members ordered by last_activity_at DESC NULLS LAST.
-      // Feature the 5 most-recently-active members who also have a
-      // substantial Watching list; gate the rest behind a "Show all
-      // members" sentinel item until selected.
+      // Feature members with more than 4 shows on their Watching list.
+      // /setup only seeds 2 shows per list, so >4 implies the member has
+      // added shows of their own. Ordered by last_activity_at from the API.
+      // Anyone below the threshold goes behind the "Show all members" sentinel.
       const active = state.members
-        .filter(h => h.last_activity_at && (h.watching_count || 0) >= MIN_WATCHING_TO_FEATURE)
+        .filter(h => (h.watching_count || 0) >= MIN_WATCHING_TO_FEATURE)
         .slice(0, FEATURED_COUNT);
       if (state.showAllMembers || active.length === 0) {
         return state.members.map(h => ({ kind: 'member', member: h }));

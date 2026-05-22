@@ -52,7 +52,7 @@ The landing page (`/`) shows:
 
 1. **My Shows link** — appears for logged-in members, jumps to their own page.
 2. **What Members Are Watching** — top 10 shows by overlap across the club's Watching lists. Tap + to add to your own list. Seed-only members are excluded from this calculation.
-3. **Members** — up to five members are featured at the top: those with the most recent non-seed activity (a show they added, were suggested, or had shared in — edits or archives of seeded rows don't count) **and** at least 3 shows on their Watching list. The watching-list threshold keeps the featured cards from leading to thin profiles. A "Browse all members ▾" disclosure underneath reveals the rest of the roster, alphabetized, so anyone is reachable. If no member meets the criteria yet, the featured row falls back to the first five members so the home page is never empty.
+3. **Members** — up to five members are featured at the top: those with **more than 4 shows on their Watching list**, ordered by most-recent activity. Since `/setup` only seeds 2 shows per list, having 5+ on Watching is itself a strong signal the member is actively curating. A "Browse all members ▾" disclosure underneath reveals the rest of the roster, alphabetized, so anyone is reachable. If no member meets the threshold yet, the featured row falls back to the first five members so the home page is never empty.
 4. **Search all libraries** — opens a modal that searches every active show across every member by title or actor. Each result shows the owning member and the list it's on; logged-in users can tap + to add to their own list.
 5. **What's New** — a dated changelog of recent features (collapsed by default after a few entries).
 
