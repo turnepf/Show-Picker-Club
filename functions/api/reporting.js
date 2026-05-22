@@ -101,48 +101,6 @@ export async function onRequestGet(context) {
      LIMIT 15`
   ).all();
 
-  // Seed-only: every show row is an untouched seed (added_by='seed', not
-  // archived, updated_at NULL). Identifies members who haven't engaged yet.
-  const { results: seedOnly } = await env.DB.prepare(
-    `SELECT m.slug, m.first_name, m.last_initial, m.created_at,
-       (SELECT COUNT(*) FROM shows s WHERE s.member_slug = m.slug) AS show_count
-     FROM members m
-     WHERE NOT EXISTS (
-       SELECT 1 FROM shows s
-       WHERE s.member_slug = m.slug
-         AND (COALESCE(s.added_by, '') != 'seed' OR s.archived = 1 OR s.updated_at IS NOT NULL)
-     )
-     ORDER BY m.created_at DESC, m.first_name`
-  ).all();
-
-  // Per-member activity: when did each member last add or edit a show?
-  // updated_at is only bumped by member actions (enrichment writes
-  // enriched_at), and we ignore seed rows for last_added. Members with no
-  // real activity sort to the top.
-  const { results: memberActivity } = await env.DB.prepare(
-    `SELECT m.slug, m.first_name, m.last_initial,
-       (SELECT COUNT(*) FROM shows s
-         WHERE s.member_slug = m.slug AND s.archived = 0) AS active_shows,
-       (SELECT MAX(s.created_at) FROM shows s
-         WHERE s.member_slug = m.slug
-           AND COALESCE(s.added_by, '') != 'seed') AS last_added,
-       (SELECT MAX(s.updated_at) FROM shows s
-         WHERE s.member_slug = m.slug
-           AND s.updated_at IS NOT NULL
-           AND s.updated_at != s.created_at) AS last_edited,
-       MAX(
-         COALESCE((SELECT MAX(s.created_at) FROM shows s
-           WHERE s.member_slug = m.slug
-             AND COALESCE(s.added_by, '') != 'seed'), '1970-01-01'),
-         COALESCE((SELECT MAX(s.updated_at) FROM shows s
-           WHERE s.member_slug = m.slug
-             AND s.updated_at IS NOT NULL
-             AND s.updated_at != s.created_at), '1970-01-01')
-       ) AS last_action
-     FROM members m
-     ORDER BY last_action ASC, m.first_name`
-  ).all();
-
   return json({
     generated_at: new Date().toISOString(),
     new_shows: newShows,
@@ -155,7 +113,5 @@ export async function onRequestGet(context) {
     top_shared: topShared,
     most_active: mostActive,
     recently_archived: recentlyArchived,
-    seed_only: seedOnly,
-    member_activity: memberActivity,
   });
 }

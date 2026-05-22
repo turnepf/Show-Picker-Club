@@ -202,46 +202,6 @@
         </div>
 
         <div class="section">
-          <h2>Seed-only members</h2>
-          ${(d.seed_only || []).length === 0 ? '<div class="empty">Everyone has engaged with their list.</div>' : `
-            <table>
-              <thead><tr><th>Member</th><th class="num">Seeded shows</th><th>Joined</th></tr></thead>
-              <tbody>
-                ${d.seed_only.map(m => `<tr>
-                  <td>${memberLabel(m)}</td>
-                  <td class="num">${fmt(m.show_count)}</td>
-                  <td>${m.created_at ? fmtDate(m.created_at) : ''}</td>
-                </tr>`).join('')}
-              </tbody>
-            </table>
-          `}
-        </div>
-
-        <div class="section">
-          <h2>Member activity (most dormant first)</h2>
-          ${(d.member_activity || []).length === 0 ? '<div class="empty">No members.</div>' : `
-            <table>
-              <thead><tr><th>Member</th><th class="num">Active shows</th><th>Last added</th><th>Last edited</th><th class="num">Days dormant</th></tr></thead>
-              <tbody>
-                ${d.member_activity.map(m => {
-                  const lastAction = m.last_action && m.last_action !== '1970-01-01' ? m.last_action : null;
-                  const days = lastAction
-                    ? Math.floor((Date.now() - new Date(lastAction).getTime()) / 86400000)
-                    : null;
-                  return `<tr>
-                    <td>${memberLabel(m)}</td>
-                    <td class="num">${fmt(m.active_shows)}</td>
-                    <td>${m.last_added ? fmtDate(m.last_added) : '<span style="color:#bbb">—</span>'}</td>
-                    <td>${m.last_edited ? fmtDate(m.last_edited) : '<span style="color:#bbb">—</span>'}</td>
-                    <td class="num">${days === null ? '<span style="color:#bbb">—</span>' : fmt(days)}</td>
-                  </tr>`;
-                }).join('')}
-              </tbody>
-            </table>
-          `}
-        </div>
-
-        <div class="section">
           <h2>Most active members (last 30 days)</h2>
           ${d.most_active.length === 0 ? '<div class="empty">No activity.</div>' : `
             <table>

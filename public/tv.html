@@ -406,7 +406,7 @@
       const path = window.location.pathname.replace(/\/$/, '');
       const match = path.match(/^\/tv\/(.+)$/);
 
-      const res = await fetch('/api/members');
+      const res = await fetch('/api/members?engaged_only=1');
       const data = await res.json();
       state.members = data.members || [];
 
