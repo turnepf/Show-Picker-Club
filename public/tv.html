@@ -214,7 +214,25 @@
       tabIndex: 0,
       listIndex: 0,
       pickerIndex: 0,
+      showAllMembers: false,
     };
+
+    const FEATURED_COUNT = 5;
+
+    function getPickerItems() {
+      // API returns members ordered by last_activity_at DESC NULLS LAST.
+      // Feature the 5 most-recently-active; gate the rest behind a
+      // "Show all members" sentinel item until selected.
+      const active = state.members.filter(h => h.last_activity_at).slice(0, FEATURED_COUNT);
+      if (state.showAllMembers || active.length === 0) {
+        return state.members.map(h => ({ kind: 'member', member: h }));
+      }
+      const featuredSlugs = new Set(active.map(h => h.slug));
+      const hasMore = state.members.some(h => !featuredSlugs.has(h.slug));
+      const items = active.map(h => ({ kind: 'member', member: h }));
+      if (hasMore) items.push({ kind: 'showAll' });
+      return items;
+    }
 
     const app = document.getElementById('app');
 
@@ -238,13 +256,18 @@
       }
 
       if (state.view === 'picker') {
+        const items = getPickerItems();
         app.innerHTML = `
           <div class="picker">
             <h1>Show Picker Club</h1>
             <div class="picker-list">
-              ${state.members.map((h, i) =>
-                `<div class="picker-item${i === state.pickerIndex ? ' focused' : ''}" onclick="selectMember('${h.slug}')">${escapeHtml(h.name)}</div>`
-              ).join('')}
+              ${items.map((item, i) => {
+                const focused = i === state.pickerIndex ? ' focused' : '';
+                if (item.kind === 'showAll') {
+                  return `<div class="picker-item${focused}" onclick="expandAllMembers()">Show all members &#9662;</div>`;
+                }
+                return `<div class="picker-item${focused}" onclick="selectMember('${item.member.slug}')">${escapeHtml(item.member.name)}</div>`;
+              }).join('')}
             </div>
           </div>`;
         return;
@@ -327,18 +350,32 @@
       render();
     }
 
+    function expandAllMembers() {
+      // Focus the first newly-revealed entry so the cursor lands on a
+      // novel name rather than jumping back to the top of the list.
+      state.pickerIndex = FEATURED_COUNT;
+      state.showAllMembers = true;
+      render();
+    }
+
     document.addEventListener('keydown', (e) => {
       const key = e.key;
 
       if (state.view === 'picker') {
+        const items = getPickerItems();
         if (key === 'ArrowDown') {
-          state.pickerIndex = Math.min(state.pickerIndex + 1, state.members.length - 1);
+          state.pickerIndex = Math.min(state.pickerIndex + 1, items.length - 1);
           render();
         } else if (key === 'ArrowUp') {
           state.pickerIndex = Math.max(state.pickerIndex - 1, 0);
           render();
         } else if (key === 'Enter') {
-          selectMember(state.members[state.pickerIndex].slug);
+          const chosen = items[state.pickerIndex];
+          if (chosen.kind === 'showAll') {
+            expandAllMembers();
+          } else {
+            selectMember(chosen.member.slug);
+          }
         }
         e.preventDefault();
         return;
@@ -406,7 +443,7 @@
       const path = window.location.pathname.replace(/\/$/, '');
       const match = path.match(/^\/tv\/(.+)$/);
 
-      const res = await fetch('/api/members?engaged_only=1');
+      const res = await fetch('/api/members');
       const data = await res.json();
       state.members = data.members || [];
 
