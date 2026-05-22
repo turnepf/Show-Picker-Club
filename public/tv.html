@@ -217,23 +217,21 @@
       showAllMembers: false,
     };
 
-    const FEATURED_COUNT = 5;
-    const MIN_WATCHING_TO_FEATURE = 5;
+    const FEATURED_COUNT = 6;
 
     function getPickerItems() {
-      // Feature members with more than 4 shows on their Watching list.
-      // /setup only seeds 2 shows per list, so >4 implies the member has
-      // added shows of their own. Ordered by last_activity_at from the API.
-      // Anyone below the threshold goes behind the "Show all members" sentinel.
-      const active = state.members
-        .filter(h => (h.watching_count || 0) >= MIN_WATCHING_TO_FEATURE)
-        .slice(0, FEATURED_COUNT);
-      if (state.showAllMembers || active.length === 0) {
+      // Feature the 6 members with the most shows on Watching + Waiting
+      // combined. Everyone else sits behind a "Show all members" sentinel
+      // until selected.
+      const activeCount = (h) => (h.watching_count || 0) + (h.waiting_count || 0);
+      const ranked = state.members.slice().sort((a, b) => activeCount(b) - activeCount(a));
+      const featured = ranked.slice(0, FEATURED_COUNT);
+      if (state.showAllMembers || featured.length === 0) {
         return state.members.map(h => ({ kind: 'member', member: h }));
       }
-      const featuredSlugs = new Set(active.map(h => h.slug));
+      const featuredSlugs = new Set(featured.map(h => h.slug));
       const hasMore = state.members.some(h => !featuredSlugs.has(h.slug));
-      const items = active.map(h => ({ kind: 'member', member: h }));
+      const items = featured.map(h => ({ kind: 'member', member: h }));
       if (hasMore) items.push({ kind: 'showAll' });
       return items;
     }

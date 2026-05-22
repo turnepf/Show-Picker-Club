@@ -12,6 +12,7 @@ export async function onRequestGet(context) {
     `SELECT h.slug, h.name, h.first_name, h.last_initial,
             COUNT(CASE WHEN s.archived = 0 THEN s.id END) as show_count,
             COUNT(CASE WHEN s.archived = 0 AND s.list = 'watching' THEN s.id END) as watching_count,
+            COUNT(CASE WHEN s.archived = 0 AND s.list = 'waiting' THEN s.id END) as waiting_count,
             MAX(
               CASE WHEN COALESCE(s.added_by, '') != 'seed'
                    THEN COALESCE(s.updated_at, s.created_at) END
@@ -40,6 +41,7 @@ export async function onRequestGet(context) {
       display_name: displayName,
       show_count: m.show_count,
       watching_count: m.watching_count,
+      waiting_count: m.waiting_count,
       last_activity_at: m.last_activity_at,
     };
   });

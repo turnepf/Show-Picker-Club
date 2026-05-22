@@ -851,21 +851,16 @@
         const res = await fetch('/api/members');
         const data = await res.json();
         const allMembers = data.members || [];
-        // Feature members with more than 4 shows on their Watching list.
-        // /setup only seeds 2 shows per list, so >4 implies the member has
-        // added shows of their own; no separate activity check needed.
-        // Ordered by last_activity_at (API default), most recent first.
-        // Anyone below the threshold still appears in "Browse all members".
-        const MIN_WATCHING_TO_FEATURE = 5;
-        const active = allMembers
-          .filter(h => (h.watching_count || 0) >= MIN_WATCHING_TO_FEATURE)
-          .slice(0, 5);
-        const featuredSlugs = new Set(active.map(h => h.slug));
+        // Feature the 6 members with the most shows on their Watching +
+        // Waiting lists combined. Simplest possible signal of "they're
+        // actually using this." Everyone else goes into "Browse all members".
+        const FEATURED_COUNT = 6;
+        const activeCount = (h) => (h.watching_count || 0) + (h.waiting_count || 0);
+        const ranked = allMembers.slice().sort((a, b) => activeCount(b) - activeCount(a));
+        const featured = ranked.slice(0, FEATURED_COUNT);
+        const featuredSlugs = new Set(featured.map(h => h.slug));
         const byName = (a, b) => (a.display_name || a.first_name).localeCompare(b.display_name || b.first_name);
-        const featured = active.length > 0 ? active : allMembers.slice(0, 5);
-        const overflow = active.length > 0
-          ? allMembers.filter(h => !featuredSlugs.has(h.slug)).sort(byName)
-          : allMembers.slice(5).sort(byName);
+        const overflow = allMembers.filter(h => !featuredSlugs.has(h.slug)).sort(byName);
         const renderCard = (h) =>
           `<a class="member-card" href="/${h.slug}">${escapeHtml(h.display_name || h.first_name || h.name.split(' ')[0])}</a>`;
         document.getElementById('memberList').innerHTML = featured.map(renderCard).join('');
