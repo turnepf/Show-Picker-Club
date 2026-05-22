@@ -157,7 +157,7 @@ The `[slug]` param matches the full final segment (including `.ics`); the handle
 
 ### Notable query params
 
-- `GET /api/members?engaged_only=1` — excludes members whose library is still 100% seeded shows (no shows with `added_by != 'seed'`). Editing or archiving a seed doesn't qualify; the member needs at least one show they added themselves, were suggested, or had shared in. Used by the landing page and TV view so unengaged members don't clutter the picker. Other callers (member-page name lookup, share modal) call without the flag and get the full list.
+- `GET /api/members` — returns every member with a `last_activity_at` field: `MAX(COALESCE(updated_at, created_at))` over that member's shows where `added_by != 'seed'`. Rows are ordered by `last_activity_at DESC NULLS LAST, name`. Editing or archiving a seeded row doesn't count — `last_activity_at` only registers shows that were self-added, suggested in, or shared in. NULL `added_by` predates the column and is treated as engaged since seeds always carry `added_by='seed'`. The home page and TV view use `last_activity_at` to decide which 5 members to feature; the rest go behind a "Browse all members" disclosure.
 - `GET /api/shows?member=<slug>&include_archived=1` — `include_archived=1` is set by the per-member search modal so archived rows can be found.
 
 ## Authentication
@@ -178,7 +178,7 @@ There is **no admin role** in the session model. Admin endpoints require a match
 
 `/auth/check` is hit on every page load by the SPA. It bumps `sessions.last_seen_at`, but throttled — the `UPDATE` clause only fires when `last_seen_at IS NULL OR last_seen_at < datetime('now', '-1 hour')`. This means at most one write per session per hour, with no read-then-write.
 
-`last_seen_at` feeds **Reporting** only: DAU / WAU / MAU = `COUNT(DISTINCT member_slug) FROM sessions WHERE last_seen_at >= ...`. It is **not** used by the home-page engaged-only filter — that one is library-based (see `/api/members?engaged_only=1`).
+`last_seen_at` feeds **Reporting** only: DAU / WAU / MAU = `COUNT(DISTINCT member_slug) FROM sessions WHERE last_seen_at >= ...`. The home-page member ordering is library-based (`last_activity_at` on `/api/members`), not session-based.
 
 ## Frontend pages
 
@@ -186,7 +186,7 @@ There is **no admin role** in the session model. Admin endpoints require a match
 
 Single-page app. Detects whether `window.location.pathname` is empty (landing) or a slug (member page) and renders accordingly. Major UI surfaces:
 
-- **Landing:** `My Shows` link (logged in), Popular Shows widget, Members grid (engaged-only), `Search all libraries` button, What's New changelog.
+- **Landing:** `My Shows` link (logged in), Popular Shows widget, featured Members row + "Browse all members" disclosure, `Search all libraries` button, What's New changelog.
 - **Member page:** title + tabs (Watching, Waiting, Recommending, Up Next), Member Match card, search button, `+ Add` button (when logged in), per-tab list of show rows with always-visible meta (Next up on Waiting, Recommended by on Up Next), `Picks for You` section above Up Next, sort + toggle pills at the bottom, footer with `Curious?` / `Vibe` / `📅 Calendar feed` links.
 - **Modals:** Add/Edit Show, Share to another member, Suggest a Show, Add to My List (used from Popular and from cross-library search), Search, Member Match details.
 
@@ -366,7 +366,7 @@ Body: `{secret}`. Returns a queue of titles where every copy has a search-URL pl
 A member is "seed-only" iff every one of their show rows satisfies:
 `added_by = 'seed' AND archived = 0 AND updated_at IS NULL`.
 
-The moment a member edits a seeded row (changes list, notes, etc.), archives one, or adds their own row, they stop being seed-only. This check appears verbatim in several queries (`/api/popular`, `/api/recommendations`, `/api/member-match`, `/api/vibe`, `/api/members?engaged_only=1`).
+The moment a member edits a seeded row (changes list, notes, etc.), archives one, or adds their own row, they stop being seed-only. This check appears verbatim in several queries (`/api/recommendations`, `/api/member-match`, `/api/vibe`). The home-page member ordering uses a stricter library-only signal — see `/api/members` — that ignores edits/archives of seeded rows.
 
 ## CI workflows
 

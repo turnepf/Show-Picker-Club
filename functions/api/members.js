@@ -1,27 +1,24 @@
 export async function onRequestGet(context) {
-  const { env, request } = context;
-  const url = new URL(request.url);
-  // ?engaged_only=1 — hide members whose library is still all seeded shows.
-  // Editing or archiving a seed doesn't count; the signal is owning at
-  // least one show that wasn't pre-loaded (self-added, suggested in, or
-  // shared in — anything with added_by other than 'seed'). NULL added_by
-  // means the row predates the seed-tracking column, which only ever
-  // applies to member-added shows, so we treat NULL as engaged.
-  const engagedOnly = url.searchParams.get('engaged_only') === '1';
-  const engagedFilter = engagedOnly
-    ? `AND EXISTS (
-         SELECT 1 FROM shows s2
-         WHERE s2.member_slug = h.slug
-           AND COALESCE(s2.added_by, '') != 'seed'
-       )`
-    : '';
+  const { env } = context;
+  // Members are returned ordered by their most-recent non-seed activity
+  // (newest first), then alphabetically. The frontend decides how many to
+  // feature on the home page; the rest tuck into a "Browse all" disclosure.
+  // last_activity_at is MAX(updated_at, created_at) over the member's shows
+  // where added_by != 'seed', so editing/archiving seeded rows doesn't
+  // count — only owning a real (self-added, suggested-in, or shared-in)
+  // show registers as activity. NULL added_by predates the column and is
+  // treated as engaged since only member-added shows ever had NULL there.
   const { results } = await env.DB.prepare(
-    `SELECT h.slug, h.name, h.first_name, h.last_initial, COUNT(s.id) as show_count
+    `SELECT h.slug, h.name, h.first_name, h.last_initial,
+            COUNT(CASE WHEN s.archived = 0 THEN s.id END) as show_count,
+            MAX(
+              CASE WHEN COALESCE(s.added_by, '') != 'seed'
+                   THEN COALESCE(s.updated_at, s.created_at) END
+            ) as last_activity_at
      FROM members h
-     LEFT JOIN shows s ON s.member_slug = h.slug AND s.archived = 0
-     WHERE 1=1 ${engagedFilter}
+     LEFT JOIN shows s ON s.member_slug = h.slug
      GROUP BY h.slug, h.name, h.first_name, h.last_initial
-     ORDER BY RANDOM()`
+     ORDER BY last_activity_at DESC NULLS LAST, h.name`
   ).all();
 
   const firstNameCounts = {};
@@ -41,6 +38,7 @@ export async function onRequestGet(context) {
       first_name: fn,
       display_name: displayName,
       show_count: m.show_count,
+      last_activity_at: m.last_activity_at,
     };
   });
 
