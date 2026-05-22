@@ -89,7 +89,7 @@ Join table for per-show cast.
 | `member_slug`   | TEXT | Which member this session can edit. |
 | `expires_at`    | TEXT NOT NULL | 30 days from creation. |
 | `created_at`    | TEXT | |
-| `last_seen_at`  | TEXT | Bumped by `/auth/check`, throttled to once per hour per session. Drives DAU/WAU/MAU and the engaged-only filter. |
+| `last_seen_at`  | TEXT | Bumped by `/auth/check`, throttled to once per hour per session. Drives DAU/WAU/MAU in reporting. |
 
 ### `failed_logins`
 Used by login throttling. Auto-pruned (>7 days) by the daily backup workflow.
@@ -157,7 +157,7 @@ The `[slug]` param matches the full final segment (including `.ics`); the handle
 
 ### Notable query params
 
-- `GET /api/members?engaged_only=1` — excludes members who are seed-only **or** haven't pinged a session in the last 60 days. Used by the landing page and TV view so dormant members don't clutter the picker. Other callers (member-page name lookup, share modal) call without the flag and get the full list.
+- `GET /api/members?engaged_only=1` — excludes members whose library is still 100% seeded shows (no shows with `added_by != 'seed'`). Editing or archiving a seed doesn't qualify; the member needs at least one show they added themselves, were suggested, or had shared in. Used by the landing page and TV view so unengaged members don't clutter the picker. Other callers (member-page name lookup, share modal) call without the flag and get the full list.
 - `GET /api/shows?member=<slug>&include_archived=1` — `include_archived=1` is set by the per-member search modal so archived rows can be found.
 
 ## Authentication
@@ -178,9 +178,7 @@ There is **no admin role** in the session model. Admin endpoints require a match
 
 `/auth/check` is hit on every page load by the SPA. It bumps `sessions.last_seen_at`, but throttled — the `UPDATE` clause only fires when `last_seen_at IS NULL OR last_seen_at < datetime('now', '-1 hour')`. This means at most one write per session per hour, with no read-then-write.
 
-`last_seen_at` feeds:
-- **Reporting**: DAU / WAU / MAU = `COUNT(DISTINCT member_slug) FROM sessions WHERE last_seen_at >= ...`.
-- **Engaged-only filter**: a member is "engaged" if they have at least one session row with `last_seen_at >= datetime('now', '-60 days')`.
+`last_seen_at` feeds **Reporting** only: DAU / WAU / MAU = `COUNT(DISTINCT member_slug) FROM sessions WHERE last_seen_at >= ...`. It is **not** used by the home-page engaged-only filter — that one is library-based (see `/api/members?engaged_only=1`).
 
 ## Frontend pages
 
