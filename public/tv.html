@@ -218,12 +218,16 @@
     };
 
     const FEATURED_COUNT = 5;
+    const MIN_WATCHING_TO_FEATURE = 6;
 
     function getPickerItems() {
       // API returns members ordered by last_activity_at DESC NULLS LAST.
-      // Feature the 5 most-recently-active; gate the rest behind a
-      // "Show all members" sentinel item until selected.
-      const active = state.members.filter(h => h.last_activity_at).slice(0, FEATURED_COUNT);
+      // Feature the 5 most-recently-active members who also have a
+      // substantial Watching list; gate the rest behind a "Show all
+      // members" sentinel item until selected.
+      const active = state.members
+        .filter(h => h.last_activity_at && (h.watching_count || 0) >= MIN_WATCHING_TO_FEATURE)
+        .slice(0, FEATURED_COUNT);
       if (state.showAllMembers || active.length === 0) {
         return state.members.map(h => ({ kind: 'member', member: h }));
       }
