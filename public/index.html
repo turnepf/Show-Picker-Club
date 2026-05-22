@@ -851,14 +851,14 @@
         const res = await fetch('/api/members');
         const data = await res.json();
         const allMembers = data.members || [];
-        // API returns members sorted by last_activity_at DESC NULLS LAST.
-        // Feature the 5 most-recently-active members who also have a
-        // substantial Watching list — clicking a featured card should never
-        // lead to a near-empty profile. Members below the threshold (or
-        // with no real activity) still appear in "Browse all members".
-        const MIN_WATCHING_TO_FEATURE = 3;
+        // Feature members with more than 4 shows on their Watching list.
+        // /setup only seeds 2 shows per list, so >4 implies the member has
+        // added shows of their own; no separate activity check needed.
+        // Ordered by last_activity_at (API default), most recent first.
+        // Anyone below the threshold still appears in "Browse all members".
+        const MIN_WATCHING_TO_FEATURE = 5;
         const active = allMembers
-          .filter(h => h.last_activity_at && (h.watching_count || 0) >= MIN_WATCHING_TO_FEATURE)
+          .filter(h => (h.watching_count || 0) >= MIN_WATCHING_TO_FEATURE)
           .slice(0, 5);
         const featuredSlugs = new Set(active.map(h => h.slug));
         const byName = (a, b) => (a.display_name || a.first_name).localeCompare(b.display_name || b.first_name);
