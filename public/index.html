@@ -856,7 +856,7 @@
         // substantial Watching list — clicking a featured card should never
         // lead to a near-empty profile. Members below the threshold (or
         // with no real activity) still appear in "Browse all members".
-        const MIN_WATCHING_TO_FEATURE = 6;
+        const MIN_WATCHING_TO_FEATURE = 3;
         const active = allMembers
           .filter(h => h.last_activity_at && (h.watching_count || 0) >= MIN_WATCHING_TO_FEATURE)
           .slice(0, 5);
