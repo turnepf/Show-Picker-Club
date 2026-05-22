@@ -852,8 +852,14 @@
         const data = await res.json();
         const allMembers = data.members || [];
         // API returns members sorted by last_activity_at DESC NULLS LAST.
-        // Feature the 5 most-recently-active; tuck the rest into a disclosure.
-        const active = allMembers.filter(h => h.last_activity_at).slice(0, 5);
+        // Feature the 5 most-recently-active members who also have a
+        // substantial Watching list — clicking a featured card should never
+        // lead to a near-empty profile. Members below the threshold (or
+        // with no real activity) still appear in "Browse all members".
+        const MIN_WATCHING_TO_FEATURE = 6;
+        const active = allMembers
+          .filter(h => h.last_activity_at && (h.watching_count || 0) >= MIN_WATCHING_TO_FEATURE)
+          .slice(0, 5);
         const featuredSlugs = new Set(active.map(h => h.slug));
         const byName = (a, b) => (a.display_name || a.first_name).localeCompare(b.display_name || b.first_name);
         const featured = active.length > 0 ? active : allMembers.slice(0, 5);
