@@ -82,25 +82,6 @@ export async function onRequestGet(context) {
      LIMIT 10`
   ).all();
 
-  const { results: mostActive } = await env.DB.prepare(
-    `SELECT m.slug, m.first_name, m.last_initial,
-       (SELECT COUNT(*) FROM shows s WHERE s.member_slug = m.slug AND s.created_at >= datetime('now', '-30 days')) as added,
-       (SELECT COUNT(*) FROM shows s WHERE s.member_slug = m.slug AND s.updated_at >= datetime('now', '-30 days') AND s.updated_at != s.created_at) as edited
-     FROM members m
-     WHERE (SELECT COUNT(*) FROM shows s WHERE s.member_slug = m.slug AND s.created_at >= datetime('now', '-30 days')) > 0
-        OR (SELECT COUNT(*) FROM shows s WHERE s.member_slug = m.slug AND s.updated_at >= datetime('now', '-30 days') AND s.updated_at != s.created_at) > 0
-     ORDER BY (added + edited) DESC, m.first_name
-     LIMIT 10`
-  ).all();
-
-  const { results: recentlyArchived } = await env.DB.prepare(
-    `SELECT s.title, s.list, m.first_name, m.last_initial, s.updated_at
-     FROM shows s JOIN members m ON m.slug = s.member_slug
-     WHERE s.archived = 1 AND s.updated_at >= datetime('now', '-7 days')
-     ORDER BY s.updated_at DESC
-     LIMIT 15`
-  ).all();
-
   return json({
     generated_at: new Date().toISOString(),
     new_shows: newShows,
@@ -111,7 +92,5 @@ export async function onRequestGet(context) {
     totals,
     top_networks: topNetworks,
     top_shared: topShared,
-    most_active: mostActive,
-    recently_archived: recentlyArchived,
   });
 }
