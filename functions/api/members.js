@@ -1,15 +1,21 @@
 export async function onRequestGet(context) {
   const { env, request } = context;
   const url = new URL(request.url);
-  // ?engaged_only=1 — hide members whose entire library is still untouched
-  // seed rows (added_by='seed', not archived, updated_at NULL). Used on the
-  // landing page and TV view so dormant members don't clutter the list.
+  // ?engaged_only=1 — hide members who are either (a) still on a pure seed
+  // library (no edits, no archives, no member-added shows) or (b) haven't
+  // pinged a session in the last 60 days. Members with no session row at
+  // all are treated as never having visited.
   const engagedOnly = url.searchParams.get('engaged_only') === '1';
   const engagedFilter = engagedOnly
     ? `AND EXISTS (
          SELECT 1 FROM shows s2
          WHERE s2.member_slug = h.slug
            AND (COALESCE(s2.added_by, '') != 'seed' OR s2.archived = 1 OR s2.updated_at IS NOT NULL)
+       )
+       AND EXISTS (
+         SELECT 1 FROM sessions sess
+         WHERE sess.member_slug = h.slug
+           AND sess.last_seen_at >= datetime('now', '-60 days')
        )`
     : '';
   const { results } = await env.DB.prepare(
