@@ -184,40 +184,6 @@
           `}
         </div>
 
-        <div class="section">
-          <h2>Recently archived (last 7 days)</h2>
-          ${d.recently_archived.length === 0 ? '<div class="empty">Nothing archived recently.</div>' : `
-            <table>
-              <thead><tr><th>Show</th><th>List</th><th>Member</th><th>When</th></tr></thead>
-              <tbody>
-                ${d.recently_archived.map(a => `<tr>
-                  <td>${a.title}</td>
-                  <td>${a.list}</td>
-                  <td>${memberLabel(a)}</td>
-                  <td>${fmtDate(a.updated_at)}</td>
-                </tr>`).join('')}
-              </tbody>
-            </table>
-          `}
-        </div>
-
-        <div class="section">
-          <h2>Most active members (last 30 days)</h2>
-          ${d.most_active.length === 0 ? '<div class="empty">No activity.</div>' : `
-            <table>
-              <thead><tr><th>Member</th><th class="num">Added</th><th class="num">Edited</th><th class="num">Total</th></tr></thead>
-              <tbody>
-                ${d.most_active.map(m => `<tr>
-                  <td>${memberLabel(m)}</td>
-                  <td class="num">${fmt(m.added)}</td>
-                  <td class="num">${fmt(m.edited)}</td>
-                  <td class="num">${fmt(m.added + m.edited)}</td>
-                </tr>`).join('')}
-              </tbody>
-            </table>
-          `}
-        </div>
-
         <div class="footer">Edits exclude automated enrichment (tracked separately as enriched_at).</div>
       `;
       document.getElementById('content').innerHTML = html;
