@@ -52,7 +52,7 @@ The landing page (`/`) shows:
 
 1. **My Shows link** — appears for logged-in members, jumps to their own page.
 2. **What Members Are Watching** — top 10 shows by overlap across the club's Watching lists. Tap + to add to your own list. Seed-only members are excluded from this calculation.
-3. **Members** — the six members with the most shows on their Watching and Waiting lists combined are featured at the top. A "Browse all members ▾" disclosure underneath reveals the rest of the roster, alphabetized, so anyone is reachable. The point of the featured row is to lead with members who actually have something on their list worth looking at.
+3. **Members** — the six members with the longest Watching lists are featured at the top (Waiting count is the tiebreaker). A "Browse all members ▾" disclosure underneath reveals the rest of the roster, alphabetized, so anyone is reachable. The point of the featured row is to lead with members who actually have something on their list worth looking at.
 4. **Search all libraries** — opens a modal that searches every active show across every member by title or actor. Each result shows the owning member and the list it's on; logged-in users can tap + to add to their own list.
 5. **What's New** — a dated changelog of recent features (collapsed by default after a few entries).
 

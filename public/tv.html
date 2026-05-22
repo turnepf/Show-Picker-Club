@@ -220,11 +220,13 @@
     const FEATURED_COUNT = 6;
 
     function getPickerItems() {
-      // Feature the 6 members with the most shows on Watching + Waiting
-      // combined. Everyone else sits behind a "Show all members" sentinel
-      // until selected.
-      const activeCount = (h) => (h.watching_count || 0) + (h.waiting_count || 0);
-      const ranked = state.members.slice().sort((a, b) => activeCount(b) - activeCount(a));
+      // Feature the 6 members with the longest Watching lists; Waiting
+      // count is the tiebreaker. Everyone else sits behind a "Show all
+      // members" sentinel until selected.
+      const ranked = state.members.slice().sort((a, b) =>
+        (b.watching_count || 0) - (a.watching_count || 0) ||
+        (b.waiting_count || 0) - (a.waiting_count || 0)
+      );
       const featured = ranked.slice(0, FEATURED_COUNT);
       if (state.showAllMembers || featured.length === 0) {
         return state.members.map(h => ({ kind: 'member', member: h }));

@@ -163,7 +163,7 @@ The `[slug]` param matches the full final segment (including `.ics`); the handle
   - `waiting_count`: active shows on the Waiting list.
   - `last_activity_at`: `MAX(COALESCE(updated_at, created_at))` over the member's shows where `added_by != 'seed'`. Editing or archiving a seeded row doesn't count — only self-added, suggested-in, or shared-in shows register. NULL `added_by` predates the column and is treated as engaged since seeds always carry `added_by='seed'`. Kept for reference and possible future filtering even though the home page no longer uses it.
 
-  Rows are ordered by `last_activity_at DESC NULLS LAST, name`. The home page and TV view re-sort the response client-side by `watching_count + waiting_count` descending and feature the top 6; the rest go behind a "Browse all members" disclosure.
+  Rows are ordered by `last_activity_at DESC NULLS LAST, name`. The home page and TV view re-sort the response client-side by `watching_count DESC, waiting_count DESC` and feature the top 6; the rest go behind a "Browse all members" disclosure.
 - `GET /api/shows?member=<slug>&include_archived=1` — `include_archived=1` is set by the per-member search modal so archived rows can be found.
 
 ## Authentication
