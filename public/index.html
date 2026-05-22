@@ -851,12 +851,13 @@
         const res = await fetch('/api/members');
         const data = await res.json();
         const allMembers = data.members || [];
-        // Feature the 6 members with the most shows on their Watching +
-        // Waiting lists combined. Simplest possible signal of "they're
-        // actually using this." Everyone else goes into "Browse all members".
+        // Feature the 6 members with the longest Watching lists; Waiting
+        // count is the tiebreaker. Everyone else goes into "Browse all".
         const FEATURED_COUNT = 6;
-        const activeCount = (h) => (h.watching_count || 0) + (h.waiting_count || 0);
-        const ranked = allMembers.slice().sort((a, b) => activeCount(b) - activeCount(a));
+        const ranked = allMembers.slice().sort((a, b) =>
+          (b.watching_count || 0) - (a.watching_count || 0) ||
+          (b.waiting_count || 0) - (a.waiting_count || 0)
+        );
         const featured = ranked.slice(0, FEATURED_COUNT);
         const featuredSlugs = new Set(featured.map(h => h.slug));
         const byName = (a, b) => (a.display_name || a.first_name).localeCompare(b.display_name || b.first_name);
