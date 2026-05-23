@@ -8,7 +8,7 @@ Implementation reference for the Show Picker Club codebase. For the user-facing 
 - **Backend:** Cloudflare Pages Functions. JavaScript modules under `functions/` route by file path.
 - **Database:** Cloudflare D1 (`shows-db`), serverless SQLite at the edge. Single `DB` binding in `wrangler.toml`.
 - **Frontend:** Static HTML/CSS/JS, no build step. Vanilla ES6 in `<script>` tags. Service worker for PWA install + offline shell.
-- **External APIs:** OMDB (ratings + canonical titles), TMDB (cast, season dates, genres), Anthropic Claude (vibe trait scoring, admin-only batch).
+- **External APIs:** OMDB (ratings + canonical titles), TMDB (cast, season dates, genres), Anthropic Claude (vibe trait scoring, admin-only batch), Twilio (outbound SMS).
 - **Backups:** Daily wrangler `d1 export` → Google Drive via rclone, GitHub Actions workflow.
 
 The `wrangler.toml` is minimal:
@@ -151,6 +151,7 @@ The complete map:
 | `POST /api/admin-create-member`        | `functions/api/admin-create-member.js`     | POST    | `ADMIN_SECRET` |
 | `POST /api/admin-vibe-fill`            | `functions/api/admin-vibe-fill.js`         | POST    | `ADMIN_SECRET` |
 | `POST /api/admin-url-cleanup`          | `functions/api/admin-url-cleanup.js`       | POST    | `ADMIN_SECRET` |
+| `POST /api/admin-sms-test`             | `functions/api/admin-sms-test.js`          | POST    | `ADMIN_SECRET` |
 | `GET /calendar/[slug].ics`             | `functions/calendar/[slug].js`             | GET     | none |
 
 The `[slug]` param matches the full final segment (including `.ics`); the handler strips the suffix.
@@ -257,6 +258,13 @@ The deploy smoke test verifies these headers are present after each push.
 - Model: `claude-sonnet-4-6`. Max tokens: 1024 per show.
 - System prompt: ~1000 tokens of calibration instructions for the 27-trait rubric, cached `ephemeral` so repeated batch calls hit the prompt cache.
 - Handles 429 with the API's `Retry-After`, capped at 60s backoff.
+
+### Twilio
+- Env: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`.
+- Used by `_shared/sms.js#sendSms` — every outbound SMS goes through this single helper (login codes, signup verification, recommendation alerts).
+- Basic-auth POST to `/2010-04-01/Accounts/{sid}/Messages.json` with form-encoded `To`, `From`, `Body`.
+- Returns `{ ok, sid, status }` on success, `{ ok: false, error, code }` on failure. Callers that shouldn't fail loudly (e.g. share/suggest alerts) can check `ok` and silently swallow.
+- Test endpoint `/api/admin-sms-test` lets the operator confirm the credentials and a destination handset round-trip without touching the login flow.
 
 ## Enrichment
 
