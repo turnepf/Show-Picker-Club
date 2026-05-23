@@ -113,7 +113,7 @@ Plus `title_lower` (PK), `title`, `unknown_show` (1 if Claude couldn't identify 
 Two routing systems combine:
 
 1. **`public/_redirects`** (handled by Cloudflare Pages):
-   - `/tv/*` → `/tv.html` (200 rewrite, keeps URL).
+   - `/privacy` → `/privacy.html` and `/terms` → `/terms.html` (200 rewrites, pretty URLs).
    - `/dorothy` and `/dorothy/` → `/whitt` (301, legacy slug rename).
    - `/*` → `/index.html` (200, SPA fallback).
 
@@ -132,7 +132,7 @@ The complete map:
 | `GET /api/popular`                     | `functions/api/popular.js`                 | GET     | none |
 | `GET /api/activity`                    | `functions/api/activity.js`                | GET     | none |
 | `GET /api/recommendations`             | `functions/api/recommendations.js`         | GET     | none |
-| `GET /api/vibe`                        | `functions/api/vibe.js`                    | GET     | none |
+| `GET /api/vibe`                        | `functions/api/vibe.js`                    | GET     | session |
 | `GET /api/shows`                       | `functions/api/shows.js`                   | GET     | none |
 | `POST /api/shows`                      | `functions/api/shows.js`                   | POST    | session |
 | `GET /api/shows/all`                   | `functions/api/shows/all.js`               | GET     | none |
@@ -164,7 +164,7 @@ The `[slug]` param matches the full final segment (including `.ics`); the handle
   - `waiting_count`: active shows on the Waiting list.
   - `last_activity_at`: `MAX(COALESCE(updated_at, created_at))` over the member's shows where `added_by != 'seed'`. Editing or archiving a seeded row doesn't count — only self-added, suggested-in, or shared-in shows register. NULL `added_by` predates the column and is treated as engaged since seeds always carry `added_by='seed'`. Kept for reference and possible future filtering even though the home page no longer uses it.
 
-  Rows are ordered by `last_activity_at DESC NULLS LAST, name`. The home page and TV view re-sort the response client-side by `watching_count DESC, waiting_count DESC` and feature the top 6; the rest go behind a "Browse all members" disclosure.
+  Rows are ordered by `last_activity_at DESC NULLS LAST, name`. The home page re-sorts the response client-side by `watching_count DESC, waiting_count DESC` and features the top 6; the rest go behind a "Browse all members" disclosure.
 - `GET /api/shows?member=<slug>&include_archived=1` — `include_archived=1` is set by the per-member search modal so archived rows can be found.
 
 ## Authentication
@@ -198,10 +198,6 @@ Single-page app. Detects whether `window.location.pathname` is empty (landing) o
 - **Modals:** Add/Edit Show, Share to another member, Suggest a Show, Add to My List (used from Popular and from cross-library search), Search, Member Match details.
 
 State lives in a handful of top-level `let` vars (`shows`, `currentTab`, `isEditor`, `memberSlug`, `authMember`, `searchMode`, etc.). No framework. All API I/O is `fetch()` to relative paths.
-
-### `tv.html`
-
-A dark, oversized read-only view of one member's lists. Hash-based tab switching. Keyboard arrow navigation for remote control.
 
 ### `vibe.html`
 

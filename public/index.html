@@ -447,8 +447,7 @@
         <strong>4/16</strong> &mdash; <strong>What Members Are Watching.</strong> The home page now shows the most popular shows across all members. Tap <strong>+</strong> to add any of them to your own list.<br>
         <strong>4/15</strong> &mdash; <strong>New domain!</strong> Show Picker Club is now at <a href="https://showpicker.club" style="color: #E67E22; font-weight: 600;">showpicker.club</a>. The old link still works too.<br>
         <strong>4/15</strong> &mdash; <strong>Share shows to other members.</strong> See a show on someone else's list that you want to add to yours? Tap the <strong>+</strong> button next to any show to send it to another member's Up Next list. It carries over the rating, network link, actors, and all the details. If you're logged in, your name auto-fills.<br>
-        <strong>4/15</strong> &mdash; <strong>TV mode.</strong> Browse your lists on the big screen. Open <strong>showpicker.club/tv</strong> in your Fire Stick, Roku, or smart TV browser. Large text, dark background, and remote-friendly navigation. The app will also suggest switching to TV mode automatically if it detects you're on a big screen.<br>
-        <strong>4/15</strong> &mdash; <strong>Sort your lists.</strong> Use the sort dropdown at the bottom of any list to sort by Rating (default), A&ndash;Z, or Date Added.<br>
+<strong>4/15</strong> &mdash; <strong>Sort your lists.</strong> Use the sort dropdown at the bottom of any list to sort by Rating (default), A&ndash;Z, or Date Added.<br>
         <strong>4/15</strong> &mdash; <strong>Back to all members.</strong> Tap the &#9664; arrow next to the member name to get back to the main list.<br>
         <strong>4/15</strong> &mdash; <strong>Network links sync across members.</strong> When someone finds a good direct link for a show, it automatically copies to matching shows on other members' lists (runs once per day).<br>
         <strong>4/15</strong> &mdash; <strong>Watching With field.</strong> Track who you're watching a show with.<br>
@@ -1001,14 +1000,6 @@
       loadShows();
       loadMemberMatch();
       if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
-      // Detect TV-like environment and offer TV view
-      const dismissed = sessionStorage.getItem('tv_banner_dismissed');
-      if (!dismissed && window.screen.width >= 1920 && !('ontouchstart' in window)) {
-        const banner = document.createElement('div');
-        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#2C3E50;color:#fff;padding:14px 20px;text-align:center;font-size:15px;display:flex;align-items:center;justify-content:center;gap:12px;';
-        banner.innerHTML = `Watching on a TV? <a href="/tv/${slug}" style="color:#E67E22;font-weight:600;text-decoration:underline;">Switch to TV view</a> <button onclick="this.parentElement.remove();sessionStorage.setItem('tv_banner_dismissed','1')" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:18px;cursor:pointer;margin-left:8px;">&#10005;</button>`;
-        document.body.prepend(banner);
-      }
     }
 
     async function checkAuth() {
