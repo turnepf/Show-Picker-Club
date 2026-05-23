@@ -38,7 +38,7 @@ A show row holds: title, network, network URL (deep link to the show on that net
 
 Members only fill in title, network, and recommender — the rest is automatic. OMDB returns the canonical title + IMDB rating + cast. TMDB returns next-season dates, finale dates, the "ended" flag, and genres. Network URL is generated from a per-network search pattern initially, then upgraded across all members when one member finds a real deep link (network URL sync, runs once per day per browser).
 
-The network dropdown lists only the modern streaming-service brand (Max, Paramount+, Peacock, Hulu, Disney+, Apple TV+, Amazon Prime Video, Netflix, Starz, AMC+, Food Network) with parenthetical aliases that name the sub-brands they carry (e.g. "Paramount+ (including CBS, MTV, Comedy Central, Nickelodeon, BET, Showtime)"). If a member ever submits an old or sub-brand name like `HBO`, `NBC`, `Bravo`, or `FX` — via API or by pasting — it gets folded to the canonical streamer on save. See [`ARCHITECTURE.md`](ARCHITECTURE.md#networks) for the full mapping.
+The network dropdown lists only the modern streaming-service brand (HBO Max, Paramount+, Peacock, Hulu, Disney+, Apple TV+, Amazon Prime Video, Netflix, Starz, AMC+, Food Network, Fox) with parenthetical aliases that name the sub-brands they carry (e.g. "Paramount+ (including CBS, MTV, Comedy Central, Nickelodeon, BET, Showtime)"). If a member ever submits an old or sub-brand name like `HBO`, `NBC`, `Bravo`, or `FX` — via API or by pasting — it gets folded to the canonical streamer on save. See [`ARCHITECTURE.md`](ARCHITECTURE.md#networks) for the full mapping.
 
 ## Authentication
 

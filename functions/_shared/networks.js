@@ -27,9 +27,9 @@ export const NETWORKS = [
     search: { base: 'https://www.netflix.com/search' },
   },
   {
-    stored: 'Max',
-    display: 'Max (including HBO, Discovery, Cartoon Network, Adult Swim, TNT, TBS, truTV, CNN)',
-    aliases: ['HBO', 'HBO Max', 'Discovery', 'Discovery+', 'Cartoon Network', 'Adult Swim', 'TNT', 'TBS', 'truTV', 'CNN'],
+    stored: 'HBO Max',
+    display: 'HBO Max (including Discovery, Cartoon Network, Adult Swim, TNT, TBS, truTV, CNN)',
+    aliases: ['HBO', 'Max', 'Discovery', 'Discovery+', 'Cartoon Network', 'Adult Swim', 'TNT', 'TBS', 'truTV', 'CNN'],
     domains: ['max.com', 'hbomax.com', 'hbo.com'],
     search: { base: 'https://play.max.com/search', param: 'q' },
   },
