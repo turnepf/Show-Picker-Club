@@ -1,6 +1,7 @@
 import { fetchEnrichment } from '../_shared/enrichment.js';
 import { getSession } from '../_shared/auth.js';
 import { NETWORK_SEARCH, canonicalNetwork, networkFromUrl } from '../_shared/networks.js';
+import { lookupWatchmodeUrl } from '../_shared/watch-providers.js';
 
 function generateNetworkUrl(network, title) {
   if (!network) return null;
@@ -113,6 +114,24 @@ export async function onRequestPost(context) {
   if (omdb.actors.length > 0) {
     const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id) VALUES (?, ?, ?)');
     await env.DB.batch(omdb.actors.map(a => stmt.bind(showId, a.name, a.imdb_id || null)));
+  }
+
+  // If we ended up on a search-URL placeholder (no user paste, no sibling
+  // good URL), kick off a Watchmode lookup in the background. The response
+  // returns immediately with the placeholder; once Watchmode resolves,
+  // every member's same-titled active row picks up the real deep link.
+  const onPlaceholder = !finalUrl ||
+    finalUrl.includes('/search') || finalUrl.includes('/s?') ||
+    finalUrl.includes('?q=') || finalUrl.includes('?query=');
+  if (onPlaceholder && finalNetwork) {
+    context.waitUntil((async () => {
+      const realUrl = await lookupWatchmodeUrl(env, finalTitle, finalNetwork, !!movie);
+      if (realUrl) {
+        await env.DB.prepare(
+          "UPDATE shows SET network_url = ?, enriched_at = datetime('now') WHERE LOWER(title) = LOWER(?) AND archived = 0"
+        ).bind(realUrl, finalTitle).run();
+      }
+    })());
   }
 
   const show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(showId).first();
