@@ -841,7 +841,39 @@
     if (!slug) {
       showLanding();
     } else {
-      showMember(slug);
+      resolveSlug(slug).then(resolved => {
+        if (resolved) {
+          showMember(resolved);
+        } else {
+          // Slug doesn't match any member even after sanitizing. Fall back to
+          // the landing page rather than rendering a confusing blank profile.
+          history.replaceState(null, '', '/');
+          showLanding();
+        }
+      });
+    }
+
+    async function resolveSlug(raw) {
+      // Slugs are [a-z0-9]+. URL-decode the raw segment, lowercase, then
+      // strip anything that isn't a slug character. Fixes things like
+      // `/annie**` (autolinker grabbed adjacent punctuation), `/Annie`
+      // (case mismatch), or `/annie%20` (encoded trailing space).
+      let decoded;
+      try { decoded = decodeURIComponent(raw); } catch { decoded = raw; }
+      const cleaned = decoded.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!cleaned) return null;
+      try {
+        const res = await fetch('/api/members');
+        const data = await res.json();
+        const hit = (data.members || []).find(m => m.slug === cleaned);
+        if (!hit) return null;
+        if (cleaned !== raw) {
+          history.replaceState(null, '', '/' + cleaned);
+        }
+        return cleaned;
+      } catch {
+        return null;
+      }
     }
 
     async function showLanding() {
