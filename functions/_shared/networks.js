@@ -31,7 +31,7 @@ export const NETWORKS = [
     display: 'HBO Max (including Discovery, Cartoon Network, Adult Swim, TNT, TBS, truTV, CNN)',
     aliases: ['HBO', 'Max', 'Discovery', 'Discovery+', 'Cartoon Network', 'Adult Swim', 'TNT', 'TBS', 'truTV', 'CNN'],
     domains: ['max.com', 'hbomax.com', 'hbo.com'],
-    search: { base: 'https://play.max.com/search', param: 'q' },
+    search: { base: 'https://play.hbomax.com/search', param: 'q' },
   },
   {
     stored: 'Apple TV+',
