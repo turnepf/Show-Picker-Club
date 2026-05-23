@@ -4,6 +4,20 @@ CREATE TABLE IF NOT EXISTS members (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS member_phones (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  phone TEXT NOT NULL,
+  member_slug TEXT NOT NULL REFERENCES members(slug),
+  label TEXT,
+  is_primary INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE (phone, member_slug)
+);
+CREATE INDEX IF NOT EXISTS idx_member_phones_phone ON member_phones(phone);
+CREATE INDEX IF NOT EXISTS idx_member_phones_slug ON member_phones(member_slug);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_member_phones_primary
+  ON member_phones(member_slug) WHERE is_primary = 1;
+
 CREATE TABLE IF NOT EXISTS member_codes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   member_slug TEXT REFERENCES members(slug),
