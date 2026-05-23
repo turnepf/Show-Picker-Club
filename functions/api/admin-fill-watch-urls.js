@@ -88,7 +88,9 @@ export async function onRequestPost(context) {
            OR network_url LIKE '%?query=%'
            OR network_url LIKE 'https://www.max.com/%'
            OR network_url LIKE 'https://www.hbomax.com/%'
-           OR network_url LIKE 'https://www.themoviedb.org/%')
+           OR network_url LIKE 'https://www.themoviedb.org/%'
+           OR network_url = 'https://www.amazon.com/s'
+           OR network_url = 'https://www.amazon.com/s/')
     -- Dedup by title — one lookup per show, push the result to every
     -- member's same-titled row via the UPDATE below.
     GROUP BY LOWER(title)

@@ -17,7 +17,13 @@ const BAD_URL = `(s.network_url IS NULL
                   OR s.network_url LIKE '%?query=%'
                   OR s.network_url LIKE 'https://www.max.com/%'
                   OR s.network_url LIKE 'https://www.hbomax.com/%'
-                  OR s.network_url LIKE 'https://www.themoviedb.org/%')`;
+                  OR s.network_url LIKE 'https://www.themoviedb.org/%'
+                  -- Bare https://www.amazon.com/s (no query) is the Amazon
+                  -- search endpoint with no search term — dumps you on the
+                  -- Amazon homepage. Legacy artifact of the old cleanUrl()
+                  -- query-string stripper.
+                  OR s.network_url = 'https://www.amazon.com/s'
+                  OR s.network_url = 'https://www.amazon.com/s/')`;
 const QUEUE_FILTER = `
   s.archived = 0
   AND ${BAD_URL}
@@ -36,6 +42,8 @@ const QUEUE_FILTER = `
       AND s_good.network_url NOT LIKE 'https://www.max.com/%'
       AND s_good.network_url NOT LIKE 'https://www.hbomax.com/%'
       AND s_good.network_url NOT LIKE 'https://www.themoviedb.org/%'
+      AND s_good.network_url != 'https://www.amazon.com/s'
+      AND s_good.network_url != 'https://www.amazon.com/s/'
   )
 `;
 
@@ -55,6 +63,8 @@ async function propagateGoodUrls(env) {
        AND network_url NOT LIKE 'https://www.max.com/%'
        AND network_url NOT LIKE 'https://www.hbomax.com/%'
        AND network_url NOT LIKE 'https://www.themoviedb.org/%'
+       AND network_url != 'https://www.amazon.com/s'
+       AND network_url != 'https://www.amazon.com/s/'
      GROUP BY LOWER(title)`
   ).all();
   for (const src of sources) {
@@ -71,7 +81,9 @@ async function propagateGoodUrls(env) {
               OR network_url LIKE '%?query=%'
               OR network_url LIKE 'https://www.max.com/%'
               OR network_url LIKE 'https://www.hbomax.com/%'
-              OR network_url LIKE 'https://www.themoviedb.org/%')`
+              OR network_url LIKE 'https://www.themoviedb.org/%'
+              OR network_url = 'https://www.amazon.com/s'
+              OR network_url = 'https://www.amazon.com/s/')`
     ).bind(src.network_url, src.network, src.ltitle).run();
   }
 }
