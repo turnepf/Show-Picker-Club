@@ -1,4 +1,5 @@
 import { canonicalNetwork, networkFromUrl } from '../_shared/networks.js';
+import { extractUrl } from '../_shared/url-utils.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -158,7 +159,10 @@ export async function onRequestPost(context) {
   if (action === 'save') {
     const id = parseInt(body.id, 10);
     const submittedNetwork = (body.network || '').trim();
-    const url = (body.network_url || '').trim();
+    // Pull just the http(s)://... portion out — catches the case where the
+    // operator pastes the whole share blob from a streamer's app, like
+    // "Check out X on Hulu! https://..."
+    const url = extractUrl(body.network_url || '') || (body.network_url || '').trim();
 
     if (!Number.isInteger(id)) return json({ error: 'id required' }, 400);
     if (!submittedNetwork) return json({ error: 'network required' }, 400);
