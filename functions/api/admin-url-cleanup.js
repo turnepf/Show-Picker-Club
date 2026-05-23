@@ -14,7 +14,10 @@ const BAD_URL = `(s.network_url IS NULL
                   OR s.network_url LIKE '%/search%'
                   OR s.network_url LIKE '%/s?%'
                   OR s.network_url LIKE '%?q=%'
-                  OR s.network_url LIKE '%?query=%')`;
+                  OR s.network_url LIKE '%?query=%'
+                  OR s.network_url LIKE 'https://www.max.com/%'
+                  OR s.network_url LIKE 'https://www.hbomax.com/%'
+                  OR s.network_url LIKE 'https://www.themoviedb.org/%')`;
 const QUEUE_FILTER = `
   s.archived = 0
   AND ${BAD_URL}
@@ -30,6 +33,9 @@ const QUEUE_FILTER = `
       AND s_good.network_url NOT LIKE '%/s?%'
       AND s_good.network_url NOT LIKE '%?q=%'
       AND s_good.network_url NOT LIKE '%?query=%'
+      AND s_good.network_url NOT LIKE 'https://www.max.com/%'
+      AND s_good.network_url NOT LIKE 'https://www.hbomax.com/%'
+      AND s_good.network_url NOT LIKE 'https://www.themoviedb.org/%'
   )
 `;
 
@@ -46,6 +52,9 @@ async function propagateGoodUrls(env) {
        AND network_url NOT LIKE '%/s?%'
        AND network_url NOT LIKE '%?q=%'
        AND network_url NOT LIKE '%?query=%'
+       AND network_url NOT LIKE 'https://www.max.com/%'
+       AND network_url NOT LIKE 'https://www.hbomax.com/%'
+       AND network_url NOT LIKE 'https://www.themoviedb.org/%'
      GROUP BY LOWER(title)`
   ).all();
   for (const src of sources) {
@@ -59,7 +68,10 @@ async function propagateGoodUrls(env) {
               OR network_url LIKE '%/search%'
               OR network_url LIKE '%/s?%'
               OR network_url LIKE '%?q=%'
-              OR network_url LIKE '%?query=%')`
+              OR network_url LIKE '%?query=%'
+              OR network_url LIKE 'https://www.max.com/%'
+              OR network_url LIKE 'https://www.hbomax.com/%'
+              OR network_url LIKE 'https://www.themoviedb.org/%')`
     ).bind(src.network_url, src.network, src.ltitle).run();
   }
 }
