@@ -5,6 +5,23 @@ function json(data, status = 200) {
   });
 }
 
+// Normalise to E.164. Accepts "+CC..." as-is, treats bare 10-digit input as US,
+// and treats 11-digit input starting with 1 as US with country code already
+// included. Anything else: trust the user and just prepend "+".
+function normalizePhone(input) {
+  if (!input) return null;
+  const trimmed = String(input).trim();
+  if (trimmed.startsWith('+')) {
+    const digits = trimmed.slice(1).replace(/\D/g, '');
+    return digits.length >= 7 && digits.length <= 15 ? '+' + digits : null;
+  }
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length === 10) return '+1' + digits;
+  if (digits.length === 11 && digits.startsWith('1')) return '+' + digits;
+  if (digits.length >= 7 && digits.length <= 15) return '+' + digits;
+  return null;
+}
+
 async function pickSeeds(env) {
   const lists = ['watching', 'waiting', 'recommending', 'next'];
   const picks = [];
@@ -47,18 +64,30 @@ export async function onRequestPost(context) {
     return json({ error: 'Invalid JSON' }, 400);
   }
 
-  const { secret, full_name, code } = body;
+  const { secret, full_name, code, phone } = body;
 
   if (secret !== env.ADMIN_SECRET) {
     return json({ error: 'Invalid secret' }, 401);
   }
 
-  if (!full_name || !code) {
-    return json({ error: 'Full name and code required' }, 400);
+  if (!full_name || !code || !phone) {
+    return json({ error: 'Full name, phone, and code required' }, 400);
   }
 
   if (!/^\d{4}$/.test(code)) {
     return json({ error: 'Code must be 4 digits' }, 400);
+  }
+
+  const phoneE164 = normalizePhone(phone);
+  if (!phoneE164) {
+    return json({ error: 'Phone number looks invalid — use digits only, with + and country code for non-US numbers' }, 400);
+  }
+
+  const phoneClash = await env.DB.prepare(
+    'SELECT member_slug FROM member_phones WHERE phone = ?'
+  ).bind(phoneE164).first();
+  if (phoneClash) {
+    return json({ error: `Phone already on file for member: ${phoneClash.member_slug}` }, 409);
   }
 
   const tokens = full_name.trim().split(/\s+/);
@@ -97,6 +126,9 @@ export async function onRequestPost(context) {
   await env.DB.prepare(
     'INSERT INTO member_codes (member_slug, code, editor_name) VALUES (?, ?, ?)'
   ).bind(slug, code, editorName).run();
+  await env.DB.prepare(
+    'INSERT INTO member_phones (phone, member_slug, label, is_primary) VALUES (?, ?, NULL, 1)'
+  ).bind(phoneE164, slug).run();
 
   const seeds = await pickSeeds(env);
   const seededTitles = [];
@@ -125,6 +157,7 @@ export async function onRequestPost(context) {
     editor_name: editorName,
     url: `https://showpicker.club/${slug}`,
     code,
+    phone: phoneE164,
     seeded: seededTitles,
   });
 }

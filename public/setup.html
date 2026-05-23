@@ -98,6 +98,10 @@
       <input type="text" id="full_name" autocomplete="off" required>
       <div class="hint" id="preview"></div>
 
+      <label>Phone number</label>
+      <input type="tel" id="phone" autocomplete="off" required placeholder="(336) 555-1234">
+      <div class="hint">For SMS login and recommendation alerts. +1 is assumed for US numbers; prefix with + and country code for non-US.</div>
+
       <label>4-digit code</label>
       <input type="text" id="code" autocomplete="off" required pattern="\d{4}" inputmode="numeric" maxlength="4">
 
@@ -153,6 +157,7 @@
       const body = {
         secret: document.getElementById('secret').value,
         full_name: nameInput.value.trim(),
+        phone: document.getElementById('phone').value.trim(),
         code: document.getElementById('code').value.trim(),
       };
 
@@ -184,7 +189,7 @@
           msg.appendChild(link);
 
           const seedList = data.seeded.map(s => '  • ' + s).join('\n');
-          msg.append(`\nCode: ${data.code}\n\nSeeded:\n${seedList}`);
+          msg.append(`\nCode: ${data.code}\nPhone: ${data.phone}\n\nSeeded:\n${seedList}`);
 
           const introLabel = document.createElement('div');
           introLabel.className = 'intro-label';
