@@ -265,6 +265,8 @@ Two surfaces:
 ### Synchronous (`_shared/enrichment.js#fetchEnrichment`)
 Called from `POST /api/shows` (and edit / suggestion paths). Returns `{canonicalTitle, rating, actors}` so the new row inserts with rating + cast already filled in. TMDB is tried first (more accurate cast); OMDB is the fallback.
 
+On insert, `POST /api/shows` also looks for any other member's active copy of the same title that already has a deep-link `network_url` (and a `network`). If one exists, the new row inherits both fields instead of falling back to the search-URL placeholder. So a show that someone else has already curated lands in the new member's library with the real URL on day one — never needs to go through `/url-cleanup`.
+
 ### Background (`POST /api/enrich`)
 A logged-in member's page calls this fire-and-forget on load. Two phases:
 
@@ -365,7 +367,7 @@ Body: `{secret, full_name, code}`. Generates a slug from `full_name`, inserts in
 Body: `{secret, count}`. Runs the vibe trait-backfill loop described above. The `vibe-admin.html` UI calls it in a loop until the operator stops or every show is scored.
 
 ### `POST /api/admin-url-cleanup`
-Body: `{secret}`. Returns a queue of titles where every copy has a search-URL placeholder. The companion `url-cleanup.html` UI lets the operator paste a real deep link, then push it to every member's copy of that title in one go.
+Body: `{secret}`. Before listing, runs `propagateGoodUrls` to push every known good URL out to any sibling row still on a placeholder (so the queue never surfaces a title that someone has already fixed). Then returns the residual queue: titles where *no* copy has a good URL yet. The companion `url-cleanup.html` UI lets the operator paste a real deep link, then push it to every member's copy of that title in one go.
 
 ## Seed-only definition
 

@@ -56,32 +56,21 @@ export async function onRequestGet(context) {
   return new Response(JSON.stringify({ shows: results }), { headers: corsHeaders() });
 }
 
-async function backfillFromOtherMembers(env, showId, title) {
-  // Check if this show exists on another member with a network/URL we can copy
-  const match = await env.DB.prepare(
+async function findGoodCopyAcrossMembers(env, title) {
+  // Returns the first (any-member) active row for this title that has a real
+  // network + deep-link URL (not a search-page placeholder). Used to inherit
+  // network/URL on insert so new shows don't land in the URL-cleanup queue.
+  return await env.DB.prepare(
     `SELECT network, network_url FROM shows
      WHERE LOWER(title) = LOWER(?) AND archived = 0
-       AND id != ?
        AND network IS NOT NULL
        AND network_url IS NOT NULL
        AND network_url NOT LIKE '%/search%'
        AND network_url NOT LIKE '%/s?%'
+       AND network_url NOT LIKE '%?q=%'
+       AND network_url NOT LIKE '%?query=%'
      LIMIT 1`
-  ).bind(title, showId).first();
-
-  if (match) {
-    const show = await env.DB.prepare('SELECT network, network_url FROM shows WHERE id = ?').bind(showId).first();
-    const updates = [];
-    if (!show.network && match.network) updates.push({ field: 'network', value: match.network });
-    if (!show.network_url && match.network_url) updates.push({ field: 'network_url', value: match.network_url });
-    if (updates.length > 0) {
-      const sets = updates.map(u => `${u.field} = ?`).join(', ');
-      const values = updates.map(u => u.value);
-      await env.DB.prepare(
-        `UPDATE shows SET ${sets}, updated_at = datetime('now') WHERE id = ?`
-      ).bind(...values, showId).run();
-    }
-  }
+  ).bind(title).first();
 }
 
 export async function onRequestPost(context) {
@@ -110,21 +99,24 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ error: 'exists_active', list: existing.list, title: finalTitle }), { status: 409, headers: corsHeaders() });
   }
 
-  const url = cleanUrl(network_url) || generateNetworkUrl(network, finalTitle);
+  // If another member already has a good (non-placeholder) URL for this title,
+  // inherit it. Beats the search-page fallback and keeps the title out of the
+  // URL-cleanup queue.
+  const goodCopy = network_url && network ? null : await findGoodCopyAcrossMembers(env, finalTitle);
+  const finalNetwork = network || (goodCopy && goodCopy.network) || null;
+  const finalUrl =
+    cleanUrl(network_url) ||
+    (goodCopy && goodCopy.network_url) ||
+    generateNetworkUrl(finalNetwork, finalTitle);
 
   const result = await env.DB.prepare(
     'INSERT INTO shows (title, network, network_url, recommended_by, rating, list, notes, movie, full_series, watching_with, member_slug, added_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).bind(finalTitle, network || null, url, recommended_by || null, omdb.rating, list, notes || null, movie || 0, full_series || 0, watching_with || null, session.member_slug, session.email).run();
+  ).bind(finalTitle, finalNetwork, finalUrl, recommended_by || null, omdb.rating, list, notes || null, movie || 0, full_series || 0, watching_with || null, session.member_slug, session.email).run();
 
   const showId = result.meta.last_row_id;
   if (omdb.actors.length > 0) {
     const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id) VALUES (?, ?, ?)');
     await env.DB.batch(omdb.actors.map(a => stmt.bind(showId, a.name, a.imdb_id || null)));
-  }
-
-  // Backfill network/URL from other members if missing
-  if (!network || !network_url) {
-    await backfillFromOtherMembers(env, showId, finalTitle);
   }
 
   const show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(showId).first();

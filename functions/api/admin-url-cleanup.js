@@ -8,15 +8,60 @@ function json(data, status = 200) {
 }
 
 const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
+const BAD_URL = `(s.network_url IS NULL
+                  OR s.network_url LIKE '%/search%'
+                  OR s.network_url LIKE '%/s?%'
+                  OR s.network_url LIKE '%?q=%'
+                  OR s.network_url LIKE '%?query=%')`;
 const QUEUE_FILTER = `
   s.archived = 0
   AND s.member_slug NOT IN (${EXCLUDED_SQL})
-  AND (s.network_url IS NULL
-       OR s.network_url LIKE '%search%'
-       OR s.network_url LIKE '%/s?%'
-       OR s.network_url LIKE '%?q=%'
-       OR s.network_url LIKE '%?query=%')
+  AND ${BAD_URL}
+  -- skip titles already resolvable from another member's good URL —
+  -- sync-urls will propagate those automatically, nothing for admin to do.
+  AND NOT EXISTS (
+    SELECT 1 FROM shows s_good
+    WHERE LOWER(s_good.title) = LOWER(s.title)
+      AND s_good.archived = 0
+      AND s_good.network IS NOT NULL
+      AND s_good.network_url IS NOT NULL
+      AND s_good.network_url NOT LIKE '%/search%'
+      AND s_good.network_url NOT LIKE '%/s?%'
+      AND s_good.network_url NOT LIKE '%?q=%'
+      AND s_good.network_url NOT LIKE '%?query=%'
+  )
 `;
+
+async function propagateGoodUrls(env) {
+  // Before listing, push every known good URL out to any sibling row that's
+  // still on a placeholder. Keeps the queue from showing titles that one
+  // member has already fixed but the daily sync-urls hasn't caught up on.
+  const { results: sources } = await env.DB.prepare(
+    `SELECT LOWER(title) as ltitle, network, network_url FROM shows
+     WHERE archived = 0
+       AND network IS NOT NULL
+       AND network_url IS NOT NULL
+       AND network_url NOT LIKE '%/search%'
+       AND network_url NOT LIKE '%/s?%'
+       AND network_url NOT LIKE '%?q=%'
+       AND network_url NOT LIKE '%?query=%'
+     GROUP BY LOWER(title)`
+  ).all();
+  for (const src of sources) {
+    await env.DB.prepare(
+      `UPDATE shows
+         SET network_url = ?,
+             network = COALESCE(network, ?),
+             enriched_at = datetime('now')
+       WHERE LOWER(title) = ? AND archived = 0
+         AND (network_url IS NULL
+              OR network_url LIKE '%/search%'
+              OR network_url LIKE '%/s?%'
+              OR network_url LIKE '%?q=%'
+              OR network_url LIKE '%?query=%')`
+    ).bind(src.network_url, src.network, src.ltitle).run();
+  }
+}
 
 async function fetchQueue(env) {
   // One row per distinct title (case-insensitive), with all the member labels
@@ -113,6 +158,7 @@ export async function onRequestPost(context) {
     return json({ ok: true, updated: result.meta.changes });
   }
 
+  await propagateGoodUrls(env);
   const shows = await fetchQueue(env);
   const networks = await fetchNetworks(env);
   return json({ shows, networks });
