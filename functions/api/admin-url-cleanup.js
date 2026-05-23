@@ -1,5 +1,3 @@
-import { EXCLUDED_FROM_TASTE } from '../_shared/excluded-members.js';
-
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -7,7 +5,9 @@ function json(data, status = 200) {
   });
 }
 
-const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
+// URL hygiene isn't taste-related — Paula and any other taste-excluded
+// members still need their placeholder URLs cleaned up, so this queue
+// covers every active row regardless of the taste exclusion list.
 const BAD_URL = `(s.network_url IS NULL
                   OR s.network_url LIKE '%/search%'
                   OR s.network_url LIKE '%/s?%'
@@ -15,7 +15,6 @@ const BAD_URL = `(s.network_url IS NULL
                   OR s.network_url LIKE '%?query=%')`;
 const QUEUE_FILTER = `
   s.archived = 0
-  AND s.member_slug NOT IN (${EXCLUDED_SQL})
   AND ${BAD_URL}
   -- skip titles already resolvable from another member's good URL —
   -- sync-urls will propagate those automatically, nothing for admin to do.
