@@ -73,8 +73,9 @@ export async function onRequestPost(context) {
   const limit = Math.max(1, Math.min(100, parseInt(body.limit, 10) || 25));
 
   // Candidates: rows without a true deep-link URL. Includes NULL, search
-  // placeholders, and the www.max.com / www.hbomax.com info-page URLs that
-  // dump users at the home screen.
+  // placeholders, www.max.com / www.hbomax.com info-page URLs that dump
+  // users at the home screen, and themoviedb.org watch pages left over
+  // from the earlier TMDB-based version of this endpoint.
   const sql = `
     SELECT id, title, network, network_url, movie
     FROM shows
@@ -86,7 +87,8 @@ export async function onRequestPost(context) {
            OR network_url LIKE '%?q=%'
            OR network_url LIKE '%?query=%'
            OR network_url LIKE 'https://www.max.com/%'
-           OR network_url LIKE 'https://www.hbomax.com/%')
+           OR network_url LIKE 'https://www.hbomax.com/%'
+           OR network_url LIKE 'https://www.themoviedb.org/%')
     -- Dedup by title — one lookup per show, push the result to every
     -- member's same-titled row via the UPDATE below.
     GROUP BY LOWER(title)
