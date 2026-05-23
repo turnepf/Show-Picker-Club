@@ -281,6 +281,19 @@ A logged-in member's page calls this fire-and-forget on load. Two phases:
 
 `POST /api/sync-urls` is a separate maintenance call also triggered from the member page (throttled to 1/day per browser via `localStorage`). It finds shows where one member has a real `network_url` for a title and another member's copy has only a search-URL placeholder, and copies the good URL over.
 
+## Networks
+
+Source of truth: `functions/_shared/networks.js`. Each entry has:
+
+- `stored` — exact string written to `shows.network`. The modern streaming-service brand (e.g. `Max`, `Paramount+`, `Peacock`).
+- `display` — what appears in the Add / Suggest dropdowns; includes the sub-brand hint in parens so members find their way ("Paramount+ (including CBS, MTV, …)").
+- `aliases` — older / sub-brand names that get folded into this canonical when matching user input or migrating data.
+- `search` — `{ base, param?, extra? }` template for the network's search page. Used as the fallback `network_url` when the member picks a network but doesn't paste a deep link.
+
+`canonicalNetwork(name)` (from the same module) returns the canonical `stored` for any alias-or-stored name (case-insensitive). `POST /api/shows` and `PUT /api/shows/[id]` both run incoming `network` values through it so an alias submitted via API or pasted in the "other" field still ends up consistent in the DB.
+
+`migrations/002_consolidate_networks.sql` ran a one-shot rewrite to fold pre-existing `HBO → Max`, `NBC → Peacock`, `Showtime → Paramount+`, etc. across all member rows.
+
 ## Calendar feed
 
 `functions/calendar/[slug].js` builds an RFC 5545 iCalendar document on every request.

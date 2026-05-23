@@ -1,5 +1,6 @@
 import { fetchEnrichment } from '../../_shared/enrichment.js';
 import { getSession } from '../../_shared/auth.js';
+import { canonicalNetwork } from '../../_shared/networks.js';
 
 function cleanUrl(url) {
   if (!url) return url;
@@ -38,7 +39,8 @@ export async function onRequestPut(context) {
   const body = await request.json();
   const val = (key) => body[key] !== undefined ? body[key] : existing[key];
   const title = val('title');
-  const network = val('network');
+  // Fold network aliases into their canonical streamer (HBO→Max, NBC→Peacock, etc.)
+  const network = canonicalNetwork(val('network'));
   const network_url = body.network_url !== undefined ? cleanUrl(body.network_url) : existing.network_url;
   const recommended_by = val('recommended_by');
   const list = val('list');

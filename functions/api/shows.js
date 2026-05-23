@@ -1,20 +1,6 @@
 import { fetchEnrichment } from '../_shared/enrichment.js';
 import { getSession } from '../_shared/auth.js';
-
-const NETWORK_SEARCH = {
-  'Netflix': { base: 'https://www.netflix.com/search' },
-  'HBO': { base: 'https://play.max.com/search', param: 'q' },
-  'Apple TV': { base: 'https://tv.apple.com/search', param: 'term' },
-  'Hulu': { base: 'https://www.hulu.com/search' },
-  'Paramount': { base: 'https://www.paramountplus.com/search' },
-  'Peacock': { base: 'https://www.peacocktv.com/watch/search' },
-  'Amazon': { base: 'https://www.amazon.com/s', param: 'k', extra: 'i=instant-video' },
-  'Bravo': { base: 'https://www.peacocktv.com/watch/search' },
-  'Disney+': { base: 'https://www.disneyplus.com/browse/search' },
-  'NBC': { base: 'https://www.nbc.com/search' },
-  'Starz': { base: 'https://www.starz.com/search', param: 'q' },
-  'Showtime': { base: 'https://www.sho.com/search', param: 'q' },
-};
+import { NETWORK_SEARCH, canonicalNetwork } from '../_shared/networks.js';
 
 function generateNetworkUrl(network, title) {
   if (!network) return null;
@@ -103,7 +89,10 @@ export async function onRequestPost(context) {
   // inherit it. Beats the search-page fallback and keeps the title out of the
   // URL-cleanup queue.
   const goodCopy = network_url && network ? null : await findGoodCopyAcrossMembers(env, finalTitle);
-  const finalNetwork = network || (goodCopy && goodCopy.network) || null;
+  const rawNetwork = network || (goodCopy && goodCopy.network) || null;
+  // Fold aliases (HBO, NBC, Bravo, Showtime, FX, AMC, ...) into their canonical
+  // streamer so the row stays consistent with the rest of the club.
+  const finalNetwork = rawNetwork ? canonicalNetwork(rawNetwork) : null;
   const finalUrl =
     cleanUrl(network_url) ||
     (goodCopy && goodCopy.network_url) ||
