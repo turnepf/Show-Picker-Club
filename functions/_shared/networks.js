@@ -82,6 +82,12 @@ export const NETWORKS = [
     aliases: [],
     search: { base: 'https://www.foodnetwork.com/search' },
   },
+  {
+    stored: 'Fox',
+    display: 'Fox',
+    aliases: [],
+    search: { base: 'https://www.fox.com/search' },
+  },
 ];
 
 // Map alias-or-stored name (case-insensitive) to canonical stored value.
