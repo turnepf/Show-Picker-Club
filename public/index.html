@@ -532,18 +532,16 @@
       <label for="inputNetwork">Network</label>
       <select id="inputNetwork">
         <option value="">— Select —</option>
-        <option value="Amazon">Amazon Prime</option>
-        <option value="Apple TV">Apple TV+</option>
-        <option value="Bravo">Bravo</option>
-        <option value="Disney+">Disney+</option>
+        <option value="AMC+">AMC+ (including AMC, BBC America, IFC, Sundance, Shudder)</option>
+        <option value="Amazon Prime Video">Amazon Prime Video (including MGM+, Freevee)</option>
+        <option value="Apple TV+">Apple TV+</option>
+        <option value="Disney+">Disney+ (including Marvel, Star Wars, Pixar, Nat Geo)</option>
         <option value="Food Network">Food Network</option>
-        <option value="HBO">HBO (Max)</option>
-        <option value="Hulu">Hulu</option>
-        <option value="NBC">NBC</option>
+        <option value="Hulu">Hulu (including FX, FXX, ABC, Nat Geo, Freeform)</option>
+        <option value="Max">Max (including HBO, Discovery, CNN, TNT, TBS, Cartoon Network)</option>
         <option value="Netflix">Netflix</option>
-        <option value="Paramount">Paramount+</option>
-        <option value="Peacock">Peacock</option>
-        <option value="Showtime">Showtime</option>
+        <option value="Paramount+">Paramount+ (including CBS, MTV, Comedy Central, Nickelodeon, BET, Showtime)</option>
+        <option value="Peacock">Peacock (including NBC, Bravo, USA, Syfy, Oxygen, E!)</option>
         <option value="Starz">Starz</option>
         <option value="__other">Network not listed</option>
       </select>
@@ -595,18 +593,16 @@
       <label for="suggestNetwork">Network</label>
       <select id="suggestNetwork">
         <option value="">— Select —</option>
-        <option value="Amazon">Amazon Prime</option>
-        <option value="Apple TV">Apple TV+</option>
-        <option value="Bravo">Bravo</option>
-        <option value="Disney+">Disney+</option>
+        <option value="AMC+">AMC+ (including AMC, BBC America, IFC, Sundance, Shudder)</option>
+        <option value="Amazon Prime Video">Amazon Prime Video (including MGM+, Freevee)</option>
+        <option value="Apple TV+">Apple TV+</option>
+        <option value="Disney+">Disney+ (including Marvel, Star Wars, Pixar, Nat Geo)</option>
         <option value="Food Network">Food Network</option>
-        <option value="HBO">HBO (Max)</option>
-        <option value="Hulu">Hulu</option>
-        <option value="NBC">NBC</option>
+        <option value="Hulu">Hulu (including FX, FXX, ABC, Nat Geo, Freeform)</option>
+        <option value="Max">Max (including HBO, Discovery, CNN, TNT, TBS, Cartoon Network)</option>
         <option value="Netflix">Netflix</option>
-        <option value="Paramount">Paramount+</option>
-        <option value="Peacock">Peacock</option>
-        <option value="Showtime">Showtime</option>
+        <option value="Paramount+">Paramount+ (including CBS, MTV, Comedy Central, Nickelodeon, BET, Showtime)</option>
+        <option value="Peacock">Peacock (including NBC, Bravo, USA, Syfy, Oxygen, E!)</option>
         <option value="Starz">Starz</option>
         <option value="__other">Network not listed</option>
       </select>
@@ -705,22 +701,21 @@
   </div>
 
   <script>
+    // Kept in sync by hand with functions/_shared/networks.js. The Find
+    // button on the add/edit modal uses this to open the network's search
+    // page pre-filled with the show title.
     const NETWORK_SEARCH = {
-      'Netflix': { base: 'https://www.netflix.com/search' },
-      'HBO': { base: 'https://play.max.com/search', param: 'q' },
-      'Apple TV': { base: 'https://tv.apple.com/search', param: 'term' },
-      'Hulu': { base: 'https://www.hulu.com/search' },
-      'Paramount': { base: 'https://www.paramountplus.com/search' },
-      'Bravo': { base: 'https://www.peacocktv.com/watch/search' },
-      'Peacock': { base: 'https://www.peacocktv.com/watch/search' },
-      'Amazon': { base: 'https://www.amazon.com/s', param: 'k', extra: 'i=instant-video' },
-      'Disney+': { base: 'https://www.disneyplus.com/search' },
-      'NBC': { base: 'https://www.nbc.com/search' },
-      'Starz': { base: 'https://www.starz.com/search', param: 'q' },
-      'Showtime': { base: 'https://www.sho.com/search', param: 'q' },
-      'Food Network': { base: 'https://www.foodnetwork.com/search', param: 'q' },
-      'Fox': { base: 'https://www.fox.com/search' },
-      'CBS': { base: 'https://www.cbs.com/search/' },
+      'Netflix':             { base: 'https://www.netflix.com/search' },
+      'Max':                 { base: 'https://play.max.com/search', param: 'q' },
+      'Apple TV+':           { base: 'https://tv.apple.com/search', param: 'term' },
+      'Hulu':                { base: 'https://www.hulu.com/search' },
+      'Paramount+':          { base: 'https://www.paramountplus.com/search' },
+      'Peacock':             { base: 'https://www.peacocktv.com/watch/search' },
+      'Amazon Prime Video':  { base: 'https://www.amazon.com/s', param: 'k', extra: 'i=instant-video' },
+      'Disney+':             { base: 'https://www.disneyplus.com/search' },
+      'Starz':               { base: 'https://www.starz.com/search', param: 'q' },
+      'AMC+':                { base: 'https://www.amcplus.com/search', param: 'q' },
+      'Food Network':        { base: 'https://www.foodnetwork.com/search', param: 'q' },
     };
 
     function buildSearchUrl(network, title) {
