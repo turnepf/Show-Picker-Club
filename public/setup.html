@@ -215,6 +215,22 @@
           });
           msg.appendChild(copyBtn);
 
+          // Open the system Messages app with the new member's number
+          // pre-populated in the To field and the intro text in the body.
+          // Apple's URI scheme wants `&body=`; Android wants `?body=`;
+          // including `?&body=` covers both.
+          const smsBtn = document.createElement('button');
+          smsBtn.type = 'button';
+          smsBtn.className = 'copy';
+          smsBtn.style.marginLeft = '8px';
+          smsBtn.style.background = '#27ae60';
+          smsBtn.textContent = 'Text intro';
+          smsBtn.addEventListener('click', () => {
+            const href = `sms:${data.phone}?&body=${encodeURIComponent(ta.value)}`;
+            window.location.href = href;
+          });
+          msg.appendChild(smsBtn);
+
           f.reset();
         }
       } catch (err) {
