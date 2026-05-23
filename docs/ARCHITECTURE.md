@@ -152,6 +152,7 @@ The complete map:
 | `POST /api/admin-vibe-fill`            | `functions/api/admin-vibe-fill.js`         | POST    | `ADMIN_SECRET` |
 | `POST /api/admin-url-cleanup`          | `functions/api/admin-url-cleanup.js`       | POST    | `ADMIN_SECRET` |
 | `POST /api/admin-sms-test`             | `functions/api/admin-sms-test.js`          | POST    | `ADMIN_SECRET` |
+| `POST /api/admin-fill-watch-urls`      | `functions/api/admin-fill-watch-urls.js`   | POST    | `ADMIN_SECRET` |
 | `GET /calendar/[slug].ics`             | `functions/calendar/[slug].js`             | GET     | none |
 
 The `[slug]` param matches the full final segment (including `.ics`); the handler strips the suffix.
