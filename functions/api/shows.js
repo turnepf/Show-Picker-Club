@@ -14,13 +14,6 @@ function generateNetworkUrl(network, title) {
   return cfg.base + '?' + params.toString();
 }
 
-function cleanUrl(url) {
-  if (!url) return url;
-  url = url.split('?')[0];
-  if (url.includes('amazon.com/')) url = url.split('ref=')[0];
-  return url.replace(/\/+$/, '/');
-}
-
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
 }
@@ -90,7 +83,7 @@ export async function onRequestPost(context) {
   // inherit it. Beats the search-page fallback and keeps the title out of the
   // URL-cleanup queue.
   const goodCopy = network_url && network ? null : await findGoodCopyAcrossMembers(env, finalTitle);
-  const userUrl = cleanUrl(network_url);
+  const userUrl = network_url || null;
   const goodCopyUrl = goodCopy && goodCopy.network_url;
   // URL trumps the dropdown — if the user pasted a Netflix link but selected
   // Hulu, the URL's domain wins (and the inverse: if user picked a network

@@ -3,13 +3,6 @@ import { getSession } from '../../_shared/auth.js';
 import { canonicalNetwork, networkFromUrl } from '../../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../../_shared/watch-providers.js';
 
-function cleanUrl(url) {
-  if (!url) return url;
-  url = url.split('?')[0];
-  if (url.includes('amazon.com/')) url = url.split('ref=')[0];
-  return url.replace(/\/+$/, '/');
-}
-
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
 }
@@ -40,7 +33,7 @@ export async function onRequestPut(context) {
   const body = await request.json();
   const val = (key) => body[key] !== undefined ? body[key] : existing[key];
   const title = val('title');
-  const network_url = body.network_url !== undefined ? cleanUrl(body.network_url) : existing.network_url;
+  const network_url = body.network_url !== undefined ? body.network_url : existing.network_url;
   // URL trumps the dropdown — if the pasted URL's domain says Netflix, the
   // stored network is Netflix regardless of what the dropdown said. Falls
   // through to alias-folding the dropdown pick when the URL doesn't tell
