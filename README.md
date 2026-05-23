@@ -14,7 +14,6 @@ Live at [showpicker.club](https://showpicker.club).
 - **Social.** Suggest a show to another member, share a show across lists, see your closest taste-match, and get "Picks for you" computed from neighbors.
 - **Vibe.** `/vibe` profiles each member's taste across 27 trait dimensions and assigns one of seven cluster identities.
 - **Calendar feed.** `webcal://showpicker.club/calendar/<slug>.ics` keeps upcoming premieres and finales in Apple Calendar / Google Calendar / Fantastical.
-- **TV mode.** `/tv/<slug>` renders a large, remote-friendly read-only view for casting.
 - **PWA.** Installable to home screen.
 
 ## Tech stack
@@ -33,7 +32,6 @@ Only `public/` (static assets) and `functions/` (Pages Functions) are deployed. 
 ```
 ├── public/                     Deployed static assets
 │   ├── index.html              Landing + per-member SPA
-│   ├── tv.html                 Read-only TV view
 │   ├── vibe.html               Member taste profiles
 │   ├── reporting.html          Admin metrics (auth-gated)
 │   ├── setup.html              Admin: create new member (secret-gated)

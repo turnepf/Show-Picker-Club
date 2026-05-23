@@ -1,6 +1,7 @@
 import { TRAIT_NAMES } from '../_shared/vibe-traits.js';
 import { CLUSTERS } from '../_shared/vibe-clusters.js';
 import { EXCLUDED_FROM_TASTE } from '../_shared/excluded-members.js';
+import { getSession } from '../_shared/auth.js';
 
 const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
 
@@ -205,6 +206,16 @@ async function enrichPick(env, p) {
 
 export async function onRequestGet(context) {
   const { env, request } = context;
+  // Vibe profiles surface taste fingerprints that feel personal — keep it
+  // behind a login. Anyone in the club can look at anyone's vibe; logged-out
+  // visitors get a 401 and the frontend prompts to log in.
+  const session = await getSession(request, env);
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: corsHeaders(),
+    });
+  }
   const url = new URL(request.url);
   const memberSlug = url.searchParams.get('member');
 

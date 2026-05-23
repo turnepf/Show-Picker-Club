@@ -130,9 +130,7 @@ A taste-profile view. Pick any member from the dropdown to see:
 
 The cluster algorithm and trait list are detailed in [`ARCHITECTURE.md`](ARCHITECTURE.md#vibe-system).
 
-## TV mode (`/tv/<slug>`)
-
-A dark, oversized, remote-friendly read-only view of a member's lists. Designed for Fire Stick, Roku, or smart-TV browsers. Auto-suggested via a banner if the app detects a screen ≥1920px with no touch input.
+Vibe profiles require a logged-in session — anyone in the club can view any other member's vibe, but the page prompts a login if you visit it logged-out.
 
 ## Suggestions to non-members
 
