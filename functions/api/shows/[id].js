@@ -1,6 +1,6 @@
 import { fetchEnrichment } from '../../_shared/enrichment.js';
 import { getSession } from '../../_shared/auth.js';
-import { canonicalNetwork } from '../../_shared/networks.js';
+import { canonicalNetwork, networkFromUrl } from '../../_shared/networks.js';
 
 function cleanUrl(url) {
   if (!url) return url;
@@ -39,9 +39,12 @@ export async function onRequestPut(context) {
   const body = await request.json();
   const val = (key) => body[key] !== undefined ? body[key] : existing[key];
   const title = val('title');
-  // Fold network aliases into their canonical streamer (HBO→Max, NBC→Peacock, etc.)
-  const network = canonicalNetwork(val('network'));
   const network_url = body.network_url !== undefined ? cleanUrl(body.network_url) : existing.network_url;
+  // URL trumps the dropdown — if the pasted URL's domain says Netflix, the
+  // stored network is Netflix regardless of what the dropdown said. Falls
+  // through to alias-folding the dropdown pick when the URL doesn't tell
+  // us anything.
+  const network = networkFromUrl(network_url) || canonicalNetwork(val('network'));
   const recommended_by = val('recommended_by');
   const list = val('list');
   const notes = val('notes');

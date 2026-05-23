@@ -1,3 +1,5 @@
+import { canonicalNetwork, networkFromUrl } from '../_shared/networks.js';
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -131,11 +133,11 @@ export async function onRequestPost(context) {
 
   if (action === 'save') {
     const id = parseInt(body.id, 10);
-    const network = (body.network || '').trim();
+    const submittedNetwork = (body.network || '').trim();
     const url = (body.network_url || '').trim();
 
     if (!Number.isInteger(id)) return json({ error: 'id required' }, 400);
-    if (!network) return json({ error: 'network required' }, 400);
+    if (!submittedNetwork) return json({ error: 'network required' }, 400);
     if (!url) return json({ error: 'URL required' }, 400);
 
     const lower = url.toLowerCase();
@@ -145,6 +147,10 @@ export async function onRequestPost(context) {
     if (looksLikeSearch) {
       return json({ error: 'That still looks like a search URL — paste the direct show URL.' }, 400);
     }
+
+    // URL trumps the dropdown pick. If the pasted URL is a Netflix link but
+    // the operator left the dropdown on Hulu, store Netflix.
+    const network = networkFromUrl(url) || canonicalNetwork(submittedNetwork);
 
     const titleRow = await env.DB.prepare('SELECT title FROM shows WHERE id = ?').bind(id).first();
     if (!titleRow) return json({ error: 'Show not found' }, 404);

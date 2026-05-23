@@ -1,6 +1,6 @@
 import { fetchEnrichment } from '../_shared/enrichment.js';
 import { getSession } from '../_shared/auth.js';
-import { NETWORK_SEARCH, canonicalNetwork } from '../_shared/networks.js';
+import { NETWORK_SEARCH, canonicalNetwork, networkFromUrl } from '../_shared/networks.js';
 
 function generateNetworkUrl(network, title) {
   if (!network) return null;
@@ -89,13 +89,20 @@ export async function onRequestPost(context) {
   // inherit it. Beats the search-page fallback and keeps the title out of the
   // URL-cleanup queue.
   const goodCopy = network_url && network ? null : await findGoodCopyAcrossMembers(env, finalTitle);
+  const userUrl = cleanUrl(network_url);
+  const goodCopyUrl = goodCopy && goodCopy.network_url;
+  // URL trumps the dropdown — if the user pasted a Netflix link but selected
+  // Hulu, the URL's domain wins (and the inverse: if user picked a network
+  // but didn't paste anything, the eventual search-URL fallback won't tell us
+  // anything new). Fold aliases (HBO, NBC, FX, ...) for the dropdown path.
   const rawNetwork = network || (goodCopy && goodCopy.network) || null;
-  // Fold aliases (HBO, NBC, Bravo, Showtime, FX, AMC, ...) into their canonical
-  // streamer so the row stays consistent with the rest of the club.
-  const finalNetwork = rawNetwork ? canonicalNetwork(rawNetwork) : null;
+  const finalNetwork =
+    networkFromUrl(userUrl) ||
+    networkFromUrl(goodCopyUrl) ||
+    (rawNetwork ? canonicalNetwork(rawNetwork) : null);
   const finalUrl =
-    cleanUrl(network_url) ||
-    (goodCopy && goodCopy.network_url) ||
+    userUrl ||
+    goodCopyUrl ||
     generateNetworkUrl(finalNetwork, finalTitle);
 
   const result = await env.DB.prepare(
