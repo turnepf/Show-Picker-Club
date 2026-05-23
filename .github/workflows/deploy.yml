@@ -58,6 +58,7 @@ jobs:
           for probe in \
             "POST /api/shows/share" \
             "GET  /api/reporting" \
+            "GET  /api/vibe" \
             "POST /api/enrich" \
             "POST /api/sync-urls"
           do

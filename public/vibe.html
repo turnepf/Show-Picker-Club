@@ -454,6 +454,11 @@
       try {
         const url = slug ? `/api/vibe?member=${encodeURIComponent(slug)}` : '/api/vibe';
         const res = await fetch(url);
+        if (res.status === 401) {
+          content.innerHTML = '<div class="empty-card">Vibe profiles are only visible to logged-in members. Visit your member page and tap <strong>Edit</strong> to log in, then come back.</div>';
+          document.getElementById('memberSelect').innerHTML = '';
+          return;
+        }
         const data = await res.json();
 
         const sel = document.getElementById('memberSelect');
