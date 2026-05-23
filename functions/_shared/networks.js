@@ -36,7 +36,7 @@ export const NETWORKS = [
   {
     stored: 'Apple TV+',
     display: 'Apple TV+',
-    aliases: ['Apple TV', 'AppleTV+', 'AppleTV'],
+    aliases: ['Apple TV', 'AppleTV+', 'AppleTV', 'Apple TV Plus'],
     domains: ['tv.apple.com', 'apple.co'],
     search: { base: 'https://tv.apple.com/search', param: 'term' },
   },
@@ -50,14 +50,14 @@ export const NETWORKS = [
   {
     stored: 'Paramount+',
     display: 'Paramount+ (including CBS, MTV, Comedy Central, Nickelodeon, BET, Showtime)',
-    aliases: ['Paramount', 'CBS', 'MTV', 'Comedy Central', 'Nickelodeon', 'BET', 'Showtime', 'Smithsonian Channel'],
+    aliases: ['Paramount', 'Paramount Plus', 'CBS', 'MTV', 'Comedy Central', 'Nickelodeon', 'BET', 'Showtime', 'Smithsonian Channel'],
     domains: ['paramountplus.com', 'paramount.com', 'cbs.com', 'sho.com', 'showtime.com'],
     search: { base: 'https://www.paramountplus.com/search' },
   },
   {
     stored: 'Peacock',
     display: 'Peacock (including NBC, Bravo, USA, Syfy, Oxygen, E!)',
-    aliases: ['NBC', 'Bravo', 'USA', 'USA Network', 'Syfy', 'SyFy', 'Oxygen', 'E!'],
+    aliases: ['NBC', 'Bravo', 'USA', 'USA Network', 'Syfy', 'SyFy', 'Oxygen', 'E!', 'Peacock Premium', 'Peacock Premium Plus'],
     domains: ['peacocktv.com', 'nbc.com', 'bravotv.com', 'usanetwork.com', 'syfy.com'],
     search: { base: 'https://www.peacocktv.com/watch/search' },
   },
@@ -71,7 +71,7 @@ export const NETWORKS = [
   {
     stored: 'Disney+',
     display: 'Disney+ (including Marvel, Star Wars, Pixar, National Geographic)',
-    aliases: ['Disney', 'Marvel', 'Star Wars', 'Pixar'],
+    aliases: ['Disney', 'Disney Plus', 'Marvel', 'Star Wars', 'Pixar'],
     domains: ['disneyplus.com'],
     search: { base: 'https://www.disneyplus.com/browse/search' },
   },

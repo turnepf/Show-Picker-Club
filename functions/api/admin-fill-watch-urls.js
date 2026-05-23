@@ -1,23 +1,25 @@
 import { canonicalNetwork } from '../_shared/networks.js';
 
-// Backfills network_url for rows missing a real deep link, using TMDB's
-// /watch/providers endpoint (powered by JustWatch). For each candidate row:
-//   1. Search TMDB for the title (tv first, then movie if marked movie).
-//   2. Hit /watch/providers for that TMDB id.
-//   3. Pull the JustWatch `link` URL for the US region IF the row's network
-//      appears in the flatrate list.
-//
-// The JustWatch URL is an aggregation page (not a direct play.hbomax.com
-// deep link) but a single tap on the service logo there opens the right
-// show in the streaming app. Two hops, but reliable.
+// Backfills network_url for rows missing a real deep link, using Watchmode's
+// /title/{id}/sources endpoint. For each candidate row:
+//   1. Search Watchmode for the title (filtered by tv vs movie).
+//   2. Fetch sources for the resulting title id.
+//   3. Among US subscription/free sources, find one whose service name maps
+//      to the row's stored network (via canonicalNetwork()).
+//   4. Save that source's web_url — a real deep link straight to the show
+//      on the streaming service.
 //
 // Admin-secret gated. Idempotent — skips rows that already have a non-
-// placeholder URL. Safe to re-run.
+// placeholder URL. Each successful lookup updates every member's same-
+// titled active row so the URL propagates immediately.
+//
+// Watchmode free tier: 1000 requests/month. Each candidate uses ~2 calls
+// (search + sources). Use the `limit` body field to keep test runs small.
 //
 // Example:
 //   curl -X POST https://showpicker.club/api/admin-fill-watch-urls \
 //     -H 'Content-Type: application/json' \
-//     -d '{"secret":"...","network":"HBO Max","limit":10}'
+//     -d '{"secret":"...","network":"HBO Max","limit":5}'
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -26,48 +28,32 @@ function json(data, status = 200) {
   });
 }
 
-function looksLikePlaceholder(url) {
-  if (!url) return true;
-  const u = url.toLowerCase();
-  return u.includes('/search') || u.includes('/s?') ||
-         u.includes('?q=') || u.includes('?query=');
-}
-
-// Some streamers know themselves as different things on different services
-// (HBO Max vs Max vs HBO). Our canonical fold handles that — match on the
-// canonical, not the literal name.
-function providerMatchesNetwork(providerName, targetNetwork) {
-  if (!providerName || !targetNetwork) return false;
-  return canonicalNetwork(providerName) === targetNetwork;
-}
-
-async function tmdbSearch(env, title, isMovie) {
-  const key = env.TMDB_API_KEY;
+async function watchmodeSearch(env, title, isMovie) {
+  const key = env.WATCHMODE_API_KEY;
   if (!key) return null;
-  const endpoint = isMovie ? 'movie' : 'tv';
-  const url = `https://api.themoviedb.org/3/search/${endpoint}?query=${encodeURIComponent(title)}&api_key=${key}`;
+  const types = isMovie ? 'movie' : 'tv_series,tv_miniseries';
+  const url = `https://api.watchmode.com/v1/search/?apiKey=${key}&search_field=name&search_value=${encodeURIComponent(title)}&types=${types}`;
   try {
     const res = await fetch(url);
-    if (!res.ok) return null;
+    if (!res.ok) return { error: `search ${res.status}` };
     const data = await res.json();
-    return data.results?.[0]?.id || null;
-  } catch {
-    return null;
+    const hit = data.title_results?.[0];
+    return hit?.id || null;
+  } catch (e) {
+    return { error: 'search fetch failed: ' + e.message };
   }
 }
 
-async function tmdbWatchProviders(env, tmdbId, isMovie) {
-  const key = env.TMDB_API_KEY;
+async function watchmodeSources(env, titleId) {
+  const key = env.WATCHMODE_API_KEY;
   if (!key) return null;
-  const endpoint = isMovie ? 'movie' : 'tv';
-  const url = `https://api.themoviedb.org/3/${endpoint}/${tmdbId}/watch/providers?api_key=${key}`;
+  const url = `https://api.watchmode.com/v1/title/${titleId}/sources/?apiKey=${key}&regions=US`;
   try {
     const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.results?.US || null;
-  } catch {
-    return null;
+    if (!res.ok) return { error: `sources ${res.status}` };
+    return await res.json();
+  } catch (e) {
+    return { error: 'sources fetch failed: ' + e.message };
   }
 }
 
@@ -75,7 +61,7 @@ export async function onRequestPost(context) {
   const { request, env } = context;
 
   if (!env.ADMIN_SECRET) return json({ error: 'ADMIN_SECRET not configured' }, 500);
-  if (!env.TMDB_API_KEY) return json({ error: 'TMDB_API_KEY not configured' }, 500);
+  if (!env.WATCHMODE_API_KEY) return json({ error: 'WATCHMODE_API_KEY not configured' }, 500);
 
   let body;
   try { body = await request.json(); }
@@ -86,7 +72,9 @@ export async function onRequestPost(context) {
   const network = (body.network || '').trim() || null;
   const limit = Math.max(1, Math.min(100, parseInt(body.limit, 10) || 25));
 
-  // Candidates: rows missing a usable URL. If `network` is provided, scope to it.
+  // Candidates: rows without a true deep-link URL. Includes NULL, search
+  // placeholders, and the www.max.com / www.hbomax.com info-page URLs that
+  // dump users at the home screen.
   const sql = `
     SELECT id, title, network, network_url, movie
     FROM shows
@@ -99,8 +87,8 @@ export async function onRequestPost(context) {
            OR network_url LIKE '%?query=%'
            OR network_url LIKE 'https://www.max.com/%'
            OR network_url LIKE 'https://www.hbomax.com/%')
-    -- Dedup by title so we only do one TMDB lookup per show, then push the
-    -- result to every member's copy via the canonical UPDATE below.
+    -- Dedup by title — one lookup per show, push the result to every
+    -- member's same-titled row via the UPDATE below.
     GROUP BY LOWER(title)
     LIMIT ${limit}
   `;
@@ -108,27 +96,55 @@ export async function onRequestPost(context) {
     ? env.DB.prepare(sql).bind(network).all()
     : env.DB.prepare(sql).all());
 
-  const summary = { checked: results.length, filled: 0, no_tmdb_hit: [], no_provider_match: [], updated: [] };
+  const summary = {
+    checked: results.length,
+    filled: 0,
+    no_match: [],          // Watchmode couldn't find the title at all
+    no_provider_match: [], // Watchmode found it but row's network isn't a source for it
+    updated: [],
+    errors: [],
+  };
 
   for (const row of results) {
     const isMovie = !!row.movie;
-    const tmdbId = await tmdbSearch(env, row.title, isMovie);
-    if (!tmdbId) { summary.no_tmdb_hit.push(row.title); continue; }
 
-    const providers = await tmdbWatchProviders(env, tmdbId, isMovie);
-    if (!providers || !providers.link) { summary.no_provider_match.push(row.title); continue; }
+    const searchResult = await watchmodeSearch(env, row.title, isMovie);
+    if (searchResult && typeof searchResult === 'object' && searchResult.error) {
+      summary.errors.push({ title: row.title, error: searchResult.error });
+      continue;
+    }
+    const titleId = searchResult;
+    if (!titleId) { summary.no_match.push(row.title); continue; }
 
-    const flatrate = providers.flatrate || [];
-    const hasNetwork = flatrate.some(p => providerMatchesNetwork(p.provider_name, row.network));
-    if (!hasNetwork) { summary.no_provider_match.push(row.title); continue; }
+    const sourcesResult = await watchmodeSources(env, titleId);
+    if (sourcesResult && typeof sourcesResult === 'object' && sourcesResult.error) {
+      summary.errors.push({ title: row.title, error: sourcesResult.error });
+      continue;
+    }
+    const sources = Array.isArray(sourcesResult) ? sourcesResult : [];
 
-    // Apply to every active row sharing this title — keeps the club in sync.
+    // Subscription / free streams only — not rent or buy. Same region filter
+    // as the API call (defense in depth).
+    const subs = sources.filter(s =>
+      s.region === 'US' && (s.type === 'sub' || s.type === 'free')
+    );
+
+    const match = subs.find(s =>
+      canonicalNetwork(s.name) === row.network && s.web_url
+    );
+    if (!match) { summary.no_provider_match.push(row.title); continue; }
+
     const upd = await env.DB.prepare(
       "UPDATE shows SET network_url = ?, enriched_at = datetime('now') WHERE LOWER(title) = LOWER(?) AND archived = 0"
-    ).bind(providers.link, row.title).run();
+    ).bind(match.web_url, row.title).run();
 
     summary.filled += upd.meta.changes;
-    summary.updated.push({ title: row.title, url: providers.link, rows_updated: upd.meta.changes });
+    summary.updated.push({
+      title: row.title,
+      source: match.name,
+      url: match.web_url,
+      rows_updated: upd.meta.changes,
+    });
   }
 
   return json(summary);
