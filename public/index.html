@@ -371,10 +371,6 @@
       box-shadow: 0 0 0 3px rgba(52,152,219,0.1);
     }
 
-    .url-row { display: flex; gap: 8px; align-items: center; }
-    .url-row input { flex: 1; }
-    .btn-find { padding: 10px 12px; background: #3498db; color: #fff; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; white-space: nowrap; }
-    .btn-find:hover { background: #2980b9; }
 
     .checkbox-label {
       display: flex; align-items: center; gap: 8px;
@@ -548,12 +544,6 @@
       </select>
       <input type="text" id="inputNetworkOther" placeholder="Enter network name" style="display:none; margin-top: 6px;">
 
-      <label for="inputUrl">Show URL</label>
-      <div class="url-row">
-        <input type="text" id="inputUrl" placeholder="Paste direct URL here">
-        <button type="button" class="btn-find" onclick="findOnNetwork()">Find</button>
-      </div>
-
       <label for="inputRecommended">Recommended By</label>
       <input type="text" id="inputRecommended" placeholder="e.g. Whitt, TC">
 
@@ -703,34 +693,6 @@
   </div>
 
   <script>
-    // Kept in sync by hand with functions/_shared/networks.js. The Find
-    // button on the add/edit modal uses this to open the network's search
-    // page pre-filled with the show title.
-    const NETWORK_SEARCH = {
-      'Netflix':             { base: 'https://www.netflix.com/search' },
-      'HBO Max':             { base: 'https://play.max.com/search', param: 'q' },
-      'Apple TV+':           { base: 'https://tv.apple.com/search', param: 'term' },
-      'Hulu':                { base: 'https://www.hulu.com/search' },
-      'Paramount+':          { base: 'https://www.paramountplus.com/search' },
-      'Peacock':             { base: 'https://www.peacocktv.com/watch/search' },
-      'Amazon Prime Video':  { base: 'https://www.amazon.com/s', param: 'k', extra: 'i=instant-video' },
-      'Disney+':             { base: 'https://www.disneyplus.com/search' },
-      'Starz':               { base: 'https://www.starz.com/search', param: 'q' },
-      'AMC+':                { base: 'https://www.amcplus.com/search', param: 'q' },
-      'Food Network':        { base: 'https://www.foodnetwork.com/search', param: 'q' },
-      'Fox':                 { base: 'https://www.fox.com/search' },
-    };
-
-    function buildSearchUrl(network, title) {
-      const cfg = NETWORK_SEARCH[network];
-      if (!cfg) return null;
-      if (!cfg.param) return cfg.base;
-      const params = new URLSearchParams();
-      if (cfg.extra) cfg.extra.split('&').forEach(p => { const [k,v] = p.split('='); params.set(k,v); });
-      params.set(cfg.param, title);
-      return cfg.base + '?' + params.toString();
-    }
-
     let shows = [];
     let currentTab = 'watching';
     let isEditor = false;
@@ -1379,15 +1341,6 @@
       if (!wasVisible) container.classList.add('visible');
     }
 
-    function findOnNetwork() {
-      const title = document.getElementById('inputTitle').value.trim();
-      const network = getNetwork('inputNetwork', 'inputNetworkOther');
-      if (!title) { alert('Enter a show title first'); return; }
-      if (!network) { alert('Select a network first'); return; }
-      const url = buildSearchUrl(network, title);
-      if (url) window.open(url, '_blank');
-    }
-
     function openAddModal() {
       editingId = null;
       document.getElementById('modalTitle').textContent = 'Add Show';
@@ -1396,7 +1349,6 @@
       document.getElementById('inputNetwork').value = '';
       document.getElementById('inputNetworkOther').value = '';
       document.getElementById('inputNetworkOther').style.display = 'none';
-      document.getElementById('inputUrl').value = '';
       document.getElementById('inputRecommended').value = '';
       document.getElementById('inputNotes').value = '';
       document.getElementById('inputWatchingWith').value = '';
@@ -1425,7 +1377,6 @@
         networkOther.value = '';
         networkOther.style.display = 'none';
       }
-      document.getElementById('inputUrl').value = show.network_url || '';
       document.getElementById('inputRecommended').value = show.recommended_by || '';
       document.getElementById('inputNotes').value = show.notes || '';
       document.getElementById('inputWatchingWith').value = show.watching_with || '';
@@ -1441,12 +1392,6 @@
       document.getElementById('modalOverlay').classList.add('hidden');
     }
 
-    function cleanUrl(url) {
-      if (!url) return url;
-      url = url.split('?')[0];
-      if (url.includes('amazon.com/')) url = url.split('ref=')[0];
-      return url.replace(/\/+$/, '/');
-    }
 
     async function saveShow() {
       const title = document.getElementById('inputTitle').value.trim();
@@ -1455,7 +1400,6 @@
       const body = {
         title,
         network: getNetwork('inputNetwork', 'inputNetworkOther'),
-        network_url: cleanUrl(document.getElementById('inputUrl').value.trim()) || null,
         recommended_by: document.getElementById('inputRecommended').value.trim() || null,
         notes: document.getElementById('inputNotes').value.trim() || null,
         watching_with: document.getElementById('inputWatchingWith').value.trim() || null,

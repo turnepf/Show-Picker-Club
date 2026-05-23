@@ -1,6 +1,7 @@
 import { fetchEnrichment } from '../../_shared/enrichment.js';
 import { getSession } from '../../_shared/auth.js';
 import { canonicalNetwork, networkFromUrl } from '../../_shared/networks.js';
+import { lookupWatchmodeUrl } from '../../_shared/watch-providers.js';
 
 function cleanUrl(url) {
   if (!url) return url;
@@ -64,6 +65,24 @@ export async function onRequestPut(context) {
     await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(params.id).run();
     const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id) VALUES (?, ?, ?)');
     await env.DB.batch(enriched.actors.map(a => stmt.bind(params.id, a.name, a.imdb_id || null)));
+  }
+
+  // If the network changed (or we landed on a placeholder URL), kick off
+  // a Watchmode lookup in the background to keep the row on a real
+  // deep link. Propagates to all members' same-titled active rows.
+  const networkChanged = (network || null) !== (existing.network || null);
+  const onPlaceholder = !network_url ||
+    network_url.includes('/search') || network_url.includes('/s?') ||
+    network_url.includes('?q=') || network_url.includes('?query=');
+  if (network && (networkChanged || onPlaceholder)) {
+    context.waitUntil((async () => {
+      const realUrl = await lookupWatchmodeUrl(env, title, network, !!movie);
+      if (realUrl) {
+        await env.DB.prepare(
+          "UPDATE shows SET network_url = ?, enriched_at = datetime('now') WHERE LOWER(title) = LOWER(?) AND archived = 0"
+        ).bind(realUrl, title).run();
+      }
+    })());
   }
 
   const show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(params.id).first();
