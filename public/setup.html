@@ -100,10 +100,7 @@
 
       <label>Phone number</label>
       <input type="tel" id="phone" autocomplete="off" required placeholder="(336) 555-1234">
-      <div class="hint">For SMS login and recommendation alerts. +1 is assumed for US numbers; prefix with + and country code for non-US.</div>
-
-      <label>4-digit code</label>
-      <input type="text" id="code" autocomplete="off" required pattern="\d{4}" inputmode="numeric" maxlength="4">
+      <div class="hint">For SMS login and recommendation alerts. +1 is assumed for US numbers; prefix with + and country code for non-US. The login code is the last 4 digits of this number.</div>
 
       <button type="submit" id="go">Create member + seed 8 shows</button>
     </form>
@@ -158,7 +155,6 @@
         secret: document.getElementById('secret').value,
         full_name: nameInput.value.trim(),
         phone: document.getElementById('phone').value.trim(),
-        code: document.getElementById('code').value.trim(),
       };
 
       try {

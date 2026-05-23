@@ -64,24 +64,25 @@ export async function onRequestPost(context) {
     return json({ error: 'Invalid JSON' }, 400);
   }
 
-  const { secret, full_name, code, phone } = body;
+  const { secret, full_name, phone } = body;
 
   if (secret !== env.ADMIN_SECRET) {
     return json({ error: 'Invalid secret' }, 401);
   }
 
-  if (!full_name || !code || !phone) {
-    return json({ error: 'Full name, phone, and code required' }, 400);
-  }
-
-  if (!/^\d{4}$/.test(code)) {
-    return json({ error: 'Code must be 4 digits' }, 400);
+  if (!full_name || !phone) {
+    return json({ error: 'Full name and phone required' }, 400);
   }
 
   const phoneE164 = normalizePhone(phone);
   if (!phoneE164) {
     return json({ error: 'Phone number looks invalid — use digits only, with + and country code for non-US numbers' }, 400);
   }
+
+  // Login code derives from the last 4 digits of the phone. Short-term until
+  // SMS code login replaces it; gives the user something to remember tied to
+  // their own number rather than an arbitrary 4-digit string.
+  const code = phoneE164.slice(-4);
 
   const phoneClash = await env.DB.prepare(
     'SELECT member_slug FROM member_phones WHERE phone = ?'
