@@ -38,8 +38,7 @@
     <h1>Vibe trait fill</h1>
     <p class="sub">Generates trait scores for any show that doesn't have them yet. Calls Claude one batch at a time until all caught up.</p>
 
-    <label>Admin secret</label>
-    <input type="password" id="secret" autocomplete="off" required>
+    <div id="authWarn" style="display:none;margin-bottom:14px;padding:10px;background:#ffebee;border:1px solid #ffcdd2;border-radius:6px;color:#b71c1c;font-size:13px;">Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a> (tap Edit, enter your code), then reload this page.</div>
 
     <label>Batch size (max 8)</label>
     <input type="number" id="batchSize" value="5" min="1" max="8">
@@ -54,30 +53,14 @@
   </div>
 
   <script>
-    const SECRET_STORE_KEY = 'admin_secret_remember';
-    const SECRET_TTL_MS = 30 * 86400000;
-
-    function loadSavedSecret() {
+    // Gated by the operator's session cookie — no secret to enter.
+    document.addEventListener('DOMContentLoaded', async () => {
       try {
-        const raw = localStorage.getItem(SECRET_STORE_KEY);
-        if (!raw) return;
-        const obj = JSON.parse(raw);
-        if (obj && obj.expires > Date.now() && obj.secret) {
-          document.getElementById('secret').value = obj.secret;
-        } else {
-          localStorage.removeItem(SECRET_STORE_KEY);
-        }
+        const r = await fetch('/auth/check');
+        const d = await r.json();
+        if (!d.authenticated) document.getElementById('authWarn').style.display = '';
       } catch {}
-    }
-    function rememberSecret(secret) {
-      try {
-        localStorage.setItem(SECRET_STORE_KEY, JSON.stringify({ secret, expires: Date.now() + SECRET_TTL_MS }));
-      } catch {}
-    }
-    function forgetSecret() {
-      try { localStorage.removeItem(SECRET_STORE_KEY); } catch {}
-    }
-    document.addEventListener('DOMContentLoaded', loadSavedSecret);
+    });
 
     let totals = { processed: 0, unknown: 0, errors: 0 };
 
@@ -115,10 +98,8 @@
     }
 
     async function run() {
-      const secret = document.getElementById('secret').value;
       const count = parseInt(document.getElementById('batchSize').value, 10) || 5;
       const btn = document.getElementById('runBtn');
-      if (!secret) { alert('Need the admin secret'); return; }
 
       totals = { processed: 0, unknown: 0, errors: 0 };
       document.getElementById('log').innerHTML = '';
@@ -132,21 +113,19 @@
       btn.textContent = 'Running…';
 
       let consecutiveErrors = 0;
-      let firstSuccessSaved = false;
       while (true) {
         try {
           const res = await fetch('/api/admin-vibe-fill', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ secret, count }),
+            body: JSON.stringify({ count }),
           });
           const data = await res.json();
           if (!res.ok) {
-            if (res.status === 401) forgetSecret();
+            if (res.status === 403) document.getElementById('authWarn').style.display = '';
             alert('Error: ' + (data.error || res.status));
             break;
           }
-          if (!firstSuccessSaved) { rememberSecret(secret); firstSuccessSaved = true; }
           totals.processed += data.processed;
           totals.unknown += data.unknown;
           totals.errors += data.errors;

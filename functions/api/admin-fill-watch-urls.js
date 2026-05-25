@@ -1,4 +1,5 @@
 import { canonicalNetwork } from '../_shared/networks.js';
+import { isAdmin } from '../_shared/admin.js';
 
 // Backfills network_url for rows missing a real deep link, using Watchmode's
 // /title/{id}/sources endpoint. For each candidate row:
@@ -16,10 +17,13 @@ import { canonicalNetwork } from '../_shared/networks.js';
 // Watchmode free tier: 1000 requests/month. Each candidate uses ~2 calls
 // (search + sources). Use the `limit` body field to keep test runs small.
 //
+// Gated by the operator's session — pass the session cookie (grab it from
+// the browser: DevTools > Application > Cookies > session).
 // Example:
 //   curl -X POST https://showpicker.club/api/admin-fill-watch-urls \
 //     -H 'Content-Type: application/json' \
-//     -d '{"secret":"...","network":"HBO Max","limit":5}'
+//     -H 'Cookie: session=YOUR_SESSION_ID' \
+//     -d '{"network":"HBO Max","limit":5}'
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -60,14 +64,12 @@ async function watchmodeSources(env, titleId) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  if (!env.ADMIN_SECRET) return json({ error: 'ADMIN_SECRET not configured' }, 500);
+  if (!(await isAdmin(request, env))) return json({ error: 'Forbidden — log in as the operator' }, 403);
   if (!env.WATCHMODE_API_KEY) return json({ error: 'WATCHMODE_API_KEY not configured' }, 500);
 
   let body;
   try { body = await request.json(); }
   catch { return json({ error: 'Invalid JSON' }, 400); }
-
-  if (body.secret !== env.ADMIN_SECRET) return json({ error: 'Invalid secret' }, 401);
 
   const network = (body.network || '').trim() || null;
   const limit = Math.max(1, Math.min(100, parseInt(body.limit, 10) || 25));
