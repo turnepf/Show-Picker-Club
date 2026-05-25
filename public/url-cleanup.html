@@ -123,11 +123,8 @@
     <h1>URL Cleanup</h1>
     <div class="remaining" id="remaining"></div>
 
-    <div class="login" id="login">
-      <label>Admin secret</label>
-      <input type="password" id="secret" autocomplete="off">
-      <button id="loginBtn" type="button">Start</button>
-      <div id="loginMsg"></div>
+    <div class="login" id="login" style="display:none;">
+      <div id="loginMsg">Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a> (tap Edit, enter your code), then reload this page.</div>
     </div>
 
     <div id="bannerErr"></div>
@@ -135,51 +132,18 @@
   </div>
 
   <script>
-    const SECRET_STORE_KEY = 'admin_secret_remember';
-    const SECRET_TTL_MS = 30 * 86400000;
-    function loadSavedSecret() {
-      try {
-        const raw = localStorage.getItem(SECRET_STORE_KEY);
-        if (!raw) return '';
-        const obj = JSON.parse(raw);
-        if (obj && obj.expires > Date.now() && obj.secret) return obj.secret;
-        localStorage.removeItem(SECRET_STORE_KEY);
-      } catch {}
-      return '';
-    }
-    function rememberSecret(s) {
-      try { localStorage.setItem(SECRET_STORE_KEY, JSON.stringify({ secret: s, expires: Date.now() + SECRET_TTL_MS })); } catch {}
-    }
-    function forgetSecret() {
-      try { localStorage.removeItem(SECRET_STORE_KEY); } catch {}
-    }
-
     const el = (id) => document.getElementById(id);
     const login = el('login');
-    const secretInput = el('secret');
-    const loginBtn = el('loginBtn');
     const loginMsg = el('loginMsg');
     const list = el('list');
     const remaining = el('remaining');
     const bannerErr = el('bannerErr');
 
-    let secret = loadSavedSecret();
     let networks = [];
 
-    if (secret) {
-      secretInput.value = secret;
-      loadList();
-    }
-
-    loginBtn.addEventListener('click', () => {
-      secret = secretInput.value.trim();
-      if (!secret) return;
-      rememberSecret(secret);
-      loadList();
-    });
-    secretInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); loginBtn.click(); }
-    });
+    // Auth is the operator's session cookie — no secret to enter. Load
+    // straight away; a 403 surfaces the login hint.
+    loadList();
 
     function escapeHtml(s) {
       return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -261,7 +225,7 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              secret, action: 'save',
+              action: 'save',
               id: parseInt(rowEl.dataset.id, 10),
               network, network_url: newUrl,
             }),
@@ -305,15 +269,12 @@
         const res = await fetch('/api/admin-url-cleanup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ secret, action: 'list' }),
+          body: JSON.stringify({ action: 'list' }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          if (res.status === 401) {
-            forgetSecret();
-            secret = '';
+          if (res.status === 403) {
             login.style.display = 'block';
-            loginMsg.innerHTML = `<div style="margin-top:10px;padding:10px;background:#ffebee;border:1px solid #ffcdd2;border-radius:6px;color:#b71c1c;font-size:13px;">${escapeHtml(data.error || 'Invalid secret')}</div>`;
             return;
           }
           bannerErr.innerHTML = `<div class="err-banner">${escapeHtml(data.error || `Error (${res.status})`)}</div>`;

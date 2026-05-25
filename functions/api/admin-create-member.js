@@ -1,3 +1,5 @@
+import { isAdmin } from '../_shared/admin.js';
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -53,8 +55,8 @@ async function pickSeeds(env) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  if (!env.ADMIN_SECRET) {
-    return json({ error: 'ADMIN_SECRET not configured' }, 500);
+  if (!(await isAdmin(request, env))) {
+    return json({ error: 'Forbidden — log in as the operator' }, 403);
   }
 
   let body;
@@ -64,11 +66,7 @@ export async function onRequestPost(context) {
     return json({ error: 'Invalid JSON' }, 400);
   }
 
-  const { secret, full_name, phone } = body;
-
-  if (secret !== env.ADMIN_SECRET) {
-    return json({ error: 'Invalid secret' }, 401);
-  }
+  const { full_name, phone } = body;
 
   if (!full_name || !phone) {
     return json({ error: 'Full name and phone required' }, 400);

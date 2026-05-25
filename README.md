@@ -92,9 +92,13 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    printf "your-omdb-key"    | wrangler pages secret put OMDB_API_KEY    --project-name shows
    printf "your-tmdb-key"    | wrangler pages secret put TMDB_API_KEY    --project-name shows
    printf "your-tmdb-token"  | wrangler pages secret put TMDB_TOKEN      --project-name shows
-   printf "your-admin-token" | wrangler pages secret put ADMIN_SECRET    --project-name shows
-   # Optional, only for /vibe-admin batch trait scoring:
-   printf "sk-ant-..."       | wrangler pages secret put ANTHROPIC_API_KEY --project-name shows
+   # Optional — only if you wire up the corresponding features:
+   printf "sk-ant-..."       | wrangler pages secret put ANTHROPIC_API_KEY --project-name shows  # /vibe-admin trait scoring
+   printf "your-watchmode"   | wrangler pages secret put WATCHMODE_API_KEY --project-name shows  # auto URL deep-links
+   printf "ACxxxx"           | wrangler pages secret put TWILIO_ACCOUNT_SID --project-name shows # SMS
+   printf "your-twilio-tok"  | wrangler pages secret put TWILIO_AUTH_TOKEN --project-name shows
+   printf "+1336..."         | wrangler pages secret put TWILIO_PHONE_NUMBER --project-name shows
+   printf "MGxxxx"           | wrangler pages secret put TWILIO_MESSAGING_SERVICE_SID --project-name shows
    ```
 
 5. **Create the Pages project and do the first deploy.**

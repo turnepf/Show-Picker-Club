@@ -148,11 +148,11 @@ The complete map:
 | `POST /api/enrich`                     | `functions/api/enrich.js`                  | POST    | session |
 | `POST /api/sync-urls`                  | `functions/api/sync-urls.js`               | POST    | session |
 | `GET /api/reporting`                   | `functions/api/reporting.js`               | GET     | session |
-| `POST /api/admin-create-member`        | `functions/api/admin-create-member.js`     | POST    | `ADMIN_SECRET` |
-| `POST /api/admin-vibe-fill`            | `functions/api/admin-vibe-fill.js`         | POST    | `ADMIN_SECRET` |
-| `POST /api/admin-url-cleanup`          | `functions/api/admin-url-cleanup.js`       | POST    | `ADMIN_SECRET` |
-| `POST /api/admin-sms-test`             | `functions/api/admin-sms-test.js`          | POST    | `ADMIN_SECRET` |
-| `POST /api/admin-fill-watch-urls`      | `functions/api/admin-fill-watch-urls.js`   | POST    | `ADMIN_SECRET` |
+| `POST /api/admin-create-member`        | `functions/api/admin-create-member.js`     | POST    | patrick session |
+| `POST /api/admin-vibe-fill`            | `functions/api/admin-vibe-fill.js`         | POST    | patrick session |
+| `POST /api/admin-url-cleanup`          | `functions/api/admin-url-cleanup.js`       | POST    | patrick session |
+| `POST /api/admin-sms-test`             | `functions/api/admin-sms-test.js`          | POST    | patrick session |
+| `POST /api/admin-fill-watch-urls`      | `functions/api/admin-fill-watch-urls.js`   | POST    | patrick session |
 | `GET /calendar/[slug].ics`             | `functions/calendar/[slug].js`             | GET     | none |
 
 The `[slug]` param matches the full final segment (including `.ics`); the handler strips the suffix.
@@ -180,7 +180,7 @@ The `[slug]` param matches the full final segment (including `.ics`); the handle
 
 `functions/_shared/auth.js` exports `getSession(request, env)` which reads the cookie, queries the session row, checks `expires_at`, and returns `{email, member_slug}` or `null`. Every mutating endpoint and `/api/reporting` calls `getSession` first.
 
-There is **no admin role** in the session model. Admin endpoints require a matching `ADMIN_SECRET` value in the request body. Admin secrets are operator-only and stored as a Pages secret.
+Admin endpoints are gated by `_shared/admin.js#isAdmin()` — a valid session whose `member_slug` is the operator (`patrick`). There is no separate admin secret; the operator just needs to be logged in. This strengthens automatically once login moves to SMS one-time codes.
 
 ### Session activity tracking
 
@@ -210,7 +210,7 @@ Auth-gated dashboard for the operator. Calls `/api/reporting`; displays metric c
 
 ### `setup.html`, `url-cleanup.html`, `vibe-admin.html`
 
-Admin tools. Each requires the operator to type the `ADMIN_SECRET` value into a field before any POSTs go out. Not linked from the navigation.
+Admin tools. Each requires the operator to be logged in as `patrick` (session cookie); they show a "log in first" hint otherwise. Not linked from the navigation.
 
 ## Service worker + PWA
 
@@ -376,7 +376,7 @@ Returns the match's display name, slug, overlap count, and the list of overlappi
 
 ## Admin endpoints
 
-All three require `ADMIN_SECRET` in the request body. No session involved.
+All require an operator (`patrick`) session via `isAdmin()`. No separate secret.
 
 ### `POST /api/admin-create-member`
 Body: `{secret, full_name, code}`. Generates a slug from `full_name`, inserts into `members` + `member_codes`, then picks 8 seed shows (2 per list) drawn from the existing club's highly-rated picks with cast and a real network URL. Shows are inserted with `added_by='seed'`, `created_at=NULL`, `updated_at=NULL` so the seed-only check (which looks for exactly that signature) recognizes them.

@@ -1,5 +1,6 @@
 import { canonicalNetwork, networkFromUrl } from '../_shared/networks.js';
 import { extractUrl } from '../_shared/url-utils.js';
+import { isAdmin } from '../_shared/admin.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -139,8 +140,8 @@ async function fetchNetworks(env) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  if (!env.ADMIN_SECRET) {
-    return json({ error: 'ADMIN_SECRET not configured' }, 500);
+  if (!(await isAdmin(request, env))) {
+    return json({ error: 'Forbidden — log in as the operator' }, 403);
   }
 
   let body;
@@ -148,10 +149,6 @@ export async function onRequestPost(context) {
     body = await request.json();
   } catch {
     return json({ error: 'Invalid JSON' }, 400);
-  }
-
-  if (body.secret !== env.ADMIN_SECRET) {
-    return json({ error: 'Invalid secret' }, 401);
   }
 
   const action = body.action || 'list';

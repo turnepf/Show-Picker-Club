@@ -90,10 +90,8 @@
 <body>
   <div class="wrap">
     <h1>New member setup</h1>
+    <div id="authWarn" class="msg err" style="display:none;">Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a> (tap Edit, enter your code), then reload this page.</div>
     <form id="f">
-      <label>Admin secret</label>
-      <input type="password" id="secret" autocomplete="off" required>
-
       <label>Full name</label>
       <input type="text" id="full_name" autocomplete="off" required>
       <div class="hint" id="preview"></div>
@@ -108,27 +106,15 @@
   </div>
 
   <script>
-    const SECRET_STORE_KEY = 'admin_secret_remember';
-    const SECRET_TTL_MS = 30 * 86400000;
-    function loadSavedSecret() {
+    // Admin pages are gated by being logged in as the operator (session
+    // cookie), not a separate secret. Show a hint if the session check fails.
+    document.addEventListener('DOMContentLoaded', async () => {
       try {
-        const raw = localStorage.getItem(SECRET_STORE_KEY);
-        if (!raw) return;
-        const obj = JSON.parse(raw);
-        if (obj && obj.expires > Date.now() && obj.secret) {
-          document.getElementById('secret').value = obj.secret;
-        } else {
-          localStorage.removeItem(SECRET_STORE_KEY);
-        }
+        const r = await fetch('/auth/check');
+        const d = await r.json();
+        if (!d.authenticated) document.getElementById('authWarn').style.display = '';
       } catch {}
-    }
-    function rememberSecret(s) {
-      try { localStorage.setItem(SECRET_STORE_KEY, JSON.stringify({ secret: s, expires: Date.now() + SECRET_TTL_MS })); } catch {}
-    }
-    function forgetSecret() {
-      try { localStorage.removeItem(SECRET_STORE_KEY); } catch {}
-    }
-    document.addEventListener('DOMContentLoaded', loadSavedSecret);
+    });
 
     const f = document.getElementById('f');
     const btn = document.getElementById('go');
@@ -152,7 +138,6 @@
       btn.textContent = 'Working…';
 
       const body = {
-        secret: document.getElementById('secret').value,
         full_name: nameInput.value.trim(),
         phone: document.getElementById('phone').value.trim(),
       };
@@ -165,11 +150,10 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          if (res.status === 401) forgetSecret();
+          if (res.status === 403) document.getElementById('authWarn').style.display = '';
           msg.className = 'msg err';
           msg.textContent = data.error || `Error (${res.status})`;
         } else {
-          rememberSecret(body.secret);
           msg.className = 'msg ok';
           msg.textContent = '';
 

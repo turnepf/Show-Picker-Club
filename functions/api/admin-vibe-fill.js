@@ -1,5 +1,6 @@
 import { TRAIT_NAMES, SYSTEM_PROMPT } from '../_shared/vibe-traits.js';
 import { EXCLUDED_FROM_TASTE } from '../_shared/excluded-members.js';
+import { isAdmin } from '../_shared/admin.js';
 
 const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
 
@@ -72,14 +73,12 @@ async function scoreShow(env, title, genres, network, rating) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  if (!env.ADMIN_SECRET) return json({ error: 'ADMIN_SECRET not configured' }, 500);
+  if (!(await isAdmin(request, env))) return json({ error: 'Forbidden — log in as the operator' }, 403);
   if (!env.ANTHROPIC_API_KEY) return json({ error: 'ANTHROPIC_API_KEY not configured' }, 500);
 
   let body;
   try { body = await request.json(); }
   catch { return json({ error: 'Invalid JSON' }, 400); }
-
-  if (body.secret !== env.ADMIN_SECRET) return json({ error: 'Invalid secret' }, 401);
 
   const count = Math.min(parseInt(body.count || '5', 10) || 5, 8);
 
