@@ -153,6 +153,7 @@ The complete map:
 | `POST /api/admin-url-cleanup`          | `functions/api/admin-url-cleanup.js`       | POST    | patrick session |
 | `POST /api/admin-sms-test`             | `functions/api/admin-sms-test.js`          | POST    | patrick session |
 | `POST /api/admin-fill-watch-urls`      | `functions/api/admin-fill-watch-urls.js`   | POST    | patrick session |
+| `POST /api/admin-dormant-digest`       | `functions/api/admin-dormant-digest.js`    | POST    | patrick session or `CRON_SECRET` header |
 | `GET /calendar/[slug].ics`             | `functions/calendar/[slug].js`             | GET     | none |
 
 The `[slug]` param matches the full final segment (including `.ics`); the handler strips the suffix.
@@ -409,6 +410,12 @@ The moment a member edits a seeded row (changes list, notes, etc.), archives one
 - Trigger: daily at 03:00 UTC, or manual dispatch.
 - Steps: install rclone, install Node + wrangler, `wrangler d1 export shows-db --remote --output /tmp/...`, upload to Google Drive (`gdrive:Shows-Backups/`), prune drive backups older than 30 days, prune `failed_logins` rows older than 7 days.
 - Required secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RCLONE_CONF` (full rclone config including drive token).
+
+### `.github/workflows/dormant-digest.yml`
+- Trigger: 14:00 UTC on the 1st of each month, or manual dispatch.
+- Steps: `curl POST /api/admin-dormant-digest` with the `X-Cron-Secret` header. The endpoint computes the dormant-member list and texts the operator's primary phone via the app's Twilio integration.
+- Required secret: `CRON_SECRET` (must match the `CRON_SECRET` Pages secret).
+- "Dormant" = a member with no non-seed shows, no edits, no archives, and no session ping in the last 30 days.
 
 ## Excluded members
 

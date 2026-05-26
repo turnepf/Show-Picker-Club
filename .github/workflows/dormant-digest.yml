@@ -1,0 +1,38 @@
+name: Monthly dormant-members digest
+
+# On the 1st of each month, ask the app to text the operator a summary of
+# members who've done nothing (no non-seed shows, no edits, no archives) and
+# haven't logged in for 30+ days — so stale accounts can be pruned.
+#
+# Delivery rides the app's own Twilio integration, so this workflow only needs
+# to authenticate the call. It posts to /api/admin-dormant-digest with the
+# shared CRON_SECRET header.
+#
+# Required repo secret (Settings → Secrets and variables → Actions):
+#   CRON_SECRET — must match the CRON_SECRET Pages secret set on the project
+#
+# Until the Twilio A2P campaign is approved the SMS send will fail, but the
+# workflow still runs and the digest is visible in the run logs.
+
+on:
+  schedule:
+    # 14:00 UTC on the 1st (~9–10am ET).
+    - cron: '0 14 1 * *'
+  workflow_dispatch:  # Manual trigger from Actions tab
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger dormant digest
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          resp=$(curl -sS -X POST https://showpicker.club/api/admin-dormant-digest \
+            -H "Content-Type: application/json" \
+            -H "X-Cron-Secret: ${CRON_SECRET}" \
+            -d '{"days":30}')
+          echo "$resp"
+          # Fail the run if the endpoint rejected us (bad/missing secret).
+          echo "$resp" | grep -q '"error": "Forbidden"' && { echo "::error::CRON_SECRET rejected"; exit 1; } || true
