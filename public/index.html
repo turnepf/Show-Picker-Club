@@ -1015,7 +1015,18 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, member: memberSlug }),
       }).then(res => {
-        window.location.href = res.ok ? '/' + memberSlug : '/' + memberSlug + '?error=invalid';
+        if (!res.ok) {
+          window.location.href = '/' + memberSlug + '?error=invalid';
+          return;
+        }
+        // Drop straight into edit mode — no reload, so no second Edit tap.
+        // checkAuth() populates authMember / editorName / Add button / recs
+        // from the new session cookie, then we flip on edit mode.
+        return checkAuth().then(() => {
+          isEditor = true;
+          document.getElementById('loginBtn').classList.add('active');
+          renderShows();
+        });
       }).catch(() => {
         window.location.href = '/' + memberSlug + '?error=invalid';
       });
