@@ -110,6 +110,17 @@
       padding: 12px; border-radius: 6px;
       font-size: 13px; margin-bottom: 16px;
     }
+    .loading {
+      text-align: center; padding: 60px 0;
+      color: #888; font-size: 15px;
+    }
+    .spinner {
+      display: inline-block; width: 28px; height: 28px;
+      border: 3px solid #e3dccd; border-top-color: #E67E22;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     @media (max-width: 540px) {
       .row-form { grid-template-columns: 1fr 1fr; }
@@ -265,6 +276,8 @@
 
     async function loadList() {
       bannerErr.innerHTML = '';
+      remaining.textContent = '';
+      list.innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading queue&hellip;<br>Syncing good URLs across members first — this can take up to a minute.</div></div>';
       try {
         const res = await fetch('/api/admin-url-cleanup', {
           method: 'POST',
@@ -273,6 +286,7 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
+          list.innerHTML = '';
           if (res.status === 403) {
             login.style.display = 'block';
             return;
@@ -291,6 +305,7 @@
         list.innerHTML = shows.map(rowHtml).join('');
         list.querySelectorAll('.row').forEach(attachRowHandlers);
       } catch (e) {
+        list.innerHTML = '';
         bannerErr.innerHTML = `<div class="err-banner">Network error: ${escapeHtml(e.message)}</div>`;
       }
     }
