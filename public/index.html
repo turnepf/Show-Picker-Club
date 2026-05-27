@@ -997,36 +997,27 @@
         renderShows();
         return;
       }
-      async function submitCode() {
-        const code = prompt('Enter 4-digit code:');
-        if (!code) return;
-        try {
-          const res = await fetch('/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, member: memberSlug }),
-          });
-          if (res.ok) {
-            window.location.href = '/' + memberSlug;
-          } else {
-            window.location.href = '/' + memberSlug + '?error=invalid';
-          }
-        } catch (e) {
-          window.location.href = '/' + memberSlug + '?error=invalid';
-        }
+      // We already know the auth state from the page-load checkAuth(), so act
+      // immediately rather than waiting on another /auth/check round-trip —
+      // that lag (with no feedback) made the button feel unresponsive and got
+      // tapped repeatedly.
+      if (authMember && authMember === memberSlug) {
+        isEditor = true;
+        document.getElementById('addBtn').classList.remove('hidden');
+        document.getElementById('loginBtn').classList.add('active');
+        renderShows();
+        return;
       }
-      // If we have a valid session, just re-enter edit mode
-      fetch('/auth/check').then(r => r.json()).then(data => {
-        if (data.authenticated && data.member === memberSlug) {
-          isEditor = true;
-          document.getElementById('addBtn').classList.remove('hidden');
-          document.getElementById('loginBtn').classList.add('active');
-          renderShows();
-        } else {
-          submitCode();
-        }
+      const code = prompt('Enter 4-digit code:');
+      if (!code) return;
+      fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, member: memberSlug }),
+      }).then(res => {
+        window.location.href = res.ok ? '/' + memberSlug : '/' + memberSlug + '?error=invalid';
       }).catch(() => {
-        submitCode();
+        window.location.href = '/' + memberSlug + '?error=invalid';
       });
     }
 
