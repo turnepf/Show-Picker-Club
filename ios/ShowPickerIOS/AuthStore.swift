@@ -5,8 +5,10 @@ import Combine
 // we just track who's logged in and which member they are so views can
 // branch on it.
 final class AuthStore: ObservableObject {
-    @Published var memberSlug: String?
-    @Published var email: String?
+    let objectWillChange = ObservableObjectPublisher()
+
+    var memberSlug: String? { willSet { objectWillChange.send() } }
+    var email: String? { willSet { objectWillChange.send() } }
 
     var isLoggedIn: Bool { memberSlug != nil }
 
