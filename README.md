@@ -6,6 +6,7 @@ Live at [showpicker.club](https://showpicker.club).
 
 - **Product overview & user flows:** [`docs/PRODUCT.md`](docs/PRODUCT.md)
 - **Architecture, data model, endpoints:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- **Apple TV (tvOS) app:** [`tvos/README.md`](tvos/README.md)
 
 ## At a glance
 
