@@ -12,6 +12,7 @@ struct ShowDetailView: View {
 
     @State private var show: Show?
     @State private var cast: [Actor] = []
+    @State private var castError: String?
     @State private var openFailed = false
     @Environment(\.openURL) private var openURL
 
@@ -76,11 +77,20 @@ struct ShowDetailView: View {
                     Spacer()
                 }
 
-                if !cast.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Cast")
-                            .font(.system(size: 30, weight: .semibold))
-                            .foregroundColor(Theme.ink)
+                // DIAGNOSTIC: always render so we can see the runtime state.
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Cast (\(cast.count)) — id \(id)")
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundColor(Theme.ink)
+                    if let castError {
+                        Text("error: \(castError)")
+                            .font(.system(size: 22))
+                            .foregroundColor(.red)
+                    } else if cast.isEmpty {
+                        Text("(none loaded)")
+                            .font(.system(size: 22))
+                            .foregroundColor(.secondary)
+                    } else {
                         Text(cast.prefix(10).map { $0.name }.joined(separator: ", "))
                             .font(.system(size: 24))
                             .foregroundColor(.secondary)
@@ -146,9 +156,11 @@ struct ShowDetailView: View {
     }
 
     private func load() async {
-        async let detailTask = try? API.showDetail(id: id)
-        async let castTask = try? API.actors(showId: id)
-        if let s = await detailTask { show = s }
-        cast = (await castTask) ?? []
+        if let s = try? await API.showDetail(id: id) { show = s }
+        do {
+            cast = try await API.actors(showId: id)
+        } catch {
+            castError = "\(error)"
+        }
     }
 }
