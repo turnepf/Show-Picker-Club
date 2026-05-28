@@ -5,6 +5,10 @@ enum Theme {
     static let cream = Color(red: 0.98, green: 0.96, blue: 0.92)
     static let ink = Color(red: 0.17, green: 0.24, blue: 0.31)   // #2C3E50
     static let orange = Color(red: 0.90, green: 0.49, blue: 0.13) // #E67E22
+    // Readable muted text on the cream background. Don't use SwiftUI's
+    // .secondary here — on tvOS it's a light translucent color meant for
+    // dark UIs, so it vanishes against cream.
+    static let muted = Color(red: 0.17, green: 0.24, blue: 0.31).opacity(0.6)
 
     // List accent colors (match the web chips).
     static func listColor(_ list: String) -> Color {

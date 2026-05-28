@@ -17,7 +17,7 @@ struct MemberView: View {
                 if loading {
                     ProgressView().padding(.top, 80)
                 } else if let errorText {
-                    Text(errorText).foregroundColor(.secondary)
+                    Text(errorText).foregroundColor(Theme.muted)
                 } else {
                     ForEach(ShowList.allCases) { list in
                         let items = shows.filter { $0.list == list.rawValue }
