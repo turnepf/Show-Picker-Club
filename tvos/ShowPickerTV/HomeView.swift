@@ -18,7 +18,7 @@ struct HomeView: View {
                     if loading {
                         ProgressView().padding(.top, 80)
                     } else if let errorText {
-                        Text(errorText).foregroundColor(.secondary)
+                        Text(errorText).foregroundColor(Theme.muted)
                     } else {
                         if !popular.isEmpty {
                             sectionHeader("What Members Are Watching")

@@ -12,7 +12,6 @@ struct ShowDetailView: View {
 
     @State private var show: Show?
     @State private var cast: [Actor] = []
-    @State private var castError: String?
     @State private var openFailed = false
     @Environment(\.openURL) private var openURL
 
@@ -67,7 +66,7 @@ struct ShowDetailView: View {
                         if let s = show, !s.genreList.isEmpty {
                             Text(s.genreList.joined(separator: " · "))
                                 .font(.system(size: 24))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(Theme.muted)
                         }
 
                         if let s = show { metaRows(s) }
@@ -77,23 +76,14 @@ struct ShowDetailView: View {
                     Spacer()
                 }
 
-                // DIAGNOSTIC: always render so we can see the runtime state.
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Cast (\(cast.count)) — id \(id)")
-                        .font(.system(size: 30, weight: .semibold))
-                        .foregroundColor(Theme.ink)
-                    if let castError {
-                        Text("error: \(castError)")
-                            .font(.system(size: 22))
-                            .foregroundColor(.red)
-                    } else if cast.isEmpty {
-                        Text("(none loaded)")
-                            .font(.system(size: 22))
-                            .foregroundColor(.secondary)
-                    } else {
+                if !cast.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Cast")
+                            .font(.system(size: 30, weight: .semibold))
+                            .foregroundColor(Theme.ink)
                         Text(cast.prefix(10).map { $0.name }.joined(separator: ", "))
                             .font(.system(size: 24))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(Theme.muted)
                     }
                 }
             }
@@ -115,7 +105,7 @@ struct ShowDetailView: View {
                 Text("Watching with \(w)").foregroundColor(Theme.ink.opacity(0.7))
             }
             if let notes = s.notes, !notes.isEmpty {
-                Text(notes).italic().foregroundColor(.secondary)
+                Text(notes).italic().foregroundColor(Theme.muted)
             }
         }
         .font(.system(size: 24))
@@ -145,22 +135,18 @@ struct ShowDetailView: View {
             if openFailed {
                 Text("Couldn't open the app on this device — try the \(network ?? "streaming") app directly.")
                     .font(.system(size: 20))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.muted)
             }
         } else if show != nil {
             Text("No direct link yet")
                 .font(.system(size: 22))
-                .foregroundColor(.secondary)
+                .foregroundColor(Theme.muted)
                 .padding(.top, 12)
         }
     }
 
     private func load() async {
         if let s = try? await API.showDetail(id: id) { show = s }
-        do {
-            cast = try await API.actors(showId: id)
-        } catch {
-            castError = "\(error)"
-        }
+        cast = (try? await API.actors(showId: id)) ?? []
     }
 }
