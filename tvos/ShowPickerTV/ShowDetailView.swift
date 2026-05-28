@@ -127,14 +127,14 @@ struct ShowDetailView: View {
                     openFailed = !accepted
                 }
             } label: {
-                Label("Watch on \(network ?? "Streaming")", systemImage: "play.fill")
+                Label(buttonLabel, systemImage: "play.fill")
                     .font(.system(size: 30, weight: .semibold))
                     .padding(.vertical, 8)
             }
             .padding(.top, 12)
 
             if openFailed {
-                Text("Couldn't open the app on this device — try the \(network ?? "streaming") app directly.")
+                Text("Couldn't open \(network ?? "the streaming") app on this device — open it directly to find the show.")
                     .font(.system(size: 20))
                     .foregroundColor(Theme.muted)
             }
@@ -146,42 +146,42 @@ struct ShowDetailView: View {
         }
     }
 
-    // Per-service URL rewriter — many tvOS streaming apps don't honor https
-    // universal links to the show, but do honor their own custom URL scheme.
-    // We learn the right scheme one service at a time from on-device testing.
+    // Networks where the streaming service's tvOS app actually honors deep
+    // links to a specific show. Most don't (industry-wide tvOS limitation),
+    // so for the rest the button just opens the app and the member searches.
+    private static let deepLinksToShow: Set<String> = [
+        "HBO Max",
+        "Apple TV+",
+    ]
+
+    private var buttonLabel: String {
+        let n = network ?? "Streaming"
+        let verb = Self.deepLinksToShow.contains(n) ? "Watch on" : "Open"
+        return "\(verb) \(n)"
+    }
+
+    // Per-service URL rewriter. For most services on tvOS, the plain https
+    // universal link doesn't even *open* the streaming app — openURL returns
+    // accepted=false. Their own custom URL scheme launches the app instead
+    // (no show-level deep link, but at least the app is up). Mapped per
+    // service based on on-device tests.
     private func deepLinkURL(for url: URL) -> URL {
-        let s = url.absoluteString
-        let lower = s.lowercased()
+        let lower = url.absoluteString.lowercased()
 
-        // Netflix: https://www.netflix.com/title/<id> only opens the Netflix
-        // app to home. nflx://www.netflix.com/title/<id> deep-links to the show.
-        if lower.contains("netflix.com") {
-            let t = s.replacingOccurrences(of: "https://www.netflix.com", with: "nflx://www.netflix.com")
-                    .replacingOccurrences(of: "https://netflix.com",   with: "nflx://www.netflix.com")
-            if let u = URL(string: t) { return u }
-        }
-
-        // Amazon Prime Video: tvOS app doesn't claim watch.amazon.com URLs.
-        // Try Amazon Instant Video's custom scheme; falls back to https if
-        // openURL rejects.
         if lower.contains("watch.amazon.com") || lower.contains("primevideo.com") || lower.contains("amazon.com/gp/video") {
-            // Extract any gti or asin we can find and route through aiv://.
-            // Worst case the Prime Video app just opens to its home — still
-            // better than tvOS rejecting outright.
             if let u = URL(string: "aiv://aiv/landing") { return u }
         }
-
-        // Paramount+: same pattern — try the custom scheme.
         if lower.contains("paramountplus.com") || lower.contains("paramount.com") {
             if let u = URL(string: "paramountplus://") { return u }
         }
-
-        // Peacock: tvOS app opens from peacocktv.com universal links but
-        // doesn't navigate to the show. Try the custom scheme.
         if lower.contains("peacocktv.com") {
-            let t = s.replacingOccurrences(of: "https://www.peacocktv.com", with: "peacocktv://www.peacocktv.com")
-                    .replacingOccurrences(of: "https://peacocktv.com",   with: "peacocktv://www.peacocktv.com")
-            if let u = URL(string: t) { return u }
+            if let u = URL(string: "peacocktv://") { return u }
+        }
+        if lower.contains("hulu.com") {
+            if let u = URL(string: "hulu://") { return u }
+        }
+        if lower.contains("disneyplus.com") {
+            if let u = URL(string: "disneyplus://") { return u }
         }
 
         return url
