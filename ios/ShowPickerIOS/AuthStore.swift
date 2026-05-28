@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // Observable session state. URLSession.shared handles the cookie itself —
 // we just track who's logged in and which member they are so views can
