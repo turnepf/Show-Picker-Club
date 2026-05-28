@@ -47,4 +47,62 @@ enum API {
         let r: ActorsResponse = try await get("/api/shows/\(showId)/actors")
         return r.actors
     }
+
+    // iTunes Search API — public, no auth. Returns a tv.apple.com URL for
+    // shows / movies in Apple's catalog. Opening it on tvOS lands on the
+    // Apple TV app's show page, which has "Watch on <Service>" buttons that
+    // deep-link into the right streaming service for that title.
+    //
+    // Coverage isn't universal: streaming-exclusive originals may not be in
+    // Apple's catalog. Returns nil in that case and callers fall back to the
+    // direct service URL.
+    static func appleTVLookup(title: String) async -> URL? {
+        let q = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? title
+        for media in ["tvShow", "movie"] {
+            let urlStr = "https://itunes.apple.com/search?term=\(q)&media=\(media)&country=us&limit=5"
+            guard let url = URL(string: urlStr) else { continue }
+            do {
+                let (data, resp) = try await URLSession.shared.data(from: url)
+                guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { continue }
+                let parsed = try JSONDecoder().decode(ITunesSearchResponse.self, from: data)
+                if let urlString = bestApple(match: title, in: parsed.results),
+                   let u = URL(string: urlString) {
+                    return u
+                }
+            } catch {
+                continue
+            }
+        }
+        return nil
+    }
+
+    private static func bestApple(match title: String, in results: [ITunesResult]) -> String? {
+        let lower = title.lowercased()
+        // Prefer exact-name match.
+        if let hit = results.first(where: { ($0.trackName ?? $0.collectionName ?? "").lowercased() == lower }) {
+            return hit.trackViewUrl ?? hit.collectionViewUrl
+        }
+        // Fall back to substring match either direction.
+        if let hit = results.first(where: {
+            let name = ($0.trackName ?? $0.collectionName ?? "").lowercased()
+            return !name.isEmpty && (name.contains(lower) || lower.contains(name))
+        }) {
+            return hit.trackViewUrl ?? hit.collectionViewUrl
+        }
+        return nil
+    }
+}
+
+struct ITunesSearchResponse: Codable {
+    let resultCount: Int
+    let results: [ITunesResult]
+}
+
+struct ITunesResult: Codable {
+    let trackName: String?
+    let collectionName: String?
+    let trackViewUrl: String?
+    let collectionViewUrl: String?
+    let wrapperType: String?
+    let kind: String?
 }

@@ -12,6 +12,7 @@ struct ShowDetailView: View {
 
     @State private var show: Show?
     @State private var cast: [Actor] = []
+    @State private var appleTVUrl: URL?
     @State private var openFailed = false
     @Environment(\.openURL) private var openURL
 
@@ -122,7 +123,7 @@ struct ShowDetailView: View {
     @ViewBuilder private var watchButton: some View {
         if let s = show, s.hasRealUrl, let urlStr = s.networkUrl, let url = URL(string: urlStr) {
             Button {
-                let target = deepLinkURL(for: url)
+                let target = chooseTarget(serviceUrl: url)
                 openURL(target) { accepted in
                     openFailed = !accepted
                 }
@@ -146,18 +147,41 @@ struct ShowDetailView: View {
         }
     }
 
-    // Networks where the streaming service's tvOS app actually honors deep
-    // links to a specific show. Most don't (industry-wide tvOS limitation),
-    // so for the rest the button just opens the app and the member searches.
+    // Networks where the streaming service's tvOS app honors deep links to
+    // a specific show via the plain https URL we already have.
     private static let deepLinksToShow: Set<String> = [
         "HBO Max",
         "Apple TV+",
     ]
 
+    // True when we can land the user on the actual show page — either the
+    // service deep-links directly, or we have an Apple TV app URL to route
+    // through (it shows the show page with a "Watch on <Service>" button).
+    private var canDeepLink: Bool {
+        Self.deepLinksToShow.contains(network ?? "") || appleTVUrl != nil
+    }
+
     private var buttonLabel: String {
         let n = network ?? "Streaming"
-        let verb = Self.deepLinksToShow.contains(n) ? "Watch on" : "Open"
+        let verb = canDeepLink ? "Watch on" : "Open"
         return "\(verb) \(n)"
+    }
+
+    // Pick the best URL to open:
+    //  1. Direct service URL if the service deep-links from its own https
+    //     URL (HBO Max, Apple TV+).
+    //  2. Otherwise route through the Apple TV app's show page if we found
+    //     one — extra hop, but lands on the show with a one-tap launch.
+    //  3. Otherwise use the per-service custom-scheme fallback to at least
+    //     open the streaming app.
+    private func chooseTarget(serviceUrl: URL) -> URL {
+        if Self.deepLinksToShow.contains(network ?? "") {
+            return serviceUrl
+        }
+        if let apple = appleTVUrl {
+            return apple
+        }
+        return deepLinkURL(for: serviceUrl)
     }
 
     // Per-service URL rewriter. For most services on tvOS, the plain https
@@ -190,5 +214,9 @@ struct ShowDetailView: View {
     private func load() async {
         if let s = try? await API.showDetail(id: id) { show = s }
         cast = (try? await API.actors(showId: id)) ?? []
+        // Pre-fetch the Apple TV app URL so the Watch button can route
+        // through Apple's show page when the streaming service itself
+        // doesn't deep-link. Falls through silently if no match.
+        appleTVUrl = await API.appleTVLookup(title: initialTitle)
     }
 }
