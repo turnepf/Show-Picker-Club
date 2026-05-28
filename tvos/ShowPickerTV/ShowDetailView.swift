@@ -122,7 +122,8 @@ struct ShowDetailView: View {
     @ViewBuilder private var watchButton: some View {
         if let s = show, s.hasRealUrl, let urlStr = s.networkUrl, let url = URL(string: urlStr) {
             Button {
-                openURL(url) { accepted in
+                let target = deepLinkURL(for: url)
+                openURL(target) { accepted in
                     openFailed = !accepted
                 }
             } label: {
@@ -143,6 +144,47 @@ struct ShowDetailView: View {
                 .foregroundColor(Theme.muted)
                 .padding(.top, 12)
         }
+    }
+
+    // Per-service URL rewriter — many tvOS streaming apps don't honor https
+    // universal links to the show, but do honor their own custom URL scheme.
+    // We learn the right scheme one service at a time from on-device testing.
+    private func deepLinkURL(for url: URL) -> URL {
+        let s = url.absoluteString
+        let lower = s.lowercased()
+
+        // Netflix: https://www.netflix.com/title/<id> only opens the Netflix
+        // app to home. nflx://www.netflix.com/title/<id> deep-links to the show.
+        if lower.contains("netflix.com") {
+            let t = s.replacingOccurrences(of: "https://www.netflix.com", with: "nflx://www.netflix.com")
+                    .replacingOccurrences(of: "https://netflix.com",   with: "nflx://www.netflix.com")
+            if let u = URL(string: t) { return u }
+        }
+
+        // Amazon Prime Video: tvOS app doesn't claim watch.amazon.com URLs.
+        // Try Amazon Instant Video's custom scheme; falls back to https if
+        // openURL rejects.
+        if lower.contains("watch.amazon.com") || lower.contains("primevideo.com") || lower.contains("amazon.com/gp/video") {
+            // Extract any gti or asin we can find and route through aiv://.
+            // Worst case the Prime Video app just opens to its home — still
+            // better than tvOS rejecting outright.
+            if let u = URL(string: "aiv://aiv/landing") { return u }
+        }
+
+        // Paramount+: same pattern — try the custom scheme.
+        if lower.contains("paramountplus.com") || lower.contains("paramount.com") {
+            if let u = URL(string: "paramountplus://") { return u }
+        }
+
+        // Peacock: tvOS app opens from peacocktv.com universal links but
+        // doesn't navigate to the show. Try the custom scheme.
+        if lower.contains("peacocktv.com") {
+            let t = s.replacingOccurrences(of: "https://www.peacocktv.com", with: "peacocktv://www.peacocktv.com")
+                    .replacingOccurrences(of: "https://peacocktv.com",   with: "peacocktv://www.peacocktv.com")
+            if let u = URL(string: t) { return u }
+        }
+
+        return url
     }
 
     private func load() async {
