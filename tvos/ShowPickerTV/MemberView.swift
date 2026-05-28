@@ -45,9 +45,9 @@ struct MemberView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(alignment: .top, spacing: 40) {
                     ForEach(items.sorted { (Double($0.rating ?? "0") ?? 0) > (Double($1.rating ?? "0") ?? 0) }) { show in
-                        NavigationLink(value: Route.show(show)) {
+                        NavigationLink(value: Route.detail(id: show.id, title: show.title, network: show.network, rating: show.rating)) {
                             ShowCard(title: show.title,
-                                     subtitle: show.network,
+                                     network: show.network,
                                      rating: show.rating,
                                      badge: show.isFullSeries ? "🎬" : nil)
                         }

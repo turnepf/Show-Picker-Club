@@ -88,6 +88,8 @@ struct Show: Codable, Identifiable, Hashable {
 }
 
 struct ShowsResponse: Codable { let shows: [Show] }
+struct ShowResponse: Codable { let show: Show }
+struct ActorsResponse: Codable { let actors: [Actor] }
 
 struct PopularShow: Codable, Identifiable, Hashable {
     let id: Int

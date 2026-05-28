@@ -35,4 +35,16 @@ enum API {
         let r: ShowsResponse = try await get("/api/shows?member=\(enc)")
         return r.shows
     }
+
+    // Full row for one show (genres, notes, recommender, dates, URL) — but
+    // not cast, which lives at a separate endpoint.
+    static func showDetail(id: Int) async throws -> Show {
+        let r: ShowResponse = try await get("/api/shows/\(id)")
+        return r.show
+    }
+
+    static func actors(showId: Int) async throws -> [Actor] {
+        let r: ActorsResponse = try await get("/api/shows/\(showId)/actors")
+        return r.actors
+    }
 }

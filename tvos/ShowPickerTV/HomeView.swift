@@ -25,9 +25,9 @@ struct HomeView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 LazyHStack(alignment: .top, spacing: 40) {
                                     ForEach(popular) { show in
-                                        NavigationLink(value: Route.popular(show)) {
+                                        NavigationLink(value: Route.detail(id: show.id, title: show.title, network: show.network, rating: show.rating)) {
                                             ShowCard(title: show.title,
-                                                     subtitle: show.network,
+                                                     network: show.network,
                                                      rating: show.rating)
                                         }
                                         .buttonStyle(.card)
@@ -55,9 +55,10 @@ struct HomeView: View {
             .background(Theme.cream.ignoresSafeArea())
             .navigationDestination(for: Route.self) { route in
                 switch route {
-                case .member(let m): MemberView(member: m)
-                case .popular(let p): ShowDetailView(detail: .popular(p))
-                case .show(let s): ShowDetailView(detail: .show(s))
+                case .member(let m):
+                    MemberView(member: m)
+                case .detail(let id, let title, let network, let rating):
+                    ShowDetailView(id: id, initialTitle: title, initialNetwork: network, initialRating: rating)
                 }
             }
             .task { await load() }
@@ -110,8 +111,9 @@ struct MemberTile: View {
 }
 
 // Navigation routes. Hashable so they work with NavigationStack value links.
+// Detail carries minimal info for an instant header; the full record + cast
+// are fetched by id on the detail screen.
 enum Route: Hashable {
     case member(Member)
-    case popular(PopularShow)
-    case show(Show)
+    case detail(id: Int, title: String, network: String?, rating: String?)
 }
