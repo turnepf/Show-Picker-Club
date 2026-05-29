@@ -175,3 +175,11 @@ A few intentional omissions:
 - No comments or threads — discussion happens off-app.
 - No public sign-up or invitation tokens.
 - No mobile app — the PWA covers it.
+
+## Backlog
+
+- **Social login (Sign in with Apple + Google).** Layer on top of the
+  current email-OTP flow as additional sign-in paths, not replacements.
+  Maps the SSO email back to an existing member's `member_emails` row,
+  so seeding stays operator-controlled (no public sign-up). "Sign in
+  with Apple" first since the iOS app is the higher-friction surface.
