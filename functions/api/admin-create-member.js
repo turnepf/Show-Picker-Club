@@ -66,28 +66,44 @@ export async function onRequestPost(context) {
     return json({ error: 'Invalid JSON' }, 400);
   }
 
-  const { full_name, phone } = body;
+  const { full_name, phone, emails } = body;
 
-  if (!full_name || !phone) {
-    return json({ error: 'Full name and phone required' }, 400);
+  if (!full_name) {
+    return json({ error: 'Full name required' }, 400);
+  }
+  if (!phone && !emails) {
+    return json({ error: 'Provide a phone number, at least one email, or both' }, 400);
   }
 
-  const phoneE164 = normalizePhone(phone);
-  if (!phoneE164) {
-    return json({ error: 'Phone number looks invalid — use digits only, with + and country code for non-US numbers' }, 400);
+  let phoneE164 = null;
+  if (phone) {
+    phoneE164 = normalizePhone(phone);
+    if (!phoneE164) {
+      return json({ error: 'Phone number looks invalid — use digits only, with + and country code for non-US numbers' }, 400);
+    }
+    const phoneClash = await env.DB.prepare(
+      'SELECT member_slug FROM member_phones WHERE phone = ?'
+    ).bind(phoneE164).first();
+    if (phoneClash) {
+      return json({ error: `Phone already on file for member: ${phoneClash.member_slug}` }, 409);
+    }
   }
 
-  // Login code derives from the last 4 digits of the phone. Short-term until
-  // SMS code login replaces it; gives the user something to remember tied to
-  // their own number rather than an arbitrary 4-digit string.
-  const code = phoneE164.slice(-4);
-
-  const phoneClash = await env.DB.prepare(
-    'SELECT member_slug FROM member_phones WHERE phone = ?'
-  ).bind(phoneE164).first();
-  if (phoneClash) {
-    return json({ error: `Phone already on file for member: ${phoneClash.member_slug}` }, 409);
+  // Parse comma/whitespace-separated emails; reject anything that doesn't
+  // look like an address so we don't silently swallow typos.
+  const emailList = (emails || '')
+    .split(/[,;\s]+/)
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+  for (const e of emailList) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+      return json({ error: `Email looks invalid: ${e}` }, 400);
+    }
   }
+
+  // Legacy static code is only meaningful when there's a phone (it's the
+  // last 4 digits). Without a phone, the member logs in via emailed OTP.
+  const code = phoneE164 ? phoneE164.slice(-4) : null;
 
   const tokens = full_name.trim().split(/\s+/);
   const firstName = tokens[0];
@@ -122,12 +138,23 @@ export async function onRequestPost(context) {
   await env.DB.prepare(
     'INSERT INTO members (slug, name, first_name, last_initial) VALUES (?, ?, ?, ?)'
   ).bind(slug, displayName, firstName, lastInitialUpper).run();
-  await env.DB.prepare(
-    'INSERT INTO member_codes (member_slug, code, editor_name) VALUES (?, ?, ?)'
-  ).bind(slug, code, editorName).run();
-  await env.DB.prepare(
-    'INSERT INTO member_phones (phone, member_slug, label, is_primary) VALUES (?, ?, NULL, 1)'
-  ).bind(phoneE164, slug).run();
+  if (code) {
+    await env.DB.prepare(
+      'INSERT INTO member_codes (member_slug, code, editor_name) VALUES (?, ?, ?)'
+    ).bind(slug, code, editorName).run();
+  }
+  if (phoneE164) {
+    await env.DB.prepare(
+      'INSERT INTO member_phones (phone, member_slug, label, is_primary) VALUES (?, ?, NULL, 1)'
+    ).bind(phoneE164, slug).run();
+  }
+  // First email becomes primary; rest are alternates. UNIQUE (email, slug)
+  // means duplicates within the request are no-ops.
+  for (let i = 0; i < emailList.length; i++) {
+    await env.DB.prepare(
+      'INSERT OR IGNORE INTO member_emails (email, member_slug, is_primary) VALUES (?, ?, ?)'
+    ).bind(emailList[i], slug, i === 0 ? 1 : 0).run();
+  }
 
   const seeds = await pickSeeds(env);
   const seededTitles = [];
@@ -157,6 +184,7 @@ export async function onRequestPost(context) {
     url: `https://showpicker.club/${slug}`,
     code,
     phone: phoneE164,
+    emails: emailList,
     seeded: seededTitles,
   });
 }

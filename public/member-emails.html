@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Member emails</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #FBF5EB;
+      color: #2C2C2C;
+      min-height: 100vh;
+      padding: 40px 20px 80px;
+    }
+    .wrap { max-width: 640px; margin: 0 auto; }
+    h1 { font-size: 22px; margin-bottom: 6px; color: #2C3E50; }
+    .sub { color: #777; font-size: 13px; margin-bottom: 24px; }
+    .card {
+      background: #fff;
+      padding: 16px 18px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      margin-bottom: 12px;
+    }
+    .row { display: flex; align-items: center; gap: 12px; }
+    .name { font-weight: 600; min-width: 110px; color: #2C3E50; }
+    .slug { color: #888; font-size: 12px; font-family: ui-monospace, monospace; }
+    input.emails {
+      flex: 1;
+      padding: 9px 11px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    input.emails:focus { outline: none; border-color: #E67E22; }
+    button.save {
+      padding: 9px 16px;
+      background: #E67E22;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.save:hover { background: #d35400; }
+    button.save:disabled { background: #bbb; cursor: not-allowed; }
+    button.save.saved { background: #27ae60; }
+    .err {
+      background: #ffebee;
+      color: #b71c1c;
+      border: 1px solid #ffcdd2;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+    .err a { color: inherit; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Member emails</h1>
+    <div class="sub">Comma-separated. The first email becomes the primary. Saving replaces the existing set for that member.</div>
+    <div id="authWarn" class="err" style="display:none;">
+      Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a>, then reload.
+    </div>
+    <div id="list"></div>
+  </div>
+
+  <script>
+    async function load() {
+      const res = await fetch('/api/admin-member-emails');
+      if (res.status === 403) {
+        document.getElementById('authWarn').style.display = '';
+        return;
+      }
+      const data = await res.json();
+      render(data.members || []);
+    }
+
+    function render(members) {
+      const list = document.getElementById('list');
+      list.innerHTML = '';
+      for (const m of members) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="row">
+            <div>
+              <div class="name">${escapeHtml(m.first_name || m.slug)}</div>
+              <div class="slug">${escapeHtml(m.slug)}</div>
+            </div>
+            <input class="emails" type="text" value="${escapeHtml(m.emails.join(', '))}" placeholder="alice@example.com, alice.b@gmail.com">
+            <button class="save" data-slug="${escapeHtml(m.slug)}">Save</button>
+          </div>
+        `;
+        list.appendChild(card);
+      }
+      list.querySelectorAll('button.save').forEach(btn => {
+        btn.addEventListener('click', () => save(btn));
+      });
+    }
+
+    async function save(btn) {
+      const slug = btn.dataset.slug;
+      const input = btn.parentElement.querySelector('input.emails');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      btn.classList.remove('saved');
+      try {
+        const res = await fetch('/api/admin-member-emails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug, emails: input.value }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          btn.textContent = 'Error';
+          alert(data.error || `Failed (${res.status})`);
+          return;
+        }
+        input.value = data.emails.join(', ');
+        btn.textContent = 'Saved';
+        btn.classList.add('saved');
+        setTimeout(() => { btn.textContent = 'Save'; btn.classList.remove('saved'); }, 1500);
+      } catch (e) {
+        btn.textContent = 'Error';
+        alert('Network error: ' + e.message);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    }
+
+    load();
+  </script>
+</body>
+</html>

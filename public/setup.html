@@ -100,6 +100,10 @@
       <input type="tel" id="phone" autocomplete="off" placeholder="(336) 555-1234">
       <div class="hint">For SMS login and recommendation alerts (optional). Members who don't provide a number receive their login code from the operator directly. +1 is assumed for US numbers; prefix with + and country code for non-US. The login code is the last 4 digits of this number.</div>
 
+      <label>Email address(es)</label>
+      <input type="text" id="emails" autocomplete="off" placeholder="alice@example.com, alice.b@gmail.com">
+      <div class="hint">For email-based login codes (optional). Separate multiple addresses with commas — any of them can be used to request a code.</div>
+
       <button type="submit" id="go">Create member + seed 8 shows</button>
     </form>
     <div id="msg"></div>
@@ -140,6 +144,7 @@
       const body = {
         full_name: nameInput.value.trim(),
         phone: document.getElementById('phone').value.trim(),
+        emails: document.getElementById('emails').value.trim(),
       };
 
       try {

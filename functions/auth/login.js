@@ -30,22 +30,53 @@ export async function onRequestPost(context) {
     });
   }
 
-  let code, member;
+  let code, member, email;
   try {
     const body = await request.json();
     code = body.code;
     member = body.member;
+    email = (body.email || '').trim().toLowerCase();
   } catch (e) {
     return new Response(JSON.stringify({ error: 'invalid_body' }), { status: 400, headers: corsHeaders() });
   }
 
-  if (!code || !member) {
+  if (!code || (!member && !email)) {
     return new Response(JSON.stringify({ error: 'missing' }), { status: 400, headers: corsHeaders() });
   }
 
-  const match = await env.DB.prepare(
-    'SELECT editor_name, member_slug FROM member_codes WHERE code = ? AND member_slug = ?'
-  ).bind(code, member).first();
+  // If the user submitted an email instead of a slug, resolve to the
+  // owning member so OTP lookup can match by (member_slug, code).
+  if (!member && email) {
+    const row = await env.DB.prepare(
+      'SELECT member_slug FROM member_emails WHERE LOWER(email) = ? LIMIT 1'
+    ).bind(email).first();
+    if (!row) {
+      await recordFailure(env, ip, null);
+      return new Response(JSON.stringify({ error: 'invalid' }), { status: 401, headers: corsHeaders() });
+    }
+    member = row.member_slug;
+  }
+
+  // Try a one-time code first (fresh, single-use, expires fast).
+  const nowISO = new Date().toISOString();
+  const otp = await env.DB.prepare(
+    `SELECT id FROM login_otps
+       WHERE member_slug = ? AND code = ? AND used_at IS NULL AND expires_at > ?
+       ORDER BY created_at DESC LIMIT 1`
+  ).bind(member, code, nowISO).first();
+
+  let match = null;
+  if (otp) {
+    await env.DB.prepare('UPDATE login_otps SET used_at = ? WHERE id = ?')
+      .bind(nowISO, otp.id).run();
+    const m = await env.DB.prepare('SELECT name FROM members WHERE slug = ?').bind(member).first();
+    match = { editor_name: m?.name || member, member_slug: member };
+  } else {
+    // Fall back to the legacy static code (last-4 of phone) during transition.
+    match = await env.DB.prepare(
+      'SELECT editor_name, member_slug FROM member_codes WHERE code = ? AND member_slug = ?'
+    ).bind(code, member).first();
+  }
 
   if (!match) {
     await recordFailure(env, ip, member);
