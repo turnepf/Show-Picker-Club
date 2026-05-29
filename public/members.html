@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <title>Member emails &amp; phones</title>
+  <title>Members</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -66,6 +66,14 @@
     button.save:hover { background: #d35400; }
     button.save:disabled { background: #bbb; cursor: not-allowed; }
     button.save.saved { background: #27ae60; }
+    .sort-bar {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 14px; font-size: 13px; color: #555;
+    }
+    .sort-bar select {
+      padding: 6px 10px; font-size: 13px; font-family: inherit;
+      border: 1px solid #ddd; border-radius: 6px; background: #fff;
+    }
     .err {
       background: #ffebee;
       color: #b71c1c;
@@ -84,7 +92,7 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>Member emails &amp; phones</h1>
+    <h1>Members</h1>
     <div class="sub">
       Emails and phones are comma-separated; the first in each list is the
       primary. Saving replaces the existing set for that member. Updating a
@@ -94,10 +102,21 @@
     <div id="authWarn" class="err" style="display:none;">
       Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a>, then reload.
     </div>
+    <div class="sort-bar">
+      <label for="sortBy">Sort:</label>
+      <select id="sortBy">
+        <option value="name">Name</option>
+        <option value="slug">Slug</option>
+        <option value="last_login_desc">Most recent login</option>
+        <option value="last_login_asc">Oldest / never logged in</option>
+      </select>
+    </div>
     <div id="list"></div>
   </div>
 
   <script>
+    let allMembers = [];
+
     async function load() {
       const res = await fetch('/api/admin-member-emails');
       if (res.status === 403) {
@@ -105,8 +124,47 @@
         return;
       }
       const data = await res.json();
-      render(data.members || []);
+      allMembers = data.members || [];
+      // Restore last-used sort preference per browser/operator so the page
+      // opens the same way each visit.
+      const saved = localStorage.getItem('membersSortBy');
+      if (saved) document.getElementById('sortBy').value = saved;
+      renderSorted();
     }
+
+    function renderSorted() {
+      const mode = document.getElementById('sortBy').value;
+      localStorage.setItem('membersSortBy', mode);
+      const sorted = [...allMembers];
+      const cmpName = (a, b) =>
+        (a.first_name || a.slug).localeCompare(b.first_name || b.slug, undefined, { sensitivity: 'base' });
+      if (mode === 'slug') {
+        sorted.sort((a, b) => a.slug.localeCompare(b.slug));
+      } else if (mode === 'last_login_desc') {
+        // Most recent first; never-logged-in members sink to the bottom.
+        sorted.sort((a, b) => {
+          if (!a.last_login && !b.last_login) return cmpName(a, b);
+          if (!a.last_login) return 1;
+          if (!b.last_login) return -1;
+          return b.last_login.localeCompare(a.last_login);
+        });
+      } else if (mode === 'last_login_asc') {
+        // Never-logged-in members rise to the top so they're easy to spot.
+        sorted.sort((a, b) => {
+          if (!a.last_login && !b.last_login) return cmpName(a, b);
+          if (!a.last_login) return -1;
+          if (!b.last_login) return 1;
+          return a.last_login.localeCompare(b.last_login);
+        });
+      } else {
+        sorted.sort(cmpName);
+      }
+      render(sorted);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('sortBy').addEventListener('change', renderSorted);
+    });
 
     function formatLastLogin(iso) {
       if (!iso) return '<span class="never">never logged in</span>';
