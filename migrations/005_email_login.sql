@@ -46,7 +46,16 @@ INSERT OR IGNORE INTO member_emails (email, member_slug, is_primary) VALUES
   ('williamwturner@icloud.com',     'william', 0),
   ('william@williamandfriends.com', 'william', 0),
   ('brownlee96@hotmail.com',     'kirsten',1),
-  ('anniekate2002@gmail.com',    'annie',  1);
+  ('anniekate2002@gmail.com',    'annie',    1),
+  ('fiona@fionaturner.com',          'fiona',    1),
+  ('fionturn@icloud.com',            'fiona',    0),
+  ('jennifer.gowen@gmail.com',       'jennifer', 1),
+  ('biggsjm2@gmail.com',             'jennifer', 0),
+  ('jessicaryan_98@yahoo.com',       'jessica',  1),
+  ('joepotterwsnc@gmail.com',        'joe',      1),
+  ('josephlbrooks@gmail.com',        'joey',     1),
+  ('countymayor@claibornecountytn.gov','joey',   0),
+  ('hillbillyvol@hotmail.com',       'joey',     0);
 
 -- Backfill mobile numbers for any members missing one. INSERT OR IGNORE
 -- with the (phone, member_slug) UNIQUE means we never duplicate, and

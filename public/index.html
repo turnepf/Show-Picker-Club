@@ -692,6 +692,31 @@
     </div>
   </div>
 
+  <div class="modal-overlay hidden" id="loginOverlay" onclick="closeLoginModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2>Log in to edit</h2>
+
+      <label for="loginCode">Code</label>
+      <input type="text" id="loginCode" inputmode="numeric" autocomplete="one-time-code"
+             pattern="[0-9]*" maxlength="6" placeholder="••••••">
+      <div style="font-size: 12px; color: #888; margin-top: 4px;">Enter the 4-digit code you already have, or get a fresh 6-digit code by email below.</div>
+
+      <label for="loginEmail" style="margin-top: 16px;">Email</label>
+      <input type="email" id="loginEmail" autocomplete="email" placeholder="you@example.com">
+      <button type="button" class="btn" id="loginEmailBtn" style="margin-top: 8px; width: 100%; background: #ecf0f1; color: #2C2C2C;" onclick="sendEmailCode()">Email me a code</button>
+      <div id="loginEmailHint" style="font-size: 12px; color: #888; margin-top: 6px;">
+        If your email isn't on file, text Patrick at <a href="sms:+13366927470" style="color: #E67E22;">+1&nbsp;336&nbsp;692&nbsp;7470</a> to add it.
+      </div>
+
+      <div id="loginErr" style="display:none; margin-top: 14px; padding: 10px; background: #ffebee; color: #b71c1c; border-radius: 6px; font-size: 13px;"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeLoginModal()">Cancel</button>
+        <button class="btn btn-save" id="loginSubmitBtn" onclick="submitLoginCode()">Log in</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let shows = [];
     let currentTab = 'watching';
@@ -1008,28 +1033,101 @@
         renderShows();
         return;
       }
-      const code = prompt('Enter 4-digit code:');
-      if (!code) return;
-      fetch('/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, member: memberSlug }),
-      }).then(res => {
+      openLoginModal();
+    }
+
+    function openLoginModal() {
+      document.getElementById('loginOverlay').classList.remove('hidden');
+      document.getElementById('loginErr').style.display = 'none';
+      document.getElementById('loginCode').value = '';
+      document.getElementById('loginEmail').value = '';
+      setTimeout(() => document.getElementById('loginCode').focus(), 50);
+    }
+
+    function closeLoginModal(e) {
+      if (e && e.target !== e.currentTarget) return;
+      document.getElementById('loginOverlay').classList.add('hidden');
+    }
+
+    function showLoginError(msg) {
+      const el = document.getElementById('loginErr');
+      el.textContent = msg;
+      el.style.display = '';
+    }
+
+    async function sendEmailCode() {
+      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showLoginError('Enter a valid email first.');
+        return;
+      }
+      const btn = document.getElementById('loginEmailBtn');
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      try {
+        const res = await fetch('/auth/request-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, channel: 'email' }),
+        });
+        if (res.status === 429) {
+          showLoginError('Too many requests. Try again in an hour.');
+        } else if (!res.ok) {
+          showLoginError('Could not send. Try again or text Patrick.');
+        } else {
+          // Identical reply whether the email is on file or not (account
+          // enumeration hardening). Show the same hint either way.
+          document.getElementById('loginErr').style.display = 'none';
+          btn.textContent = 'Code sent — check your email';
+          btn.style.background = '#27ae60';
+          btn.style.color = '#fff';
+          document.getElementById('loginCode').focus();
+        }
+      } catch {
+        showLoginError('Network error. Try again.');
+      } finally {
+        setTimeout(() => {
+          btn.disabled = false;
+          if (btn.textContent === 'Sending…') btn.textContent = 'Email me a code';
+        }, 600);
+      }
+    }
+
+    async function submitLoginCode() {
+      const code = document.getElementById('loginCode').value.trim();
+      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+      if (!code) {
+        showLoginError('Enter your code.');
+        return;
+      }
+      const btn = document.getElementById('loginSubmitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Logging in…';
+      // If the user supplied an email, prefer that (resolves to any member);
+      // otherwise stick with the legacy slug-based path so the static code
+      // keeps working on the page they're currently viewing.
+      const body = email ? { code, email } : { code, member: memberSlug };
+      try {
+        const res = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
         if (!res.ok) {
-          window.location.href = '/' + memberSlug + '?error=invalid';
+          showLoginError('Invalid or expired code.');
           return;
         }
-        // Drop straight into edit mode — no reload, so no second Edit tap.
-        // checkAuth() populates authMember / editorName / Add button / recs
-        // from the new session cookie, then we flip on edit mode.
-        return checkAuth().then(() => {
-          isEditor = true;
-          document.getElementById('loginBtn').classList.add('active');
-          renderShows();
-        });
-      }).catch(() => {
-        window.location.href = '/' + memberSlug + '?error=invalid';
-      });
+        closeLoginModal();
+        await checkAuth();
+        isEditor = true;
+        document.getElementById('loginBtn').classList.add('active');
+        renderShows();
+      } catch {
+        showLoginError('Network error. Try again.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Log in';
+      }
     }
 
     async function loadShows() {
