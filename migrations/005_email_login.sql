@@ -46,7 +46,16 @@ INSERT OR IGNORE INTO member_emails (email, member_slug, is_primary) VALUES
   ('member@example.com',     'william', 0),
   ('member@example.com', 'william', 0),
   ('member@example.com',     'kirsten',1),
-  ('member@example.com',    'annie',  1);
+  ('member@example.com',    'annie',    1),
+  ('member@example.com',          'fiona',    1),
+  ('member@example.com',            'fiona',    0),
+  ('member@example.com',       'jennifer', 1),
+  ('member@example.com',             'jennifer', 0),
+  ('member@example.com',       'jessica',  1),
+  ('member@example.com',        'joe',      1),
+  ('member@example.com',        'joey',     1),
+  ('member@example.com','joey',   0),
+  ('member@example.com',       'joey',     0);
 
 -- Backfill mobile numbers for any members missing one. INSERT OR IGNORE
 -- with the (phone, member_slug) UNIQUE means we never duplicate, and
