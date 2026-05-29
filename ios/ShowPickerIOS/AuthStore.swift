@@ -30,6 +30,16 @@ final class AuthStore: ObservableObject {
     }
 
     @MainActor
+    func loginWithEmail(email: String, code: String) async throws {
+        let r = try await API.loginWithEmail(email: email, code: code)
+        if r.success == true {
+            await refresh()
+        } else {
+            throw API.APIError.badResponse(401)
+        }
+    }
+
+    @MainActor
     func logout() async {
         await API.logout()
         memberSlug = nil

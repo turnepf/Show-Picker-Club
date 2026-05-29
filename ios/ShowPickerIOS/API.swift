@@ -62,6 +62,22 @@ enum API {
         try await postJSON("/auth/login", body: ["code": code, "member": slug])
     }
 
+    static func loginWithEmail(email: String, code: String) async throws -> LoginResponse {
+        try await postJSON("/auth/login", body: ["code": code, "email": email])
+    }
+
+    // Ask the server to email a fresh 6-digit OTP. Server replies 200 even
+    // for unknown emails (account-enumeration hardening), so a true result
+    // doesn't prove the address is on file — it just means the request was
+    // accepted.
+    @discardableResult
+    static func requestEmailCode(email: String) async throws -> Bool {
+        struct Ack: Decodable { let success: Bool? }
+        let r: Ack = try await postJSON("/auth/request-code",
+                                        body: ["email": email, "channel": "email"])
+        return r.success == true
+    }
+
     static func logout() async {
         guard let url = URL(string: baseString + "/auth/logout") else { return }
         _ = try? await URLSession.shared.data(for: URLRequest(url: url))
