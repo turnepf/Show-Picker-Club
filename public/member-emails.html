@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <title>Member emails</title>
+  <title>Member emails &amp; phones</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -12,32 +12,48 @@
       background: #FBF5EB;
       color: #2C2C2C;
       min-height: 100vh;
-      padding: 40px 20px 80px;
+      padding: 32px 16px 80px;
     }
-    .wrap { max-width: 640px; margin: 0 auto; }
+    .wrap { max-width: 920px; margin: 0 auto; }
     h1 { font-size: 22px; margin-bottom: 6px; color: #2C3E50; }
-    .sub { color: #777; font-size: 13px; margin-bottom: 24px; }
+    .sub { color: #777; font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
     .card {
       background: #fff;
-      padding: 16px 18px;
+      padding: 14px 16px;
       border-radius: 10px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
-    .row { display: flex; align-items: center; gap: 12px; }
-    .name { font-weight: 600; min-width: 110px; color: #2C3E50; }
-    .slug { color: #888; font-size: 12px; font-family: ui-monospace, monospace; }
-    input.emails {
+    .top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      gap: 12px;
+    }
+    .name { font-weight: 600; color: #2C3E50; font-size: 15px; }
+    .meta { color: #888; font-size: 12px; font-family: ui-monospace, monospace; }
+    .meta .never { color: #c0392b; }
+    .field { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+    .field label {
+      width: 60px;
+      font-size: 12px;
+      color: #777;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .field input {
       flex: 1;
-      padding: 9px 11px;
+      padding: 8px 10px;
       border: 1px solid #ddd;
       border-radius: 6px;
-      font-size: 14px;
+      font-size: 13px;
       font-family: inherit;
     }
-    input.emails:focus { outline: none; border-color: #E67E22; }
+    .field input:focus { outline: none; border-color: #E67E22; }
     button.save {
-      padding: 9px 16px;
+      margin-top: 12px;
+      padding: 8px 16px;
       background: #E67E22;
       color: #fff;
       border: none;
@@ -45,6 +61,7 @@
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
+      align-self: flex-start;
     }
     button.save:hover { background: #d35400; }
     button.save:disabled { background: #bbb; cursor: not-allowed; }
@@ -59,12 +76,21 @@
       font-size: 13px;
     }
     .err a { color: inherit; }
+    @media (max-width: 560px) {
+      .top { flex-direction: column; align-items: flex-start; }
+      .field label { width: 50px; }
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Member emails</h1>
-    <div class="sub">Comma-separated. The first email becomes the primary. Saving replaces the existing set for that member.</div>
+    <h1>Member emails &amp; phones</h1>
+    <div class="sub">
+      Emails and phones are comma-separated; the first in each list is the
+      primary. Saving replaces the existing set for that member. Updating a
+      member's phone also resyncs their legacy 4-digit code to the new
+      last-4 (legacy codes stop working after June 7th).
+    </div>
     <div id="authWarn" class="err" style="display:none;">
       Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a>, then reload.
     </div>
@@ -82,21 +108,42 @@
       render(data.members || []);
     }
 
+    function formatLastLogin(iso) {
+      if (!iso) return '<span class="never">never logged in</span>';
+      const d = new Date(iso);
+      if (isNaN(d)) return 'last login: ' + escapeHtml(iso);
+      const now = new Date();
+      const days = Math.floor((now - d) / 86400000);
+      let when;
+      if (days === 0) when = 'today';
+      else if (days === 1) when = 'yesterday';
+      else if (days < 30) when = `${days}d ago`;
+      else if (days < 365) when = `${Math.floor(days/30)}mo ago`;
+      else when = `${Math.floor(days/365)}y ago`;
+      return `last login: ${when} (${d.toLocaleDateString()})`;
+    }
+
     function render(members) {
       const list = document.getElementById('list');
       list.innerHTML = '';
       for (const m of members) {
         const card = document.createElement('div');
         card.className = 'card';
+        const displayName = `${m.first_name || m.slug}${m.last_initial ? ' ' + m.last_initial + '.' : ''}`;
         card.innerHTML = `
-          <div class="row">
-            <div>
-              <div class="name">${escapeHtml(m.first_name || m.slug)}</div>
-              <div class="slug">${escapeHtml(m.slug)}</div>
-            </div>
-            <input class="emails" type="text" value="${escapeHtml(m.emails.join(', '))}" placeholder="alice@example.com, alice.b@gmail.com">
-            <button class="save" data-slug="${escapeHtml(m.slug)}">Save</button>
+          <div class="top">
+            <div class="name">${escapeHtml(displayName)} <span class="meta">${escapeHtml(m.slug)}</span></div>
+            <div class="meta">${formatLastLogin(m.last_login)}</div>
           </div>
+          <div class="field">
+            <label>Emails</label>
+            <input class="emails" type="text" value="${escapeHtml(m.emails.join(', '))}" placeholder="alice@example.com, alice.b@gmail.com">
+          </div>
+          <div class="field">
+            <label>Phones</label>
+            <input class="phones" type="text" value="${escapeHtml(m.phones.join(', '))}" placeholder="+1 336 555 1234">
+          </div>
+          <button class="save" data-slug="${escapeHtml(m.slug)}">Save</button>
         `;
         list.appendChild(card);
       }
@@ -107,7 +154,9 @@
 
     async function save(btn) {
       const slug = btn.dataset.slug;
-      const input = btn.parentElement.querySelector('input.emails');
+      const card = btn.parentElement;
+      const emails = card.querySelector('input.emails').value;
+      const phones = card.querySelector('input.phones').value;
       btn.disabled = true;
       btn.textContent = 'Saving…';
       btn.classList.remove('saved');
@@ -115,7 +164,7 @@
         const res = await fetch('/api/admin-member-emails', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slug, emails: input.value }),
+          body: JSON.stringify({ slug, emails, phones }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -123,7 +172,8 @@
           alert(data.error || `Failed (${res.status})`);
           return;
         }
-        input.value = data.emails.join(', ');
+        card.querySelector('input.emails').value = (data.emails || []).join(', ');
+        card.querySelector('input.phones').value = (data.phones || []).join(', ');
         btn.textContent = 'Saved';
         btn.classList.add('saved');
         setTimeout(() => { btn.textContent = 'Save'; btn.classList.remove('saved'); }, 1500);
