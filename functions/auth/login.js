@@ -72,10 +72,16 @@ export async function onRequestPost(context) {
     const m = await env.DB.prepare('SELECT name FROM members WHERE slug = ?').bind(member).first();
     match = { editor_name: m?.name || member, member_slug: member };
   } else {
-    // Fall back to the legacy static code (last-4 of phone) during transition.
-    match = await env.DB.prepare(
-      'SELECT editor_name, member_slug FROM member_codes WHERE code = ? AND member_slug = ?'
-    ).bind(code, member).first();
+    // Fall back to the legacy static code (last-4 of phone) during the
+    // transition — only honored through end of day June 7, 2026 Eastern,
+    // after which the column-name check still hits but we refuse to
+    // return a session. Email-OTP login above stays available forever.
+    const LEGACY_CUTOFF = new Date('2026-06-08T04:00:00Z'); // 00:00 ET on Jun 8
+    if (new Date() < LEGACY_CUTOFF) {
+      match = await env.DB.prepare(
+        'SELECT editor_name, member_slug FROM member_codes WHERE code = ? AND member_slug = ?'
+      ).bind(code, member).first();
+    }
   }
 
   if (!match) {
