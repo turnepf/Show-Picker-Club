@@ -473,12 +473,15 @@
   <div id="showPage" class="hidden">
     <header>
       <div class="header-top">
-        <a href="/" style="color: rgba(255,255,255,0.85); text-decoration: none; font-size: 24px; line-height: 1; padding: 6px 10px; margin: -6px 4px -6px -10px; border-radius: 6px;" title="All members" aria-label="Back to all members">&#9664;</a>
+        <div class="header-actions">
+          <a href="/" style="color: rgba(255,255,255,0.85); text-decoration: none; font-size: 24px; line-height: 1; padding: 6px 10px; margin: -6px 0 -6px -10px; border-radius: 6px;" title="All members" aria-label="Back to all members">&#9664;</a>
+          <button class="btn btn-search" id="searchBtn" title="Search this member's shows" onclick="openSearchModal()">Search</button>
+        </div>
         <h1 id="appTitle"></h1>
         <div class="header-actions">
           <button class="btn btn-add hidden" id="addBtn" title="Add a new show" aria-label="Add a new show" onclick="openAddModal()">+</button>
           <button class="btn btn-login" id="loginBtn" title="Toggle edit mode" onclick="login()">Edit</button>
-          <button class="btn btn-search" id="searchBtn" title="Search this member's shows" onclick="openSearchModal()">Search</button>
+          <button class="btn btn-login hidden" id="logoutBtn" title="Log out" onclick="logout()">Log out</button>
         </div>
       </div>
       <div class="member-match-card hidden" id="memberMatchCard" onclick="openMatchModal()" role="button" tabindex="0">
@@ -1009,6 +1012,8 @@
             if (addBtn) addBtn.classList.remove('hidden');
             loadRecs();
           }
+          const logoutBtn = document.getElementById('logoutBtn');
+          if (logoutBtn) logoutBtn.classList.remove('hidden');
           // Per-row Edit/Delete affordances still require clicking Edit.
         }
       } catch (e) {}
@@ -1034,6 +1039,23 @@
         return;
       }
       openLoginModal();
+    }
+
+    async function logout() {
+      try {
+        // GET /auth/logout deletes the session row and 302s back; we don't
+        // follow the redirect, we just refresh state in place so the user
+        // stays on the page they were viewing.
+        await fetch('/auth/logout', { redirect: 'manual' });
+      } catch {}
+      authMember = null;
+      editorName = '';
+      isEditor = false;
+      document.getElementById('loginBtn').classList.remove('active');
+      document.getElementById('logoutBtn').classList.add('hidden');
+      const addBtn = document.getElementById('addBtn');
+      if (addBtn) addBtn.classList.add('hidden');
+      renderShows();
     }
 
     function openLoginModal() {
