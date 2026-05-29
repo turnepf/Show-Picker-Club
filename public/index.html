@@ -696,20 +696,17 @@
     <div class="modal" onclick="event.stopPropagation()">
       <h2>Log in to edit</h2>
 
-      <label for="loginCode">Code</label>
-      <input type="text" id="loginCode" inputmode="numeric" autocomplete="one-time-code"
-             pattern="[0-9]*" maxlength="6" placeholder="••••••">
-      <div style="font-size: 12px; color: #888; margin-top: 4px;">
-        Enter the 4-digit code you already have, or get a fresh 6-digit code by email below.
-        <strong style="color: #d35400;">Your old 4-digit code works through June 7th</strong> — after that, log in with an emailed code instead.
-      </div>
-
-      <label for="loginEmail" style="margin-top: 16px;">Email</label>
+      <label for="loginEmail">Email</label>
       <input type="email" id="loginEmail" autocomplete="email" placeholder="you@example.com">
       <button type="button" class="btn" id="loginEmailBtn" style="margin-top: 8px; width: 100%; background: #ecf0f1; color: #2C2C2C;" onclick="sendEmailCode()">Email me a code</button>
       <div id="loginEmailHint" style="font-size: 12px; color: #888; margin-top: 6px;">
         If your email isn't on file, text Patrick to add it.
       </div>
+
+      <label for="loginCode" style="margin-top: 18px;">Code</label>
+      <input type="text" id="loginCode" inputmode="numeric" autocomplete="one-time-code"
+             pattern="[0-9]*" maxlength="6" placeholder="••••••">
+      <div id="loginCodeHint" style="font-size: 12px; color: #888; margin-top: 4px;"></div>
 
       <div id="loginErr" style="display:none; margin-top: 14px; padding: 10px; background: #ffebee; color: #b71c1c; border-radius: 6px; font-size: 13px;"></div>
 
@@ -1044,7 +1041,16 @@
       document.getElementById('loginErr').style.display = 'none';
       document.getElementById('loginCode').value = '';
       document.getElementById('loginEmail').value = '';
-      setTimeout(() => document.getElementById('loginCode').focus(), 50);
+      // The static 4-digit code path expires at midnight ET on Jun 8, 2026;
+      // before that, surface the deadline; after, just say "from your email".
+      const LEGACY_CUTOFF = new Date('2026-06-08T04:00:00Z');
+      const hint = document.getElementById('loginCodeHint');
+      if (new Date() < LEGACY_CUTOFF) {
+        hint.innerHTML = 'Enter the 6-digit code from your email, or your original 4-digit code. <strong style="color: #d35400;">4-digit codes work through June 7th.</strong>';
+      } else {
+        hint.textContent = 'Enter the 6-digit code from your email.';
+      }
+      setTimeout(() => document.getElementById('loginEmail').focus(), 50);
     }
 
     function closeLoginModal(e) {

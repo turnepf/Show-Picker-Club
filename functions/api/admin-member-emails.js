@@ -25,7 +25,7 @@ function normalizePhone(input) {
 }
 
 // GET: list every member with their current emails, phones, and last
-// login time. Used by the /member-emails admin page.
+// login time. Used by the /members admin page.
 export async function onRequestGet(context) {
   const { request, env } = context;
   if (!(await isAdmin(request, env))) {
