@@ -90,6 +90,7 @@ export async function onRequestPost(context) {
            OR network_url LIKE '%?query=%'
            OR network_url LIKE 'https://www.max.com/%'
            OR network_url LIKE 'https://www.hbomax.com/%'
+           OR network_url LIKE 'https://play.hbomax.com/video/watch/%'
            OR network_url LIKE 'https://www.themoviedb.org/%'
            OR network_url = 'https://www.amazon.com/s'
            OR network_url = 'https://www.amazon.com/s/')
