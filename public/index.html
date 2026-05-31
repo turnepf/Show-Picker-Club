@@ -586,8 +586,9 @@
   <div class="modal-overlay hidden" id="suggestOverlay" onclick="closeSuggestModal(event)">
     <div class="modal" onclick="event.stopPropagation()">
       <h2>Suggest a Show</h2>
-      <label for="suggestName">Your Name</label>
-      <input type="text" id="suggestName" placeholder="e.g. Dorothy">
+      <!-- Hidden — we use the logged-in member's name automatically. Suggest
+           is only reachable when authenticated, so this can never be blank. -->
+      <input type="hidden" id="suggestName">
 
       <label for="suggestTitle">Show Title</label>
       <input type="text" id="suggestTitle" placeholder="e.g. The Night Agent">
@@ -1839,14 +1840,18 @@
     }
 
     function openSuggestModal() {
-      document.getElementById('suggestName').value = '';
+      if (!authMember) {
+        openLoginModal();
+        return;
+      }
+      document.getElementById('suggestName').value = editorName || authMember;
       document.getElementById('suggestTitle').value = '';
       document.getElementById('suggestNetwork').value = '';
       document.getElementById('suggestNetworkOther').value = '';
       document.getElementById('suggestNetworkOther').style.display = 'none';
       document.getElementById('suggestNotes').value = '';
       document.getElementById('suggestOverlay').classList.remove('hidden');
-      document.getElementById('suggestName').focus();
+      document.getElementById('suggestTitle').focus();
     }
 
     function closeSuggestModal(event) {

@@ -69,8 +69,13 @@ export async function onRequestPost(context) {
   if (otp) {
     await env.DB.prepare('UPDATE login_otps SET used_at = ? WHERE id = ?')
       .bind(nowISO, otp.id).run();
-    const m = await env.DB.prepare('SELECT name FROM members WHERE slug = ?').bind(member).first();
-    match = { editor_name: m?.name || member, member_slug: member };
+    // Match the legacy path's shape: editor_name is the member's first
+    // name (used as the display name in suggestions etc.), not the full
+    // "Patrick's Shows"-style record name.
+    const m = await env.DB.prepare(
+      'SELECT first_name, name FROM members WHERE slug = ?'
+    ).bind(member).first();
+    match = { editor_name: m?.first_name || m?.name || member, member_slug: member };
   } else {
     // Fall back to the legacy static code (last-4 of phone) during the
     // transition — only honored through end of day June 7, 2026 Eastern,
