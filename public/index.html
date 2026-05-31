@@ -637,8 +637,9 @@
       <label for="shareMember">Send to</label>
       <select id="shareMember"></select>
 
-      <label for="shareName">Your Name</label>
-      <input type="text" id="shareName" placeholder="e.g. Whitt">
+      <!-- Hidden — we use the logged-in member's name automatically. Both
+           paths into this modal are gated on auth before getting here. -->
+      <input type="hidden" id="shareName">
 
       <label for="shareNotes">Notes</label>
       <input type="text" id="shareNotes" placeholder="e.g. You'll love this one">
@@ -1907,12 +1908,13 @@
     let popularShowData = null;
 
     async function openPopularShare(title, network, networkUrl, movie) {
+      if (!authMember) { openLoginModal(); return; }
       await loadMembers();
       popularShowData = { title, network, network_url: networkUrl, movie };
       document.getElementById('shareShowId').value = '';
       document.getElementById('shareTitle').value = title;
       document.getElementById('shareNotes').value = '';
-      document.getElementById('shareName').value = editorName;
+      document.getElementById('shareName').value = editorName || authMember;
 
       const select = document.getElementById('shareMember');
       select.innerHTML = allMembers
@@ -1920,17 +1922,18 @@
         .join('');
 
       document.getElementById('shareOverlay').classList.remove('hidden');
-      document.getElementById('shareName').focus();
+      document.getElementById('shareNotes').focus();
     }
 
     async function openShareModal(showId) {
+      if (!authMember) { openLoginModal(); return; }
       await loadMembers();
       const show = shows.find(s => s.id === showId);
       if (!show) return;
       document.getElementById('shareShowId').value = showId;
       document.getElementById('shareTitle').value = show.title;
       document.getElementById('shareNotes').value = '';
-      document.getElementById('shareName').value = editorName;
+      document.getElementById('shareName').value = editorName || authMember;
 
       const select = document.getElementById('shareMember');
       select.innerHTML = allMembers
@@ -1939,7 +1942,7 @@
         .join('');
 
       document.getElementById('shareOverlay').classList.remove('hidden');
-      document.getElementById('shareName').focus();
+      document.getElementById('shareNotes').focus();
     }
 
     function closeShareModal(event) {
