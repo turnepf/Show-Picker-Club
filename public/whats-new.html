@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>What's New — Show Picker Club</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/favicon.svg">
+  <meta name="theme-color" content="#2C3E50">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { padding-top: 0; }
+    header {
+      background: var(--header-bg);
+      color: #fff;
+      padding: 20px;
+      padding-top: calc(20px + env(safe-area-inset-top, 0px));
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .header-top a.back {
+      color: rgba(255,255,255,0.85);
+      text-decoration: none;
+      font-size: 24px;
+      line-height: 1;
+      padding: 6px 10px;
+      margin: -6px 0 -6px -10px;
+      border-radius: 6px;
+    }
+    .header-top h1 {
+      font-family: var(--font-display);
+      font-size: var(--text-xl);
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+    }
+    .changelog p { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--border-soft); font-size: var(--text-sm); line-height: 1.6; color: var(--ink-muted); }
+    .changelog p:last-child { border-bottom: none; }
+    .cl-date { font-weight: 600; color: var(--ink); margin-right: 6px; }
+    .cl-title { font-weight: 600; color: var(--ink); margin-right: 4px; }
+    .changelog a { color: var(--accent); }
+    footer {
+      padding: 24px 0 20px;
+      font-size: var(--text-xs);
+      color: var(--ink-quiet);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-top">
+      <a class="back" href="/" title="Home" aria-label="Back to home">&#9664;</a>
+      <h1>What's New</h1>
+    </div>
+  </header>
+
+  <main>
+    <div class="changelog">
+      <p><span class="cl-date">5/21</span><span class="cl-title">Calendar feed.</span> Each member page now has a <strong>📅 Calendar feed</strong> link at the bottom. Subscribe in Apple Calendar, Google Calendar, or Fantastical to get upcoming season premieres and finales from that member's Watching and Waiting lists, updated daily.</p>
+      <p><span class="cl-date">5/9</span><span class="cl-title">Vibe.</span> Visit <a href="/vibe">showpicker.club/vibe</a> to see a personality fingerprint based on each member's taste: cluster name, top trait signals, balance read, and shows aligned with the vibe. Pick any member from the dropdown.</p>
+      <p><span class="cl-date">5/9</span><span class="cl-title">Picks for You.</span> Log in and visit your Up Next list to see five suggestions tailored to what your closest matches are watching. Tap <strong>+</strong> on any pick to add it straight to your Up Next.</p>
+      <p><span class="cl-date">5/4</span><span class="cl-title">Your Member Match.</span> Visit any member's page to see who they share the most shows with. Tap the match card to see the overlapping titles and jump straight to that member's lists.</p>
+      <p><span class="cl-date">4/28</span><span class="cl-title">Search.</span> Tap <strong>Search</strong> in the header on any member's page to find shows by title or actor across all four lists plus archived. Each result shows the list it's on; tap a result to expand the full details.</p>
+      <p><span class="cl-date">4/28</span><span class="cl-title">One-tap Add.</span> The <strong>+ Add</strong> button now appears on your member page as soon as you're logged in. No need to click Edit first.</p>
+      <p><span class="cl-date">4/26</span><span class="cl-title">Cleaner show rows.</span> Each show is now one tidy line: title, network, rating. Tap the title to expand and see genre, cast, who recommended it, next season dates, who you're watching with, and notes; only the lines with data show up.</p>
+      <p><span class="cl-date">4/21</span><span class="cl-title">My Shows link.</span> When logged in, a quick "My Shows" link appears on the home page just below the title.</p>
+      <p><span class="cl-date">4/17</span><span class="cl-title">Quick actions.</span> On the Watching list, "Watched it" moves a show to Recommending and "Season done" moves it to Waiting. No dropdown needed.</p>
+      <p><span class="cl-date">4/17</span><span class="cl-title">Genre tags.</span> Shows now display genre info (Drama, Comedy, Thriller, etc.) pulled from TMDB. Toggle visibility with the Genres pill.</p>
+      <p><span class="cl-date">4/17</span><span class="cl-title">Share this list.</span> Share a member's list with friends via text, email, or clipboard.</p>
+      <p><span class="cl-date">4/16</span><span class="cl-title">What Members Are Watching.</span> The home page now shows the most popular shows across all members. Tap <strong>+</strong> to add any of them to your own list.</p>
+      <p><span class="cl-date">4/15</span><span class="cl-title">New domain!</span> Show Picker Club is now at <a href="https://showpicker.club">showpicker.club</a>. The old link still works too.</p>
+      <p><span class="cl-date">4/15</span><span class="cl-title">Share shows to other members.</span> See a show on someone else's list that you want to add to yours? Tap the <strong>+</strong> button next to any show to send it to another member's Up Next list. It carries over the rating, network link, actors, and all the details. If you're logged in, your name auto-fills.</p>
+      <p><span class="cl-date">4/15</span><span class="cl-title">Sort your lists.</span> Use the sort dropdown at the bottom of any list to sort by Rating (default), A&ndash;Z, or Date Added.</p>
+      <p><span class="cl-date">4/15</span><span class="cl-title">Back to all members.</span> Tap the &#9664; arrow next to the member name to get back to the main list.</p>
+      <p><span class="cl-date">4/15</span><span class="cl-title">Network links sync across members.</span> When someone finds a good direct link for a show, it automatically copies to matching shows on other members' lists (runs once per day).</p>
+      <p><span class="cl-date">4/15</span><span class="cl-title">Watching With field.</span> Track who you're watching a show with.</p>
+      <p><span class="cl-date">4/14</span><span class="cl-title">Series Complete icon.</span> Shows that have ended get a &#127916; badge.</p>
+      <p><span class="cl-date">4/13</span><span class="cl-title">Suggest a Show.</span> Logged-in members can suggest shows to any other member via the button at the bottom of any list.</p>
+      <p><span class="cl-date">4/13</span><span class="cl-title">Toggle pills.</span> Show or hide Ratings, Networks, Recommended By, Dates, and Notes with the pill buttons at the bottom.</p>
+      <p><span class="cl-date">4/13</span><span class="cl-title">Season dates.</span> See when the next season starts (and when it ends) pulled automatically from TMDB.</p>
+      <p><span class="cl-date">4/13</span><span class="cl-title">Multi-member support.</span> One app, multiple members, each with their own lists and login codes.</p>
+      <p><span class="cl-date">4/13</span><span class="cl-title">PWA support.</span> Add Show Picker Club to your phone's home screen for an app-like experience.</p>
+      <p><span class="cl-date">4/12</span><span class="cl-title">Initial launch.</span> Add, edit, move, and archive shows across four lists: Watching, Waiting, Recommending, and Up Next. Auto-enriched with IMDB ratings, actors, and network links.</p>
+    </div>
+
+    <footer>&copy; 2025 Patrick Turner.</footer>
+  </main>
+</body>
+</html>
