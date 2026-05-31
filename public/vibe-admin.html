@@ -5,32 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title>Vibe trait fill</title>
+  <link rel="stylesheet" href="/styles.css">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #FBF5EB; color: #2C2C2C; min-height: 100vh; padding: 40px 20px;
-    }
-    .wrap { max-width: 720px; margin: 0 auto; background: #fff; padding: 28px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-    h1 { font-size: 20px; margin-bottom: 8px; color: #2C3E50; }
-    p.sub { color: #888; font-size: 13px; margin-bottom: 20px; }
-    label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; margin-top: 14px; color: #555; }
-    input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; font-family: inherit; }
-    input:focus { outline: none; border-color: #E67E22; }
-    button { width: 100%; margin-top: 24px; padding: 12px; background: #E67E22; color: #fff; border: none; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer; }
-    button:hover { background: #d35400; }
-    button:disabled { background: #bbb; cursor: not-allowed; }
-    .progress { margin-top: 20px; padding: 14px; border-radius: 6px; background: #f5f1e8; font-size: 13px; line-height: 1.6; }
-    .progress strong { color: #2C3E50; }
+    body { padding: 40px 20px; }
+    .wrap { max-width: 720px; margin: 0 auto; background: var(--surface); padding: 28px; border-radius: 12px; box-shadow: 0 1px 2px oklch(0.18 0.03 50 / 0.06), 0 8px 28px oklch(0.18 0.03 50 / 0.06); }
+    h1 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--ink); margin-bottom: 8px; }
+    p.sub { color: var(--ink-muted); font-size: var(--text-sm); margin-bottom: 20px; }
+    label { display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: 6px; margin-top: 14px; color: var(--ink-muted); }
+    input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: var(--text-base); font-family: inherit; }
+    input:focus { outline: none; border-color: var(--accent); }
+    button { width: 100%; margin-top: 24px; padding: 12px; background: var(--accent); color: #fff; border: none; border-radius: 6px; font-size: var(--text-base); font-weight: 600; cursor: pointer; }
+    button:hover { background: var(--accent-hover); }
+    button:disabled { background: var(--ink-faint); cursor: not-allowed; }
+    .progress { margin-top: 20px; padding: 14px; border-radius: 6px; background: var(--surface-2); font-size: var(--text-sm); line-height: 1.6; }
+    .progress strong { color: var(--ink); }
     .log-toolbar { display: flex; justify-content: flex-end; margin-top: 10px; }
-    button.copy { width: auto; margin: 0; padding: 6px 12px; font-size: 12px; background: #2C3E50; }
-    button.copy:hover { background: #1a252f; }
-    .log { margin-top: 6px; max-height: 300px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 12px; background: #fdfaf2; padding: 10px; border-radius: 6px; }
+    button.copy { width: auto; margin: 0; padding: 6px 12px; font-size: var(--text-xs); background: var(--ink); }
+    button.copy:hover { background: oklch(0.18 0.025 50); }
+    .log { margin-top: 6px; max-height: 300px; overflow-y: auto; font-family: var(--font-mono); font-size: var(--text-xs); background: var(--surface-2); padding: 10px; border-radius: 6px; }
     .log-row { padding: 2px 0; }
-    .log-row.ok { color: #1b5e20; }
-    .log-row.unknown { color: #b8860b; }
-    .log-row.error { color: #b71c1c; }
-    .err { color: #b71c1c; font-size: 13px; margin-top: 12px; }
+    .log-row.ok { color: oklch(0.42 0.13 150); }
+    .log-row.unknown { color: oklch(0.55 0.14 80); }
+    .log-row.error { color: var(--danger-deep); }
+    .err { color: var(--danger-deep); font-size: var(--text-sm); margin-top: 12px; }
   </style>
 </head>
 <body>
@@ -38,7 +35,7 @@
     <h1>Vibe trait fill</h1>
     <p class="sub">Generates trait scores for any show that doesn't have them yet. Calls Claude one batch at a time until all caught up.</p>
 
-    <div id="authWarn" style="display:none;margin-bottom:14px;padding:10px;background:#ffebee;border:1px solid #ffcdd2;border-radius:6px;color:#b71c1c;font-size:13px;">Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a> (tap Edit, enter your code), then reload this page.</div>
+    <div id="authWarn" style="display:none;margin-bottom:14px;padding:10px;background:var(--danger-soft);border:1px solid color-mix(in oklch, var(--danger) 30%, transparent);border-radius:6px;color:var(--danger-deep);font-size:13px;">Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a> (tap Edit, enter your code), then reload this page.</div>
 
     <label>Batch size (max 8)</label>
     <input type="number" id="batchSize" value="5" min="1" max="8">
@@ -89,7 +86,7 @@
       rows.forEach(r => {
         const div = document.createElement('div');
         div.className = 'log-row ' + r.status;
-        let line = `${r.title} — ${r.status}`;
+        let line = `${r.title}: ${r.status}`;
         if (r.error) line += ` (${r.error})`;
         div.textContent = line;
         log.appendChild(div);

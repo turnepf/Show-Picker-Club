@@ -5,20 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title>Members</title>
+  <link rel="stylesheet" href="/styles.css">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #FBF5EB;
-      color: #2C2C2C;
-      min-height: 100vh;
-      padding: 32px 16px 80px;
-    }
+    body { padding: 32px 16px 80px; }
     .wrap { max-width: 920px; margin: 0 auto; }
-    h1 { font-size: 22px; margin-bottom: 6px; color: #2C3E50; }
-    .sub { color: #777; font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
+    h1 { font-size: 22px; margin-bottom: 6px; color: var(--ink); }
+    .sub { color: var(--ink-muted); font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
     .card {
-      background: #fff;
+      background: var(--surface);
       padding: 14px 16px;
       border-radius: 10px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -31,30 +25,30 @@
       margin-bottom: 8px;
       gap: 12px;
     }
-    .name { font-weight: 600; color: #2C3E50; font-size: 15px; }
-    .meta { color: #888; font-size: 12px; font-family: ui-monospace, monospace; }
-    .meta .never { color: #c0392b; }
+    .name { font-weight: 600; color: var(--ink); font-size: 15px; }
+    .meta { color: var(--ink-muted); font-size: 12px; font-family: ui-monospace, monospace; }
+    .meta .never { color: var(--danger); }
     .field { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
     .field label {
       width: 60px;
       font-size: 12px;
-      color: #777;
+      color: var(--ink-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
     .field input {
       flex: 1;
       padding: 8px 10px;
-      border: 1px solid #ddd;
+      border: 1px solid var(--border);
       border-radius: 6px;
       font-size: 13px;
       font-family: inherit;
     }
-    .field input:focus { outline: none; border-color: #E67E22; }
+    .field input:focus { outline: none; border-color: var(--accent); }
     button.save {
       margin-top: 12px;
       padding: 8px 16px;
-      background: #E67E22;
+      background: var(--accent);
       color: #fff;
       border: none;
       border-radius: 6px;
@@ -63,21 +57,21 @@
       cursor: pointer;
       align-self: flex-start;
     }
-    button.save:hover { background: #d35400; }
-    button.save:disabled { background: #bbb; cursor: not-allowed; }
-    button.save.saved { background: #27ae60; }
+    button.save:hover { background: var(--accent-hover); }
+    button.save:disabled { background: var(--ink-faint); cursor: not-allowed; }
+    button.save.saved { background: var(--list-watching); }
     .sort-bar {
       display: flex; align-items: center; gap: 8px;
-      margin-bottom: 14px; font-size: 13px; color: #555;
+      margin-bottom: 14px; font-size: 13px; color: var(--ink-muted);
     }
     .sort-bar select {
       padding: 6px 10px; font-size: 13px; font-family: inherit;
-      border: 1px solid #ddd; border-radius: 6px; background: #fff;
+      border: 1px solid var(--border); border-radius: 6px; background: var(--surface);
     }
     .err {
-      background: #ffebee;
-      color: #b71c1c;
-      border: 1px solid #ffcdd2;
+      background: var(--danger-soft);
+      color: var(--danger-deep);
+      border: 1px solid var(--danger-soft);
       padding: 12px;
       border-radius: 6px;
       margin-bottom: 16px;
