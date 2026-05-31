@@ -1042,7 +1042,7 @@
       }
       // Logged in and clicking Log in from the landing page → straight to
       // their member page; no modal needed.
-      if (authMember && typeof memberSlug === 'undefined') {
+      if (authMember && !memberSlug) {
         window.location.href = '/' + authMember;
         return;
       }
@@ -1177,10 +1177,10 @@
         }
         closeLoginModal();
         await checkAuth();
-        // From the landing page (no memberSlug in scope), drop the user on
-        // their own member page so the login click feels like "go to my
-        // shows" rather than just "you're now authenticated".
-        if (typeof memberSlug === 'undefined' && authMember) {
+        // From the landing page (memberSlug is null until we navigate to a
+        // member route), drop the user on their own page so the login feels
+        // like "go to my shows" rather than just "you're now authenticated".
+        if (!memberSlug && authMember) {
           window.location.href = '/' + authMember;
           return;
         }
