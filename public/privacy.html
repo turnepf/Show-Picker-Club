@@ -4,23 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Privacy Policy — Show Picker Club</title>
+  <link rel="stylesheet" href="/styles.css">
   <style>
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #FBF5EB;
-      color: #2C2C2C;
       max-width: 720px;
       margin: 0 auto;
       padding: 40px 24px 80px;
       line-height: 1.6;
     }
-    h1 { font-size: 28px; color: #2C3E50; margin-bottom: 6px; }
-    h2 { font-size: 18px; color: #2C3E50; margin-top: 32px; margin-bottom: 8px; }
-    p, li { font-size: 15px; }
+    h1 { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 600; letter-spacing: -0.01em; color: var(--ink); margin-bottom: 6px; }
+    h2 { font-family: var(--font-display); font-size: var(--text-md); font-weight: 600; color: var(--ink); margin-top: 32px; margin-bottom: 8px; }
+    p, li { font-size: var(--text-sm); }
     ul { padding-left: 22px; margin: 8px 0; }
-    .updated { color: #888; font-size: 13px; margin-bottom: 24px; }
-    a { color: #E67E22; }
-    footer { margin-top: 48px; font-size: 13px; color: #888; }
+    .updated { color: var(--ink-muted); font-size: var(--text-xs); margin-bottom: 24px; }
+    a { color: var(--accent); }
+    footer { margin-top: 48px; font-size: var(--text-xs); color: var(--ink-muted); }
   </style>
 </head>
 <body>
@@ -53,8 +51,8 @@
   <p>We do not sell or share your phone number or personal information with third parties for marketing. The only third parties that handle your data are infrastructure providers required to operate the app:</p>
   <ul>
     <li><strong>Cloudflare</strong> (hosting and database).</li>
-    <li><strong>Twilio</strong> (SMS delivery — phone numbers are sent to Twilio for the purpose of delivering messages).</li>
-    <li><strong>OMDB, TMDB</strong> (show metadata enrichment — these calls do not include your phone number or other personal data).</li>
+    <li><strong>Twilio</strong> (SMS delivery; phone numbers are sent to Twilio for the purpose of delivering messages).</li>
+    <li><strong>OMDB, TMDB</strong> (show metadata enrichment; these calls do not include your phone number or other personal data).</li>
   </ul>
 
   <h2>Retention and deletion</h2>

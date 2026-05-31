@@ -5,20 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title>Show Picker Club Reporting</title>
+  <link rel="stylesheet" href="/styles.css">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #FBF5EB;
-      color: #2C2C2C;
-      min-height: 100vh;
-      padding: 24px 16px 60px;
-    }
+    body { padding: 24px 16px 60px; }
     .wrap { max-width: 960px; margin: 0 auto; }
-    h1 { font-size: 22px; color: #2C3E50; margin-bottom: 4px; }
-    .subtitle { font-size: 13px; color: #888; margin-bottom: 24px; }
+    h1 { font-size: 22px; color: var(--ink); margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: var(--ink-muted); margin-bottom: 24px; }
 
-    .err { color: #b71c1c; font-size: 13px; margin-top: 12px; text-align: center; }
+    .err { color: var(--danger-deep); font-size: 13px; margin-top: 12px; text-align: center; }
 
     .grid {
       display: grid;
@@ -27,31 +21,31 @@
       margin-bottom: 24px;
     }
     .card {
-      background: #fff;
+      background: var(--surface);
       border-radius: 8px;
       padding: 16px 12px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     }
     .card h3 {
       font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
-      color: #888; margin-bottom: 12px; font-weight: 600; text-align: center;
+      color: var(--ink-muted); margin-bottom: 12px; font-weight: 600; text-align: center;
     }
     .metrics { display: flex; gap: 2px; }
     .metric { flex: 1; min-width: 0; text-align: center; padding: 4px 2px; }
     .metric-val {
-      font-size: 20px; font-weight: 700; color: #2C3E50;
+      font-size: 20px; font-weight: 700; color: var(--ink);
       font-variant-numeric: tabular-nums; line-height: 1.1;
     }
     .metric-lbl {
       font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px;
-      color: #999; margin-top: 4px;
+      color: var(--ink-muted); margin-top: 4px;
     }
     .stat-row { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; font-size: 14px; }
-    .stat-row .lbl { color: #777; }
-    .stat-row .val { font-weight: 600; color: #2C3E50; font-variant-numeric: tabular-nums; }
+    .stat-row .lbl { color: var(--ink-muted); }
+    .stat-row .val { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
 
     .section {
-      background: #fff;
+      background: var(--surface);
       border-radius: 8px;
       padding: 16px 20px;
       margin-bottom: 16px;
@@ -59,21 +53,21 @@
     }
     .section h2 {
       font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;
-      color: #888; margin-bottom: 12px; font-weight: 600;
+      color: var(--ink-muted); margin-bottom: 12px; font-weight: 600;
     }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    th { text-align: left; font-weight: 500; color: #888; padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 12px; }
-    td { padding: 8px; border-bottom: 1px solid #f3f3f3; }
+    th { text-align: left; font-weight: 500; color: var(--ink-muted); padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 12px; }
+    td { padding: 8px; border-bottom: 1px solid var(--border-soft); }
     td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
     tr:last-child td { border-bottom: none; }
 
-    .empty { color: #aaa; font-style: italic; font-size: 13px; padding: 8px 0; }
-    .footer { text-align: center; color: #aaa; font-size: 12px; margin-top: 32px; }
+    .empty { color: var(--ink-faint); font-style: italic; font-size: 13px; padding: 8px 0; }
+    .footer { text-align: center; color: var(--ink-faint); font-size: 12px; margin-top: 32px; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1><a href="/" style="color: #95a5a6; text-decoration: none; font-size: 18px; margin-right: 8px;" title="Home">&#9664;</a>Show Picker Club Reporting</h1>
+    <h1><a href="/" style="color: var(--ink-quiet); text-decoration: none; font-size: 18px; margin-right: 8px;" title="Home">&#9664;</a>Show Picker Club Reporting</h1>
     <div class="subtitle" id="generated">Loading…</div>
     <div id="content"></div>
     <div id="loadErr" class="err"></div>

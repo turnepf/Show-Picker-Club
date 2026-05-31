@@ -1,0 +1,80 @@
+/*
+ * Show Picker Club — design tokens + shared baseline.
+ * Linked by every public HTML page; page-specific styles stay inline.
+ */
+
+:root {
+  /* Surfaces — body is the committed warm taupe; cards inside are near-white */
+  --body:         oklch(0.86  0.025 50);   /* warm taupe — the brand's own warmth as the surface */
+  --surface:      oklch(0.985 0.003 50);   /* near-white card (landing, modals) */
+  --surface-2:    oklch(0.955 0.014 50);   /* subtly recessed panel inside a card */
+  --border:       oklch(0.78  0.020 50);   /* visible against both surface and body */
+  --border-soft:  oklch(0.83  0.014 50);   /* quiet row separators */
+
+  /* Type ramp — verified against --body (taupe) AND --surface (near-white) */
+  --ink:          oklch(0.22  0.025 50);   /* ~7:1 on body, ~14:1 on surface */
+  --ink-muted:    oklch(0.40  0.018 50);   /* ~4.6:1 on body, ~5.4:1 on surface */
+  --ink-quiet:    oklch(0.48  0.015 50);   /* AA-large only, easter eggs / fine print */
+  --ink-faint:    oklch(0.60  0.012 50);   /* placeholders, decoration */
+
+  /* The one earned accent */
+  --accent:        oklch(0.69 0.15 50);    /* same hue as the prior #E67E22 */
+  --accent-hover:  oklch(0.60 0.16 50);
+  --accent-soft:   oklch(0.95 0.04 50);    /* tinted hover wash, not body */
+
+  /* List vocabulary — same chroma family, retuned off Flat UI */
+  --list-watching:     oklch(0.58 0.13 150);   /* sage */
+  --list-waiting:      oklch(0.60 0.09 230);   /* quiet steel */
+  --list-recommending: oklch(0.55 0.13 340);   /* clay rose */
+  --list-up-next:      var(--accent);          /* brand orange */
+
+  /* Semantic */
+  --info:        oklch(0.55 0.11 230);
+  --danger:      oklch(0.55 0.18 25);
+  --danger-soft: oklch(0.95 0.04 25);
+  --danger-deep: oklch(0.38 0.18 25);
+  --star:        oklch(0.83 0.16 90);
+
+  /* Structural */
+  --header-bg:   oklch(0.22 0.025 50);
+
+  /* Type — system pairing: warm serif for display, system sans for everything else */
+  --font-display: ui-serif, 'New York', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+  --font-sans:    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:    ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Type scale — fixed rem, ~1.25 ratio between most steps */
+  --text-xs:   0.75rem;     /* 12px */
+  --text-sm:   0.875rem;    /* 14px */
+  --text-base: 1rem;        /* 16px */
+  --text-md:   1.125rem;    /* 18px */
+  --text-lg:   1.375rem;    /* 22px */
+  --text-xl:   1.75rem;     /* 28px */
+  --text-2xl:  clamp(2rem, 6.5vw, 2.75rem);  /* 32 → 44px */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { overflow-x: hidden; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--body);
+  color: var(--ink);
+  min-height: 100vh;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Shared section heading: serif display face, used on landing + vibe + others */
+.section-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  line-height: 1.2;
+  color: var(--ink);
+  margin: 26px 0 10px;
+  text-align: center;
+  text-wrap: balance;
+}
+.section-title:first-child { margin-top: 0; }

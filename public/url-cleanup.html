@@ -5,43 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title>URL Cleanup</title>
+  <link rel="stylesheet" href="/styles.css">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #FBF5EB;
-      color: #2C2C2C;
-      min-height: 100vh;
-      padding: 32px 16px 80px;
-    }
+    body { padding: 32px 16px 80px; }
     .wrap { max-width: 760px; margin: 0 auto; }
-    h1 { font-size: 22px; color: #2C3E50; margin-bottom: 4px; }
-    .remaining { font-size: 13px; color: #888; margin-bottom: 20px; }
+    h1 { font-size: 22px; color: var(--ink); margin-bottom: 4px; }
+    .remaining { font-size: 13px; color: var(--ink-muted); margin-bottom: 20px; }
 
     .login {
-      background: #fff;
+      background: var(--surface);
       padding: 24px;
       border-radius: 10px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
       max-width: 380px;
       margin: 0 auto;
     }
-    .login label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: #555; }
+    .login label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--ink-muted); }
     .login input {
       width: 100%; padding: 10px 12px;
-      border: 1px solid #ddd; border-radius: 6px;
+      border: 1px solid var(--border); border-radius: 6px;
       font-size: 15px; font-family: inherit;
     }
-    .login input:focus { outline: none; border-color: #E67E22; }
+    .login input:focus { outline: none; border-color: var(--accent); }
     .login button {
       width: 100%; margin-top: 16px; padding: 12px;
-      background: #E67E22; color: #fff; border: none; border-radius: 6px;
+      background: var(--accent); color: #fff; border: none; border-radius: 6px;
       font-size: 15px; font-weight: 600; cursor: pointer;
     }
-    .login button:hover { background: #d35400; }
+    .login button:hover { background: var(--accent-hover); }
 
     .row {
-      background: #fff;
+      background: var(--surface);
       border-radius: 8px;
       padding: 14px 16px;
       margin-bottom: 10px;
@@ -55,14 +49,14 @@
       flex-wrap: wrap; margin-bottom: 10px;
     }
     .show-link {
-      font-size: 16px; font-weight: 600; color: #2C3E50;
-      text-decoration: underline; text-decoration-color: #bdc3c7;
+      font-size: 16px; font-weight: 600; color: var(--ink);
+      text-decoration: underline; text-decoration-color: var(--ink-faint);
       text-underline-offset: 3px;
     }
-    .show-link:hover { color: #E67E22; text-decoration-color: #E67E22; }
-    .show-meta { font-size: 12px; color: #888; }
+    .show-link:hover { color: var(--accent); text-decoration-color: var(--accent); }
+    .show-meta { font-size: 12px; color: var(--ink-muted); }
     .current-url {
-      font-size: 11px; color: #b71c1c;
+      font-size: 11px; color: var(--danger-deep);
       width: 100%; word-break: break-all; margin-top: 2px;
     }
 
@@ -74,49 +68,49 @@
     }
     .row-form select, .row-form input {
       padding: 8px 10px;
-      border: 1px solid #ddd;
+      border: 1px solid var(--border);
       border-radius: 5px;
       font-size: 14px;
       font-family: inherit;
-      background: #fff;
+      background: var(--surface);
       min-width: 0;
     }
-    .row-form select:focus, .row-form input:focus { outline: none; border-color: #E67E22; }
+    .row-form select:focus, .row-form input:focus { outline: none; border-color: var(--accent); }
     .row-form .other-input { display: none; grid-column: 1 / -1; margin-top: 4px; }
     .row-form .other-input.show { display: block; }
     .btn-update {
       padding: 8px 14px;
-      background: #E67E22; color: #fff;
+      background: var(--accent); color: #fff;
       border: none; border-radius: 5px;
       font-size: 14px; font-weight: 600;
       cursor: pointer; font-family: inherit;
       white-space: nowrap;
     }
-    .btn-update:hover { background: #d35400; }
-    .btn-update:disabled { background: #bbb; cursor: not-allowed; }
+    .btn-update:hover { background: var(--accent-hover); }
+    .btn-update:disabled { background: var(--ink-faint); cursor: not-allowed; }
 
     .row-err {
       grid-column: 1 / -1;
-      font-size: 12px; color: #b71c1c; margin-top: 4px;
+      font-size: 12px; color: var(--danger-deep); margin-top: 4px;
     }
 
     .empty {
       text-align: center; padding: 60px 0;
-      color: #888; font-style: italic; font-size: 16px;
+      color: var(--ink-muted); font-style: italic; font-size: 16px;
     }
     .err-banner {
-      background: #ffebee; color: #b71c1c;
-      border: 1px solid #ffcdd2;
+      background: var(--danger-soft); color: var(--danger-deep);
+      border: 1px solid color-mix(in oklch, var(--danger) 30%, transparent);
       padding: 12px; border-radius: 6px;
       font-size: 13px; margin-bottom: 16px;
     }
     .loading {
       text-align: center; padding: 60px 0;
-      color: #888; font-size: 15px;
+      color: var(--ink-muted); font-size: 15px;
     }
     .spinner {
       display: inline-block; width: 28px; height: 28px;
-      border: 3px solid #e3dccd; border-top-color: #E67E22;
+      border: 3px solid var(--border); border-top-color: var(--accent);
       border-radius: 50%; animation: spin 0.8s linear infinite;
       margin-bottom: 12px;
     }
@@ -166,7 +160,7 @@
     }
 
     function networkOptionsHtml(currentValue) {
-      const opts = ['<option value="">— Select —</option>'];
+      const opts = ['<option value="">Select…</option>'];
       networks.forEach(n => {
         const sel = (n === currentValue) ? ' selected' : '';
         opts.push(`<option value="${escapeAttr(n)}"${sel}>${escapeHtml(n)}</option>`);
@@ -277,7 +271,7 @@
     async function loadList() {
       bannerErr.innerHTML = '';
       remaining.textContent = '';
-      list.innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading queue&hellip;<br>Syncing good URLs across members first — this can take up to a minute.</div></div>';
+      list.innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading queue&hellip;<br>Syncing good URLs across members first; this can take up to a minute.</div></div>';
       try {
         const res = await fetch('/api/admin-url-cleanup', {
           method: 'POST',

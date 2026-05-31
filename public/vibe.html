@@ -4,78 +4,75 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vibe — Show Picker Club</title>
+  <link rel="stylesheet" href="/styles.css">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #FBF5EB; color: #2C2C2C; min-height: 100vh; padding: 24px 16px 60px;
-    }
+    body { padding: 24px 16px 60px; }
     .wrap { max-width: 720px; margin: 0 auto; }
     .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
-    .topbar a.back { color: #95a5a6; text-decoration: none; font-size: 22px; }
-    .topbar h1 { font-size: 20px; color: #2C3E50; flex: 0 0 auto; }
+    .topbar a.back { color: var(--ink-quiet); text-decoration: none; font-size: 22px; }
+    .topbar h1 { font-size: 20px; color: var(--ink); flex: 0 0 auto; }
     .topbar select {
-      flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;
-      font-size: 15px; background: #fff; font-family: inherit;
+      flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px;
+      font-size: 15px; background: var(--surface); font-family: inherit;
     }
 
     .hero {
-      background: #fff; border-radius: 12px; padding: 32px 24px; text-align: center;
+      background: var(--surface); border-radius: 12px; padding: 32px 24px; text-align: center;
       box-shadow: 0 1px 3px rgba(0,0,0,0.04); margin-bottom: 20px;
     }
-    .hero .star { color: #E67E22; font-size: 14px; letter-spacing: 2px; }
-    .hero .cluster-name { font-size: 28px; color: #2C3E50; margin: 8px 0 12px; font-weight: 700; }
-    .hero .cluster-tag { color: #555; font-size: 15px; line-height: 1.5; max-width: 540px; margin: 0 auto; font-style: italic; }
-    .hero .similarity { color: #95a5a6; font-size: 12px; margin-top: 14px; }
+    .hero .star { color: var(--accent); font-size: 14px; letter-spacing: 2px; }
+    .hero .cluster-name { font-family: var(--font-display); font-size: var(--text-xl); color: var(--ink); margin: 8px 0 12px; font-weight: 600; letter-spacing: -0.015em; }
+    .hero .cluster-tag { color: var(--ink-muted); font-size: 15px; line-height: 1.5; max-width: 540px; margin: 0 auto; font-style: italic; }
+    .hero .similarity { color: var(--ink-quiet); font-size: 12px; margin-top: 14px; }
 
-    .section { background: #fff; border-radius: 10px; padding: 20px 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
-    .section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.8px; color: #888; margin-bottom: 14px; font-weight: 600; }
+    .section { background: var(--surface); border-radius: 10px; padding: 20px 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    .section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--ink-muted); margin-bottom: 14px; font-weight: 600; }
 
     .trait-block { margin-bottom: 10px; }
     .trait-row { display: flex; align-items: center; gap: 12px; font-size: 14px; }
-    .trait-row .lbl { flex: 0 0 38%; color: #444; }
-    .trait-row .bar-bg { flex: 1; height: 10px; background: #f0ebe3; border-radius: 5px; overflow: hidden; }
-    .trait-row .bar { height: 100%; background: linear-gradient(90deg, #E67E22, #d35400); border-radius: 5px; transition: width 0.6s ease-out; }
-    .trait-row .val { flex: 0 0 42px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: #2C3E50; }
-    .trait-explain { font-size: 11px; color: #95a5a6; margin: 2px 0 0 calc(38% + 12px); line-height: 1.35; }
+    .trait-row .lbl { flex: 0 0 38%; color: var(--ink); }
+    .trait-row .bar-bg { flex: 1; height: 10px; background: var(--surface-2); border-radius: 5px; overflow: hidden; }
+    .trait-row .bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-hover)); border-radius: 5px; transition: width 0.6s ease-out; }
+    .trait-row .val { flex: 0 0 42px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
+    .trait-explain { font-size: 11px; color: var(--ink-quiet); margin: 2px 0 0 calc(38% + 12px); line-height: 1.35; }
     @media (max-width: 480px) {
       .trait-row .lbl { flex: 0 0 44%; font-size: 13px; }
       .trait-explain { margin-left: 0; }
     }
 
-    .toggle-more { display: block; text-align: center; padding: 10px 0 0; background: none; border: none; color: #E67E22; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
-    .blend-note { font-size: 12px; color: #888; margin-bottom: 12px; font-style: italic; }
+    .toggle-more { display: block; text-align: center; padding: 10px 0 0; background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .blend-note { font-size: 12px; color: var(--ink-muted); margin-bottom: 12px; font-style: italic; }
 
     .balance-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
-    .balance-item .lbl { font-size: 13px; color: #555; margin-bottom: 4px; }
+    .balance-item .lbl { font-size: 13px; color: var(--ink-muted); margin-bottom: 4px; }
     .balance-item .val-row { display: flex; align-items: center; gap: 10px; }
     .balance-item .pill {
       display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px;
-      background: #f0ebe3; color: #2C3E50; font-weight: 600;
+      background: var(--surface-2); color: var(--ink); font-weight: 600;
     }
-    .balance-item .pill.dark { background: #2c3e50; color: #fff; }
-    .balance-item .pill.warm { background: #ffe4cc; color: #8b3e0d; }
+    .balance-item .pill.dark { background: var(--ink); color: #fff; }
+    .balance-item .pill.warm { background: var(--accent-soft); color: var(--accent-hover); }
 
-    .pick-row { padding: 10px 0; border-bottom: 1px solid #f3f3f3; font-size: 14px; }
+    .pick-row { padding: 10px 0; border-bottom: 1px solid var(--border-soft); font-size: 14px; }
     .pick-row:last-child { border-bottom: none; }
     .pick-row .pick-line { display: flex; align-items: center; gap: 10px; }
     .pick-row .pick-add {
       flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
-      background: #E67E22; color: #fff; border: none; font-size: 16px; line-height: 1;
+      background: var(--accent); color: #fff; border: none; font-size: 16px; line-height: 1;
       cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center;
     }
-    .pick-row .pick-add:hover { background: #d35400; }
+    .pick-row .pick-add:hover { background: var(--accent-hover); }
     .pick-row .pick-info { flex: 1; min-width: 0; }
-    .pick-row .pick-title { font-weight: 600; color: #2C3E50; cursor: pointer; }
-    .pick-row .pick-title:hover { color: #E67E22; }
-    .pick-row .pick-network { color: #555; }
-    .pick-row .pick-network a { color: #E67E22; text-decoration: none; }
-    .pick-row .pick-rating { color: #95a5a6; }
-    .pick-row .pick-list-tag { color: #95a5a6; font-size: 12px; margin-left: 6px; text-transform: capitalize; }
-    .pick-detail { display: none; padding: 8px 0 4px; font-size: 13px; color: #555; line-height: 1.5; }
+    .pick-row .pick-title { font-weight: 600; color: var(--ink); cursor: pointer; }
+    .pick-row .pick-title:hover { color: var(--accent); }
+    .pick-row .pick-network { color: var(--ink-muted); }
+    .pick-row .pick-network a { color: var(--accent); text-decoration: none; }
+    .pick-row .pick-rating { color: var(--ink-quiet); }
+    .pick-row .pick-list-tag { color: var(--ink-quiet); font-size: 12px; margin-left: 6px; text-transform: capitalize; }
+    .pick-detail { display: none; padding: 8px 0 4px; font-size: 13px; color: var(--ink-muted); line-height: 1.5; }
     .pick-detail.open { display: block; }
     .pick-detail .pick-detail-line { display: flex; gap: 8px; }
-    .pick-detail .pick-detail-key { color: #95a5a6; flex: 0 0 70px; }
+    .pick-detail .pick-detail-key { color: var(--ink-quiet); flex: 0 0 70px; }
 
     .modal-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.5);
@@ -84,44 +81,44 @@
     }
     .modal-overlay.hidden { display: none; }
     .modal-card {
-      background: #fff; padding: 24px; border-radius: 10px;
+      background: var(--surface); padding: 24px; border-radius: 10px;
       max-width: 420px; width: 100%; max-height: calc(100vh - 32px); overflow-y: auto;
     }
-    .modal-card h2 { font-size: 18px; color: #2C3E50; margin-bottom: 4px; }
+    .modal-card h2 { font-size: 18px; color: var(--ink); margin-bottom: 4px; }
     .modal-pick-info {
-      background: #f5f1e8; padding: 10px 12px; border-radius: 6px;
+      background: var(--surface-2); padding: 10px 12px; border-radius: 6px;
       font-size: 13px; margin: 12px 0;
     }
-    .modal-pick-info .modal-pick-title { font-weight: 600; color: #2C3E50; font-size: 14px; }
-    .modal-pick-info .modal-pick-meta { color: #777; margin-top: 2px; }
-    .modal-card label { display: block; font-size: 13px; font-weight: 500; margin: 12px 0 6px; color: #555; }
+    .modal-pick-info .modal-pick-title { font-weight: 600; color: var(--ink); font-size: 14px; }
+    .modal-pick-info .modal-pick-meta { color: var(--ink-muted); margin-top: 2px; }
+    .modal-card label { display: block; font-size: 13px; font-weight: 500; margin: 12px 0 6px; color: var(--ink-muted); }
     .modal-card select, .modal-card textarea {
-      width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px;
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px;
       font-size: 14px; font-family: inherit;
     }
-    .modal-card select:focus, .modal-card textarea:focus { outline: none; border-color: #E67E22; }
+    .modal-card select:focus, .modal-card textarea:focus { outline: none; border-color: var(--accent); }
     .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
     .modal-actions button {
       flex: 1; padding: 10px; border-radius: 6px; font-size: 14px; font-weight: 600;
       cursor: pointer; font-family: inherit; border: none;
     }
-    .modal-actions .cancel { background: #ecf0f1; color: #2C3E50; }
-    .modal-actions .submit { background: #E67E22; color: #fff; }
-    .modal-actions .submit:hover { background: #d35400; }
+    .modal-actions .cancel { background: var(--surface-2); color: var(--ink); }
+    .modal-actions .submit { background: var(--accent); color: #fff; }
+    .modal-actions .submit:hover { background: var(--accent-hover); }
     .modal-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
     #addError:empty { display: none; }
-    #addError { margin-top: 10px; padding: 8px 10px; background: #ffebee; color: #b71c1c; border-radius: 6px; font-size: 12px; }
+    #addError { margin-top: 10px; padding: 8px 10px; background: var(--danger-soft); color: var(--danger-deep); border-radius: 6px; font-size: 12px; }
 
-    .footer { text-align: center; color: #95a5a6; font-size: 12px; margin-top: 24px; }
-    .empty-card { background: #fff; border-radius: 10px; padding: 32px; text-align: center; color: #888; font-size: 14px; }
-    .err { color: #b71c1c; font-size: 13px; text-align: center; padding: 20px; }
+    .footer { text-align: center; color: var(--ink-quiet); font-size: 12px; margin-top: 24px; }
+    .empty-card { background: var(--surface); border-radius: 10px; padding: 32px; text-align: center; color: var(--ink-muted); font-size: 14px; }
+    .err { color: var(--danger-deep); font-size: 13px; text-align: center; padding: 20px; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="topbar">
       <a class="back" href="/" title="Home">&#9664;</a>
-      <h1>Vibe &mdash;</h1>
+      <h1>Vibe</h1>
       <select id="memberSelect" aria-label="Pick a member"></select>
     </div>
     <div id="content"><div class="empty-card">Loading&hellip;</div></div>
@@ -229,7 +226,7 @@
         return `<div class="empty-card">${escapeHtml(m.name)}'s list isn't used for taste-based features.</div>`;
       }
       if (m.is_seed_only) {
-        return `<div class="empty-card">${escapeHtml(m.name)} hasn't engaged with their list yet — no fingerprint to compute.</div>`;
+        return `<div class="empty-card">${escapeHtml(m.name)} hasn't engaged with their list yet, so there's no fingerprint to compute.</div>`;
       }
       if (m.no_fingerprint) {
         return `<div class="empty-card">No scored shows on ${escapeHtml(m.name)}'s list yet. Once trait data fills in, a fingerprint will appear here.</div>`;
@@ -267,13 +264,13 @@
         const key = pickKey(i, 'aligned');
         currentPicks.push({ key, data: p });
         return renderPickRow(p, key, { canAdd: isOwnPage });
-      }).join('') || '<div class="pick-row" style="color:#aaa;">No aligned picks available.</div>';
+      }).join('') || '<div class="pick-row" style="color:var(--ink-faint);">No aligned picks available.</div>';
 
       const outliers = (m.outlier_picks || []).map((p, i) => {
         const key = pickKey(i, 'outlier');
         currentPicks.push({ key, data: p });
         return renderPickRow(p, key, { canAdd: false });
-      }).join('') || '<div class="pick-row" style="color:#aaa;">Not enough scored shows to find outliers.</div>';
+      }).join('') || '<div class="pick-row" style="color:var(--ink-faint);">Not enough scored shows to find outliers.</div>';
 
       const blendRows = (c.blend || []).map(b => {
         const pct = Math.max(0, Math.round(b.similarity * 100));
@@ -326,20 +323,20 @@
                 <div class="bar-bg" style="flex:1;"><div class="bar" style="width:${b.range}%;"></div></div>
                 <span class="val">${b.range}</span>
               </div>
-              <div class="trait-explain" style="margin-left:0;">How varied your trait fingerprint is — higher = wider range of moods and styles.</div>
+              <div class="trait-explain" style="margin-left:0;">How varied your trait fingerprint is. Higher means a wider range of moods and styles.</div>
             </div>
           </div>
         </div>
 
         <div class="section">
           <h2>Shows aligned with your vibe</h2>
-          <p class="blend-note">Trait-similarity picks from across the club — closest in mood to your fingerprint.</p>
+          <p class="blend-note">Trait-similarity picks from across the club, closest in mood to your fingerprint.</p>
           ${aligned}
         </div>
 
         <div class="section">
           <h2>Shows that don't make sense</h2>
-          <p class="blend-note">Shows already on this list whose trait pattern is the *opposite* of the fingerprint — outliers in the member's own taste.</p>
+          <p class="blend-note">Shows already on this list whose trait pattern is the *opposite* of the fingerprint: outliers in the member's own taste.</p>
           ${outliers}
         </div>
       `;
@@ -408,7 +405,7 @@
           let msg = `Error (${res.status})`;
           try {
             const data = await res.json();
-            if (data.error === 'exists_archived') msg = 'You archived this once already — unarchive from your list.';
+            if (data.error === 'exists_archived') msg = 'You archived this once already. Unarchive from your list.';
             else if (data.error === 'exists_active') msg = `Already on your ${data.list} list.`;
             else if (data.error) msg = data.error;
           } catch {}

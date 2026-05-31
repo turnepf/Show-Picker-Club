@@ -5,86 +5,88 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title>Setup</title>
+  <link rel="stylesheet" href="/styles.css">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #FBF5EB;
-      color: #2C2C2C;
-      min-height: 100vh;
-      padding: 40px 20px;
-    }
+    body { padding: 40px 20px; }
     .wrap {
       max-width: 480px;
       margin: 0 auto;
-      background: #fff;
+      background: var(--surface);
       padding: 28px;
-      border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      border-radius: 12px;
+      box-shadow: 0 1px 2px oklch(0.18 0.03 50 / 0.06), 0 8px 28px oklch(0.18 0.03 50 / 0.06);
     }
-    h1 { font-size: 20px; margin-bottom: 20px; color: #2C3E50; }
-    label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; margin-top: 14px; color: #555; }
+    h1 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--ink); margin-bottom: 20px; }
+    label { display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: 6px; margin-top: 14px; color: var(--ink-muted); }
     label:first-of-type { margin-top: 0; }
     input {
       width: 100%;
       padding: 10px 12px;
-      border: 1px solid #ddd;
+      border: 1px solid var(--border);
       border-radius: 6px;
-      font-size: 15px;
+      font-size: var(--text-base);
       font-family: inherit;
     }
-    input:focus { outline: none; border-color: #E67E22; }
-    .hint { font-size: 12px; color: #888; margin-top: 4px; }
+    input:focus { outline: none; border-color: var(--accent); }
+    .hint { font-size: var(--text-xs); color: var(--ink-muted); margin-top: 4px; }
     button {
       width: 100%;
       margin-top: 24px;
       padding: 12px;
-      background: #E67E22;
+      background: var(--accent);
       color: #fff;
       border: none;
       border-radius: 6px;
-      font-size: 15px;
+      font-size: var(--text-base);
       font-weight: 600;
       cursor: pointer;
     }
-    button:hover { background: #d35400; }
-    button:disabled { background: #bbb; cursor: not-allowed; }
+    button:hover { background: var(--accent-hover); }
+    button:disabled { background: var(--ink-faint); cursor: not-allowed; }
     .msg {
       margin-top: 20px;
       padding: 14px;
       border-radius: 6px;
-      font-size: 14px;
+      font-size: var(--text-sm);
       line-height: 1.5;
       white-space: pre-wrap;
       word-break: break-word;
     }
-    .msg.ok { background: #e8f5e9; color: #1b5e20; border: 1px solid #c8e6c9; }
-    .msg.err { background: #ffebee; color: #b71c1c; border: 1px solid #ffcdd2; }
+    .msg.ok {
+      background: color-mix(in oklch, var(--list-watching) 10%, var(--surface));
+      color: var(--ink);
+      border: 1px solid color-mix(in oklch, var(--list-watching) 35%, transparent);
+    }
+    .msg.err {
+      background: var(--danger-soft);
+      color: var(--danger-deep);
+      border: 1px solid color-mix(in oklch, var(--danger) 30%, transparent);
+    }
     .msg strong { display: block; margin-bottom: 6px; }
     .msg a { color: inherit; }
-    .intro-label { display: block; margin-top: 16px; font-weight: 600; font-size: 13px; }
+    .intro-label { display: block; margin-top: 16px; font-weight: 600; font-size: var(--text-sm); }
     textarea.intro {
       width: 100%;
       margin-top: 6px;
       padding: 10px 12px;
-      border: 1px solid #c8e6c9;
+      border: 1px solid color-mix(in oklch, var(--list-watching) 30%, transparent);
       border-radius: 6px;
-      font-size: 13px;
+      font-size: var(--text-sm);
       font-family: inherit;
       line-height: 1.5;
       resize: vertical;
-      background: #fff;
-      color: #2C2C2C;
+      background: var(--surface);
+      color: var(--ink);
       white-space: pre-wrap;
     }
     button.copy {
       width: auto;
       margin-top: 8px;
       padding: 8px 14px;
-      font-size: 13px;
-      background: #2C3E50;
+      font-size: var(--text-sm);
+      background: var(--ink);
     }
-    button.copy:hover { background: #1a252f; }
+    button.copy:hover { background: oklch(0.18 0.025 50); }
   </style>
 </head>
 <body>
@@ -102,7 +104,7 @@
 
       <label>Email address(es)</label>
       <input type="text" id="emails" autocomplete="off" placeholder="alice@example.com, alice.b@gmail.com">
-      <div class="hint">For email-based login codes (optional). Separate multiple addresses with commas — any of them can be used to request a code.</div>
+      <div class="hint">For email-based login codes (optional). Separate multiple addresses with commas; any of them can be used to request a code.</div>
 
       <button type="submit" id="go">Create member + seed 8 shows</button>
     </form>
@@ -178,14 +180,14 @@
 
           const introLabel = document.createElement('div');
           introLabel.className = 'intro-label';
-          introLabel.textContent = 'Intro text — copy and send:';
+          introLabel.textContent = 'Intro text. Copy and send:';
           msg.appendChild(introLabel);
 
           const ta = document.createElement('textarea');
           ta.className = 'intro';
           ta.rows = 12;
           ta.readOnly = true;
-          ta.value = `Hey ${data.editor_name}! I set you up on Show Picker Club — it's a shared show tracker where we all keep track of what we're watching, what's next, and what we'd recommend. I seeded yours with some popular shows to get you started — if any don't interest you, just tap Edit, then Archive to remove them. If you have your own list of shows you'd like uploaded, share it with me and I'll get it loaded for you.\n\nYour list:\n${data.url}\n\nTo edit your list, tap Edit and enter your code: **${data.code}**\n\nYou can also browse everyone else's lists from the home page:\nhttps://showpicker.club\n\nIf you see something you like on someone else's list, tap the **+** to add it to yours!\n\n- Patrick`;
+          ta.value = `Hey ${data.editor_name}! I set you up on Show Picker Club. It's a shared show tracker where we all keep track of what we're watching, what's next, and what we'd recommend. I seeded yours with some popular shows to get you started; if any don't interest you, just tap Edit, then Archive to remove them. If you have your own list of shows you'd like uploaded, share it with me and I'll get it loaded for you.\n\nYour list:\n${data.url}\n\nTo edit your list, tap Edit and enter your code: **${data.code}**\n\nYou can also browse everyone else's lists from the home page:\nhttps://showpicker.club\n\nIf you see something you like on someone else's list, tap the **+** to add it to yours!\n\n- Patrick`;
           msg.appendChild(ta);
 
           const copyBtn = document.createElement('button');
@@ -212,7 +214,7 @@
           smsBtn.type = 'button';
           smsBtn.className = 'copy';
           smsBtn.style.marginLeft = '8px';
-          smsBtn.style.background = '#27ae60';
+          smsBtn.style.background = 'var(--list-watching)';
           smsBtn.textContent = 'Text intro';
           smsBtn.addEventListener('click', () => {
             const href = `sms:${data.phone}?&body=${encodeURIComponent(ta.value)}`;
