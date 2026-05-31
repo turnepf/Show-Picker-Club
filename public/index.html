@@ -53,11 +53,12 @@
     .btn-login:hover { background: rgba(255,255,255,0.25); }
     .btn-login.active {
       background: var(--accent);
+      color: var(--ink);
       border-color: var(--accent);
-      box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+      box-shadow: inset 0 1px 2px oklch(0.30 0.04 50 / 0.25);
     }
 
-    .btn-add { background: var(--accent); color: #fff; padding: 6px 12px; font-size: 18px; line-height: 1; font-weight: 600; }
+    .btn-add { background: var(--accent); color: var(--ink); padding: 6px 12px; font-size: 18px; line-height: 1; font-weight: 700; }
     .btn-add:hover { background: var(--accent-hover); }
     .btn-search { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); }
     .btn-search:hover { background: rgba(255,255,255,0.25); }
@@ -284,16 +285,16 @@
 
     /* Landing page */
     .landing {
-      max-width: 540px;
+      max-width: 720px;
       margin: 56px auto;
-      padding: 36px 32px 28px;
+      padding: 44px 44px 32px;
       background: var(--surface);
       border-radius: 18px;
       box-shadow: 0 1px 2px oklch(0.18 0.03 50 / 0.06),
                   0 14px 44px oklch(0.18 0.03 50 / 0.07);
       text-align: center;
     }
-    @media (max-width: 540px) {
+    @media (max-width: 600px) {
       .landing { margin: 20px 12px; padding: 28px 22px 22px; border-radius: 14px; }
     }
     .landing h1 {
@@ -308,49 +309,11 @@
     }
     .landing p { color: var(--ink-muted); margin-bottom: 30px; }
 
-    /* What's New: hanging-indent changelog. Date column, no em-dashes. */
-    .changelog {
-      padding: 18px 22px 20px;
-      background: var(--surface-2);
-      border: 1px solid var(--border-soft);
-      border-radius: 12px;
-      font-size: var(--text-sm);
-      color: var(--ink);
-      line-height: 1.55;
-      text-align: left;
+    .member-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+      gap: 4px 14px;
     }
-    .changelog p { margin: 0 0 12px; padding-left: 56px; text-indent: -56px; }
-    .changelog p:last-child { margin-bottom: 0; }
-    .changelog .cl-date {
-      display: inline-block;
-      width: 48px;
-      margin-right: 8px;
-      color: var(--ink-muted);
-      font-weight: 500;
-      font-variant-numeric: tabular-nums;
-    }
-    .changelog .cl-title { color: var(--ink); font-weight: 600; }
-    .changelog a {
-      color: var(--accent);
-      font-weight: 500;
-      text-decoration: none;
-      border-bottom: 1px solid color-mix(in oklch, var(--accent) 35%, transparent);
-    }
-    .changelog a:hover { border-bottom-color: var(--accent); }
-    .changelog-more {
-      display: block;
-      margin: 6px auto 0;
-      background: none;
-      border: none;
-      color: var(--accent);
-      font-size: var(--text-xs);
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-      padding: 6px 10px;
-    }
-    .member-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 12px; }
-    @media (min-width: 480px) { .member-list { grid-template-columns: repeat(4, 1fr); } }
     .member-card {
       display: block;
       padding: 6px 4px;
@@ -434,7 +397,7 @@
     .modal-actions { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
     .btn-cancel { background: var(--surface-2); color: var(--ink); }
     .btn-cancel:hover { background: var(--surface); }
-    .btn-save { background: var(--accent); color: #fff; }
+    .btn-save { background: var(--accent); color: var(--ink); font-weight: 700; }
     .btn-save:hover { background: var(--accent-hover); }
 
     .loading { text-align: center; padding: 40px; color: var(--ink-quiet); font-size: 15px; }
@@ -447,6 +410,15 @@
       .show-row { font-size: 13px; }
       .show-actions-inline .btn-small { padding: 3px 6px; font-size: 10px; }
     }
+
+    .popular-members-badge {
+      font-size: 11px;
+      color: var(--ink-quiet);
+      cursor: pointer;
+      text-decoration: underline dotted;
+      text-underline-offset: 2px;
+    }
+    .popular-members-badge:hover { color: var(--ink); }
 
     .recs-section { margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
     .recs-heading { font-size: 15px; color: var(--ink); margin-bottom: 4px; text-align: center; }
@@ -793,6 +765,9 @@
       const lines = [];
       if (show.genres) lines.push(escapeHtml(show.genres));
       if (show.actors) lines.push(renderActors(show.actors));
+      if (opts.aggregate && show.members && show.members.length) {
+        lines.push(`Watching: ${escapeHtml(show.members.join(', '))}`);
+      }
       if (!opts.aggregate) {
         if (show.recommended_by && !opts.skipRecommender) lines.push(`Recommended by ${escapeHtml(show.recommended_by)}`);
         if (show.next_season_date && !opts.skipNextSeason) {
@@ -941,7 +916,7 @@
             const rating = show.rating ? ` <span class="show-rating"><span class="star">&#9733;</span>${escapeHtml(show.rating)}</span>` : '';
             const movieTag = show.movie ? ' <span class="show-movie">(Movie)</span>' : '';
             const memberList = (show.members || []).join(', ');
-            const badge = ` <span style="font-size: 11px; color: var(--ink-quiet); cursor: pointer; text-decoration: underline dotted;" onclick="alert('${memberList.replace(/'/g, "\\'")}')" title="${memberList}">${show.member_count} Members</span>`;
+            const badge = ` <span class="popular-members-badge" onclick="toggleExpand(${show.id})" title="Tap to see who's watching">${show.member_count} Members</span>`;
             const details = buildDetailLines(show, { aggregate: true });
             return `<div class="show-row popular-row" ${i >= 5 ? 'style="display:none;"' : ''}>
               <button class="share-btn popular-add-btn" style="display:none;" onclick="openAddMyList('${escapeHtml(show.title).replace(/'/g, "\\'")}', '${escapeHtml(show.network || '').replace(/'/g, "\\'")}', '${escapeHtml(show.network_url || '').replace(/'/g, "\\'")}', ${show.movie || 0})" title="Add to my list">+</button>
