@@ -94,6 +94,10 @@ export async function onRequestPost(context) {
            OR network_url LIKE 'https://www.themoviedb.org/%'
            OR network_url = 'https://www.amazon.com/s'
            OR network_url = 'https://www.amazon.com/s/')
+      -- Our intentional HBO Max search fallback — Watchmode only ever
+      -- returns auto-play URLs for these, so the search page is the
+      -- best we can do. Don't re-queue them every cleanup pass.
+      AND network_url NOT LIKE 'https://play.hbomax.com/search?%'
     -- Dedup by title — one lookup per show, push the result to every
     -- member's same-titled row via the UPDATE below.
     GROUP BY LOWER(title)
@@ -141,15 +145,27 @@ export async function onRequestPost(context) {
     );
     if (!match) { summary.no_provider_match.push(row.title); continue; }
 
+    // HBO Max's Watchmode entries frequently come back as
+    // play.hbomax.com/video/watch/<uuid>?utm_source=universal_search —
+    // an episode-deep-link that *auto-plays*. We can't transform that
+    // into the show-page UUID (different resource), so we degrade
+    // gracefully to a title search on HBO Max instead. The user lands
+    // on a search results page with their title pre-filled, one tap
+    // from the right show, and crucially never starts playback.
+    let url = match.web_url;
+    if (/^https?:\/\/play\.hbomax\.com\/video\/watch\//i.test(url)) {
+      url = `https://play.hbomax.com/search?q=${encodeURIComponent(row.title)}`;
+    }
+
     const upd = await env.DB.prepare(
       "UPDATE shows SET network_url = ?, enriched_at = datetime('now') WHERE LOWER(title) = LOWER(?) AND archived = 0"
-    ).bind(match.web_url, row.title).run();
+    ).bind(url, row.title).run();
 
     summary.filled += upd.meta.changes;
     summary.updated.push({
       title: row.title,
       source: match.name,
-      url: match.web_url,
+      url,
       rows_updated: upd.meta.changes,
     });
   }
