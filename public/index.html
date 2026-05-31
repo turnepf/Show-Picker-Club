@@ -221,6 +221,16 @@
       gap: 6px;
       padding: 8px 0 10px;
     }
+
+    /* Sort + future filter controls above the list. Right-aligned utility row. */
+    .list-controls {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0 10px;
+    }
+    .list-controls .sort-select { margin-left: 0; }
     .toggle-pill {
       padding: 4px 10px;
       font-size: 11px;
@@ -480,7 +490,7 @@
         <h1 id="appTitle"></h1>
         <div class="header-actions">
           <button class="btn btn-add hidden" id="addBtn" title="Add a new show" aria-label="Add a new show" onclick="openAddModal()">+</button>
-          <button class="btn btn-login" id="loginBtn" title="Toggle edit mode" onclick="login()">Edit</button>
+          <button class="btn btn-login" id="loginBtn" title="Log in to edit your shows" onclick="login()">Log in</button>
           <button class="btn btn-login hidden" id="logoutBtn" title="Log out" onclick="logout()">Log out</button>
         </div>
       </div>
@@ -505,6 +515,7 @@
         <p class="recs-explainer" id="recsExplainer"></p>
         <div class="show-list" id="recsList" style="text-align: left;"></div>
       </div>
+      <div class="list-controls hidden" id="listControls"></div>
       <div class="show-list" id="showList"></div>
       <div class="empty hidden" id="empty">No shows in this list yet.</div>
     </main>
@@ -995,6 +1006,30 @@
       if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
     }
 
+    // Sets the header login/edit button label by current state:
+    //   logged out                       → "Log in" (visible)
+    //   logged in, own page, view mode   → "Edit"   (visible)
+    //   logged in, own page, edit mode   → "Done"   (visible, active style)
+    //   logged in, viewing another's page → hidden  (logout button is enough)
+    function updateLoginBtnLabel() {
+      const btn = document.getElementById('loginBtn');
+      if (!btn) return;
+      if (!authMember) {
+        btn.textContent = 'Log in';
+        btn.title = 'Log in to edit your shows';
+        btn.classList.remove('hidden', 'active');
+        return;
+      }
+      if (typeof memberSlug !== 'undefined' && authMember === memberSlug) {
+        btn.textContent = isEditor ? 'Done' : 'Edit';
+        btn.title = isEditor ? 'Exit edit mode' : 'Edit your list';
+        btn.classList.toggle('active', !!isEditor);
+        btn.classList.remove('hidden');
+        return;
+      }
+      btn.classList.add('hidden');
+    }
+
     async function checkAuth() {
       try {
         const res = await fetch('/auth/check');
@@ -1023,17 +1058,16 @@
           const landingLogoutBtn = document.getElementById('landingLogoutBtn');
           if (landingLoginBtn) landingLoginBtn.classList.add('hidden');
           if (landingLogoutBtn) landingLogoutBtn.classList.remove('hidden');
-          // Per-row Edit/Delete affordances still require clicking Edit.
         }
       } catch (e) {}
+      updateLoginBtnLabel();
     }
 
     function login() {
       if (isEditor) {
         // Toggle out of edit mode — keep the Add button visible since they're still logged in.
         isEditor = false;
-        const loginBtn = document.getElementById('loginBtn');
-        if (loginBtn) loginBtn.classList.remove('active');
+        updateLoginBtnLabel();
         renderShows();
         return;
       }
@@ -1050,7 +1084,7 @@
       if (authMember && authMember === memberSlug) {
         isEditor = true;
         document.getElementById('addBtn').classList.remove('hidden');
-        document.getElementById('loginBtn').classList.add('active');
+        updateLoginBtnLabel();
         renderShows();
         return;
       }
@@ -1067,8 +1101,6 @@
       authMember = null;
       editorName = '';
       isEditor = false;
-      const loginBtn = document.getElementById('loginBtn');
-      if (loginBtn) loginBtn.classList.remove('active');
       const logoutBtn = document.getElementById('logoutBtn');
       if (logoutBtn) logoutBtn.classList.add('hidden');
       const addBtn = document.getElementById('addBtn');
@@ -1079,6 +1111,7 @@
       if (landingLogoutBtn) landingLogoutBtn.classList.add('hidden');
       const myShowsLink = document.getElementById('myShowsLink');
       if (myShowsLink) myShowsLink.classList.add('hidden');
+      updateLoginBtnLabel();
       if (typeof renderShows === 'function' && typeof shows !== 'undefined') renderShows();
     }
 
@@ -1182,8 +1215,7 @@
           return;
         }
         isEditor = true;
-        const loginBtn = document.getElementById('loginBtn');
-        if (loginBtn) loginBtn.classList.add('active');
+        updateLoginBtnLabel();
         renderShows();
       } catch {
         showLoginError('Network error. Try again.');
@@ -1403,6 +1435,8 @@
       if (filtered.length === 0) {
         container.innerHTML = '';
         empty.classList.remove('hidden');
+        const lc = document.getElementById('listControls');
+        if (lc) lc.classList.add('hidden');
         return;
       }
       empty.classList.add('hidden');
@@ -1457,7 +1491,7 @@
 
         return `
           <div class="show-row">
-            <button class="share-btn" onclick="openShareModal(${show.id})" title="Share to another list">+</button>
+            <button class="share-btn" onclick="openShareModal(${show.id})" title="Send this show to another member" aria-label="Send this show to another member">&rarr;</button>
             <span class="show-info"><span class="show-title clickable" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}</span>${network}${rating}${series}${movieTag}</span>
             ${actions}
           </div>
@@ -1479,7 +1513,7 @@
       const legendParts = [];
       if (hasFullSeries) legendParts.push('🎬 Series Complete');
       legendParts.push('Tap title for details');
-      legendParts.push('+ Suggest to another member');
+      legendParts.push('→ Send to another member');
       const legend = legendParts.join(' | ');
       if (legend) container.innerHTML += `<div class="network-counts">${legend}</div>`;
       if (countsHtml) container.innerHTML += `<div class="network-counts">${countsHtml}</div>`;
@@ -1488,12 +1522,16 @@
         container.innerHTML += `<div class="suggest-bar" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;"><button class="suggest-btn" onclick="shareList()" style="background: var(--ink-quiet);">Share ${escapeHtml(owners)}'s Shows</button>${suggestBtn}</div>`;
       }
 
-      const sortHtml = `<select class="sort-select" onchange="changeSort(this.value)">
+      const sortHtml = `<select class="sort-select" onchange="changeSort(this.value)" aria-label="Sort shows">
         <option value="rating"${sortOrder === 'rating' ? ' selected' : ''}>Sort by Rating</option>
         <option value="alpha"${sortOrder === 'alpha' ? ' selected' : ''}>Sort A–Z</option>
         <option value="added"${sortOrder === 'added' ? ' selected' : ''}>Sort by Date Added</option>
       </select>`;
-      container.innerHTML += `<div class="toggle-bar">${sortHtml}</div>`;
+      const listControls = document.getElementById('listControls');
+      if (listControls) {
+        listControls.innerHTML = sortHtml;
+        listControls.classList.remove('hidden');
+      }
     }
 
     function toggleExpand(showId) {
