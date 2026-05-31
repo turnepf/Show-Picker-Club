@@ -20,6 +20,9 @@ const BAD_URL = `(s.network_url IS NULL
                   OR s.network_url LIKE 'https://www.max.com/%'
                   OR s.network_url LIKE 'https://www.hbomax.com/%'
                   OR s.network_url LIKE 'https://play.hbomax.com/video/watch/%'
+                  -- Note: HBO Max search-fallback URLs are intentionally
+                  -- not listed here. They're the best we can do for
+                  -- titles Watchmode only knows as auto-play deep links.
                   OR s.network_url LIKE 'https://www.themoviedb.org/%'
                   -- Bare https://www.amazon.com/s (no query) is the Amazon
                   -- search endpoint with no search term — dumps you on the
@@ -30,6 +33,10 @@ const BAD_URL = `(s.network_url IS NULL
 const QUEUE_FILTER = `
   s.archived = 0
   AND ${BAD_URL}
+  -- Exempt HBO Max search-fallback URLs: they're the best deep link we
+  -- can offer for titles Watchmode only knows as auto-play URLs, so
+  -- they shouldn't show up in the queue every cleanup pass.
+  AND s.network_url NOT LIKE 'https://play.hbomax.com/search?%'
   -- skip titles already resolvable from another member's good URL —
   -- sync-urls will propagate those automatically, nothing for admin to do.
   AND NOT EXISTS (
