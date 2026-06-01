@@ -13,7 +13,7 @@
     p.sub { color: var(--ink-muted); font-size: var(--text-sm); margin-bottom: 20px; }
     label { display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: 6px; margin-top: 14px; color: var(--ink-muted); }
     input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: var(--text-base); font-family: inherit; }
-    input:focus { outline: none; border-color: var(--accent); }
+    input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent); }
     button { width: 100%; margin-top: 24px; padding: 12px; background: var(--accent); color: var(--ink); border: none; border-radius: 6px; font-size: var(--text-base); font-weight: 700; cursor: pointer; }
     button:hover { background: var(--accent-hover); }
     button:disabled { background: var(--ink-faint); cursor: not-allowed; }
