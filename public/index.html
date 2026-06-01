@@ -1721,10 +1721,11 @@
       loading.classList.add('hidden');
       renderRecs();
 
-      // Each list remembers its own sort. Waiting defaults to the "Next up"
-      // premiere date (soonest first); every other list defaults to rating.
+      // Each list remembers its own sort. Watching and Waiting default to the
+      // "Next up" premiere date (soonest first); the others default to rating.
       const savedSort = localStorage.getItem('sort_order_' + currentTab);
-      const sortOrder = savedSort || (currentTab === 'waiting' ? 'nextup' : 'rating');
+      const dateDefaultTab = currentTab === 'waiting' || currentTab === 'watching';
+      const sortOrder = savedSort || (dateDefaultTab ? 'nextup' : 'rating');
       const filtered = shows.filter(s => s.list === currentTab)
         .sort((a, b) => {
           if (sortOrder === 'alpha') return (a.title || '').localeCompare(b.title || '');
@@ -1767,7 +1768,7 @@
 
         let alwaysMeta = '';
         const detailOpts = {};
-        if (currentTab === 'waiting' && show.next_season_date) {
+        if ((currentTab === 'waiting' || currentTab === 'watching') && show.next_season_date) {
           alwaysMeta = `<div class="show-meta">Next up: ${formatSeasonRange(show)}</div>`;
           detailOpts.skipNextSeason = true;
         } else if (currentTab === 'next' && show.recommended_by) {
@@ -1846,7 +1847,7 @@
         : '';
       container.innerHTML += `<div class="suggest-bar" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;"><button class="suggest-btn" title="Copy a link to ${escapeHtml(owners)}'s lists" onclick="shareList()" style="background: var(--ink-quiet);">Share ${escapeHtml(owners)}'s Shows</button>${suggestBtn}</div>`;
 
-      const nextUpOption = currentTab === 'waiting'
+      const nextUpOption = dateDefaultTab
         ? `<option value="nextup"${sortOrder === 'nextup' ? ' selected' : ''}>Sort by Next up</option>`
         : '';
       const sortHtml = `<select class="sort-select" onchange="changeSort(this.value)" aria-label="Sort shows">
