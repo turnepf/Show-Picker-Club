@@ -144,8 +144,21 @@
     .show-info { flex: 1; min-width: 0; line-height: 1.4; }
 
     .show-title { font-weight: 600; color: var(--ink); }
-    .show-title.clickable { cursor: pointer; text-decoration: underline; text-decoration-color: var(--ink-faint); text-underline-offset: 2px; }
-    .show-title.clickable:hover { color: var(--accent); text-decoration-color: var(--accent); }
+    .show-title.clickable { cursor: pointer; }
+    .show-title.clickable::after {
+      content: ' \25BE';
+      display: inline-block;
+      margin-left: 4px;
+      color: var(--ink-faint);
+      font-size: 0.75em;
+      transition: transform 0.18s ease-out;
+    }
+    .show-row.expanded .show-title.clickable::after {
+      transform: rotate(180deg);
+      color: var(--ink-muted);
+    }
+    .show-title.clickable:hover { color: var(--accent); }
+    .show-title.clickable:hover::after { color: var(--accent); }
 
     .show-movie { font-weight: 400; color: var(--ink-quiet); font-size: 12px; }
 
@@ -194,6 +207,55 @@
     .show-notes-inline { color: var(--ink-faint); font-size: 12px; font-style: italic; white-space: nowrap; }
 
     .show-actions-inline { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+
+    /* Primary inline action on each row (own page, logged in) — outlined pill
+       in the destination list color. Tap to perform the most-frequent move. */
+    .btn-row-action {
+      background: transparent;
+      color: var(--action-color, var(--ink));
+      border: 1px solid currentColor;
+      padding: 4px 12px;
+      border-radius: 14px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-row-action:hover {
+      background: color-mix(in oklch, var(--action-color, var(--ink)) 14%, transparent);
+    }
+
+    /* Secondary actions inside the row's expanded panel — Edit, Archive, and
+       any secondary move (e.g. Season done on Watching). Neutral outline. */
+    .show-actions-expanded {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border-soft);
+    }
+    .btn-row-secondary {
+      background: var(--surface);
+      color: var(--ink);
+      border: 1px solid var(--border-soft);
+      padding: 5px 12px;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-row-secondary:hover { background: var(--surface-2); border-color: var(--border); }
+    .btn-row-secondary.danger { color: var(--danger-deep); }
+    .btn-row-secondary.danger:hover {
+      background: var(--danger-soft);
+      border-color: color-mix(in oklch, var(--danger) 30%, transparent);
+    }
 
     .show-actors { padding: 4px 0 8px 16px; display: none; font-size: 13px; color: var(--ink-muted); }
     .show-actors.visible { display: block; }
@@ -768,7 +830,7 @@
   <script>
     let shows = [];
     let currentTab = 'watching';
-    let isEditor = false;
+    // isEditor removed: per-row actions now always show on own page when logged in.
     let editingId = null;
     let memberSlug = null;
     let memberName = '';
@@ -1038,11 +1100,9 @@
       if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
     }
 
-    // Sets the header login/edit button label by current state:
-    //   logged out                       → "Log in" (visible)
-    //   logged in, own page, view mode   → "Edit"   (visible)
-    //   logged in, own page, edit mode   → "Done"   (visible, active style)
-    //   logged in, viewing another's page → hidden  (logout button is enough)
+    // Header login button: visible only when logged out. Once logged in, the
+    // Log out button takes over; per-row actions show inline on your own page
+    // (no edit-mode toggle needed).
     function updateLoginBtnLabel() {
       const btn = document.getElementById('loginBtn');
       if (!btn) return;
@@ -1050,16 +1110,10 @@
         btn.textContent = 'Log in';
         btn.title = 'Log in to edit your shows';
         btn.classList.remove('hidden', 'active');
-        return;
+      } else {
+        btn.classList.add('hidden');
+        btn.classList.remove('active');
       }
-      if (typeof memberSlug !== 'undefined' && authMember === memberSlug) {
-        btn.textContent = isEditor ? 'Done' : 'Edit';
-        btn.title = isEditor ? 'Exit edit mode' : 'Edit your list';
-        btn.classList.toggle('active', !!isEditor);
-        btn.classList.remove('hidden');
-        return;
-      }
-      btn.classList.add('hidden');
     }
 
     async function checkAuth() {
@@ -1096,30 +1150,14 @@
     }
 
     function login() {
-      if (isEditor) {
-        // Toggle out of edit mode — keep the Add button visible since they're still logged in.
-        isEditor = false;
-        updateLoginBtnLabel();
-        renderShows();
-        return;
-      }
-      // Logged in and clicking Log in from the landing page → straight to
-      // their member page; no modal needed.
+      // Already logged in and clicked Log in from the landing page → go
+      // straight to their own member page.
       if (authMember && !memberSlug) {
         window.location.href = '/' + authMember;
         return;
       }
-      // We already know the auth state from the page-load checkAuth(), so act
-      // immediately rather than waiting on another /auth/check round-trip —
-      // that lag (with no feedback) made the button feel unresponsive and got
-      // tapped repeatedly.
-      if (authMember && authMember === memberSlug) {
-        isEditor = true;
-        document.getElementById('addBtn').classList.remove('hidden');
-        updateLoginBtnLabel();
-        renderShows();
-        return;
-      }
+      // Logged-in users on a member page never see the login button (it
+      // hides), so this only fires for truly logged-out clicks.
       openLoginModal();
     }
 
@@ -1132,7 +1170,6 @@
       } catch {}
       authMember = null;
       editorName = '';
-      isEditor = false;
       const logoutBtn = document.getElementById('logoutBtn');
       if (logoutBtn) logoutBtn.classList.add('hidden');
       const addBtn = document.getElementById('addBtn');
@@ -1246,7 +1283,6 @@
           window.location.href = '/' + authMember;
           return;
         }
-        isEditor = true;
         updateLoginBtnLabel();
         renderShows();
       } catch {
@@ -1415,7 +1451,8 @@
       const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
       const suggestCount = shows.filter(s => s.list === 'next' && s.recommended_by && s.created_at >= weekAgo).length;
       const lastSeen = parseInt(localStorage.getItem('suggestions_seen_count') || '0');
-      const hasNew = isEditor && currentTab === 'next' && suggestCount > lastSeen;
+      const isOwnPage = authMember && authMember === memberSlug;
+      const hasNew = isOwnPage && currentTab === 'next' && suggestCount > lastSeen;
       const desc = SECTION_DESCS[currentTab] + ` (${count} show${count !== 1 ? 's' : ''})`;
       const el = document.getElementById('sectionDesc');
       if (hasNew) {
@@ -1500,35 +1537,45 @@
 
         const details = buildDetailLines(show, detailOpts);
 
-        let actions = '';
-        if (isEditor) {
-          let quickBtns = '';
+        // Per-row actions. Primary quick action is always visible on your own
+        // rows when logged in; secondary actions (Edit, Archive, the second
+        // move target on Watching) live in the row's expand panel.
+        const isOwn = authMember && authMember === memberSlug;
+        let primaryAction = '';
+        let expandedActions = '';
+        if (isOwn) {
+          let pLabel = '', pTarget = '', pColorVar = '';
           if (show.list === 'watching') {
-            quickBtns = `<button class="btn btn-small" style="background:var(--list-recommending);color:#fff;" title="Move to Recommending" onclick="moveShow(${show.id}, 'recommending')">Watched it</button>
-               <button class="btn btn-small" style="background:var(--list-waiting);color:#fff;" title="Move to Waiting on Next Showings" onclick="moveShow(${show.id}, 'waiting')">Season done</button>`;
+            pLabel = 'Watched it'; pTarget = 'recommending'; pColorVar = '--list-recommending';
           } else if (show.list === 'waiting') {
-            quickBtns = `<button class="btn btn-small" style="background:var(--list-watching);color:#fff;" title="Move to Watching" onclick="moveShow(${show.id}, 'watching')">It's back!</button>`;
+            pLabel = "It's back!"; pTarget = 'watching'; pColorVar = '--list-watching';
           } else if (show.list === 'recommending') {
-            quickBtns = `<button class="btn btn-small" style="background:var(--list-watching);color:#fff;" title="Move to Watching" onclick="moveShow(${show.id}, 'watching')">Watching again</button>`;
+            pLabel = 'Watching again'; pTarget = 'watching'; pColorVar = '--list-watching';
           } else if (show.list === 'next') {
-            quickBtns = `<button class="btn btn-small" style="background:var(--list-watching);color:#fff;" title="Move to Watching" onclick="moveShow(${show.id}, 'watching')">Start watching</button>`;
+            pLabel = 'Start watching'; pTarget = 'watching'; pColorVar = '--list-watching';
           }
-          actions = `
-            <div class="show-actions-inline">
-              ${quickBtns}
-              <button class="btn btn-small btn-edit" title="Edit this show" onclick="openEditModal(${show.id})">Edit</button>
-              <button class="btn btn-small btn-archive" title="Archive this show" onclick="archiveShow(${show.id})">Archive</button>
+          if (pLabel) {
+            primaryAction = `<button class="btn-row-action" style="--action-color: var(${pColorVar});" onclick="moveShow(${show.id}, '${pTarget}')">${pLabel}</button>`;
+          }
+          const secondaryMove = show.list === 'watching'
+            ? `<button class="btn-row-secondary" onclick="moveShow(${show.id}, 'waiting')">Season done</button>`
+            : '';
+          expandedActions = `
+            <div class="show-actions-expanded">
+              ${secondaryMove}
+              <button class="btn-row-secondary" onclick="openEditModal(${show.id})">Edit</button>
+              <button class="btn-row-secondary danger" onclick="archiveShow(${show.id})">Archive</button>
             </div>`;
         }
 
         return `
-          <div class="show-row">
+          <div class="show-row" id="row-${show.id}">
             <button class="share-btn" onclick="openShareModal(${show.id})" title="Send this show to another member" aria-label="Send this show to another member">&rarr;</button>
             <span class="show-info"><span class="show-title clickable" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}</span>${network}${rating}${series}${movieTag}</span>
-            ${actions}
+            ${primaryAction}
           </div>
           ${alwaysMeta}
-          <div class="show-actors" id="actors-${show.id}">${details}</div>`;
+          <div class="show-actors" id="actors-${show.id}">${details}${expandedActions}</div>`;
       }).join('');
 
       // Footer: legend + network counts
@@ -1544,15 +1591,17 @@
         .join(' &middot; ');
       const legendParts = [];
       if (hasFullSeries) legendParts.push('🎬 Series Complete');
-      legendParts.push('Tap title for details');
       legendParts.push('→ Send to another member');
       const legend = legendParts.join(' | ');
       if (legend) container.innerHTML += `<div class="network-counts">${legend}</div>`;
       if (countsHtml) container.innerHTML += `<div class="network-counts">${countsHtml}</div>`;
-      if (!isEditor) {
-        const suggestBtn = authMember ? `<button class="suggest-btn" onclick="openSuggestModal()">Suggest a Show for ${escapeHtml(owners)}</button>` : '';
-        container.innerHTML += `<div class="suggest-bar" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;"><button class="suggest-btn" onclick="shareList()" style="background: var(--ink-quiet);">Share ${escapeHtml(owners)}'s Shows</button>${suggestBtn}</div>`;
-      }
+      // Suggest only makes sense when logged in and viewing someone else's
+      // list. Share-list URL works for any list including your own.
+      const ownPage = authMember && authMember === memberSlug;
+      const suggestBtn = authMember && !ownPage
+        ? `<button class="suggest-btn" onclick="openSuggestModal()">Suggest a Show for ${escapeHtml(owners)}</button>`
+        : '';
+      container.innerHTML += `<div class="suggest-bar" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;"><button class="suggest-btn" onclick="shareList()" style="background: var(--ink-quiet);">Share ${escapeHtml(owners)}'s Shows</button>${suggestBtn}</div>`;
 
       const sortHtml = `<select class="sort-select" onchange="changeSort(this.value)" aria-label="Sort shows">
         <option value="rating"${sortOrder === 'rating' ? ' selected' : ''}>Sort by Rating</option>
@@ -1567,11 +1616,17 @@
     }
 
     function toggleExpand(showId) {
-      const container = document.getElementById(`actors-${showId}`);
-      if (!container) return;
-      const wasVisible = container.classList.contains('visible');
+      const panel = document.getElementById(`actors-${showId}`);
+      const row = document.getElementById(`row-${showId}`);
+      if (!panel) return;
+      const wasOpen = panel.classList.contains('visible');
+      // Collapse any other open row.
       document.querySelectorAll('.show-actors.visible').forEach(el => el.classList.remove('visible'));
-      if (!wasVisible) container.classList.add('visible');
+      document.querySelectorAll('.show-row.expanded').forEach(el => el.classList.remove('expanded'));
+      if (!wasOpen) {
+        panel.classList.add('visible');
+        if (row) row.classList.add('expanded');
+      }
     }
 
     function openAddModal() {
