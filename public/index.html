@@ -1093,7 +1093,8 @@
     }
 
     function changeSort(value) {
-      localStorage.setItem('sort_order', value);
+      // Per-list so each tab keeps its own sort (Waiting -> Next up, etc.).
+      localStorage.setItem('sort_order_' + currentTab, value);
       renderShows();
     }
 
@@ -1720,11 +1721,22 @@
       loading.classList.add('hidden');
       renderRecs();
 
-      const sortOrder = localStorage.getItem('sort_order') || 'rating';
+      // Each list remembers its own sort. Waiting defaults to the "Next up"
+      // premiere date (soonest first); every other list defaults to rating.
+      const savedSort = localStorage.getItem('sort_order_' + currentTab);
+      const sortOrder = savedSort || (currentTab === 'waiting' ? 'nextup' : 'rating');
       const filtered = shows.filter(s => s.list === currentTab)
         .sort((a, b) => {
           if (sortOrder === 'alpha') return (a.title || '').localeCompare(b.title || '');
           if (sortOrder === 'added') return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+          if (sortOrder === 'nextup') {
+            // next_season_date is ISO (YYYY-MM-DD), so a string compare is
+            // chronological; undated shows sink to the bottom, then rating.
+            const da = a.next_season_date || '9999-12-31';
+            const db = b.next_season_date || '9999-12-31';
+            if (da !== db) return da < db ? -1 : 1;
+            return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
+          }
           return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
         });
       if (filtered.length === 0) {
@@ -1834,7 +1846,11 @@
         : '';
       container.innerHTML += `<div class="suggest-bar" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;"><button class="suggest-btn" title="Copy a link to ${escapeHtml(owners)}'s lists" onclick="shareList()" style="background: var(--ink-quiet);">Share ${escapeHtml(owners)}'s Shows</button>${suggestBtn}</div>`;
 
+      const nextUpOption = currentTab === 'waiting'
+        ? `<option value="nextup"${sortOrder === 'nextup' ? ' selected' : ''}>Sort by Next up</option>`
+        : '';
       const sortHtml = `<select class="sort-select" onchange="changeSort(this.value)" aria-label="Sort shows">
+        ${nextUpOption}
         <option value="rating"${sortOrder === 'rating' ? ' selected' : ''}>Sort by Rating</option>
         <option value="alpha"${sortOrder === 'alpha' ? ' selected' : ''}>Sort A–Z</option>
         <option value="added"${sortOrder === 'added' ? ' selected' : ''}>Sort by Date Added</option>
