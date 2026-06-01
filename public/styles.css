@@ -28,6 +28,15 @@
   --list-recommending: oklch(0.55 0.13 340);   /* clay rose */
   --list-up-next:      var(--accent);          /* brand orange */
 
+  /* Deeper variants for surfaces where the list color carries white text.
+     The list-* tokens above are tuned for outline pills, hover tints, and
+     decorative accents. These tab-* variants pass AA (≥4.5:1) against white
+     text — used for the active-tab pill in the dark header. */
+  --tab-watching:     oklch(0.42 0.13 150);
+  --tab-waiting:      oklch(0.40 0.09 230);
+  --tab-recommending: oklch(0.40 0.13 340);
+  --tab-up-next:      oklch(0.45 0.16 50);
+
   /* Semantic */
   --info:        oklch(0.55 0.11 230);
   --danger:      oklch(0.55 0.18 25);
