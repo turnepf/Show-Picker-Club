@@ -245,33 +245,44 @@
       background: color-mix(in oklch, var(--action-color, var(--ink)) 14%, transparent);
     }
 
-    /* Secondary actions inside the row's expanded panel — Edit, Archive, and
-       any secondary move (e.g. Season done on Watching). Neutral outline. */
+    /* Secondary actions sit at the TOP of the expand panel, above the show
+       detail lines, so they're the first thing the user sees when they tap
+       a row. Tinted pills so they stand off the main surface. */
     .show-actions-expanded {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid var(--border-soft);
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-soft);
     }
+    .show-actors:empty,
+    .show-actors > .show-actions-expanded:only-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
     .btn-row-secondary {
-      background: var(--surface);
+      background: var(--surface-2);
       color: var(--ink);
       border: 1px solid var(--border-soft);
-      padding: 5px 12px;
+      padding: 6px 14px;
       border-radius: 14px;
       font-size: 12px;
-      font-weight: 500;
+      font-weight: 600;
       font-family: inherit;
       cursor: pointer;
-      transition: background 0.15s, border-color 0.15s;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
     }
-    .btn-row-secondary:hover { background: var(--surface-2); border-color: var(--border); }
-    .btn-row-secondary.danger { color: var(--danger-deep); }
-    .btn-row-secondary.danger:hover {
+    .btn-row-secondary:hover {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent-hover);
+    }
+    .btn-row-secondary.danger {
       background: var(--danger-soft);
-      border-color: color-mix(in oklch, var(--danger) 30%, transparent);
+      color: var(--danger-deep);
+      border-color: color-mix(in oklch, var(--danger) 28%, transparent);
+    }
+    .btn-row-secondary.danger:hover {
+      background: color-mix(in oklch, var(--danger-soft) 70%, var(--danger) 18%);
+      border-color: var(--danger);
     }
 
     .show-actors { padding: 4px 0 8px 16px; display: none; font-size: 13px; color: var(--ink-muted); }
@@ -1606,7 +1617,7 @@
             ${primaryAction}
           </div>
           ${alwaysMeta}
-          <div class="show-actors" id="actors-${show.id}">${details}${expandedActions}</div>`;
+          <div class="show-actors" id="actors-${show.id}">${expandedActions}${details}</div>`;
       }).join('');
 
       // Footer: legend + network counts
