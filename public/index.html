@@ -144,21 +144,29 @@
     .show-info { flex: 1; min-width: 0; line-height: 1.4; }
 
     .show-title { font-weight: 600; color: var(--ink); }
-    .show-title.clickable { cursor: pointer; }
-    .show-title.clickable::after {
-      content: " ▾";
-      display: inline-block;
-      margin-left: 5px;
-      color: var(--ink-muted);
-      font-size: 0.9em;
-      transition: transform 0.18s ease-out;
+    .show-title.clickable {
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-decoration-color: var(--ink-faint);
+      text-underline-offset: 3px;
     }
-    .show-row.expanded .show-title.clickable::after {
+    .show-title .chev {
+      display: inline-block;
+      margin-left: 6px;
+      color: var(--ink-muted);
+      font-weight: 700;
+      font-size: 0.95em;
+      text-decoration: none;
+      transition: transform 0.18s ease-out;
+      transform-origin: center 55%;
+    }
+    .show-row.expanded .show-title .chev {
       transform: rotate(180deg);
       color: var(--accent);
     }
-    .show-title.clickable:hover { color: var(--accent); }
-    .show-title.clickable:hover::after { color: var(--accent); }
+    .show-title.clickable:hover { color: var(--accent); text-decoration-color: var(--accent); }
+    .show-title.clickable:hover .chev { color: var(--accent); }
 
     .show-movie { font-weight: 400; color: var(--ink-quiet); font-size: 12px; }
 
@@ -1035,7 +1043,7 @@
             const details = buildDetailLines(show, { aggregate: true });
             return `<div class="show-row popular-row" ${i >= 5 ? 'style="display:none;"' : ''}>
               <button class="share-btn popular-add-btn" style="display:none;" onclick="openAddMyList('${escapeHtml(show.title).replace(/'/g, "\\'")}', '${escapeHtml(show.network || '').replace(/'/g, "\\'")}', '${escapeHtml(show.network_url || '').replace(/'/g, "\\'")}', ${show.movie || 0})" title="Add to my list">+</button>
-              <span class="show-info"><span class="show-title clickable" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}</span>${network}${rating}${movieTag}${badge}</span>
+              <span class="show-info"><span class="show-title clickable" title="Tap to see more" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true">▾</span></span>${network}${rating}${movieTag}${badge}</span>
             </div>
             <div class="show-actors" id="actors-${show.id}">${details}</div>`;
           }).join('');
@@ -1554,34 +1562,38 @@
         let primaryAction = '';
         let expandedActions = '';
         if (isOwn) {
-          let pLabel = '', pTarget = '', pColorVar = '';
+          let pLabel = '', pTarget = '', pColorVar = '', pTitle = '';
           if (show.list === 'watching') {
             pLabel = 'Watched it'; pTarget = 'recommending'; pColorVar = '--list-recommending';
+            pTitle = 'Move to Recommending';
           } else if (show.list === 'waiting') {
             pLabel = "It's back!"; pTarget = 'watching'; pColorVar = '--list-watching';
+            pTitle = 'Move back to Watching';
           } else if (show.list === 'recommending') {
             pLabel = 'Watching again'; pTarget = 'watching'; pColorVar = '--list-watching';
+            pTitle = 'Move back to Watching';
           } else if (show.list === 'next') {
             pLabel = 'Start watching'; pTarget = 'watching'; pColorVar = '--list-watching';
+            pTitle = 'Move to Watching';
           }
           if (pLabel) {
-            primaryAction = `<button class="btn-row-action" style="--action-color: var(${pColorVar});" onclick="moveShow(${show.id}, '${pTarget}')">${pLabel}</button>`;
+            primaryAction = `<button class="btn-row-action" style="--action-color: var(${pColorVar});" title="${pTitle}" onclick="moveShow(${show.id}, '${pTarget}')">${pLabel}</button>`;
           }
           const secondaryMove = show.list === 'watching'
-            ? `<button class="btn-row-secondary" onclick="moveShow(${show.id}, 'waiting')">Season done</button>`
+            ? `<button class="btn-row-secondary" title="Move to Waiting for next season" onclick="moveShow(${show.id}, 'waiting')">Season done</button>`
             : '';
           expandedActions = `
             <div class="show-actions-expanded">
               ${secondaryMove}
-              <button class="btn-row-secondary" onclick="openEditModal(${show.id})">Edit</button>
-              <button class="btn-row-secondary danger" onclick="archiveShow(${show.id})">Archive</button>
+              <button class="btn-row-secondary" title="Edit this show's details" onclick="openEditModal(${show.id})">Edit</button>
+              <button class="btn-row-secondary danger" title="Hide from your lists (you can bring it back any time)" onclick="archiveShow(${show.id})">Archive</button>
             </div>`;
         }
 
         return `
           <div class="show-row" id="row-${show.id}">
             <button class="share-btn" onclick="openShareModal(${show.id})" title="Send this show to another member" aria-label="Send this show to another member"><svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
-            <span class="show-info"><span class="show-title clickable" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}</span>${network}${rating}${series}${movieTag}</span>
+            <span class="show-info"><span class="show-title clickable" title="Tap to see more" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true">▾</span></span>${network}${rating}${series}${movieTag}</span>
             ${primaryAction}
           </div>
           ${alwaysMeta}
@@ -1608,9 +1620,9 @@
       // list. Share-list URL works for any list including your own.
       const ownPage = authMember && authMember === memberSlug;
       const suggestBtn = authMember && !ownPage
-        ? `<button class="suggest-btn" onclick="openSuggestModal()">Suggest a Show for ${escapeHtml(owners)}</button>`
+        ? `<button class="suggest-btn" title="Suggest a new show for ${escapeHtml(owners)} to watch" onclick="openSuggestModal()">Suggest a Show for ${escapeHtml(owners)}</button>`
         : '';
-      container.innerHTML += `<div class="suggest-bar" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;"><button class="suggest-btn" onclick="shareList()" style="background: var(--ink-quiet);">Share ${escapeHtml(owners)}'s Shows</button>${suggestBtn}</div>`;
+      container.innerHTML += `<div class="suggest-bar" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;"><button class="suggest-btn" title="Copy a link to ${escapeHtml(owners)}'s lists" onclick="shareList()" style="background: var(--ink-quiet);">Share ${escapeHtml(owners)}'s Shows</button>${suggestBtn}</div>`;
 
       const sortHtml = `<select class="sort-select" onchange="changeSort(this.value)" aria-label="Sort shows">
         <option value="rating"${sortOrder === 'rating' ? ' selected' : ''}>Sort by Rating</option>
@@ -1946,7 +1958,7 @@
           <div class="show-row">
             ${addBtn}
             <span class="show-info">
-              <span class="show-title clickable" onclick="toggleSearchExpand(${show.id})">${escapeHtml(show.title)}</span>${network}${rating}${series}${movieTag}${listLabel}
+              <span class="show-title clickable" title="Tap to see more" onclick="toggleSearchExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true">▾</span></span>${network}${rating}${series}${movieTag}${listLabel}
             </span>
           </div>
           <div class="show-actors" id="search-actors-${show.id}">${details}</div>`;
