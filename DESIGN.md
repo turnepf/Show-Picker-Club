@@ -189,11 +189,14 @@ Four hues, one per product list. Tuned for outline pills and quiet accents at th
 
 Flat by default. Surfaces rest on the taupe body with hairline borders, not shadows. Depth is reserved for layers that are genuinely lifted off the page — and even those use a soft, low-contrast shadow tinted with the ink hue (`oklch(0.18 0.03 50 / …)`), never a hard black drop. The look is paper on a desk, not glass floating in space.
 
+Two of these are CSS custom properties in `styles.css` (`--shadow-card`, `--focus-ring`); use the token, not the raw value.
+
 ### Shadow Vocabulary
-- **Resting card** (`box-shadow: 0 1px 2px oklch(0.18 0.03 50 / 0.06), 0 14px 44px oklch(0.18 0.03 50 / 0.07)`): the landing card. A whisper of lift, mostly the long soft second layer.
+- **Primary content card** (`box-shadow: 0 1px 2px oklch(0.18 0.03 50 / 0.06), 0 14px 44px oklch(0.18 0.03 50 / 0.07)`): the landing card and the member-page `main`. A whisper of lift, mostly the long soft second layer.
+- **Secondary card** (`var(--shadow-card)` = `0 1px 2px oklch(0.18 0.03 50 / 0.06), 0 8px 28px oklch(0.18 0.03 50 / 0.06)`): a slightly lighter lift for operator-page wrap cards and the vibe hero. The shared token.
 - **Modal** (`box-shadow: 0 20px 60px rgba(0,0,0,0.2)`): the one place a heavier shadow is right, because the modal must read as above everything.
 - **Toast** (`box-shadow: 0 4px 12px oklch(0.18 0.03 50 / 0.18), 0 14px 32px oklch(0.18 0.03 50 / 0.22)`): a floating pill, lifted clearly off the content.
-- **Focus ring** (`box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent)`): not elevation, but the only other use of the shadow channel — a soft accent halo on focused inputs.
+- **Focus ring** (`var(--focus-ring)` = `0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent)`): not elevation, but the only other use of the shadow channel — a soft accent halo on focused inputs. The shared token; every focusable input/select/textarea uses it.
 
 ### Named Rules
 **The Flat-By-Default Rule.** Rows, chips, and panels are flat with hairline borders. If you're reaching for a shadow on a list row, stop — that depth isn't earned. Shadow is for the card, the modal, and the toast. Test: if it looks like a 2014 app, the shadow is too dark and the blur is too tight.
