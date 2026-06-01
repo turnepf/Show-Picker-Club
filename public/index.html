@@ -57,12 +57,6 @@
       border: 1px solid rgba(255,255,255,0.3);
     }
     .btn-login:hover { background: rgba(255,255,255,0.25); }
-    .btn-login.active {
-      background: var(--accent);
-      color: var(--ink);
-      border-color: var(--accent);
-      box-shadow: inset 0 1px 2px oklch(0.30 0.04 50 / 0.25);
-    }
 
     .btn-add { background: var(--accent); color: var(--ink); padding: 6px 12px; font-size: 18px; line-height: 1; font-weight: 700; }
     .btn-add:hover { background: var(--accent-hover); }
@@ -78,10 +72,6 @@
     .search-empty { text-align: center; color: var(--ink-muted); padding: 24px 0; font-size: 13px; }
 
     .btn-small { padding: 4px 8px; font-size: 11px; border-radius: 4px; }
-    .btn-move { background: var(--info); color: #fff; }
-    .btn-archive { background: var(--ink-muted); color: #fff; }
-    .btn-edit { background: var(--ink); color: #fff; }
-    .btn-delete { background: var(--danger); color: #fff; }
 
     .tabs { display: flex; gap: 0; overflow-x: auto; scrollbar-width: none; }
     .tabs::-webkit-scrollbar { display: none; }
@@ -102,10 +92,10 @@
     }
     .tab:hover { color: rgba(255,255,255,0.85); border-color: rgba(255,255,255,0.4); }
     .tab.active { color: #fff; font-weight: 600; }
-    .tab.active[data-list="watching"] { background: var(--list-watching); border-color: var(--list-watching); }
-    .tab.active[data-list="waiting"] { background: var(--list-waiting); border-color: var(--list-waiting); }
-    .tab.active[data-list="recommending"] { background: var(--list-recommending); border-color: var(--list-recommending); }
-    .tab.active[data-list="next"] { background: var(--accent); border-color: var(--accent); }
+    .tab.active[data-list="watching"] { background: var(--tab-watching); border-color: var(--tab-watching); }
+    .tab.active[data-list="waiting"] { background: var(--tab-waiting); border-color: var(--tab-waiting); }
+    .tab.active[data-list="recommending"] { background: var(--tab-recommending); border-color: var(--tab-recommending); }
+    .tab.active[data-list="next"] { background: var(--tab-up-next); border-color: var(--tab-up-next); }
 
     .section-desc {
       text-align: center;
@@ -223,8 +213,6 @@
     .show-watching-with { color: var(--ink-muted); font-size: 13px; white-space: nowrap; }
     .show-notes-inline { color: var(--ink-faint); font-size: 12px; font-style: italic; white-space: nowrap; }
 
-    .show-actions-inline { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
-
     /* Primary inline action on each row (own page, logged in) — outlined pill
        in the destination list color. Tap to perform the most-frequent move. */
     .btn-row-action {
@@ -331,14 +319,6 @@
 
     .network-counts { text-align: center; font-size: 12px; color: var(--ink-quiet); padding: 12px 0 4px; }
 
-    .toggle-bar {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 6px;
-      padding: 8px 0 10px;
-    }
-
     /* Sort + future filter controls above the list. Right-aligned utility row. */
     .list-controls {
       display: flex;
@@ -346,18 +326,6 @@
       align-items: center;
       gap: 8px;
       padding: 4px 0 10px;
-    }
-    .list-controls .sort-select { margin-left: 0; }
-    .toggle-pill {
-      padding: 4px 10px;
-      font-size: 11px;
-      font-family: inherit;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: all 0.15s;
-      border: 1px solid var(--border);
-      background: #fff;
-      color: var(--ink-faint);
     }
     .sort-select {
       padding: 6px 10px;
@@ -368,15 +336,7 @@
       background: #fff;
       color: var(--ink);
       cursor: pointer;
-      margin-left: 4px;
     }
-
-    .toggle-pill.active {
-      background: var(--ink);
-      color: #fff;
-      border-color: var(--ink);
-    }
-
 
     .hidden { display: none !important; }
 
@@ -579,9 +539,7 @@
     @media (max-width: 480px) {
       .header-top h1 { font-size: 18px; }
       .tab { padding: 10px 0; font-size: 12px; }
-      main { padding: 8px 12px; }
       .show-row { font-size: 13px; }
-      .show-actions-inline .btn-small { padding: 3px 6px; font-size: 10px; }
     }
 
     .popular-members-badge {
@@ -1316,6 +1274,52 @@
       loadMemberMatch();
       if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
     }
+
+    // Keyboard shortcuts (member page only):
+    //   /    focus search
+    //   1-4  switch tabs in order (Watching, Waiting, Recommending, Up Next)
+    //   n    open Add Show modal (own page, logged in)
+    //   Esc  close any open modal
+    document.addEventListener('keydown', (e) => {
+      // Esc works even from inside inputs — that's the universal "get me out" key.
+      if (e.key === 'Escape') {
+        const open = document.querySelectorAll('.modal-overlay:not(.hidden)');
+        if (open.length > 0) {
+          open.forEach(o => o.classList.add('hidden'));
+          e.preventDefault();
+        }
+        return;
+      }
+      // Skip the rest while typing in a field.
+      const tag = (e.target.tagName || '').toLowerCase();
+      const isTyping = tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable;
+      if (isTyping) return;
+      // Don't hijack browser/system shortcuts.
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Only meaningful on a member page (showPage visible).
+      const showPage = document.getElementById('showPage');
+      if (!showPage || showPage.classList.contains('hidden')) return;
+      // Don't fire when any modal is open.
+      if (document.querySelector('.modal-overlay:not(.hidden)')) return;
+
+      if (e.key === '/') {
+        openSearchModal();
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'n' || e.key === 'N') {
+        if (authMember && authMember === memberSlug) {
+          openAddModal();
+          e.preventDefault();
+        }
+        return;
+      }
+      if (['1', '2', '3', '4'].includes(e.key)) {
+        const tab = ['watching', 'waiting', 'recommending', 'next'][parseInt(e.key, 10) - 1];
+        switchTab(tab);
+        e.preventDefault();
+      }
+    });
 
     // Header login button: visible only when logged out. Once logged in, the
     // Log out button takes over; per-row actions show inline on your own page
