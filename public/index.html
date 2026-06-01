@@ -426,7 +426,7 @@
       border: 1px solid var(--border); border-radius: 6px;
       font-size: 15px; font-family: inherit; background: var(--surface); color: var(--ink); cursor: pointer;
     }
-    .member-jump-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent); }
+    .member-jump-select:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
 
     /* Modal */
     .modal-overlay {
@@ -479,7 +479,7 @@
     .modal input:focus, .modal select:focus {
       outline: none;
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent);
+      box-shadow: var(--focus-ring);
     }
 
 
@@ -1186,15 +1186,12 @@
             const memberList = (show.members || []).join(', ');
             const badge = ` <span class="popular-members-badge" onclick="toggleExpand(${show.id})" title="Tap to see who's watching">${show.member_count} Members</span>`;
             const details = buildDetailLines(show, { aggregate: true });
-            return `<div class="show-row popular-row" ${i >= 5 ? 'style="display:none;"' : ''}>
+            return `<div class="show-row popular-row">
               <button class="share-btn popular-add-btn" style="display:none;" onclick="openAddMyList('${escapeHtml(show.title).replace(/'/g, "\\'")}', '${escapeHtml(show.network || '').replace(/'/g, "\\'")}', '${escapeHtml(show.network_url || '').replace(/'/g, "\\'")}', ${show.movie || 0})" title="Add to my list">+</button>
               <span class="show-info"><span class="show-title clickable" title="Tap to see more" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${movieTag}${badge}</span>
             </div>
             <div class="show-actors" id="actors-${show.id}">${details}</div>`;
           }).join('');
-          if (popData.shows.length > 5) {
-            popList.innerHTML += `<div id="popularToggle" style="text-align: center; padding: 8px 0;"><button onclick="togglePopular(true)" style="background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;">More &#9660;</button></div>`;
-          }
           document.getElementById('popularSection').style.display = 'block';
         }
       } catch (e) {}
@@ -2473,14 +2470,6 @@
       }
     }
 
-    function togglePopular(expand) {
-      document.querySelectorAll('.popular-row').forEach((r, i) => {
-        if (i >= 5) r.style.display = expand ? '' : 'none';
-      });
-      document.getElementById('popularToggle').innerHTML = expand
-        ? `<button onclick="togglePopular(false)" style="background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;">Less &#9650;</button>`
-        : `<button onclick="togglePopular(true)" style="background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;">More &#9660;</button>`;
-    }
 
     function timeAgo(dateStr) {
       const now = new Date();

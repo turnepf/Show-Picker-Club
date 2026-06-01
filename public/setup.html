@@ -14,7 +14,7 @@
       background: var(--surface);
       padding: 28px;
       border-radius: 12px;
-      box-shadow: 0 1px 2px oklch(0.18 0.03 50 / 0.06), 0 8px 28px oklch(0.18 0.03 50 / 0.06);
+      box-shadow: var(--shadow-card);
     }
     h1 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--ink); margin-bottom: 20px; }
     label { display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: 6px; margin-top: 14px; color: var(--ink-muted); }
@@ -27,7 +27,7 @@
       font-size: var(--text-base);
       font-family: inherit;
     }
-    input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent); }
+    input:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
     .hint { font-size: var(--text-xs); color: var(--ink-muted); margin-top: 4px; }
     button {
       width: 100%;
@@ -79,7 +79,7 @@
       color: var(--ink);
       white-space: pre-wrap;
     }
-    textarea.intro:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent); }
+    textarea.intro:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
     button.copy {
       width: auto;
       margin-top: 8px;

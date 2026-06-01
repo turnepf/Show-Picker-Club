@@ -18,7 +18,7 @@
 
     .hero {
       background: var(--surface); border-radius: 12px; padding: 32px 24px; text-align: center;
-      box-shadow: 0 1px 2px oklch(0.18 0.03 50 / 0.06), 0 8px 28px oklch(0.18 0.03 50 / 0.06); margin-bottom: 20px;
+      box-shadow: var(--shadow-card); margin-bottom: 20px;
     }
     .hero .star { color: var(--accent); font-size: 14px; letter-spacing: 2px; }
     .hero .cluster-name { font-family: var(--font-display); font-size: var(--text-xl); color: var(--ink); margin: 8px 0 12px; font-weight: 600; letter-spacing: -0.015em; }
@@ -97,7 +97,7 @@
       width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px;
       font-size: 14px; font-family: inherit;
     }
-    .modal-card select:focus, .modal-card textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent); }
+    .modal-card select:focus, .modal-card textarea:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
     .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
     .modal-actions button {
       flex: 1; padding: 10px; border-radius: 6px; font-size: 14px; font-weight: 600;
