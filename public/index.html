@@ -554,6 +554,59 @@
     }
     .popular-members-badge:hover { color: var(--ink); }
 
+    /* Toast notifications — bottom-center stack. Used for action feedback
+       (move, archive, share, suggest, save) and undo on archive. */
+    .toast-stack {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: max(16px, env(safe-area-inset-bottom, 16px));
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 0 16px;
+      pointer-events: none;
+      z-index: 300;
+    }
+    .toast {
+      display: inline-flex;
+      align-items: center;
+      gap: 16px;
+      max-width: 480px;
+      background: oklch(0.22 0.025 50);
+      color: var(--surface);
+      padding: 10px 14px 10px 18px;
+      border-radius: 999px;
+      font-size: var(--text-sm);
+      font-weight: 500;
+      box-shadow: 0 4px 12px oklch(0.18 0.03 50 / 0.18),
+                  0 14px 32px oklch(0.18 0.03 50 / 0.22);
+      pointer-events: auto;
+      animation: toast-in 0.22s ease-out;
+    }
+    .toast.error { background: var(--danger-deep); }
+    .toast button {
+      background: transparent;
+      color: var(--accent);
+      border: none;
+      padding: 4px 10px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      border-radius: 999px;
+    }
+    .toast button:hover { color: #fff; background: oklch(0.32 0.04 50); }
+    @keyframes toast-in {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .toast { animation: none; }
+      .show-title .chev svg { transition: none; }
+      .show-actors { transition: none; }
+    }
+
     .recs-section { margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--border-soft); }
     .recs-heading {
       font-family: var(--font-display);
@@ -903,6 +956,50 @@
     function actorNamesText(raw) {
       return parseActors(raw).map(a => a.name).join(', ');
     }
+
+    // Show a transient toast at the bottom of the screen.
+    //   showToast("Moved to Recommending")
+    //   showToast("Archived \"Foo\"", { action: { label: "Undo", onClick: fn } })
+    //   showToast("Network error", { tone: "error" })
+    function showToast(message, opts = {}) {
+      let stack = document.getElementById('toastStack');
+      if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'toastStack';
+        stack.className = 'toast-stack';
+        stack.setAttribute('role', 'status');
+        stack.setAttribute('aria-live', 'polite');
+        document.body.appendChild(stack);
+      }
+      const toast = document.createElement('div');
+      toast.className = 'toast' + (opts.tone === 'error' ? ' error' : '');
+      const msg = document.createElement('span');
+      msg.textContent = message;
+      toast.appendChild(msg);
+      let dismissTimer = null;
+      const dismiss = () => {
+        if (dismissTimer) clearTimeout(dismissTimer);
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        toast.style.transition = 'opacity 0.18s, transform 0.18s';
+        setTimeout(() => toast.remove(), 220);
+      };
+      if (opts.action) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = opts.action.label;
+        btn.addEventListener('click', () => {
+          try { opts.action.onClick(); } catch (e) {}
+          dismiss();
+        });
+        toast.appendChild(btn);
+      }
+      stack.appendChild(toast);
+      dismissTimer = setTimeout(dismiss, opts.duration || (opts.action ? 6000 : 3500));
+      return dismiss;
+    }
+
+    const LIST_LABELS = { watching: 'Watching', waiting: 'Waiting', recommending: 'Recommending', next: 'Up Next' };
 
     function buildDetailLines(show, opts = {}) {
       const lines = [];
@@ -1430,13 +1527,16 @@
           // Network/server error — restore the pick so the user can retry.
           recsData.picks.splice(idx, 0, pick);
           renderRecs();
+          showToast('Could not add. Try again.', { tone: 'error' });
           return;
         }
         // 200/201 success or 409 (already on list, e.g. archived) — refresh main list.
         await loadShows();
+        showToast(`Added "${pick.title}" to your Up Next`);
       } catch (e) {
         recsData.picks.splice(idx, 0, pick);
         renderRecs();
+        showToast('Network error. Try again.', { tone: 'error' });
       }
     }
 
@@ -1724,7 +1824,8 @@
 
     async function saveShow() {
       const title = document.getElementById('inputTitle').value.trim();
-      if (!title) { alert('Title is required'); return; }
+      if (!title) { showToast('Title is required', { tone: 'error' }); return; }
+      const wasEditing = !!editingId;
 
       const body = {
         title,
@@ -1758,7 +1859,7 @@
                 body: JSON.stringify({ ...body, archived: 0 }),
               });
             } else {
-              alert(`"${title}" is already on the ${check.list} list.`);
+              showToast(`"${title}" is already on the ${LIST_LABELS[check.list] || check.list} list.`, { tone: 'error' });
               return;
             }
           } else {
@@ -1779,13 +1880,13 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...body, title: err.title, archived: 0 }),
               });
-              if (!res.ok) { alert('Failed to restore'); return; }
+              if (!res.ok) { showToast('Failed to restore', { tone: 'error' }); return; }
             } else { return; }
           } else if (err.error === 'exists_active') {
-            alert(`IMDB knows this as "${err.title}" and it's already on the ${err.list} list.`);
+            showToast(`IMDB knows this as "${err.title}". Already on the ${LIST_LABELS[err.list] || err.list} list.`, { tone: 'error' });
             return;
           } else {
-            alert(err.error || 'Failed to save');
+            showToast(err.error || 'Failed to save', { tone: 'error' });
             return;
           }
         }
@@ -1798,13 +1899,17 @@
           shows.push(saved.show);
         }
         renderShows();
+        showToast(wasEditing ? 'Saved changes' : `Added "${saved.show.title}"`);
       } catch (e) {
-        alert('Failed to save show');
+        showToast('Network error. Try again.', { tone: 'error' });
       }
     }
 
-    async function moveShow(showId, newList) {
+    async function moveShow(showId, newList, opts = {}) {
       if (!newList) return;
+      const show = shows.find(s => s.id === showId);
+      if (!show) return;
+      const oldList = show.list;
       try {
         const res = await fetch(`/api/shows/${showId}/move`, {
           method: 'PUT',
@@ -1812,26 +1917,57 @@
           body: JSON.stringify({ list: newList }),
         });
         if (res.ok) {
-          const show = shows.find(s => s.id === showId);
-          if (show) show.list = newList;
+          show.list = newList;
           renderShows();
+          if (!opts.silent) {
+            showToast(`Moved to ${LIST_LABELS[newList] || newList}`, {
+              action: { label: 'Undo', onClick: () => moveShow(showId, oldList, { silent: true }) },
+            });
+          }
+        } else {
+          showToast('Failed to move show', { tone: 'error' });
         }
       } catch (e) {
-        alert('Failed to move show');
+        showToast('Network error. Try again.', { tone: 'error' });
       }
     }
 
     async function archiveShow(showId) {
       const show = shows.find(s => s.id === showId);
-      if (!confirm(`Archive "${show?.title}"?`)) return;
+      if (!show) return;
+      const savedShow = { ...show };
       try {
         const res = await fetch(`/api/shows/${showId}/archive`, { method: 'PUT' });
         if (res.ok) {
           shows = shows.filter(s => s.id !== showId);
           renderShows();
+          showToast(`Archived "${show.title}"`, {
+            action: { label: 'Undo', onClick: () => unarchiveShow(showId, savedShow) },
+          });
+        } else {
+          showToast('Failed to archive show', { tone: 'error' });
         }
       } catch (e) {
-        alert('Failed to archive show');
+        showToast('Network error. Try again.', { tone: 'error' });
+      }
+    }
+
+    async function unarchiveShow(showId, savedShow) {
+      try {
+        const res = await fetch(`/api/shows/${showId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ archived: 0 }),
+        });
+        if (res.ok) {
+          shows.push(savedShow);
+          renderShows();
+          showToast(`Restored "${savedShow.title}"`);
+        } else {
+          showToast('Failed to restore show', { tone: 'error' });
+        }
+      } catch (e) {
+        showToast('Network error. Try again.', { tone: 'error' });
       }
     }
 
@@ -1875,9 +2011,11 @@
       if (navigator.share) {
         navigator.share({ title: `${owners}'s Shows`, text, url }).catch(() => {});
       } else if (navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(() => alert('Link copied to clipboard!')).catch(() => alert(text));
+        navigator.clipboard.writeText(text)
+          .then(() => showToast('Link copied to clipboard'))
+          .catch(() => prompt('Copy this link', text));
       } else {
-        alert(text);
+        prompt('Copy this link', text);
       }
     }
 
@@ -1989,7 +2127,7 @@
           const id = parseInt(btn.dataset.addIdx, 10);
           btn.addEventListener('click', () => {
             if (!authMember) {
-              alert('Log in on your member page first to add shows to your list.');
+              showToast('Log in on your member page first to add shows', { tone: 'error' });
               return;
             }
             const s = searchableShows.find(x => x.id === id);
@@ -2026,8 +2164,8 @@
       const title = document.getElementById('suggestTitle').value.trim();
       const network = getNetwork('suggestNetwork', 'suggestNetworkOther');
       const notes = document.getElementById('suggestNotes').value.trim() || null;
-      if (!title) { alert('Show title is required'); return; }
-      if (!name) { alert('Your name is required'); return; }
+      if (!title) { showToast('Show title is required', { tone: 'error' }); return; }
+      if (!name) { showToast('Your name is required', { tone: 'error' }); return; }
 
       try {
         const res = await fetch('/api/suggestions', {
@@ -2038,6 +2176,8 @@
         const data = await res.json();
         if (data.duplicate) {
           closeSuggestModal();
+          // Quips for duplicate suggestions stay as alerts — they're playful
+          // multi-line messages that don't fit the toast format.
           if (data.archived) {
             alert(ARCHIVED_QUIPS[Math.floor(Math.random() * ARCHIVED_QUIPS.length)]);
           } else {
@@ -2045,13 +2185,13 @@
           }
         } else if (data.success) {
           closeSuggestModal();
-          alert(`Thanks! Your suggestion has been sent!`);
+          showToast(`Suggested to ${owners}`);
           await loadShows();
         } else {
-          alert(data.error || 'Failed to send suggestion');
+          showToast(data.error || 'Failed to send suggestion', { tone: 'error' });
         }
       } catch (e) {
-        alert('Failed to send suggestion');
+        showToast('Network error. Try again.', { tone: 'error' });
       }
     }
 
@@ -2122,8 +2262,8 @@
       const name = document.getElementById('shareName').value.trim();
       const notes = document.getElementById('shareNotes').value.trim() || null;
 
-      if (!name) { alert('Your name is required'); return; }
-      if (!targetMember) { alert('Please select a member'); return; }
+      if (!name) { showToast('Your name is required', { tone: 'error' }); return; }
+      if (!targetMember) { showToast('Please select a member', { tone: 'error' }); return; }
 
       try {
         let res, data;
@@ -2161,20 +2301,22 @@
         }
         if (data.duplicate) {
           closeShareModal();
+          // Quips for duplicate shares stay as alerts — playful messages.
           if (data.archived) {
             alert('They had this one but archived it. They must not be fans!');
           } else {
-            alert(`They already have this on their "${data.list}" list!`);
+            alert(`They already have this on their "${LIST_LABELS[data.list] || data.list}" list!`);
           }
         } else if (data.success) {
           closeShareModal();
           const target = allMembers.find(h => h.slug === targetMember);
-          alert(`Added to ${target ? (target.display_name || target.first_name || target.name.split(' ')[0]) + "'s Shows" : 'their'} Up Next list!`);
+          const targetName = target ? (target.display_name || target.first_name || target.name.split(' ')[0]) : 'their';
+          showToast(`Sent to ${targetName}'s Up Next`);
         } else {
-          alert(data.error || 'Failed to share');
+          showToast(data.error || 'Failed to send', { tone: 'error' });
         }
       } catch (e) {
-        alert('Failed to share');
+        showToast('Network error. Try again.', { tone: 'error' });
       }
     }
 
@@ -2221,15 +2363,20 @@
         const data = await res.json();
         if (res.status === 409) {
           closeAddMyList();
-          alert(data.error === 'exists_archived' ? 'You had this one but archived it.' : `Already on your "${data.list}" list!`);
+          showToast(
+            data.error === 'exists_archived'
+              ? 'You had this one but archived it.'
+              : `Already on your ${LIST_LABELS[data.list] || data.list} list.`,
+            { tone: 'error' }
+          );
         } else if (data.show) {
           closeAddMyList();
-          alert(`Added to your ${list} list!`);
+          showToast(`Added to your ${LIST_LABELS[list] || list} list`);
         } else {
-          alert(data.error || 'Failed to add');
+          showToast(data.error || 'Failed to add', { tone: 'error' });
         }
       } catch (e) {
-        alert('Failed to add');
+        showToast('Network error. Try again.', { tone: 'error' });
       }
     }
 
