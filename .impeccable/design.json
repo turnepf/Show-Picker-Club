@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-01T00:00:00Z",
+  "title": "Design System: Show Picker Club",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Brand Orange",
+        "canonical": "oklch(0.69 0.15 50)",
+        "tonalRamp": ["oklch(0.15 0.037 50)", "oklch(0.26 0.077 50)", "oklch(0.38 0.118 50)", "oklch(0.49 0.144 50)", "oklch(0.61 0.144 50)", "oklch(0.72 0.118 50)", "oklch(0.84 0.077 50)", "oklch(0.95 0.037 50)"]
+      },
+      "body": {
+        "role": "neutral",
+        "displayName": "Taupe Body",
+        "canonical": "oklch(0.86 0.025 50)",
+        "tonalRamp": ["oklch(0.15 0.006 50)", "oklch(0.26 0.013 50)", "oklch(0.38 0.020 50)", "oklch(0.49 0.024 50)", "oklch(0.61 0.024 50)", "oklch(0.72 0.020 50)", "oklch(0.84 0.013 50)", "oklch(0.95 0.006 50)"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Warm Ink",
+        "canonical": "oklch(0.22 0.025 50)",
+        "tonalRamp": ["oklch(0.15 0.006 50)", "oklch(0.26 0.013 50)", "oklch(0.38 0.020 50)", "oklch(0.49 0.024 50)", "oklch(0.61 0.024 50)", "oklch(0.72 0.020 50)", "oklch(0.84 0.013 50)", "oklch(0.95 0.006 50)"]
+      },
+      "list-watching": {
+        "role": "secondary",
+        "displayName": "Sage / Watching",
+        "canonical": "oklch(0.58 0.13 150)",
+        "tonalRamp": ["oklch(0.15 0.033 150)", "oklch(0.26 0.067 150)", "oklch(0.38 0.102 150)", "oklch(0.49 0.125 150)", "oklch(0.61 0.125 150)", "oklch(0.72 0.102 150)", "oklch(0.84 0.067 150)", "oklch(0.95 0.033 150)"]
+      },
+      "list-waiting": {
+        "role": "secondary",
+        "displayName": "Steel / Waiting",
+        "canonical": "oklch(0.60 0.09 230)",
+        "tonalRamp": ["oklch(0.15 0.022 230)", "oklch(0.26 0.046 230)", "oklch(0.38 0.071 230)", "oklch(0.49 0.087 230)", "oklch(0.61 0.087 230)", "oklch(0.72 0.071 230)", "oklch(0.84 0.046 230)", "oklch(0.95 0.022 230)"]
+      },
+      "list-recommending": {
+        "role": "secondary",
+        "displayName": "Clay Rose / Recommending",
+        "canonical": "oklch(0.55 0.13 340)",
+        "tonalRamp": ["oklch(0.15 0.033 340)", "oklch(0.26 0.067 340)", "oklch(0.38 0.102 340)", "oklch(0.49 0.125 340)", "oklch(0.61 0.125 340)", "oklch(0.72 0.102 340)", "oklch(0.84 0.067 340)", "oklch(0.95 0.033 340)"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Landing hero only. Serif, ~2.75rem ceiling. The one place the app raises its voice." },
+      "headline": { "displayName": "Headline", "purpose": "Section titles and modal titles. Serif, balanced wrap." },
+      "title": { "displayName": "Title", "purpose": "Empty-state headlines." },
+      "body": { "displayName": "Body", "purpose": "Show data and prose. System sans, 65-75ch for prose." },
+      "label": { "displayName": "Label", "purpose": "Form labels, tab text, metadata. Sentence case, ink-muted." }
+    },
+    "shadows": [
+      { "name": "card-resting", "value": "0 1px 2px oklch(0.18 0.03 50 / 0.06), 0 14px 44px oklch(0.18 0.03 50 / 0.07)", "purpose": "The landing/content card. A whisper of lift on the taupe body." },
+      { "name": "modal", "value": "0 20px 60px rgba(0,0,0,0.2)", "purpose": "Modal dialog; the one place a heavier shadow is correct." },
+      { "name": "toast", "value": "0 4px 12px oklch(0.18 0.03 50 / 0.18), 0 14px 32px oklch(0.18 0.03 50 / 0.22)", "purpose": "Floating toast pill, clearly lifted off content." },
+      { "name": "focus-ring", "value": "0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent)", "purpose": "Soft accent halo on focused inputs. Not elevation; the only other use of the shadow channel." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "ease-out", "purpose": "Default for state transitions (chevron rotate, toast slide). 0.15-0.22s." },
+      { "name": "toast-in", "value": "translateY(20px)->0, opacity 0->1, 0.22s ease-out", "purpose": "Toast entry. Disabled under prefers-reduced-motion." },
+      { "name": "duration-fast", "value": "0.15s", "purpose": "Button and chip state changes." },
+      { "name": "duration-base", "value": "0.18s-0.22s", "purpose": "Row expand, chevron, toast." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "480px" },
+      { "name": "tablet", "value": "600px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Add / Save. The accent-fill action; appears at most once or twice per surface.",
+      "html": "<button class=\"ds-btn-primary\">Save changes</button>",
+      "css": ".ds-btn-primary { background: oklch(0.69 0.15 50); color: oklch(0.22 0.025 50); font-weight: 700; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; transition: background 0.15s ease-out; } .ds-btn-primary:hover { background: oklch(0.60 0.16 50); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, oklch(0.69 0.15 50) 40%, transparent); }"
+    },
+    {
+      "name": "Cancel Button",
+      "kind": "button",
+      "refersTo": "button-cancel",
+      "description": "The quiet secondary action beside a primary button.",
+      "html": "<button class=\"ds-btn-cancel\">Cancel</button>",
+      "css": ".ds-btn-cancel { background: oklch(0.955 0.014 50); color: oklch(0.22 0.025 50); font-weight: 500; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; transition: background 0.15s ease-out; } .ds-btn-cancel:hover { background: oklch(0.985 0.003 50); }"
+    },
+    {
+      "name": "List Tabs",
+      "kind": "nav",
+      "refersTo": "tab-active",
+      "description": "The signature four-list switcher in the dark header. Active tab fills with its list's deep variant; white text. Inactive tabs are translucent-white outlines.",
+      "html": "<div class=\"ds-tabs\"><div class=\"ds-tab ds-tab-active\">Watching</div><div class=\"ds-tab\">Waiting</div><div class=\"ds-tab\">Recommending</div><div class=\"ds-tab\">Up Next</div></div>",
+      "css": ".ds-tabs { display: flex; gap: 0; background: oklch(0.22 0.025 50); padding: 8px; border-radius: 8px; } .ds-tab { flex: 1; padding: 8px 4px; text-align: center; font-size: 12px; font-weight: 500; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; transition: color 0.2s ease-out, border-color 0.2s ease-out; } .ds-tab:hover { color: rgba(255,255,255,0.85); border-color: rgba(255,255,255,0.4); } .ds-tab-active { background: oklch(0.42 0.13 150); border-color: oklch(0.42 0.13 150); color: #fff; font-weight: 600; }"
+    },
+    {
+      "name": "List Chip",
+      "kind": "chip",
+      "refersTo": "list-chip",
+      "description": "Outline pill for the add-to-list picker. Selected state inverts to a filled chip.",
+      "html": "<div class=\"ds-chips\"><div class=\"ds-chip ds-chip-selected\">Watching</div><div class=\"ds-chip\">Waiting</div></div>",
+      "css": ".ds-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; } .ds-chip { display: flex; align-items: center; justify-content: center; height: 34px; font-size: 12px; font-weight: 500; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; border: 1.5px solid oklch(0.58 0.13 150); border-radius: 6px; color: oklch(0.58 0.13 150); cursor: pointer; transition: all 0.15s ease-out; user-select: none; } .ds-chip-selected { background: oklch(0.58 0.13 150); color: #fff; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Labeled text field. Accent border plus soft halo on focus.",
+      "html": "<label class=\"ds-label\">Show title</label><input class=\"ds-input\" type=\"text\" placeholder=\"Severance\">",
+      "css": ".ds-label { display: block; font-size: 13px; font-weight: 500; color: oklch(0.40 0.018 50); margin-bottom: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; } .ds-input { width: 100%; padding: 10px 12px; border: 1px solid oklch(0.78 0.020 50); border-radius: 6px; font-size: 14px; font-family: inherit; color: oklch(0.22 0.025 50); } .ds-input::placeholder { color: oklch(0.60 0.012 50); } .ds-input:focus { outline: none; border-color: oklch(0.69 0.15 50); box-shadow: 0 0 0 3px color-mix(in oklch, oklch(0.69 0.15 50) 22%, transparent); }"
+    },
+    {
+      "name": "Show Row",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "The core list primitive. Flat, hairline-separated, with an expandable title (chevron rotates on open).",
+      "html": "<div class=\"ds-row\"><span class=\"ds-row-title\">Severance<span class=\"ds-chev\"><svg viewBox=\"0 0 24 24\"><polyline points=\"6 9 12 15 18 9\"></polyline></svg></span></span><span class=\"ds-row-rating\"><span class=\"ds-star\">★</span> 8.7</span><a class=\"ds-row-net\">Apple TV+</a></div>",
+      "css": ".ds-row { display: flex; align-items: baseline; gap: 8px; padding: 7px 0; border-bottom: 1px solid oklch(0.83 0.014 50); font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; } .ds-row-title { flex: 1; font-weight: 600; color: oklch(0.22 0.025 50); cursor: pointer; text-decoration: underline dotted oklch(0.60 0.012 50); text-underline-offset: 3px; } .ds-row-title:hover { color: oklch(0.69 0.15 50); } .ds-chev { display: inline-block; width: 16px; height: 16px; margin-left: 6px; vertical-align: -3px; } .ds-chev svg { width: 100%; height: 100%; fill: none; stroke: oklch(0.40 0.018 50); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.18s ease-out; } .ds-row-rating { color: oklch(0.40 0.018 50); font-size: 13px; white-space: nowrap; } .ds-star { color: oklch(0.83 0.16 90); } .ds-row-net { color: oklch(0.55 0.11 230); font-size: 13px; text-decoration: none; white-space: nowrap; }"
+    },
+    {
+      "name": "Toast",
+      "kind": "custom",
+      "refersTo": "toast",
+      "description": "Action-confirmation pill, bottom-center. Accent Undo button on reversible actions.",
+      "html": "<div class=\"ds-toast\">Moved to Recommending<button class=\"ds-toast-undo\">Undo</button></div>",
+      "css": ".ds-toast { display: inline-flex; align-items: center; gap: 16px; max-width: 480px; background: oklch(0.22 0.025 50); color: oklch(0.985 0.003 50); padding: 10px 14px 10px 18px; border-radius: 999px; font-size: 14px; font-weight: 500; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; box-shadow: 0 4px 12px oklch(0.18 0.03 50 / 0.18), 0 14px 32px oklch(0.18 0.03 50 / 0.22); } .ds-toast-undo { background: transparent; color: oklch(0.69 0.15 50); border: none; padding: 4px 10px; font: inherit; font-weight: 700; cursor: pointer; border-radius: 999px; } .ds-toast-undo:hover { color: #fff; background: oklch(0.32 0.04 50); }"
+    },
+    {
+      "name": "Empty State",
+      "kind": "custom",
+      "refersTo": "button-empty-cta",
+      "description": "Teaches the list's purpose, then offers a pill CTA. Never a blank 'nothing here'.",
+      "html": "<div class=\"ds-empty\"><div class=\"ds-empty-headline\">Nothing here yet</div><p class=\"ds-empty-help\">Once you've watched something worth recommending, move it here.</p><button class=\"ds-empty-cta\">Add a show</button></div>",
+      "css": ".ds-empty { text-align: center; padding: 48px 20px 36px; color: oklch(0.40 0.018 50); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; } .ds-empty-headline { font-family: ui-serif, 'New York', 'Iowan Old Style', Georgia, serif; font-size: 18px; font-weight: 600; color: oklch(0.22 0.025 50); margin: 0 0 8px; } .ds-empty-help { font-size: 14px; line-height: 1.55; max-width: 360px; margin: 0 auto 18px; } .ds-empty-cta { background: oklch(0.69 0.15 50); color: oklch(0.22 0.025 50); border: none; padding: 8px 22px; border-radius: 999px; font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.15s ease-out; } .ds-empty-cta:hover { background: oklch(0.60 0.16 50); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Shared Almanac",
+    "overview": "Show Picker Club looks like a warm paper almanac a small group of friends keeps together: a curated, color-coded record of what everyone is watching. The member page is the canonical surface; every other screen is measured against it. The mood is domestic and editorial at once. A serif display face gives section headers the authority of a printed page, system sans carries every piece of data underneath, and the body is a committed warm taupe rather than the usual near-white. Cards float on that taupe as near-white paper. Nothing shouts. The system runs on restraint: exactly one earned accent (brand orange), reserved for primary actions, the current selection, and live state, with color otherwise coming from a quiet four-list vocabulary. Surfaces are flat at rest; depth appears only on genuinely raised layers, and even then as a soft ink-tinted ambient shadow. This explicitly rejects the 'AI made this' surface: no gradient text, no glassmorphism, no side-stripe callouts, no tracked-uppercase eyebrows, no identical icon-card grids.",
+    "keyCharacteristics": [
+      "Warm taupe paper body; near-white cards float on it.",
+      "Serif for headers, system sans for everything else. No third typeface.",
+      "One orange accent, used on ≤10% of any screen.",
+      "Quiet four-list color vocabulary, never decorative.",
+      "Flat surfaces; shadow only on raised layers, soft and ink-tinted.",
+      "Every action confirms with a toast; reversible ones offer Undo."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "The brand orange appears on ≤10% of any given screen. Its rarity is what makes 'add this' and 'this is selected' read instantly. If two oranges compete on a screen, one is wrong.", "section": "colors" },
+      { "name": "The Deep-Variant Rule", "body": "A list-* color is for outline pills, hover tints, and decoration. The moment white text sits on a list color, switch to its tab-* variant. White on a list-* fill fails AA; white on a tab-* fill passes it. This rule exists because we shipped the violation once.", "section": "colors" },
+      { "name": "The One Serif Rule", "body": "Exactly one serif display face and one system sans. A third typeface is indecision, not richness. Hierarchy comes from weight and the serif/sans switch, never from a new family.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "Rows, chips, and panels are flat with hairline borders. Shadow is for the card, the modal, and the toast. If it looks like a 2014 app, the shadow is too dark and the blur is too tight.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do anchor every new surface on the member page: taupe body, near-white card, serif headers, sans body, one orange accent.",
+      "Do keep the accent rare — primary action, current selection, and live state only.",
+      "Do use the tab-* deep variant the instant white text sits on a list color.",
+      "Do keep surfaces flat; reach for shadow only on the card, modal, and toast.",
+      "Do confirm every action with a toast, and give Undo on anything reversible or destructive.",
+      "Do teach in empty states — say what the list is for.",
+      "Do verify body text ≥4.5:1 and large text ≥3:1 before shipping.",
+      "Do prefer inline progressive disclosure over a modal."
+    ],
+    "donts": [
+      "Don't use side-stripe borders (border-left/right >1px as a colored accent).",
+      "Don't use gradient text (background-clip: text on a gradient).",
+      "Don't use glassmorphism — no decorative blur or glass cards.",
+      "Don't add a second display font. One serif + one system sans is the entire pairing.",
+      "Don't put gray text on the dark header or on the tabs — use white at ≥0.6 opacity.",
+      "Don't stack the tiny uppercase tracked eyebrow above every section.",
+      "Don't nest cards, or repeat identical icon-card grids.",
+      "Don't push the display heading above ~2.75rem or shrink any text below its AA contrast.",
+      "Don't reach for a modal first; prefer the inline row expand."
+    ]
+  }
+}
