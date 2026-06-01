@@ -842,7 +842,7 @@
 
   <div class="modal-overlay hidden" id="loginOverlay" onclick="closeLoginModal(event)">
     <div class="modal" onclick="event.stopPropagation()">
-      <h2>Log in to edit</h2>
+      <h2>Log in</h2>
 
       <label for="loginEmail">Email</label>
       <input type="email" id="loginEmail" autocomplete="email" placeholder="you@example.com">
@@ -2078,8 +2078,11 @@
       document.getElementById('shareName').value = editorName || authMember;
 
       const select = document.getElementById('shareMember');
+      const label = h => h.display_name || h.first_name || h.name.split(' ')[0];
       select.innerHTML = allMembers
-        .map(h => `<option value="${h.slug}">${escapeHtml((h.display_name || h.first_name || h.name.split(' ')[0]) + "'s Shows")}</option>`)
+        .slice()
+        .sort((a, b) => label(a).localeCompare(label(b)))
+        .map(h => `<option value="${h.slug}">${escapeHtml(label(h) + "'s Shows")}</option>`)
         .join('');
 
       document.getElementById('shareOverlay').classList.remove('hidden');
@@ -2097,9 +2100,11 @@
       document.getElementById('shareName').value = editorName || authMember;
 
       const select = document.getElementById('shareMember');
+      const label = h => h.display_name || h.first_name || h.name.split(' ')[0];
       select.innerHTML = allMembers
         .filter(h => h.slug !== memberSlug)
-        .map(h => `<option value="${h.slug}">${escapeHtml((h.display_name || h.first_name || h.name.split(' ')[0]) + "'s Shows")}</option>`)
+        .sort((a, b) => label(a).localeCompare(label(b)))
+        .map(h => `<option value="${h.slug}">${escapeHtml(label(h) + "'s Shows")}</option>`)
         .join('');
 
       document.getElementById('shareOverlay').classList.remove('hidden');
