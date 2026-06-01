@@ -535,7 +535,46 @@
     .btn-save:hover { background: var(--accent-hover); }
 
     .loading { text-align: center; padding: 40px; color: var(--ink-quiet); font-size: 15px; }
-    .empty { text-align: center; padding: 40px; color: var(--ink-faint); font-size: 15px; }
+    .empty {
+      text-align: center;
+      padding: 48px 20px 36px;
+      color: var(--ink-muted);
+    }
+    .empty .empty-headline {
+      font-family: var(--font-display);
+      font-size: var(--text-md);
+      font-weight: 600;
+      color: var(--ink);
+      margin: 0 0 8px;
+    }
+    .empty .empty-help {
+      font-size: var(--text-sm);
+      color: var(--ink-muted);
+      line-height: 1.55;
+      max-width: 360px;
+      margin: 0 auto 18px;
+    }
+    .empty .btn-empty-cta {
+      background: var(--accent);
+      color: var(--ink);
+      border: none;
+      padding: 8px 22px;
+      border-radius: 999px;
+      font-size: var(--text-sm);
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    .empty .btn-empty-cta:hover { background: var(--accent-hover); }
+
+    .picks-empty {
+      text-align: center;
+      color: var(--ink-muted);
+      font-size: var(--text-sm);
+      font-style: italic;
+      padding: 6px 0 0;
+    }
 
     @media (max-width: 480px) {
       .header-top h1 { font-size: 18px; }
@@ -1001,6 +1040,49 @@
 
     const LIST_LABELS = { watching: 'Watching', waiting: 'Waiting', recommending: 'Recommending', next: 'Up Next' };
 
+    // Empty-state copy. own.* is shown when the viewer owns this page; guest.*
+    // is shown to anyone else (no CTA, just acknowledges the list is empty).
+    const EMPTY_COPY = {
+      own: {
+        watching: {
+          headline: "You're not watching anything yet.",
+          help: "Add a show you're actively watching so the club knows what you're into.",
+          cta: { label: 'Add a show', action: 'openAddModal()' },
+        },
+        waiting: {
+          headline: "Nothing waiting on a next season.",
+          help: "When you finish a season but want to come back, move the show here. Premiere dates show on your calendar feed.",
+        },
+        recommending: {
+          headline: "Nothing to recommend yet.",
+          help: "Once you've watched something worth recommending, move it here so the rest of the club sees it.",
+        },
+        next: {
+          headline: "Your Up Next is empty.",
+          help: "Add shows you want to watch later, or wait for picks and suggestions from other members.",
+          cta: { label: 'Add a show', action: 'openAddModal()' },
+        },
+      },
+      guest: {
+        watching:   (name) => `${name} isn't watching anything right now.`,
+        waiting:    (name) => `${name} isn't waiting on any seasons.`,
+        recommending: (name) => `${name} hasn't recommended anything yet.`,
+        next:       (name) => `${name}'s Up Next is empty.`,
+      },
+    };
+
+    function renderEmptyState(currentTab, isOwn, ownerName) {
+      if (isOwn) {
+        const c = EMPTY_COPY.own[currentTab] || { headline: 'Nothing here yet.' };
+        const cta = c.cta ? `<button class="btn-empty-cta" onclick="${c.cta.action}">${escapeHtml(c.cta.label)}</button>` : '';
+        const help = c.help ? `<p class="empty-help">${escapeHtml(c.help)}</p>` : '';
+        return `<p class="empty-headline">${escapeHtml(c.headline)}</p>${help}${cta}`;
+      }
+      const guestFn = EMPTY_COPY.guest[currentTab];
+      const headline = guestFn ? guestFn(ownerName) : 'Nothing here yet.';
+      return `<p class="empty-headline">${escapeHtml(headline)}</p>`;
+    }
+
     function buildDetailLines(show, opts = {}) {
       const lines = [];
       if (show.genres) lines.push(escapeHtml(show.genres));
@@ -1459,9 +1541,22 @@
     function renderRecs() {
       const section = document.getElementById('recsSection');
       if (!section) return;
-      const visible = recsData && recsData.picks && recsData.picks.length > 0 && currentTab === 'next';
-      if (!visible) { section.classList.add('hidden'); return; }
+      // The section is only relevant when viewing your own Up Next tab and the
+      // server actually returned a pick set (recsData null = seed-only member
+      // or no auth match, both correct reasons to hide entirely).
+      const onOwnUpNext = currentTab === 'next' && authMember && authMember === memberSlug;
+      if (!onOwnUpNext || !recsData) { section.classList.add('hidden'); return; }
       section.classList.remove('hidden');
+
+      const hasPicks = recsData.picks && recsData.picks.length > 0;
+      if (!hasPicks) {
+        // Don't vanish on the user — show a friendly empty so the section's
+        // existence stays discoverable for future visits.
+        document.getElementById('recsExplainer').innerHTML = '';
+        document.getElementById('recsList').innerHTML =
+          '<p class="picks-empty">All caught up. Check back as the club watches new things.</p>';
+        return;
+      }
 
       const explainer = recsData.cold_start
         ? 'Based on shows that share actors with what you have.'
@@ -1621,6 +1716,10 @@
       });
       updateDesc();
       renderShows();
+      // Picks for You visibility is gated on the Up Next tab; re-evaluate
+      // each tab switch so it shows up when you arrive at Up Next from
+      // another tab (not just when you land via the #next hash).
+      renderRecs();
     }
 
     function renderShows() {
@@ -1641,6 +1740,8 @@
         });
       if (filtered.length === 0) {
         container.innerHTML = '';
+        const isOwn = authMember && authMember === memberSlug;
+        empty.innerHTML = renderEmptyState(currentTab, isOwn, owners);
         empty.classList.remove('hidden');
         const lc = document.getElementById('listControls');
         if (lc) lc.classList.add('hidden');
