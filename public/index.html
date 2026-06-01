@@ -399,11 +399,6 @@
     }
     .landing p { color: var(--ink-muted); margin-bottom: 30px; }
 
-    .member-list {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
-      gap: 4px 14px;
-    }
     .member-card {
       display: block;
       padding: 6px 4px;
@@ -417,18 +412,21 @@
       transition: color 0.2s;
     }
     .member-card:hover { color: var(--accent); text-decoration-color: var(--accent); }
-    .all-members > summary {
-      list-style: none;
-      cursor: pointer;
-      text-align: center;
-      font-size: 13px;
-      color: var(--ink-quiet);
-      padding: 4px 0;
+
+    /* Landing top bar: My Shows (left, when logged in) + quiet account button (right). */
+    .landing-topbar { display: flex; align-items: center; gap: 10px; min-height: 30px; margin-bottom: 14px; }
+    .landing-topbar #myShowsLink { margin: 0; }
+    .landing-auth { margin-left: auto; display: inline-flex; gap: 8px; }
+
+    /* Member jump dropdown — replaces the old featured grid + browse-all disclosure. */
+    .member-jump { margin: 4px 0 8px; text-align: center; }
+    .member-jump-label { display: block; font-size: 13px; color: var(--ink-muted); margin-bottom: 6px; }
+    .member-jump-select {
+      width: 100%; max-width: 320px; padding: 10px 12px;
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: 15px; font-family: inherit; background: var(--surface); color: var(--ink); cursor: pointer;
     }
-    .all-members > summary::-webkit-details-marker { display: none; }
-    .all-members > summary::after { content: ' \25BE'; }
-    .all-members[open] > summary::after { content: ' \25B4'; }
-    .all-members > summary:hover { color: var(--accent); }
+    .member-jump-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent); }
 
     /* Modal */
     .modal-overlay {
@@ -627,24 +625,25 @@
   <!-- Landing Page -->
   <div id="landingPage" class="hidden">
     <div class="landing">
-      <h1>Show Picker Club</h1>
-      <a id="myShowsLink" href="#" class="member-card hidden" style="display: inline-block; margin: 4px auto 20px;">My Shows &rarr;</a>
-      <div id="landingAuthBar" style="margin: 8px 0 20px; text-align: center;">
-        <button class="btn btn-quiet" id="landingLoginBtn" onclick="login()">Log in</button>
-        <button class="btn btn-quiet hidden" id="landingLogoutBtn" onclick="logout()">Log out</button>
+      <div class="landing-topbar">
+        <a id="myShowsLink" href="#" class="member-card hidden">My Shows &rarr;</a>
+        <span class="landing-auth" id="landingAuthBar">
+          <button class="btn btn-quiet btn-small" id="landingLoginBtn" onclick="login()">Log in</button>
+          <button class="btn btn-quiet btn-small hidden" id="landingLogoutBtn" onclick="logout()">Log out</button>
+        </span>
       </div>
+      <h1>Show Picker Club</h1>
       <div id="popularSection" style="margin-top: 8px; margin-bottom: 24px; display: none;">
         <h3 class="section-title">What Members Are Watching</h3>
         <div id="popularList" class="show-list" style="text-align: left;"></div>
       </div>
 
-      <h3 id="members" class="section-title">Members</h3>
-      <div class="member-list" id="memberList" style="scroll-margin-top: 8px;">
+      <div class="member-jump">
+        <label class="member-jump-label" for="memberJump">Go to a member's lists</label>
+        <select id="memberJump" class="member-jump-select" onchange="if(this.value)location.href=this.value">
+          <option value="">Pick a member&hellip;</option>
+        </select>
       </div>
-      <details id="allMembersDetails" class="all-members" style="margin-top: 10px; display: none;">
-        <summary>Browse all members</summary>
-        <div class="member-list" id="allMembersList" style="margin-top: 8px;"></div>
-      </details>
       <div style="text-align: center; margin: 16px 0 0;">
         <button class="btn btn-quiet" onclick="openLandingSearchModal()">Search all libraries</button>
       </div>
@@ -1154,29 +1153,19 @@
         const res = await fetch('/api/members');
         const data = await res.json();
         const allMembers = data.members || [];
-        // Feature the 6 members with the longest Watching lists; Waiting
-        // count is the tiebreaker. Everyone else goes into "Browse all".
-        const FEATURED_COUNT = 6;
-        const ranked = allMembers.slice().sort((a, b) =>
-          (b.watching_count || 0) - (a.watching_count || 0) ||
-          (b.waiting_count || 0) - (a.waiting_count || 0)
-        );
-        const featured = ranked.slice(0, FEATURED_COUNT);
-        const featuredSlugs = new Set(featured.map(h => h.slug));
-        const byName = (a, b) => (a.display_name || a.first_name).localeCompare(b.display_name || b.first_name);
-        const overflow = allMembers.filter(h => !featuredSlugs.has(h.slug)).sort(byName);
-        const renderCard = (h) =>
-          `<a class="member-card" href="/${h.slug}">${escapeHtml(h.display_name || h.first_name || h.name.split(' ')[0])}</a>`;
-        document.getElementById('memberList').innerHTML = featured.map(renderCard).join('');
-        const details = document.getElementById('allMembersDetails');
-        if (overflow.length > 0) {
-          document.getElementById('allMembersList').innerHTML = overflow.map(renderCard).join('');
-          details.style.display = '';
-        } else {
-          details.style.display = 'none';
-        }
+        // Alphabetical jump dropdown — pick a member, go to their lists.
+        const byName = (a, b) =>
+          (a.display_name || a.first_name || a.name).localeCompare(
+            b.display_name || b.first_name || b.name, undefined, { sensitivity: 'base' });
+        const sorted = allMembers.slice().sort(byName);
+        const jump = document.getElementById('memberJump');
+        jump.innerHTML = '<option value="">Pick a member&hellip;</option>' +
+          sorted.map(h =>
+            `<option value="/${escapeHtml(h.slug)}">${escapeHtml(h.display_name || h.first_name || (h.name || '').split(' ')[0])}</option>`
+          ).join('');
       } catch (e) {
-        document.getElementById('memberList').innerHTML = '<p>Failed to load.</p>';
+        const jump = document.getElementById('memberJump');
+        if (jump) jump.innerHTML = '<option value="">Failed to load members</option>';
       }
 
       // Load popular shows
