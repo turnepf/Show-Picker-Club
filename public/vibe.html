@@ -10,7 +10,7 @@
     .wrap { max-width: 720px; margin: 0 auto; }
     .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
     .topbar a.back { color: var(--ink-quiet); text-decoration: none; font-size: 22px; }
-    .topbar h1 { font-size: 20px; color: var(--ink); flex: 0 0 auto; }
+    .topbar h1 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; letter-spacing: -0.01em; color: var(--ink); flex: 0 0 auto; }
     .topbar select {
       flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px;
       font-size: 15px; background: var(--surface); font-family: inherit;
@@ -18,21 +18,21 @@
 
     .hero {
       background: var(--surface); border-radius: 12px; padding: 32px 24px; text-align: center;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04); margin-bottom: 20px;
+      box-shadow: 0 1px 2px oklch(0.18 0.03 50 / 0.06), 0 8px 28px oklch(0.18 0.03 50 / 0.06); margin-bottom: 20px;
     }
     .hero .star { color: var(--accent); font-size: 14px; letter-spacing: 2px; }
     .hero .cluster-name { font-family: var(--font-display); font-size: var(--text-xl); color: var(--ink); margin: 8px 0 12px; font-weight: 600; letter-spacing: -0.015em; }
     .hero .cluster-tag { color: var(--ink-muted); font-size: 15px; line-height: 1.5; max-width: 540px; margin: 0 auto; font-style: italic; }
     .hero .similarity { color: var(--ink-quiet); font-size: 12px; margin-top: 14px; }
 
-    .section { background: var(--surface); border-radius: 10px; padding: 20px 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
-    .section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--ink-muted); margin-bottom: 14px; font-weight: 600; }
+    .section { background: var(--surface); border-radius: 10px; padding: 20px 24px; margin-bottom: 16px; border: 1px solid var(--border-soft); }
+    .section h2 { font-family: var(--font-display); font-size: var(--text-md); letter-spacing: -0.01em; color: var(--ink); margin-bottom: 14px; font-weight: 600; }
 
     .trait-block { margin-bottom: 10px; }
     .trait-row { display: flex; align-items: center; gap: 12px; font-size: 14px; }
     .trait-row .lbl { flex: 0 0 38%; color: var(--ink); }
     .trait-row .bar-bg { flex: 1; height: 10px; background: var(--surface-2); border-radius: 5px; overflow: hidden; }
-    .trait-row .bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-hover)); border-radius: 5px; transition: width 0.6s ease-out; }
+    .trait-row .bar { height: 100%; background: var(--accent); border-radius: 5px; transition: width 0.6s ease-out; }
     .trait-row .val { flex: 0 0 42px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
     .trait-explain { font-size: 11px; color: var(--ink-quiet); margin: 2px 0 0 calc(38% + 12px); line-height: 1.35; }
     @media (max-width: 480px) {
@@ -51,7 +51,7 @@
       background: var(--surface-2); color: var(--ink); font-weight: 600;
     }
     .balance-item .pill.dark { background: var(--ink); color: #fff; }
-    .balance-item .pill.warm { background: var(--accent-soft); color: var(--accent-hover); }
+    .balance-item .pill.warm { background: var(--accent-soft); color: var(--tab-up-next); }
 
     .pick-row { padding: 10px 0; border-bottom: 1px solid var(--border-soft); font-size: 14px; }
     .pick-row:last-child { border-bottom: none; }
@@ -81,10 +81,11 @@
     }
     .modal-overlay.hidden { display: none; }
     .modal-card {
-      background: var(--surface); padding: 24px; border-radius: 10px;
+      background: var(--surface); padding: 24px; border-radius: 12px;
       max-width: 420px; width: 100%; max-height: calc(100vh - 32px); overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
     }
-    .modal-card h2 { font-size: 18px; color: var(--ink); margin-bottom: 4px; }
+    .modal-card h2 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; letter-spacing: -0.01em; color: var(--ink); margin-bottom: 4px; }
     .modal-pick-info {
       background: var(--surface-2); padding: 10px 12px; border-radius: 6px;
       font-size: 13px; margin: 12px 0;
@@ -96,7 +97,7 @@
       width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px;
       font-size: 14px; font-family: inherit;
     }
-    .modal-card select:focus, .modal-card textarea:focus { outline: none; border-color: var(--accent); }
+    .modal-card select:focus, .modal-card textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent); }
     .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
     .modal-actions button {
       flex: 1; padding: 10px; border-radius: 6px; font-size: 14px; font-weight: 600;
@@ -112,6 +113,10 @@
     .footer { text-align: center; color: var(--ink-quiet); font-size: 12px; margin-top: 24px; }
     .empty-card { background: var(--surface); border-radius: 10px; padding: 32px; text-align: center; color: var(--ink-muted); font-size: 14px; }
     .err { color: var(--danger-deep); font-size: 13px; text-align: center; padding: 20px; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .trait-row .bar { transition: none; }
+    }
   </style>
 </head>
 <body>
@@ -336,7 +341,7 @@
 
         <div class="section">
           <h2>Shows that don't make sense</h2>
-          <p class="blend-note">Shows already on this list whose trait pattern is the *opposite* of the fingerprint: outliers in the member's own taste.</p>
+          <p class="blend-note">Shows already on this list whose trait pattern is the opposite of the fingerprint: outliers in the member's own taste.</p>
           ${outliers}
         </div>
       `;

@@ -62,6 +62,9 @@
     .btn-add:hover { background: var(--accent-hover); }
     .btn-search { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); }
     .btn-search:hover { background: rgba(255,255,255,0.25); }
+    /* Quiet button for light surfaces (landing): paper-toned, not ghost-on-dark. */
+    .btn-quiet { background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); }
+    .btn-quiet:hover { background: var(--surface); }
     /* Search modal sits anchored to the top so the box doesn't jump as result count changes. */
     #searchOverlay { align-items: flex-start; padding-top: 6vh; padding-bottom: 6vh; }
     #searchOverlay .modal { max-height: 88vh; display: flex; flex-direction: column; }
@@ -342,10 +345,10 @@
 
     /* Member Match card */
     .member-match-card {
-      background: var(--surface);
+      background: var(--surface-2);
       border-radius: 10px;
       padding: 10px 14px;
-      margin: 0 0 14px;
+      margin: 18px 0 0;
       cursor: pointer;
       display: flex;
       align-items: baseline;
@@ -355,7 +358,7 @@
       text-align: center;
       transition: background 0.15s;
     }
-    .member-match-card:hover { background: var(--surface-2); }
+    .member-match-card:hover { background: var(--accent-soft); }
     .member-match-label { font-size: 11px; font-weight: 600; color: var(--ink); text-transform: uppercase; letter-spacing: 0.5px; }
     .member-match-name { font-size: 14px; font-weight: 600; color: var(--accent); }
     .member-match-count { font-size: 12px; color: var(--ink-muted); }
@@ -627,15 +630,11 @@
       <h1>Show Picker Club</h1>
       <a id="myShowsLink" href="#" class="member-card hidden" style="display: inline-block; margin: 4px auto 20px;">My Shows &rarr;</a>
       <div id="landingAuthBar" style="margin: 8px 0 20px; text-align: center;">
-        <button class="btn btn-search" id="landingLoginBtn"
-                style="background: var(--surface-2); color: var(--ink); border: 1px solid var(--border);"
-                onclick="login()">Log in</button>
-        <button class="btn btn-search hidden" id="landingLogoutBtn"
-                style="background: var(--surface-2); color: var(--ink); border: 1px solid var(--border);"
-                onclick="logout()">Log out</button>
+        <button class="btn btn-quiet" id="landingLoginBtn" onclick="login()">Log in</button>
+        <button class="btn btn-quiet hidden" id="landingLogoutBtn" onclick="logout()">Log out</button>
       </div>
-      <div id="popularSection" id="popular" style="margin-top: 8px; margin-bottom: 24px; display: none;">
-        <h3 id="popular" class="section-title">What Members Are Watching</h3>
+      <div id="popularSection" style="margin-top: 8px; margin-bottom: 24px; display: none;">
+        <h3 class="section-title">What Members Are Watching</h3>
         <div id="popularList" class="show-list" style="text-align: left;"></div>
       </div>
 
@@ -647,7 +646,7 @@
         <div class="member-list" id="allMembersList" style="margin-top: 8px;"></div>
       </details>
       <div style="text-align: center; margin: 16px 0 0;">
-        <button class="btn btn-search" style="background: var(--surface-2); color: var(--ink); border: 1px solid var(--border);" onclick="openLandingSearchModal()">Search all libraries</button>
+        <button class="btn btn-quiet" onclick="openLandingSearchModal()">Search all libraries</button>
       </div>
       <div style="text-align: center; margin-top: 24px;">
         <a href="/reporting" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic;">Curious?</a>
@@ -676,11 +675,6 @@
           <button class="btn btn-login hidden" id="logoutBtn" title="Log out" onclick="logout()">Log out</button>
         </div>
       </div>
-      <div class="member-match-card hidden" id="memberMatchCard" onclick="openMatchModal()" role="button" tabindex="0">
-        <span class="member-match-label">Your Member Match</span>
-        <span class="member-match-name" id="memberMatchName"></span>
-        <span class="member-match-count" id="memberMatchCount"></span>
-      </div>
       <div class="tabs" id="tabs">
         <div class="tab active" data-list="watching" onclick="switchTab('watching')">Watching</div>
         <div class="tab" data-list="waiting" onclick="switchTab('waiting')">Waiting</div>
@@ -700,6 +694,11 @@
       <div class="list-controls hidden" id="listControls"></div>
       <div class="show-list" id="showList"></div>
       <div class="empty hidden" id="empty">No shows in this list yet.</div>
+      <div class="member-match-card hidden" id="memberMatchCard" onclick="openMatchModal()" role="button" tabindex="0">
+        <span class="member-match-label">Your Member Match</span>
+        <span class="member-match-name" id="memberMatchName"></span>
+        <span class="member-match-count" id="memberMatchCount"></span>
+      </div>
     </main>
 
     <div style="text-align: center; margin-top: 24px;">
