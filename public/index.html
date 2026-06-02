@@ -127,12 +127,17 @@
       display: flex;
       align-items: baseline;
       padding: 7px 0;
-      border-bottom: 1px solid var(--border-soft);
       font-size: 14px;
       gap: 8px;
     }
 
-    .show-row:last-child { border-bottom: none; }
+    /* Each show's title row, meta line ("Next up: 6/1") and the
+       expandable details all live inside a single .show wrapper so the
+       divider sits between shows, not between title and meta. */
+    .show {
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .show:last-child { border-bottom: none; }
 
     .show-info { flex: 1; min-width: 0; line-height: 1.4; }
 
@@ -1187,11 +1192,13 @@
             const memberList = (show.members || []).join(', ');
             const badge = ` <span class="popular-members-badge" onclick="toggleExpand(${show.id})" title="Tap to see who's watching">${show.member_count} Members</span>`;
             const details = buildDetailLines(show, { aggregate: true });
-            return `<div class="show-row popular-row">
-              <button class="share-btn popular-add-btn" style="display:none;" onclick="openAddMyList('${escapeHtml(show.title).replace(/'/g, "\\'")}', '${escapeHtml(show.network || '').replace(/'/g, "\\'")}', '${escapeHtml(show.network_url || '').replace(/'/g, "\\'")}', ${show.movie || 0})" title="Add to my list">+</button>
-              <span class="show-info"><span class="show-title clickable" title="Tap to see more" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${movieTag}${badge}</span>
-            </div>
-            <div class="show-actors" id="actors-${show.id}">${details}</div>`;
+            return `<div class="show popular-row">
+              <div class="show-row">
+                <button class="share-btn popular-add-btn" style="display:none;" onclick="openAddMyList('${escapeHtml(show.title).replace(/'/g, "\\'")}', '${escapeHtml(show.network || '').replace(/'/g, "\\'")}', '${escapeHtml(show.network_url || '').replace(/'/g, "\\'")}', ${show.movie || 0})" title="Add to my list">+</button>
+                <span class="show-info"><span class="show-title clickable" title="Tap to see more" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${movieTag}${badge}</span>
+              </div>
+              <div class="show-actors" id="actors-${show.id}">${details}</div>
+            </div>`;
           }).join('');
           document.getElementById('popularSection').style.display = 'block';
         }
@@ -1577,11 +1584,13 @@
           reason = `On ${nameStr}'s list${names.length === 1 ? '' : 's'}`;
           if (p.shared_actors > 0) reason += ` &middot; ${p.shared_actors} shared actor${p.shared_actors === 1 ? '' : 's'}`;
         }
-        return `<div class="show-row rec-row">
-          <button class="share-btn rec-add-btn" data-rec-idx="${idx}" title="Add to my Up Next">+</button>
-          <div class="rec-info">
-            <span class="show-info"><span class="show-title">${escapeHtml(p.title)}</span>${networkHtml}${rating}</span>
-            <span class="rec-reason">${reason}</span>
+        return `<div class="show rec-row">
+          <div class="show-row">
+            <button class="share-btn rec-add-btn" data-rec-idx="${idx}" title="Add to my Up Next">+</button>
+            <div class="rec-info">
+              <span class="show-info"><span class="show-title">${escapeHtml(p.title)}</span>${networkHtml}${rating}</span>
+              <span class="rec-reason">${reason}</span>
+            </div>
           </div>
         </div>`;
       }).join('');
@@ -1814,13 +1823,15 @@
         }
 
         return `
-          <div class="show-row" id="row-${show.id}">
-            <button class="share-btn" onclick="openShareModal(${show.id})" title="Send this show to another member" aria-label="Send this show to another member"><svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
-            <span class="show-info"><span class="show-title clickable" title="Tap to see more" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${series}${movieTag}</span>
-            ${primaryAction}
-          </div>
-          ${alwaysMeta}
-          <div class="show-actors" id="actors-${show.id}">${expandedActions}${details}</div>`;
+          <div class="show" id="row-${show.id}">
+            <div class="show-row">
+              <button class="share-btn" onclick="openShareModal(${show.id})" title="Send this show to another member" aria-label="Send this show to another member"><svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+              <span class="show-info"><span class="show-title clickable" title="Tap to see more" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${series}${movieTag}</span>
+              ${primaryAction}
+            </div>
+            ${alwaysMeta}
+            <div class="show-actors" id="actors-${show.id}">${expandedActions}${details}</div>
+          </div>`;
       }).join('');
 
       // Footer: legend + network counts
@@ -2220,13 +2231,15 @@
           ? `<button class="share-btn" data-add-idx="${show.id}" title="Add to my list">+</button>`
           : '';
         return `
-          <div class="show-row">
-            ${addBtn}
-            <span class="show-info">
-              <span class="show-title clickable" title="Tap to see more" onclick="toggleSearchExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${series}${movieTag}${listLabel}
-            </span>
-          </div>
-          <div class="show-actors" id="search-actors-${show.id}">${details}</div>`;
+          <div class="show">
+            <div class="show-row">
+              ${addBtn}
+              <span class="show-info">
+                <span class="show-title clickable" title="Tap to see more" onclick="toggleSearchExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${series}${movieTag}${listLabel}
+              </span>
+            </div>
+            <div class="show-actors" id="search-actors-${show.id}">${details}</div>
+          </div>`;
       }).join('');
 
       if (searchMode === 'all') {
