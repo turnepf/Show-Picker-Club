@@ -32,7 +32,7 @@ export async function onRequestGet(context) {
     return json({ error: 'forbidden' }, 403);
   }
   const { results } = await env.DB.prepare(`
-    SELECT m.slug, m.name, m.first_name, m.last_initial,
+    SELECT m.slug, m.name, m.first_name, m.last_initial, m.last_name,
            (SELECT GROUP_CONCAT(email, ',')
               FROM (SELECT email FROM member_emails
                      WHERE member_slug = m.slug
@@ -51,6 +51,7 @@ export async function onRequestGet(context) {
     name: r.name,
     first_name: r.first_name,
     last_initial: r.last_initial,
+    last_name: r.last_name,
     emails: r.emails ? r.emails.split(',').filter(Boolean) : [],
     phones: r.phones ? r.phones.split(',').filter(Boolean) : [],
     last_login: r.last_login || null,
