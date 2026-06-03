@@ -12,7 +12,7 @@ export async function onRequestGet(context) {
        COUNT(DISTINCT s.member_slug) as member_count,
        GROUP_CONCAT(DISTINCT s.member_slug) as member_slugs
      FROM shows s
-     WHERE s.archived = 0 AND s.list = 'watching'
+     WHERE s.archived = 0
        AND s.member_slug NOT IN (${EXCLUDED_SQL})
        -- Seeded rows are the operator's auto-pick, not a member endorsement.
        -- A row "counts" only once a member has actually touched it
