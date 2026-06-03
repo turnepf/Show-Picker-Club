@@ -33,13 +33,17 @@ export async function onRequestGet(context) {
     show.actors = acts.map(a => a.name).join(', ') || null;
   }
 
-  // Get member names to map slugs to first names
+  // Map slugs to first names. Members.name is the possessive display
+  // name ("Carter's Shows") — splitting on space gave "Carter's", which
+  // showed up wrong in the "Watching: ..." line. Use the dedicated
+  // first_name column instead, falling back to name's first token only
+  // if first_name is missing for some reason.
   const { results: members } = await env.DB.prepare(
-    'SELECT slug, name FROM members'
+    'SELECT slug, name, first_name FROM members'
   ).all();
   const nameMap = {};
   for (const h of members) {
-    nameMap[h.slug] = h.name.split(' ')[0];
+    nameMap[h.slug] = h.first_name || (h.name || '').split(' ')[0];
   }
 
   // Add member names to each show
