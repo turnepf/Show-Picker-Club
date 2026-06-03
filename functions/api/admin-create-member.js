@@ -108,8 +108,12 @@ export async function onRequestPost(context) {
   const tokens = full_name.trim().split(/\s+/);
   const firstName = tokens[0];
   const firstSlug = firstName.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const lastInitial = tokens.length > 1
-    ? tokens[tokens.length - 1].toLowerCase().replace(/[^a-z0-9]/g, '').charAt(0)
+  // Stash the full last name now so display code doesn't have to parse
+  // out of the possessive "Name's Shows" string. last_initial is kept
+  // in sync for any legacy reader.
+  const lastName = tokens.length > 1 ? tokens[tokens.length - 1] : null;
+  const lastInitial = lastName
+    ? lastName.toLowerCase().replace(/[^a-z0-9]/g, '').charAt(0)
     : '';
 
   if (!firstSlug) {
@@ -136,8 +140,8 @@ export async function onRequestPost(context) {
   const lastInitialUpper = lastInitial ? lastInitial.toUpperCase() : null;
 
   await env.DB.prepare(
-    'INSERT INTO members (slug, name, first_name, last_initial) VALUES (?, ?, ?, ?)'
-  ).bind(slug, displayName, firstName, lastInitialUpper).run();
+    'INSERT INTO members (slug, name, first_name, last_initial, last_name) VALUES (?, ?, ?, ?, ?)'
+  ).bind(slug, displayName, firstName, lastInitialUpper, lastName).run();
   if (code) {
     await env.DB.prepare(
       'INSERT INTO member_codes (member_slug, code, editor_name) VALUES (?, ?, ?)'
