@@ -79,11 +79,22 @@ struct Show: Codable, Identifiable, Hashable {
         return (try? JSONDecoder().decode([Actor].self, from: data)) ?? []
     }
 
-    // A real deep link (not a search-page placeholder).
+    // A real deep link (not a search-page placeholder). HBO Max search
+    // URLs are an intentional fallback — Watchmode only knows some HBO
+    // titles via auto-play URLs we can't use, so the search page is the
+    // best stable option. Allow those through; the detail view prefers
+    // Apple TV routing for them anyway, so users land on the show page
+    // rather than HBO Max search whenever possible.
     var hasRealUrl: Bool {
         guard let u = networkUrl?.lowercased() else { return false }
         if u.isEmpty || u == "#" { return false }
+        if u.hasPrefix("https://play.hbomax.com/search?") { return true }
         return !(u.contains("/search") || u.contains("/s?") || u.contains("?q=") || u.contains("?query="))
+    }
+
+    var isHBOMaxSearchFallback: Bool {
+        guard let u = networkUrl?.lowercased() else { return false }
+        return u.hasPrefix("https://play.hbomax.com/search?")
     }
 }
 

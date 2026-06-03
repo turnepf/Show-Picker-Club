@@ -169,19 +169,22 @@ struct ShowDetailView: View {
 
     // Pick the best URL to open:
     //  1. Direct service URL if the service deep-links from its own https
-    //     URL (HBO Max, Apple TV+).
+    //     URL (HBO Max, Apple TV+) AND we actually have a show-page URL,
+    //     not the HBO Max search fallback.
     //  2. Otherwise route through the Apple TV app's show page if we found
     //     one — extra hop, but lands on the show with a one-tap launch.
-    //  3. Otherwise use the per-service custom-scheme fallback to at least
-    //     open the streaming app.
+    //  3. Otherwise the service URL itself (which for HBO Max search at
+    //     least opens HBO Max with the title pre-filled), or the per-
+    //     service custom-scheme fallback.
     private func chooseTarget(serviceUrl: URL) -> URL {
-        if Self.deepLinksToShow.contains(network ?? "") {
+        let isHBOSearch = show?.isHBOMaxSearchFallback == true
+        if Self.deepLinksToShow.contains(network ?? "") && !isHBOSearch {
             return serviceUrl
         }
         if let apple = appleTVUrl {
             return apple
         }
-        return deepLinkURL(for: serviceUrl)
+        return isHBOSearch ? serviceUrl : deepLinkURL(for: serviceUrl)
     }
 
     // Per-service URL rewriter. For most services on tvOS, the plain https
