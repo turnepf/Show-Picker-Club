@@ -226,14 +226,23 @@ struct ShowDetailView: View {
     }
 
     private func load() async {
-        // Fire all three lookups in parallel — the iTunes Search call for
-        // the Apple TV app URL takes 500ms-2s, which used to leave the
-        // Watch button enabled but routed to a stale fallback (HBO search,
-        // service home) if you tapped it before iTunes responded.
+        // HBO Max + Apple TV+ honor direct https URLs in their tvOS apps,
+        // and HBO content rarely lives on Apple TV anyway — iTunes Search
+        // for those just slows the Watch button down for no gain. Skip
+        // the lookup entirely and enable the button immediately.
+        let skipITunes = Self.deepLinksToShow.contains(network ?? "")
+
         async let detail = API.showDetail(id: id)
         async let actors = API.actors(showId: id)
-        async let appleURL = API.appleTVLookup(title: initialTitle)
 
+        if skipITunes {
+            if let s = try? await detail { show = s }
+            cast = (try? await actors) ?? []
+            lookedUp = true
+            return
+        }
+
+        async let appleURL = API.appleTVLookup(title: initialTitle)
         if let s = try? await detail { show = s }
         cast = (try? await actors) ?? []
         appleTVUrl = await appleURL
