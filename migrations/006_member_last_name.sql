@@ -3,7 +3,9 @@
 -- with just last_initial. last_initial stays around to avoid breaking
 -- callers; new code should prefer last_name.
 
-ALTER TABLE members ADD COLUMN last_name TEXT;
+-- ALTER TABLE ADD COLUMN has no IF NOT EXISTS in SQLite. Run this once.
+-- (Already applied to prod 2026-06-03 — see UPDATEs below.)
+-- ALTER TABLE members ADD COLUMN last_name TEXT;
 
 -- Backfill known members. Anyone added through /setup from here on out
 -- will get last_name written directly by admin-create-member.
