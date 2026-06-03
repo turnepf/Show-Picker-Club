@@ -65,43 +65,26 @@ export async function onRequestPost(context) {
        ORDER BY created_at DESC LIMIT 1`
   ).bind(member, code, nowISO).first();
 
-  let match = null;
-  if (otp) {
-    await env.DB.prepare('UPDATE login_otps SET used_at = ? WHERE id = ?')
-      .bind(nowISO, otp.id).run();
-    // Match the legacy path's shape: editor_name is the member's first
-    // name (used as the display name in suggestions etc.), not the full
-    // "Patrick's Shows"-style record name.
-    const m = await env.DB.prepare(
-      'SELECT first_name, name FROM members WHERE slug = ?'
-    ).bind(member).first();
-    match = { editor_name: m?.first_name || m?.name || member, member_slug: member };
-  } else {
-    // Fall back to the legacy static code (last-4 of phone) during the
-    // transition — only honored through end of day June 7, 2026 Eastern,
-    // after which the column-name check still hits but we refuse to
-    // return a session. Email-OTP login above stays available forever.
-    const LEGACY_CUTOFF = new Date('2026-06-08T04:00:00Z'); // 00:00 ET on Jun 8
-    if (new Date() < LEGACY_CUTOFF) {
-      match = await env.DB.prepare(
-        'SELECT editor_name, member_slug FROM member_codes WHERE code = ? AND member_slug = ?'
-      ).bind(code, member).first();
-    }
-  }
-
-  if (!match) {
+  if (!otp) {
     await recordFailure(env, ip, member);
     return new Response(JSON.stringify({ error: 'invalid' }), { status: 401, headers: corsHeaders() });
   }
+
+  await env.DB.prepare('UPDATE login_otps SET used_at = ? WHERE id = ?')
+    .bind(nowISO, otp.id).run();
+  const m = await env.DB.prepare(
+    'SELECT first_name, name FROM members WHERE slug = ?'
+  ).bind(member).first();
+  const editorName = m?.first_name || m?.name || member;
 
   const sessionId = crypto.randomUUID();
   const sessionExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   await env.DB.prepare(
     'INSERT INTO sessions (id, email, member_slug, expires_at, created_at) VALUES (?, ?, ?, ?, ?)'
-  ).bind(sessionId, match.editor_name, match.member_slug, sessionExpires.toISOString(), new Date().toISOString()).run();
+  ).bind(sessionId, editorName, member, sessionExpires.toISOString(), new Date().toISOString()).run();
 
-  return new Response(JSON.stringify({ success: true, slug: match.member_slug }), {
+  return new Response(JSON.stringify({ success: true, slug: member }), {
     status: 200,
     headers: {
       ...corsHeaders(),

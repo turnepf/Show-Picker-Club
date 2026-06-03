@@ -905,7 +905,7 @@
       <input type="email" id="loginEmail" autocomplete="email" placeholder="you@example.com">
       <button type="button" class="btn" id="loginEmailBtn" style="margin-top: 8px; width: 100%; background: var(--surface-2); color: var(--ink);" onclick="sendEmailCode()">Email me a code</button>
       <div id="loginEmailHint" style="font-size: 12px; color: var(--ink-muted); margin-top: 6px;">
-        If your email isn't on file, text Patrick to add it.
+        If your email isn't on file, reach out to the group owner to get it added.
       </div>
 
       <label for="loginCode" style="margin-top: 18px;">Code</label>
@@ -1407,15 +1407,7 @@
       document.getElementById('loginErr').style.display = 'none';
       document.getElementById('loginCode').value = '';
       document.getElementById('loginEmail').value = '';
-      // The static 4-digit code path expires at midnight ET on Jun 8, 2026;
-      // before that, surface the deadline; after, just say "from your email".
-      const LEGACY_CUTOFF = new Date('2026-06-08T04:00:00Z');
-      const hint = document.getElementById('loginCodeHint');
-      if (new Date() < LEGACY_CUTOFF) {
-        hint.innerHTML = 'Enter the 6-digit code from your email, or your original 4-digit code. <strong style="color: var(--accent-hover);">4-digit codes work through June 7th.</strong>';
-      } else {
-        hint.textContent = 'Enter the 6-digit code from your email.';
-      }
+      document.getElementById('loginCodeHint').textContent = 'Enter the 6-digit code from your email.';
       setTimeout(() => document.getElementById('loginEmail').focus(), 50);
     }
 
@@ -1448,7 +1440,7 @@
         if (res.status === 429) {
           showLoginError('Too many requests. Try again in an hour.');
         } else if (!res.ok) {
-          showLoginError('Could not send. Try again or text Patrick.');
+          showLoginError('Could not send. Try again, or contact the group owner if your email isn\'t on file.');
         } else {
           // Identical reply whether the email is on file or not (account
           // enumeration hardening). Show the same hint either way.

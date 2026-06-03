@@ -1,9 +1,7 @@
 import SwiftUI
 
-// Login flow: email-first (the new path) with the legacy 4-digit code
-// path still present until end-of-day June 7 ET. After that, /auth/login
-// stops accepting static codes server-side, so the UI keeps the same
-// shape and the 4-digit attempt just fails.
+// Email-only login: enter address, get a 6-digit OTP, paste it in.
+// /auth/login no longer accepts the legacy static code.
 struct LoginView: View {
     let memberSlug: String
 
@@ -15,8 +13,6 @@ struct LoginView: View {
     @State private var sendingCode = false
     @State private var codeSent = false
     @State private var errorText: String?
-
-    private static let legacyCutoff = Date(timeIntervalSince1970: 1749355200)  // 00:00 ET 2026-06-08
 
     var body: some View {
         NavigationStack {
@@ -54,15 +50,9 @@ struct LoginView: View {
                         .textContentType(.oneTimeCode)
                         .font(.title2.monospacedDigit())
                         .multilineTextAlignment(.center)
-                    if Date() < Self.legacyCutoff {
-                        Text("Enter the code from your email — or your original 4-digit code (works through June 7th).")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("Enter the code from your email.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    Text("Enter the code from your email.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 if let err = errorText {
@@ -70,7 +60,7 @@ struct LoginView: View {
                 }
 
                 Section {
-                    Text("If your email isn't on file, text Patrick to add it.")
+                    Text("If your email isn't on file, reach out to the group owner to get it added.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

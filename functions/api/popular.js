@@ -14,6 +14,10 @@ export async function onRequestGet(context) {
      FROM shows s
      WHERE s.archived = 0 AND s.list = 'watching'
        AND s.member_slug NOT IN (${EXCLUDED_SQL})
+       -- Seeded rows are the operator's auto-pick, not a member endorsement.
+       -- A row "counts" only once a member has actually touched it
+       -- (added themselves, or had a list manually loaded by the operator).
+       AND COALESCE(s.added_by, '') != 'seed'
      GROUP BY LOWER(s.title)
      HAVING COUNT(DISTINCT s.member_slug) >= 2
      ORDER BY member_count DESC, CAST(s.rating AS REAL) DESC
