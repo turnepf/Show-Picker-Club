@@ -13,6 +13,7 @@ struct ShowDetailView: View {
     @State private var show: Show?
     @State private var cast: [Actor] = []
     @State private var appleTVUrl: URL?
+    @State private var lookedUp = false
     @State private var openFailed = false
     @Environment(\.openURL) private var openURL
 
@@ -128,10 +129,20 @@ struct ShowDetailView: View {
                     openFailed = !accepted
                 }
             } label: {
-                Label(buttonLabel, systemImage: "play.fill")
-                    .font(.system(size: 30, weight: .semibold))
-                    .padding(.vertical, 8)
+                HStack(spacing: 12) {
+                    Label(buttonLabel, systemImage: "play.fill")
+                        .font(.system(size: 30, weight: .semibold))
+                    if !lookedUp {
+                        // While the iTunes Search lookup is in flight we
+                        // don't yet know whether to route through the
+                        // Apple TV app or land on the service. Show a
+                        // spinner so the button is honest about waiting.
+                        ProgressView().scaleEffect(0.9)
+                    }
+                }
+                .padding(.vertical, 8)
             }
+            .disabled(!lookedUp)
             .padding(.top, 12)
 
             if openFailed {
@@ -215,11 +226,17 @@ struct ShowDetailView: View {
     }
 
     private func load() async {
-        if let s = try? await API.showDetail(id: id) { show = s }
-        cast = (try? await API.actors(showId: id)) ?? []
-        // Pre-fetch the Apple TV app URL so the Watch button can route
-        // through Apple's show page when the streaming service itself
-        // doesn't deep-link. Falls through silently if no match.
-        appleTVUrl = await API.appleTVLookup(title: initialTitle)
+        // Fire all three lookups in parallel — the iTunes Search call for
+        // the Apple TV app URL takes 500ms-2s, which used to leave the
+        // Watch button enabled but routed to a stale fallback (HBO search,
+        // service home) if you tapped it before iTunes responded.
+        async let detail = API.showDetail(id: id)
+        async let actors = API.actors(showId: id)
+        async let appleURL = API.appleTVLookup(title: initialTitle)
+
+        if let s = try? await detail { show = s }
+        cast = (try? await actors) ?? []
+        appleTVUrl = await appleURL
+        lookedUp = true
     }
 }
