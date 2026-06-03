@@ -60,8 +60,9 @@ const QUEUE_FILTER = `
 
 async function propagateGoodUrls(env) {
   // Before listing, push every known good URL out to any sibling row that's
-  // still on a placeholder. Keeps the queue from showing titles that one
-  // member has already fixed but the daily sync-urls hasn't caught up on.
+  // still on a placeholder. Scoped to (title, network) because the same
+  // title can live on multiple services — copying URLs across networks
+  // would land members on the wrong streaming app at watch time.
   const { results: sources } = await env.DB.prepare(
     `SELECT LOWER(title) as ltitle, network, network_url FROM shows
      WHERE archived = 0
@@ -77,15 +78,14 @@ async function propagateGoodUrls(env) {
        AND network_url NOT LIKE 'https://www.themoviedb.org/%'
        AND network_url != 'https://www.amazon.com/s'
        AND network_url != 'https://www.amazon.com/s/'
-     GROUP BY LOWER(title)`
+     GROUP BY LOWER(title), network`
   ).all();
   for (const src of sources) {
     await env.DB.prepare(
       `UPDATE shows
          SET network_url = ?,
-             network = COALESCE(network, ?),
              enriched_at = datetime('now')
-       WHERE LOWER(title) = ? AND archived = 0
+       WHERE LOWER(title) = ? AND network = ? AND archived = 0
          AND (network_url IS NULL
               OR network_url LIKE '%/search%'
               OR network_url LIKE '%/s?%'
@@ -97,7 +97,7 @@ async function propagateGoodUrls(env) {
               OR network_url LIKE 'https://www.themoviedb.org/%'
               OR network_url = 'https://www.amazon.com/s'
               OR network_url = 'https://www.amazon.com/s/')`
-    ).bind(src.network_url, src.network, src.ltitle).run();
+    ).bind(src.network_url, src.ltitle, src.network).run();
   }
 }
 
@@ -191,10 +191,16 @@ export async function onRequestPost(context) {
     const titleRow = await env.DB.prepare('SELECT title FROM shows WHERE id = ?').bind(id).first();
     if (!titleRow) return json({ error: 'Show not found' }, 404);
 
-    // Apply to every active row sharing this title — across all members.
+    // Apply to every row sharing this title on the same service, plus any
+    // rows that have no network yet. Don't overwrite rows that already
+    // have a different specific network — the same title can legitimately
+    // be carried by multiple services (e.g. All Her Fault on Peacock for
+    // one member, Amazon for another).
     const result = await env.DB.prepare(
-      "UPDATE shows SET network = ?, network_url = ?, enriched_at = datetime('now') WHERE LOWER(title) = LOWER(?) AND archived = 0"
-    ).bind(network, url, titleRow.title).run();
+      `UPDATE shows SET network = ?, network_url = ?, enriched_at = datetime('now')
+       WHERE LOWER(title) = LOWER(?) AND archived = 0
+         AND (network = ? OR network IS NULL)`
+    ).bind(network, url, titleRow.title, network).run();
 
     return json({ ok: true, updated: result.meta.changes });
   }
