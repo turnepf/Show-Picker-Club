@@ -157,9 +157,14 @@ export async function onRequestPost(context) {
       url = `https://play.hbomax.com/search?q=${encodeURIComponent(row.title)}`;
     }
 
+    // Only write to rows on the same service. The Watchmode match we
+    // picked is scoped to row.network already (canonicalNetwork(s.name) ===
+    // row.network), so blasting it across every same-titled row would
+    // misroute members whose row carries a different network for the
+    // same title (e.g. All Her Fault on Peacock vs Amazon).
     const upd = await env.DB.prepare(
-      "UPDATE shows SET network_url = ?, enriched_at = datetime('now') WHERE LOWER(title) = LOWER(?) AND archived = 0"
-    ).bind(url, row.title).run();
+      "UPDATE shows SET network_url = ?, enriched_at = datetime('now') WHERE LOWER(title) = LOWER(?) AND network = ? AND archived = 0"
+    ).bind(url, row.title, row.network).run();
 
     summary.filled += upd.meta.changes;
     summary.updated.push({
