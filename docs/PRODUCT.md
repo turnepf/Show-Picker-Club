@@ -183,3 +183,21 @@ A few intentional omissions:
   Maps the SSO email back to an existing member's `member_emails` row,
   so seeding stays operator-controlled (no public sign-up). "Sign in
   with Apple" first since the iOS app is the higher-friction surface.
+
+- **Open signup ("request access" flow).** Anyone can submit name +
+  email on a `/signup` page. Submission lands in a `pending_signups`
+  table and notifies the operator. Operator approves from `/members`
+  with one click, which runs the existing create-member flow and emails
+  the new member a welcome with their first login code. Keeps the
+  trust model identical to today (operator vets every member) but
+  removes the operator as the bottleneck for inbound interest. No
+  CAPTCHA / Turnstile needed at this scale since the human approval
+  gate already kills automated abuse.
+
+- **SMS login codes via Twilio A2P 10DLC.** Shelved June 2026 after
+  two rejections (consent-required, then person-to-person). Email-OTP
+  is doing the job. Revisit only if a member can't use email, if
+  Twilio's small-sender lane improves, or if we switch to a provider
+  with friendlier verification (Vonage, Sinch). Server-side already
+  accepts `channel: 'sms'` on `/auth/request-code`; just the
+  `sendSms()` half is stubbed.
