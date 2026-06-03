@@ -18,6 +18,24 @@ struct MemberView: View {
                     ProgressView().padding(.top, 80)
                 } else if let errorText {
                     Text(errorText).foregroundColor(Theme.muted)
+                } else if shows.allSatisfy({ ShowList(rawValue: $0.list) == nil }) {
+                    // Defensive empty-state: tvOS focus engine needs *some*
+                    // visible content to land on, otherwise the screen looks
+                    // hung when every list happens to be empty (e.g. a brand-
+                    // new member, or a member whose rows all carry an
+                    // unrecognised list value).
+                    VStack(spacing: 24) {
+                        Text("\(member.label) hasn't added any shows yet.")
+                            .font(.system(size: 32))
+                            .foregroundColor(Theme.muted)
+                            .multilineTextAlignment(.center)
+                        Text("Check back later, or pick another member from the home page.")
+                            .font(.system(size: 24))
+                            .foregroundColor(Theme.muted)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 80)
                 } else {
                     ForEach(ShowList.allCases) { list in
                         let items = shows.filter { $0.list == list.rawValue }
