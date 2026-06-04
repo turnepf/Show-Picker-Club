@@ -74,15 +74,32 @@
     }
     .approved-intro {
       margin-top: 14px;
-      padding: 12px 14px;
       background: color-mix(in oklch, var(--list-watching) 8%, var(--surface));
       border-radius: 6px;
       border: 1px solid color-mix(in oklch, var(--list-watching) 30%, transparent);
       font-size: 13px;
     }
-    .approved-intro a { color: var(--accent); }
+    .approved-intro > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 8px 12px;
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      font-weight: 600; color: var(--ink);
+    }
+    .approved-intro > summary::-webkit-details-marker { display: none; }
+    .approved-intro > summary::after {
+      content: '+'; color: var(--ink-muted); font-size: 18px;
+    }
+    .approved-intro[open] > summary::after { content: '−'; }
+    .approved-intro .intro-url {
+      font-weight: 400; color: var(--ink-muted); font-size: 12px;
+      font-family: ui-monospace, monospace;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      min-width: 0;
+    }
+    .approved-intro .intro-body { padding: 0 12px 12px; }
     .approved-intro textarea {
-      width: 100%; margin-top: 8px;
+      width: 100%;
       padding: 10px 12px; min-height: 140px;
       border: 1px solid color-mix(in oklch, var(--list-watching) 30%, transparent);
       border-radius: 6px;
@@ -318,6 +335,7 @@
             slug: data.created.slug,
             phone: data.created.phone,
             displayName: data.created.editor_name,
+            defaultOpen: true,
           }));
         }
       } catch (e) {
@@ -332,7 +350,7 @@
       doAction(card, id, 'reject', notes);
     }
 
-    function buildIntroPanel({ slug, name, phone, displayName }) {
+    function buildIntroPanel({ slug, name, phone, displayName, defaultOpen }) {
       const url = `https://showpicker.club/${slug}`;
       const editor = displayName || (name || '').trim().split(/\s+/)[0] || slug;
       const intro = `Hey ${editor}! I set you up on Show Picker Club. It's a shared show tracker where we all keep track of what we're watching, what's next, and what we'd recommend. I seeded yours with some popular shows to get you started; if any don't interest you, just tap Edit, then Archive to remove them.
@@ -349,27 +367,35 @@ If you see something you like on someone else's list, tap the **+** to add it to
 
 - Patrick`;
 
-      const wrap = document.createElement('div');
+      // Collapsible so approved cards stay short by default. Operator
+      // expands when they actually want to send the intro. After a fresh
+      // approve we pass defaultOpen=true so the textarea is right there.
+      const wrap = document.createElement('details');
       wrap.className = 'approved-intro';
+      if (defaultOpen) wrap.open = true;
       wrap.innerHTML = `
-        <div>List: <a href="${escapeHtml(url)}" target="_blank">${escapeHtml(url)}</a></div>
-        <textarea readonly></textarea>
-        <div class="copy-row">
-          <button class="copy">Copy intro</button>
-          ${phone ? '<button class="text">Text intro</button>' : ''}
+        <summary>Welcome intro <span class="intro-url">${escapeHtml(url.replace(/^https?:\/\//, ''))}</span></summary>
+        <div class="intro-body">
+          <textarea readonly></textarea>
+          <div class="copy-row">
+            <button class="copy">Copy intro</button>
+            ${phone ? '<button class="text">Text intro</button>' : ''}
+          </div>
         </div>
       `;
       const ta = wrap.querySelector('textarea');
       ta.value = intro;
 
       wrap.querySelector('.copy').addEventListener('click', async (e) => {
+        e.preventDefault();
         try { await navigator.clipboard.writeText(ta.value); } catch { ta.select(); document.execCommand('copy'); }
         e.target.textContent = 'Copied!';
         setTimeout(() => { e.target.textContent = 'Copy intro'; }, 1500);
       });
       const textBtn = wrap.querySelector('.text');
       if (textBtn) {
-        textBtn.addEventListener('click', () => {
+        textBtn.addEventListener('click', (e) => {
+          e.preventDefault();
           const href = `sms:${phone}?&body=${encodeURIComponent(intro)}`;
           window.location.href = href;
         });
@@ -441,6 +467,7 @@ If you see something you like on someone else's list, tap the **+** to add it to
             slug: data.slug,
             phone: data.phone,
             displayName: data.editor_name,
+            defaultOpen: true,
           }));
           addForm.reset();
           previewEl.textContent = '';
