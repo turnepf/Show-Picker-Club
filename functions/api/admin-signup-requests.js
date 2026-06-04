@@ -43,8 +43,13 @@ export async function onRequestPost(context) {
     'SELECT id, full_name, email, phone, status FROM signup_requests WHERE id = ?'
   ).bind(id).first();
   if (!row) return json({ error: 'not_found' }, 404);
-  if (row.status !== 'pending') {
+  // Allow approve on pending OR rejected — operator may change their mind.
+  // Reject only makes sense from pending.
+  if (body.action === 'reject' && row.status !== 'pending') {
     return json({ error: `Already ${row.status}` }, 409);
+  }
+  if (body.action === 'approve' && row.status === 'approved') {
+    return json({ error: 'Already approved' }, 409);
   }
 
   if (body.action === 'approve') {

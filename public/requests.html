@@ -178,21 +178,24 @@
         ${reviewedLine}
       `;
 
-      if (req.status === 'pending') {
+      if (req.status === 'pending' || req.status === 'rejected') {
         const actions = document.createElement('div');
         actions.className = 'actions';
 
         const approve = document.createElement('button');
         approve.className = 'btn-approve';
-        approve.textContent = 'Approve';
+        approve.textContent = req.status === 'rejected' ? 'Approve anyway' : 'Approve';
         approve.onclick = () => doAction(c, req.id, 'approve');
+        actions.appendChild(approve);
 
-        const reject = document.createElement('button');
-        reject.className = 'btn-reject';
-        reject.textContent = 'Reject';
-        reject.onclick = () => doReject(c, req.id);
+        if (req.status === 'pending') {
+          const reject = document.createElement('button');
+          reject.className = 'btn-reject';
+          reject.textContent = 'Reject';
+          reject.onclick = () => doReject(c, req.id);
+          actions.appendChild(reject);
+        }
 
-        actions.append(approve, reject);
         c.appendChild(actions);
       }
       return c;
