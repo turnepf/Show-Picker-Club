@@ -16,7 +16,8 @@ export async function onRequestGet(context) {
 
   const { results } = await env.DB.prepare(`
     SELECT id, full_name, email, phone, source, status,
-           created_at, reviewed_at, reviewed_by, notes
+           created_at, reviewed_at, reviewed_by, notes,
+           created_member_slug
       FROM signup_requests
      ORDER BY
        CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
@@ -65,9 +66,10 @@ export async function onRequestPost(context) {
       `UPDATE signup_requests
           SET status = 'approved',
               reviewed_at = datetime('now'),
-              reviewed_by = ?
+              reviewed_by = ?,
+              created_member_slug = ?
         WHERE id = ?`
-    ).bind(ADMIN_SLUG, id).run();
+    ).bind(ADMIN_SLUG, created.slug, id).run();
     return json({ ok: true, action: 'approve', created });
   }
 

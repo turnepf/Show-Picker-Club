@@ -107,6 +107,9 @@
     <div id="authWarn" class="err" style="display:none;">
       Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a>, then reload.
     </div>
+    <div style="margin: 0 0 16px;">
+      <button type="button" onclick="load()" style="background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;">↻ Refresh queue</button>
+    </div>
     <div id="content"></div>
   </div>
 
@@ -178,6 +181,17 @@
         ${reviewedLine}
       `;
 
+      // Approved requests carry the slug of the member that was created,
+      // so we can rebuild the welcome URL + intro text on every page load
+      // and let the operator re-send if needed.
+      if (req.status === 'approved' && req.created_member_slug) {
+        c.appendChild(buildIntroPanel({
+          slug: req.created_member_slug,
+          name: req.full_name,
+          phone: req.phone,
+        }));
+      }
+
       if (req.status === 'pending' || req.status === 'rejected') {
         const actions = document.createElement('div');
         actions.className = 'actions';
@@ -216,15 +230,31 @@
           buttons.forEach(b => b.disabled = false);
           return;
         }
-        if (action === 'approve' && data.created) {
-          showApprovedIntro(card, data.created);
-        }
-        // Reload so the row reshuffles into Approved/Rejected at the bottom.
-        // We do that after a short delay if we showed the intro; otherwise now.
-        if (action === 'approve') {
-          setTimeout(load, 1500);
-        } else {
+        if (action === 'reject') {
+          // Reject is cheap to re-render — reload so the row moves into
+          // the Rejected section with its badge + reviewed line.
           load();
+          return;
+        }
+        // Approve: stay on this card so the operator can copy/text the
+        // intro without losing it. Strip the action buttons, swap in a
+        // green status badge, and append the intro panel inline. Operator
+        // hits "Refresh queue" (added below) when ready to move on.
+        const actionsRow = card.querySelector('.actions');
+        if (actionsRow) actionsRow.remove();
+        const when = card.querySelector('.when');
+        if (when && !when.querySelector('.status-badge')) {
+          when.insertAdjacentHTML('beforeend', ' <span class="status-badge approved">approved</span>');
+        }
+        if (data.created) {
+          card.appendChild(buildIntroPanel({
+            slug: data.created.slug,
+            name: data.created.editor_name + (data.created.name ? '' : ''),
+            // editor_name is just the first name; we want the full name
+            // the requester gave us so the intro reads naturally.
+            phone: data.created.phone,
+            displayName: data.created.editor_name,
+          }));
         }
       } catch (e) {
         alert('Network error: ' + e.message);
@@ -238,14 +268,13 @@
       doAction(card, id, 'reject', notes);
     }
 
-    function showApprovedIntro(card, created) {
-      const wrap = document.createElement('div');
-      wrap.className = 'approved-intro';
-      const editor = created.editor_name || (created.name || '').split("'")[0];
+    function buildIntroPanel({ slug, name, phone, displayName }) {
+      const url = `https://showpicker.club/${slug}`;
+      const editor = displayName || (name || '').trim().split(/\s+/)[0] || slug;
       const intro = `Hey ${editor}! I set you up on Show Picker Club. It's a shared show tracker where we all keep track of what we're watching, what's next, and what we'd recommend. I seeded yours with some popular shows to get you started; if any don't interest you, just tap Edit, then Archive to remove them.
 
 Your list:
-${created.url}
+${url}
 
 To edit your list, tap Edit and we'll send a login code by text or email.
 
@@ -256,9 +285,10 @@ If you see something you like on someone else's list, tap the **+** to add it to
 
 - Patrick`;
 
+      const wrap = document.createElement('div');
+      wrap.className = 'approved-intro';
       wrap.innerHTML = `
-        <strong>Created ${escapeHtml(created.name)}</strong>
-        <div>URL: <a href="${escapeHtml(created.url)}" target="_blank">${escapeHtml(created.url)}</a></div>
+        <div>List: <a href="${escapeHtml(url)}" target="_blank">${escapeHtml(url)}</a></div>
         <textarea readonly></textarea>
         <div class="copy-row">
           <button class="copy">Copy intro</button>
@@ -274,12 +304,10 @@ If you see something you like on someone else's list, tap the **+** to add it to
         setTimeout(() => { e.target.textContent = 'Copy intro'; }, 1500);
       });
       wrap.querySelector('.text').addEventListener('click', () => {
-        // Open Messages with the new member's number pre-filled. Same `?&body=`
-        // trick we use elsewhere — covers both Apple and Android query styles.
-        const href = `sms:${created.phone}?&body=${encodeURIComponent(intro)}`;
+        const href = `sms:${phone}?&body=${encodeURIComponent(intro)}`;
         window.location.href = href;
       });
-      card.appendChild(wrap);
+      return wrap;
     }
 
     function formatWhen(iso) {
