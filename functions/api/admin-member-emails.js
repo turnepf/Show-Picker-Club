@@ -31,6 +31,10 @@ export async function onRequestGet(context) {
   if (!(await isAdmin(request, env))) {
     return json({ error: 'forbidden' }, 403);
   }
+  // Activity rollup: per (member, list) count of shows added or touched
+  // in the last 30 days. Excludes seeded rows (they're the operator's
+  // auto-pick, not member activity) and archived rows.
+  const since = "datetime('now', '-30 days')";
   const { results } = await env.DB.prepare(`
     SELECT m.slug, m.name, m.first_name, m.last_initial, m.last_name,
            (SELECT GROUP_CONCAT(email, ',')
@@ -42,7 +46,23 @@ export async function onRequestGet(context) {
                      WHERE member_slug = m.slug
                      ORDER BY is_primary DESC, id)) AS phones,
            (SELECT MAX(created_at) FROM sessions
-             WHERE member_slug = m.slug) AS last_login
+             WHERE member_slug = m.slug) AS last_login,
+           (SELECT COUNT(*) FROM shows
+             WHERE member_slug = m.slug AND archived = 0 AND list = 'watching'
+               AND COALESCE(added_by,'') != 'seed'
+               AND COALESCE(updated_at, created_at) >= ${since}) AS act_watching,
+           (SELECT COUNT(*) FROM shows
+             WHERE member_slug = m.slug AND archived = 0 AND list = 'waiting'
+               AND COALESCE(added_by,'') != 'seed'
+               AND COALESCE(updated_at, created_at) >= ${since}) AS act_waiting,
+           (SELECT COUNT(*) FROM shows
+             WHERE member_slug = m.slug AND archived = 0 AND list = 'recommending'
+               AND COALESCE(added_by,'') != 'seed'
+               AND COALESCE(updated_at, created_at) >= ${since}) AS act_recommending,
+           (SELECT COUNT(*) FROM shows
+             WHERE member_slug = m.slug AND archived = 0 AND list = 'next'
+               AND COALESCE(added_by,'') != 'seed'
+               AND COALESCE(updated_at, created_at) >= ${since}) AS act_next
       FROM members m
      ORDER BY m.first_name COLLATE NOCASE
   `).all();
@@ -55,6 +75,12 @@ export async function onRequestGet(context) {
     emails: r.emails ? r.emails.split(',').filter(Boolean) : [],
     phones: r.phones ? r.phones.split(',').filter(Boolean) : [],
     last_login: r.last_login || null,
+    activity_30d: {
+      watching: r.act_watching || 0,
+      waiting: r.act_waiting || 0,
+      recommending: r.act_recommending || 0,
+      next: r.act_next || 0,
+    },
   }));
   return json({ members });
 }

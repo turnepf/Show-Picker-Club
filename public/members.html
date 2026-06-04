@@ -26,6 +26,20 @@
       gap: 12px;
     }
     .name { font-weight: 600; color: var(--ink); font-size: 15px; }
+    .name a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted color-mix(in oklch, var(--ink) 25%, transparent); }
+    .name a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+    .activity {
+      margin: 6px 0 10px; font-size: 12px; color: var(--ink-muted);
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    }
+    .activity.zero { font-style: italic; }
+    .pill {
+      display: inline-flex; align-items: baseline; gap: 4px;
+      padding: 2px 8px; border-radius: 999px;
+      border: 1px solid transparent; font-size: 11px; color: var(--ink);
+      font-weight: 500;
+    }
+    .pill strong { font-weight: 700; }
     .meta { color: var(--ink-muted); font-size: 12px; font-family: ui-monospace, monospace; }
     .meta .never { color: var(--danger); }
     .field { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
@@ -175,6 +189,21 @@
       document.getElementById('sortBy').addEventListener('change', renderSorted);
     });
 
+    function activityPills(act) {
+      const order = [
+        ['watching',    'Watching',     'var(--list-watching)'],
+        ['waiting',     'Waiting',      'var(--list-waiting)'],
+        ['recommending','Recommending', 'var(--list-recommending)'],
+        ['next',        'Up Next',      'var(--list-up-next)'],
+      ];
+      return order
+        .filter(([k]) => (act[k] || 0) > 0)
+        .map(([k, label, color]) =>
+          `<span class="pill" style="background: color-mix(in oklch, ${color} 18%, var(--surface)); border-color: color-mix(in oklch, ${color} 35%, transparent);">${escapeHtml(label)} <strong>${act[k]}</strong></span>`
+        )
+        .join(' ');
+    }
+
     function formatLastLogin(iso) {
       if (!iso) return '<span class="never">never logged in</span>';
       const d = new Date(iso);
@@ -196,12 +225,18 @@
       for (const m of members) {
         const card = document.createElement('div');
         card.className = 'card';
-        const displayName = `${m.first_name || m.slug}${m.last_initial ? ' ' + m.last_initial + '.' : ''}`;
+        const displayName = `${m.first_name || m.slug}${m.last_name ? ' ' + m.last_name : (m.last_initial ? ' ' + m.last_initial + '.' : '')}`;
+        const act = m.activity_30d || {};
+        const total = (act.watching || 0) + (act.waiting || 0) + (act.recommending || 0) + (act.next || 0);
+        const activityRow = total === 0
+          ? `<div class="activity zero">no list activity in the last 30 days</div>`
+          : `<div class="activity">last 30 days: ${activityPills(act)}</div>`;
         card.innerHTML = `
           <div class="top">
-            <div class="name">${escapeHtml(displayName)} <span class="meta">${escapeHtml(m.slug)}</span></div>
+            <div class="name"><a href="/${escapeHtml(m.slug)}" target="_blank">${escapeHtml(displayName)}</a> <span class="meta">${escapeHtml(m.slug)}</span></div>
             <div class="meta">${formatLastLogin(m.last_login)}</div>
           </div>
+          ${activityRow}
           <div class="field">
             <label>Emails</label>
             <input class="emails" type="text" value="${escapeHtml(m.emails.join(', '))}" placeholder="alice@example.com, alice.b@gmail.com">
