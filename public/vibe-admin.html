@@ -32,6 +32,12 @@
 </head>
 <body>
   <div class="wrap">
+    <nav style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; font-size: 13px;">
+      <a href="/admin"       style="color: var(--accent); text-decoration: none;">Admin</a>
+      <a href="/members"     style="color: var(--accent); text-decoration: none;">Members</a>
+      <a href="/url-cleanup" style="color: var(--accent); text-decoration: none;">URL cleanup</a>
+      <a href="/vibe-admin"  style="color: var(--ink); text-decoration: none; font-weight: 600;">Vibe admin</a>
+    </nav>
     <h1>Vibe trait fill</h1>
     <p class="sub">Generates trait scores for any show that doesn't have them yet. Calls Claude one batch at a time until all caught up. <strong>Re-score all</strong> refreshes every existing report too — useful when the prompt or model improves.</p>
 
