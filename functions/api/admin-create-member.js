@@ -52,72 +52,53 @@ async function pickSeeds(env) {
   return picks;
 }
 
-export async function onRequestPost(context) {
-  const { request, env } = context;
-
-  if (!(await isAdmin(request, env))) {
-    return json({ error: 'Forbidden — log in as the operator' }, 403);
-  }
-
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: 'Invalid JSON' }, 400);
-  }
-
-  const { full_name, phone, emails } = body;
-
+// Core member-creation routine. Used both by the operator-facing POST
+// endpoint below and by the /requests admin page's "Approve" action.
+// Returns either { ok: true, ...details } or { ok: false, status, error }.
+export async function createMember(env, { full_name, phone, emails }) {
   if (!full_name) {
-    return json({ error: 'Full name required' }, 400);
+    return { ok: false, status: 400, error: 'Full name required' };
   }
   if (!phone && !emails) {
-    return json({ error: 'Provide a phone number, at least one email, or both' }, 400);
+    return { ok: false, status: 400, error: 'Provide a phone number, at least one email, or both' };
   }
 
   let phoneE164 = null;
   if (phone) {
     phoneE164 = normalizePhone(phone);
     if (!phoneE164) {
-      return json({ error: 'Phone number looks invalid — use digits only, with + and country code for non-US numbers' }, 400);
+      return { ok: false, status: 400, error: 'Phone number looks invalid — use digits only, with + and country code for non-US numbers' };
     }
     const phoneClash = await env.DB.prepare(
       'SELECT member_slug FROM member_phones WHERE phone = ?'
     ).bind(phoneE164).first();
     if (phoneClash) {
-      return json({ error: `Phone already on file for member: ${phoneClash.member_slug}` }, 409);
+      return { ok: false, status: 409, error: `Phone already on file for member: ${phoneClash.member_slug}` };
     }
   }
 
-  // Parse comma/whitespace-separated emails; reject anything that doesn't
-  // look like an address so we don't silently swallow typos.
   const emailList = (emails || '')
     .split(/[,;\s]+/)
     .map(e => e.trim().toLowerCase())
     .filter(Boolean);
   for (const e of emailList) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
-      return json({ error: `Email looks invalid: ${e}` }, 400);
+      return { ok: false, status: 400, error: `Email looks invalid: ${e}` };
     }
   }
 
-  // Legacy static code is only meaningful when there's a phone (it's the
-  // last 4 digits). Without a phone, the member logs in via emailed OTP.
   const code = phoneE164 ? phoneE164.slice(-4) : null;
 
   const tokens = full_name.trim().split(/\s+/);
   const firstName = tokens[0];
   const firstSlug = firstName.toLowerCase().replace(/[^a-z0-9]/g, '');
-  // Stash the full last name now so display code doesn't have to parse
-  // out of the possessive "Name's Shows" string. last_initial is kept
-  // in sync for any legacy reader.
   const lastName = tokens.length > 1 ? tokens[tokens.length - 1] : null;
   const lastInitial = lastName
     ? lastName.toLowerCase().replace(/[^a-z0-9]/g, '').charAt(0)
     : '';
 
   if (!firstSlug) {
-    return json({ error: 'Could not derive slug from name' }, 400);
+    return { ok: false, status: 400, error: 'Could not derive slug from name' };
   }
 
   const candidates = [firstSlug];
@@ -132,7 +113,7 @@ export async function onRequestPost(context) {
     if (!hit) { slug = cand; break; }
   }
   if (!slug) {
-    return json({ error: 'Could not find available slug' }, 409);
+    return { ok: false, status: 409, error: 'Could not find available slug' };
   }
 
   const displayName = `${firstName}'s Shows`;
@@ -152,8 +133,6 @@ export async function onRequestPost(context) {
       'INSERT INTO member_phones (phone, member_slug, label, is_primary) VALUES (?, ?, NULL, 1)'
     ).bind(phoneE164, slug).run();
   }
-  // First email becomes primary; rest are alternates. UNIQUE (email, slug)
-  // means duplicates within the request are no-ops.
   for (let i = 0; i < emailList.length; i++) {
     await env.DB.prepare(
       'INSERT OR IGNORE INTO member_emails (email, member_slug, is_primary) VALUES (?, ?, ?)'
@@ -180,7 +159,7 @@ export async function onRequestPost(context) {
     seededTitles.push(`${seed.title} (${seed.list})`);
   }
 
-  return json({
+  return {
     ok: true,
     slug,
     name: displayName,
@@ -190,5 +169,26 @@ export async function onRequestPost(context) {
     phone: phoneE164,
     emails: emailList,
     seeded: seededTitles,
-  });
+  };
+}
+
+export async function onRequestPost(context) {
+  const { request, env } = context;
+
+  if (!(await isAdmin(request, env))) {
+    return json({ error: 'Forbidden — log in as the operator' }, 403);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'Invalid JSON' }, 400);
+  }
+
+  const result = await createMember(env, body);
+  if (!result.ok) {
+    return json({ error: result.error }, result.status || 400);
+  }
+  return json(result);
 }

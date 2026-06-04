@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Membership requests</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { padding: 32px 16px 80px; }
+    .wrap { max-width: 760px; margin: 0 auto; }
+    h1 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; letter-spacing: -0.01em; color: var(--ink); margin-bottom: 6px; }
+    .sub { color: var(--ink-muted); font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
+    .section-title {
+      font-size: 13px; color: var(--ink-muted);
+      text-transform: uppercase; letter-spacing: 0.6px;
+      margin: 24px 0 10px;
+    }
+    .card {
+      background: var(--surface);
+      padding: 16px 18px;
+      border-radius: 10px;
+      border: 1px solid var(--border-soft);
+      margin-bottom: 12px;
+    }
+    .card.pending { border-color: color-mix(in oklch, var(--accent) 40%, transparent); }
+    .card .top {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap;
+    }
+    .card .name { font-weight: 600; color: var(--ink); font-size: 16px; }
+    .card .when { color: var(--ink-muted); font-size: 12px; }
+    .card .contact {
+      display: flex; flex-wrap: wrap; gap: 14px;
+      margin-top: 8px; font-size: 13px; color: var(--ink-muted);
+    }
+    .card .contact a { color: var(--accent); text-decoration: none; }
+    .card .contact a:hover { text-decoration: underline; }
+    .card .source {
+      margin-top: 10px; padding: 10px 12px;
+      background: color-mix(in oklch, var(--surface-2) 65%, transparent);
+      border-radius: 6px; font-size: 13px;
+      color: var(--ink); line-height: 1.5;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .card .source.empty { color: var(--ink-muted); font-style: italic; }
+    .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px; font-weight: 600;
+      border: none; cursor: pointer; font-family: inherit;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-approve { background: var(--accent); color: #fff; }
+    .btn-approve:hover { background: var(--accent-hover); }
+    .btn-reject { background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); }
+    .btn-reject:hover { background: color-mix(in oklch, var(--danger) 10%, var(--surface-2)); border-color: color-mix(in oklch, var(--danger) 30%, transparent); }
+    .status-badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 999px;
+      text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600;
+    }
+    .status-badge.approved { background: color-mix(in oklch, var(--list-watching) 18%, var(--surface)); color: var(--ink); }
+    .status-badge.rejected { background: var(--danger-soft); color: var(--danger-deep); }
+    .reviewed-note { font-size: 12px; color: var(--ink-muted); margin-top: 8px; }
+    .err {
+      background: var(--danger-soft); color: var(--danger-deep);
+      border: 1px solid var(--danger-soft);
+      padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 13px;
+    }
+    .empty {
+      color: var(--ink-muted); font-style: italic;
+      padding: 24px; text-align: center;
+    }
+    .approved-intro {
+      margin-top: 14px;
+      padding: 12px 14px;
+      background: color-mix(in oklch, var(--list-watching) 8%, var(--surface));
+      border-radius: 6px;
+      border: 1px solid color-mix(in oklch, var(--list-watching) 30%, transparent);
+      font-size: 13px;
+    }
+    .approved-intro a { color: var(--accent); }
+    .approved-intro textarea {
+      width: 100%; margin-top: 8px;
+      padding: 10px 12px; min-height: 140px;
+      border: 1px solid color-mix(in oklch, var(--list-watching) 30%, transparent);
+      border-radius: 6px;
+      font-size: 13px; font-family: inherit; line-height: 1.5;
+      resize: vertical; background: var(--surface); color: var(--ink);
+      white-space: pre-wrap;
+    }
+    .copy-row { display: flex; gap: 8px; margin-top: 8px; }
+    .copy-row button { background: var(--ink); color: #fff; }
+    .copy-row button:hover { background: oklch(0.18 0.025 50); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Membership requests</h1>
+    <div class="sub">
+      Anyone who submits the <a href="/join">/join</a> form lands here. Approving runs
+      the same create-member flow as <a href="/setup">/setup</a> and pops the intro
+      text to send to the new member. Rejecting marks the row and leaves it for the
+      record; nothing is sent to the requester automatically.
+    </div>
+    <div id="authWarn" class="err" style="display:none;">
+      Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a>, then reload.
+    </div>
+    <div id="content"></div>
+  </div>
+
+  <script>
+    let allRequests = [];
+
+    async function load() {
+      const res = await fetch('/api/admin-signup-requests');
+      if (res.status === 403) {
+        document.getElementById('authWarn').style.display = '';
+        return;
+      }
+      const data = await res.json();
+      allRequests = data.requests || [];
+      render();
+    }
+
+    function render() {
+      const root = document.getElementById('content');
+      root.innerHTML = '';
+
+      const pending  = allRequests.filter(r => r.status === 'pending');
+      const approved = allRequests.filter(r => r.status === 'approved');
+      const rejected = allRequests.filter(r => r.status === 'rejected');
+
+      root.appendChild(section('Pending', pending, true));
+      if (approved.length) root.appendChild(section('Approved', approved, false));
+      if (rejected.length) root.appendChild(section('Rejected', rejected, false));
+    }
+
+    function section(title, items, isPending) {
+      const wrap = document.createElement('div');
+      const h = document.createElement('div');
+      h.className = 'section-title';
+      h.textContent = `${title} (${items.length})`;
+      wrap.appendChild(h);
+      if (items.length === 0) {
+        const e = document.createElement('div');
+        e.className = 'empty';
+        e.textContent = isPending ? 'No requests right now.' : '';
+        if (isPending) wrap.appendChild(e);
+        return wrap;
+      }
+      for (const req of items) wrap.appendChild(card(req));
+      return wrap;
+    }
+
+    function card(req) {
+      const c = document.createElement('div');
+      c.className = `card ${req.status}`;
+      c.dataset.id = req.id;
+      const when = formatWhen(req.created_at);
+      const reviewedLine = req.reviewed_at
+        ? `<div class="reviewed-note">${escapeHtml(req.status === 'approved' ? 'Approved' : 'Rejected')} ${formatWhen(req.reviewed_at)}${req.reviewed_by ? ' by ' + escapeHtml(req.reviewed_by) : ''}${req.notes ? ' · ' + escapeHtml(req.notes) : ''}</div>`
+        : '';
+      const statusBadge = req.status === 'pending'
+        ? ''
+        : `<span class="status-badge ${escapeHtml(req.status)}">${escapeHtml(req.status)}</span>`;
+      c.innerHTML = `
+        <div class="top">
+          <div class="name">${escapeHtml(req.full_name)}</div>
+          <div class="when">${escapeHtml(when)} ${statusBadge}</div>
+        </div>
+        <div class="contact">
+          <span><a href="mailto:${escapeHtml(req.email)}">${escapeHtml(req.email)}</a></span>
+          <span><a href="tel:${escapeHtml(req.phone)}">${escapeHtml(req.phone)}</a></span>
+        </div>
+        <div class="source ${req.source ? '' : 'empty'}">${req.source ? escapeHtml(req.source) : '(no answer)'}</div>
+        ${reviewedLine}
+      `;
+
+      if (req.status === 'pending') {
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+
+        const approve = document.createElement('button');
+        approve.className = 'btn-approve';
+        approve.textContent = 'Approve';
+        approve.onclick = () => doAction(c, req.id, 'approve');
+
+        const reject = document.createElement('button');
+        reject.className = 'btn-reject';
+        reject.textContent = 'Reject';
+        reject.onclick = () => doReject(c, req.id);
+
+        actions.append(approve, reject);
+        c.appendChild(actions);
+      }
+      return c;
+    }
+
+    async function doAction(card, id, action, notes) {
+      const buttons = card.querySelectorAll('button');
+      buttons.forEach(b => b.disabled = true);
+      try {
+        const res = await fetch('/api/admin-signup-requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, action, notes }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || `Failed (${res.status})`);
+          buttons.forEach(b => b.disabled = false);
+          return;
+        }
+        if (action === 'approve' && data.created) {
+          showApprovedIntro(card, data.created);
+        }
+        // Reload so the row reshuffles into Approved/Rejected at the bottom.
+        // We do that after a short delay if we showed the intro; otherwise now.
+        if (action === 'approve') {
+          setTimeout(load, 1500);
+        } else {
+          load();
+        }
+      } catch (e) {
+        alert('Network error: ' + e.message);
+        buttons.forEach(b => b.disabled = false);
+      }
+    }
+
+    function doReject(card, id) {
+      const notes = prompt('Optional rejection note (kept for your records, not sent to the requester):');
+      if (notes === null) return;
+      doAction(card, id, 'reject', notes);
+    }
+
+    function showApprovedIntro(card, created) {
+      const wrap = document.createElement('div');
+      wrap.className = 'approved-intro';
+      const editor = created.editor_name || (created.name || '').split("'")[0];
+      const intro = `Hey ${editor}! I set you up on Show Picker Club. It's a shared show tracker where we all keep track of what we're watching, what's next, and what we'd recommend. I seeded yours with some popular shows to get you started; if any don't interest you, just tap Edit, then Archive to remove them.
+
+Your list:
+${created.url}
+
+To edit your list, tap Edit and we'll send a login code by text or email.
+
+You can also browse everyone else's lists from the home page:
+https://showpicker.club
+
+If you see something you like on someone else's list, tap the **+** to add it to yours!
+
+- Patrick`;
+
+      wrap.innerHTML = `
+        <strong>Created ${escapeHtml(created.name)}</strong>
+        <div>URL: <a href="${escapeHtml(created.url)}" target="_blank">${escapeHtml(created.url)}</a></div>
+        <textarea readonly></textarea>
+        <div class="copy-row">
+          <button class="copy">Copy intro</button>
+          <button class="text">Text intro</button>
+        </div>
+      `;
+      const ta = wrap.querySelector('textarea');
+      ta.value = intro;
+
+      wrap.querySelector('.copy').addEventListener('click', async (e) => {
+        try { await navigator.clipboard.writeText(ta.value); } catch { ta.select(); document.execCommand('copy'); }
+        e.target.textContent = 'Copied!';
+        setTimeout(() => { e.target.textContent = 'Copy intro'; }, 1500);
+      });
+      wrap.querySelector('.text').addEventListener('click', () => {
+        // Open Messages with the new member's number pre-filled. Same `?&body=`
+        // trick we use elsewhere — covers both Apple and Android query styles.
+        const href = `sms:${created.phone}?&body=${encodeURIComponent(intro)}`;
+        window.location.href = href;
+      });
+      card.appendChild(wrap);
+    }
+
+    function formatWhen(iso) {
+      if (!iso) return '';
+      const d = new Date(iso.replace(' ', 'T') + 'Z');
+      if (isNaN(d)) return iso;
+      const days = Math.floor((Date.now() - d) / 86400000);
+      if (days === 0) return 'today';
+      if (days === 1) return 'yesterday';
+      if (days < 30) return `${days}d ago`;
+      return d.toLocaleDateString();
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    }
+
+    load();
+  </script>
+</body>
+</html>

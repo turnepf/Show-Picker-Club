@@ -85,6 +85,9 @@
 <body>
   <div class="wrap">
     <h1>Members</h1>
+    <a id="pendingLink" href="/requests" style="display:none; align-items:center; gap:6px; margin: -2px 0 12px; padding: 6px 12px; background: color-mix(in oklch, var(--accent) 14%, var(--surface)); border: 1px solid color-mix(in oklch, var(--accent) 35%, transparent); border-radius: 999px; font-size: 13px; color: var(--ink); text-decoration: none; width: fit-content;">
+      <span id="pendingCount">0</span> pending membership request<span id="pendingPlural">s</span>
+    </a>
     <div class="sub">
       Emails and phones are comma-separated; the first in each list is the
       primary. Saving replaces the existing set for that member. Updating a
@@ -122,6 +125,20 @@
       const saved = localStorage.getItem('membersSortBy');
       if (saved) document.getElementById('sortBy').value = saved;
       renderSorted();
+      loadPendingRequests();
+    }
+
+    async function loadPendingRequests() {
+      try {
+        const res = await fetch('/api/admin-signup-requests');
+        if (!res.ok) return;
+        const data = await res.json();
+        const pending = (data.requests || []).filter(r => r.status === 'pending');
+        if (pending.length === 0) return;
+        document.getElementById('pendingCount').textContent = pending.length;
+        document.getElementById('pendingPlural').style.display = pending.length === 1 ? 'none' : '';
+        document.getElementById('pendingLink').style.display = 'inline-flex';
+      } catch {}
     }
 
     function renderSorted() {
