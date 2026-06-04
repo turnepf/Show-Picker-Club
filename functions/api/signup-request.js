@@ -73,7 +73,7 @@ Email:   ${req.email}
 Phone:   ${req.phone}
 Source:  ${req.source || '(none)'}
 
-Manage at https://showpicker.club/members
+Approve or reject at https://showpicker.club/requests
 (Request id ${req.id})
 `;
   const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#2C2C2C;">
@@ -84,7 +84,8 @@ Manage at https://showpicker.club/members
       <tr><td style="padding:6px 12px 6px 0;color:#888;white-space:nowrap;">Phone</td><td style="padding:6px 0;"><a href="tel:${escapeHtml(req.phone)}" style="color:#E67E22;">${escapeHtml(req.phone)}</a></td></tr>
       <tr><td style="padding:6px 12px 6px 0;color:#888;white-space:nowrap;vertical-align:top;">Source</td><td style="padding:6px 0;">${req.source ? escapeHtml(req.source).replace(/\n/g, '<br>') : '<span style="color:#888;">(none)</span>'}</td></tr>
     </table>
-    <p style="margin-top:18px;font-size:13px;color:#888;">Request id ${req.id} &middot; <a href="https://showpicker.club/members" style="color:#E67E22;">Members admin</a></p>
+    <p style="margin-top:18px;"><a href="https://showpicker.club/requests" style="display:inline-block;background:#E67E22;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600;">Review request</a></p>
+    <p style="margin-top:14px;font-size:13px;color:#888;">Request id ${req.id}</p>
   </div>`;
   await sendEmail(env, { to: OPERATOR_EMAIL, subject, text, html });
 }
