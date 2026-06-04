@@ -40,6 +40,16 @@ final class AuthStore: ObservableObject {
     }
 
     @MainActor
+    func loginWithPhone(phone: String, code: String) async throws {
+        let r = try await API.loginWithPhone(phone: phone, code: code)
+        if r.success == true {
+            await refresh()
+        } else {
+            throw API.APIError.badResponse(401)
+        }
+    }
+
+    @MainActor
     func logout() async {
         await API.logout()
         memberSlug = nil

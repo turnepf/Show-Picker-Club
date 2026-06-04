@@ -66,6 +66,22 @@ enum API {
         try await postJSON("/auth/login", body: ["code": code, "email": email])
     }
 
+    static func loginWithPhone(phone: String, code: String) async throws -> LoginResponse {
+        try await postJSON("/auth/login", body: ["code": code, "phone": phone])
+    }
+
+    // Ask Twilio Verify to text a 6-digit OTP. Server replies 200 even for
+    // unknown numbers (account-enumeration hardening), so a true result
+    // doesn't prove the number is on file — it just means the request was
+    // accepted.
+    @discardableResult
+    static func requestSmsCode(phone: String) async throws -> Bool {
+        struct Ack: Decodable { let success: Bool? }
+        let r: Ack = try await postJSON("/auth/request-code",
+                                        body: ["phone": phone, "channel": "sms"])
+        return r.success == true
+    }
+
     // Ask the server to email a fresh 6-digit OTP. Server replies 200 even
     // for unknown emails (account-enumeration hardening), so a true result
     // doesn't prove the address is on file — it just means the request was
