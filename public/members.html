@@ -7,10 +7,6 @@
   <title>Members</title>
   <link rel="stylesheet" href="/styles.css">
   <style>
-    body { padding: 32px 16px 80px; }
-    .wrap { max-width: 920px; margin: 0 auto; }
-    h1 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; letter-spacing: -0.01em; margin-bottom: 6px; color: var(--ink); }
-    .sub { color: var(--ink-muted); font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
     .card {
       background: var(--surface);
       padding: 14px 16px;
@@ -96,19 +92,19 @@
     }
   </style>
 </head>
-<body>
-  <div class="wrap">
-    <nav style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; font-size: 13px;">
-      <a href="/admin"       style="color: var(--accent); text-decoration: none;">Admin</a>
-      <a href="/members"     style="color: var(--ink); text-decoration: none; font-weight: 600;">Members</a>
-      <a href="/url-cleanup" style="color: var(--accent); text-decoration: none;">URL cleanup</a>
-      <a href="/vibe-admin"  style="color: var(--accent); text-decoration: none;">Vibe admin</a>
+<body class="admin-page">
+  <div class="admin-wrap">
+    <nav class="admin-nav">
+      <a href="/admin">Admin</a>
+      <a href="/members" class="current">Members</a>
+      <a href="/url-cleanup">URL cleanup</a>
+      <a href="/vibe-admin">Vibe admin</a>
     </nav>
-    <h1>Members</h1>
+    <h1 class="admin-title">Members</h1>
     <a id="pendingLink" href="/admin" style="display:none; align-items:center; gap:6px; margin: -2px 0 12px; padding: 6px 12px; background: color-mix(in oklch, var(--accent) 14%, var(--surface)); border: 1px solid color-mix(in oklch, var(--accent) 35%, transparent); border-radius: 999px; font-size: 13px; color: var(--ink); text-decoration: none; width: fit-content;">
       <span id="pendingCount">0</span> pending membership request<span id="pendingPlural">s</span>
     </a>
-    <div class="sub">
+    <div class="admin-sub">
       Emails and phones are comma-separated; the first in each list is the
       primary. Saving replaces the existing set for that member. Updating a
       member's phone also resyncs their legacy 4-digit code to the new

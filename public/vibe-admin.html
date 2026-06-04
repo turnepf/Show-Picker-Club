@@ -7,52 +7,58 @@
   <title>Vibe trait fill</title>
   <link rel="stylesheet" href="/styles.css">
   <style>
-    body { padding: 40px 20px; }
-    .wrap { max-width: 720px; margin: 0 auto; background: var(--surface); padding: 28px; border-radius: 12px; box-shadow: var(--shadow-card); }
-    h1 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--ink); margin-bottom: 8px; }
-    p.sub { color: var(--ink-muted); font-size: var(--text-sm); margin-bottom: 20px; }
-    label { display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: 6px; margin-top: 14px; color: var(--ink-muted); }
-    input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: var(--text-base); font-family: inherit; }
-    input:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
-    button { width: 100%; margin-top: 24px; padding: 12px; background: var(--accent); color: var(--ink); border: none; border-radius: 6px; font-size: var(--text-base); font-weight: 700; cursor: pointer; }
-    button:hover { background: var(--accent-hover); }
-    button:disabled { background: var(--ink-faint); cursor: not-allowed; }
-    .progress { margin-top: 20px; padding: 14px; border-radius: 6px; background: var(--surface-2); font-size: var(--text-sm); line-height: 1.6; }
+    label { display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: 6px; margin-top: 6px; color: var(--ink-muted); }
+    input[type=number] { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: var(--text-base); font-family: inherit; }
+    input[type=number]:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+    button.go { width: 100%; margin-top: 16px; padding: 12px; background: var(--accent); color: #fff; border: none; border-radius: 6px; font-size: var(--text-base); font-weight: 700; cursor: pointer; }
+    button.go:hover { background: var(--accent-hover); }
+    button.go:disabled { background: var(--ink-faint); cursor: not-allowed; }
+    button.secondary { width: 100%; margin-top: 10px; padding: 12px; background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); border-radius: 6px; font-size: var(--text-base); font-weight: 600; cursor: pointer; }
+    button.secondary:hover { background: color-mix(in oklch, var(--accent) 8%, var(--surface-2)); }
+    button.secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .progress { margin-top: 14px; padding: 14px; border-radius: 6px; background: var(--surface-2); font-size: var(--text-sm); line-height: 1.6; }
     .progress strong { color: var(--ink); }
     .log-toolbar { display: flex; justify-content: flex-end; margin-top: 10px; }
-    button.copy { width: auto; margin: 0; padding: 6px 12px; font-size: var(--text-xs); background: var(--ink); }
+    button.copy { width: auto; margin: 0; padding: 6px 12px; font-size: var(--text-xs); background: var(--ink); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-family: inherit; }
     button.copy:hover { background: oklch(0.18 0.025 50); }
-    .log { margin-top: 6px; max-height: 300px; overflow-y: auto; font-family: var(--font-mono); font-size: var(--text-xs); background: var(--surface-2); padding: 10px; border-radius: 6px; }
+    .log { margin-top: 6px; max-height: 300px; overflow-y: auto; font-family: var(--font-mono); font-size: var(--text-xs); background: var(--surface); padding: 10px; border-radius: 6px; border: 1px solid var(--border-soft); }
     .log-row { padding: 2px 0; }
     .log-row.ok { color: oklch(0.42 0.13 150); }
     .log-row.unknown { color: oklch(0.55 0.14 80); }
     .log-row.error { color: var(--danger-deep); }
-    .err { color: var(--danger-deep); font-size: var(--text-sm); margin-top: 12px; }
+    .auth-warn {
+      margin-bottom: 14px; padding: 10px;
+      background: var(--danger-soft);
+      border: 1px solid color-mix(in oklch, var(--danger) 30%, transparent);
+      border-radius: 6px; color: var(--danger-deep); font-size: 13px;
+    }
   </style>
 </head>
-<body>
-  <div class="wrap">
-    <nav style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; font-size: 13px;">
-      <a href="/admin"       style="color: var(--accent); text-decoration: none;">Admin</a>
-      <a href="/members"     style="color: var(--accent); text-decoration: none;">Members</a>
-      <a href="/url-cleanup" style="color: var(--accent); text-decoration: none;">URL cleanup</a>
-      <a href="/vibe-admin"  style="color: var(--ink); text-decoration: none; font-weight: 600;">Vibe admin</a>
+<body class="admin-page">
+  <div class="admin-wrap">
+    <nav class="admin-nav">
+      <a href="/admin">Admin</a>
+      <a href="/members">Members</a>
+      <a href="/url-cleanup">URL cleanup</a>
+      <a href="/vibe-admin" class="current">Vibe admin</a>
     </nav>
-    <h1>Vibe trait fill</h1>
-    <p class="sub">Generates trait scores for any show that doesn't have them yet. Calls Claude one batch at a time until all caught up. <strong>Re-score all</strong> refreshes every existing report too — useful when the prompt or model improves.</p>
+    <h1 class="admin-title">Vibe admin</h1>
+    <div class="admin-sub">Generates trait scores for any show that doesn't have them yet. Calls Claude one batch at a time until all caught up. <strong>Re-score all</strong> refreshes every existing report too — useful when the prompt or model improves.</div>
 
-    <div id="authWarn" style="display:none;margin-bottom:14px;padding:10px;background:var(--danger-soft);border:1px solid color-mix(in oklch, var(--danger) 30%, transparent);border-radius:6px;color:var(--danger-deep);font-size:13px;">Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a> (tap Edit, enter your code), then reload this page.</div>
+    <div id="authWarn" class="auth-warn" style="display:none;">Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a> (tap Edit, enter your code), then reload this page.</div>
 
-    <label>Batch size (max 8)</label>
-    <input type="number" id="batchSize" value="5" min="1" max="8">
+    <div class="admin-card">
+      <label>Batch size (max 8)</label>
+      <input type="number" id="batchSize" value="5" min="1" max="8">
 
-    <button id="runBtn" onclick="run(false)">Fill missing</button>
-    <button id="rescoreBtn" onclick="confirmRescore()" style="background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); margin-top: 10px;">Re-score all</button>
+      <button class="go" id="runBtn" onclick="run(false)">Fill missing</button>
+      <button class="secondary" id="rescoreBtn" onclick="confirmRescore()">Re-score all</button>
 
-    <div class="progress" id="progress" style="display:none;">
-      <div><strong>Processed:</strong> <span id="processed">0</span> &middot; <strong>Unknown:</strong> <span id="unknown">0</span> &middot; <strong>Errors:</strong> <span id="errors">0</span> &middot; <strong>Remaining:</strong> <span id="remaining">?</span></div>
-      <div class="log-toolbar"><button type="button" class="copy" id="copyLogBtn" onclick="copyLog()">Copy summary + log</button></div>
-      <div class="log" id="log"></div>
+      <div class="progress" id="progress" style="display:none;">
+        <div><strong>Processed:</strong> <span id="processed">0</span> &middot; <strong>Unknown:</strong> <span id="unknown">0</span> &middot; <strong>Errors:</strong> <span id="errors">0</span> &middot; <strong>Remaining:</strong> <span id="remaining">?</span></div>
+        <div class="log-toolbar"><button type="button" class="copy" id="copyLogBtn" onclick="copyLog()">Copy summary + log</button></div>
+        <div class="log" id="log"></div>
+      </div>
     </div>
   </div>
 

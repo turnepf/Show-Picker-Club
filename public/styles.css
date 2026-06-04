@@ -91,3 +91,43 @@ body {
   text-wrap: balance;
 }
 .section-title:first-child { margin-top: 0; }
+
+/* Shared admin baseline. The four operator pages (/admin, /members,
+   /url-cleanup, /vibe-admin) opt in by setting <body class="admin-page">
+   and using .admin-nav / .admin-wrap / .admin-title / .admin-sub. Each
+   page can layer its own page-specific styles on top, but the wrapper,
+   title, blurb, nav and surface-card chrome stay consistent. */
+body.admin-page { padding: 32px 16px 80px; }
+.admin-wrap { max-width: 920px; margin: 0 auto; }
+.admin-nav {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  font-size: var(--text-sm);
+}
+.admin-nav a { color: var(--accent); text-decoration: none; }
+.admin-nav a:hover { text-decoration: underline; }
+.admin-nav a.current { color: var(--ink); font-weight: 600; text-decoration: none; cursor: default; }
+.admin-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.admin-sub {
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+.admin-sub a { color: var(--accent); }
+.admin-card {
+  background: var(--surface);
+  padding: 16px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  margin-bottom: 12px;
+}

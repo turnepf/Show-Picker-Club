@@ -7,10 +7,7 @@
   <title>URL Cleanup</title>
   <link rel="stylesheet" href="/styles.css">
   <style>
-    body { padding: 32px 16px 80px; }
-    .wrap { max-width: 760px; margin: 0 auto; }
-    h1 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; letter-spacing: -0.01em; color: var(--ink); margin-bottom: 4px; }
-    .remaining { font-size: 13px; color: var(--ink-muted); margin-bottom: 20px; }
+    .remaining { font-size: var(--text-sm); color: var(--ink-muted); margin-bottom: 20px; }
 
     .login {
       background: var(--surface);
@@ -139,15 +136,15 @@
     }
   </style>
 </head>
-<body>
-  <div class="wrap">
-    <nav style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; font-size: 13px;">
-      <a href="/admin"       style="color: var(--accent); text-decoration: none;">Admin</a>
-      <a href="/members"     style="color: var(--accent); text-decoration: none;">Members</a>
-      <a href="/url-cleanup" style="color: var(--ink); text-decoration: none; font-weight: 600;">URL cleanup</a>
-      <a href="/vibe-admin"  style="color: var(--accent); text-decoration: none;">Vibe admin</a>
+<body class="admin-page">
+  <div class="admin-wrap">
+    <nav class="admin-nav">
+      <a href="/admin">Admin</a>
+      <a href="/members">Members</a>
+      <a href="/url-cleanup" class="current">URL cleanup</a>
+      <a href="/vibe-admin">Vibe admin</a>
     </nav>
-    <h1>URL Cleanup</h1>
+    <h1 class="admin-title">URL cleanup</h1>
     <div class="remaining" id="remaining"></div>
 
     <div class="login" id="login" style="display:none;">
