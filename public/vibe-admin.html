@@ -33,14 +33,15 @@
 <body>
   <div class="wrap">
     <h1>Vibe trait fill</h1>
-    <p class="sub">Generates trait scores for any show that doesn't have them yet. Calls Claude one batch at a time until all caught up.</p>
+    <p class="sub">Generates trait scores for any show that doesn't have them yet. Calls Claude one batch at a time until all caught up. <strong>Re-score all</strong> refreshes every existing report too — useful when the prompt or model improves.</p>
 
     <div id="authWarn" style="display:none;margin-bottom:14px;padding:10px;background:var(--danger-soft);border:1px solid color-mix(in oklch, var(--danger) 30%, transparent);border-radius:6px;color:var(--danger-deep);font-size:13px;">Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a> (tap Edit, enter your code), then reload this page.</div>
 
     <label>Batch size (max 8)</label>
     <input type="number" id="batchSize" value="5" min="1" max="8">
 
-    <button id="runBtn" onclick="run()">Run until done</button>
+    <button id="runBtn" onclick="run(false)">Fill missing</button>
+    <button id="rescoreBtn" onclick="confirmRescore()" style="background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); margin-top: 10px;">Re-score all</button>
 
     <div class="progress" id="progress" style="display:none;">
       <div><strong>Processed:</strong> <span id="processed">0</span> &middot; <strong>Unknown:</strong> <span id="unknown">0</span> &middot; <strong>Errors:</strong> <span id="errors">0</span> &middot; <strong>Remaining:</strong> <span id="remaining">?</span></div>
@@ -94,9 +95,20 @@
       log.scrollTop = log.scrollHeight;
     }
 
-    async function run() {
+    function confirmRescore() {
+      if (!confirm('Re-score every show? This calls Claude for every existing report — slower and costs a bit. Cancel to fill missing only.')) return;
+      run(true);
+    }
+
+    async function run(rescore) {
       const count = parseInt(document.getElementById('batchSize').value, 10) || 5;
-      const btn = document.getElementById('runBtn');
+      const fillBtn = document.getElementById('runBtn');
+      const rescoreBtn = document.getElementById('rescoreBtn');
+      // Sentinel for the rescore session — every row we touch gets stamped
+      // with datetime('now'), and the server treats any row with scored_at
+      // >= this timestamp as "already done in this run." Loop ends when
+      // nothing matches.
+      const before = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
       totals = { processed: 0, unknown: 0, errors: 0 };
       document.getElementById('log').innerHTML = '';
@@ -106,8 +118,11 @@
       document.getElementById('errors').textContent = '0';
       document.getElementById('remaining').textContent = '?';
 
-      btn.disabled = true;
-      btn.textContent = 'Running…';
+      fillBtn.disabled = true;
+      rescoreBtn.disabled = true;
+      const activeBtn = rescore ? rescoreBtn : fillBtn;
+      const origLabel = activeBtn.textContent;
+      activeBtn.textContent = rescore ? 'Re-scoring…' : 'Running…';
 
       let consecutiveErrors = 0;
       while (true) {
@@ -115,7 +130,7 @@
           const res = await fetch('/api/admin-vibe-fill', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ count }),
+            body: JSON.stringify(rescore ? { count, rescore: true, before } : { count }),
           });
           const data = await res.json();
           if (!res.ok) {
@@ -132,7 +147,6 @@
           document.getElementById('remaining').textContent = data.remaining;
           appendLog(data.results || []);
 
-          // Stop conditions: nothing returned (done), or repeated 0-progress batches.
           if (!data.results || data.results.length === 0) break;
           if (data.processed === 0 && data.unknown === 0) {
             consecutiveErrors++;
@@ -147,8 +161,9 @@
         }
       }
 
-      btn.disabled = false;
-      btn.textContent = 'Run until done';
+      fillBtn.disabled = false;
+      rescoreBtn.disabled = false;
+      activeBtn.textContent = origLabel;
     }
   </script>
 </body>

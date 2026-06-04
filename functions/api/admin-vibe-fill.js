@@ -81,9 +81,33 @@ export async function onRequestPost(context) {
   catch { return json({ error: 'Invalid JSON' }, 400); }
 
   const count = Math.min(parseInt(body.count || '5', 10) || 5, 8);
+  // Default behaviour: score titles that don't yet have a row in show_traits.
+  // With rescore=true the operator forces a fresh score across every
+  // eligible title — useful when the prompt or model improves and we
+  // want to refresh the existing reports. The client passes `before` as
+  // the timestamp it started the rescore at; we keep picking titles whose
+  // last scored_at predates that cursor, so the loop terminates once
+  // everything has been refreshed in this run.
+  const rescore = body.rescore === true || body.rescore === 'true';
+  const before = typeof body.before === 'string' ? body.before : null;
 
-  // Find unique titles missing trait rows. Skip titles where all copies are
-  // archived — no point scoring something nobody actively tracks.
+  let candidateFilter;
+  let remainingFilter;
+  const filterParams = [];
+  const remainingParams = [];
+  if (rescore && before) {
+    candidateFilter = `AND (LOWER(s.title) NOT IN (SELECT title_lower FROM show_traits WHERE scored_at IS NOT NULL AND scored_at >= ?))`;
+    remainingFilter = `AND (LOWER(title) NOT IN (SELECT title_lower FROM show_traits WHERE scored_at IS NOT NULL AND scored_at >= ?))`;
+    filterParams.push(before);
+    remainingParams.push(before);
+  } else if (rescore) {
+    candidateFilter = '';
+    remainingFilter = '';
+  } else {
+    candidateFilter = 'AND LOWER(s.title) NOT IN (SELECT title_lower FROM show_traits)';
+    remainingFilter = 'AND LOWER(title) NOT IN (SELECT title_lower FROM show_traits)';
+  }
+
   const { results: pending } = await env.DB.prepare(`
     SELECT LOWER(s.title) AS title_lower,
            MIN(s.title) AS title,
@@ -99,21 +123,21 @@ export async function onRequestPost(context) {
     FROM shows s
     WHERE s.archived = 0
       AND s.member_slug NOT IN (${EXCLUDED_SQL})
-      AND LOWER(s.title) NOT IN (SELECT title_lower FROM show_traits)
+      ${candidateFilter}
     GROUP BY LOWER(s.title)
     ORDER BY LOWER(s.title)
     LIMIT ?
-  `).bind(count).all();
+  `).bind(...filterParams, count).all();
 
   const remaining = await env.DB.prepare(`
     SELECT COUNT(*) AS cnt FROM (
       SELECT LOWER(title) AS t FROM shows
       WHERE archived = 0
         AND member_slug NOT IN (${EXCLUDED_SQL})
-        AND LOWER(title) NOT IN (SELECT title_lower FROM show_traits)
+        ${remainingFilter}
       GROUP BY LOWER(title)
     )
-  `).first();
+  `).bind(...remainingParams).first();
 
   const results = [];
   for (let i = 0; i < pending.length; i++) {
@@ -124,14 +148,14 @@ export async function onRequestPost(context) {
 
       if (traits.unknown_show) {
         await env.DB.prepare(
-          'INSERT OR REPLACE INTO show_traits (title_lower, title, unknown_show) VALUES (?, ?, 1)'
+          'INSERT OR REPLACE INTO show_traits (title_lower, title, unknown_show, scored_at) VALUES (?, ?, 1, datetime(\'now\'))'
         ).bind(row.title_lower, row.title).run();
         results.push({ title: row.title, status: 'unknown' });
         continue;
       }
 
-      const cols = ['title_lower', 'title', ...TRAIT_NAMES];
-      const placeholders = cols.map(() => '?').join(', ');
+      const cols = ['title_lower', 'title', ...TRAIT_NAMES, 'scored_at'];
+      const placeholders = cols.map(c => c === 'scored_at' ? "datetime('now')" : '?').join(', ');
       const values = [
         row.title_lower,
         row.title,
