@@ -60,7 +60,7 @@ struct LoginView: View {
                 }
 
                 Section {
-                    Text("If your email isn't on file, reach out to the group owner to get it added.")
+                    Text("If you don't receive an email, reach out to the group owner with the email you'd like to use.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
