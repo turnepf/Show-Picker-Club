@@ -89,12 +89,14 @@ struct Show: Codable, Identifiable, Hashable {
         guard let u = networkUrl?.lowercased() else { return false }
         if u.isEmpty || u == "#" { return false }
         if u.hasPrefix("https://play.hbomax.com/search?") { return true }
+        if u.hasPrefix("https://play.hbomax.com/search/result?") { return true }
         return !(u.contains("/search") || u.contains("/s?") || u.contains("?q=") || u.contains("?query="))
     }
 
     var isHBOMaxSearchFallback: Bool {
         guard let u = networkUrl?.lowercased() else { return false }
         return u.hasPrefix("https://play.hbomax.com/search?")
+            || u.hasPrefix("https://play.hbomax.com/search/result?")
     }
 }
 
