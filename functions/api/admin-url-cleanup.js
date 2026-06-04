@@ -146,6 +146,70 @@ async function fetchQueue(env) {
   }));
 }
 
+// Titles where two or more members carry the show on different networks.
+// Often a typo (member picked the wrong service) but sometimes legitimate
+// (a title that lives on multiple services). Surface so the operator can
+// pick a canonical answer for the title.
+async function fetchConflicts(env) {
+  const { results } = await env.DB.prepare(`
+    SELECT LOWER(s.title) AS ltitle,
+           MIN(s.title) AS title,
+           COUNT(DISTINCT s.network) AS distinct_networks,
+           GROUP_CONCAT(DISTINCT s.network) AS networks,
+           COUNT(*) AS rows
+      FROM shows s
+     WHERE s.archived = 0
+       AND s.network IS NOT NULL
+     GROUP BY LOWER(s.title)
+    HAVING COUNT(DISTINCT s.network) > 1
+     ORDER BY distinct_networks DESC, rows DESC, LOWER(s.title)
+  `).all();
+  return (results || []).map(r => ({
+    title: r.title,
+    networks: (r.networks || '').split(',').filter(Boolean),
+    rows: r.rows,
+  }));
+}
+
+// Rows where the URL's domain points at a different service than the
+// stored network. The url-utils helper canonicalises a URL's host to one
+// of our known networks; when it matches a network *but* doesn't match
+// the row's declared network, that's a mismatch worth surfacing.
+async function fetchMismatches(env) {
+  const { results } = await env.DB.prepare(`
+    SELECT s.id, s.title, s.network, s.network_url, s.member_slug,
+           m.first_name, m.last_initial
+      FROM shows s
+      LEFT JOIN members m ON m.slug = s.member_slug
+     WHERE s.archived = 0
+       AND s.network IS NOT NULL AND s.network != ''
+       AND s.network_url IS NOT NULL AND s.network_url != ''
+       -- skip the patterns we already treat as not-a-real-link
+       AND s.network_url NOT LIKE '%/search%'
+       AND s.network_url NOT LIKE '%/s?%'
+       AND s.network_url NOT LIKE 'https://play.hbomax.com/search?%'
+       AND s.network_url NOT LIKE 'https://play.hbomax.com/search/result?%'
+     ORDER BY LOWER(s.title), s.member_slug
+  `).all();
+  // Per-row classification needs the JS helper; SQL can't tell.
+  const mismatches = [];
+  for (const r of results || []) {
+    const derived = networkFromUrl(r.network_url);
+    if (!derived) continue;                       // unknown domain — can't classify
+    if (derived === r.network) continue;          // matches; skip
+    const label = (r.first_name || r.member_slug) + (r.last_initial ? ' ' + r.last_initial : '');
+    mismatches.push({
+      id: r.id,
+      title: r.title,
+      network: r.network,
+      network_url: r.network_url,
+      url_network: derived,
+      member: label,
+    });
+  }
+  return mismatches;
+}
+
 async function fetchNetworks(env) {
   const { results } = await env.DB.prepare(
     "SELECT DISTINCT network FROM shows WHERE network IS NOT NULL AND network != '' ORDER BY network COLLATE NOCASE"
@@ -210,8 +274,57 @@ export async function onRequestPost(context) {
     return json({ ok: true, updated: result.meta.changes });
   }
 
+  if (action === 'resolve_conflict') {
+    // Operator picked the canonical network for a title where members
+    // disagreed. Set every active row to that network and clear any
+    // network_url that came from a wrong-network propagation so the
+    // next fill pass picks the right URL per the chosen network.
+    const title = String(body.title || '').trim();
+    const network = canonicalNetwork(String(body.network || '').trim());
+    if (!title) return json({ error: 'title required' }, 400);
+    if (!network) return json({ error: 'network required' }, 400);
+    const result = await env.DB.prepare(
+      `UPDATE shows
+          SET network = ?,
+              network_url = CASE WHEN network = ? THEN network_url ELSE NULL END,
+              enriched_at = datetime('now')
+        WHERE LOWER(title) = LOWER(?) AND archived = 0`
+    ).bind(network, network, title).run();
+    return json({ ok: true, updated: result.meta.changes });
+  }
+
+  if (action === 'fix_mismatch') {
+    // Operator chose which side wins for a single mismatched row.
+    // `keep: 'url'`   → change the row's network to whatever the URL points at.
+    // `keep: 'network'` → drop the URL so the next fill pass picks one for the
+    //                     stored network.
+    const id = parseInt(body.id, 10);
+    const keep = body.keep === 'network' ? 'network' : 'url';
+    if (!Number.isInteger(id)) return json({ error: 'id required' }, 400);
+    const row = await env.DB.prepare(
+      'SELECT id, network, network_url FROM shows WHERE id = ?'
+    ).bind(id).first();
+    if (!row) return json({ error: 'row_not_found' }, 404);
+
+    if (keep === 'url') {
+      const derived = networkFromUrl(row.network_url);
+      if (!derived) return json({ error: 'Could not derive network from URL' }, 400);
+      await env.DB.prepare(
+        `UPDATE shows SET network = ?, enriched_at = datetime('now') WHERE id = ?`
+      ).bind(derived, id).run();
+      return json({ ok: true, set_network: derived });
+    }
+    // keep === 'network': null out the URL
+    await env.DB.prepare(
+      `UPDATE shows SET network_url = NULL, enriched_at = datetime('now') WHERE id = ?`
+    ).bind(id).run();
+    return json({ ok: true, cleared_url: true });
+  }
+
   await propagateGoodUrls(env);
   const shows = await fetchQueue(env);
   const networks = await fetchNetworks(env);
-  return json({ shows, networks });
+  const conflicts = await fetchConflicts(env);
+  const mismatches = await fetchMismatches(env);
+  return json({ shows, networks, conflicts, mismatches });
 }

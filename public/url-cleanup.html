@@ -34,6 +34,22 @@
     }
     .login button:hover { background: var(--accent-hover); }
 
+    .section-head {
+      font-family: var(--font-display); font-size: var(--text-md); font-weight: 600;
+      color: var(--ink); margin: 18px 0 4px;
+    }
+    .section-blurb { color: var(--ink-muted); font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
+    .row.conflict { border-color: color-mix(in oklch, var(--accent) 35%, transparent); }
+    .row.mismatch { border-color: color-mix(in oklch, var(--danger) 30%, transparent); }
+    .row.conflict .row-form, .row.mismatch .row-form {
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+    .row.mismatch .row-form { grid-template-columns: 1fr 1fr; }
+    @media (max-width: 560px) {
+      .row.mismatch .row-form { grid-template-columns: 1fr; }
+    }
+
     .row {
       background: var(--surface);
       border-radius: 8px;
@@ -139,6 +155,8 @@
     </div>
 
     <div id="bannerErr"></div>
+    <div id="conflicts"></div>
+    <div id="mismatches"></div>
     <div id="list"></div>
   </div>
 
@@ -274,6 +292,89 @@
       }
     }
 
+    function renderConflicts(conflicts) {
+      const root = document.getElementById('conflicts');
+      if (!conflicts.length) { root.innerHTML = ''; return; }
+      root.innerHTML = `
+        <div class="section-head">Cross-member network conflicts</div>
+        <div class="section-blurb">Members disagree on which service carries the show. Pick the canonical answer and we'll unify all rows; URLs that came from a wrong-network propagation are cleared so the next fill picks the right one.</div>
+        ${conflicts.map(c => `
+          <div class="row conflict" data-title="${escapeAttr(c.title)}">
+            <div class="row-head">
+              <span class="show-link">${escapeHtml(c.title)}</span>
+              <span class="show-meta">${c.rows} rows · ${escapeHtml(c.networks.join(', '))}</span>
+            </div>
+            <div class="row-form">
+              <select class="conflict-net">${[''].concat(c.networks, networks.filter(n => !c.networks.includes(n))).map(n => `<option value="${escapeAttr(n)}">${n || '— pick canonical —'}</option>`).join('')}</select>
+              <button class="btn-update conflict-save" type="button">Unify</button>
+            </div>
+          </div>
+        `).join('')}
+      `;
+      root.querySelectorAll('.conflict-save').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const row = btn.closest('.row');
+          const title = row.dataset.title;
+          const net = row.querySelector('.conflict-net').value.trim();
+          if (!net) return;
+          btn.disabled = true; btn.textContent = 'Saving…';
+          try {
+            const res = await fetch('/api/admin-url-cleanup', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'resolve_conflict', title, network: net }),
+            });
+            const data = await res.json();
+            if (!res.ok) { alert(data.error || `Error (${res.status})`); btn.disabled = false; btn.textContent = 'Unify'; return; }
+            row.classList.add('removing');
+            setTimeout(() => row.remove(), 250);
+          } catch (e) { alert('Network error: ' + e.message); btn.disabled = false; btn.textContent = 'Unify'; }
+        });
+      });
+    }
+
+    function renderMismatches(mismatches) {
+      const root = document.getElementById('mismatches');
+      if (!mismatches.length) { root.innerHTML = ''; return; }
+      root.innerHTML = `
+        <div class="section-head">URL doesn't match network</div>
+        <div class="section-blurb">The stored URL points at a different service than the row's network. Pick which side wins. "Keep URL" rewrites the network to match. "Keep network" clears the URL so the next fill picks the right one.</div>
+        ${mismatches.map(m => `
+          <div class="row mismatch" data-id="${m.id}">
+            <div class="row-head">
+              <span class="show-link">${escapeHtml(m.title)}</span>
+              <span class="show-meta">${escapeHtml(m.member)} · network: <strong>${escapeHtml(m.network)}</strong> · URL points at <strong>${escapeHtml(m.url_network)}</strong></span>
+              <div class="current-url"><a href="${escapeAttr(m.network_url)}" target="_blank">${escapeHtml(m.network_url)}</a></div>
+            </div>
+            <div class="row-form">
+              <button class="btn-update mismatch-url" type="button">Keep URL · become ${escapeHtml(m.url_network)}</button>
+              <button class="btn-update mismatch-network" type="button">Keep ${escapeHtml(m.network)} · clear URL</button>
+            </div>
+          </div>
+        `).join('')}
+      `;
+      root.querySelectorAll('.mismatch-url, .mismatch-network').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const row = btn.closest('.row');
+          const id = parseInt(row.dataset.id, 10);
+          const keep = btn.classList.contains('mismatch-url') ? 'url' : 'network';
+          btn.disabled = true;
+          const orig = btn.textContent; btn.textContent = 'Saving…';
+          try {
+            const res = await fetch('/api/admin-url-cleanup', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'fix_mismatch', id, keep }),
+            });
+            const data = await res.json();
+            if (!res.ok) { alert(data.error || `Error (${res.status})`); btn.disabled = false; btn.textContent = orig; return; }
+            row.classList.add('removing');
+            setTimeout(() => row.remove(), 250);
+          } catch (e) { alert('Network error: ' + e.message); btn.disabled = false; btn.textContent = orig; }
+        });
+      });
+    }
+
     async function loadList() {
       bannerErr.innerHTML = '';
       remaining.textContent = '';
@@ -297,13 +398,21 @@
         login.style.display = 'none';
         networks = data.networks || [];
         const shows = data.shows || [];
-        remaining.textContent = `${shows.length} show${shows.length === 1 ? '' : 's'} remaining`;
+        const conflicts = data.conflicts || [];
+        const mismatches = data.mismatches || [];
+        renderConflicts(conflicts);
+        renderMismatches(mismatches);
+        const queueSummary = `${shows.length} show${shows.length === 1 ? '' : 's'} remaining`;
+        const extras = [];
+        if (conflicts.length) extras.push(`${conflicts.length} cross-network conflict${conflicts.length === 1 ? '' : 's'}`);
+        if (mismatches.length) extras.push(`${mismatches.length} URL/network mismatch${mismatches.length === 1 ? 'es' : 'es'}`);
+        remaining.textContent = extras.length ? `${queueSummary} · ${extras.join(' · ')}` : queueSummary;
         if (shows.length === 0) {
           list.innerHTML = '<div class="empty">🎉 Queue empty. All shows have direct URLs.</div>';
-          return;
+        } else {
+          list.innerHTML = shows.map(rowHtml).join('');
+          list.querySelectorAll('.row').forEach(attachRowHandlers);
         }
-        list.innerHTML = shows.map(rowHtml).join('');
-        list.querySelectorAll('.row').forEach(attachRowHandlers);
       } catch (e) {
         list.innerHTML = '';
         bannerErr.innerHTML = `<div class="err-banner">Network error: ${escapeHtml(e.message)}</div>`;
