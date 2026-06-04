@@ -28,15 +28,22 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 8px;
+      gap: 8px;
     }
 
-    .header-top h1 {
+    .header-title {
       font-family: var(--font-display);
       font-size: var(--text-lg);
       font-weight: 600;
       letter-spacing: -0.015em;
       color: #fff;
+      text-align: center;
+      margin: 8px 0 4px;
+      /* Hard one-line; if a name really won't fit the screen the
+         ellipsis kicks in rather than wrapping into the controls. */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .header-actions { display: flex; gap: 10px; align-items: center; }
@@ -547,7 +554,7 @@
     }
 
     @media (max-width: 480px) {
-      .header-top h1 { font-size: 18px; }
+      .header-title { font-size: 18px; }
       .tab { padding: 10px 0; font-size: 12px; }
       .show-row { font-size: 13px; }
     }
@@ -678,13 +685,13 @@
           <a href="/" style="color: rgba(255,255,255,0.85); text-decoration: none; font-size: 24px; line-height: 1; padding: 6px 10px; margin: -6px 0 -6px -10px; border-radius: 6px;" title="All members" aria-label="Back to all members">&#9664;</a>
           <button class="btn btn-search" id="searchBtn" title="Search this member's shows" onclick="openSearchModal()">Search</button>
         </div>
-        <h1 id="appTitle"></h1>
         <div class="header-actions">
           <button class="btn btn-add hidden" id="addBtn" title="Add a new show" aria-label="Add a new show" onclick="openAddModal()">+</button>
           <button class="btn btn-login" id="loginBtn" title="Log in to edit your shows" onclick="login()">Log in</button>
-          <button class="btn btn-login hidden" id="logoutBtn" title="Log out" onclick="logout()">Log out</button>
+          <button class="btn btn-login hidden" id="logoutBtn" title="Log out" aria-label="Log out" onclick="logout()">Log out</button>
         </div>
       </div>
+      <h1 class="header-title" id="appTitle"></h1>
       <div class="tabs" id="tabs">
         <div class="tab active" data-list="watching" onclick="switchTab('watching')">Watching</div>
         <div class="tab" data-list="waiting" onclick="switchTab('waiting')">Waiting</div>
