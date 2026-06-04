@@ -664,6 +664,7 @@
 
       <footer style="padding: 24px 0 20px; font-size: 12px; color: var(--ink-quiet); text-align: center;">
         &copy; 2025 Patrick Turner.
+        <a id="adminLink" href="/admin" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Admin</a>
       </footer>
     </div>
   </div>
@@ -717,6 +718,7 @@
 
     <footer style="text-align: center; padding: 24px 16px 32px; font-size: 12px; color: var(--ink-quiet);">
       &copy; 2025 Patrick Turner.
+      <a class="admin-link" href="/admin" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Admin</a>
     </footer>
 
   </div>
@@ -1349,6 +1351,14 @@
         if (data.authenticated) {
           editorName = data.email || '';
           authMember = data.member;
+          // Surface Admin link in footers only when this session belongs to
+          // the operator. /auth/check sets is_admin server-side, so we don't
+          // have to hardcode the slug here.
+          if (data.is_admin) {
+            const adminLink = document.getElementById('adminLink');
+            if (adminLink) adminLink.style.display = '';
+            document.querySelectorAll('.admin-link').forEach(a => a.style.display = '');
+          }
           // Show + buttons on popular list if on landing page
           document.querySelectorAll('.popular-add-btn').forEach(b => b.style.display = '');
           // Show "My Shows" link on landing page

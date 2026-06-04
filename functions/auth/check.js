@@ -1,3 +1,5 @@
+import { ADMIN_SLUG } from '../_shared/admin.js';
+
 export async function onRequestGet(context) {
   const { env, request } = context;
   const cookie = request.headers.get('Cookie') || '';
@@ -30,6 +32,7 @@ export async function onRequestGet(context) {
     authenticated: true,
     email: session.email,
     member: session.member_slug,
+    is_admin: session.member_slug === ADMIN_SLUG,
   }), {
     headers: { 'Content-Type': 'application/json' },
   });
