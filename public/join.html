@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- Quiet from search engines; this URL is meant to be shared deliberately. -->
+  <meta name="robots" content="noindex, nofollow">
+  <title>Join Show Picker Club</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/favicon.svg">
+  <meta name="theme-color" content="#2C3E50">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { padding: 40px 20px 80px; }
+    .wrap {
+      max-width: 480px;
+      margin: 0 auto;
+      background: var(--surface);
+      padding: 28px;
+      border-radius: 12px;
+      box-shadow: 0 1px 2px oklch(0.18 0.03 50 / 0.06), 0 8px 28px oklch(0.18 0.03 50 / 0.06);
+    }
+    h1 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+    .lede { color: var(--ink-muted); font-size: var(--text-sm); margin-bottom: 22px; line-height: 1.6; }
+    label { display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: 6px; margin-top: 16px; color: var(--ink-muted); }
+    label:first-of-type { margin-top: 0; }
+    input, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: var(--text-base);
+      font-family: inherit;
+    }
+    textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
+    input:focus, textarea:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 18%, transparent);
+    }
+    .hint { font-size: var(--text-xs); color: var(--ink-muted); margin-top: 4px; }
+    button {
+      width: 100%;
+      margin-top: 22px;
+      padding: 12px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: var(--text-base);
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: var(--accent-hover); }
+    button:disabled { background: var(--ink-faint); cursor: not-allowed; }
+    .msg {
+      margin-top: 20px;
+      padding: 14px;
+      border-radius: 6px;
+      font-size: var(--text-sm);
+      line-height: 1.5;
+    }
+    .msg.ok {
+      background: color-mix(in oklch, var(--list-watching) 12%, var(--surface));
+      color: var(--ink);
+      border: 1px solid color-mix(in oklch, var(--list-watching) 35%, transparent);
+    }
+    .msg.err {
+      background: var(--danger-soft);
+      color: var(--danger-deep);
+      border: 1px solid color-mix(in oklch, var(--danger) 30%, transparent);
+    }
+    .home {
+      display: block; text-align: center; margin-top: 18px;
+      font-size: var(--text-xs); color: var(--ink-quiet);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Join Show Picker Club</h1>
+    <p class="lede">Show Picker Club is a private group of friends and family who share what they're watching, want to watch, and recommend. Tell us a little about yourself and we'll be in touch.</p>
+
+    <form id="f">
+      <label for="full_name">Full name</label>
+      <input type="text" id="full_name" name="full_name" autocomplete="name" required maxlength="100">
+
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" autocomplete="email" inputmode="email" required maxlength="200" placeholder="you@example.com">
+
+      <label for="phone">Mobile phone</label>
+      <input type="tel" id="phone" name="phone" autocomplete="tel" inputmode="tel" required placeholder="(336) 555-1234">
+
+      <label for="source">How did you find out about the club?</label>
+      <textarea id="source" name="source" maxlength="1000" placeholder="A friend mentioned it, saw it somewhere, just curious — anything helps."></textarea>
+
+      <button type="submit" id="go">Request membership</button>
+    </form>
+    <div id="msg"></div>
+    <a class="home" href="/">← back to Show Picker Club</a>
+  </div>
+
+  <script>
+    const f = document.getElementById('f');
+    const btn = document.getElementById('go');
+    const msg = document.getElementById('msg');
+
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.className = '';
+      msg.textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+
+      const body = {
+        full_name: document.getElementById('full_name').value.trim(),
+        email:     document.getElementById('email').value.trim(),
+        phone:     document.getElementById('phone').value.trim(),
+        source:    document.getElementById('source').value.trim(),
+      };
+
+      try {
+        const res = await fetch('/api/signup-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          msg.className = 'msg err';
+          msg.textContent = data.error || `Couldn't send (${res.status}).`;
+          return;
+        }
+        msg.className = 'msg ok';
+        msg.textContent = "Thanks! We got your request and will be in touch soon.";
+        f.reset();
+      } catch (err) {
+        msg.className = 'msg err';
+        msg.textContent = 'Network error. Try again in a moment.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Request membership';
+      }
+    });
+  </script>
+</body>
+</html>
