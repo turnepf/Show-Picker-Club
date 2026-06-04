@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <title>Membership requests</title>
+  <title>Admin</title>
   <link rel="stylesheet" href="/styles.css">
   <style>
     body { padding: 32px 16px 80px; }
@@ -93,20 +93,95 @@
     .copy-row { display: flex; gap: 8px; margin-top: 8px; }
     .copy-row button { background: var(--ink); color: #fff; }
     .copy-row button:hover { background: oklch(0.18 0.025 50); }
+
+    /* Manual-add form, sits collapsed by default. */
+    details.add-manual {
+      background: var(--surface);
+      border: 1px solid var(--border-soft);
+      border-radius: 10px;
+      padding: 0;
+      margin-bottom: 18px;
+    }
+    details.add-manual > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 14px 18px;
+      font-weight: 600;
+      color: var(--ink);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    details.add-manual > summary::-webkit-details-marker { display: none; }
+    details.add-manual > summary::after {
+      content: '+'; font-size: 18px; color: var(--ink-muted);
+      transition: transform 0.15s;
+    }
+    details.add-manual[open] > summary::after { content: '−'; }
+    details.add-manual > summary:hover { background: color-mix(in oklch, var(--surface-2) 60%, transparent); border-top-left-radius: 10px; border-top-right-radius: 10px; }
+    .add-form { padding: 4px 18px 18px; }
+    .add-form label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; margin-top: 14px; color: var(--ink-muted); }
+    .add-form label:first-of-type { margin-top: 6px; }
+    .add-form input {
+      width: 100%; padding: 10px 12px;
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: 15px; font-family: inherit;
+    }
+    .add-form input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 18%, transparent); }
+    .hint { font-size: 12px; color: var(--ink-muted); margin-top: 4px; }
+    .add-form button[type=submit] {
+      width: 100%; margin-top: 22px; padding: 12px;
+      background: var(--accent); color: #fff;
+    }
+    .add-form button[type=submit]:hover { background: var(--accent-hover); }
+    .preview { font-size: 12px; color: var(--ink-muted); margin-top: 4px; }
+    .add-msg {
+      margin-top: 16px; padding: 12px 14px;
+      border-radius: 6px; font-size: 13px; line-height: 1.5;
+    }
+    .add-msg.err {
+      background: var(--danger-soft); color: var(--danger-deep);
+      border: 1px solid color-mix(in oklch, var(--danger) 30%, transparent);
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Membership requests</h1>
+    <nav style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; font-size: 13px;">
+      <a href="/members" style="color: var(--accent); text-decoration: none;">Members</a>
+      <a href="/url-cleanup" style="color: var(--accent); text-decoration: none;">URL cleanup</a>
+      <a href="/vibe-admin" style="color: var(--accent); text-decoration: none;">Vibe admin</a>
+    </nav>
+    <h1>Admin</h1>
     <div class="sub">
-      Anyone who submits the <a href="/join">/join</a> form lands here. Approving runs
-      the same create-member flow as <a href="/setup">/setup</a> and pops the intro
-      text to send to the new member. Rejecting marks the row and leaves it for the
-      record; nothing is sent to the requester automatically.
+      Anyone who submits the <a href="/join">/join</a> form lands here as a pending
+      request. Approve to run the create-member flow and get the intro text to send.
+      Reject marks the row for the record; nothing is sent to the requester automatically.
+      Use "Add a member manually" below to seed someone yourself.
     </div>
     <div id="authWarn" class="err" style="display:none;">
       Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a>, then reload.
     </div>
+
+    <details class="add-manual">
+      <summary>Add a member manually</summary>
+      <form class="add-form" id="addForm">
+        <label for="full_name">Full name</label>
+        <input type="text" id="full_name" autocomplete="off" required>
+        <div class="preview" id="preview"></div>
+
+        <label for="phone">Phone number</label>
+        <input type="tel" id="phone" autocomplete="off" placeholder="(336) 555-1234">
+        <div class="hint">Optional. +1 assumed for US numbers; prefix with + and country code for non-US. Used as the SMS Verify destination.</div>
+
+        <label for="emails">Email address(es)</label>
+        <input type="text" id="emails" autocomplete="off" placeholder="alice@example.com, alice.b@gmail.com">
+        <div class="hint">Optional. Comma-separated for multiple. Any of them can be used to request an email code.</div>
+
+        <button type="submit" id="addBtn">Create member + seed 8 shows</button>
+        <div id="addMsg"></div>
+        <div id="addIntro"></div>
+      </form>
+    </details>
+
     <div style="margin: 0 0 16px;">
       <button type="button" onclick="load()" style="background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;">↻ Refresh queue</button>
     </div>
@@ -181,9 +256,6 @@
         ${reviewedLine}
       `;
 
-      // Approved requests carry the slug of the member that was created,
-      // so we can rebuild the welcome URL + intro text on every page load
-      // and let the operator re-send if needed.
       if (req.status === 'approved' && req.created_member_slug) {
         c.appendChild(buildIntroPanel({
           slug: req.created_member_slug,
@@ -231,15 +303,9 @@
           return;
         }
         if (action === 'reject') {
-          // Reject is cheap to re-render — reload so the row moves into
-          // the Rejected section with its badge + reviewed line.
           load();
           return;
         }
-        // Approve: stay on this card so the operator can copy/text the
-        // intro without losing it. Strip the action buttons, swap in a
-        // green status badge, and append the intro panel inline. Operator
-        // hits "Refresh queue" (added below) when ready to move on.
         const actionsRow = card.querySelector('.actions');
         if (actionsRow) actionsRow.remove();
         const when = card.querySelector('.when');
@@ -249,9 +315,6 @@
         if (data.created) {
           card.appendChild(buildIntroPanel({
             slug: data.created.slug,
-            name: data.created.editor_name + (data.created.name ? '' : ''),
-            // editor_name is just the first name; we want the full name
-            // the requester gave us so the intro reads naturally.
             phone: data.created.phone,
             displayName: data.created.editor_name,
           }));
@@ -292,7 +355,7 @@ If you see something you like on someone else's list, tap the **+** to add it to
         <textarea readonly></textarea>
         <div class="copy-row">
           <button class="copy">Copy intro</button>
-          <button class="text">Text intro</button>
+          ${phone ? '<button class="text">Text intro</button>' : ''}
         </div>
       `;
       const ta = wrap.querySelector('textarea');
@@ -303,10 +366,13 @@ If you see something you like on someone else's list, tap the **+** to add it to
         e.target.textContent = 'Copied!';
         setTimeout(() => { e.target.textContent = 'Copy intro'; }, 1500);
       });
-      wrap.querySelector('.text').addEventListener('click', () => {
-        const href = `sms:${phone}?&body=${encodeURIComponent(intro)}`;
-        window.location.href = href;
-      });
+      const textBtn = wrap.querySelector('.text');
+      if (textBtn) {
+        textBtn.addEventListener('click', () => {
+          const href = `sms:${phone}?&body=${encodeURIComponent(intro)}`;
+          window.location.href = href;
+        });
+      }
       return wrap;
     }
 
@@ -324,6 +390,68 @@ If you see something you like on someone else's list, tap the **+** to add it to
     function escapeHtml(s) {
       return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     }
+
+    // ---- Manual add ----
+    const addForm = document.getElementById('addForm');
+    const addBtn = document.getElementById('addBtn');
+    const addMsg = document.getElementById('addMsg');
+    const addIntro = document.getElementById('addIntro');
+    const nameInput = document.getElementById('full_name');
+    const previewEl = document.getElementById('preview');
+
+    nameInput.addEventListener('input', () => {
+      const v = nameInput.value.trim();
+      if (!v) { previewEl.textContent = ''; return; }
+      const first = v.split(/\s+/)[0];
+      const slugGuess = first.toLowerCase().replace(/[^a-z0-9]/g, '');
+      previewEl.innerHTML = `URL: <code>showpicker.club/${escapeHtml(slugGuess)}</code> (suffix added on collision) &middot; Display: <code>${escapeHtml(first)}'s Shows</code>`;
+    });
+
+    addForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      addMsg.className = '';
+      addMsg.textContent = '';
+      addIntro.innerHTML = '';
+      addBtn.disabled = true;
+      addBtn.textContent = 'Working…';
+
+      const body = {
+        full_name: nameInput.value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        emails: document.getElementById('emails').value.trim(),
+      };
+
+      try {
+        const res = await fetch('/api/admin-create-member', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          if (res.status === 403) document.getElementById('authWarn').style.display = '';
+          addMsg.className = 'add-msg err';
+          addMsg.textContent = data.error || `Error (${res.status})`;
+        } else {
+          addMsg.className = 'add-msg';
+          addMsg.style.color = 'var(--ink-muted)';
+          addMsg.textContent = `Created ${data.name} · seeded ${data.seeded.length} shows.`;
+          addIntro.appendChild(buildIntroPanel({
+            slug: data.slug,
+            phone: data.phone,
+            displayName: data.editor_name,
+          }));
+          addForm.reset();
+          previewEl.textContent = '';
+        }
+      } catch (err) {
+        addMsg.className = 'add-msg err';
+        addMsg.textContent = 'Network error: ' + err.message;
+      } finally {
+        addBtn.disabled = false;
+        addBtn.textContent = 'Create member + seed 8 shows';
+      }
+    });
 
     load();
   </script>
