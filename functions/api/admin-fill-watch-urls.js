@@ -97,7 +97,10 @@ export async function onRequestPost(context) {
       -- Our intentional HBO Max search fallback — Watchmode only ever
       -- returns auto-play URLs for these, so the search page is the
       -- best we can do. Don't re-queue them every cleanup pass.
+      -- Two shapes accepted: the auto-generated /search? URL and the
+      -- operator-pasted /search/result? URL.
       AND network_url NOT LIKE 'https://play.hbomax.com/search?%'
+      AND network_url NOT LIKE 'https://play.hbomax.com/search/result?%'
     -- Dedup by title — one lookup per show, push the result to every
     -- member's same-titled row via the UPDATE below.
     GROUP BY LOWER(title)

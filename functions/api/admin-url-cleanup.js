@@ -35,8 +35,11 @@ const QUEUE_FILTER = `
   AND ${BAD_URL}
   -- Exempt HBO Max search-fallback URLs: they're the best deep link we
   -- can offer for titles Watchmode only knows as auto-play URLs, so
-  -- they shouldn't show up in the queue every cleanup pass.
+  -- they shouldn't show up in the queue every cleanup pass. Two shapes:
+  -- /search?q=... (our auto-generated fallback) and /search/result?q=...
+  -- (operator-pasted from HBO Max's own search-results page).
   AND s.network_url NOT LIKE 'https://play.hbomax.com/search?%'
+  AND s.network_url NOT LIKE 'https://play.hbomax.com/search/result?%'
   -- A row escapes the queue only if its network is set AND another row
   -- of the same network already has a good URL (sync-urls will propagate
   -- it). Rows with NULL network always belong in the queue — they can't
