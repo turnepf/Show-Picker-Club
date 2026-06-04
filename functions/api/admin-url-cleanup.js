@@ -37,13 +37,15 @@ const QUEUE_FILTER = `
   -- can offer for titles Watchmode only knows as auto-play URLs, so
   -- they shouldn't show up in the queue every cleanup pass.
   AND s.network_url NOT LIKE 'https://play.hbomax.com/search?%'
-  -- skip titles already resolvable from another member's good URL —
-  -- sync-urls will propagate those automatically, nothing for admin to do.
-  AND NOT EXISTS (
+  -- A row escapes the queue only if its network is set AND another row
+  -- of the same network already has a good URL (sync-urls will propagate
+  -- it). Rows with NULL network always belong in the queue — they can't
+  -- be auto-rescued because propagation is network-scoped now.
+  AND (s.network IS NULL OR NOT EXISTS (
     SELECT 1 FROM shows s_good
     WHERE LOWER(s_good.title) = LOWER(s.title)
       AND s_good.archived = 0
-      AND s_good.network IS NOT NULL
+      AND s_good.network = s.network
       AND s_good.network_url IS NOT NULL
       AND s_good.network_url NOT LIKE '%/search%'
       AND s_good.network_url NOT LIKE '%/s?%'
@@ -55,7 +57,7 @@ const QUEUE_FILTER = `
       AND s_good.network_url NOT LIKE 'https://www.themoviedb.org/%'
       AND s_good.network_url != 'https://www.amazon.com/s'
       AND s_good.network_url != 'https://www.amazon.com/s/'
-  )
+  ))
 `;
 
 async function propagateGoodUrls(env) {
