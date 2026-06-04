@@ -901,11 +901,17 @@
     <div class="modal" onclick="event.stopPropagation()">
       <h2>Log in</h2>
 
+      <label for="loginPhone">Phone (US)</label>
+      <input type="tel" id="loginPhone" autocomplete="tel" placeholder="(336) 555-1234">
+      <button type="button" class="btn" id="loginPhoneBtn" style="margin-top: 8px; width: 100%; background: var(--surface-2); color: var(--ink);" onclick="sendPhoneCode()">Text me a code</button>
+
+      <div style="text-align: center; margin: 14px 0; font-size: 12px; color: var(--ink-muted);">or</div>
+
       <label for="loginEmail">Email</label>
       <input type="email" id="loginEmail" autocomplete="email" placeholder="you@example.com">
       <button type="button" class="btn" id="loginEmailBtn" style="margin-top: 8px; width: 100%; background: var(--surface-2); color: var(--ink);" onclick="sendEmailCode()">Email me a code</button>
       <div id="loginEmailHint" style="font-size: 12px; color: var(--ink-muted); margin-top: 6px;">
-        If you don't receive an email, reach out to the group owner with the email you'd like to use.
+        If you don't receive an email or text, reach out to the group owner with the email or phone you'd like to use.
       </div>
 
       <label for="loginCode" style="margin-top: 18px;">Code</label>
@@ -1407,8 +1413,19 @@
       document.getElementById('loginErr').style.display = 'none';
       document.getElementById('loginCode').value = '';
       document.getElementById('loginEmail').value = '';
-      document.getElementById('loginCodeHint').textContent = 'Enter the 6-digit code from your email.';
-      setTimeout(() => document.getElementById('loginEmail').focus(), 50);
+      document.getElementById('loginPhone').value = '';
+      document.getElementById('loginCodeHint').textContent = 'Enter the 6-digit code from your text or email.';
+      // Reset both send buttons to their pristine state — they leave
+      // green / "Code sent" residue if the modal is closed and reopened.
+      ['loginEmailBtn','loginPhoneBtn'].forEach(id => {
+        const b = document.getElementById(id);
+        if (!b) return;
+        b.disabled = false;
+        b.style.background = 'var(--surface-2)';
+        b.style.color = 'var(--ink)';
+        b.textContent = id === 'loginPhoneBtn' ? 'Text me a code' : 'Email me a code';
+      });
+      setTimeout(() => document.getElementById('loginPhone').focus(), 50);
     }
 
     function closeLoginModal(e) {
@@ -1420,6 +1437,44 @@
       const el = document.getElementById('loginErr');
       el.textContent = msg;
       el.style.display = '';
+    }
+
+    async function sendPhoneCode() {
+      const phone = document.getElementById('loginPhone').value.trim();
+      // Loose validation — server normalises and rejects on its own. We just
+      // want to catch the empty-field case before round-tripping.
+      if (!phone || phone.replace(/\D/g, '').length < 7) {
+        showLoginError('Enter your phone number first.');
+        return;
+      }
+      const btn = document.getElementById('loginPhoneBtn');
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      try {
+        const res = await fetch('/auth/request-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, channel: 'sms' }),
+        });
+        if (res.status === 429) {
+          showLoginError('Too many requests. Try again in an hour.');
+        } else if (!res.ok) {
+          showLoginError('Could not send. Try again, or contact the group owner.');
+        } else {
+          document.getElementById('loginErr').style.display = 'none';
+          btn.textContent = 'Code sent. Check your texts';
+          btn.style.background = 'var(--list-watching)';
+          btn.style.color = '#fff';
+          document.getElementById('loginCode').focus();
+        }
+      } catch {
+        showLoginError('Network error. Try again.');
+      } finally {
+        setTimeout(() => {
+          btn.disabled = false;
+          if (btn.textContent === 'Sending…') btn.textContent = 'Text me a code';
+        }, 600);
+      }
     }
 
     async function sendEmailCode() {
@@ -1463,6 +1518,7 @@
     async function submitLoginCode() {
       const code = document.getElementById('loginCode').value.trim();
       const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+      const phone = document.getElementById('loginPhone').value.trim();
       if (!code) {
         showLoginError('Enter your code.');
         return;
@@ -1470,10 +1526,11 @@
       const btn = document.getElementById('loginSubmitBtn');
       btn.disabled = true;
       btn.textContent = 'Logging in…';
-      // If the user supplied an email, prefer that (resolves to any member);
-      // otherwise stick with the legacy slug-based path so the static code
-      // keeps working on the page they're currently viewing.
-      const body = email ? { code, email } : { code, member: memberSlug };
+      // Phone wins if both are filled — phone OTP is the more recent intent.
+      // Fall back to email, then to the slug for the page we're viewing.
+      const body = phone ? { code, phone }
+                   : email ? { code, email }
+                   : { code, member: memberSlug };
       try {
         const res = await fetch('/auth/login', {
           method: 'POST',
