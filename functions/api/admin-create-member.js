@@ -53,7 +53,7 @@ async function pickSeeds(env) {
 }
 
 // Core member-creation routine. Used both by the operator-facing POST
-// endpoint below and by the /requests admin page's "Approve" action.
+// endpoint below and by the /admin page's "Approve" action.
 // Returns either { ok: true, ...details } or { ok: false, status, error }.
 export async function createMember(env, { full_name, phone, emails }) {
   if (!full_name) {
