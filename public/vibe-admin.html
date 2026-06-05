@@ -32,6 +32,20 @@
       border: 1px solid color-mix(in oklch, var(--danger) 30%, transparent);
       border-radius: 6px; color: var(--danger-deep); font-size: 13px;
     }
+    .bg-status {
+      margin-bottom: 14px; padding: 12px 14px;
+      background: color-mix(in oklch, var(--list-watching) 12%, var(--surface));
+      border: 1px solid color-mix(in oklch, var(--list-watching) 35%, transparent);
+      border-radius: 6px;
+      color: var(--ink); font-size: 13px; line-height: 1.5;
+    }
+    .bg-status strong { color: var(--ink); }
+    .bg-status .pulse {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      background: var(--list-watching); margin-right: 6px; vertical-align: middle;
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
   </style>
 </head>
 <body class="admin-page">
@@ -49,11 +63,14 @@
     <div id="authWarn" class="auth-warn" style="display:none;">Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a> (tap Edit, enter your code), then reload this page.</div>
 
     <div class="admin-card">
+      <div id="bgStatus" class="bg-status" style="display:none;"></div>
+
       <label>Batch size (max 8)</label>
       <input type="number" id="batchSize" value="5" min="1" max="8">
 
       <button class="go" id="runBtn" onclick="run(false)">Fill missing</button>
-      <button class="secondary" id="rescoreBtn" onclick="confirmRescore()">Re-score all</button>
+      <button class="secondary" id="rescoreBtn" onclick="confirmStartRescore()">Start background re-score</button>
+      <button class="secondary" id="cancelRescoreBtn" onclick="cancelRescore()" style="display:none; background: var(--danger-soft); color: var(--danger-deep); border-color: color-mix(in oklch, var(--danger) 30%, transparent);">Cancel background re-score</button>
 
       <div class="progress" id="progress" style="display:none;">
         <div><strong>Processed:</strong> <span id="processed">0</span> &middot; <strong>Unknown:</strong> <span id="unknown">0</span> &middot; <strong>Errors:</strong> <span id="errors">0</span> &middot; <strong>Remaining:</strong> <span id="remaining">?</span></div>
@@ -108,10 +125,95 @@
       log.scrollTop = log.scrollHeight;
     }
 
-    function confirmRescore() {
-      if (!confirm('Re-score every show? This calls Claude for every existing report — slower and costs a bit. Cancel to fill missing only.')) return;
-      run(true);
+    async function refreshStatus() {
+      try {
+        const r = await fetch('/api/admin-vibe-fill');
+        if (r.status === 403) {
+          document.getElementById('authWarn').style.display = '';
+          return;
+        }
+        const d = await r.json();
+        const banner = document.getElementById('bgStatus');
+        const cancelBtn = document.getElementById('cancelRescoreBtn');
+        const rescoreBtn = document.getElementById('rescoreBtn');
+        if (d.rescore_active) {
+          banner.innerHTML = `<span class="pulse"></span><strong>Background re-score running</strong> &middot; ${d.rescore_remaining} title${d.rescore_remaining === 1 ? '' : 's'} left. Started ${formatStarted(d.rescore_started_at)}. <em>Safe to close this page.</em>`;
+          banner.style.display = '';
+          cancelBtn.style.display = '';
+          rescoreBtn.style.display = 'none';
+        } else {
+          banner.style.display = 'none';
+          cancelBtn.style.display = 'none';
+          rescoreBtn.style.display = '';
+        }
+      } catch {}
     }
+
+    function formatStarted(iso) {
+      if (!iso) return '';
+      const d = new Date(iso.replace(' ', 'T') + 'Z');
+      if (isNaN(d)) return iso;
+      const mins = Math.floor((Date.now() - d) / 60000);
+      if (mins < 1) return 'just now';
+      if (mins < 60) return `${mins} min ago`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return `${hrs} hour${hrs === 1 ? '' : 's'} ago`;
+      return d.toLocaleString();
+    }
+
+    async function confirmStartRescore() {
+      if (!confirm('Start a background re-score of every show? Cron processes a batch every 15 minutes; safe to close the page. Costs a few cents in Claude calls.')) return;
+      const btn = document.getElementById('rescoreBtn');
+      btn.disabled = true; btn.textContent = 'Starting…';
+      try {
+        const r = await fetch('/api/admin-vibe-fill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'start_background_rescore' }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          alert(d.error || `Failed (${r.status})`);
+          return;
+        }
+        await refreshStatus();
+      } catch (e) {
+        alert('Network error: ' + e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Start background re-score';
+      }
+    }
+
+    async function cancelRescore() {
+      if (!confirm('Cancel the background re-score? Already-refreshed titles keep their new scores; the rest stay where they are.')) return;
+      const btn = document.getElementById('cancelRescoreBtn');
+      btn.disabled = true; btn.textContent = 'Cancelling…';
+      try {
+        const r = await fetch('/api/admin-vibe-fill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'cancel_background_rescore' }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          alert(d.error || `Failed (${r.status})`);
+          return;
+        }
+        await refreshStatus();
+      } catch (e) {
+        alert('Network error: ' + e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Cancel background re-score';
+      }
+    }
+
+    // Poll status every 20s so the banner reflects cron progress without
+    // a manual refresh. Tab-hidden pages still get one update on focus.
+    refreshStatus();
+    setInterval(refreshStatus, 20000);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) refreshStatus();
+    });
 
     async function run(rescore) {
       const count = parseInt(document.getElementById('batchSize').value, 10) || 5;

@@ -79,26 +79,102 @@ async function scoreShow(env, title, genres, network, rating) {
   return parsed;
 }
 
+async function getRescoreCursor(env) {
+  const row = await env.DB.prepare(
+    "SELECT value FROM vibe_state WHERE key = 'rescore_before'"
+  ).first();
+  return row?.value || null;
+}
+
+async function setRescoreCursor(env, value) {
+  if (value) {
+    await env.DB.prepare(
+      `INSERT INTO vibe_state (key, value, updated_at)
+       VALUES ('rescore_before', ?, datetime('now'))
+       ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`
+    ).bind(value).run();
+  } else {
+    await env.DB.prepare("DELETE FROM vibe_state WHERE key = 'rescore_before'").run();
+  }
+}
+
+// GET — status snapshot so the page can show "running in background" + a
+// remaining count without triggering a Claude call.
+export async function onRequestGet(context) {
+  const { request, env } = context;
+  if (!(await authorized(request, env))) return json({ error: 'Forbidden' }, 403);
+  const cursor = await getRescoreCursor(env);
+  const fillRemaining = (await env.DB.prepare(`
+    SELECT COUNT(*) AS cnt FROM (
+      SELECT LOWER(title) AS t FROM shows
+      WHERE archived = 0
+        AND member_slug NOT IN (${EXCLUDED_SQL})
+        AND LOWER(title) NOT IN (SELECT title_lower FROM show_traits)
+      GROUP BY LOWER(title)
+    )
+  `).first())?.cnt ?? 0;
+  let rescoreRemaining = 0;
+  if (cursor) {
+    rescoreRemaining = (await env.DB.prepare(`
+      SELECT COUNT(*) AS cnt FROM (
+        SELECT LOWER(title) AS t FROM shows
+        WHERE archived = 0
+          AND member_slug NOT IN (${EXCLUDED_SQL})
+          AND LOWER(title) NOT IN (
+            SELECT title_lower FROM show_traits
+             WHERE scored_at IS NOT NULL AND scored_at >= ?
+          )
+        GROUP BY LOWER(title)
+      )
+    `).bind(cursor).first())?.cnt ?? 0;
+  }
+  return json({
+    rescore_active: !!cursor,
+    rescore_started_at: cursor,
+    fill_remaining: fillRemaining,
+    rescore_remaining: rescoreRemaining,
+  });
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
   if (!(await authorized(request, env))) return json({ error: 'Forbidden — log in as the operator' }, 403);
-  if (!env.ANTHROPIC_API_KEY) return json({ error: 'ANTHROPIC_API_KEY not configured' }, 500);
 
   let body;
   try { body = await request.json(); }
   catch { return json({ error: 'Invalid JSON' }, 400); }
 
+  // Operator-driven state mutations. These don't need ANTHROPIC_API_KEY
+  // because they don't call Claude.
+  if (body.action === 'start_background_rescore') {
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    await setRescoreCursor(env, now);
+    return json({ ok: true, rescore_started_at: now });
+  }
+  if (body.action === 'cancel_background_rescore') {
+    await setRescoreCursor(env, null);
+    return json({ ok: true });
+  }
+
+  if (!env.ANTHROPIC_API_KEY) return json({ error: 'ANTHROPIC_API_KEY not configured' }, 500);
+
   const count = Math.min(parseInt(body.count || '5', 10) || 5, 8);
-  // Default behaviour: score titles that don't yet have a row in show_traits.
-  // With rescore=true the operator forces a fresh score across every
-  // eligible title — useful when the prompt or model improves and we
-  // want to refresh the existing reports. The client passes `before` as
-  // the timestamp it started the rescore at; we keep picking titles whose
-  // last scored_at predates that cursor, so the loop terminates once
-  // everything has been refreshed in this run.
-  const rescore = body.rescore === true || body.rescore === 'true';
-  const before = typeof body.before === 'string' ? body.before : null;
+  // Three ways to enter rescore mode:
+  //   1. body.rescore=true + body.before=isoStamp  (foreground, page-driven)
+  //   2. body.rescore=true with no before          (foreground, server stamps now)
+  //   3. body.rescore not set, but a cursor sits in vibe_state           ←
+  //                                                  cron auto-mode
+  // The third path is what lets the GitHub Action keep a re-score going
+  // after the operator closes the browser.
+  let rescore = body.rescore === true || body.rescore === 'true';
+  let before = typeof body.before === 'string' ? body.before : null;
+  if (!rescore && !before) {
+    const stored = await getRescoreCursor(env);
+    if (stored) { rescore = true; before = stored; }
+  } else if (rescore && !before) {
+    before = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  }
 
   let candidateFilter;
   let remainingFilter;
@@ -182,11 +258,24 @@ export async function onRequestPost(context) {
     }
   }
 
+  const remainingCount = remaining
+    ? remaining.cnt - results.filter(r => r.status !== 'error').length
+    : 0;
+
+  // If we just ran rescore mode against a stored cursor and have caught
+  // up, clear the cursor so the cron stops trying. Foreground rescore
+  // (page-driven, body.before passed explicitly) doesn't touch state.
+  if (rescore && remainingCount <= 0 && !body.before) {
+    await setRescoreCursor(env, null);
+  }
+
   return json({
     processed: results.filter(r => r.status === 'ok').length,
     unknown: results.filter(r => r.status === 'unknown').length,
     errors: results.filter(r => r.status === 'error').length,
-    remaining: remaining ? remaining.cnt - results.filter(r => r.status !== 'error').length : 0,
+    remaining: remainingCount,
+    mode: rescore ? 'rescore' : 'fill',
+    rescore_cursor: rescore ? before : null,
     results,
   });
 }
