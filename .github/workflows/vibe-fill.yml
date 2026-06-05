@@ -1,0 +1,53 @@
+name: Background vibe trait fill
+
+# Drains the show_traits queue without the operator keeping a browser open.
+# Hits /api/admin-vibe-fill in batches of 5 until the endpoint reports
+# nothing left to process, then exits.
+#
+# Runs every 15 minutes; the workflow short-circuits within ~10s when the
+# queue is empty. Re-score mode is operator-driven only (via the page),
+# this cron is fill-missing only.
+#
+# Required repo secret (Settings → Secrets and variables → Actions):
+#   CRON_SECRET — must match the CRON_SECRET Pages secret on the project.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Drain pending vibe scores
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repo secret is not set"
+            exit 1
+          fi
+          URL="https://showpicker.club/api/admin-vibe-fill"
+          total_filled=0
+          total_unknown=0
+          total_errors=0
+          for i in $(seq 1 40); do
+            resp=$(curl -sS -X POST "$URL" \
+              -H "Content-Type: application/json" \
+              -H "X-Cron-Secret: ${CRON_SECRET}" \
+              -d '{"count":5}')
+            echo "Batch $i: $resp"
+            remaining=$(echo "$resp" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('remaining',0))" 2>/dev/null || echo 0)
+            processed=$(echo "$resp" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('processed',0))" 2>/dev/null || echo 0)
+            unknown=$(echo "$resp" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('unknown',0))" 2>/dev/null || echo 0)
+            errors=$(echo "$resp" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('errors',0))" 2>/dev/null || echo 0)
+            total_filled=$((total_filled + processed))
+            total_unknown=$((total_unknown + unknown))
+            total_errors=$((total_errors + errors))
+            if [ "$remaining" = "0" ]; then break; fi
+            # Small pause between batches so Claude rate limits aren't hammered.
+            sleep 2
+          done
+          echo "Done. Filled: $total_filled · Unknown: $total_unknown · Errors: $total_errors"

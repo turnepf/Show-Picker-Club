@@ -11,6 +11,15 @@ function json(data, status = 200) {
   });
 }
 
+// Authorise either an operator session OR a CRON_SECRET header — the
+// scheduled GitHub Action uses the latter so it can keep the fill
+// queue draining without anyone logged in.
+async function authorized(request, env) {
+  if (await isAdmin(request, env)) return true;
+  const provided = request.headers.get('X-Cron-Secret');
+  return !!env.CRON_SECRET && provided === env.CRON_SECRET;
+}
+
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
 
 async function callClaude(env, userMsg) {
@@ -73,7 +82,7 @@ async function scoreShow(env, title, genres, network, rating) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  if (!(await isAdmin(request, env))) return json({ error: 'Forbidden — log in as the operator' }, 403);
+  if (!(await authorized(request, env))) return json({ error: 'Forbidden — log in as the operator' }, 403);
   if (!env.ANTHROPIC_API_KEY) return json({ error: 'ANTHROPIC_API_KEY not configured' }, 500);
 
   let body;
