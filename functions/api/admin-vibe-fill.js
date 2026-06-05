@@ -80,21 +80,31 @@ async function scoreShow(env, title, genres, network, rating) {
 }
 
 async function getRescoreCursor(env) {
-  const row = await env.DB.prepare(
-    "SELECT value FROM vibe_state WHERE key = 'rescore_before'"
-  ).first();
-  return row?.value || null;
+  try {
+    const row = await env.DB.prepare(
+      "SELECT value FROM vibe_state WHERE key = 'rescore_before'"
+    ).first();
+    return row?.value || null;
+  } catch (e) {
+    // vibe_state may not exist yet (pre-migration). Treat as no cursor.
+    return null;
+  }
 }
 
 async function setRescoreCursor(env, value) {
-  if (value) {
-    await env.DB.prepare(
-      `INSERT INTO vibe_state (key, value, updated_at)
-       VALUES ('rescore_before', ?, datetime('now'))
-       ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`
-    ).bind(value).run();
-  } else {
-    await env.DB.prepare("DELETE FROM vibe_state WHERE key = 'rescore_before'").run();
+  try {
+    if (value) {
+      await env.DB.prepare(
+        `INSERT INTO vibe_state (key, value, updated_at)
+         VALUES ('rescore_before', ?, datetime('now'))
+         ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`
+      ).bind(value).run();
+    } else {
+      await env.DB.prepare("DELETE FROM vibe_state WHERE key = 'rescore_before'").run();
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: 'vibe_state table missing — apply migration 010 first.' };
   }
 }
 
@@ -149,11 +159,13 @@ export async function onRequestPost(context) {
   // because they don't call Claude.
   if (body.action === 'start_background_rescore') {
     const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
-    await setRescoreCursor(env, now);
+    const res = await setRescoreCursor(env, now);
+    if (!res.ok) return json({ error: res.error }, 500);
     return json({ ok: true, rescore_started_at: now });
   }
   if (body.action === 'cancel_background_rescore') {
-    await setRescoreCursor(env, null);
+    const res = await setRescoreCursor(env, null);
+    if (!res.ok) return json({ error: res.error }, 500);
     return json({ ok: true });
   }
 
