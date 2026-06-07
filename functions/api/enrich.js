@@ -1,4 +1,5 @@
 import { getSession } from '../_shared/auth.js';
+import { fetchEnrichment } from '../_shared/enrichment.js';
 
 // Networks with `param` pass the show name in the search URL query string.
 // Networks without `param` just link to the search page (no show name).
@@ -253,7 +254,50 @@ export async function onRequestPost(context) {
     }
   }
 
-  return new Response(JSON.stringify({ enriched, tmdbUpdated }), {
+  // Actor IMDB-id backfill — self-healing, no admin action required.
+  // imdb_id is only ever written by the TMDB enrichment path (at add/edit time).
+  // Shows added before that path existed, or via one that omits it (OMDB
+  // fallback, the OMDB pass above, share, suggestions), keep actor rows with
+  // imdb_id = NULL, so their names render as plain non-clickable tags. Re-run
+  // the same TMDB enrichment for any show that still has null-id actors and
+  // refresh its cast. We propagate by title so a single lookup fixes every
+  // member's copy at once — including the oldest copy the home page surfaces
+  // via /api/popular's MIN(id). Gated on TMDB_TOKEN: the OMDB fallback can't
+  // supply actor ids, so there's nothing to gain (and nothing to wipe) without it.
+  let actorImdbFilled = 0;
+  if (env.TMDB_TOKEN) {
+    const maxActorImdb = parseInt(body.max_actor_imdb ?? '8', 10);
+    const backfillBase = `SELECT s.title, MAX(s.movie) AS movie
+       FROM shows s
+       WHERE s.archived = 0
+         AND EXISTS (SELECT 1 FROM actors a WHERE a.show_id = s.id AND a.imdb_id IS NULL)`;
+    const backfillStmt = member
+      ? env.DB.prepare(`${backfillBase} AND s.member_slug = ? GROUP BY LOWER(s.title) ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(member, maxActorImdb)
+      : env.DB.prepare(`${backfillBase} GROUP BY LOWER(s.title) ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(maxActorImdb);
+    const { results: backfillShows } = await backfillStmt.all();
+
+    for (const show of backfillShows) {
+      try {
+        const result = await fetchEnrichment(show.title, env, !!show.movie);
+        const actors = result.actors || [];
+        // Only act when TMDB actually returned IMDB ids. If it fell back to OMDB
+        // (all ids null) or found nothing, leave the existing cast untouched.
+        if (!actors.some(a => a.imdb_id)) continue;
+
+        const { results: copies } = await env.DB.prepare(
+          'SELECT id FROM shows WHERE LOWER(title) = LOWER(?) AND archived = 0'
+        ).bind(show.title).all();
+        const insert = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id) VALUES (?, ?, ?)');
+        for (const copy of copies) {
+          await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(copy.id).run();
+          await env.DB.batch(actors.map(a => insert.bind(copy.id, a.name, a.imdb_id || null)));
+          actorImdbFilled++;
+        }
+      } catch (e) {}
+    }
+  }
+
+  return new Response(JSON.stringify({ enriched, tmdbUpdated, actorImdbFilled }), {
     headers: { 'Content-Type': 'application/json' },
   });
 }
