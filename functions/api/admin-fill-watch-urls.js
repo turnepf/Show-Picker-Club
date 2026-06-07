@@ -32,6 +32,15 @@ function json(data, status = 200) {
   });
 }
 
+// Authorise either an operator session OR a CRON_SECRET header — the scheduled
+// GitHub Action (watch-urls-fill.yml) uses the latter so the deep-link backfill
+// drains on its own without anyone logged in. Mirrors admin-vibe-fill.js.
+async function authorized(request, env) {
+  if (await isAdmin(request, env)) return true;
+  const provided = request.headers.get('X-Cron-Secret');
+  return !!env.CRON_SECRET && provided === env.CRON_SECRET;
+}
+
 async function watchmodeSearch(env, title, isMovie) {
   const key = env.WATCHMODE_API_KEY;
   if (!key) return null;
@@ -64,7 +73,7 @@ async function watchmodeSources(env, titleId) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  if (!(await isAdmin(request, env))) return json({ error: 'Forbidden — log in as the operator' }, 403);
+  if (!(await authorized(request, env))) return json({ error: 'Forbidden — log in as the operator' }, 403);
   if (!env.WATCHMODE_API_KEY) return json({ error: 'WATCHMODE_API_KEY not configured' }, 500);
 
   let body;

@@ -5,8 +5,10 @@ name: Background vibe trait fill
 # nothing left to process, then exits.
 #
 # Runs every 15 minutes; the workflow short-circuits within ~10s when the
-# queue is empty. Re-score mode is operator-driven only (via the page),
-# this cron is fill-missing only.
+# queue is empty. It also drains a background re-score: once the operator
+# starts one (which stores a cursor in vibe_state), the endpoint's cursor
+# path means these plain fill calls keep that re-score going with the page
+# closed, until the cursor clears.
 #
 # Required repo secret (Settings → Secrets and variables → Actions):
 #   CRON_SECRET — must match the CRON_SECRET Pages secret on the project.
@@ -37,12 +39,26 @@ jobs:
             resp=$(curl -sS -X POST "$URL" \
               -H "Content-Type: application/json" \
               -H "X-Cron-Secret: ${CRON_SECRET}" \
-              -d '{"count":5}')
-            echo "Batch $i: $resp"
-            remaining=$(echo "$resp" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('remaining',0))" 2>/dev/null || echo 0)
-            processed=$(echo "$resp" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('processed',0))" 2>/dev/null || echo 0)
-            unknown=$(echo "$resp" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('unknown',0))" 2>/dev/null || echo 0)
-            errors=$(echo "$resp" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('errors',0))" 2>/dev/null || echo 0)
+              -d '{"count":5}' \
+              -w $'\n%{http_code}')
+            http=$(printf '%s' "$resp" | tail -n1)
+            body=$(printf '%s' "$resp" | sed '$d')
+            echo "Batch $i (HTTP $http): $body"
+            # Fail loudly on a rejected or errored call instead of silently
+            # reporting "0 filled" with a green check — that masked a multi-day
+            # outage when CRON_SECRET wasn't live.
+            if [ "$http" != "200" ]; then
+              echo "::error::vibe-fill returned HTTP $http (CRON_SECRET rejected, or endpoint error)"
+              exit 1
+            fi
+            if printf '%s' "$body" | grep -q '"error"'; then
+              echo "::error::vibe-fill returned an error body"
+              exit 1
+            fi
+            remaining=$(printf '%s' "$body" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('remaining',0))" 2>/dev/null || echo 0)
+            processed=$(printf '%s' "$body" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('processed',0))" 2>/dev/null || echo 0)
+            unknown=$(printf '%s' "$body" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('unknown',0))" 2>/dev/null || echo 0)
+            errors=$(printf '%s' "$body" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('errors',0))" 2>/dev/null || echo 0)
             total_filled=$((total_filled + processed))
             total_unknown=$((total_unknown + unknown))
             total_errors=$((total_errors + errors))
