@@ -25,12 +25,17 @@ export async function onRequestGet(context) {
      LIMIT 10`
   ).all();
 
-  // Pull actors for each (one query per show; n=10 max)
+  // Pull actors for each (one query per show; n=10 max). Include imdb_id so
+  // the front end can render clickable IMDB links — matching the {name, imdb_id}
+  // shape the member-page endpoints return. A plain name string would parse to
+  // imdb_id:null and render as non-clickable tags.
   for (const show of results) {
     const { results: acts } = await env.DB.prepare(
-      'SELECT name FROM actors WHERE show_id = ?'
+      'SELECT name, imdb_id FROM actors WHERE show_id = ?'
     ).bind(show.id).all();
-    show.actors = acts.map(a => a.name).join(', ') || null;
+    show.actors = acts.length
+      ? acts.map(a => ({ name: a.name, imdb_id: a.imdb_id }))
+      : null;
   }
 
   // Map slugs to first names. Members.name is the possessive display
