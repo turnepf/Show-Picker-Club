@@ -1,0 +1,60 @@
+name: Background streaming deep-link fill
+
+# Drains shows that still lack a real streaming deep link by calling
+# /api/admin-fill-watch-urls (Watchmode). The endpoint is idempotent — it only
+# touches rows whose network_url is missing or a placeholder/search page — so
+# once the backlog clears these runs find nothing and cost ~0.
+#
+# Budget: Watchmode's free tier is ~1000 requests/month and each candidate
+# costs ~2 calls (search + sources). We run once a day with a small cap
+# (default 12 titles ≈ 24 calls/day ≈ 720/month), leaving headroom for ad-hoc
+# operator runs. Bump `limit` via "Run workflow" to drain a backlog faster —
+# just keep the monthly total under ~1000.
+#
+# Required repo secret (must equal the Pages CRON_SECRET):
+#   CRON_SECRET — Settings → Secrets and variables → Actions.
+
+on:
+  schedule:
+    - cron: '37 9 * * *'   # daily at 09:37 UTC
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Max titles to process this run (~2 Watchmode calls each)'
+        required: false
+        default: '12'
+
+jobs:
+  fill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Fill streaming deep links
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          LIMIT: ${{ github.event.inputs.limit || '12' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repo secret is not set"
+            exit 1
+          fi
+          URL="https://showpicker.club/api/admin-fill-watch-urls"
+          resp=$(curl -sS -X POST "$URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Cron-Secret: ${CRON_SECRET}" \
+            -d "{\"limit\": ${LIMIT}}" \
+            -w $'\n%{http_code}')
+          http=$(printf '%s' "$resp" | tail -n1)
+          body=$(printf '%s' "$resp" | sed '$d')
+          echo "HTTP $http: $body"
+          if [ "$http" != "200" ]; then
+            echo "::error::watch-url fill returned HTTP $http (CRON_SECRET rejected, or endpoint error)"
+            exit 1
+          fi
+          if printf '%s' "$body" | grep -q '"error"'; then
+            echo "::error::watch-url fill returned an error body"
+            exit 1
+          fi
+          checked=$(printf '%s' "$body" | python3 -c "import sys,json;print(json.load(sys.stdin).get('checked',0))" 2>/dev/null || echo 0)
+          filled=$(printf '%s' "$body" | python3 -c "import sys,json;print(json.load(sys.stdin).get('filled',0))" 2>/dev/null || echo 0)
+          echo "Done. Checked: $checked · Filled: $filled"
