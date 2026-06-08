@@ -7,9 +7,12 @@ name: Background streaming deep-link fill
 #
 # Budget: Watchmode's free tier is ~1000 requests/month and each candidate
 # costs ~2 calls (search + sources). We run once a day with a small cap
-# (default 12 titles ≈ 24 calls/day ≈ 720/month), leaving headroom for ad-hoc
-# operator runs. Bump `limit` via "Run workflow" to drain a backlog faster —
-# just keep the monthly total under ~1000.
+# (default 15 titles ≈ 30 calls/day ≈ 900/month), leaving headroom for the
+# real-time insert/edit lookups and ad-hoc operator runs. Watchmode's faster
+# endpoints + higher request-volume infra (mid-2026 updates) mean a single
+# "Run workflow" drain can now go up to 250 titles without timing out — but
+# the ~1000/month quota is still the real ceiling, so keep the monthly total
+# under it when bumping `limit`.
 #
 # Required repo secret (must equal the Pages CRON_SECRET):
 #   CRON_SECRET — Settings → Secrets and variables → Actions.
@@ -22,7 +25,7 @@ on:
       limit:
         description: 'Max titles to process this run (~2 Watchmode calls each)'
         required: false
-        default: '12'
+        default: '15'
 
 jobs:
   fill:
@@ -32,7 +35,7 @@ jobs:
       - name: Fill streaming deep links
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          LIMIT: ${{ github.event.inputs.limit || '12' }}
+          LIMIT: ${{ github.event.inputs.limit || '15' }}
         run: |
           if [ -z "$CRON_SECRET" ]; then
             echo "::error::CRON_SECRET repo secret is not set"
