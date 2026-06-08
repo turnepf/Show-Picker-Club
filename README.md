@@ -102,6 +102,9 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    printf "+1336..."         | wrangler pages secret put TWILIO_PHONE_NUMBER --project-name shows
    printf "MGxxxx"           | wrangler pages secret put TWILIO_MESSAGING_SERVICE_SID --project-name shows
    ```
+   Watchmode deep-link lookups default to the US region. To target another
+   country, set the non-secret `WATCHMODE_REGION` var (e.g. `GB`, `CA`) in
+   the Cloudflare Pages dashboard → Settings → Environment variables.
 
 5. **Create the Pages project and do the first deploy.**
    ```bash

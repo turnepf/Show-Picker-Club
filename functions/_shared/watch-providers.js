@@ -13,17 +13,25 @@ import { canonicalNetwork } from './networks.js';
 //
 // Never throws — callers can use it inside ctx.waitUntil without wrapping.
 // Each call burns ~2 Watchmode requests (free tier = 1000/month).
+//
+// Region defaults to US but is configurable via WATCHMODE_REGION so the
+// integration can serve other countries later without code changes — the
+// region flows into both the sources query and the in-app filter below.
+// Auth uses the X-API-Key header (Watchmode's recommended scheme for new
+// integrations) rather than an apiKey query param.
 
 export async function lookupWatchmodeUrl(env, title, network, isMovie) {
   if (!env.WATCHMODE_API_KEY) return null;
   if (!title || !network) return null;
-  const key = env.WATCHMODE_API_KEY;
+  const headers = { 'X-API-Key': env.WATCHMODE_API_KEY };
+  const region = env.WATCHMODE_REGION || 'US';
   const types = isMovie ? 'movie' : 'tv_series,tv_miniseries';
 
   try {
     const searchRes = await fetch(
-      `https://api.watchmode.com/v1/search/?apiKey=${key}` +
-      `&search_field=name&search_value=${encodeURIComponent(title)}&types=${types}`
+      `https://api.watchmode.com/v1/search/?search_field=name` +
+      `&search_value=${encodeURIComponent(title)}&types=${types}`,
+      { headers }
     );
     if (!searchRes.ok) return null;
     const searchData = await searchRes.json();
@@ -31,14 +39,15 @@ export async function lookupWatchmodeUrl(env, title, network, isMovie) {
     if (!titleId) return null;
 
     const sourcesRes = await fetch(
-      `https://api.watchmode.com/v1/title/${titleId}/sources/?apiKey=${key}&regions=US`
+      `https://api.watchmode.com/v1/title/${titleId}/sources/?regions=${encodeURIComponent(region)}`,
+      { headers }
     );
     if (!sourcesRes.ok) return null;
     const sources = await sourcesRes.json();
     if (!Array.isArray(sources)) return null;
 
     const subs = sources.filter(s =>
-      s.region === 'US' && (s.type === 'sub' || s.type === 'free')
+      s.region === region && (s.type === 'sub' || s.type === 'free')
     );
     const match = subs.find(s =>
       canonicalNetwork(s.name) === network && s.web_url

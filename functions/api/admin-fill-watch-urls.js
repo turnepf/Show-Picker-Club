@@ -41,13 +41,23 @@ async function authorized(request, env) {
   return !!env.CRON_SECRET && provided === env.CRON_SECRET;
 }
 
+// Auth uses the X-API-Key header (Watchmode's recommended scheme for new
+// integrations) rather than an apiKey query param. Region defaults to US but
+// is configurable via WATCHMODE_REGION — see watchmodeRegion() below.
+function watchmodeHeaders(env) {
+  return { 'X-API-Key': env.WATCHMODE_API_KEY };
+}
+
+function watchmodeRegion(env) {
+  return env.WATCHMODE_REGION || 'US';
+}
+
 async function watchmodeSearch(env, title, isMovie) {
-  const key = env.WATCHMODE_API_KEY;
-  if (!key) return null;
+  if (!env.WATCHMODE_API_KEY) return null;
   const types = isMovie ? 'movie' : 'tv_series,tv_miniseries';
-  const url = `https://api.watchmode.com/v1/search/?apiKey=${key}&search_field=name&search_value=${encodeURIComponent(title)}&types=${types}`;
+  const url = `https://api.watchmode.com/v1/search/?search_field=name&search_value=${encodeURIComponent(title)}&types=${types}`;
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: watchmodeHeaders(env) });
     if (!res.ok) return { error: `search ${res.status}` };
     const data = await res.json();
     const hit = data.title_results?.[0];
@@ -58,11 +68,10 @@ async function watchmodeSearch(env, title, isMovie) {
 }
 
 async function watchmodeSources(env, titleId) {
-  const key = env.WATCHMODE_API_KEY;
-  if (!key) return null;
-  const url = `https://api.watchmode.com/v1/title/${titleId}/sources/?apiKey=${key}&regions=US`;
+  if (!env.WATCHMODE_API_KEY) return null;
+  const url = `https://api.watchmode.com/v1/title/${titleId}/sources/?regions=${encodeURIComponent(watchmodeRegion(env))}`;
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: watchmodeHeaders(env) });
     if (!res.ok) return { error: `sources ${res.status}` };
     return await res.json();
   } catch (e) {
@@ -81,7 +90,13 @@ export async function onRequestPost(context) {
   catch { return json({ error: 'Invalid JSON' }, 400); }
 
   const network = (body.network || '').trim() || null;
-  const limit = Math.max(1, Math.min(100, parseInt(body.limit, 10) || 25));
+  // Per-run cap raised to 250 (was 100): Watchmode's faster List Titles /
+  // sources endpoints + higher request-volume infra let a manual backlog
+  // drain process more titles in one run without tripping the job timeout.
+  // The monthly quota (~1000 free-tier calls, ~2 per title) is still the
+  // real ceiling — keep ad-hoc runs in mind when draining.
+  const limit = Math.max(1, Math.min(250, parseInt(body.limit, 10) || 25));
+  const region = watchmodeRegion(env);
 
   // Candidates: rows without a true deep-link URL. Includes NULL, search
   // placeholders, www.max.com / www.hbomax.com info-page URLs that dump
@@ -149,7 +164,7 @@ export async function onRequestPost(context) {
     // Subscription / free streams only — not rent or buy. Same region filter
     // as the API call (defense in depth).
     const subs = sources.filter(s =>
-      s.region === 'US' && (s.type === 'sub' || s.type === 'free')
+      s.region === region && (s.type === 'sub' || s.type === 'free')
     );
 
     const match = subs.find(s =>
