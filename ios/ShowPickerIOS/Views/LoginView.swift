@@ -4,8 +4,6 @@ import AuthenticationServices
 // Login: Sign in with Apple, OR phone (Twilio Verify) / email (Resend-delivered
 // OTP). User picks whichever, gets a 6-digit code, enters it, taps Log in.
 struct LoginView: View {
-    let memberSlug: String
-
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @State private var phone = ""
@@ -170,20 +168,22 @@ struct LoginView: View {
     }
 
     private func submit() async {
-        submitting = true
-        defer { submitting = false }
         let trimmedCode = code.trimmingCharacters(in: .whitespaces)
         let trimmedPhone = phone.trimmingCharacters(in: .whitespaces)
         let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
+        guard !trimmedPhone.isEmpty || !trimmedEmail.isEmpty else {
+            errorText = "Enter your phone or email above first, then the code."
+            return
+        }
+        submitting = true
+        defer { submitting = false }
         do {
             // Phone wins if both are filled — it's the more recent intent
             // (Twilio Verify holds the code; lookup happens server-side).
             if !trimmedPhone.isEmpty {
                 try await auth.loginWithPhone(phone: trimmedPhone, code: trimmedCode)
-            } else if !trimmedEmail.isEmpty {
-                try await auth.loginWithEmail(email: trimmedEmail, code: trimmedCode)
             } else {
-                try await auth.login(member: memberSlug, code: trimmedCode)
+                try await auth.loginWithEmail(email: trimmedEmail, code: trimmedCode)
             }
             dismiss()
         } catch {

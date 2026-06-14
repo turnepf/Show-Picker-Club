@@ -11,7 +11,7 @@ Live at [showpicker.club](https://showpicker.club).
 
 ## At a glance
 
-- **Multi-tenant.** One deployment, many members. Each member is a slug (`/whitt`, `/patrick`) with their own lists and 4-digit login code.
+- **Multi-tenant.** One deployment, many members. Each member is a slug (`/whitt`, `/patrick`) with their own lists; they sign in with a one-time code (text or email) or Sign in with Apple.
 - **Auto-enriched.** OMDB supplies IMDB ratings and canonical titles; TMDB supplies cast, next-season dates, finale dates, series-ended flags, and genres.
 - **Social.** Suggest a show to another member, share a show across lists, see your closest taste-match, and get "Picks for you" computed from neighbors.
 - **Vibe.** `/vibe` profiles each member's taste across 27 trait dimensions and assigns one of seven cluster identities.
@@ -25,7 +25,7 @@ Live at [showpicker.club](https://showpicker.club).
 - **Database:** Cloudflare D1 (SQLite at the edge).
 - **Enrichment:** OMDB API + TMDB API.
 - **Vibe trait scoring:** Claude API (Sonnet 4.6 with prompt caching), admin-triggered batch only.
-- **Auth:** Per-member 4-digit codes, HttpOnly session cookies, 30-day expiry.
+- **Auth:** One-time codes (SMS via Twilio Verify, email via Resend) plus Sign in with Apple; HttpOnly session cookies, 30-day expiry.
 
 ## Project structure
 
@@ -83,10 +83,11 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    wrangler d1 execute shows-db --remote --file=schema.sql
    ```
 
-3. **Seed at least one member + login code.** New members are usually created via the admin `/setup` page once you're deployed; bootstrap by hand the first time.
+3. **Seed at least one member + a contact for login.** New members are usually created via the admin `/setup` page once you're deployed; bootstrap by hand the first time. Login is by one-time code, so seed an email and/or phone the member will receive the code at.
    ```sql
    INSERT INTO members (slug, name, first_name) VALUES ('patrick', 'Patrick Turner', 'Patrick');
-   INSERT INTO member_codes (member_slug, code, editor_name) VALUES ('patrick', '1234', 'patrick@example.com');
+   INSERT INTO member_emails (email, member_slug, is_primary) VALUES ('patrick@example.com', 'patrick', 1);
+   INSERT INTO member_phones (phone, member_slug, is_primary) VALUES ('+13365550123', 'patrick', 1);
    ```
 
 4. **Set API key secrets.** Use `printf` (not `echo`) so trailing newlines don't break runtime calls.

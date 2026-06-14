@@ -23,16 +23,6 @@ final class AuthStore: ObservableObject {
     }
 
     @MainActor
-    func login(member slug: String, code: String) async throws {
-        let r = try await API.login(member: slug, code: code)
-        if r.success == true {
-            await refresh()
-        } else {
-            throw API.APIError.badResponse(401)
-        }
-    }
-
-    @MainActor
     func loginWithEmail(email: String, code: String) async throws {
         let r = try await API.loginWithEmail(email: email, code: code)
         if r.success == true {

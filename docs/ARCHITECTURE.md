@@ -37,15 +37,12 @@ database_id = "..."
 | `last_initial` | TEXT             | Suffix used to disambiguate two first-name collisions. |
 | `created_at`   | TEXT             | Default `datetime('now')`.                  |
 
-### `member_codes`
-4-digit login codes. `editor_name` doubles as the login email/identifier.
+### Login identity tables
+Login is by one-time code or Sign in with Apple — there are no stored passwords. The relevant tables (added by migrations, not in the base `schema.sql`):
 
-| Column         | Type | Notes |
-|----------------|------|-------|
-| `id`           | INTEGER PK | |
-| `member_slug`  | TEXT REFERENCES members(slug) | |
-| `code`         | TEXT NOT NULL | 4-digit code, plain text. |
-| `editor_name`  | TEXT NOT NULL | Used as session `email`. |
+- `member_emails` / `member_phones` — map an email or phone to a member; the address a login code is sent to and matched against.
+- `login_otps` — short-lived, single-use email codes (`member_slug`, `code`, `channel`, `expires_at`, `used_at`). SMS codes are held by Twilio Verify, not stored here.
+- `member_apple_ids` — links an Apple user id (`apple_sub`) to a member, populated on first Apple sign-in by email match so later sign-ins work even behind a private-relay address.
 
 ### `shows`
 | Column              | Type | Notes |
@@ -85,7 +82,7 @@ Join table for per-show cast.
 | Column          | Type | Notes |
 |-----------------|------|-------|
 | `id`            | TEXT PK | UUID. |
-| `email`         | TEXT NOT NULL | From `member_codes.editor_name`. |
+| `email`         | TEXT NOT NULL | Display/identifier for the session (member's first name or name). |
 | `member_slug`   | TEXT | Which member this session can edit. |
 | `expires_at`    | TEXT NOT NULL | 30 days from creation. |
 | `created_at`    | TEXT | |
@@ -173,10 +170,10 @@ The `[slug]` param matches the full final segment (including `.ics`); the handle
 
 ### Login flow
 
-1. `POST /auth/login` with `{member, code}`.
+1. `POST /auth/login` with `{phone, code}` or `{email, code}` (codes are requested first via `POST /auth/request-code`). Sign in with Apple uses `POST /auth/apple` with Apple's identity token instead.
 2. Throttle check: 5 failed attempts per IP in 15 minutes → 429 with `Retry-After`.
-3. Match `code` against `member_codes` for that `member_slug`.
-4. On success: insert a `sessions` row (UUID id, `editor_name` as `email`, 30-day `expires_at`), set an HttpOnly + Secure + SameSite=Lax `session=` cookie, return the slug.
+3. Resolve the member: phone → `member_phones` + Twilio Verify; email → `member_emails` + `login_otps`; Apple → verify the token, then `member_apple_ids` (or first-time email match against `member_emails`).
+4. On success: insert a `sessions` row (UUID id, member's name as `email`, 30-day `expires_at`), set an HttpOnly + Secure + SameSite=Lax `session=` cookie, return the slug.
 5. On failure: insert a `failed_logins` row, return 401.
 
 `functions/_shared/auth.js` exports `getSession(request, env)` which reads the cookie, queries the session row, checks `expires_at`, and returns `{email, member_slug}` or `null`. Every mutating endpoint and `/api/reporting` calls `getSession` first.
@@ -380,7 +377,7 @@ Returns the match's display name, slug, overlap count, and the list of overlappi
 All require an operator (`patrick`) session via `isAdmin()`. No separate secret.
 
 ### `POST /api/admin-create-member`
-Body: `{secret, full_name, code}`. Generates a slug from `full_name`, inserts into `members` + `member_codes`, then picks 8 seed shows (2 per list) drawn from the existing club's highly-rated picks with cast and a real network URL. Shows are inserted with `added_by='seed'`, `created_at=NULL`, `updated_at=NULL` so the seed-only check (which looks for exactly that signature) recognizes them.
+Body: `{secret, full_name, phone, emails}`. Generates a slug from `full_name`, inserts into `members` plus `member_phones`/`member_emails` (the contacts the member's login codes are sent to), then picks 8 seed shows (2 per list) drawn from the existing club's highly-rated picks with cast and a real network URL. Shows are inserted with `added_by='seed'`, `created_at=NULL`, `updated_at=NULL` so the seed-only check (which looks for exactly that signature) recognizes them.
 
 ### `POST /api/admin-vibe-fill`
 Body: `{secret, count}`. Runs the vibe trait-backfill loop described above. The `vibe-admin.html` UI calls it in a loop until the operator stops or every show is scored.
