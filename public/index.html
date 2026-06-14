@@ -919,6 +919,13 @@
     <div class="modal" onclick="event.stopPropagation()">
       <h2>Log in</h2>
 
+      <button type="button" class="btn" id="appleSignInBtn" onclick="signInWithApple()"
+              style="width:100%; background:#000; color:#fff; display:flex; align-items:center; justify-content:center; gap:8px;">
+        <svg width="13" height="16" viewBox="0 0 170 170" fill="#fff" aria-hidden="true"><path d="M150.4 130.3c-2.5 5.7-5.4 11-8.9 15.8-4.7 6.6-8.6 11.2-11.6 13.7-4.6 4.2-9.5 6.3-14.8 6.5-3.8 0-8.3-1.1-13.6-3.3-5.3-2.2-10.1-3.3-14.6-3.3-4.7 0-9.7 1.1-15 3.3-5.3 2.2-9.6 3.3-12.9 3.4-5.1.2-10.1-2-15-6.7-3.2-2.7-7.3-7.5-12.2-14.4-5.3-7.3-9.6-15.9-13-25.7-3.6-10.6-5.4-20.9-5.4-30.8 0-11.4 2.5-21.2 7.4-29.4 3.9-6.6 9-11.8 15.4-15.6 6.4-3.8 13.3-5.8 20.8-5.9 4 0 9.3 1.3 15.9 3.7 6.6 2.5 10.9 3.7 12.7 3.7 1.4 0 6.1-1.5 14.1-4.4 7.6-2.7 14-3.8 19.3-3.4 14.3 1.2 25 6.8 32.1 16.9-12.8 7.8-19.1 18.6-19 32.6.1 10.9 4.1 20 11.9 27.2 3.5 3.4 7.5 6 11.9 7.8-1 2.8-2 5.4-3.1 7.9zM119.9 7.3c0 8.5-3.1 16.4-9.3 23.8-7.5 8.8-16.5 13.8-26.3 13-.1-1-.2-2.1-.2-3.2 0-8.1 3.6-16.8 9.9-23.9 3.2-3.6 7.2-6.6 12.1-9 4.9-2.3 9.5-3.6 13.9-3.9.1 1.1.2 2.2.2 3.2z"/></svg>
+        Sign in with Apple
+      </button>
+      <div style="text-align: center; margin: 14px 0; font-size: 12px; color: var(--ink-muted);">or use a code</div>
+
       <label for="loginPhone">Phone (US)</label>
       <input type="tel" id="loginPhone" name="phone"
              autocomplete="tel" inputmode="tel"
@@ -948,6 +955,7 @@
     </div>
   </div>
 
+  <script type="text/javascript" src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
   <script>
     let shows = [];
     let currentTab = 'watching';
@@ -1542,6 +1550,51 @@
           btn.disabled = false;
           if (btn.textContent === 'Sending…') btn.textContent = 'Email me a code';
         }, 600);
+      }
+    }
+
+    // Sign in with Apple (web). Uses a Services ID — NOT the iOS bundle id —
+    // which must be created in the Apple Developer portal with the showpicker.club
+    // domain verified and "https://showpicker.club/" registered as a Return URL,
+    // and added to the APPLE_CLIENT_ID Pages env var. Change this to whatever
+    // Services ID you register.
+    const APPLE_WEB_CLIENT_ID = 'club.showpicker.web';
+    let appleInited = false;
+    function initApple() {
+      if (appleInited || !window.AppleID) return;
+      AppleID.auth.init({
+        clientId: APPLE_WEB_CLIENT_ID,
+        scope: 'name email',
+        redirectURI: window.location.origin + '/',
+        usePopup: true,
+      });
+      appleInited = true;
+    }
+    async function signInWithApple() {
+      initApple();
+      if (!window.AppleID) { showLoginError('Apple sign-in is unavailable right now — use a code.'); return; }
+      try {
+        const data = await AppleID.auth.signIn();
+        const idToken = data && data.authorization && data.authorization.id_token;
+        if (!idToken) { showLoginError("Apple didn't return a sign-in token. Try again."); return; }
+        const res = await fetch('/auth/apple', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identity_token: idToken }),
+        });
+        if (res.ok) {
+          location.reload();
+        } else if (res.status === 401) {
+          showLoginError('That Apple ID isn\'t linked to a member. Choose "Share My Email" with the address the owner has on file, or use a code.');
+        } else {
+          showLoginError('Apple sign-in failed. Try a code instead.');
+        }
+      } catch (e) {
+        // Popup closed / user cancelled — stay quiet; surface only real errors.
+        const code = e && e.error;
+        if (code && code !== 'popup_closed_by_user' && code !== 'user_cancelled_authorize' && code !== 'user_trigger_new_signin_flow') {
+          showLoginError('Apple sign-in failed. Try a code instead.');
+        }
       }
     }
 

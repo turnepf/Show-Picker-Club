@@ -11,11 +11,18 @@ function corsHeaders() {
 const MAX_FAILS = 5;
 const WINDOW_MIN = 15;
 
-// Native Sign in with Apple sets the token audience to the app's bundle id.
-// Overridable via env in case the bundle id changes.
-const DEFAULT_CLIENT_ID = 'net.patrickturner.showpickerios';
+// The token audience is the native app's bundle id, OR — for "Sign in with
+// Apple" on the website — the web Services ID. APPLE_CLIENT_ID may be a
+// comma-separated list to allow both; defaults to the native bundle id.
+const DEFAULT_CLIENT_IDS = ['net.patrickturner.showpickerios'];
 const APPLE_ISS = 'https://appleid.apple.com';
 const APPLE_KEYS_URL = 'https://appleid.apple.com/auth/keys';
+
+function allowedClientIds(env) {
+  const configured = (env.APPLE_CLIENT_ID || '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  return configured.length ? configured : DEFAULT_CLIENT_IDS;
+}
 
 async function failureCount(env, ip) {
   const since = new Date(Date.now() - WINDOW_MIN * 60 * 1000).toISOString();
@@ -62,7 +69,7 @@ async function getAppleKey(kid) {
 }
 
 // Returns the verified payload, or throws on any failure.
-async function verifyAppleToken(token, clientId) {
+async function verifyAppleToken(token, allowedAuds) {
   const parts = token.split('.');
   if (parts.length !== 3) throw new Error('malformed');
 
@@ -88,7 +95,7 @@ async function verifyAppleToken(token, clientId) {
 
   if (payload.iss !== APPLE_ISS) throw new Error('bad_iss');
   const auds = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-  if (!auds.includes(clientId)) throw new Error('bad_aud');
+  if (!auds.some((a) => allowedAuds.includes(a))) throw new Error('bad_aud');
   if (typeof payload.exp !== 'number' || payload.exp * 1000 <= Date.now()) throw new Error('expired');
 
   return payload;
@@ -116,11 +123,11 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ error: 'missing' }), { status: 400, headers: corsHeaders() });
   }
 
-  const clientId = env.APPLE_CLIENT_ID || DEFAULT_CLIENT_ID;
+  const clientIds = allowedClientIds(env);
 
   let payload;
   try {
-    payload = await verifyAppleToken(identityToken, clientId);
+    payload = await verifyAppleToken(identityToken, clientIds);
   } catch (e) {
     await recordFailure(env, ip, null);
     return new Response(JSON.stringify({ error: 'invalid_token' }), { status: 401, headers: corsHeaders() });
