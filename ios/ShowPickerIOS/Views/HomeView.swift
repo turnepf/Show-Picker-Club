@@ -5,10 +5,33 @@ struct HomeView: View {
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
     @State private var loading = true
+    @State private var showingLogin = false
+
+    // The logged-in member, resolved against the loaded member list.
+    private var myMember: Member? {
+        guard let slug = auth.memberSlug else { return nil }
+        return members.first { $0.slug == slug }
+    }
 
     var body: some View {
         NavigationStack {
             List {
+                if let me = myMember {
+                    Section {
+                        NavigationLink(value: Route.member(me)) {
+                            Label("My Shows", systemImage: "person.crop.circle")
+                                .font(.body.weight(.semibold))
+                        }
+                    }
+                } else if !auth.isLoggedIn {
+                    Section {
+                        Button {
+                            showingLogin = true
+                        } label: {
+                            Label("Log in to see your shows", systemImage: "person.crop.circle.badge.plus")
+                        }
+                    }
+                }
                 if !popular.isEmpty {
                     Section("What members are watching") {
                         ForEach(popular) { show in
@@ -41,13 +64,23 @@ struct HomeView: View {
             .overlay { if loading && members.isEmpty { ProgressView() } }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    if let slug = auth.memberSlug,
-                       let me = members.first(where: { $0.slug == slug }) {
-                        NavigationLink(value: Route.member(me)) {
-                            Label("My Shows", systemImage: "person.crop.circle")
+                    if auth.isLoggedIn {
+                        Menu {
+                            Button(role: .destructive) {
+                                Task { await auth.logout() }
+                            } label: {
+                                Label("Log out", systemImage: "rectangle.portrait.and.arrow.right")
+                            }
+                        } label: {
+                            Image(systemName: "person.crop.circle")
                         }
+                    } else {
+                        Button("Log in") { showingLogin = true }
                     }
                 }
+            }
+            .sheet(isPresented: $showingLogin) {
+                LoginView(memberSlug: auth.memberSlug ?? "").environmentObject(auth)
             }
         }
     }
