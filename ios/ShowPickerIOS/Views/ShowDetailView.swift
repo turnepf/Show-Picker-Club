@@ -44,7 +44,7 @@ struct ShowDetailView: View {
                     if let w = s.watchingWith, !w.isEmpty {
                         LabeledContent("Watching with", value: w)
                     }
-                    if let dates = seasonDates(s) {
+                    if let dates = s.seasonDatesText {
                         LabeledContent("Next up", value: dates)
                     }
                 }
@@ -90,14 +90,6 @@ struct ShowDetailView: View {
                 AddEditShowView(memberSlug: s.memberSlug ?? "", existing: s) { await load() }
             }
         }
-    }
-
-    private func seasonDates(_ s: Show) -> String? {
-        let start = s.nextSeasonDate, end = s.seasonEndDate
-        if let start, !start.isEmpty, let end, !end.isEmpty { return "\(start) – \(end)" }
-        if let start, !start.isEmpty { return start }
-        if let end, !end.isEmpty { return "through \(end)" }
-        return nil
     }
 
     private func isRealUrl(_ u: String) -> Bool {

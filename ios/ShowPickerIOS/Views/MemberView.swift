@@ -36,6 +36,13 @@ struct MemberView: View {
             .padding(.horizontal)
             .padding(.top, 8)
 
+            Text(listHelp(currentList))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+                .padding(.vertical, 6)
+
             List {
                 let items = sortedItems()
                 if items.isEmpty {
@@ -116,6 +123,16 @@ struct MemberView: View {
         }
     }
 
+    // Short description of what each list is for, shown under the tab picker.
+    private func listHelp(_ list: ShowList) -> String {
+        switch list {
+        case .watching:     return "Shows you're actively watching."
+        case .waiting:      return "Between seasons — premiere dates show on the calendar feed."
+        case .recommending: return "Shows worth recommending to the club."
+        case .next:         return "Saved to watch later, plus picks and suggestions from others."
+        }
+    }
+
     private func defaultSort(_ list: ShowList) -> SortOption {
         (list == .watching || list == .waiting) ? .nextup : .rating
     }
@@ -180,6 +197,12 @@ struct MemberView: View {
                     }
                 }
                 .font(.caption)
+                if (currentList == .watching || currentList == .waiting), let range = s.nextUpRange {
+                    Label("Next up: \(range)", systemImage: "calendar")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .labelStyle(.titleAndIcon)
+                }
             }
             Spacer()
             if let r = s.rating, !r.isEmpty {
