@@ -42,14 +42,38 @@
 		A100000000000000000000E1 /* SharedSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/SharedSession.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A10000000000000000000401 /* Exceptions for "ShowPickerIOS" folder in "ShowPickerIOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				ShowPickerIOS.entitlements,
+			);
+			target = A100000000000000000000B1 /* ShowPickerIOS */;
+		};
+		A10000000000000000000402 /* Exceptions for "ShowPickerShareExtension" folder in "ShowPickerShareExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+				ShareExtension.entitlements,
+			);
+			target = A100000000000000000000B2 /* ShowPickerShareExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A100000000000000000000D3 /* ShowPickerIOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A10000000000000000000401 /* Exceptions for "ShowPickerIOS" folder in "ShowPickerIOS" target */,
+			);
 			path = ShowPickerIOS;
 			sourceTree = "<group>";
 		};
 		A100000000000000000000D4 /* ShowPickerShareExtension */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A10000000000000000000402 /* Exceptions for "ShowPickerShareExtension" folder in "ShowPickerShareExtension" target */,
+			);
 			path = ShowPickerShareExtension;
 			sourceTree = "<group>";
 		};
