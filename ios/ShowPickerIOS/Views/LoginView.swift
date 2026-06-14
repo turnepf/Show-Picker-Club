@@ -81,7 +81,14 @@ struct LoginView: View {
                         .textContentType(.oneTimeCode)
                         .font(.title2.monospacedDigit())
                         .multilineTextAlignment(.center)
-                    Text("Enter the code from your text or email.")
+                        .onChange(of: code) { _, newValue in
+                            // Auto-submit as soon as a full 6-digit code is in,
+                            // so the user never has to reach for the Log in button.
+                            if newValue.filter(\.isNumber).count == 6 && !submitting {
+                                Task { await submit() }
+                            }
+                        }
+                    Text("Enter the code from your text or email — it logs you in automatically.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
