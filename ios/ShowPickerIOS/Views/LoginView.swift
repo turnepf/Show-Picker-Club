@@ -26,79 +26,51 @@ struct LoginView: View {
                         Task { await handleApple(result) }
                     }
                     .signInWithAppleButtonStyle(.black)
-                    .frame(height: 48)
+                    .frame(height: 46)
                     .listRowInsets(EdgeInsets())
                     .disabled(submitting)
-                } footer: {
-                    Text("Use the Apple ID email the group owner has on file. Or sign in by phone or email below — we'll send you a 6-digit code.")
                 }
 
-                Section("Phone") {
-                    TextField("(336) 555-1234", text: $phone)
-                        .keyboardType(.phonePad)
-                        .textContentType(.telephoneNumber)
-                    Button {
-                        Task { await sendPhoneCode() }
-                    } label: {
-                        if sendingPhone {
-                            ProgressView()
-                        } else if phoneCodeSent {
-                            Label("Code sent — check your texts", systemImage: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                        } else {
-                            Text("Text me a code")
+                Section {
+                    HStack {
+                        TextField("Phone", text: $phone)
+                            .keyboardType(.phonePad)
+                            .textContentType(.telephoneNumber)
+                        sendButton(title: "Text", sent: phoneCodeSent,
+                                   sending: sendingPhone, disabled: phone.isEmpty) {
+                            await sendPhoneCode()
                         }
                     }
-                    .disabled(phone.isEmpty || sendingPhone)
-                }
-
-                Section("Email") {
-                    TextField("you@example.com", text: $email)
-                        .keyboardType(.emailAddress)
-                        .textContentType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    Button {
-                        Task { await sendEmailCode() }
-                    } label: {
-                        if sendingEmail {
-                            ProgressView()
-                        } else if emailCodeSent {
-                            Label("Code sent — check your email", systemImage: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                        } else {
-                            Text("Email me a code")
+                    HStack {
+                        TextField("Email", text: $email)
+                            .keyboardType(.emailAddress)
+                            .textContentType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        sendButton(title: "Email", sent: emailCodeSent,
+                                   sending: sendingEmail, disabled: email.isEmpty) {
+                            await sendEmailCode()
                         }
                     }
-                    .disabled(email.isEmpty || sendingEmail)
-                }
-
-                Section("Code") {
-                    TextField("••••••", text: $code)
+                    TextField("6-digit code", text: $code)
                         .keyboardType(.numberPad)
                         .textContentType(.oneTimeCode)
-                        .font(.title2.monospacedDigit())
+                        .font(.title3.monospacedDigit())
                         .multilineTextAlignment(.center)
                         .onChange(of: code) { _, newValue in
-                            // Auto-submit as soon as a full 6-digit code is in,
-                            // so the user never has to reach for the Log in button.
+                            // Auto-submit as soon as a full 6-digit code is in.
                             if newValue.filter(\.isNumber).count == 6 && !submitting {
                                 Task { await submit() }
                             }
                         }
-                    Text("Enter the code from your text or email — it logs you in automatically.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                if let err = errorText {
-                    Section { Text(err).foregroundStyle(.red) }
-                }
-
-                Section {
-                    Text("If you don't receive a text or email, reach out to the group owner with the phone or email you'd like to use.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("Or get a code by text or email")
+                } footer: {
+                    if let err = errorText {
+                        Text(err).foregroundStyle(.red)
+                    } else {
+                        Text("The code logs you in automatically.")
+                    }
                 }
             }
             .navigationTitle("Log in")
@@ -112,6 +84,27 @@ struct LoginView: View {
             }
             .overlay { if submitting { ProgressView().controlSize(.large) } }
         }
+    }
+
+    // Inline "send me a code" button that lives in the trailing edge of a field
+    // row. .borderless keeps it a separate tap target from the text field.
+    @ViewBuilder
+    private func sendButton(title: String, sent: Bool, sending: Bool,
+                            disabled: Bool, action: @escaping () async -> Void) -> some View {
+        Button {
+            Task { await action() }
+        } label: {
+            if sending {
+                ProgressView()
+            } else if sent {
+                Label("Sent", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            } else {
+                Text(title)
+            }
+        }
+        .buttonStyle(.borderless)
+        .font(.callout)
+        .disabled(disabled || sending)
     }
 
     private func handleApple(_ result: Result<ASAuthorization, Error>) async {
