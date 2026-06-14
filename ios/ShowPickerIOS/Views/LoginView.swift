@@ -124,8 +124,11 @@ struct LoginView: View {
             do {
                 try await auth.loginWithApple(identityToken: token)
                 dismiss()
-            } catch {
+            } catch API.APIError.badResponse(401) {
                 errorText = "That Apple ID isn't linked to a member yet. Pick \"Share My Email\" with the address the owner has on file, or log in by text/email."
+            } catch {
+                // 404/403/5xx or no network — distinct from an unrecognized member.
+                errorText = "Couldn't reach sign-in. Check your connection (the Apple endpoint may not be deployed yet), or use a text/email code."
             }
         case .failure(let error):
             // Silently ignore a user-initiated cancel; surface anything else.
