@@ -80,7 +80,7 @@ struct HomeView: View {
                 }
             }
             .sheet(isPresented: $showingLogin) {
-                LoginView(memberSlug: auth.memberSlug ?? "").environmentObject(auth)
+                LoginView().environmentObject(auth)
             }
         }
     }

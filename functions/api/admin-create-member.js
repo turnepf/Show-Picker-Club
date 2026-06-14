@@ -87,8 +87,6 @@ export async function createMember(env, { full_name, phone, emails }) {
     }
   }
 
-  const code = phoneE164 ? phoneE164.slice(-4) : null;
-
   const tokens = full_name.trim().split(/\s+/);
   const firstName = tokens[0];
   const firstSlug = firstName.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -123,11 +121,6 @@ export async function createMember(env, { full_name, phone, emails }) {
   await env.DB.prepare(
     'INSERT INTO members (slug, name, first_name, last_initial, last_name) VALUES (?, ?, ?, ?, ?)'
   ).bind(slug, displayName, firstName, lastInitialUpper, lastName).run();
-  if (code) {
-    await env.DB.prepare(
-      'INSERT INTO member_codes (member_slug, code, editor_name) VALUES (?, ?, ?)'
-    ).bind(slug, code, editorName).run();
-  }
   if (phoneE164) {
     await env.DB.prepare(
       'INSERT INTO member_phones (phone, member_slug, label, is_primary) VALUES (?, ?, NULL, 1)'
@@ -165,7 +158,6 @@ export async function createMember(env, { full_name, phone, emails }) {
     name: displayName,
     editor_name: editorName,
     url: `https://showpicker.club/${slug}`,
-    code,
     phone: phoneE164,
     emails: emailList,
     seeded: seededTitles,

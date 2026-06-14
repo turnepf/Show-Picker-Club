@@ -1553,14 +1553,15 @@
         showLoginError('Enter your code.');
         return;
       }
+      if (!phone && !email) {
+        showLoginError('Enter your phone or email first, then the code.');
+        return;
+      }
       const btn = document.getElementById('loginSubmitBtn');
       btn.disabled = true;
       btn.textContent = 'Logging in…';
       // Phone wins if both are filled — phone OTP is the more recent intent.
-      // Fall back to email, then to the slug for the page we're viewing.
-      const body = phone ? { code, phone }
-                   : email ? { code, email }
-                   : { code, member: memberSlug };
+      const body = phone ? { code, phone } : { code, email };
       try {
         const res = await fetch('/auth/login', {
           method: 'POST',

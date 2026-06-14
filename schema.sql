@@ -18,13 +18,6 @@ CREATE INDEX IF NOT EXISTS idx_member_phones_slug ON member_phones(member_slug);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_member_phones_primary
   ON member_phones(member_slug) WHERE is_primary = 1;
 
-CREATE TABLE IF NOT EXISTS member_codes (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  member_slug TEXT REFERENCES members(slug),
-  code TEXT NOT NULL,
-  editor_name TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS shows (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,
@@ -87,5 +80,4 @@ CREATE INDEX IF NOT EXISTS idx_shows_list ON shows(list);
 CREATE INDEX IF NOT EXISTS idx_shows_archived ON shows(archived);
 CREATE INDEX IF NOT EXISTS idx_shows_member ON shows(member_slug);
 CREATE INDEX IF NOT EXISTS idx_actors_show_id ON actors(show_id);
-CREATE INDEX IF NOT EXISTS idx_member_codes_code ON member_codes(code);
 CREATE INDEX IF NOT EXISTS idx_failed_logins_ip_time ON failed_logins(ip, created_at);

@@ -8,7 +8,7 @@ A shared tracker for a small private TV/movie club. Each member maintains their 
 
 ## Who it's for
 
-A closed group of friends and family (~20 members in production). Everyone has a member slug (e.g. `/whitt`), a 4-digit login code, and full edit rights over their own lists. No public registration.
+A closed group of friends and family (~20 members in production). Everyone has a member slug (e.g. `/whitt`), signs in with a one-time code (text/email) or Sign in with Apple, and has full edit rights over their own lists. No public registration.
 
 ## The four lists
 
@@ -42,7 +42,7 @@ The network dropdown lists only the modern streaming-service brand (HBO Max, Par
 
 ## Authentication
 
-A member logs in by entering their 4-digit code on their own member page. The code is matched against the `member_codes` table (codes are stored in plain text but only valid for that member's slug). A successful login sets a 30-day HttpOnly session cookie.
+A member logs in with a one-time code sent to their phone (SMS via Twilio Verify) or email (via Resend, validated against `login_otps`), or with Sign in with Apple (iOS app). All paths resolve to an existing member and set a 30-day HttpOnly session cookie. There are no static per-member passwords.
 
 Failed logins are rate-limited: 5 attempts per IP in any 15-minute window returns a 429 with `Retry-After`. Failed-login rows are pruned daily.
 
@@ -153,7 +153,7 @@ Recently removed: "Most active members," "Recently archived," "Seed-only members
 
 Three secret-protected admin pages (all require the `ADMIN_SECRET` value to be entered in the page):
 
-- **/setup** — create a new member. Pick a name and a 4-digit code; the page generates a slug, picks 8 seed shows from highly-rated club picks (2 per list), and copies them in as `added_by='seed'` rows. The new member sees these on first login.
+- **/setup** — create a new member. Enter a name plus the phone and/or email they'll receive login codes at; the page generates a slug, picks 8 seed shows from highly-rated club picks (2 per list), and copies them in as `added_by='seed'` rows. The new member sees these on first login.
 - **/url-cleanup** — queue of shows missing a real network URL (still on a generic search link). Operator can paste a deep link; the page pushes it to every member's copy of that show.
 - **/vibe-admin** — batch-score show traits using Claude. Picks shows missing a `show_traits` row, sends each title to Claude with a calibration prompt that asks for 27 trait scores (0–1), writes the result back. Used to backfill the trait data that powers Vibe.
 
@@ -163,7 +163,7 @@ There is no admin role in the session model — admin actions are gated purely b
 
 - **Created** by an operator via `/setup` (or by hand-INSERT during bootstrap).
 - **Seeded** with 8 shows automatically (2 per list, drawn from the existing club's highly-rated picks).
-- **Logs in** for the first time with the 4-digit code they were given.
+- **Logs in** for the first time with a one-time code (text or email), or Sign in with Apple.
 - **Engages** by editing notes, moving shows between lists, adding new shows, archiving, or sharing. Any of these flips the member out of "seed-only" status and they begin showing in popular, recommendations, member match, and vibe.
 - **Goes dormant** when 60 days pass without a session ping; the member card disappears from the home page picker until they come back. They're still reachable by direct URL.
 

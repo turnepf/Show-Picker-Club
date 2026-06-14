@@ -70,7 +70,7 @@ struct MemberView: View {
         .task { if loading { await load() } }
         .overlay { if loading && shows.isEmpty { ProgressView() } }
         .sheet(isPresented: $showingLogin) {
-            LoginView(memberSlug: member.slug).environmentObject(auth)
+            LoginView().environmentObject(auth)
         }
         .sheet(isPresented: $showingAdd) {
             if isMine {

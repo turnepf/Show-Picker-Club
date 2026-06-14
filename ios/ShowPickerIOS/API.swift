@@ -58,10 +58,6 @@ enum API {
 
     // MARK: Auth
 
-    static func login(member slug: String, code: String) async throws -> LoginResponse {
-        try await postJSON("/auth/login", body: ["code": code, "member": slug])
-    }
-
     static func loginWithEmail(email: String, code: String) async throws -> LoginResponse {
         try await postJSON("/auth/login", body: ["code": code, "email": email])
     }

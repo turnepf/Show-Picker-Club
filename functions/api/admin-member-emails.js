@@ -156,22 +156,6 @@ export async function onRequestPost(context) {
         'INSERT INTO member_phones (phone, member_slug, is_primary) VALUES (?, ?, ?)'
       ).bind(phones[i], slug, i === 0 ? 1 : 0).run();
     }
-    // Keep the legacy static code in sync with the (new) primary phone so
-    // the 4-digit login flow keeps working through the June 7 cutoff.
-    if (phones.length > 0) {
-      const code = phones[0].slice(-4);
-      const editorRow = await env.DB.prepare(
-        'SELECT editor_name FROM member_codes WHERE member_slug = ? LIMIT 1'
-      ).bind(slug).first();
-      const firstNameRow = await env.DB.prepare(
-        'SELECT first_name FROM members WHERE slug = ?'
-      ).bind(slug).first();
-      const editorName = editorRow?.editor_name || firstNameRow?.first_name || slug;
-      await env.DB.prepare('DELETE FROM member_codes WHERE member_slug = ?').bind(slug).run();
-      await env.DB.prepare(
-        'INSERT INTO member_codes (member_slug, code, editor_name) VALUES (?, ?, ?)'
-      ).bind(slug, code, editorName).run();
-    }
   }
 
   return json({ ok: true, slug, emails, phones });

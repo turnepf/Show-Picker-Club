@@ -18,7 +18,7 @@ ios/ShowPickerIOS/
     ├── ShowDetailView.swift    Read-only detail + Edit + Watch
     ├── AddEditShowView.swift   Sheet for add / edit
     ├── SuggestShowView.swift   Sheet for suggesting to another member
-    └── LoginView.swift         4-digit code entry
+    └── LoginView.swift         Sign in with Apple + one-time code entry
 ```
 
 ## Build it on your Mac
@@ -101,7 +101,7 @@ ios/
 | Browse popular + members | ✅ |
 | Member's four lists with sort by rating | ✅ |
 | Show detail (title, network, rating, genres, recommender, notes, cast, dates) | ✅ |
-| Log in with 4-digit code | ✅ (will swap to SMS code once Twilio campaign clears) |
+| Log in with one-time code (text or email) | ✅ (auto-submits on the 6th digit) |
 | Sign in with Apple | ✅ (maps the Apple ID email → existing member; see note) |
 | Add show | ✅ |
 | Edit show | ✅ |
