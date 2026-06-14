@@ -13,6 +13,8 @@ export async function onRequestGet(context) {
             COUNT(CASE WHEN s.archived = 0 THEN s.id END) as show_count,
             COUNT(CASE WHEN s.archived = 0 AND s.list = 'watching' THEN s.id END) as watching_count,
             COUNT(CASE WHEN s.archived = 0 AND s.list = 'waiting' THEN s.id END) as waiting_count,
+            COUNT(CASE WHEN s.archived = 0 AND s.list = 'recommending' THEN s.id END) as recommending_count,
+            COUNT(CASE WHEN s.archived = 0 AND s.list = 'next' THEN s.id END) as next_count,
             MAX(
               CASE WHEN COALESCE(s.added_by, '') != 'seed'
                    THEN COALESCE(s.updated_at, s.created_at) END
@@ -42,6 +44,8 @@ export async function onRequestGet(context) {
       show_count: m.show_count,
       watching_count: m.watching_count,
       waiting_count: m.waiting_count,
+      recommending_count: m.recommending_count,
+      next_count: m.next_count,
       last_activity_at: m.last_activity_at,
     };
   });

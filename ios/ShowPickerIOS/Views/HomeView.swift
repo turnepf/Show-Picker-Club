@@ -120,8 +120,8 @@ struct HomeView: View {
         HStack {
             Text(m.label)
             Spacer()
-            if let c = m.watchingCount {
-                Text("\(c) watching").font(.caption).foregroundStyle(.secondary)
+            if m.activeCount > 0 {
+                Text("\(m.activeCount) active").font(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -133,11 +133,11 @@ struct HomeView: View {
         async let p = try? await API.popular()
         let mr = (await m) ?? []
         let pr = (await p) ?? []
-        // Top 6 by watching count, tiebreak on waiting count.
+        // Most active first — Watching + Up Next + Recommending — then most
+        // recent activity as a tiebreaker so the preview surfaces live members.
         members = mr.sorted {
-            let a = ($0.watchingCount ?? 0, $0.waitingCount ?? 0)
-            let b = ($1.watchingCount ?? 0, $1.waitingCount ?? 0)
-            return a > b
+            if $0.activeCount != $1.activeCount { return $0.activeCount > $1.activeCount }
+            return ($0.lastActivityAt ?? "") > ($1.lastActivityAt ?? "")
         }
         popular = pr
     }
