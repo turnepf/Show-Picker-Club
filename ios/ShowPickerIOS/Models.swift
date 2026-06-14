@@ -56,6 +56,7 @@ struct Show: Codable, Identifiable, Hashable {
     let actors: String?
     let archived: Int?
     let memberSlug: String?
+    let createdAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, network, rating, list, notes, movie, genres, actors, archived
@@ -66,6 +67,7 @@ struct Show: Codable, Identifiable, Hashable {
         case nextSeasonDate = "next_season_date"
         case seasonEndDate = "season_end_date"
         case memberSlug = "member_slug"
+        case createdAt = "created_at"
     }
 
     var isMovie: Bool { (movie ?? 0) == 1 }
