@@ -17,6 +17,9 @@ final class AuthStore: ObservableObject {
         let r = await API.checkAuth()
         memberSlug = r.authenticated ? r.member : nil
         email = r.authenticated ? r.email : nil
+        if r.authenticated, let slug = memberSlug {
+            SharedSession.sync(memberSlug: slug)
+        }
     }
 
     @MainActor
@@ -54,6 +57,7 @@ final class AuthStore: ObservableObject {
         await API.logout()
         memberSlug = nil
         email = nil
+        SharedSession.clear()
     }
 
     func isMe(_ slug: String) -> Bool { memberSlug == slug }
