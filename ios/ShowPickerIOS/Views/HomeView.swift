@@ -6,6 +6,9 @@ struct HomeView: View {
     @State private var popular: [PopularShow] = []
     @State private var loading = true
     @State private var showingLogin = false
+    @State private var showAllMembers = false
+
+    private let memberPreviewCount = 6
 
     // The logged-in member, resolved against the loaded member list.
     private var myMember: Member? {
@@ -42,9 +45,19 @@ struct HomeView: View {
                     }
                 }
                 Section("Members") {
-                    ForEach(members) { m in
+                    let visible = showAllMembers ? members : Array(members.prefix(memberPreviewCount))
+                    ForEach(visible) { m in
                         NavigationLink(value: Route.member(m)) {
                             memberRow(m)
+                        }
+                    }
+                    if members.count > memberPreviewCount {
+                        Button {
+                            withAnimation { showAllMembers.toggle() }
+                        } label: {
+                            Label(showAllMembers ? "Show fewer" : "Show all \(members.count) members",
+                                  systemImage: showAllMembers ? "chevron.up" : "chevron.down")
+                                .font(.callout)
                         }
                     }
                 }
