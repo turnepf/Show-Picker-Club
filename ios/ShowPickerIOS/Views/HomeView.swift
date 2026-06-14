@@ -18,52 +18,69 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                if let me = myMember {
-                    Section {
-                        NavigationLink(value: Route.member(me)) {
-                            Label("My Shows", systemImage: "person.crop.circle")
-                                .font(.body.weight(.semibold))
-                        }
-                    }
-                } else if !auth.isLoggedIn {
-                    Section {
-                        Button {
-                            showingLogin = true
-                        } label: {
-                            Label("Log in to see your shows", systemImage: "person.crop.circle.badge.plus")
-                        }
-                    }
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Show Picker Club")
+                        .font(.largeTitle.bold())
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Spacer()
+                    accountControl
                 }
-                if !popular.isEmpty {
-                    Section("What members are watching") {
-                        ForEach(popular) { show in
-                            NavigationLink(value: Route.detail(id: show.id, title: show.title, network: show.network, rating: show.rating)) {
-                                popularRow(show)
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .padding(.bottom, 8)
+
+                List {
+                    if let me = myMember {
+                        Section {
+                            NavigationLink(value: Route.member(me)) {
+                                Label("My Shows", systemImage: "person.crop.circle")
+                                    .font(.body.weight(.semibold))
+                            }
+                        }
+                    } else if !auth.isLoggedIn {
+                        Section {
+                            Button {
+                                showingLogin = true
+                            } label: {
+                                Label("Log in to see your shows", systemImage: "person.crop.circle.badge.plus")
+                            }
+                        }
+                    }
+                    if !popular.isEmpty {
+                        Section("What members are watching") {
+                            ForEach(popular) { show in
+                                NavigationLink(value: Route.detail(id: show.id, title: show.title, network: show.network, rating: show.rating)) {
+                                    popularRow(show)
+                                }
+                            }
+                        }
+                    }
+                    Section("Members") {
+                        let visible = showAllMembers ? members : Array(members.prefix(memberPreviewCount))
+                        ForEach(visible) { m in
+                            NavigationLink(value: Route.member(m)) {
+                                memberRow(m)
+                            }
+                        }
+                        if members.count > memberPreviewCount {
+                            Button {
+                                withAnimation { showAllMembers.toggle() }
+                            } label: {
+                                Label(showAllMembers ? "Show fewer" : "Show all \(members.count) members",
+                                      systemImage: showAllMembers ? "chevron.up" : "chevron.down")
+                                    .font(.callout)
                             }
                         }
                     }
                 }
-                Section("Members") {
-                    let visible = showAllMembers ? members : Array(members.prefix(memberPreviewCount))
-                    ForEach(visible) { m in
-                        NavigationLink(value: Route.member(m)) {
-                            memberRow(m)
-                        }
-                    }
-                    if members.count > memberPreviewCount {
-                        Button {
-                            withAnimation { showAllMembers.toggle() }
-                        } label: {
-                            Label(showAllMembers ? "Show fewer" : "Show all \(members.count) members",
-                                  systemImage: showAllMembers ? "chevron.up" : "chevron.down")
-                                .font(.callout)
-                        }
-                    }
-                }
+                .listStyle(.insetGrouped)
+                .refreshable { await load() }
+                .task { if loading { await load() } }
+                .overlay { if loading && members.isEmpty { ProgressView() } }
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Show Picker Club")
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Route.self) { route in
                 switch route {
                 case .member(let m):
@@ -72,28 +89,32 @@ struct HomeView: View {
                     ShowDetailView(id: id, initialTitle: title, initialNetwork: network, initialRating: rating)
                 }
             }
-            .refreshable { await load() }
-            .task { if loading { await load() } }
-            .overlay { if loading && members.isEmpty { ProgressView() } }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    if auth.isLoggedIn {
-                        Menu {
-                            Button(role: .destructive) {
-                                Task { await auth.logout() }
-                            } label: {
-                                Label("Log out", systemImage: "rectangle.portrait.and.arrow.right")
-                            }
-                        } label: {
-                            Image(systemName: "person.crop.circle")
-                        }
-                    } else {
-                        Button("Log in") { showingLogin = true }
-                    }
-                }
-            }
             .sheet(isPresented: $showingLogin) {
                 LoginView().environmentObject(auth)
+            }
+        }
+    }
+
+    // Account control shown on the title line: a menu (Log out) when signed in,
+    // otherwise a tap target that opens the login sheet.
+    private var accountControl: some View {
+        Group {
+            if auth.isLoggedIn {
+                Menu {
+                    Button(role: .destructive) {
+                        Task { await auth.logout() }
+                    } label: {
+                        Label("Log out", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                } label: {
+                    Image(systemName: "person.crop.circle").font(.title)
+                }
+            } else {
+                Button {
+                    showingLogin = true
+                } label: {
+                    Image(systemName: "person.crop.circle").font(.title)
+                }
             }
         }
     }
