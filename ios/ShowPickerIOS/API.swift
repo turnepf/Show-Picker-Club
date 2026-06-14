@@ -70,6 +70,12 @@ enum API {
         try await postJSON("/auth/login", body: ["code": code, "phone": phone])
     }
 
+    // Sign in with Apple: hand the verified identity token to the server, which
+    // maps it to an existing member and sets the session cookie.
+    static func loginWithApple(identityToken: String) async throws -> LoginResponse {
+        try await postJSON("/auth/apple", body: ["identity_token": identityToken])
+    }
+
     // Ask Twilio Verify to text a 6-digit OTP. Server replies 200 even for
     // unknown numbers (account-enumeration hardening), so a true result
     // doesn't prove the number is on file — it just means the request was

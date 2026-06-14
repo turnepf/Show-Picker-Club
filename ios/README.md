@@ -102,6 +102,7 @@ ios/
 | Member's four lists with sort by rating | ✅ |
 | Show detail (title, network, rating, genres, recommender, notes, cast, dates) | ✅ |
 | Log in with 4-digit code | ✅ (will swap to SMS code once Twilio campaign clears) |
+| Sign in with Apple | ✅ (maps the Apple ID email → existing member; see note) |
 | Add show | ✅ |
 | Edit show | ✅ |
 | Archive show (swipe action) | ✅ |
@@ -114,3 +115,21 @@ ios/
 | Calendar feed | not in v1 (could add a "Subscribe in Calendar" button that opens the webcal:// URL) |
 
 Anything in "not in v1" is straightforward to add later; it's the same backend endpoints, just more views.
+
+## Sign in with Apple
+
+The login sheet offers **Sign in with Apple** alongside phone/email codes. How it works:
+
+- The app gets Apple's signed identity token and POSTs it to `POST /auth/apple`.
+- The server (`functions/auth/apple.js`) verifies the token against Apple's public keys, then maps it to an **existing** member — first by the email Apple shares (against `member_emails`), then by the stable Apple user id (`sub`), which it remembers in `member_apple_ids` so later sign-ins work even behind a private-relay email. There is no public sign-up; an unrecognized Apple ID is rejected.
+
+Two things to know before it works end to end:
+
+1. **The Apple ID must already be a member.** The first sign-in matches by email, so on Apple's consent screen choose **"Share My Email"** with the address the owner has on file (hiding your email on the *first* sign-in can't be matched). After that first link it's keyed by `sub`.
+2. **Deploy the backend + run the migration.** The app talks to the live `showpicker.club` API, so `/auth/apple` only exists once this branch is deployed (push to `main`). Apply the new table first:
+   ```bash
+   wrangler d1 execute shows-db --remote --file=migrations/011_apple_login.sql
+   ```
+   Until then, Apple sign-in returns an error and you can fall back to phone/email codes.
+
+On the Xcode side, the **Sign in with Apple** capability is already declared in `ShowPickerIOS.entitlements`. With automatic signing and a paid Apple Developer account, Xcode registers it on your App ID when you select your Team. The token audience is the app bundle id (`net.patrickturner.showpickerios`); if you change the bundle id, set `APPLE_CLIENT_ID` in the Pages environment to match.

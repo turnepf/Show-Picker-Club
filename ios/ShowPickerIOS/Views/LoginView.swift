@@ -1,7 +1,8 @@
 import SwiftUI
+import AuthenticationServices
 
-// Login: phone (Twilio Verify) OR email (Resend-delivered OTP). User
-// picks whichever, gets a 6-digit code, enters it, taps Log in.
+// Login: Sign in with Apple, OR phone (Twilio Verify) / email (Resend-delivered
+// OTP). User picks whichever, gets a 6-digit code, enters it, taps Log in.
 struct LoginView: View {
     let memberSlug: String
 
@@ -21,9 +22,17 @@ struct LoginView: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Log in by phone or email — we'll send you a 6-digit code.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    SignInWithAppleButton(.signIn) { request in
+                        request.requestedScopes = [.email, .fullName]
+                    } onCompletion: { result in
+                        Task { await handleApple(result) }
+                    }
+                    .signInWithAppleButtonStyle(.black)
+                    .frame(height: 48)
+                    .listRowInsets(EdgeInsets())
+                    .disabled(submitting)
+                } footer: {
+                    Text("Use the Apple ID email the group owner has on file. Or sign in by phone or email below — we'll send you a 6-digit code.")
                 }
 
                 Section("Phone") {
@@ -97,6 +106,32 @@ struct LoginView: View {
                 }
             }
             .overlay { if submitting { ProgressView().controlSize(.large) } }
+        }
+    }
+
+    private func handleApple(_ result: Result<ASAuthorization, Error>) async {
+        errorText = nil
+        switch result {
+        case .success(let authorization):
+            guard let cred = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let tokenData = cred.identityToken,
+                  let token = String(data: tokenData, encoding: .utf8) else {
+                errorText = "Apple didn't return a sign-in token. Try again."
+                return
+            }
+            submitting = true
+            defer { submitting = false }
+            do {
+                try await auth.loginWithApple(identityToken: token)
+                dismiss()
+            } catch {
+                errorText = "That Apple ID isn't linked to a member yet. Pick \"Share My Email\" with the address the owner has on file, or log in by text/email."
+            }
+        case .failure(let error):
+            // Silently ignore a user-initiated cancel; surface anything else.
+            if (error as? ASAuthorizationError)?.code != .canceled {
+                errorText = "Apple sign-in failed. Try again."
+            }
         }
     }
 
