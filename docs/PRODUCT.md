@@ -178,11 +178,12 @@ A few intentional omissions:
 
 ## Backlog
 
-- **Social login (Sign in with Apple + Google).** Layer on top of the
-  current email-OTP flow as additional sign-in paths, not replacements.
-  Maps the SSO email back to an existing member's `member_emails` row,
-  so seeding stays operator-controlled (no public sign-up). "Sign in
-  with Apple" first since the iOS app is the higher-friction surface.
+- **Social login — Google.** ~~Sign in with Apple~~ shipped in the iOS app
+  (`/auth/apple`, mapping the Apple ID email back to an existing member's
+  `member_emails` row, then remembering the Apple `sub` in
+  `member_apple_ids`). Google would layer on the same way: an additional
+  sign-in path that maps the SSO email to a seeded member, keeping seeding
+  operator-controlled (no public sign-up).
 
 - **Open signup ("request access" flow).** Anyone can submit name +
   email on a `/signup` page. Submission lands in a `pending_signups`

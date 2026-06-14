@@ -53,6 +53,16 @@ final class AuthStore: ObservableObject {
     }
 
     @MainActor
+    func loginWithApple(identityToken: String) async throws {
+        let r = try await API.loginWithApple(identityToken: identityToken)
+        if r.success == true {
+            await refresh()
+        } else {
+            throw API.APIError.badResponse(401)
+        }
+    }
+
+    @MainActor
     func logout() async {
         await API.logout()
         memberSlug = nil
