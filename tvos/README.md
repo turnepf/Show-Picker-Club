@@ -7,30 +7,27 @@ Built with SwiftUI. Talks to the same public `/api/*` endpoints as the web app; 
 ## What's here
 
 ```
-tvos/ShowPickerTV/
+tvos/
+├── ShowPickerTV.xcodeproj/   Xcode project (open this)
 ├── ShowPickerTVApp.swift     App entry point
 ├── Models.swift              Codable models matching the API JSON
 ├── API.swift                 Async networking client (view-only endpoints)
 ├── Theme.swift               Colors + deterministic fallback tile colors
-└── Views/
-    ├── HomeView.swift        Popular shelf + members grid
-    ├── MemberView.swift      A member's four lists as horizontal shelves
-    ├── ShowDetailView.swift  Detail + "Watch on …" deep-link button
-    └── ShowCard.swift        Focusable show tile
+├── HomeView.swift            Popular shelf + members grid
+├── MemberView.swift          A member's four lists as horizontal shelves
+├── ShowDetailView.swift      Detail + "Watch on …" deep-link button
+├── ShowCard.swift            Focusable show tile
+└── ShowPickerTV/             Assets (app icon, top shelf, accent color)
+    └── Assets.xcassets/
 ```
 
 ## Build it (on your Mac)
 
-These are source files, not a full `.xcodeproj` (the project format is fragile to hand-author). Wiring them into a fresh project takes ~3 minutes:
+The Xcode project is committed at `tvos/ShowPickerTV.xcodeproj` — just open and run.
 
-1. **Xcode → File → New → Project → tvOS → App.**
-   - Product Name: `ShowPickerTV`
-   - Interface: **SwiftUI**, Language: **Swift**
-   - Uncheck Core Data / Tests if you don't want them.
-2. Delete the auto-generated `ContentView.swift` and the stub `…App.swift`.
-3. Drag the contents of `ShowPickerTV/` (the four root `.swift` files **and** the `Views/` folder) into the project navigator. Check **"Copy items if needed"** and add to the `ShowPickerTV` target.
-4. **Signing & Capabilities** → select your Team. Set a unique Bundle Identifier (e.g. `net.patrickturner.showpickertv`).
-5. Pick the **Apple TV** simulator and hit Run. You should see the home screen load from the live API.
+1. **Open `tvos/ShowPickerTV.xcodeproj`** in Xcode (double-click it, or `open tvos/ShowPickerTV.xcodeproj` from the repo root).
+2. **Signing & Capabilities** → select your Team. The project ships with `DEVELOPMENT_TEAM = NQ6AJVVBBJ` and bundle id `net.patrickturner.ShowPickerTV`; change the team to yours (and the bundle id if it collides with an existing app).
+3. Pick the **Apple TV** simulator and **Cmd+R**. You should see the home screen load from the live API.
 
 No `Info.plist` edits needed — showpicker.club is HTTPS, so App Transport Security passes by default.
 
