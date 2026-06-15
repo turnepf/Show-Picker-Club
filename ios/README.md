@@ -54,7 +54,7 @@ ios/
 
 ## Share Extension (iOS share sheet → Up Next)
 
-The Share Extension lets you hit the share button in Netflix, the Apple TV app, or any other streaming app and send that show straight to your Up Next list — without opening Show Picker first.
+The Share Extension lets you hit the share button in Netflix, the Apple TV app, or any other streaming app and send that show straight to your Up Next list — without opening Show Picker Club first.
 
 ### How it works
 
@@ -88,9 +88,9 @@ ios/
 ### Test it
 
 1. Cmd+R the `ShowPickerIOS` scheme to your device or simulator, then **log in once** in the app.
-2. Open Safari (or the Apple TV app) → navigate to any show → tap the share button → scroll the share sheet to find **Show Picker**. The compose form appears, pre-filled where possible; tap **Add**.
+2. Open Safari (or the Apple TV app) → navigate to any show → tap the share button → scroll the share sheet to find **Show Picker Club**. The compose form appears, pre-filled where possible; tap **Add**.
 
-> **First launch note:** the extension reads your session from the App Group. If you've never opened the main Show Picker app and logged in on that device, the extension shows "Not logged in — open Show Picker first." Open the app, log in once, and the extension works from then on.
+> **First launch note:** the extension reads your session from the App Group. If you've never opened the main Show Picker Club app and logged in on that device, the extension shows "Not logged in — open Show Picker Club first." Open the app, log in once, and the extension works from then on.
 >
 > **Simulator note:** Netflix/Apple TV aren't on the simulator, but Safari is — sharing any web page exercises the same URL path, so it's the easiest way to smoke-test.
 

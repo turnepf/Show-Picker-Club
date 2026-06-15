@@ -4,7 +4,7 @@ After several rounds of on-device testing and community-source research, here's 
 
 ## The headline
 
-**tvOS deep-linking to a specific show is broadly broken across the industry.** It's a platform-level limitation, not a Show Picker bug. The streaming services have largely chosen *not* to honor third-party deep links into specific content on tvOS — they only let you launch the app. Apple's official path forward isn't custom URL schemes at all; it's the Apple TV app and Universal Search, which require services to submit metadata feeds to Apple. That's not accessible to us from outside that system.
+**tvOS deep-linking to a specific show is broadly broken across the industry.** It's a platform-level limitation, not a Show Picker Club bug. The streaming services have largely chosen *not* to honor third-party deep links into specific content on tvOS — they only let you launch the app. Apple's official path forward isn't custom URL schemes at all; it's the Apple TV app and Universal Search, which require services to submit metadata feeds to Apple. That's not accessible to us from outside that system.
 
 Where this leaves us:
 
@@ -32,7 +32,7 @@ Status after the latest in-app code with custom-scheme fallbacks:
 
 The Apple-blessed integration path for tvOS streaming apps is the **Apple TV app + Universal Search**. Services submit XML metadata feeds to Apple containing show catalogs and per-territory availability + deep-link URLs ("locator elements"). The Apple TV app and Siri then call into those services with the right URL when a user picks the show through Apple's UI. **The streaming services' own apps mostly do not honor those same deep-link URLs when invoked by third parties** — the integration is one-way, into the Apple TV app's ecosystem, not out to arbitrary callers.
 
-So tools like Show Picker that want to bypass the Apple TV app entirely are working against the grain.
+So tools like Show Picker Club that want to bypass the Apple TV app entirely are working against the grain.
 
 ## Realistic UX (what's now shipped)
 
