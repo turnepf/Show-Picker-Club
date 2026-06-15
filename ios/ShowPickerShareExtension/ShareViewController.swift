@@ -41,13 +41,33 @@ class ShareViewController: UIViewController {
             let candidateTitle = item.attributedTitle?.string.nilIfEmpty
                 ?? item.attributedContentText?.string.nilIfEmpty
 
-            for provider in item.attachments ?? [] {
-                guard provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) else { continue }
+            let providers = item.attachments ?? []
+
+            // Preferred: a real URL attachment (Safari, Apple TV, most apps).
+            if let provider = providers.first(where: {
+                $0.hasItemConformingToTypeIdentifier(UTType.url.identifier)
+            }) {
                 provider.loadItem(forTypeIdentifier: UTType.url.identifier) { value, _ in
                     let url     = value as? URL
                     let network = url.flatMap { Self.networkFrom($0) }
                     // For Apple TV URLs the title slug is in the path; use it only
                     // when the app didn't supply an explicit title.
+                    let title   = candidateTitle ?? url.flatMap { Self.titleSlugFrom($0) }
+                    DispatchQueue.main.async { completion(title, network) }
+                }
+                return
+            }
+
+            // Fallback: some apps (e.g. Netflix) share the link inside plain text
+            // rather than as a discrete URL attachment. Recover the URL from it so
+            // the network still auto-detects.
+            if let provider = providers.first(where: {
+                $0.hasItemConformingToTypeIdentifier(UTType.plainText.identifier)
+            }) {
+                provider.loadItem(forTypeIdentifier: UTType.plainText.identifier) { value, _ in
+                    let text    = (value as? String) ?? candidateTitle
+                    let url     = text.flatMap { Self.firstURL(in: $0) }
+                    let network = url.flatMap { Self.networkFrom($0) }
                     let title   = candidateTitle ?? url.flatMap { Self.titleSlugFrom($0) }
                     DispatchQueue.main.async { completion(title, network) }
                 }
@@ -60,6 +80,19 @@ class ShareViewController: UIViewController {
             }
         }
         DispatchQueue.main.async { completion(nil, nil) }
+    }
+
+    // Pull the first http(s) URL out of a shared text blob. Apps like Netflix
+    // share the link as text ("Watch X on Netflix https://…") instead of as a
+    // discrete URL attachment.
+    private static func firstURL(in text: String) -> URL? {
+        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        let range = NSRange(text.startIndex..., in: text)
+        guard let url = detector?.firstMatch(in: text, options: [], range: range)?.url,
+              let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
+            return nil
+        }
+        return url
     }
 
     // Map the share URL's hostname to one of the app's canonical network names.

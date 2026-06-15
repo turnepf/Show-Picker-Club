@@ -24,9 +24,13 @@
 		<dict>
 			<key>NSExtensionActivationRule</key>
 			<dict>
-				<!-- Activate whenever the share payload contains a URL (Netflix, Apple TV, etc.). -->
+				<!-- Activate when the share payload contains a URL (Safari, Apple TV)
+				     OR text that embeds one. Streaming apps like Netflix share the
+				     link inside a text blob rather than as a discrete URL item. -->
 				<key>NSExtensionActivationSupportsWebURLWithMaxCount</key>
 				<integer>1</integer>
+				<key>NSExtensionActivationSupportsText</key>
+				<true/>
 			</dict>
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
