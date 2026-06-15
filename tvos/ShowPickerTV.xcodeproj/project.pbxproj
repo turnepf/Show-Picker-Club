@@ -7,26 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		CDB3617B2FC7CB26009F34F5 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB361782FC7CB25009F34F5 /* Models.swift */; };
-		CDB3617C2FC7CB26009F34F5 /* ShowPickerTVApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB361792FC7CB25009F34F5 /* ShowPickerTVApp.swift */; };
-		CDB3617D2FC7CB26009F34F5 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB3617A2FC7CB25009F34F5 /* Theme.swift */; };
-		CDB3617E2FC7CB26009F34F5 /* API.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB361772FC7CB25009F34F5 /* API.swift */; };
-		CDB361832FC7CE45009F34F5 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB3617F2FC7CE45009F34F5 /* HomeView.swift */; };
-		CDB361842FC7CE45009F34F5 /* MemberView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB361802FC7CE45009F34F5 /* MemberView.swift */; };
-		CDB361852FC7CE45009F34F5 /* ShowCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB361812FC7CE45009F34F5 /* ShowCard.swift */; };
-		CDB361862FC7CE45009F34F5 /* ShowDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB361822FC7CE45009F34F5 /* ShowDetailView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		CDB361692FC7CA68009F34F5 /* ShowPickerTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShowPickerTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		CDB361772FC7CB25009F34F5 /* API.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = API.swift; sourceTree = "<group>"; };
-		CDB361782FC7CB25009F34F5 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
-		CDB361792FC7CB25009F34F5 /* ShowPickerTVApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowPickerTVApp.swift; sourceTree = "<group>"; };
-		CDB3617A2FC7CB25009F34F5 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		CDB3617F2FC7CE45009F34F5 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
-		CDB361802FC7CE45009F34F5 /* MemberView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemberView.swift; sourceTree = "<group>"; };
-		CDB361812FC7CE45009F34F5 /* ShowCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowCard.swift; sourceTree = "<group>"; };
-		CDB361822FC7CE45009F34F5 /* ShowDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowDetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -53,14 +37,6 @@
 			children = (
 				CDB3616B2FC7CA68009F34F5 /* ShowPickerTV */,
 				CDB3616A2FC7CA68009F34F5 /* Products */,
-				CDB361772FC7CB25009F34F5 /* API.swift */,
-				CDB361782FC7CB25009F34F5 /* Models.swift */,
-				CDB361792FC7CB25009F34F5 /* ShowPickerTVApp.swift */,
-				CDB3617A2FC7CB25009F34F5 /* Theme.swift */,
-				CDB3617F2FC7CE45009F34F5 /* HomeView.swift */,
-				CDB361802FC7CE45009F34F5 /* MemberView.swift */,
-				CDB361812FC7CE45009F34F5 /* ShowCard.swift */,
-				CDB361822FC7CE45009F34F5 /* ShowDetailView.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -147,14 +123,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CDB3617B2FC7CB26009F34F5 /* Models.swift in Sources */,
-				CDB3617C2FC7CB26009F34F5 /* ShowPickerTVApp.swift in Sources */,
-				CDB3617D2FC7CB26009F34F5 /* Theme.swift in Sources */,
-				CDB3617E2FC7CB26009F34F5 /* API.swift in Sources */,
-				CDB361832FC7CE45009F34F5 /* HomeView.swift in Sources */,
-				CDB361842FC7CE45009F34F5 /* MemberView.swift in Sources */,
-				CDB361852FC7CE45009F34F5 /* ShowCard.swift in Sources */,
-				CDB361862FC7CE45009F34F5 /* ShowDetailView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
