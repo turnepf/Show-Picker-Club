@@ -8,17 +8,17 @@ Built with SwiftUI. Talks to the same public `/api/*` endpoints as the web app; 
 
 ```
 tvos/
-├── ShowPickerTV.xcodeproj/   Xcode project (open this)
-├── ShowPickerTVApp.swift     App entry point
-├── Models.swift              Codable models matching the API JSON
-├── API.swift                 Async networking client (view-only endpoints)
-├── Theme.swift               Colors + deterministic fallback tile colors
-├── HomeView.swift            Popular shelf + members grid
-├── MemberView.swift          A member's four lists as horizontal shelves
-├── ShowDetailView.swift      Detail + "Watch on …" deep-link button
-├── ShowCard.swift            Focusable show tile
-└── ShowPickerTV/             Assets (app icon, top shelf, accent color)
-    └── Assets.xcassets/
+├── ShowPickerTV.xcodeproj/       Xcode project (open this)
+└── ShowPickerTV/                 App sources (synchronized folder)
+    ├── ShowPickerTVApp.swift     App entry point
+    ├── Models.swift              Codable models matching the API JSON
+    ├── API.swift                 Async networking client (view-only endpoints)
+    ├── Theme.swift               Colors + deterministic fallback tile colors
+    ├── HomeView.swift            Popular shelf + members grid
+    ├── MemberView.swift          A member's four lists as horizontal shelves
+    ├── ShowDetailView.swift      Detail + "Watch on …" deep-link button
+    ├── ShowCard.swift            Focusable show tile
+    └── Assets.xcassets/          App icon, top shelf, accent color
 ```
 
 ## Build it (on your Mac)
