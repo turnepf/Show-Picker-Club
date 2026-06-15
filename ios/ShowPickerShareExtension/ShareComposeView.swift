@@ -61,7 +61,7 @@ struct ShareComposeView: View {
                     Section { Text(err).foregroundStyle(.red) }
                 }
             }
-            .navigationTitle("Add to Show Picker")
+            .navigationTitle("Add to Show Picker Club")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -78,7 +78,7 @@ struct ShareComposeView: View {
 
     private func save() async {
         guard let slug = SharedSession.memberSlug else {
-            errorText = "Not logged in — open Show Picker first."
+            errorText = "Not logged in — open Show Picker Club first."
             return
         }
         saving = true
@@ -91,7 +91,7 @@ struct ShareComposeView: View {
                                        list: list.rawValue, notes: n, movie: movie)
             onComplete()
         } catch ShareAPI.APIError.notLoggedIn {
-            errorText = "Not logged in — open Show Picker first."
+            errorText = "Not logged in — open Show Picker Club first."
         } catch {
             errorText = "Couldn't save — check your connection."
         }
