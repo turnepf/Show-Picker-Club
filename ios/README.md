@@ -38,7 +38,7 @@ The app is **already in TestFlight**, so shipping a new build is just *archive +
 
 **Always bump the build number before you archive.** App Store Connect rejects any build whose number isn't strictly higher than the last one uploaded for the same marketing version (this bit us once — the repo lagged what was already in TestFlight). The build number is `CURRENT_PROJECT_VERSION`, set **once at the project level** so the app and the share extension always match (Xcode → project → Build Settings → *Current Project Version*).
 
-> **Build log — keep this current.** Marketing version `1.0`. Highest build uploaded to TestFlight: **2**. Committed and ready to upload next: **3**. Before each upload, set this to the next unused integer (here *and* in the project), then update this line after uploading.
+> **Build log — keep this current.** Marketing version `1.0`. Highest build uploaded to TestFlight: **3**. Committed and ready to upload next: **4**. Before each upload, set this to the next unused integer (here *and* in the project), then update this line after uploading.
 
 Steps:
 1. `git pull origin main` (so you archive the bumped number).
