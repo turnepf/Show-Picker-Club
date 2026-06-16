@@ -73,10 +73,6 @@ Logged-in members viewing their own Up Next list see a "★ Picks for you" secti
 
 Each pick has a + button to one-tap-add to your Up Next list. After being added, it disappears from the picks section.
 
-### Member match
-
-A small card on each member page calls out the other member with the largest title overlap. Requires at least 5 active titles to surface (avoids noise from sparse libraries). Tap the card for the list of overlapping titles and a link to that member's lists. Seed-only members get no match card.
-
 ### Suggest a show
 
 Any logged-in member can suggest a show to any other member via the **Suggest a Show for ...** button at the bottom of any list. The suggestion lands on that member's Up Next list with the recommender attribution pre-filled and "Suggested · &lt;your notes&gt;" prepended to the notes.
@@ -87,7 +83,7 @@ The **+** button on any show row opens a share modal. The original member can co
 
 ### Edit, archive
 
-Logged in as yourself, every row gets Edit and Archive buttons inline. Editing re-runs enrichment if the title changes. Archive sets `archived=1`; archived shows are still searchable but don't appear in lists, popular, picks, recommendations, member match, or vibe.
+Logged in as yourself, every row gets Edit and Archive buttons inline. Editing re-runs enrichment if the title changes. Archive sets `archived=1`; archived shows are still searchable but don't appear in lists, popular, picks, recommendations, or vibe.
 
 ## Sort and toggle controls
 
@@ -164,7 +160,7 @@ There is no admin role in the session model — admin actions are gated purely b
 - **Created** by an operator via `/setup` (or by hand-INSERT during bootstrap).
 - **Seeded** with 8 shows automatically (2 per list, drawn from the existing club's highly-rated picks).
 - **Logs in** for the first time with a one-time code (text or email), or Sign in with Apple.
-- **Engages** by editing notes, moving shows between lists, adding new shows, archiving, or sharing. Any of these flips the member out of "seed-only" status and they begin showing in popular, recommendations, member match, and vibe.
+- **Engages** by editing notes, moving shows between lists, adding new shows, archiving, or sharing. Any of these flips the member out of "seed-only" status and they begin showing in popular, recommendations, and vibe.
 - **Goes dormant** when 60 days pass without a session ping; the member card disappears from the home page picker until they come back. They're still reachable by direct URL.
 
 ## Future / not built
