@@ -93,6 +93,35 @@ enum API {
         return try JSONDecoder().decode(SignupActionResult.self, from: data)
     }
 
+    // URL-cleanup queue: titles still on a placeholder network URL (operator).
+    static func urlCleanupQueue() async throws -> UrlCleanupResponse {
+        try await postDecoding("/api/admin-url-cleanup", body: ["action": "list"])
+    }
+
+    // Save a real deep link for a queued title (propagates to every copy).
+    static func saveShowUrl(id: Int, network: String, url: String) async throws -> AdminActionResult {
+        try await postDecoding("/api/admin-url-cleanup",
+                               body: ["action": "save", "id": id, "network": network, "network_url": url])
+    }
+
+    // Rename a wrong/typo'd title across all copies and re-enrich it (operator).
+    static func fixShowTitle(id: Int, newTitle: String) async throws -> AdminActionResult {
+        try await postDecoding("/api/admin-url-cleanup",
+                               body: ["action": "fix_title", "id": id, "new_title": newTitle])
+    }
+
+    // POST + decode the body regardless of HTTP status, so admin tools can show
+    // the server's error message instead of a bare status code.
+    private static func postDecoding<T: Decodable>(_ path: String, body: [String: Any]) async throws -> T {
+        guard let url = URL(string: baseString + path) else { throw APIError.badURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, _) = try await URLSession.shared.data(for: req)
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
     // Create a new member (operator only). Decodes the body on success or
     // failure so the caller can surface the server's error message.
     static func createMember(fullName: String, phone: String?, emails: String?) async throws -> CreateMemberResult {
