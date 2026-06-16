@@ -212,6 +212,8 @@
             <input type="text" class="url-input" placeholder="Paste direct URL" autocomplete="off">
             <button class="btn-update" type="button">Update</button>
             <input type="text" class="other-input${otherClass}" placeholder="New network name" value="${escapeAttr(otherValue)}">
+            <input type="text" class="title-input" placeholder="Fix title" value="${escapeAttr(show.title)}" autocomplete="off">
+            <button class="btn-rename" type="button">Rename</button>
             <div class="row-err"></div>
           </div>
         </div>
@@ -279,6 +281,46 @@
           btn.disabled = false;
           btn.textContent = oldText;
         }
+      });
+
+      // Fix a wrong/typo'd title: renames every member's copy and re-enriches.
+      const titleInput = rowEl.querySelector('.title-input');
+      const renameBtn = rowEl.querySelector('.btn-rename');
+      titleInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); renameBtn.click(); }
+      });
+      renameBtn.addEventListener('click', async () => {
+        errBox.textContent = '';
+        const newTitle = titleInput.value.trim();
+        if (!newTitle) { errBox.textContent = 'Enter a title.'; return; }
+        renameBtn.disabled = true;
+        const old = renameBtn.textContent;
+        renameBtn.textContent = '…';
+        try {
+          const res = await fetch('/api/admin-url-cleanup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'fix_title',
+              id: parseInt(rowEl.dataset.id, 10),
+              new_title: newTitle,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            errBox.textContent = data.error || `Error (${res.status})`;
+          } else {
+            const finalTitle = data.new_title || newTitle;
+            rowEl.querySelector('.show-link').textContent = finalTitle;
+            titleInput.value = finalTitle;
+            const n = data.updated || 0;
+            errBox.textContent = `Renamed to "${finalTitle}" across ${n} cop${n === 1 ? 'y' : 'ies'}.`;
+          }
+        } catch (e) {
+          errBox.textContent = 'Network error: ' + e.message;
+        }
+        renameBtn.disabled = false;
+        renameBtn.textContent = old;
       });
     }
 
