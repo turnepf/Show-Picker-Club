@@ -82,6 +82,17 @@ export async function onRequestGet(context) {
      LIMIT 10`
   ).all();
 
+  // Durable login coverage (migration 013). Defensive: if the column isn't
+  // there yet, report nulls rather than 500 the whole dashboard.
+  let membersLogin = { ever: null, never: null };
+  try {
+    membersLogin = await env.DB.prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM members WHERE last_login_at IS NOT NULL) AS ever,
+         (SELECT COUNT(*) FROM members WHERE last_login_at IS NULL) AS never`
+    ).first();
+  } catch (_) { /* column not migrated yet */ }
+
   return json({
     generated_at: new Date().toISOString(),
     new_shows: newShows,
@@ -90,6 +101,7 @@ export async function onRequestGet(context) {
     new_members: newMembers,
     active_members: activeMembers,
     totals,
+    members_login: membersLogin,
     top_networks: topNetworks,
     top_shared: topShared,
   });
