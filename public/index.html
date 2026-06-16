@@ -598,17 +598,18 @@
       .show-actors { transition: none; }
     }
 
-    .recs-section { margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--border-soft); }
+    .recs-section { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border-soft); }
     .recs-heading {
       font-family: var(--font-display);
       font-size: var(--text-lg);
       font-weight: 500;
       letter-spacing: -0.005em;
       color: var(--ink);
-      margin-bottom: 4px;
+      margin-bottom: 8px;
       text-align: center;
     }
     .recs-explainer { font-size: 12px; color: var(--ink-muted); text-align: center; margin-bottom: 12px; font-style: italic; padding: 0 16px; }
+    .recs-explainer:empty { display: none; }
     .rec-row .rec-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
     .rec-reason { font-size: 11px; color: var(--ink-quiet); margin-top: 2px; }
   </style>
@@ -1644,10 +1645,9 @@
         return;
       }
 
-      const explainer = recsData.cold_start
-        ? 'Based on shows that share actors with what you have.'
-        : `Based on what your closest matches (${recsData.neighbor_pool.map(n => escapeHtml(n.name)).join(', ')}) are watching.`;
-      document.getElementById('recsExplainer').innerHTML = explainer;
+      // No subtitle — keep it tight (matches the iOS app); the per-pick
+      // reason lines carry the context.
+      document.getElementById('recsExplainer').innerHTML = '';
 
       const list = document.getElementById('recsList');
       const hasRealUrl = (url) => url && !url.includes('/search') && !url.includes('/s?') && url !== '#';
@@ -1666,11 +1666,9 @@
             ? `${p.shared_actors} shared actor${p.shared_actors === 1 ? '' : 's'} with your shows`
             : 'Popular in the club';
         } else {
-          const names = (p.who || []).map(w => escapeHtml(w.name));
-          const nameStr = names.length === 1 ? names[0]
-            : names.length === 2 ? `${names[0]} and ${names[1]}`
-            : `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
-          reason = `On ${nameStr}'s list${names.length === 1 ? '' : 's'}`;
+          // De-named to match the iOS app — count members, don't list them.
+          const members = (p.who || []).length || p.n_neighbors || 0;
+          reason = members === 1 ? "On 1 member's list" : `On ${members} members' lists`;
           if (p.shared_actors > 0) reason += ` &middot; ${p.shared_actors} shared actor${p.shared_actors === 1 ? '' : 's'}`;
         }
         return `<div class="show rec-row">
