@@ -10,6 +10,8 @@ struct ShowDetailView: View {
     @State private var show: Show?
     @State private var cast: [Actor] = []
     @State private var showingEdit = false
+    @State private var addingToMine = false
+    @State private var addAlert: AddAlert?
     @Environment(\.openURL) private var openURL
 
     private var title: String { show?.title ?? initialTitle }
@@ -18,6 +20,10 @@ struct ShowDetailView: View {
     private var isMine: Bool {
         guard let mine = auth.memberSlug, let s = show else { return false }
         return s.memberSlug == mine
+    }
+    // Logged in, viewing someone else's (or a popular) show → can copy it onto a list of mine.
+    private var canAddToMine: Bool {
+        auth.memberSlug != nil && show != nil && !isMine
     }
 
     var body: some View {
@@ -74,6 +80,19 @@ struct ShowDetailView: View {
                     }
                 }
             }
+
+            if canAddToMine {
+                Section {
+                    Menu {
+                        ForEach(ShowList.allCases) { l in
+                            Button(l.title) { Task { await addToMyList(l) } }
+                        }
+                    } label: {
+                        Label("Add to My List", systemImage: "plus.circle.fill")
+                    }
+                    .disabled(addingToMine)
+                }
+            }
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
@@ -90,6 +109,11 @@ struct ShowDetailView: View {
                 AddEditShowView(memberSlug: s.memberSlug ?? "", existing: s) { await load() }
             }
         }
+        .alert(addAlert?.title ?? "",
+               isPresented: Binding(get: { addAlert != nil }, set: { if !$0 { addAlert = nil } }),
+               presenting: addAlert) { _ in
+            Button("OK", role: .cancel) { }
+        } message: { Text($0.message) }
     }
 
     private func isRealUrl(_ u: String) -> Bool {
@@ -102,4 +126,40 @@ struct ShowDetailView: View {
         if let s = try? await API.showDetail(id: id) { show = s }
         cast = (try? await API.actors(showId: id)) ?? []
     }
+
+    // Copy this show onto one of the logged-in member's lists. The POST is
+    // session-scoped, so it lands on *my* lists regardless of whose show this is.
+    private func addToMyList(_ list: ShowList) async {
+        guard let s = show, let mine = auth.memberSlug else { return }
+        addingToMine = true
+        defer { addingToMine = false }
+        do {
+            _ = try await API.addShow(
+                memberSlug: mine,
+                title: s.title,
+                network: s.network,
+                networkUrl: s.networkUrl,
+                list: list.rawValue,
+                notes: nil,
+                recommendedBy: nil,
+                movie: s.isMovie,
+                fullSeries: s.isFullSeries,
+                watchingWith: nil
+            )
+            addAlert = AddAlert(title: "Added",
+                                message: "“\(s.title)” was added to your \(list.title) list.")
+        } catch API.APIError.badResponse(409) {
+            addAlert = AddAlert(title: "Already on a list",
+                                message: "“\(s.title)” is already on one of your lists.")
+        } catch {
+            addAlert = AddAlert(title: "Couldn’t add",
+                                message: "Something went wrong. Please try again.")
+        }
+    }
+}
+
+private struct AddAlert: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
 }

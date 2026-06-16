@@ -104,13 +104,14 @@ enum API {
     // MARK: Writes (require session cookie)
 
     @discardableResult
-    static func addShow(memberSlug: String, title: String, network: String?, list: String,
-                        notes: String?, recommendedBy: String?, movie: Bool, fullSeries: Bool,
+    static func addShow(memberSlug: String, title: String, network: String?, networkUrl: String? = nil,
+                        list: String, notes: String?, recommendedBy: String?, movie: Bool, fullSeries: Bool,
                         watchingWith: String?) async throws -> Show {
         struct Wrapper: Decodable { let show: Show }
         let body: [String: Any?] = [
             "title": title,
             "network": network,
+            "network_url": networkUrl,
             "list": list,
             "notes": notes,
             "recommended_by": recommendedBy,
