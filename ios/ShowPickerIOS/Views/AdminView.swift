@@ -21,6 +21,11 @@ struct AdminView: View {
                 } label: {
                     Label("Create member", systemImage: "person.badge.plus")
                 }
+                NavigationLink {
+                    SignupRequestsView()
+                } label: {
+                    Label("Signup requests", systemImage: "tray.and.arrow.down")
+                }
             }
         }
         .navigationTitle("Admin")
