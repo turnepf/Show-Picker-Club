@@ -88,7 +88,15 @@ struct MemberView: View {
                 }
             }
         }
-        .onAppear(perform: loadSavedSorts)
+        .onAppear {
+            loadSavedSorts()
+            // Refresh on every reappear (e.g. returning from the show-detail
+            // screen after an edit moved a show to another list). `.task` only
+            // runs on first appearance, so without this the list stays stale
+            // until a pull-to-refresh. No spinner flash: the loading overlay
+            // only shows while `shows` is empty.
+            if !loading { Task { await load() } }
+        }
         .refreshable { await load() }
         .task { if loading { await load() } }
         .overlay { if loading && shows.isEmpty { ProgressView() } }
