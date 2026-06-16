@@ -125,9 +125,9 @@ ios/
 | Cross-library search (title + actor, across all members) | ✅ (home-screen 🔍, add results to your lists) |
 | Watch on streaming service (deep link) | ✅ for services that support it |
 | Share from Netflix / Apple TV / etc. → Up Next | ✅ (Share Extension) |
+| Calendar feed (Subscribe in Calendar) | ✅ (per-member webcal:// button at the bottom of their list) |
+| Recommendations / "Picks for you" | not yet |
 | Vibe profile | not in v1 |
-| Recommendations / "Picks for you" | not in v1 |
-| Calendar feed | not in v1 (could add a "Subscribe in Calendar" button that opens the webcal:// URL) |
 
 Anything in "not in v1" is straightforward to add later; it's the same backend endpoints, just more views.
 
