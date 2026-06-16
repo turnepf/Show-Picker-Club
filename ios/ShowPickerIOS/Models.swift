@@ -256,6 +256,7 @@ struct Reporting: Codable {
     let newMembers: ReportWindow
     let activeMembers: ActiveWindow
     let totals: ReportTotals
+    let membersLogin: LoginStats?
     let topNetworks: [NetworkCount]
     let topShared: [SharedTitle]
 
@@ -267,9 +268,15 @@ struct Reporting: Codable {
         case archivedShows = "archived_shows"
         case newMembers = "new_members"
         case activeMembers = "active_members"
+        case membersLogin = "members_login"
         case topNetworks = "top_networks"
         case topShared = "top_shared"
     }
+}
+
+struct LoginStats: Codable {
+    let ever: Int?
+    let never: Int?
 }
 
 struct ReportWindow: Codable {

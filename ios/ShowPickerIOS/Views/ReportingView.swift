@@ -17,6 +17,12 @@ struct ReportingView: View {
                 Section("Edited shows") { windowRows(r.editedShows) }
                 Section("Archived shows") { windowRows(r.archivedShows) }
                 Section("New members") { windowRows(r.newMembers) }
+                if let l = r.membersLogin, l.ever != nil || l.never != nil {
+                    Section("Logins") {
+                        if let e = l.ever { metric("Logged in (ever)", e) }
+                        if let n = l.never { metric("Never logged in", n) }
+                    }
+                }
                 Section("Totals") {
                     metric("Members", r.totals.members)
                     metric("Active shows", r.totals.activeShows)

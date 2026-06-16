@@ -112,6 +112,11 @@ async function issueSession(env, memberSlug) {
     'INSERT INTO sessions (id, email, member_slug, expires_at, created_at) VALUES (?, ?, ?, ?, ?)'
   ).bind(sessionId, editorName, memberSlug, sessionExpires.toISOString(), new Date().toISOString()).run();
 
+  // Durable login timestamp (migration 013). Best-effort: never let a missing
+  // column or write error break the login itself.
+  await env.DB.prepare("UPDATE members SET last_login_at = datetime('now') WHERE slug = ?")
+    .bind(memberSlug).run().catch(() => {});
+
   return new Response(JSON.stringify({ success: true, slug: memberSlug }), {
     status: 200,
     headers: {
