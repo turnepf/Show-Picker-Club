@@ -17,6 +17,7 @@ private enum SortOption: String, CaseIterable {
 struct MemberView: View {
     let member: Member
     @EnvironmentObject private var auth: AuthStore
+    @Environment(\.openURL) private var openURL
     @State private var shows: [Show] = []
     @State private var currentList: ShowList = .watching
     @State private var loading = true
@@ -79,6 +80,21 @@ struct MemberView: View {
                             }
                         }
                     }
+                }
+
+                // Subscribe to this member's premiere/finale feed. webcal:// makes
+                // iOS offer to add it as a subscription calendar.
+                Section {
+                    Button {
+                        let enc = member.slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? member.slug
+                        if let url = URL(string: "webcal://showpicker.club/calendar/\(enc).ics") {
+                            openURL(url)
+                        }
+                    } label: {
+                        Label("Subscribe in Calendar", systemImage: "calendar.badge.plus")
+                    }
+                } footer: {
+                    Text("Adds \(member.label)'s upcoming season premieres and finales to your calendar app.")
                 }
             }
         }
