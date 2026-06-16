@@ -32,7 +32,20 @@ The Xcode project is committed at `ios/ShowPickerIOS.xcodeproj` with **two targe
 3. Pick the iPhone simulator and **Cmd+R** (scheme: `ShowPickerIOS`). You should see the home screen load against the live API.
 4. To run on your actual iPhone, plug it in (or pair via Wi-Fi: Window → Devices and Simulators), pick it from the device dropdown, then Cmd+R.
 
-Same TestFlight distribution path as the tvOS app once you're ready to share with members.
+### Releasing a new build to TestFlight
+
+The app is **already in TestFlight**, so shipping a new build is just *archive + upload* — no app-record or first-time setup.
+
+**Always bump the build number before you archive.** App Store Connect rejects any build whose number isn't strictly higher than the last one uploaded for the same marketing version (this bit us once — the repo lagged what was already in TestFlight). The build number is `CURRENT_PROJECT_VERSION`, set **once at the project level** so the app and the share extension always match (Xcode → project → Build Settings → *Current Project Version*).
+
+> **Build log — keep this current.** Marketing version `1.0`. Highest build uploaded to TestFlight: **2**. Committed and ready to upload next: **3**. Before each upload, set this to the next unused integer (here *and* in the project), then update this line after uploading.
+
+Steps:
+1. `git pull origin main` (so you archive the bumped number).
+2. Xcode → run destination **Any iOS Device (arm64)**.
+3. **Product → Archive**.
+4. Organizer → **Distribute App → App Store Connect → Upload** → accept the defaults.
+5. ~5–15 min later it appears under the app's **TestFlight** tab; internal testers auto-update, external groups need the new build assigned.
 
 ### Project layout
 
