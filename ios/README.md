@@ -112,17 +112,19 @@ ios/
 | Feature | Status |
 |---|---|
 | Browse popular + members | ✅ |
-| Member's four lists with sort by rating | ✅ |
+| Member's four lists with sort (Next up / Rating / A–Z / Date added) | ✅ |
 | Show detail (title, network, rating, genres, recommender, notes, cast, dates) | ✅ |
 | Log in with one-time code (text or email) | ✅ (auto-submits on the 6th digit) |
 | Sign in with Apple | ✅ (maps the Apple ID email → existing member; see note) |
 | Add show | ✅ |
 | Edit show | ✅ |
 | Archive show (swipe action) | ✅ |
+| Quick-list promotions (leading swipe + detail "Move" section) | ✅ (Watched it / Season done / Watching / Start) |
 | Suggest a show to another member | ✅ |
+| Send an existing show to another member's Up Next | ✅ (carries over rating, network link, cast) |
+| Cross-library search (title + actor, across all members) | ✅ (home-screen 🔍, add results to your lists) |
 | Watch on streaming service (deep link) | ✅ for services that support it |
 | Share from Netflix / Apple TV / etc. → Up Next | ✅ (Share Extension) |
-| Cross-library search | not in v1 — could be added with `.searchable` |
 | Vibe profile | not in v1 |
 | Recommendations / "Picks for you" | not in v1 |
 | Calendar feed | not in v1 (could add a "Subscribe in Calendar" button that opens the webcal:// URL) |

@@ -115,6 +115,71 @@ struct ShowsResponse: Codable { let shows: [Show] }
 struct ShowResponse: Codable { let show: Show }
 struct ActorsResponse: Codable { let actors: [Actor] }
 
+// One row from /api/shows/all — every active show across all members, used by
+// cross-library search. Carries member attribution + cast so results can read
+// "on Watching · William" and be filtered by actor.
+struct AllShow: Codable, Identifiable, Hashable {
+    let id: Int
+    let title: String
+    let network: String?
+    let networkUrl: String?
+    let rating: String?
+    let movie: Int?
+    let fullSeries: Int?
+    let list: String
+    let memberSlug: String
+    let genres: String?
+    let memberName: String?
+    let memberFirstName: String?
+    let actors: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, network, rating, movie, list, genres, actors
+        case networkUrl = "network_url"
+        case fullSeries = "full_series"
+        case memberSlug = "member_slug"
+        case memberName = "member_name"
+        case memberFirstName = "member_first_name"
+    }
+
+    var isMovie: Bool { (movie ?? 0) == 1 }
+    var isFullSeries: Bool { (fullSeries ?? 0) == 1 }
+    var listLabel: String { ShowList(rawValue: list)?.title ?? list.capitalized }
+    var ownerLabel: String {
+        if let f = memberFirstName, !f.isEmpty { return f }
+        if let n = memberName, let first = n.split(separator: " ").first { return String(first) }
+        return memberSlug
+    }
+    var genreList: [String] {
+        (genres ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+    // Flattened actor names for substring matching, mirroring the web's
+    // actorNamesText(): the `actors` column is a JSON array of {name,imdb_id}.
+    var actorNamesText: String {
+        guard let actors, let data = actors.data(using: .utf8),
+              let arr = try? JSONDecoder().decode([Actor].self, from: data) else { return "" }
+        return arr.map { $0.name }.joined(separator: " ")
+    }
+}
+
+struct AllShowsResponse: Codable { let shows: [AllShow] }
+
+// /api/shows/share response. `duplicate` means the target already had it; if
+// `archived` they'd archived it, otherwise `list` is where it currently sits.
+struct ShareResponse: Codable {
+    let success: Bool?
+    let duplicate: Bool?
+    let archived: Bool?
+    let list: String?
+    let error: String?
+}
+
+enum ShareOutcome {
+    case sent
+    case duplicate(list: String?)
+    case duplicateArchived
+}
+
 struct PopularShow: Codable, Identifiable, Hashable {
     let id: Int
     let title: String

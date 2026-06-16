@@ -66,6 +66,18 @@ struct MemberView: View {
                                     .tint(.blue)
                             }
                         }
+                        // One-tap promotions to the list each row should move to,
+                        // colour-coded to the destination. Full swipe fires the first.
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            if isMine {
+                                ForEach(listPromotions(for: currentList)) { p in
+                                    Button {
+                                        Task { try? await API.moveShow(id: show.id, to: p.target.rawValue); await load() }
+                                    } label: { Label(p.label, systemImage: p.systemImage) }
+                                        .tint(p.tint)
+                                }
+                            }
+                        }
                     }
                 }
             }

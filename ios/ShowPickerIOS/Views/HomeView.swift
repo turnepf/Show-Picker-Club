@@ -6,6 +6,7 @@ struct HomeView: View {
     @State private var popular: [PopularShow] = []
     @State private var loading = true
     @State private var showingLogin = false
+    @State private var showingSearch = false
     @State private var showAllMembers = false
 
     private let memberPreviewCount = 6
@@ -25,6 +26,12 @@ struct HomeView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     Spacer()
+                    Button {
+                        showingSearch = true
+                    } label: {
+                        Image(systemName: "magnifyingglass").font(.title3)
+                    }
+                    .padding(.trailing, 4)
                     accountControl
                 }
                 .padding(.horizontal)
@@ -91,6 +98,9 @@ struct HomeView: View {
             }
             .sheet(isPresented: $showingLogin) {
                 LoginView().environmentObject(auth)
+            }
+            .sheet(isPresented: $showingSearch) {
+                SearchView().environmentObject(auth)
             }
         }
     }
