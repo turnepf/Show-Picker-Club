@@ -180,6 +180,43 @@ enum ShareOutcome {
     case duplicateArchived
 }
 
+// /api/recommendations — "Picks for you" shown above a member's own Up Next.
+struct Recommendations: Codable {
+    let coldStart: Bool?
+    let isSeedOnly: Bool?
+    let picks: [Pick]
+
+    enum CodingKeys: String, CodingKey {
+        case picks
+        case coldStart = "cold_start"
+        case isSeedOnly = "is_seed_only"
+    }
+}
+
+struct Pick: Codable, Identifiable, Hashable {
+    let title: String
+    let network: String?
+    let networkUrl: String?
+    let rating: Double?
+    let nNeighbors: Int?
+    let sharedActors: Int?
+    let who: [PickWho]?
+
+    var id: String { title }
+
+    enum CodingKeys: String, CodingKey {
+        case title, network, rating, who
+        case networkUrl = "network_url"
+        case nNeighbors = "n_neighbors"
+        case sharedActors = "shared_actors"
+    }
+}
+
+struct PickWho: Codable, Hashable {
+    let slug: String
+    let name: String
+}
+
 struct PopularShow: Codable, Identifiable, Hashable {
     let id: Int
     let title: String

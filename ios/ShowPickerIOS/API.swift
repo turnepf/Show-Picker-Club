@@ -58,6 +58,12 @@ enum API {
         return r.shows
     }
 
+    // "Picks for you" for a member's own Up Next list.
+    static func recommendations(member slug: String) async throws -> Recommendations {
+        let enc = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? slug
+        return try await get("/api/recommendations?member=\(enc)")
+    }
+
     static func checkAuth() async -> AuthCheckResponse {
         (try? await get("/auth/check")) ?? AuthCheckResponse(authenticated: false, email: nil, member: nil)
     }

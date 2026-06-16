@@ -126,8 +126,11 @@ ios/
 | Watch on streaming service (deep link) | ✅ for services that support it |
 | Share from Netflix / Apple TV / etc. → Up Next | ✅ (Share Extension) |
 | Calendar feed (Subscribe in Calendar) | ✅ (per-member webcal:// button at the bottom of their list) |
-| Recommendations / "Picks for you" | not yet |
-| Vibe profile | not in v1 |
+| Recommendations / "Picks for you" | ✅ (above your own Up Next; top 3, de-named reasons) |
+| Field toggle pills (hide ratings/networks/etc.) | ❌ Not planned for iOS |
+| Vibe profile | ❌ Not planned for iOS |
+
+> **Picks parity:** the ranking logic is server-side only (`functions/api/recommendations.js`); every client just renders `GET /api/recommendations`. iOS shows the top 3 with de-named reasons — same picks as the web, different presentation.
 
 Anything in "not in v1" is straightforward to add later; it's the same backend endpoints, just more views.
 
