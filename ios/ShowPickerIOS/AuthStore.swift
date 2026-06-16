@@ -9,6 +9,7 @@ final class AuthStore: ObservableObject {
 
     var memberSlug: String? { willSet { objectWillChange.send() } }
     var email: String? { willSet { objectWillChange.send() } }
+    var isAdmin: Bool = false { willSet { objectWillChange.send() } }
 
     var isLoggedIn: Bool { memberSlug != nil }
 
@@ -17,6 +18,7 @@ final class AuthStore: ObservableObject {
         let r = await API.checkAuth()
         memberSlug = r.authenticated ? r.member : nil
         email = r.authenticated ? r.email : nil
+        isAdmin = r.authenticated ? (r.isAdmin ?? false) : false
         if r.authenticated, let slug = memberSlug {
             SharedSession.sync(memberSlug: slug)
         }
@@ -57,6 +59,7 @@ final class AuthStore: ObservableObject {
         await API.logout()
         memberSlug = nil
         email = nil
+        isAdmin = false
         SharedSession.clear()
     }
 

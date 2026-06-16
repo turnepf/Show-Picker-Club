@@ -239,6 +239,81 @@ struct AuthCheckResponse: Codable {
     let authenticated: Bool
     let email: String?
     let member: String?
+    let isAdmin: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case authenticated, email, member
+        case isAdmin = "is_admin"
+    }
+}
+
+// /api/reporting — operator dashboard metrics.
+struct Reporting: Codable {
+    let generatedAt: String?
+    let newShows: ReportWindow
+    let editedShows: ReportWindow
+    let archivedShows: ReportWindow
+    let newMembers: ReportWindow
+    let activeMembers: ActiveWindow
+    let totals: ReportTotals
+    let topNetworks: [NetworkCount]
+    let topShared: [SharedTitle]
+
+    enum CodingKeys: String, CodingKey {
+        case totals
+        case generatedAt = "generated_at"
+        case newShows = "new_shows"
+        case editedShows = "edited_shows"
+        case archivedShows = "archived_shows"
+        case newMembers = "new_members"
+        case activeMembers = "active_members"
+        case topNetworks = "top_networks"
+        case topShared = "top_shared"
+    }
+}
+
+struct ReportWindow: Codable {
+    let day: Int
+    let week: Int
+    let month: Int
+    let allTime: Int
+    enum CodingKeys: String, CodingKey {
+        case day, week, month
+        case allTime = "all_time"
+    }
+}
+
+struct ActiveWindow: Codable {
+    let day: Int
+    let week: Int
+    let month: Int
+}
+
+struct ReportTotals: Codable {
+    let members: Int
+    let activeShows: Int
+    let archivedShows: Int
+    let watching: Int
+    let waiting: Int
+    let recommending: Int
+    let next: Int
+    enum CodingKeys: String, CodingKey {
+        case members, watching, waiting, recommending, next
+        case activeShows = "active_shows"
+        case archivedShows = "archived_shows"
+    }
+}
+
+struct NetworkCount: Codable, Identifiable {
+    let network: String
+    let cnt: Int
+    var id: String { network }
+}
+
+struct SharedTitle: Codable, Identifiable {
+    let title: String
+    let members: Int
+    var id: String { title }
 }
 
 // Login response.
