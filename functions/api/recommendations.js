@@ -231,7 +231,7 @@ export async function onRequestGet(context) {
     ? await contentBased(env, member)
     : await memberBased(env, member);
 
-  const picks = diversify(candidates, 5, 2);
+  const picks = diversify(candidates, 3, 2);
 
   const slugsInPicks = new Set();
   for (const p of picks) {
