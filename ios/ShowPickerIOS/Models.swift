@@ -326,6 +326,36 @@ struct CreateMemberResult: Codable {
     let error: String?
 }
 
+// /api/admin-signup-requests — pending /join requests for the operator.
+struct SignupRequest: Codable, Identifiable {
+    let id: Int
+    let fullName: String
+    let email: String?
+    let phone: String?
+    let source: String?
+    let status: String
+    let createdAt: String?
+    let reviewedBy: String?
+    let notes: String?
+    let createdMemberSlug: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, email, phone, source, status, notes
+        case fullName = "full_name"
+        case createdAt = "created_at"
+        case reviewedBy = "reviewed_by"
+        case createdMemberSlug = "created_member_slug"
+    }
+}
+
+struct SignupRequestsResponse: Codable { let requests: [SignupRequest] }
+
+struct SignupActionResult: Codable {
+    let ok: Bool?
+    let error: String?
+    let created: CreateMemberResult?
+}
+
 // Login response.
 struct LoginResponse: Codable {
     let success: Bool?
