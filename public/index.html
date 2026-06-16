@@ -366,36 +366,6 @@
 
     .hidden { display: none !important; }
 
-    /* Member Match card */
-    .member-match-card {
-      background: var(--surface-2);
-      border-radius: 10px;
-      padding: 10px 14px;
-      margin: 18px 0 0;
-      cursor: pointer;
-      display: flex;
-      align-items: baseline;
-      justify-content: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      text-align: center;
-      transition: background 0.15s;
-    }
-    .member-match-card:hover { background: var(--accent-soft); }
-    .member-match-label { font-size: 11px; font-weight: 600; color: var(--ink); text-transform: uppercase; letter-spacing: 0.5px; }
-    .member-match-name { font-size: 14px; font-weight: 600; color: var(--accent); }
-    .member-match-count { font-size: 12px; color: var(--ink-muted); }
-
-    .match-line { font-size: 14px; color: var(--ink); line-height: 1.5; margin-bottom: 14px; }
-    .match-section-label { font-size: 12px; color: var(--ink-muted); margin: 0 0 6px; }
-    .match-titles { list-style: none; margin: 0 0 16px; padding: 0; font-size: 13px; color: var(--ink); line-height: 1.7; }
-    .match-titles li::before { content: "• "; color: var(--ink-faint); }
-    .match-titles .match-more::before { content: ""; }
-    .match-titles .match-more { color: var(--ink-quiet); font-style: italic; }
-    .match-link { font-size: 13px; margin: 0; }
-    .match-link a { color: var(--accent); font-weight: 600; text-decoration: none; }
-    .match-link a:hover { text-decoration: underline; }
-
     /* Landing page */
     .landing {
       max-width: 720px;
@@ -718,11 +688,6 @@
       <div class="list-controls hidden" id="listControls"></div>
       <div class="show-list" id="showList"></div>
       <div class="empty hidden" id="empty">No shows in this list yet.</div>
-      <div class="member-match-card hidden" id="memberMatchCard" onclick="openMatchModal()" role="button" tabindex="0">
-        <span class="member-match-label">Your Member Match</span>
-        <span class="member-match-name" id="memberMatchName"></span>
-        <span class="member-match-count" id="memberMatchCount"></span>
-      </div>
     </main>
 
     <div style="text-align: center; margin-top: 24px;">
@@ -883,17 +848,6 @@
       <div class="modal-actions">
         <button class="btn btn-cancel" onclick="closeAddMyList()">Cancel</button>
         <button class="btn btn-save" onclick="submitAddMyList()">Add</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Search Modal -->
-  <div class="modal-overlay hidden" id="matchOverlay" onclick="closeMatchModal(event)">
-    <div class="modal" onclick="event.stopPropagation()">
-      <h2 id="matchModalTitle">Your Member Match</h2>
-      <div id="matchModalBody"></div>
-      <div class="modal-actions">
-        <button class="btn btn-cancel" onclick="closeMatchModal()">Close</button>
       </div>
     </div>
   </div>
@@ -1302,7 +1256,6 @@
         }
       });
       loadShows();
-      loadMemberMatch();
       if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
     }
 
@@ -1655,7 +1608,6 @@
       }
     }
 
-    let memberMatch = null;
     let recsData = null;
 
     async function loadRecs() {
@@ -1769,48 +1721,6 @@
         renderRecs();
         showToast('Network error. Try again.', { tone: 'error' });
       }
-    }
-
-    async function loadMemberMatch() {
-      const card = document.getElementById('memberMatchCard');
-      card.classList.add('hidden');
-      memberMatch = null;
-      try {
-        const res = await fetch(`/api/member-match?member=${encodeURIComponent(memberSlug)}`);
-        const data = await res.json();
-        if (data.match && data.match.match_count > 0) {
-          memberMatch = data.match;
-          document.getElementById('memberMatchName').textContent = data.match.display_name;
-          const n = data.match.match_count;
-          document.getElementById('memberMatchCount').textContent = `${n} show${n === 1 ? '' : 's'} in common`;
-          card.classList.remove('hidden');
-        }
-      } catch (e) {}
-    }
-
-    function openMatchModal() {
-      if (!memberMatch) return;
-      const titleText = (document.getElementById('appTitle').textContent || '').trim();
-      const youName = titleText.replace(/'s Shows$/, '') || 'You';
-      const titles = memberMatch.titles || [];
-      const shown = titles.slice(0, 5);
-      const more = titles.length - shown.length;
-      const titlesHtml = shown.map(t => `<li>${escapeHtml(t)}</li>`).join('')
-        + (more > 0 ? `<li class="match-more">+ ${more} more</li>` : '');
-      const n = memberMatch.match_count;
-      const body = `
-        <p class="match-line"><strong>${escapeHtml(youName)}</strong> matches with <strong>${escapeHtml(memberMatch.display_name)}</strong> on <strong>${n}</strong> show${n === 1 ? '' : 's'}.</p>
-        <p class="match-section-label">Shows in common:</p>
-        <ul class="match-titles">${titlesHtml}</ul>
-        <p class="match-link"><a href="/${encodeURIComponent(memberMatch.slug)}">See ${escapeHtml(memberMatch.display_name)}'s shows &rarr;</a></p>
-      `;
-      document.getElementById('matchModalBody').innerHTML = body;
-      document.getElementById('matchOverlay').classList.remove('hidden');
-    }
-
-    function closeMatchModal(event) {
-      if (event && event.target !== event.currentTarget) return;
-      document.getElementById('matchOverlay').classList.add('hidden');
     }
 
     const TAB_LABELS = { watching: 'Watching', waiting: 'Waiting', recommending: 'Recommending', next: 'Up Next' };

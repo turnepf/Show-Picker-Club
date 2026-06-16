@@ -13,7 +13,7 @@ Live at [showpicker.club](https://showpicker.club).
 
 - **Multi-tenant.** One deployment, many members. Each member is a slug (`/whitt`, `/patrick`) with their own lists; they sign in with a one-time code (text or email) or Sign in with Apple.
 - **Auto-enriched.** OMDB supplies IMDB ratings and canonical titles; TMDB supplies cast, next-season dates, finale dates, series-ended flags, and genres.
-- **Social.** Suggest a show to another member, share a show across lists, see your closest taste-match, and get "Picks for you" computed from neighbors.
+- **Social.** Suggest a show to another member, share a show across lists, and get "Picks for you" computed from neighbors.
 - **Vibe.** `/vibe` profiles each member's taste across 27 trait dimensions and assigns one of seven cluster identities.
 - **Calendar feed.** `webcal://showpicker.club/calendar/<slug>.ics` keeps upcoming premieres and finales in Apple Calendar / Google Calendar / Fantastical.
 - **PWA.** Installable to home screen.

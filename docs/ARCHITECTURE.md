@@ -125,7 +125,6 @@ The complete map:
 | `GET /auth/check`                      | `functions/auth/check.js`                  | GET     | none (reads cookie) |
 | `GET /auth/logout`                     | `functions/auth/logout.js`                 | GET     | none |
 | `GET /api/members`                     | `functions/api/members.js`                 | GET     | none |
-| `GET /api/member-match`                | `functions/api/member-match.js`            | GET     | none |
 | `GET /api/popular`                     | `functions/api/popular.js`                 | GET     | none |
 | `GET /api/activity`                    | `functions/api/activity.js`                | GET     | none |
 | `GET /api/recommendations`             | `functions/api/recommendations.js`         | GET     | none |
@@ -193,8 +192,8 @@ Admin endpoints are gated by `_shared/admin.js#isAdmin()` — a valid session wh
 Single-page app. Detects whether `window.location.pathname` is empty (landing) or a slug (member page) and renders accordingly. Major UI surfaces:
 
 - **Landing:** `My Shows` link (logged in), Popular Shows widget, featured Members row + "Browse all members" disclosure, `Search all libraries` button, What's New changelog.
-- **Member page:** title + tabs (Watching, Waiting, Recommending, Up Next), Member Match card, search button, `+ Add` button (when logged in), per-tab list of show rows with always-visible meta (Next up on Waiting, Recommended by on Up Next), `Picks for You` section above Up Next, sort + toggle pills at the bottom, footer with `Curious?` / `Vibe` / `📅 Calendar feed` links.
-- **Modals:** Add/Edit Show, Share to another member, Suggest a Show, Add to My List (used from Popular and from cross-library search), Search, Member Match details.
+- **Member page:** title + tabs (Watching, Waiting, Recommending, Up Next), search button, `+ Add` button (when logged in), per-tab list of show rows with always-visible meta (Next up on Waiting, Recommended by on Up Next), `Picks for You` section above Up Next, sort + toggle pills at the bottom, footer with `Curious?` / `Vibe` / `📅 Calendar feed` links.
+- **Modals:** Add/Edit Show, Share to another member, Suggest a Show, Add to My List (used from Popular and from cross-library search), Search.
 
 State lives in a handful of top-level `let` vars (`shows`, `currentTab`, `isEditor`, `memberSlug`, `authMember`, `searchMode`, etc.). No framework. All API I/O is `fetch()` to relative paths.
 
@@ -362,16 +361,6 @@ Compute the **deviation from the club mean** for both the member fingerprint and
 - 429-aware: respects `Retry-After`, capped at 60s.
 - Batched: caller passes `count`, capped at 8 per request.
 
-## Member match
-
-`GET /api/member-match?member=<slug>` finds the other member with the largest case-insensitive active-title overlap. Requires:
-
-- At least 5 active titles on the requester's side (else returns nothing, to avoid noisy matches).
-- The requester isn't seed-only.
-- The match isn't in `_shared/excluded-members.js`.
-
-Returns the match's display name, slug, overlap count, and the list of overlapping titles.
-
 ## Admin endpoints
 
 All require an operator (`patrick`) session via `isAdmin()`. No separate secret.
@@ -390,7 +379,7 @@ Body: `{secret}`. Before listing, runs `propagateGoodUrls` to push every known g
 A member is "seed-only" iff every one of their show rows satisfies:
 `added_by = 'seed' AND archived = 0 AND updated_at IS NULL`.
 
-The moment a member edits a seeded row (changes list, notes, etc.), archives one, or adds their own row, they stop being seed-only. This check appears verbatim in several queries (`/api/recommendations`, `/api/member-match`, `/api/vibe`). The home-page member ordering uses a stricter library-only signal — see `/api/members` — that ignores edits/archives of seeded rows.
+The moment a member edits a seeded row (changes list, notes, etc.), archives one, or adds their own row, they stop being seed-only. This check appears verbatim in several queries (`/api/recommendations`, `/api/vibe`). The home-page member ordering uses a stricter library-only signal — see `/api/members` — that ignores edits/archives of seeded rows.
 
 ## CI workflows
 
@@ -416,7 +405,7 @@ The moment a member edits a seeded row (changes list, notes, etc.), archives one
 
 ## Excluded members
 
-`functions/_shared/excluded-members.js` exports a list of member slugs that are skipped from taste aggregation (popular, recommendations, member match). Use this when an operator-only or test member's library would skew the social signals.
+`functions/_shared/excluded-members.js` exports a list of member slugs that are skipped from taste aggregation (popular, recommendations). Use this when an operator-only or test member's library would skew the social signals.
 
 ## Conventions that aren't obvious
 
