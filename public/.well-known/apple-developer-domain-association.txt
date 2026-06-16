@@ -1,0 +1,11 @@
+PLACEHOLDER — replace this entire file with the contents Apple gives you.
+
+When you add the domain "showpicker.club" (and Return URL "https://showpicker.club/")
+to your Sign in with Apple Services ID in the Apple Developer portal, Apple shows a
+"Download" button for a domain-association file. Paste that file's exact contents
+here, commit, and deploy. Apple then fetches this URL to verify domain ownership:
+
+  https://showpicker.club/.well-known/apple-developer-domain-association.txt
+
+Until this holds Apple's real content, web Sign in with Apple will fail domain
+verification (expected before setup is complete).
