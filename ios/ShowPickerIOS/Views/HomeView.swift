@@ -8,6 +8,7 @@ struct HomeView: View {
     @State private var showingLogin = false
     @State private var showingSearch = false
     @State private var showAllMembers = false
+    @State private var shakePick: Show?
 
     private let memberPreviewCount = 6
 
@@ -102,6 +103,23 @@ struct HomeView: View {
             .sheet(isPresented: $showingSearch) {
                 SearchView().environmentObject(auth)
             }
+            .sheet(item: $shakePick) { pick in
+                ShakePickView(show: pick).environmentObject(auth)
+            }
+            .onShake { Task { await handleShake() } }
+        }
+    }
+
+    // Easter egg: a shake surfaces a random show from the logged-in member's
+    // own Up Next list. Silent if you're logged out or your Up Next is empty.
+    @MainActor
+    private func handleShake() async {
+        guard let slug = auth.memberSlug, shakePick == nil else { return }
+        let mine = (try? await API.shows(member: slug)) ?? []
+        let upNext = mine.filter { $0.list == ShowList.next.rawValue && !$0.isArchived }
+        if let pick = upNext.randomElement() {
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            shakePick = pick
         }
     }
 
