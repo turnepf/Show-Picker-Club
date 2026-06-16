@@ -10,6 +10,7 @@ struct ShowDetailView: View {
     @State private var show: Show?
     @State private var cast: [Actor] = []
     @State private var showingEdit = false
+    @State private var showingShare = false
     @State private var addingToMine = false
     @State private var addAlert: AddAlert?
     @Environment(\.openURL) private var openURL
@@ -93,6 +94,31 @@ struct ShowDetailView: View {
                     .disabled(addingToMine)
                 }
             }
+
+            // Quick promotions — move this show to the list it belongs on next.
+            if isMine, let s = show, let cur = ShowList(rawValue: s.list) {
+                Section("Move") {
+                    ForEach(listPromotions(for: cur)) { p in
+                        Button {
+                            Task { try? await API.moveShow(id: s.id, to: p.target.rawValue); await load() }
+                        } label: {
+                            Label(p.detailLabel, systemImage: p.systemImage).tint(p.tint)
+                        }
+                    }
+                }
+            }
+
+            // Send the whole show (rating, network link, cast, flags) to another
+            // member's Up Next. Available on any real member's show when logged in.
+            if auth.isLoggedIn, let s = show, s.memberSlug != nil {
+                Section {
+                    Button {
+                        showingShare = true
+                    } label: {
+                        Label("Send to a member", systemImage: "paperplane.fill")
+                    }
+                }
+            }
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
@@ -107,6 +133,12 @@ struct ShowDetailView: View {
         .sheet(isPresented: $showingEdit) {
             if let s = show {
                 AddEditShowView(memberSlug: s.memberSlug ?? "", existing: s) { await load() }
+            }
+        }
+        .sheet(isPresented: $showingShare) {
+            if let s = show, let owner = s.memberSlug {
+                ShareShowView(showId: s.id, showTitle: s.title, sourceMember: owner)
+                    .environmentObject(auth)
             }
         }
         .alert(addAlert?.title ?? "",

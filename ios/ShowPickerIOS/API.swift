@@ -52,6 +52,12 @@ enum API {
         return r.actors
     }
 
+    // Every active show across every member — backs cross-library search.
+    static func allShows() async throws -> [AllShow] {
+        let r: AllShowsResponse = try await get("/api/shows/all")
+        return r.shows
+    }
+
     static func checkAuth() async -> AuthCheckResponse {
         (try? await get("/auth/check")) ?? AuthCheckResponse(authenticated: false, email: nil, member: nil)
     }
@@ -161,6 +167,26 @@ enum API {
         guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw APIError.badResponse((resp as? HTTPURLResponse)?.statusCode ?? -1)
         }
+    }
+
+    // Send an existing show to another member's Up Next, carrying over its
+    // enrichment (rating, network link, cast, movie/series flags). Returns the
+    // outcome so the UI can speak to duplicates.
+    @discardableResult
+    static func shareShow(showId: Int, sourceMember: String, targetMember: String,
+                          recommendedBy: String, notes: String?) async throws -> ShareOutcome {
+        let body: [String: Any?] = [
+            "show_id": showId,
+            "source_member": sourceMember,
+            "target_member": targetMember,
+            "recommended_by": recommendedBy,
+            "notes": notes,
+        ]
+        let r: ShareResponse = try await postJSON("/api/shows/share", body: body)
+        if r.duplicate == true {
+            return r.archived == true ? .duplicateArchived : .duplicate(list: r.list)
+        }
+        return .sent
     }
 
     static func suggest(to member: String, title: String, network: String?, notes: String?,
