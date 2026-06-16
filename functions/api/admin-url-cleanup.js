@@ -1,6 +1,7 @@
 import { canonicalNetwork, networkFromUrl } from '../_shared/networks.js';
 import { extractUrl } from '../_shared/url-utils.js';
 import { isAdmin } from '../_shared/admin.js';
+import { fetchEnrichment } from '../_shared/enrichment.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -319,6 +320,44 @@ export async function onRequestPost(context) {
       `UPDATE shows SET network_url = NULL, enriched_at = datetime('now') WHERE id = ?`
     ).bind(id).run();
     return json({ ok: true, cleared_url: true });
+  }
+
+  if (action === 'fix_title') {
+    // Operator corrects a wrong/typo'd title. Re-run enrichment on the new
+    // title (canonical title + rating + cast), then rename every active copy
+    // of the old title and refresh their cast. Fixes both failure modes:
+    // enrichment matched the wrong show, or matched nothing and the typo stuck.
+    const id = parseInt(body.id, 10);
+    const rawNew = String(body.new_title || '').trim();
+    if (!Number.isInteger(id)) return json({ error: 'id required' }, 400);
+    if (!rawNew) return json({ error: 'new title required' }, 400);
+
+    const row = await env.DB.prepare('SELECT title, movie FROM shows WHERE id = ?').bind(id).first();
+    if (!row) return json({ error: 'Show not found' }, 404);
+    const oldTitle = row.title;
+
+    const enriched = await fetchEnrichment(rawNew, env, !!row.movie);
+    const finalTitle = enriched.canonicalTitle || rawNew;
+
+    const upd = await env.DB.prepare(
+      `UPDATE shows
+          SET title = ?, rating = COALESCE(?, rating), enriched_at = datetime('now')
+        WHERE LOWER(title) = LOWER(?) AND archived = 0`
+    ).bind(finalTitle, enriched.rating, oldTitle).run();
+
+    // Refresh cast on each renamed copy.
+    if (enriched.actors.length > 0) {
+      const { results: copies } = await env.DB.prepare(
+        'SELECT id FROM shows WHERE LOWER(title) = LOWER(?) AND archived = 0'
+      ).bind(finalTitle).all();
+      const ins = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id) VALUES (?, ?, ?)');
+      for (const c of copies) {
+        await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(c.id).run();
+        await env.DB.batch(enriched.actors.map(a => ins.bind(c.id, a.name, a.imdb_id || null)));
+      }
+    }
+
+    return json({ ok: true, old_title: oldTitle, new_title: finalTitle, updated: upd.meta.changes });
   }
 
   await propagateGoodUrls(env);

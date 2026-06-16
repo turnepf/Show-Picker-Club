@@ -27,6 +27,13 @@ struct AdminView: View {
                     Label("Signup requests", systemImage: "tray.and.arrow.down")
                 }
             }
+            Section("Content") {
+                NavigationLink {
+                    UrlCleanupView()
+                } label: {
+                    Label("URL cleanup & titles", systemImage: "link.badge.plus")
+                }
+            }
         }
         .navigationTitle("Admin")
         .navigationBarTitleDisplayMode(.inline)

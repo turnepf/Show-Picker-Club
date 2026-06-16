@@ -356,6 +356,40 @@ struct SignupActionResult: Codable {
     let created: CreateMemberResult?
 }
 
+// /api/admin-url-cleanup — queue of titles missing a real network URL.
+struct UrlQueueItem: Codable, Identifiable {
+    let id: Int
+    let title: String
+    let network: String?
+    let networkUrl: String?
+    let memberCount: Int?
+    let members: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, network, members
+        case networkUrl = "network_url"
+        case memberCount = "member_count"
+    }
+}
+
+struct UrlCleanupResponse: Codable {
+    let shows: [UrlQueueItem]
+    let networks: [String]
+}
+
+// Generic admin action result (save URL / fix title).
+struct AdminActionResult: Codable {
+    let ok: Bool?
+    let updated: Int?
+    let error: String?
+    let newTitle: String?
+
+    enum CodingKeys: String, CodingKey {
+        case ok, updated, error
+        case newTitle = "new_title"
+    }
+}
+
 // Login response.
 struct LoginResponse: Codable {
     let success: Bool?
