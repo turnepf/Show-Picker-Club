@@ -65,7 +65,12 @@ enum API {
     }
 
     static func checkAuth() async -> AuthCheckResponse {
-        (try? await get("/auth/check")) ?? AuthCheckResponse(authenticated: false, email: nil, member: nil)
+        (try? await get("/auth/check")) ?? AuthCheckResponse(authenticated: false, email: nil, member: nil, isAdmin: nil)
+    }
+
+    // Operator-only dashboard metrics (gated server-side on the session).
+    static func reporting() async throws -> Reporting {
+        try await get("/api/reporting")
     }
 
     // MARK: Auth

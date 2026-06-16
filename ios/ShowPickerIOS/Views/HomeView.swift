@@ -56,6 +56,15 @@ struct HomeView: View {
                             }
                         }
                     }
+                    if auth.isAdmin {
+                        Section {
+                            NavigationLink {
+                                AdminView().environmentObject(auth)
+                            } label: {
+                                Label("Admin", systemImage: "wrench.and.screwdriver")
+                            }
+                        }
+                    }
                     if !popular.isEmpty {
                         Section("What members are watching") {
                             ForEach(popular) { show in
