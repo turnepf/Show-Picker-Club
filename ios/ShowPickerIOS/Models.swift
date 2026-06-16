@@ -316,6 +316,16 @@ struct SharedTitle: Codable, Identifiable {
     var id: String { title }
 }
 
+// /api/admin-create-member result (success or {error}).
+struct CreateMemberResult: Codable {
+    let ok: Bool?
+    let slug: String?
+    let name: String?
+    let url: String?
+    let seeded: [String]?
+    let error: String?
+}
+
 // Login response.
 struct LoginResponse: Codable {
     let success: Bool?

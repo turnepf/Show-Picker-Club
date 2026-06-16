@@ -73,6 +73,21 @@ enum API {
         try await get("/api/reporting")
     }
 
+    // Create a new member (operator only). Decodes the body on success or
+    // failure so the caller can surface the server's error message.
+    static func createMember(fullName: String, phone: String?, emails: String?) async throws -> CreateMemberResult {
+        guard let url = URL(string: baseString + "/api/admin-create-member") else { throw APIError.badURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = ["full_name": fullName]
+        if let p = phone, !p.isEmpty { body["phone"] = p }
+        if let e = emails, !e.isEmpty { body["emails"] = e }
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, _) = try await URLSession.shared.data(for: req)
+        return try JSONDecoder().decode(CreateMemberResult.self, from: data)
+    }
+
     // MARK: Auth
 
     static func loginWithEmail(email: String, code: String) async throws -> LoginResponse {

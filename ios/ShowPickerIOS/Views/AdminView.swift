@@ -15,6 +15,13 @@ struct AdminView: View {
                     Label("Reporting", systemImage: "chart.bar.xaxis")
                 }
             }
+            Section("Members") {
+                NavigationLink {
+                    CreateMemberView()
+                } label: {
+                    Label("Create member", systemImage: "person.badge.plus")
+                }
+            }
         }
         .navigationTitle("Admin")
         .navigationBarTitleDisplayMode(.inline)
