@@ -94,16 +94,7 @@
       min-width: 0;
     }
     .approved-intro .intro-body { padding: 0 12px 12px; }
-    .approved-intro textarea {
-      width: 100%;
-      padding: 10px 12px; min-height: 140px;
-      border: 1px solid color-mix(in oklch, var(--list-watching) 30%, transparent);
-      border-radius: 6px;
-      font-size: 13px; font-family: inherit; line-height: 1.5;
-      resize: vertical; background: var(--surface); color: var(--ink);
-      white-space: pre-wrap;
-    }
-    .copy-row { display: flex; gap: 8px; margin-top: 8px; }
+    .copy-row { display: flex; gap: 8px; margin-top: 4px; }
     .copy-row button { background: var(--ink); color: #fff; }
     .copy-row button:hover { background: oklch(0.18 0.025 50); }
 
@@ -373,19 +364,16 @@ If you see something you like on someone else's list, tap the **+** to add it to
       wrap.innerHTML = `
         <summary>Welcome intro <span class="intro-url">${escapeHtml(url.replace(/^https?:\/\//, ''))}</span></summary>
         <div class="intro-body">
-          <textarea readonly></textarea>
           <div class="copy-row">
             <button class="copy">Copy intro</button>
             ${phone ? '<button class="text">Text intro</button>' : ''}
           </div>
         </div>
       `;
-      const ta = wrap.querySelector('textarea');
-      ta.value = intro;
 
       wrap.querySelector('.copy').addEventListener('click', async (e) => {
         e.preventDefault();
-        try { await navigator.clipboard.writeText(ta.value); } catch { ta.select(); document.execCommand('copy'); }
+        try { await navigator.clipboard.writeText(intro); } catch {}
         e.target.textContent = 'Copied!';
         setTimeout(() => { e.target.textContent = 'Copy intro'; }, 1500);
       });
