@@ -162,6 +162,11 @@ Four hues, one per product list. Tuned for outline pills and quiet accents at th
 - **Ink ramp**: `ink` (`0.22`) for primary text, `ink-muted` (`0.40`) for secondary, `ink-quiet` (`0.48`, AA-large only — fine print and easter eggs), `ink-faint` (`0.60`, placeholders and decoration only).
 - **Borders**: `border` (`oklch(0.78 0.020 50)`) for visible edges, `border-soft` (`oklch(0.83 0.014 50)`) for quiet row separators.
 
+### Dark Mode
+The app follows the **system appearance** — there is no in-app toggle. When the OS is in dark mode the page becomes a *warm night reading-light, not cold glass*: the neutrals keep hue 50 so it still reads as paper, just dimmed. The body drops to a dark warm near-black (`oklch(0.165 0.010 50)`), cards rest a step above it (`surface` `0.215`), and the ink ramp inverts to a light warm scale (`ink` `0.93` → `ink-faint` `0.52`). The accent and `list-*` vocabulary hold their hue and lift a touch brighter to stay legible. The dark **header band stays dark in both themes** (it's the brand's signature), so its white text and translucent-white ghost controls are unchanged.
+
+Implementation: web does this entirely with token overrides inside a single `@media (prefers-color-scheme: dark)` block in `styles.css` plus `color-scheme: light dark` on `:root` — so any surface built from the tokens flips for free; only literal colors (e.g. a hardcoded modal `#fff`) need fixing. iOS leans on SwiftUI's semantic colors and ships a dark appearance variant of `AccentColor`. tvOS still uses a light-only `Theme.swift` and has not been adapted.
+
 ### Named Rules
 **The One Accent Rule.** The brand orange appears on ≤10% of any given screen. Its rarity is what makes "add this" and "this is selected" read instantly. If two oranges compete on a screen, one is wrong.
 

@@ -4,6 +4,10 @@
  */
 
 :root {
+  /* Honour the system appearance; lets form controls, scrollbars and the
+     UA's own chrome flip alongside the dark-mode token overrides below. */
+  color-scheme: light dark;
+
   /* Surfaces — body is the committed warm taupe; cards inside are near-white */
   --body:         oklch(0.86  0.025 50);   /* warm taupe — the brand's own warmth as the surface */
   --surface:      oklch(0.985 0.003 50);   /* near-white card (landing, modals) */
@@ -139,4 +143,59 @@ body.admin-page { padding: 32px 16px 80px; }
   border-radius: 10px;
   border: 1px solid var(--border-soft);
   margin-bottom: 12px;
+}
+
+/*
+ * Dark mode — a warm night reading-light, not cold glass. The neutrals keep
+ * hue 50 so the page still feels like paper, just dimmed: a dark warm body,
+ * cards lifted a step above it, and a light warm ink ramp. Only tokens that
+ * carry lightness flip; the brand accent and list vocabulary keep their hue
+ * and are nudged a touch brighter to stay legible on the dark surfaces.
+ *
+ * The dark header band is dark in both themes (it's the brand's signature),
+ * so its white text and translucent-white ghost controls need no overrides.
+ * Everything else inherits automatically from these token redefinitions.
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Surfaces — warm near-black paper; cards rest a step above the body */
+    --body:         oklch(0.165 0.010 50);   /* dimmed warm paper, not pure black */
+    --surface:      oklch(0.215 0.011 50);   /* card lifted above the body */
+    --surface-2:    oklch(0.255 0.013 50);   /* distinct sub-panel inside a card */
+    --border:       oklch(0.38  0.012 50);   /* visible hairline against surface */
+    --border-soft:  oklch(0.31  0.010 50);   /* quiet row separators */
+
+    /* Type ramp — light warm ink, verified against --body and --surface */
+    --ink:          oklch(0.93  0.010 50);   /* primary text */
+    --ink-muted:    oklch(0.74  0.012 50);   /* secondary text */
+    --ink-quiet:    oklch(0.63  0.012 50);   /* tertiary / fine print */
+    --ink-faint:    oklch(0.52  0.010 50);   /* placeholders, decoration */
+
+    /* The accent and its washes — hue held, lightness retuned for the dark */
+    --accent:        oklch(0.72 0.15 50);
+    --accent-hover:  oklch(0.78 0.15 50);    /* hover lifts brighter on dark */
+    --accent-soft:   oklch(0.32 0.045 50);   /* dark tinted wash, not a light one */
+
+    /* List vocabulary — nudged brighter to read on the dark surfaces.
+       The tab-* variants back the active pill in the always-dark header,
+       so they stay as-is. */
+    --list-watching:     oklch(0.66 0.13 150);
+    --list-waiting:      oklch(0.68 0.10 230);
+    --list-recommending: oklch(0.64 0.13 340);
+
+    /* Semantic — lifted for contrast on the dark body */
+    --info:        oklch(0.68 0.11 230);
+    --danger:      oklch(0.66 0.17 25);
+    --danger-soft: oklch(0.32 0.060 25);
+    --danger-deep: oklch(0.72 0.15 25);
+    --star:        oklch(0.85 0.16 90);
+
+    /* Structural — header band stays a touch above the body so it still
+       reads as a band rather than merging into the page. */
+    --header-bg:   oklch(0.235 0.018 50);
+
+    /* Elevation — soft ink shadows vanish on a dark page, so lean on a
+       deeper, near-black drop to give the card and modal their lift. */
+    --shadow-card: 0 1px 2px oklch(0 0 0 / 0.45), 0 10px 30px oklch(0 0 0 / 0.55);
+  }
 }
