@@ -73,7 +73,7 @@ The Share Extension lets you hit the share button in Netflix, the Apple TV app, 
 
 - The extension runs as a separate process bundled inside the main app.
 - Session credentials (the cookie + your member slug) are stored in a shared App Group container by the main app after you log in. The extension reads them from there to make authenticated API calls.
-- When you share from the source app, the extension gets the URL and, when the source app provides it, the show title as well. For Apple TV URLs (`tv.apple.com/*/show/show-name/id`) it can extract the title directly from the URL path. For Netflix and others it prefills whatever the app shares; you can edit the title before saving.
+- When you share from the source app, the extension gets the URL and, when the source app provides it, the show title as well. For Apple TV URLs (`tv.apple.com/*/show/show-name/id`) it can extract the title directly from the URL path. Netflix shares a whole sentence instead (`Check out "I Will Find You" on Netflix https://…`), so the extension parses that down to just the title (the quoted show name) and auto-detects the network from the "on <Service>" mention even when no discrete URL is attached. You can still edit the title before saving.
 - A small compose form appears: title (editable), network (auto-detected from the URL), list (defaults to **Up Next**), movie toggle, optional notes. Tap **Add** and it calls `POST /api/shows` and dismisses.
 
 ### It's already wired up
