@@ -73,7 +73,7 @@ The Share Extension lets you hit the share button in Netflix, the Apple TV app, 
 
 - The extension runs as a separate process bundled inside the main app.
 - Session credentials (the cookie + your member slug) are stored in a shared App Group container by the main app after you log in. The extension reads them from there to make authenticated API calls.
-- When you share from the source app, the extension gets the URL and, when the source app provides it, the show title as well. For Apple TV URLs (`tv.apple.com/*/show/show-name/id`) it can extract the title directly from the URL path. For Netflix and others it prefills whatever the app shares; you can edit the title before saving.
+- When you share from the source app, the extension gets the URL and, when the source app provides it, the show title as well. For Apple TV URLs (`tv.apple.com/*/show/show-name/id`) it can extract the title directly from the URL path. Netflix shares a whole sentence instead (`Check out "I Will Find You" on Netflix https://…`), so the extension parses that down to just the title (the quoted show name) and auto-detects the network from the "on <Service>" mention even when no discrete URL is attached. You can still edit the title before saving.
 - A small compose form appears: title (editable), network (auto-detected from the URL), list (defaults to **Up Next**), movie toggle, optional notes. Tap **Add** and it calls `POST /api/shows` and dismisses.
 
 ### It's already wired up
@@ -85,17 +85,43 @@ The moving parts, for reference:
 ```
 ios/
 ├── Shared/
-│   └── SharedSession.swift         ← in BOTH targets; manages the App Group cookie
+│   ├── SharedSession.swift         ← in BOTH app + extension; manages the App Group cookie
+│   └── ShareTitleParser.swift      ← in extension + test target; normalizes shared text → title + network
 ├── ShowPickerIOS/
 │   ├── ShowPickerIOS.entitlements  ← App Group for main app
 │   ├── AuthStore.swift             ← syncs cookie to App Group on login/logout
 │   └── … (existing files)
-└── ShowPickerShareExtension/
-    ├── ShareViewController.swift   ← entry point; extracts title + network from share payload
-    ├── ShareComposeView.swift      ← SwiftUI form (title, network, list, movie, notes)
-    ├── ShareAPI.swift              ← POST /api/shows using the shared session cookie
-    ├── ShareExtension.entitlements ← App Group for extension
-    └── Info.plist                  ← NSExtension config; activates on URLs
+├── ShowPickerShareExtension/
+│   ├── ShareViewController.swift   ← entry point; extracts the share payload, defers parsing to ShareTitleParser
+│   ├── ShareComposeView.swift      ← SwiftUI form (title, network, list, movie, notes)
+│   ├── ShareAPI.swift              ← POST /api/shows using the shared session cookie
+│   ├── ShareExtension.entitlements ← App Group for extension
+│   └── Info.plist                  ← NSExtension config; activates on URLs
+└── ShowPickerShareExtensionTests/
+    └── ShareTitleParserTests.swift ← XCTest cases for the share-text → title normalization
+```
+
+### Title normalization
+
+Streaming apps wrap the show name in marketing boilerplate, which used to land in the title field verbatim. `ShareTitleParser` strips the wrapper down to just the title and auto-detects the network:
+
+| Service | Raw shared text | Title |
+|---|---|---|
+| Netflix | `Check out "I Will Find You" on Netflix https://…` | I Will Find You |
+| Paramount+ | `Hey! Thought you'd like The Amazing Race on Paramount+. Check it out…` | The Amazing Race |
+| HBO Max | `Stream DTF St. Louis on HBO Max` | DTF St. Louis |
+| Hulu | `Check out Good Luck, Have Fun, Don't Die on Hulu! https://…?utm_source=…` | Good Luck, Have Fun, Don't Die |
+
+A plain title that isn't a recognized wrapper is left untouched (so e.g. "Watch What Happens Live" and "Based on a True Story" aren't mangled).
+
+### Unit tests
+
+The parser is pure Foundation (no UIKit), so it's covered by a host-less logic-test bundle — the `ShowPickerShareExtensionTests` target — that compiles `ShareTitleParser.swift` directly (the same way `SharedSession.swift` is shared across targets). Run them with the committed **ShowPickerShareExtensionTests** scheme (Cmd+U), or from the command line:
+
+```bash
+xcodebuild test -project ios/ShowPickerIOS.xcodeproj \
+  -scheme ShowPickerShareExtensionTests \
+  -destination 'platform=iOS Simulator,name=iPhone 16'
 ```
 
 ### Test it
