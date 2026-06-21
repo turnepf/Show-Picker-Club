@@ -153,15 +153,27 @@ class ShareViewController: UIViewController {
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    // Leading verbs streaming apps prepend to a share. Ordered longest-first so the
+    // Leading boilerplate streaming apps prepend to a share, written with straight
+    // apostrophes (text is normalized before matching). Ordered longest-first so the
     // most specific prefix wins (e.g. "check this out" before "check out").
     private static let leadingVerbs = [
+        "hey! thought you'd like", "hey, thought you'd like",
+        "hey thought you'd like", "hey! i thought you'd like",
+        "hey i thought you'd like", "i thought you'd like", "thought you'd like",
         "check this out:", "check this out", "check out:", "check out",
         "i'm watching", "now watching", "watching", "watch"
     ]
 
+    // Lowercase + fold curly apostrophes to straight so prefixes match regardless
+    // of how the source app typed them. One-for-one substitutions keep .count stable.
+    private static func normalizedForMatch(_ text: String) -> String {
+        text.lowercased()
+            .replacingOccurrences(of: "\u{2019}", with: "'")
+            .replacingOccurrences(of: "\u{2018}", with: "'")
+    }
+
     private static func leadingVerb(of text: String) -> String? {
-        let lower = text.lowercased()
+        let lower = normalizedForMatch(text)
         for verb in leadingVerbs where lower.hasPrefix(verb) {
             // Require a word boundary so titles like "Watchmen" aren't mistaken
             // for the verb "watch".
