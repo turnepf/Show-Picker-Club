@@ -105,19 +105,25 @@ class ShareViewController: UIViewController {
         // A quoted span is the exact title in every Netflix-style share.
         if let quoted = firstQuoted(in: trimmed) { return quoted }
 
-        // Only treat it as a sentence if it carries a URL or a leading verb;
-        // otherwise it's already a bare title (which may legitimately contain
+        // Only treat it as a marketing wrapper if it carries a URL or a leading
+        // verb; otherwise it's already a bare title (which may legitimately contain
         // " on ", e.g. "Based on a True Story") and we leave it alone.
         let hasURL  = firstURL(in: trimmed) != nil
         let hasVerb = leadingVerb(of: trimmed) != nil
         guard hasURL || hasVerb else { return trimmed.nilIfEmpty }
 
+        // Always drop a trailing/standalone share URL.
         var s = stripURLs(from: trimmed)
-        s = stripLeadingVerb(s)
-        // Drop a trailing "on <Network>" service mention (Netflix: "… on Netflix").
-        if network != nil,
-           let r = s.range(of: " on ", options: [.backwards, .caseInsensitive]) {
-            s = String(s[..<r.lowerBound])
+
+        // Strip the lead-in verb and a trailing "on <Network>" only when there's a
+        // streaming context (a URL or a detected service). This protects plain
+        // titles that happen to start with a verb, e.g. "Watch What Happens Live".
+        if hasURL || network != nil {
+            s = stripLeadingVerb(s)
+            if network != nil,
+               let r = s.range(of: " on ", options: [.backwards, .caseInsensitive]) {
+                s = String(s[..<r.lowerBound])
+            }
         }
         s = s.trimmingCharacters(in: titleTrimSet)
         return s.nilIfEmpty
@@ -161,7 +167,8 @@ class ShareViewController: UIViewController {
         "hey thought you'd like", "hey! i thought you'd like",
         "hey i thought you'd like", "i thought you'd like", "thought you'd like",
         "check this out:", "check this out", "check out:", "check out",
-        "i'm watching", "now watching", "watching", "watch"
+        "i'm watching", "now watching", "watching", "watch",
+        "stream the", "stream:", "stream"
     ]
 
     // Lowercase + fold curly apostrophes to straight so prefixes match regardless
