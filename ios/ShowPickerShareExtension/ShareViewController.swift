@@ -37,7 +37,8 @@ class ShareViewController: UIViewController {
         }
 
         for item in items {
-            // Many apps (Apple TV, Netflix) populate attributedTitle with the show name.
+            // Many apps (Apple TV, Netflix) populate attributedTitle with the show
+            // name; some (Netflix) instead drop a full sentence into the content text.
             let candidateTitle = item.attributedTitle?.string.nilIfEmpty
                 ?? item.attributedContentText?.string.nilIfEmpty
 
@@ -48,38 +49,149 @@ class ShareViewController: UIViewController {
                 $0.hasItemConformingToTypeIdentifier(UTType.url.identifier)
             }) {
                 provider.loadItem(forTypeIdentifier: UTType.url.identifier) { value, _ in
-                    let url     = value as? URL
-                    let network = url.flatMap { Self.networkFrom($0) }
-                    // For Apple TV URLs the title slug is in the path; use it only
-                    // when the app didn't supply an explicit title.
-                    let title   = candidateTitle ?? url.flatMap { Self.titleSlugFrom($0) }
-                    DispatchQueue.main.async { completion(title, network) }
+                    let parsed = Self.parseSharedContent(text: candidateTitle,
+                                                         url: value as? URL)
+                    DispatchQueue.main.async { completion(parsed.title, parsed.network) }
                 }
                 return
             }
 
             // Fallback: some apps (e.g. Netflix) share the link inside plain text
             // rather than as a discrete URL attachment. Recover the URL from it so
-            // the network still auto-detects.
+            // the network still auto-detects, and mine the title out of the sentence.
             if let provider = providers.first(where: {
                 $0.hasItemConformingToTypeIdentifier(UTType.plainText.identifier)
             }) {
                 provider.loadItem(forTypeIdentifier: UTType.plainText.identifier) { value, _ in
-                    let text    = (value as? String) ?? candidateTitle
-                    let url     = text.flatMap { Self.firstURL(in: $0) }
-                    let network = url.flatMap { Self.networkFrom($0) }
-                    let title   = candidateTitle ?? url.flatMap { Self.titleSlugFrom($0) }
-                    DispatchQueue.main.async { completion(title, network) }
+                    let text   = (value as? String).flatMap { $0.nilIfEmpty } ?? candidateTitle
+                    let url    = text.flatMap { Self.firstURL(in: $0) }
+                    let parsed = Self.parseSharedContent(text: text, url: url)
+                    DispatchQueue.main.async { completion(parsed.title, parsed.network) }
                 }
                 return
             }
 
             if candidateTitle != nil {
-                DispatchQueue.main.async { completion(candidateTitle, nil) }
+                let parsed = Self.parseSharedContent(text: candidateTitle, url: nil)
+                DispatchQueue.main.async { completion(parsed.title, parsed.network) }
                 return
             }
         }
         DispatchQueue.main.async { completion(nil, nil) }
+    }
+
+    // Turn whatever a source app shared — a clean show name, an Apple TV URL, or a
+    // Netflix-style sentence ("Check out "I Will Find You" on Netflix https://…") —
+    // into a clean title plus a streaming service.
+    static func parseSharedContent(text: String?, url: URL?) -> (title: String?, network: String?) {
+        // Network: the URL host is authoritative; otherwise look for an
+        // "on <Service>" mention in the shared text (Netflix shares no URL object).
+        let network = url.flatMap { networkFrom($0) }
+            ?? text.flatMap { networkFromText($0) }
+
+        // Title: clean up the shared text, falling back to the Apple TV URL slug.
+        let title = text.flatMap { cleanTitle($0, network: network) }
+            ?? url.flatMap { titleSlugFrom($0) }
+
+        return (title?.nilIfEmpty, network)
+    }
+
+    // Reduce a shared text blob to just the show title. Plain, already-clean titles
+    // (Apple TV, Safari page titles) pass through untouched; sentence-style shares
+    // get their boilerplate, URL, and trailing "on <Network>" stripped off.
+    static func cleanTitle(_ raw: String, network: String?) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // A quoted span is the exact title in every Netflix-style share.
+        if let quoted = firstQuoted(in: trimmed) { return quoted }
+
+        // Only treat it as a sentence if it carries a URL or a leading verb;
+        // otherwise it's already a bare title (which may legitimately contain
+        // " on ", e.g. "Based on a True Story") and we leave it alone.
+        let hasURL  = firstURL(in: trimmed) != nil
+        let hasVerb = leadingVerb(of: trimmed) != nil
+        guard hasURL || hasVerb else { return trimmed.nilIfEmpty }
+
+        var s = stripURLs(from: trimmed)
+        s = stripLeadingVerb(s)
+        // Drop a trailing "on <Network>" service mention (Netflix: "… on Netflix").
+        if network != nil,
+           let r = s.range(of: " on ", options: [.backwards, .caseInsensitive]) {
+            s = String(s[..<r.lowerBound])
+        }
+        s = s.trimmingCharacters(in: titleTrimSet)
+        return s.nilIfEmpty
+    }
+
+    // Characters to peel off the ends of a recovered title: whitespace, stray
+    // quotes (straight + curly), and trailing punctuation.
+    private static let titleTrimSet = CharacterSet(charactersIn: " \t\n.,:;-—\"'\u{201C}\u{201D}\u{2018}\u{2019}")
+        .union(.whitespacesAndNewlines)
+
+    // The first double-quoted span (straight or curly quotes) — Netflix wraps the
+    // exact show name in curly quotes: Check out "I Will Find You" on Netflix.
+    private static func firstQuoted(in text: String) -> String? {
+        let pattern = "[\"\u{201C}\u{201D}]([^\"\u{201C}\u{201D}]+)[\"\u{201C}\u{201D}]"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let range = NSRange(text.startIndex..., in: text)
+        guard let match = regex.firstMatch(in: text, options: [], range: range),
+              let r = Range(match.range(at: 1), in: text) else { return nil }
+        return String(text[r]).trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    }
+
+    // Strip every http(s) URL out of a text blob so links don't bleed into the title.
+    private static func stripURLs(from text: String) -> String {
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
+            return text
+        }
+        var result = text
+        let range = NSRange(text.startIndex..., in: text)
+        // Remove from the end backwards so earlier match ranges stay valid.
+        for match in detector.matches(in: text, options: [], range: range).reversed() {
+            if let r = Range(match.range, in: result) { result.replaceSubrange(r, with: "") }
+        }
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // Leading verbs streaming apps prepend to a share. Ordered longest-first so the
+    // most specific prefix wins (e.g. "check this out" before "check out").
+    private static let leadingVerbs = [
+        "check this out:", "check this out", "check out:", "check out",
+        "i'm watching", "now watching", "watching", "watch"
+    ]
+
+    private static func leadingVerb(of text: String) -> String? {
+        let lower = text.lowercased()
+        for verb in leadingVerbs where lower.hasPrefix(verb) {
+            // Require a word boundary so titles like "Watchmen" aren't mistaken
+            // for the verb "watch".
+            let after = lower.dropFirst(verb.count).first
+            if after == nil || after == " " || after == "\n" || after == "\t" || after == ":" {
+                return verb
+            }
+        }
+        return nil
+    }
+
+    private static func stripLeadingVerb(_ text: String) -> String {
+        guard let verb = leadingVerb(of: text) else { return text }
+        return String(text.dropFirst(verb.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // Detect the streaming service from an "on <Service>" mention in shared text,
+    // for apps (Netflix) that hand us no URL object. Mirrors networkFrom(_:).
+    private static func networkFromText(_ text: String) -> String? {
+        let lower = text.lowercased()
+        if lower.contains("netflix")                                 { return "Netflix"             }
+        if lower.contains("apple tv")                                { return "Apple TV+"           }
+        if lower.contains("hulu")                                    { return "Hulu"                }
+        if lower.contains("disney")                                  { return "Disney+"             }
+        if lower.contains("hbo max") || lower.contains("hbo")        { return "HBO Max"             }
+        if lower.contains("peacock")                                 { return "Peacock"             }
+        if lower.contains("paramount")                               { return "Paramount+"          }
+        if lower.contains("prime video") || lower.contains("amazon") { return "Amazon Prime Video"  }
+        if lower.contains("starz")                                   { return "Starz"               }
+        return nil
     }
 
     // Pull the first http(s) URL out of a shared text blob. Apps like Netflix
