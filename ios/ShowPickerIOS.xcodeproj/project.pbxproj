@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		A100000000000000000000E2 /* SharedSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* SharedSession.swift */; };
 		A100000000000000000000E3 /* SharedSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* SharedSession.swift */; };
+		A100000000000000000000E6 /* ShareTitleParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E5 /* ShareTitleParser.swift */; };
+		A100000000000000000000E7 /* ShareTitleParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E5 /* ShareTitleParser.swift */; };
 		A1000000000000000000010D /* ShowPickerShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A100000000000000000000C2 /* ShowPickerShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -40,6 +42,8 @@
 		A100000000000000000000C1 /* ShowPickerIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShowPickerIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A100000000000000000000C2 /* ShowPickerShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShowPickerShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A100000000000000000000E1 /* SharedSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/SharedSession.swift; sourceTree = "<group>"; };
+		A100000000000000000000E5 /* ShareTitleParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/ShareTitleParser.swift; sourceTree = "<group>"; };
+		A100000000000000000000C3 /* ShowPickerShareExtensionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShowPickerShareExtensionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -77,6 +81,11 @@
 			path = ShowPickerShareExtension;
 			sourceTree = "<group>";
 		};
+		A100000000000000000000D5 /* ShowPickerShareExtensionTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ShowPickerShareExtensionTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -94,6 +103,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A100000000000000000000F6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -102,7 +118,9 @@
 			children = (
 				A100000000000000000000D3 /* ShowPickerIOS */,
 				A100000000000000000000D4 /* ShowPickerShareExtension */,
+				A100000000000000000000D5 /* ShowPickerShareExtensionTests */,
 				A100000000000000000000E1 /* SharedSession.swift */,
+				A100000000000000000000E5 /* ShareTitleParser.swift */,
 				A100000000000000000000D2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -112,6 +130,7 @@
 			children = (
 				A100000000000000000000C1 /* ShowPickerIOS.app */,
 				A100000000000000000000C2 /* ShowPickerShareExtension.appex */,
+				A100000000000000000000C3 /* ShowPickerShareExtensionTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -165,6 +184,27 @@
 			productReference = A100000000000000000000C2 /* ShowPickerShareExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		A100000000000000000000B3 /* ShowPickerShareExtensionTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A10000000000000000000204 /* Build configuration list for PBXNativeTarget "ShowPickerShareExtensionTests" */;
+			buildPhases = (
+				A100000000000000000000F5 /* Sources */,
+				A100000000000000000000F6 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A100000000000000000000D5 /* ShowPickerShareExtensionTests */,
+			);
+			name = ShowPickerShareExtensionTests;
+			packageProductDependencies = (
+			);
+			productName = ShowPickerShareExtensionTests;
+			productReference = A100000000000000000000C3 /* ShowPickerShareExtensionTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -179,6 +219,9 @@
 						CreatedOnToolsVersion = 26.5;
 					};
 					A100000000000000000000B2 = {
+						CreatedOnToolsVersion = 26.5;
+					};
+					A100000000000000000000B3 = {
 						CreatedOnToolsVersion = 26.5;
 					};
 				};
@@ -199,6 +242,7 @@
 			targets = (
 				A100000000000000000000B1 /* ShowPickerIOS */,
 				A100000000000000000000B2 /* ShowPickerShareExtension */,
+				A100000000000000000000B3 /* ShowPickerShareExtensionTests */,
 			);
 		};
 /* End PBXProject section */
@@ -234,6 +278,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				A100000000000000000000E3 /* SharedSession.swift in Sources */,
+				A100000000000000000000E6 /* ShareTitleParser.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A100000000000000000000F5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A100000000000000000000E7 /* ShareTitleParser.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -477,6 +530,40 @@
 			};
 			name = Release;
 		};
+		A10000000000000000000307 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NQ6AJVVBBJ;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.patrickturner.showpickerios.ShareTitleParserTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A10000000000000000000308 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NQ6AJVVBBJ;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.patrickturner.showpickerios.ShareTitleParserTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -503,6 +590,15 @@
 			buildConfigurations = (
 				A10000000000000000000305 /* Debug */,
 				A10000000000000000000306 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A10000000000000000000204 /* Build configuration list for PBXNativeTarget "ShowPickerShareExtensionTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000000307 /* Debug */,
+				A10000000000000000000308 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
