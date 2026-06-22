@@ -99,7 +99,8 @@ struct AddEditShowView: View {
             if let s = existing {
                 _ = try await API.updateShow(id: s.id, title: t, network: net, list: list.rawValue,
                                              notes: n, recommendedBy: rec, movie: movie,
-                                             fullSeries: fullSeries, watchingWith: ww, archived: archived)
+                                             fullSeries: fullSeries, watchingWith: ww, archived: archived,
+                                             memberSlug: memberSlug)
             } else {
                 _ = try await API.addShow(memberSlug: memberSlug, title: t, network: net, list: list.rawValue,
                                           notes: n, recommendedBy: rec, movie: movie,

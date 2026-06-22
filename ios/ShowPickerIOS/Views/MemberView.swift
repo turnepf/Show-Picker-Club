@@ -32,6 +32,8 @@ struct MemberView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            OfflineBanner()
+
             Picker("List", selection: $currentList) {
                 ForEach(ShowList.allCases) { l in Text(l.title).tag(l) }
             }
