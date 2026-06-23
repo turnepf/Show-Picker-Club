@@ -10,6 +10,21 @@ enum API {
 
     enum APIError: Error { case badURL, badResponse(Int), badBody }
 
+    // True for the URLError codes that mean "no usable network" rather than a
+    // real server rejection. We queue writes / serve cache for these, and
+    // propagate everything else (4xx/5xx, decode failures) as before.
+    static func isOffline(_ error: Error) -> Bool {
+        guard let e = error as? URLError else { return false }
+        switch e.code {
+        case .notConnectedToInternet, .networkConnectionLost, .timedOut,
+             .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed,
+             .dataNotAllowed, .internationalRoamingOff:
+            return true
+        default:
+            return false
+        }
+    }
+
     // MARK: GET helpers
 
     private static func get<T: Decodable>(_ path: String) async throws -> T {
@@ -22,46 +37,81 @@ enum API {
         return try JSONDecoder().decode(T.self, from: data)
     }
 
+    // GET that mirrors each success to the offline cache and, when the device
+    // is offline, replays the last good copy instead of throwing.
+    private static func getCached<T: Codable>(_ path: String, cacheKey: String) async throws -> T {
+        do {
+            let value: T = try await get(path)
+            OfflineCache.save(value, for: cacheKey)
+            return value
+        } catch {
+            if isOffline(error), let cached = OfflineCache.load(T.self, for: cacheKey) {
+                return cached
+            }
+            throw error
+        }
+    }
+
     // MARK: Reads
 
     static func members() async throws -> [Member] {
-        let r: MembersResponse = try await get("/api/members")
+        let r: MembersResponse = try await getCached("/api/members", cacheKey: "members")
         return r.members
     }
 
     static func popular() async throws -> [PopularShow] {
-        let r: PopularResponse = try await get("/api/popular")
+        let r: PopularResponse = try await getCached("/api/popular", cacheKey: "popular")
         return r.shows
     }
 
+    // Active shows for a member. Online: fetch and refresh the offline snapshot.
+    // Offline: serve the snapshot (with any pending offline edits already
+    // layered on) so browsing and optimistic edits both keep working.
     static func shows(member slug: String, includeArchived: Bool = false) async throws -> [Show] {
         let enc = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? slug
         var path = "/api/shows?member=\(enc)"
         if includeArchived { path += "&include_archived=1" }
-        let r: ShowsResponse = try await get(path)
-        return r.shows
+        do {
+            let r: ShowsResponse = try await get(path)
+            if !includeArchived { await OfflineQueue.shared.replaceMember(slug, shows: r.shows) }
+            return r.shows
+        } catch {
+            if isOffline(error) {
+                return await OfflineQueue.shared.shows(for: slug, includeArchived: includeArchived)
+            }
+            throw error
+        }
     }
 
     static func showDetail(id: Int) async throws -> Show {
-        let r: ShowResponse = try await get("/api/shows/\(id)")
-        return r.show
+        do {
+            let r: ShowResponse = try await get("/api/shows/\(id)")
+            OfflineCache.save(r, for: "show_\(id)")
+            return r.show
+        } catch {
+            if isOffline(error) {
+                if let cached = OfflineCache.load(ShowResponse.self, for: "show_\(id)") { return cached.show }
+                if let local = await OfflineQueue.shared.cachedShow(id: id) { return local }
+            }
+            throw error
+        }
     }
 
     static func actors(showId: Int) async throws -> [Actor] {
-        let r: ActorsResponse = try await get("/api/shows/\(showId)/actors")
+        let r: ActorsResponse = try await getCached("/api/shows/\(showId)/actors", cacheKey: "actors_\(showId)")
         return r.actors
     }
 
     // Every active show across every member — backs cross-library search.
     static func allShows() async throws -> [AllShow] {
-        let r: AllShowsResponse = try await get("/api/shows/all")
+        let r: AllShowsResponse = try await getCached("/api/shows/all", cacheKey: "all_shows")
         return r.shows
     }
 
     // "Picks for you" for a member's own Up Next list.
     static func recommendations(member slug: String) async throws -> Recommendations {
         let enc = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? slug
-        return try await get("/api/recommendations?member=\(enc)")
+        return try await getCached("/api/recommendations?member=\(enc)", cacheKey: "recs_\(slug)")
     }
 
     static func checkAuth() async -> AuthCheckResponse {
@@ -183,11 +233,39 @@ enum API {
     }
 
     // MARK: Writes (require session cookie)
+    //
+    // Each write has a `…Remote` core that hits the network and throws on
+    // failure, plus a public wrapper that — when the failure is "we're
+    // offline" — queues the change locally (so the UI updates optimistically)
+    // and reports success. The OfflineQueue replays the `…Remote` cores when
+    // connectivity returns. Real server rejections still surface to the caller.
 
     @discardableResult
     static func addShow(memberSlug: String, title: String, network: String?, networkUrl: String? = nil,
                         list: String, notes: String?, recommendedBy: String?, movie: Bool, fullSeries: Bool,
                         watchingWith: String?) async throws -> Show {
+        do {
+            let show = try await addShowRemote(memberSlug: memberSlug, title: title, network: network,
+                                               networkUrl: networkUrl, list: list, notes: notes,
+                                               recommendedBy: recommendedBy, movie: movie,
+                                               fullSeries: fullSeries, watchingWith: watchingWith)
+            await OfflineQueue.shared.upsert(show, slug: memberSlug)
+            return show
+        } catch {
+            if isOffline(error) {
+                return await OfflineQueue.shared.enqueueAdd(
+                    memberSlug: memberSlug, title: title, network: network, networkUrl: networkUrl,
+                    list: list, notes: notes, recommendedBy: recommendedBy, movie: movie,
+                    fullSeries: fullSeries, watchingWith: watchingWith)
+            }
+            throw error
+        }
+    }
+
+    @discardableResult
+    static func addShowRemote(memberSlug: String, title: String, network: String?, networkUrl: String? = nil,
+                              list: String, notes: String?, recommendedBy: String?, movie: Bool, fullSeries: Bool,
+                              watchingWith: String?) async throws -> Show {
         struct Wrapper: Decodable { let show: Show }
         let body: [String: Any?] = [
             "title": title,
@@ -207,7 +285,29 @@ enum API {
     @discardableResult
     static func updateShow(id: Int, title: String, network: String?, list: String,
                            notes: String?, recommendedBy: String?, movie: Bool, fullSeries: Bool,
-                           watchingWith: String?, archived: Bool) async throws -> Show {
+                           watchingWith: String?, archived: Bool, memberSlug: String? = nil) async throws -> Show {
+        do {
+            let show = try await updateShowRemote(id: id, title: title, network: network, list: list,
+                                                  notes: notes, recommendedBy: recommendedBy, movie: movie,
+                                                  fullSeries: fullSeries, watchingWith: watchingWith,
+                                                  archived: archived)
+            if let slug = show.memberSlug ?? memberSlug { await OfflineQueue.shared.upsert(show, slug: slug) }
+            return show
+        } catch {
+            if isOffline(error) {
+                return await OfflineQueue.shared.enqueueUpdate(
+                    id: id, memberSlug: memberSlug, title: title, network: network, list: list,
+                    notes: notes, recommendedBy: recommendedBy, movie: movie, fullSeries: fullSeries,
+                    watchingWith: watchingWith, archived: archived)
+            }
+            throw error
+        }
+    }
+
+    @discardableResult
+    static func updateShowRemote(id: Int, title: String, network: String?, list: String,
+                                 notes: String?, recommendedBy: String?, movie: Bool, fullSeries: Bool,
+                                 watchingWith: String?, archived: Bool) async throws -> Show {
         struct Wrapper: Decodable { let show: Show }
         let body: [String: Any?] = [
             "title": title,
@@ -225,16 +325,43 @@ enum API {
     }
 
     static func moveShow(id: Int, to list: String) async throws {
+        do {
+            try await moveShowRemote(id: id, to: list)
+        } catch {
+            if isOffline(error) { await OfflineQueue.shared.enqueueMove(id: id, to: list) }
+            else { throw error }
+        }
+    }
+
+    static func moveShowRemote(id: Int, to list: String) async throws {
         struct Ack: Decodable {}
-        let _: Ack? = try? await putJSON("/api/shows/\(id)/move", body: ["list": list])
+        let _: Ack = try await putJSON("/api/shows/\(id)/move", body: ["list": list])
     }
 
     static func archiveShow(id: Int) async throws {
+        do {
+            try await archiveShowRemote(id: id)
+        } catch {
+            if isOffline(error) { await OfflineQueue.shared.enqueueArchive(id: id) }
+            else { throw error }
+        }
+    }
+
+    static func archiveShowRemote(id: Int) async throws {
         struct Ack: Decodable {}
-        let _: Ack? = try? await putJSON("/api/shows/\(id)/archive", body: [:])
+        let _: Ack = try await putJSON("/api/shows/\(id)/archive", body: [:])
     }
 
     static func deleteShow(id: Int) async throws {
+        do {
+            try await deleteShowRemote(id: id)
+        } catch {
+            if isOffline(error) { await OfflineQueue.shared.enqueueDelete(id: id) }
+            else { throw error }
+        }
+    }
+
+    static func deleteShowRemote(id: Int) async throws {
         guard let url = URL(string: baseString + "/api/shows/\(id)") else { throw APIError.badURL }
         var req = URLRequest(url: url)
         req.httpMethod = "DELETE"

@@ -38,7 +38,7 @@ The app is **already in TestFlight**, so shipping a new build is just *archive +
 
 **Always bump the build number before you archive.** App Store Connect rejects any build whose number isn't strictly higher than the last one uploaded for the same marketing version (this bit us once — the repo lagged what was already in TestFlight). The build number is `CURRENT_PROJECT_VERSION`, set **once at the project level** so the app and the share extension always match (Xcode → project → Build Settings → *Current Project Version*).
 
-> **Build log — keep this current.** Marketing version `1.0`. Highest build uploaded to TestFlight: **7** (share-sheet title parsing — Netflix / Paramount+ / HBO Max / Hulu). Committed and ready to upload next: **8**. Before each upload, set this to the next unused integer (here *and* in the project), then update this line after uploading.
+> **Build log — keep this current.** Marketing version `1.0`. Highest build uploaded to TestFlight: **7** (share-sheet title parsing — Netflix / Paramount+ / HBO Max / Hulu). Committed and ready to upload next: **9** (offline support — read cache + queued offline edits). Before each upload, set this to the next unused integer (here *and* in the project), then update this line after uploading.
 >
 > A TestFlight **tester group** has been set up for this app, so builds can be assigned to it for external testing (internal testers still auto-update).
 
@@ -135,6 +135,61 @@ xcodebuild test -project ios/ShowPickerIOS.xcodeproj \
 >
 > **Simulator note:** Netflix/Apple TV aren't on the simulator, but Safari is — sharing any web page exercises the same URL path, so it's the easiest way to smoke-test.
 
+## Offline support
+
+The app keeps working without a connection — you can browse what you've already
+seen and make changes to your own lists; everything reconciles when you're back
+online. No new screens: the only visible addition is a thin status strip under
+the header ("Offline — N changes will sync…" / "Syncing…").
+
+### How it works
+
+Everything lives in `ShowPickerIOS/Offline/`:
+
+```
+Offline/
+├── Connectivity.swift     NWPathMonitor → isOnline; kicks a flush on reconnect
+├── OfflineCache.swift     disk JSON cache for read endpoints (Application Support)
+├── PendingMutation.swift  one queued write (add / update / move / archive / delete)
+├── OfflineQueue.swift     shows-per-member snapshot + the write queue + flush
+└── OfflineBanner.swift    the status strip shown in Home + Member views
+```
+
+- **Reads (browse offline).** `API`'s GET helpers mirror every success to
+  `OfflineCache`; when a later GET fails *because the device is offline* (a
+  `URLError` like `.notConnectedToInternet`), the last good copy is served
+  instead of throwing. Members, popular, a member's shows, a show's detail,
+  cast, cross-library search, and recommendations are all cached. Real server
+  errors (4xx/5xx, decode failures) still propagate as before.
+
+- **Writes (add / edit offline).** Each write in `API` is split into a
+  `…Remote` core (hits the network, throws on failure) and a public wrapper.
+  When the wrapper sees an offline error it hands the change to `OfflineQueue`,
+  which (a) appends a persisted `PendingMutation` and (b) layers it onto the
+  cached shows so the UI updates immediately. Adds get a temporary negative id
+  until the server assigns a real one.
+
+- **Sync.** `OfflineQueue.flush()` replays the queue in order against the
+  `…Remote` cores — on app launch, when the scene returns to the foreground,
+  and the moment `Connectivity` reports the network is back. Temporary add-ids
+  are remapped to the server's real ids so a later edit/move of a
+  just-created show targets the right row. A mutation the server *rejects*
+  (e.g. the show was deleted on the web) is dropped so it can't wedge the queue.
+
+- **Lifecycle.** Logging out wipes the read cache and clears any queued edits
+  so the next person on the device starts clean.
+
+### Limits
+
+- Only edits to *your own* library queue offline — add / edit / move / archive /
+  delete, including adding a cached search result or a "Picks for you" pick onto
+  one of your lists. Suggesting or sending a show to *another* member, login,
+  and the admin tools still need a connection and surface their usual errors
+  offline.
+- The share extension is a separate process and remains online-only.
+- Enrichment (ratings, cast, premiere dates) for a show added offline fills in
+  after it syncs and the server enriches it.
+
 ## Feature status
 
 | Feature | Status |
@@ -155,6 +210,7 @@ xcodebuild test -project ios/ShowPickerIOS.xcodeproj \
 | Share from Netflix / Apple TV / etc. → Up Next | ✅ (Share Extension) |
 | Calendar feed (Subscribe in Calendar) | ✅ (per-member webcal:// button at the bottom of their list) |
 | Recommendations / "Picks for you" | ✅ (above your own Up Next; top 3, de-named reasons) |
+| Offline browsing + offline edits | ✅ (cached reads, queued add/edit/move/archive, auto-sync on reconnect) |
 | Field toggle pills (hide ratings/networks/etc.) | ❌ Not planned for iOS |
 | Vibe profile | ❌ Not planned for iOS |
 

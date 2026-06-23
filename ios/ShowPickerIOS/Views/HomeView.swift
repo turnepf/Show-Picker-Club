@@ -39,6 +39,8 @@ struct HomeView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 8)
 
+                OfflineBanner()
+
                 List {
                     if let me = myMember {
                         Section {

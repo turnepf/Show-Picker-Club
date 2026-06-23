@@ -61,6 +61,10 @@ final class AuthStore: ObservableObject {
         email = nil
         isAdmin = false
         SharedSession.clear()
+        // Drop cached reads and any queued offline edits so the next person to
+        // sign in on this device starts clean.
+        OfflineQueue.shared.reset()
+        OfflineCache.clearAll()
     }
 
     func isMe(_ slug: String) -> Bool { memberSlug == slug }
