@@ -24,11 +24,16 @@ export async function onRequestGet(context) {
   ).bind(slug).all();
 
   // Resubscribe reminders for services the member paused with a target date,
-  // set from the Subscription Audit page.
-  const { results: resubs } = await env.DB.prepare(
-    `SELECT network, resubscribe_date FROM member_subscriptions
-     WHERE member_slug = ? AND status = 'paused' AND resubscribe_date IS NOT NULL`
-  ).bind(slug).all();
+  // set from the Subscription Audit page. Guarded so the feed still serves its
+  // show events if the member_subscriptions table hasn't been migrated yet.
+  let resubs = [];
+  try {
+    const r = await env.DB.prepare(
+      `SELECT network, resubscribe_date FROM member_subscriptions
+       WHERE member_slug = ? AND status = 'paused' AND resubscribe_date IS NOT NULL`
+    ).bind(slug).all();
+    resubs = r.results || [];
+  } catch (e) {}
 
   const calName = `${member.first_name || member.name}'s Shows`;
   const dtstamp = formatDtStamp(new Date());
