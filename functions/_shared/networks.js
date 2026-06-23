@@ -156,3 +156,29 @@ export function networkFromUrl(url) {
 export const NETWORK_SEARCH = Object.fromEntries(
   NETWORKS.map(n => [n.stored, n.search])
 );
+
+// Editable default monthly prices (US, cents) for the Subscription Audit, so
+// the "save $X/mo" figures are real without forcing data entry. These are
+// approximate standard-plan rates and drift over time — every member can
+// override their own price per service, and these are only the starting point.
+// Keyed by canonical `stored` network name.
+export const DEFAULT_PRICE_CENTS = {
+  'Netflix': 1799,
+  'HBO Max': 1699,
+  'Apple TV+': 999,
+  'Hulu': 999,
+  'Paramount+': 799,
+  'Peacock': 799,
+  'Amazon Prime Video': 899,
+  'Disney+': 999,
+  'Starz': 1099,
+  'AMC+': 899,
+  'Food Network': 699,
+  'Fox': 799,
+};
+
+export function defaultPriceCents(network) {
+  if (!network) return null;
+  const hit = DEFAULT_PRICE_CENTS[canonicalNetwork(network)];
+  return hit == null ? null : hit;
+}

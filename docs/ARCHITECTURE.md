@@ -105,6 +105,34 @@ Pre-computed taste fingerprint per title, used by the vibe system. Keyed by `LOW
 
 Plus `title_lower` (PK), `title`, `unknown_show` (1 if Claude couldn't identify the show), `generated_at`.
 
+### `member_subscriptions`
+Per-member subscription decisions for the Subscription Audit (`/subscriptions`). Added by `migrations/014_member_subscriptions.sql`. The audit itself is **derived** from the `shows` table on every request — this table only stores what can't be computed.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER PK | |
+| `member_slug` | TEXT NOT NULL | FK to `members`. |
+| `network` | TEXT NOT NULL | Canonical network name for derived services, or free text for a manual service. One row per `(member_slug, network)`. |
+| `status` | TEXT NOT NULL | `subscribed` / `paused` / `cancelled`. The member's real decision. |
+| `monthly_price_cents` | INTEGER | What they pay; `NULL` falls back to the editable default in `_shared/networks.js#DEFAULT_PRICE_CENTS`. |
+| `resubscribe_date` | TEXT | Optional ISO `yyyy-mm-dd` reminder; emitted into the member's calendar feed as a "Resubscribe" event. |
+| `is_manual` | INTEGER DEFAULT 0 | 1 for a service the member pays for but tracks no shows on (e.g. a sports package). Stays 1 once set (`MAX` on upsert). |
+| `created_at`, `updated_at` | TEXT | |
+
+## Subscription audit
+
+`GET/PUT /api/subscriptions` (`functions/api/subscriptions.js`), page at `public/subscriptions.html`, linked from the member page nav (own page only). Both verbs require a session and operate on the logged-in member.
+
+- **GET** groups the member's active shows by canonical network and assigns each service a **verdict**:
+  - `keep` — ≥1 show in `watching`.
+  - `pause` — nothing watching, but a `waiting` show has a future `next_season_date`; the soonest such date is the suggested resubscribe target.
+  - `pause_tba` — `waiting` shows but no announced premiere date.
+  - `start` — only `next` ("up next") shows; start one or skip.
+  - `cancel` — only finished / `recommending` shows.
+  - Manual services (no shows) carry verdict `manual`.
+  Saved `member_subscriptions` rows are merged in (status, price, resubscribe date), and totals (service count, est. monthly spend, potential savings) are computed. Savings = sum of price over non-cancelled services whose verdict is `cancel` / `pause` / `pause_tba`.
+- **PUT** upserts one service's saved decision. Only the fields the caller actually sends are overwritten (a status change won't wipe a saved price), via per-field `CASE WHEN ?` flags in the `ON CONFLICT` clause. `{ remove: true }` deletes a manual service.
+
 ## Routing
 
 Two routing systems combine:
@@ -302,6 +330,7 @@ Source of truth: `functions/_shared/networks.js`. Each entry has:
 - **Events emitted:**
   - One per show with `next_season_date` (uid: `show-<id>-premiere@showpicker.club`).
   - One per show with `season_end_date != next_season_date` (uid: `show-<id>-finale@showpicker.club`).
+  - One per `member_subscriptions` row with `status = 'paused'` and a `resubscribe_date` set (uid: `resub-<slug>-<network-slug>@showpicker.club`, summary `Resubscribe to <Network>`). These come from the Subscription Audit.
 - **Event fields:**
   - `SUMMARY`: `<Title> on <Network>` (or just `<Title>` if no network).
   - `URL`: the show's `network_url` if it's a real deep link (not a `/search` or `/s?` placeholder), else the member's app page.

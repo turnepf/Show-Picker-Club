@@ -76,8 +76,22 @@ CREATE TABLE IF NOT EXISTS failed_logins (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS member_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  member_slug TEXT NOT NULL REFERENCES members(slug),
+  network TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'subscribed',
+  monthly_price_cents INTEGER,
+  resubscribe_date TEXT,
+  is_manual INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE (member_slug, network)
+);
+
 CREATE INDEX IF NOT EXISTS idx_shows_list ON shows(list);
 CREATE INDEX IF NOT EXISTS idx_shows_archived ON shows(archived);
 CREATE INDEX IF NOT EXISTS idx_shows_member ON shows(member_slug);
 CREATE INDEX IF NOT EXISTS idx_actors_show_id ON actors(show_id);
 CREATE INDEX IF NOT EXISTS idx_failed_logins_ip_time ON failed_logins(ip, created_at);
+CREATE INDEX IF NOT EXISTS idx_member_subs_slug ON member_subscriptions(member_slug);
