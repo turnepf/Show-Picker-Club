@@ -116,6 +116,24 @@ Calendar apps re-fetch the feed on their own schedule (Apple Calendar typically 
 
 A "📅 Calendar feed" link in each member-page footer opens the `webcal://` URL, which Apple Calendar recognizes as a one-tap subscribe.
 
+## Subscriptions (`/subscriptions`)
+
+A private audit that helps a member trim streaming spend, reached from a "💸 Subscriptions" link on their own member page (logged-in members only).
+
+The page reads the shows already on your lists, groups them by streaming service, and gives each service a plain-English call:
+
+- **Keep** — you're actively watching something there right now.
+- **Pause & save** — nothing to watch this minute, but a show you're waiting on has a known next-season date. It tells you the month to **cancel now and resubscribe** (e.g. "resubscribe around Oct 2026, when Tulsa King returns").
+- **Pause (renewal TBA)** — you're waiting on a renewal with no announced date yet.
+- **Start or skip** — shows queued up there but nothing started.
+- **Cancel candidate** — every show there is finished; nothing pulls you back.
+
+The top of the page sums it up: services tracked, estimated monthly spend, and roughly how much you could save right now. Each service shows a "Why?" expander listing the exact shows behind its verdict, so the recommendation is never a black box.
+
+You stay in control: every service has a **Subscribed / Paused / Cancelled** toggle (the verdict is only a suggestion), an editable monthly price (pre-filled with a sensible default per service), and — for paused services — a **resubscribe date**. Setting that date drops a "Resubscribe to <Service>" reminder onto your [calendar feed](#calendar-feed), right next to your premiere and finale dates. You can also **add a service** you pay for that has no tracked shows (a sports or music package) so the monthly total reflects everything.
+
+Prices are editable defaults — approximate US standard-plan rates that each member can correct to what they actually pay. Implementation in [`ARCHITECTURE.md`](ARCHITECTURE.md#subscription-audit).
+
 ## Vibe (`/vibe`)
 
 A taste-profile view. Pick any member from the dropdown to see:
