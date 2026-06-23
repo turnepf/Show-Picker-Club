@@ -46,6 +46,12 @@ both targets derive it from the same `HEAD` so the app and extension always
 match. Because the date integer dwarfs the old plain counters, every
 date-based build also sorts above the old builds 1–7.
 
+The script runs on **every** build (debug and release), not just Archive —
+Apple requires the parent app and its embedded extension to carry the same
+`CFBundleVersion`, and stamping both on each build keeps them from drifting
+apart (e.g. when an incremental build regenerates one target's `Info.plist`
+but not the other's).
+
 > The script reads the commit count via `git`, so the app/extension targets
 > have `ENABLE_USER_SCRIPT_SANDBOXING = NO`. `CURRENT_PROJECT_VERSION` is left
 > in the project as a fallback for builds made outside a git checkout (where the
