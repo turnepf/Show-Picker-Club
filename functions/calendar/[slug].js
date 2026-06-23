@@ -23,6 +23,13 @@ export async function onRequestGet(context) {
        AND (next_season_date IS NOT NULL OR season_end_date IS NOT NULL)`
   ).bind(slug).all();
 
+  // Resubscribe reminders for services the member paused with a target date,
+  // set from the Subscription Audit page.
+  const { results: resubs } = await env.DB.prepare(
+    `SELECT network, resubscribe_date FROM member_subscriptions
+     WHERE member_slug = ? AND status = 'paused' AND resubscribe_date IS NOT NULL`
+  ).bind(slug).all();
+
   const calName = `${member.first_name || member.name}'s Shows`;
   const dtstamp = formatDtStamp(new Date());
 
@@ -65,6 +72,19 @@ export async function onRequestGet(context) {
     }
   }
 
+  const subsUrl = `https://showpicker.club/subscriptions`;
+  for (const r of resubs) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(r.resubscribe_date || '')) continue;
+    lines.push(...buildEvent({
+      uid: `resub-${slug}-${slugifyForUid(r.network)}@showpicker.club`,
+      dtstamp,
+      date: r.resubscribe_date,
+      summary: `Resubscribe to ${r.network}`,
+      description: `You paused ${r.network}. A show you're waiting on returns around now — resubscribe to catch it. Manage: ${subsUrl}`,
+      url: subsUrl,
+    }));
+  }
+
   lines.push('END:VCALENDAR');
   const ics = lines.map(foldLine).join('\r\n') + '\r\n';
 
@@ -91,6 +111,11 @@ function buildEvent({ uid, dtstamp, date, summary, description, url }) {
     'TRANSP:TRANSPARENT',
     'END:VEVENT',
   ];
+}
+
+// Make a network name safe for use inside an iCal UID (no spaces/punctuation).
+function slugifyForUid(name) {
+  return String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'service';
 }
 
 function isRealShowUrl(url) {
