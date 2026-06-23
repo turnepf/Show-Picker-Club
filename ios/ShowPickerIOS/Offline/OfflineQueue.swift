@@ -29,7 +29,7 @@ final class OfflineQueue: ObservableObject {
 
     private init() {
         pending = OfflineCache.load([PendingMutation].self, for: pendingKey) ?? []
-        base = OfflineCache.load([String: [Show]].self, for: baseKey) ?? []
+        base = OfflineCache.load([String: [Show]].self, for: baseKey) ?? [:]
         rebuildAll()
     }
 
