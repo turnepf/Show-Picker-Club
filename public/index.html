@@ -695,6 +695,7 @@
       <a href="/reporting" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic;">Curious?</a>
       <a href="/vibe" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic; margin-left: 16px;">Vibe</a>
       <a id="calendarFeedLink" href="#" style="display:none; color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic; margin-left: 16px;" title="Subscribe in Calendar to keep upcoming season dates on your phone">📅 Calendar feed</a>
+      <a id="subscriptionsLink" href="/subscriptions" style="display:none; color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic; margin-left: 16px;" title="See which streaming subscriptions you actually need right now">💸 Subscriptions</a>
     </div>
 
     <footer style="text-align: center; padding: 24px 16px 32px; font-size: 12px; color: var(--ink-quiet);">
@@ -1352,6 +1353,9 @@
           if (authMember && typeof memberSlug !== 'undefined' && authMember === memberSlug) {
             const addBtn = document.getElementById('addBtn');
             if (addBtn) addBtn.classList.remove('hidden');
+            // Subscription audit is personal — only on your own page.
+            const subsLink = document.getElementById('subscriptionsLink');
+            if (subsLink) subsLink.style.display = 'inline';
             loadRecs();
           }
           const logoutBtn = document.getElementById('logoutBtn');

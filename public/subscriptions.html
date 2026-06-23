@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Subscriptions — Show Picker Club</title>
+  <link rel="stylesheet" href="/styles.css?v=4">
+  <style>
+    body { padding: 24px 16px 60px; }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .topbar a.back { color: var(--ink-quiet); text-decoration: none; font-size: 22px; }
+    .topbar h1 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
+
+    .hero {
+      background: var(--surface); border-radius: 12px; padding: 24px; margin-bottom: 22px;
+      box-shadow: var(--shadow-card);
+    }
+    .hero .stat-grid { display: flex; gap: 18px; flex-wrap: wrap; }
+    .hero .stat { flex: 1 1 120px; }
+    .hero .stat .num { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; color: var(--ink); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    .hero .stat .num.save { color: var(--accent); }
+    .hero .stat .lbl { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+    .hero .save-line { margin-top: 16px; font-size: 14px; color: var(--ink); line-height: 1.5; }
+    .hero .save-line strong { color: var(--accent); }
+
+    .bucket { margin-bottom: 26px; }
+    .bucket-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; padding: 0 2px; }
+    .bucket-head h2 { font-family: var(--font-display); font-size: var(--text-md); font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
+    .bucket-head .count { font-size: 13px; color: var(--ink-quiet); }
+    .bucket-head .blurb { font-size: 12px; color: var(--ink-muted); margin-left: auto; font-style: italic; }
+
+    .svc {
+      background: var(--surface); border: 1px solid var(--border-soft); border-radius: 10px;
+      padding: 14px 16px; margin-bottom: 10px; border-left: 4px solid var(--border);
+    }
+    .svc.keep { border-left-color: var(--accent); }
+    .svc.pause { border-left-color: #d99a2b; }
+    .svc.start { border-left-color: #7c93c4; }
+    .svc.cancel { border-left-color: var(--danger-deep, #c0392b); }
+    .svc.manual { border-left-color: var(--ink-quiet); }
+
+    .svc-top { display: flex; align-items: center; gap: 10px; }
+    .svc-name { font-weight: 700; color: var(--ink); font-size: 15px; }
+    .svc-pill { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 2px 8px; border-radius: 10px; }
+    .svc-pill.keep { background: var(--accent-soft); color: var(--tab-up-next, #6a5b1f); }
+    .svc-pill.pause { background: #fbeccb; color: #8a6210; }
+    .svc-pill.start { background: #e6ecf7; color: #3f5488; }
+    .svc-pill.cancel { background: var(--danger-soft, #fbe3e0); color: var(--danger-deep, #c0392b); }
+    .svc-pill.manual { background: var(--surface-2); color: var(--ink-muted); }
+    .svc-price { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; font-size: 14px; white-space: nowrap; }
+    .svc-price button { background: none; border: none; color: var(--accent); font-size: 12px; cursor: pointer; font-family: inherit; padding: 0 0 0 6px; }
+
+    .svc-reason { font-size: 13px; color: var(--ink-muted); margin: 8px 0 0; line-height: 1.5; }
+    .svc-reason .when { color: var(--ink); font-weight: 600; }
+
+    .svc-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+    .seg button {
+      border: none; background: var(--surface); color: var(--ink-muted); font-family: inherit;
+      font-size: 12px; font-weight: 600; padding: 6px 11px; cursor: pointer; border-right: 1px solid var(--border);
+    }
+    .seg button:last-child { border-right: none; }
+    .seg button.on { background: var(--ink); color: #fff; }
+    .seg button.on.cancelled { background: var(--danger-deep, #c0392b); }
+    .seg button.on.paused { background: #d99a2b; color: #fff; }
+
+    .resub { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-muted); }
+    .resub input[type=date] { font-family: inherit; font-size: 12px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+
+    .why-btn { background: none; border: none; color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; padding: 0; margin-left: auto; }
+    .why { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-soft); }
+    .why.open { display: block; }
+    .why .show-row { font-size: 13px; color: var(--ink); padding: 3px 0; display: flex; gap: 8px; }
+    .why .show-row .tag { color: var(--ink-quiet); font-size: 11px; text-transform: capitalize; flex: 0 0 78px; }
+    .why .show-row .date { color: var(--ink-quiet); font-size: 11px; margin-left: auto; }
+
+    .addbar { text-align: center; margin: 4px 0 28px; }
+    .addbar button { background: none; border: 1px dashed var(--border); border-radius: 8px; color: var(--ink-muted); font-family: inherit; font-size: 13px; font-weight: 600; padding: 10px 16px; cursor: pointer; }
+    .addbar button:hover { border-color: var(--accent); color: var(--accent); }
+
+    .cal-note { background: var(--surface-2); border-radius: 8px; padding: 12px 14px; font-size: 12px; color: var(--ink-muted); margin-bottom: 24px; line-height: 1.5; }
+    .cal-note a { color: var(--accent); text-decoration: none; font-weight: 600; }
+
+    .empty-card { background: var(--surface); border-radius: 10px; padding: 32px; text-align: center; color: var(--ink-muted); font-size: 14px; line-height: 1.6; }
+    .err { color: var(--danger-deep); font-size: 13px; text-align: center; padding: 20px; }
+    .footer { text-align: center; color: var(--ink-quiet); font-size: 12px; margin-top: 24px; }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+      background: var(--ink); color: #fff; padding: 9px 16px; border-radius: 8px;
+      font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); opacity: 0; pointer-events: none;
+      transition: opacity 0.2s; z-index: 200;
+    }
+    .toast.show { opacity: 1; }
+
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+    .modal-overlay.hidden { display: none; }
+    .modal-card { background: var(--surface); padding: 24px; border-radius: 12px; max-width: 380px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal-card h2 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--ink); margin-bottom: 14px; }
+    .modal-card label { display: block; font-size: 13px; font-weight: 500; margin: 12px 0 6px; color: var(--ink-muted); }
+    .modal-card input, .modal-card select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: inherit; box-sizing: border-box; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+    .modal-actions button { flex: 1; padding: 10px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; border: none; }
+    .modal-actions .cancel { background: var(--surface-2); color: var(--ink); }
+    .modal-actions .submit { background: var(--accent); color: var(--ink); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <a class="back" href="/" title="Home">&#9664;</a>
+      <h1>Subscriptions</h1>
+    </div>
+    <div id="content"><div class="empty-card">Loading&hellip;</div></div>
+    <div class="footer" id="footer"></div>
+  </div>
+
+  <div class="modal-overlay hidden" id="addOverlay" onclick="closeAddModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <h2>Add a service</h2>
+      <p style="font-size:13px;color:var(--ink-muted);line-height:1.5;margin-bottom:4px;">
+        For something you pay for but don't track shows on — a sports package, a music bundle, anything.
+      </p>
+      <label for="addName">Service name</label>
+      <input type="text" id="addName" placeholder="e.g. ESPN+">
+      <label for="addPrice">Monthly price (USD)</label>
+      <input type="number" id="addPrice" min="0" step="0.01" placeholder="e.g. 10.99">
+      <div class="modal-actions">
+        <button type="button" class="cancel" onclick="closeAddModal()">Cancel</button>
+        <button type="button" class="submit" onclick="submitAdd()">Add service</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]);
+    }
+    function fmtMoney(cents) {
+      if (cents == null) return '—';
+      const d = cents / 100;
+      return '$' + (Number.isInteger(d) ? d : d.toFixed(2));
+    }
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function fmtMonth(iso) {
+      if (!iso) return '';
+      const [y, m] = iso.split('-').map(Number);
+      return `${MONTHS[m - 1]} ${y}`;
+    }
+    function fmtDate(iso) {
+      if (!iso) return '';
+      const [y, m, d] = iso.split('-').map(Number);
+      return `${MONTHS[m - 1]} ${d}, ${y}`;
+    }
+
+    let toastTimer = null;
+    function toast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+    }
+
+    // verdict → bucket + display metadata
+    const BUCKETS = [
+      { key: 'keep',   title: 'Keep',            blurb: "you're watching something here now",   verdicts: ['keep'] },
+      { key: 'pause',  title: 'Pause & save',    blurb: 'nothing active — cancel and come back', verdicts: ['pause', 'pause_tba'] },
+      { key: 'start',  title: 'Start or skip',   blurb: 'queued up but not started',             verdicts: ['start'] },
+      { key: 'cancel', title: 'Cancel candidates', blurb: 'nothing here needs you',              verdicts: ['cancel'] },
+      { key: 'manual', title: 'Other services',  blurb: 'tracked manually',                      verdicts: ['manual'] },
+    ];
+    const PILL = {
+      keep: { cls: 'keep', text: 'Keep' },
+      pause: { cls: 'pause', text: 'Pause' },
+      pause_tba: { cls: 'pause', text: 'Pause' },
+      start: { cls: 'start', text: 'Start or skip' },
+      cancel: { cls: 'cancel', text: 'Cancel' },
+      manual: { cls: 'manual', text: 'Manual' },
+    };
+
+    function reasonHtml(s) {
+      const watching = s.shows.filter(x => x.list === 'watching').map(x => x.title);
+      if (s.verdict === 'keep') {
+        return `Active now: ${watching.slice(0, 3).map(escapeHtml).join(', ')}${watching.length > 3 ? '…' : ''}.`;
+      }
+      if (s.verdict === 'pause') {
+        const ret = s.shows.find(x => x.list === 'waiting' && x.next_season_date === s.suggested_resubscribe_date);
+        const who = ret ? escapeHtml(ret.title) : 'A show';
+        return `Nothing to watch right now. Cancel and resubscribe around <span class="when">${escapeHtml(fmtMonth(s.suggested_resubscribe_date))}</span>, when ${who} returns.`;
+      }
+      if (s.verdict === 'pause_tba') {
+        return `Nothing active. You're waiting on a renewal, but no premiere date is announced yet — pause until one is.`;
+      }
+      if (s.verdict === 'start') {
+        return `You have shows queued up here but aren't watching any yet. Start one this month or skip the service.`;
+      }
+      if (s.verdict === 'cancel') {
+        return `Nothing watching, waiting, or up next — your shows here are finished. Safe to cancel.`;
+      }
+      return `Tracked manually — no shows on your lists use it.`;
+    }
+
+    function segHtml(s) {
+      const eff = s.status || 'subscribed';
+      const opt = (val, label) => {
+        const on = eff === val;
+        const cls = on ? `on ${val}` : '';
+        return `<button class="${cls}" data-net="${escapeHtml(s.network)}" data-status="${val}">${label}</button>`;
+      };
+      return `<div class="seg">${opt('subscribed', 'Subscribed')}${opt('paused', 'Paused')}${opt('cancelled', 'Cancelled')}</div>`;
+    }
+
+    function resubHtml(s) {
+      const eff = s.status || 'subscribed';
+      // Show the resubscribe-date picker when paused, or when the verdict
+      // suggests pausing (so the suggestion is one click away).
+      const relevant = eff === 'paused' || s.verdict === 'pause' || s.verdict === 'pause_tba';
+      if (!relevant) return '';
+      const val = s.resubscribe_date || (s.verdict === 'pause' ? s.suggested_resubscribe_date : '') || '';
+      return `<span class="resub">Resubscribe
+        <input type="date" data-net="${escapeHtml(s.network)}" value="${escapeHtml(val)}">
+      </span>`;
+    }
+
+    function whyHtml(s, idx) {
+      if (!s.shows.length) return '';
+      const rows = s.shows.map(x => `
+        <div class="show-row">
+          <span class="tag">${escapeHtml(x.list === 'next' ? 'up next' : x.list)}</span>
+          <span>${escapeHtml(x.title)}${x.full_series ? ' <span class="date">(ended)</span>' : ''}</span>
+          ${x.next_season_date ? `<span class="date">returns ${escapeHtml(fmtDate(x.next_season_date))}</span>` : ''}
+        </div>`).join('');
+      return `<button class="why-btn" data-why="${idx}">Why? (${s.shows.length} show${s.shows.length === 1 ? '' : 's'})</button>
+        <div class="why" id="why-${idx}">${rows}</div>`;
+    }
+
+    function svcHtml(s, idx) {
+      const pill = PILL[s.verdict] || PILL.manual;
+      const cls = pill.cls;
+      const price = `${fmtMoney(s.monthly_price_cents)}<span style="color:var(--ink-quiet);font-weight:400;">/mo</span>
+        <button data-editprice="${escapeHtml(s.network)}" data-cents="${s.monthly_price_cents == null ? '' : s.monthly_price_cents}">edit</button>`;
+      const removeBtn = s.is_manual
+        ? `<button class="why-btn" style="color:var(--ink-quiet);" data-remove="${escapeHtml(s.network)}">Remove</button>`
+        : '';
+      return `<div class="svc ${cls}">
+        <div class="svc-top">
+          <span class="svc-name">${escapeHtml(s.network)}</span>
+          <span class="svc-pill ${cls}">${pill.text}</span>
+          <span class="svc-price">${price}</span>
+        </div>
+        <p class="svc-reason">${reasonHtml(s)}</p>
+        <div class="svc-actions">
+          ${segHtml(s)}
+          ${resubHtml(s)}
+          ${whyHtml(s, idx)}
+          ${removeBtn}
+        </div>
+      </div>`;
+    }
+
+    let DATA = null;
+
+    function render(data) {
+      DATA = data;
+      const content = document.getElementById('content');
+      const footer = document.getElementById('footer');
+
+      if (!data.services.length) {
+        content.innerHTML = `<div class="empty-card">
+          No streaming services to audit yet. Once you add shows with a network on your list,
+          they'll show up here grouped by service — with a keep / pause / cancel call for each.
+        </div>`;
+        footer.textContent = '';
+        return;
+      }
+
+      const t = data.totals;
+      const savingsBlock = t.potential_savings_cents > 0
+        ? `<div class="save-line">You could trim about <strong>${fmtMoney(t.potential_savings_cents)}/mo</strong>
+            by pausing or cancelling the services nothing on your list needs right now.</div>`
+        : `<div class="save-line">Everything you're paying for is pulling its weight right now. Nice.</div>`;
+
+      let html = `<div class="hero">
+        <div class="stat-grid">
+          <div class="stat"><div class="num">${t.service_count}</div><div class="lbl">services tracked</div></div>
+          <div class="stat"><div class="num">${fmtMoney(t.monthly_spend_cents)}</div><div class="lbl">est. per month</div></div>
+          <div class="stat"><div class="num save">${fmtMoney(t.potential_savings_cents)}</div><div class="lbl">potential savings</div></div>
+        </div>
+        ${savingsBlock}
+      </div>`;
+
+      let idx = 0;
+      for (const b of BUCKETS) {
+        const items = data.services.filter(s => b.verdicts.includes(s.verdict));
+        if (!items.length) continue;
+        html += `<div class="bucket">
+          <div class="bucket-head">
+            <h2>${b.title}</h2><span class="count">${items.length}</span>
+            <span class="blurb">${b.blurb}</span>
+          </div>
+          ${items.map(s => svcHtml(s, idx++)).join('')}
+        </div>`;
+      }
+
+      html += `<div class="addbar"><button id="addBtn">+ Add a service you pay for</button></div>`;
+
+      html += `<div class="cal-note">
+        💡 Set a <strong>resubscribe date</strong> on a paused service and it lands on your
+        <a href="webcal://showpicker.club/calendar/${encodeURIComponent(data.member)}.ics">Shows calendar</a>
+        as a reminder — right next to your premiere and finale dates.
+      </div>`;
+
+      content.innerHTML = html;
+      footer.textContent = `Audited from the shows on your list · ${data.today}`;
+      bind();
+    }
+
+    function bind() {
+      document.querySelectorAll('[data-why]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.getElementById('why-' + btn.dataset.why).classList.toggle('open');
+        });
+      });
+      document.querySelectorAll('.seg button').forEach(btn => {
+        btn.addEventListener('click', () => setStatus(btn.dataset.net, btn.dataset.status));
+      });
+      document.querySelectorAll('.resub input[type=date]').forEach(inp => {
+        inp.addEventListener('change', () => save(inp.dataset.net, { resubscribe_date: inp.value || '' }, 'Reminder updated'));
+      });
+      document.querySelectorAll('[data-editprice]').forEach(btn => {
+        btn.addEventListener('click', () => editPrice(btn.dataset.editprice, btn.dataset.cents));
+      });
+      document.querySelectorAll('[data-remove]').forEach(btn => {
+        btn.addEventListener('click', () => removeService(btn.dataset.remove));
+      });
+      const addBtn = document.getElementById('addBtn');
+      if (addBtn) addBtn.addEventListener('click', openAddModal);
+    }
+
+    async function save(network, fields, msg) {
+      try {
+        const res = await fetch('/api/subscriptions', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ network, ...fields }),
+        });
+        if (!res.ok) { toast('Could not save'); return false; }
+        if (msg) toast(msg);
+        return true;
+      } catch { toast('Network error'); return false; }
+    }
+
+    async function setStatus(network, status) {
+      // Optimistically update local state, then reconcile the picker affordances
+      // by re-rendering (so the resubscribe date input appears/disappears).
+      const svc = DATA.services.find(s => s.network === network);
+      if (svc) {
+        svc.status = status;
+        if (status === 'paused' && !svc.resubscribe_date && svc.suggested_resubscribe_date) {
+          svc.resubscribe_date = svc.suggested_resubscribe_date;
+        }
+      }
+      const fields = { status };
+      if (svc && status === 'paused' && svc.resubscribe_date) fields.resubscribe_date = svc.resubscribe_date;
+      recomputeTotals();
+      render(DATA);
+      await save(network, fields, status === 'subscribed' ? 'Marked subscribed' : status === 'paused' ? 'Paused' : 'Marked cancelled');
+    }
+
+    function editPrice(network, cents) {
+      const current = cents === '' ? '' : (Number(cents) / 100);
+      const input = prompt(`Monthly price for ${network} (USD):`, current);
+      if (input == null) return;
+      const dollars = parseFloat(input);
+      if (isNaN(dollars) || dollars < 0) { toast('Enter a number'); return; }
+      const newCents = Math.round(dollars * 100);
+      const svc = DATA.services.find(s => s.network === network);
+      if (svc) svc.monthly_price_cents = newCents;
+      recomputeTotals();
+      render(DATA);
+      save(network, { monthly_price_cents: newCents }, 'Price updated');
+    }
+
+    function recomputeTotals() {
+      let spend = 0, savings = 0;
+      for (const s of DATA.services) {
+        const status = s.status || 'subscribed';
+        if (status === 'cancelled') continue;
+        const p = s.monthly_price_cents || 0;
+        spend += p;
+        if (s.verdict === 'cancel' || s.verdict === 'pause' || s.verdict === 'pause_tba') savings += p;
+      }
+      DATA.totals.monthly_spend_cents = spend;
+      DATA.totals.potential_savings_cents = savings;
+    }
+
+    async function removeService(network) {
+      if (!confirm(`Remove ${network} from your subscriptions?`)) return;
+      const ok = await save(network, { remove: true }, 'Removed');
+      if (ok) { DATA.services = DATA.services.filter(s => s.network !== network); recomputeTotals(); render(DATA); }
+    }
+
+    function openAddModal() {
+      document.getElementById('addName').value = '';
+      document.getElementById('addPrice').value = '';
+      document.getElementById('addOverlay').classList.remove('hidden');
+    }
+    function closeAddModal(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('addOverlay').classList.add('hidden');
+    }
+    async function submitAdd() {
+      const name = document.getElementById('addName').value.trim();
+      if (!name) { toast('Enter a name'); return; }
+      const priceVal = document.getElementById('addPrice').value;
+      const cents = priceVal === '' ? null : Math.round(parseFloat(priceVal) * 100);
+      const ok = await save(name, { is_manual: 1, status: 'subscribed', monthly_price_cents: cents }, 'Service added');
+      if (ok) { closeAddModal(); load(); }
+    }
+
+    async function load() {
+      const content = document.getElementById('content');
+      try {
+        const res = await fetch('/api/subscriptions');
+        if (res.status === 401) {
+          content.innerHTML = `<div class="empty-card">
+            Your subscription audit is private. Visit your member page and tap <strong>Edit</strong> to log in,
+            then come back here.
+          </div>`;
+          return;
+        }
+        if (!res.ok) { content.innerHTML = `<div class="err">Failed to load (${res.status}).</div>`; return; }
+        render(await res.json());
+      } catch (e) {
+        content.innerHTML = `<div class="err">Failed to load: ${escapeHtml(e.message || e)}</div>`;
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>
