@@ -155,6 +155,11 @@
   </div>
 
   <script>
+    function safeUrl(url) {
+      if (!url || typeof url !== 'string') return '#';
+      const t = url.trim();
+      return /^https?:\/\//i.test(t) ? t : '#';
+    }
     function escapeHtml(s) {
       return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]);
     }
@@ -197,7 +202,7 @@
     function renderPickRow(p, key, opts) {
       const showAdd = opts.canAdd;
       const link = p.network_url
-        ? `<a href="${escapeHtml(p.network_url)}" target="_blank" rel="noopener">${escapeHtml(p.network || fmtUrl(p.network_url))}</a>`
+        ? `<a href="${escapeHtml(safeUrl(p.network_url))}" target="_blank" rel="noopener">${escapeHtml(p.network || fmtUrl(p.network_url))}</a>`
         : escapeHtml(p.network || '');
       const rating = p.rating ? ` &middot; <span class="pick-rating">&#9733;${escapeHtml(p.rating)}</span>` : '';
       const listTag = p.list ? ` <span class="pick-list-tag">(${escapeHtml(p.list === 'next' ? 'Up Next' : p.list)})</span>` : '';

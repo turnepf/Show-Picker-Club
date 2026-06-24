@@ -1,4 +1,4 @@
-import { getSession } from '../_shared/auth.js';
+import { isAdmin } from '../_shared/admin.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -14,8 +14,9 @@ async function countOver(env, sql, ...binds) {
 
 export async function onRequestGet(context) {
   const { env, request } = context;
-  const session = await getSession(request, env);
-  if (!session) return json({ error: 'Unauthorized' }, 401);
+  // Operator-only: aggregate metrics (member counts, login coverage) shouldn't
+  // be visible to every logged-in member, only the admin.
+  if (!(await isAdmin(request, env))) return json({ error: 'Forbidden' }, 403);
 
   const windows = [
     ['day', "AND created_at >= datetime('now', '-1 day')", "AND updated_at >= datetime('now', '-1 day')"],

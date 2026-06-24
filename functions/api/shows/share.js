@@ -1,4 +1,5 @@
 import { getSession } from '../../_shared/auth.js';
+import { safeNetworkUrl } from '../../_shared/url-utils.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
@@ -16,6 +17,12 @@ export async function onRequestPost(context) {
 
   if (!show_id || !source_member || !target_member) {
     return new Response(JSON.stringify({ error: 'show_id, source_member, and target_member are required' }), { status: 400, headers: corsHeaders() });
+  }
+
+  // You can only share FROM your own list. Without this, any logged-in member
+  // could copy any other member's show into any third member's list.
+  if (source_member !== session.member_slug) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders() });
   }
 
   // Fetch the source show
@@ -46,7 +53,7 @@ export async function onRequestPost(context) {
   ).bind(
     show.title,
     show.network || null,
-    show.network_url || null,
+    safeNetworkUrl(show.network_url),
     recommended_by || null,
     show.rating || null,
     notes || null,
