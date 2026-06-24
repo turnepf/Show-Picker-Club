@@ -2,6 +2,7 @@ import { fetchEnrichment } from '../_shared/enrichment.js';
 import { getSession } from '../_shared/auth.js';
 import { NETWORK_SEARCH, canonicalNetwork, networkFromUrl } from '../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../_shared/watch-providers.js';
+import { safeNetworkUrl } from '../_shared/url-utils.js';
 
 function generateNetworkUrl(network, title) {
   if (!network) return null;
@@ -64,6 +65,10 @@ export async function onRequestPost(context) {
   const { title, network, recommended_by, list, notes, network_url, movie, full_series, watching_with } = body;
   if (!title || !list) {
     return new Response(JSON.stringify({ error: 'Title and list are required' }), { status: 400, headers: corsHeaders() });
+  }
+  // network_url is rendered into an href on the public site — only http(s).
+  if (network_url && !safeNetworkUrl(network_url)) {
+    return new Response(JSON.stringify({ error: 'invalid network_url' }), { status: 400, headers: corsHeaders() });
   }
 
   const omdb = await fetchEnrichment(title, env, !!movie);

@@ -2,6 +2,7 @@ import { fetchEnrichment } from '../../_shared/enrichment.js';
 import { getSession } from '../../_shared/auth.js';
 import { canonicalNetwork, networkFromUrl } from '../../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../../_shared/watch-providers.js';
+import { safeNetworkUrl } from '../../_shared/url-utils.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
@@ -31,6 +32,10 @@ export async function onRequestPut(context) {
   }
 
   const body = await request.json();
+  // network_url is rendered into an href on the public site — only http(s).
+  if (body.network_url !== undefined && body.network_url && !safeNetworkUrl(body.network_url)) {
+    return new Response(JSON.stringify({ error: 'invalid network_url' }), { status: 400, headers: corsHeaders() });
+  }
   const val = (key) => body[key] !== undefined ? body[key] : existing[key];
   const title = val('title');
   const network_url = body.network_url !== undefined ? body.network_url : existing.network_url;

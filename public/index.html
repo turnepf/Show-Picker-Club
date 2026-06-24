@@ -1181,7 +1181,7 @@
           popList.innerHTML = popData.shows.map((show, i) => {
             const network = show.network
               ? hasRealUrl(show.network_url)
-                ? ` <span class="show-on">on</span> <a class="show-network" href="${show.network_url}" target="_blank" rel="noopener">${escapeHtml(show.network)}</a>`
+                ? ` <span class="show-on">on</span> <a class="show-network" href="${escapeHtml(safeUrl(show.network_url))}" target="_blank" rel="noopener">${escapeHtml(show.network)}</a>`
                 : ` <span class="show-on">on</span> <span class="show-network-plain">${escapeHtml(show.network)}</span>`
               : '';
             const rating = show.rating ? ` <span class="show-rating"><span class="star">&#9733;</span>${escapeHtml(show.rating)}</span>` : '';
@@ -1191,7 +1191,7 @@
             const details = buildDetailLines(show, { aggregate: true });
             return `<div class="show popular-row">
               <div class="show-row">
-                <button class="share-btn popular-add-btn" style="display:none;" onclick="openAddMyList('${escapeHtml(show.title).replace(/'/g, "\\'")}', '${escapeHtml(show.network || '').replace(/'/g, "\\'")}', '${escapeHtml(show.network_url || '').replace(/'/g, "\\'")}', ${show.movie || 0})" title="Add to my list">+</button>
+                <button class="share-btn popular-add-btn" style="display:none;" data-title="${escapeHtml(show.title)}" data-network="${escapeHtml(show.network || '')}" data-url="${escapeHtml(show.network_url || '')}" data-movie="${show.movie || 0}" title="Add to my list">+</button>
                 <span class="show-info"><span class="show-title clickable" title="Tap to see more" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${movieTag}${badge}</span>
               </div>
               <div class="show-actors" id="actors-${show.id}">${details}</div>
@@ -1661,7 +1661,7 @@
       list.innerHTML = recsData.picks.map((p, idx) => {
         const networkHtml = p.network
           ? hasRealUrl(p.network_url)
-            ? ` <span class="show-on">on</span> <a class="show-network" href="${p.network_url}" target="_blank" rel="noopener">${escapeHtml(p.network)}</a>`
+            ? ` <span class="show-on">on</span> <a class="show-network" href="${escapeHtml(safeUrl(p.network_url))}" target="_blank" rel="noopener">${escapeHtml(p.network)}</a>`
             : ` <span class="show-on">on</span> <span class="show-network-plain">${escapeHtml(p.network)}</span>`
           : '';
         const rating = p.rating
@@ -1816,7 +1816,7 @@
         const hasRealUrl = show.network_url && !show.network_url.includes('/search') && !show.network_url.includes('/s?') && show.network_url !== '#';
         const network = show.network
           ? hasRealUrl
-            ? ` <span class="show-on">on</span> <a class="show-network" href="${show.network_url}" target="_blank" rel="noopener">${escapeHtml(show.network)}</a>`
+            ? ` <span class="show-on">on</span> <a class="show-network" href="${escapeHtml(safeUrl(show.network_url))}" target="_blank" rel="noopener">${escapeHtml(show.network)}</a>`
             : ` <span class="show-on">on</span> <span class="show-network-plain">${escapeHtml(show.network)}</span>`
           : '';
         const rating = show.rating
@@ -2500,6 +2500,20 @@
 
     let addMyListData = null;
 
+    // Popular-list "+" buttons carry their show data in data-* attributes and
+    // are wired here via delegation, so no member-supplied text is ever
+    // interpolated into an inline event handler.
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest && e.target.closest('.popular-add-btn');
+      if (!btn) return;
+      openAddMyList(
+        btn.dataset.title || '',
+        btn.dataset.network || '',
+        btn.dataset.url || '',
+        parseInt(btn.dataset.movie, 10) || 0
+      );
+    });
+
     function openAddMyList(title, network, networkUrl, movie) {
       addMyListData = { title, network, network_url: networkUrl, movie };
       document.getElementById('addMyTitle').value = title;
@@ -2569,9 +2583,19 @@
 
     function escapeHtml(str) {
       if (!str) return '';
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
+      // Encode quotes too — output is interpolated into HTML *attribute*
+      // values (href, title, data-*), where unescaped " or ' breaks out.
+      return String(str).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    // Allow only http(s) URLs into href/data attributes. Blocks javascript:,
+    // data:, and other script-bearing schemes from member-supplied network_url.
+    function safeUrl(url) {
+      if (!url || typeof url !== 'string') return '#';
+      const t = url.trim();
+      return /^https?:\/\//i.test(t) ? t : '#';
     }
 
     document.addEventListener('keydown', e => {

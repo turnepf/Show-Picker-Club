@@ -176,6 +176,11 @@
       return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
     function escapeAttr(s) { return escapeHtml(s); }
+    function safeUrl(url) {
+      if (!url || typeof url !== 'string') return '#';
+      const t = url.trim();
+      return /^https?:\/\//i.test(t) ? t : '#';
+    }
     function googleSearchUrl(title, network) {
       const q = network ? `${title} on ${network}` : title;
       return 'https://www.google.com/search?q=' + encodeURIComponent(q);
@@ -384,7 +389,7 @@
             <div class="row-head">
               <span class="show-link">${escapeHtml(m.title)}</span>
               <span class="show-meta">${escapeHtml(m.member)} · network: <strong>${escapeHtml(m.network)}</strong> · URL points at <strong>${escapeHtml(m.url_network)}</strong></span>
-              <div class="current-url"><a href="${escapeAttr(m.network_url)}" target="_blank">${escapeHtml(m.network_url)}</a></div>
+              <div class="current-url"><a href="${escapeAttr(safeUrl(m.network_url))}" target="_blank">${escapeHtml(m.network_url)}</a></div>
             </div>
             <div class="row-form">
               <button class="btn-update mismatch-url" type="button">Keep URL · become ${escapeHtml(m.url_network)}</button>

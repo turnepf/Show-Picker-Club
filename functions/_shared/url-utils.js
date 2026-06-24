@@ -6,6 +6,15 @@
 // Returns the first http(s) substring, or null if the input is empty /
 // not a string / contains no recognizable URL.
 
+// A network_url ends up rendered into an href on the public site, so only
+// http(s) URLs may be stored. Rejects javascript:, data:, and other
+// script-bearing schemes. Returns the trimmed URL, or null if unsafe/empty.
+export function safeNetworkUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  const t = url.trim();
+  return /^https?:\/\//i.test(t) ? t : null;
+}
+
 export function extractUrl(text) {
   if (!text || typeof text !== 'string') return null;
   const trimmed = text.trim();
