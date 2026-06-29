@@ -12,6 +12,12 @@ struct WhatsNewView: View {
     }
 
     private let entries: [Entry] = [
+        .init(date: "6/29", title: "Shake to pick.", body: "Give your phone a shake to pull a random show from your Up Next list \u{2014} an instant answer to \u{201C}what should we watch?\u{201D}"),
+        .init(date: "6/29", title: "Share a show.", body: "Send any show to a friend through the standard share sheet \u{2014} Messages, Mail, AirDrop, anything. Tap the share button on a show's detail screen."),
+        .init(date: "6/29", title: "Seasons released.", body: "Show rows now tell you how many seasons have dropped, right next to the Next up date (e.g. \u{201C}Next up: 6/1 \u{00B7} 3 seasons\u{201D})."),
+        .init(date: "6/29", title: "Straight to your shows.", body: "Open the app while you're logged in and you land right on your own list, instead of the home screen."),
+        .init(date: "6/29", title: "Subscription Audit & Vibe.", body: "The subscription audit and taste-vibe pages are now in the app \u{2014} find them on your member page. This changelog moved into the account menu, too."),
+        .init(date: "6/29", title: "BritBox.", body: "Added BritBox as a network option for British TV from the BBC and ITV."),
         .init(date: "5/21", title: "Calendar feed.", body: "Each member page now has a 📅 Calendar feed link at the bottom. Subscribe in Apple Calendar, Google Calendar, or Fantastical to get upcoming season premieres and finales from that member's Watching and Waiting lists, updated daily."),
         .init(date: "5/9", title: "Vibe.", body: "See a personality fingerprint based on each member's taste: cluster name, top trait signals, balance read, and shows aligned with the vibe. Open Vibe from any member's page."),
         .init(date: "5/9", title: "Picks for You.", body: "Log in and visit your Up Next list to see suggestions tailored to what your closest matches are watching. Tap + on any pick to add it straight to your Up Next."),
