@@ -23,6 +23,7 @@ const NETWORK_SEARCH = {
   'National Geographic': { base: 'https://www.nationalgeographic.com/tv/shows' },
   'Food Network': { base: 'https://www.foodnetwork.com/search', param: 'q' },
   'Fox': { base: 'https://www.fox.com/search' },
+  'BritBox': { base: 'https://www.britbox.com/us/search' },
 };
 
 function generateSearchUrl(network, title) {
