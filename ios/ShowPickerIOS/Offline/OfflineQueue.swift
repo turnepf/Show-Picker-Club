@@ -276,7 +276,7 @@ final class OfflineQueue: ObservableObject {
              recommendedBy: m.recommendedBy, rating: nil, list: m.list ?? ShowList.watching.rawValue,
              notes: m.notes, movie: (m.movie ?? false) ? 1 : 0,
              fullSeries: (m.fullSeries ?? false) ? 1 : 0, watchingWith: m.watchingWith,
-             nextSeasonDate: nil, seasonEndDate: nil, genres: nil, actors: nil,
+             nextSeasonDate: nil, seasonEndDate: nil, seasonsReleased: nil, genres: nil, actors: nil,
              archived: (m.archived ?? false) ? 1 : 0, memberSlug: m.memberSlug,
              createdAt: ISO8601DateFormatter().string(from: m.createdAt))
     }
@@ -286,7 +286,8 @@ final class OfflineQueue: ObservableObject {
              recommendedBy: m.recommendedBy, rating: s.rating, list: m.list ?? s.list,
              notes: m.notes, movie: (m.movie ?? false) ? 1 : 0,
              fullSeries: (m.fullSeries ?? false) ? 1 : 0, watchingWith: m.watchingWith,
-             nextSeasonDate: s.nextSeasonDate, seasonEndDate: s.seasonEndDate, genres: s.genres,
+             nextSeasonDate: s.nextSeasonDate, seasonEndDate: s.seasonEndDate,
+             seasonsReleased: s.seasonsReleased, genres: s.genres,
              actors: s.actors, archived: (m.archived ?? false) ? 1 : 0, memberSlug: s.memberSlug,
              createdAt: s.createdAt)
     }

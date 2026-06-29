@@ -249,6 +249,13 @@ struct MemberView: View {
         }
     }
 
+    // "Next up: 6/1 · 3 seasons" — premiere range plus the seasons count when
+    // both are known; either part alone otherwise. nil if neither exists.
+    private func nextUpLine(_ s: Show) -> String? {
+        let parts = [s.nextUpRange.map { "Next up: \($0)" }, s.seasonsText].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     @ViewBuilder private func row(_ s: Show) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
@@ -265,11 +272,16 @@ struct MemberView: View {
                     }
                 }
                 .font(.caption)
-                if (currentList == .watching || currentList == .waiting), let range = s.nextUpRange {
-                    Label("Next up: \(range)", systemImage: "calendar")
+                if (currentList == .watching || currentList == .waiting),
+                   let line = nextUpLine(s) {
+                    Label(line, systemImage: "calendar")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .labelStyle(.titleAndIcon)
+                } else if let seasons = s.seasonsText {
+                    Text(seasons)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
             Spacer()

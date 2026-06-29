@@ -61,6 +61,7 @@ struct Show: Codable, Identifiable, Hashable {
     let watchingWith: String?
     let nextSeasonDate: String?
     let seasonEndDate: String?
+    let seasonsReleased: Int?
     let genres: String?
     let actors: String?
     let archived: Int?
@@ -75,8 +76,15 @@ struct Show: Codable, Identifiable, Hashable {
         case watchingWith = "watching_with"
         case nextSeasonDate = "next_season_date"
         case seasonEndDate = "season_end_date"
+        case seasonsReleased = "seasons_released"
         case memberSlug = "member_slug"
         case createdAt = "created_at"
+    }
+
+    // "3 seasons" / "1 season" — total seasons released, when known.
+    var seasonsText: String? {
+        guard let n = seasonsReleased, n > 0 else { return nil }
+        return "\(n) season\(n == 1 ? "" : "s")"
     }
 
     var isMovie: Bool { (movie ?? 0) == 1 }
