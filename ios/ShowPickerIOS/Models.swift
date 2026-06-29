@@ -382,6 +382,259 @@ struct UrlQueueItem: Codable, Identifiable {
 struct UrlCleanupResponse: Codable {
     let shows: [UrlQueueItem]
     let networks: [String]
+    // Titles members carry on different networks, and rows whose URL points at
+    // a different service than the stored network. Present on the list action.
+    let conflicts: [UrlConflict]?
+    let mismatches: [UrlMismatch]?
+}
+
+// A title two or more members carry on different networks — operator picks the
+// canonical one. POST action: resolve_conflict { title, network }.
+struct UrlConflict: Codable, Identifiable {
+    let title: String
+    let networks: [String]
+    let rows: Int
+    var id: String { title }
+}
+
+// A row whose URL domain disagrees with its stored network. Operator chooses
+// which side wins. POST action: fix_mismatch { id, keep: "url" | "network" }.
+struct UrlMismatch: Codable, Identifiable {
+    let id: Int
+    let title: String
+    let network: String
+    let networkUrl: String
+    let urlNetwork: String
+    let member: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, network, member
+        case networkUrl = "network_url"
+        case urlNetwork = "url_network"
+    }
+}
+
+// MARK: - Subscription Audit (/api/subscriptions)
+
+struct SubscriptionAudit: Codable {
+    let member: String
+    let today: String
+    let services: [SubscriptionService]
+    let totals: SubscriptionTotals
+}
+
+struct SubscriptionTotals: Codable {
+    let serviceCount: Int
+    let monthlySpendCents: Int
+    let potentialSavingsCents: Int
+
+    enum CodingKeys: String, CodingKey {
+        case serviceCount = "service_count"
+        case monthlySpendCents = "monthly_spend_cents"
+        case potentialSavingsCents = "potential_savings_cents"
+    }
+}
+
+struct SubscriptionService: Codable, Identifiable {
+    let network: String
+    let isManual: Bool
+    let counts: SubscriptionCounts
+    let shows: [SubscriptionShow]
+    let verdict: String                      // keep | pause | pause_tba | start | cancel | manual
+    let suggestedResubscribeDate: String?
+    let status: String?                      // subscribed | paused | cancelled | nil (untouched)
+    let monthlyPriceCents: Int?
+    let resubscribeDate: String?
+    var id: String { network }
+
+    enum CodingKeys: String, CodingKey {
+        case network, counts, shows, verdict, status
+        case isManual = "is_manual"
+        case suggestedResubscribeDate = "suggested_resubscribe_date"
+        case monthlyPriceCents = "monthly_price_cents"
+        case resubscribeDate = "resubscribe_date"
+    }
+
+    var effectiveStatus: String { status ?? "subscribed" }
+}
+
+struct SubscriptionCounts: Codable {
+    let watching: Int
+    let waiting: Int
+    let recommending: Int
+    let next: Int
+}
+
+struct SubscriptionShow: Codable, Identifiable {
+    let title: String
+    let list: String
+    let nextSeasonDate: String?
+    let fullSeries: Int?
+    var id: String { title }
+
+    enum CodingKeys: String, CodingKey {
+        case title, list
+        case nextSeasonDate = "next_season_date"
+        case fullSeries = "full_series"
+    }
+}
+
+// MARK: - Vibe (/api/vibe)
+
+struct VibeResponse: Codable {
+    let members: [VibeMemberRef]
+    let member: VibeMember?
+}
+
+struct VibeMemberRef: Codable, Identifiable, Hashable {
+    let slug: String
+    let name: String
+    let activeCount: Int?
+    var id: String { slug }
+
+    enum CodingKeys: String, CodingKey {
+        case slug, name
+        case activeCount = "active_count"
+    }
+}
+
+struct VibeMember: Codable {
+    let slug: String
+    let name: String?
+    // State flags — only one branch is populated per response.
+    let excluded: Bool?
+    let isSeedOnly: Bool?
+    let noFingerprint: Bool?
+    let activeCount: Int?
+    let scoredCount: Int?
+    // Full fingerprint (present only when the member has a real one).
+    let cluster: VibeCluster?
+    let displayTraits: [String: Int]?
+    let balance: VibeBalance?
+    let alignedPicks: [VibePick]?
+    let outlierPicks: [VibePick]?
+
+    enum CodingKeys: String, CodingKey {
+        case slug, name, excluded, cluster, balance
+        case isSeedOnly = "is_seed_only"
+        case noFingerprint = "no_fingerprint"
+        case activeCount = "active_count"
+        case scoredCount = "scored_count"
+        case displayTraits = "display_traits"
+        case alignedPicks = "aligned_picks"
+        case outlierPicks = "outlier_picks"
+    }
+}
+
+struct VibeCluster: Codable {
+    let id: String
+    let name: String
+    let tagline: String
+    let similarity: Double
+    let blend: [VibeBlendItem]
+}
+
+struct VibeBlendItem: Codable, Identifiable {
+    let id: String
+    let name: String
+    let similarity: Double
+}
+
+struct VibeBalance: Codable {
+    let range: Int
+    let warmthDarknessBalance: Int
+    let warmthDarknessLabel: String
+
+    enum CodingKeys: String, CodingKey {
+        case range
+        case warmthDarknessBalance = "warmth_darkness_balance"
+        case warmthDarknessLabel = "warmth_darkness_label"
+    }
+}
+
+struct VibePick: Codable, Identifiable {
+    let title: String
+    let titleLower: String?
+    let list: String?
+    let network: String?
+    let networkUrl: String?
+    let rating: String?
+    let genres: String?
+    let actors: [String]?
+    var id: String { title }
+
+    enum CodingKeys: String, CodingKey {
+        case title, list, network, rating, genres, actors
+        case titleLower = "title_lower"
+        case networkUrl = "network_url"
+    }
+}
+
+// Display order for the ten vibe trait signals, matching the web. The API
+// returns display_traits as an unordered object; we render in this order.
+let VIBE_TRAIT_ORDER: [String] = [
+    "Warmth", "Empathy", "Complexity", "Cynicism risk", "Power orientation",
+    "Curiosity", "Healing & growth", "Chaos tolerance",
+    "Humor (warm vs cruel)", "Optimism",
+]
+
+// MARK: - Admin: member contacts (/api/admin-member-emails)
+
+struct AdminMembersResponse: Codable { let members: [AdminMember] }
+
+struct AdminMember: Codable, Identifiable {
+    let slug: String
+    let name: String?
+    let firstName: String?
+    let lastInitial: String?
+    let lastName: String?
+    let emails: [String]
+    let phones: [String]
+    let lastLogin: String?
+    let activity30d: MemberActivity?
+    var id: String { slug }
+
+    enum CodingKeys: String, CodingKey {
+        case slug, name, emails, phones
+        case firstName = "first_name"
+        case lastInitial = "last_initial"
+        case lastName = "last_name"
+        case lastLogin = "last_login"
+        case activity30d = "activity_30d"
+    }
+}
+
+struct MemberActivity: Codable {
+    let watching: Int
+    let waiting: Int
+    let recommending: Int
+    let next: Int
+}
+
+// MARK: - Admin: vibe trait scoring (/api/admin-vibe-fill)
+
+struct VibeFillStatus: Codable {
+    let rescoreActive: Bool
+    let rescoreStartedAt: String?
+    let fillRemaining: Int
+    let rescoreRemaining: Int
+
+    enum CodingKeys: String, CodingKey {
+        case rescoreActive = "rescore_active"
+        case rescoreStartedAt = "rescore_started_at"
+        case fillRemaining = "fill_remaining"
+        case rescoreRemaining = "rescore_remaining"
+    }
+}
+
+struct VibeFillResult: Codable {
+    let processed: Int?
+    let unknown: Int?
+    let errors: Int?
+    let remaining: Int?
+    let mode: String?
+    let ok: Bool?
+    let error: String?
 }
 
 // Generic admin action result (save URL / fix title).

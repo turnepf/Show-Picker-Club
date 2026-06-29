@@ -187,6 +187,93 @@ enum API {
         return try JSONDecoder().decode(CreateMemberResult.self, from: data)
     }
 
+    // Resolve a conflict: set every active copy of a title to one network.
+    static func resolveUrlConflict(title: String, network: String) async throws -> AdminActionResult {
+        try await postDecoding("/api/admin-url-cleanup",
+                               body: ["action": "resolve_conflict", "title": title, "network": network])
+    }
+
+    // Fix a URL/network mismatch: keep "url" (adopt the URL's network) or
+    // "network" (drop the URL so the next fill pass repicks one).
+    static func fixUrlMismatch(id: Int, keep: String) async throws -> AdminActionResult {
+        try await postDecoding("/api/admin-url-cleanup",
+                               body: ["action": "fix_mismatch", "id": id, "keep": keep])
+    }
+
+    // MARK: Subscription Audit (own session)
+
+    static func subscriptions() async throws -> SubscriptionAudit {
+        try await get("/api/subscriptions")
+    }
+
+    // Upsert one service's saved decision. Omitted fields are left untouched
+    // server-side; `remove` deletes a manual service. Returns nothing useful.
+    static func updateSubscription(network: String, status: String? = nil,
+                                   monthlyPriceCents: Int? = nil, resubscribeDate: String?? = nil,
+                                   isManual: Bool? = nil, remove: Bool = false) async throws {
+        struct Ack: Decodable {}
+        var body: [String: Any?] = ["network": network]
+        if remove { body["remove"] = true }
+        if let s = status { body["status"] = s }
+        if let p = monthlyPriceCents { body["monthly_price_cents"] = p }
+        // resubscribeDate is a double-optional: .some(nil) clears it, .none omits it.
+        if let outer = resubscribeDate { body["resubscribe_date"] = outer ?? "" }
+        if let m = isManual { body["is_manual"] = m ? 1 : 0 }
+        let _: Ack = try await putJSON("/api/subscriptions", body: body)
+    }
+
+    // MARK: Vibe
+
+    // Taste fingerprint for a member (any member; requires login). Pass nil to
+    // get just the eligible-member list.
+    static func vibe(member slug: String?) async throws -> VibeResponse {
+        var path = "/api/vibe"
+        if let slug, !slug.isEmpty {
+            let enc = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? slug
+            path += "?member=\(enc)"
+        }
+        return try await get(path)
+    }
+
+    // MARK: Admin: member contacts
+
+    static func adminMembers() async throws -> [AdminMember] {
+        let r: AdminMembersResponse = try await get("/api/admin-member-emails")
+        return r.members
+    }
+
+    // Replace a member's email and/or phone set. Pass a comma/space-separated
+    // string; an empty string clears that side. Decodes the body either way so
+    // the caller can show validation errors.
+    static func updateMemberContacts(slug: String, emails: String?, phones: String?) async throws -> AdminActionResult {
+        var body: [String: Any] = ["slug": slug]
+        if let e = emails { body["emails"] = e }
+        if let p = phones { body["phones"] = p }
+        return try await postDecoding("/api/admin-member-emails", body: body)
+    }
+
+    // MARK: Admin: vibe trait scoring
+
+    static func vibeFillStatus() async throws -> VibeFillStatus {
+        try await get("/api/admin-vibe-fill")
+    }
+
+    // Score one batch. rescore=false fills only unscored titles; rescore=true
+    // refreshes already-scored ones. Returns per-batch counts incl. remaining.
+    static func vibeFill(count: Int, rescore: Bool) async throws -> VibeFillResult {
+        var body: [String: Any] = ["count": count]
+        if rescore { body["rescore"] = true }
+        return try await postDecoding("/api/admin-vibe-fill", body: body)
+    }
+
+    static func startBackgroundRescore() async throws -> VibeFillResult {
+        try await postDecoding("/api/admin-vibe-fill", body: ["action": "start_background_rescore"])
+    }
+
+    static func cancelBackgroundRescore() async throws -> VibeFillResult {
+        try await postDecoding("/api/admin-vibe-fill", body: ["action": "cancel_background_rescore"])
+    }
+
     // MARK: Auth
 
     static func loginWithEmail(email: String, code: String) async throws -> LoginResponse {
