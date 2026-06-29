@@ -26,6 +26,15 @@ jobs:
       - name: Install wrangler
         run: npm install -g wrangler@latest
 
+      # Apply any pending D1 migrations BEFORE the code that depends on them
+      # goes live. Self-tracked in a schema_migrations table; baselines the
+      # existing migrations on first run. See scripts/apply-migrations.sh.
+      - name: Apply pending D1 migrations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bash scripts/apply-migrations.sh
+
       - name: Deploy to Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
