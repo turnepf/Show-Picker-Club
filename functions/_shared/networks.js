@@ -103,6 +103,13 @@ export const NETWORKS = [
     domains: ['fox.com'],
     search: { base: 'https://www.fox.com/search' },
   },
+  {
+    stored: 'BritBox',
+    display: 'BritBox (British TV from the BBC and ITV)',
+    aliases: ['Brit Box'],
+    domains: ['britbox.com', 'britbox.co.uk'],
+    search: { base: 'https://www.britbox.com/us/search' },
+  },
 ];
 
 // Map alias-or-stored name (case-insensitive) to canonical stored value.
@@ -175,6 +182,7 @@ export const DEFAULT_PRICE_CENTS = {
   'AMC+': 899,
   'Food Network': 699,
   'Fox': 799,
+  'BritBox': 899,
 };
 
 export function defaultPriceCents(network) {

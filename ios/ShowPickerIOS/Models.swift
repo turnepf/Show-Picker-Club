@@ -424,6 +424,7 @@ let CANONICAL_NETWORKS: [String] = [
     "AMC+",
     "Amazon Prime Video",
     "Apple TV+",
+    "BritBox",
     "Disney+",
     "Food Network",
     "Fox",
