@@ -1,0 +1,2667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Show Picker Club</title>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CP9N26NG19"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-CP9N26NG19');</script>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/favicon.svg">
+  <meta name="theme-color" content="#2e2825">
+  <link rel="stylesheet" href="/styles.css?v=4">
+  <style>
+    header {
+      background: var(--header-bg);
+      color: #fff;
+      padding: 20px 20px 0;
+      padding-top: calc(20px + env(safe-area-inset-top, 0px));
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-title {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      color: #fff;
+      text-align: center;
+      margin: 8px 0 4px;
+      /* Hard one-line; if a name really won't fit the screen the
+         ellipsis kicks in rather than wrapping into the controls. */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-login {
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    .btn-login:hover { background: rgba(255,255,255,0.25); }
+
+    .btn-add { background: var(--accent); color: var(--ink); padding: 6px 12px; font-size: 18px; line-height: 1; font-weight: 700; }
+    .btn-add:hover { background: var(--accent-hover); }
+    .btn-search { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); }
+    .btn-search:hover { background: rgba(255,255,255,0.25); }
+    /* Quiet button for light surfaces (landing): paper-toned, not ghost-on-dark. */
+    .btn-quiet { background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); }
+    .btn-quiet:hover { background: var(--surface); }
+    /* Search modal sits anchored to the top so the box doesn't jump as result count changes. */
+    #searchOverlay { align-items: flex-start; padding-top: 6vh; padding-bottom: 6vh; }
+    #searchOverlay .modal { max-height: 88vh; display: flex; flex-direction: column; }
+    .search-results { flex: 1 1 auto; min-height: 220px; max-height: 60vh; overflow-y: auto; margin-top: 12px; border-top: 1px solid var(--surface-2); padding-top: 8px; }
+    .search-results .show-row { padding: 8px 4px; }
+    .search-meta { font-size: 12px; color: var(--ink-muted); margin-bottom: 8px; }
+    .search-list-label { color: var(--ink-muted); font-size: 12px; margin-left: 6px; }
+    .search-empty { text-align: center; color: var(--ink-muted); padding: 24px 0; font-size: 13px; }
+
+    .btn-small { padding: 4px 8px; font-size: 11px; border-radius: 4px; }
+
+    .tabs { display: flex; gap: 0; overflow-x: auto; scrollbar-width: none; }
+    .tabs::-webkit-scrollbar { display: none; }
+
+    .tab {
+      flex: 1;
+      padding: 8px 4px;
+      color: rgba(255,255,255,0.6);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      transition: all 0.2s;
+      text-align: center;
+      background: transparent;
+    }
+    .tab:hover { color: rgba(255,255,255,0.85); border-color: rgba(255,255,255,0.4); }
+    .tab.active { color: #fff; font-weight: 600; }
+    .tab.active[data-list="watching"] { background: var(--tab-watching); border-color: var(--tab-watching); }
+    .tab.active[data-list="waiting"] { background: var(--tab-waiting); border-color: var(--tab-waiting); }
+    .tab.active[data-list="recommending"] { background: var(--tab-recommending); border-color: var(--tab-recommending); }
+    .tab.active[data-list="next"] { background: var(--tab-up-next); border-color: var(--tab-up-next); }
+
+    .section-desc {
+      text-align: center;
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      font-style: italic;
+      padding: 6px 20px 10px;
+    }
+
+    main {
+      max-width: 720px;
+      margin: 24px auto 56px;
+      padding: 24px 28px 28px;
+      background: var(--surface);
+      border-radius: 18px;
+      box-shadow: 0 1px 2px oklch(0.18 0.03 50 / 0.06),
+                  0 14px 44px oklch(0.18 0.03 50 / 0.07);
+    }
+    @media (max-width: 600px) {
+      main { margin: 16px 12px 40px; padding: 18px 18px 22px; border-radius: 14px; }
+    }
+
+    .show-list { display: flex; flex-direction: column; gap: 0; }
+
+    .show-row {
+      display: flex;
+      align-items: baseline;
+      padding: 7px 0;
+      font-size: 14px;
+      gap: 8px;
+    }
+
+    /* Each show's title row, meta line ("Next up: 6/1") and the
+       expandable details all live inside a single .show wrapper so the
+       divider sits between shows, not between title and meta. */
+    .show {
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .show:last-child { border-bottom: none; }
+
+    .show-info { flex: 1; min-width: 0; line-height: 1.4; }
+
+    .show-title { font-weight: 600; color: var(--ink); }
+    .show-title.clickable {
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-decoration-color: var(--ink-faint);
+      text-underline-offset: 3px;
+    }
+    .show-title .chev {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      margin-left: 6px;
+      vertical-align: -3px;
+      text-decoration: none;
+    }
+    .show-title .chev svg {
+      width: 100%;
+      height: 100%;
+      fill: none;
+      stroke: var(--ink-muted);
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: transform 0.18s ease-out;
+      transform-origin: center;
+    }
+    .show-row.expanded .show-title .chev svg {
+      transform: rotate(180deg);
+      stroke: var(--accent);
+    }
+    .show-title.clickable:hover { color: var(--accent); text-decoration-color: var(--accent); }
+    .show-title.clickable:hover .chev svg { stroke: var(--accent); }
+
+    .show-movie { font-weight: 400; color: var(--ink-quiet); font-size: 12px; }
+
+
+    .show-rating { color: var(--ink-muted); font-size: 13px; white-space: nowrap; }
+    .show-rating .star { color: var(--star); }
+
+    .show-network { color: var(--info); text-decoration: none; font-size: 13px; white-space: nowrap; }
+    .show-network:hover { text-decoration: underline; }
+
+    .show-network-plain { color: var(--ink-muted); font-size: 13px; white-space: nowrap; }
+
+
+    .show-next-date { color: var(--accent); font-size: 12px; font-weight: 500; white-space: nowrap; }
+
+    .show-from { color: var(--ink-quiet); font-size: 13px; white-space: nowrap; }
+    .show-detail-line { font-size: 12px; color: var(--ink-muted); padding: 2px 0; }
+    .show-meta { font-size: 12px; color: var(--ink-muted); padding: 0 0 6px 16px; }
+
+    .list-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+    .list-chip {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 34px;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 500;
+      border: 1.5px solid var(--chip-color);
+      border-radius: 6px;
+      color: var(--chip-color);
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+      text-align: center;
+      -webkit-text-size-adjust: 100%;
+      box-sizing: border-box;
+    }
+    .list-chip.selected {
+      background: var(--chip-color);
+      color: #fff;
+    }
+    .show-via { color: var(--list-recommending); font-size: 12px; font-style: italic; white-space: nowrap; }
+    .show-on { color: var(--ink-quiet); font-size: 13px; }
+    .show-watching-with { color: var(--ink-muted); font-size: 13px; white-space: nowrap; }
+    .show-notes-inline { color: var(--ink-faint); font-size: 12px; font-style: italic; white-space: nowrap; }
+
+    /* Primary inline action on each row (own page, logged in) — outlined pill
+       in the destination list color. Tap to perform the most-frequent move. */
+    .btn-row-action {
+      background: transparent;
+      color: var(--action-color, var(--ink));
+      border: 1px solid currentColor;
+      padding: 6px 14px;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-row-action:hover {
+      background: color-mix(in oklch, var(--action-color, var(--ink)) 14%, transparent);
+    }
+
+    /* Secondary actions sit at the TOP of the expand panel, above the show
+       detail lines, so they're the first thing the user sees when they tap
+       a row. Tinted pills so they stand off the main surface. */
+    .show-actions-expanded {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .show-actors:empty,
+    .show-actors > .show-actions-expanded:only-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+    .btn-row-secondary {
+      background: var(--surface-2);
+      color: var(--ink);
+      border: 1px solid var(--border-soft);
+      padding: 6px 14px;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .btn-row-secondary:hover {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent-hover);
+    }
+    .btn-row-secondary.danger {
+      background: var(--danger-soft);
+      color: var(--danger-deep);
+      border-color: color-mix(in oklch, var(--danger) 28%, transparent);
+    }
+    .btn-row-secondary.danger:hover {
+      background: color-mix(in oklch, var(--danger-soft) 70%, var(--danger) 18%);
+      border-color: var(--danger);
+    }
+
+    .show-actors { padding: 4px 0 8px 16px; display: none; font-size: 13px; color: var(--ink-muted); }
+    .show-actors.visible { display: block; }
+    /* Negative margin compensates for the actor-tag's own 8px horizontal
+       padding so the first name visually aligns with the other detail
+       lines above ("Western, Drama", "Next up: ...") instead of looking
+       indented. */
+    .actor-list { display: flex; flex-wrap: wrap; gap: 4px; margin-left: -8px; }
+    .actor-tag { background: var(--surface); border: 1px solid transparent; padding: 2px 8px; border-radius: 10px; font-size: 12px; text-decoration: none; color: var(--ink-muted); }
+    /* Linked actors open their IMDB page. Make the affordance obvious so it
+       reads as tappable rather than a plain label: accent tint, accent text,
+       a pointer cursor, and a small "opens externally" arrow. Plain (un-linked)
+       actors keep the muted look above so the difference is meaningful. */
+    a.actor-tag { background: var(--accent-soft); border-color: color-mix(in oklch, var(--accent) 35%, transparent); color: var(--accent-hover); cursor: pointer; }
+    a.actor-tag::after { content: "\2197"; margin-left: 3px; font-size: 10px; opacity: 0.7; }
+    a.actor-tag:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+    a.actor-tag:hover::after { opacity: 1; }
+
+    .suggest-bar { text-align: center; padding: 16px 0 4px; }
+    .suggest-btn {
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      background: var(--ink);
+      color: #fff;
+      border: none;
+      border-radius: 24px;
+      cursor: pointer;
+    }
+    .suggest-btn:hover { background: var(--header-bg); }
+
+    .share-btn {
+      background: none;
+      border: none;
+      color: var(--ink-quiet);
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0 6px;
+      line-height: 1;
+      font-family: inherit;
+      transition: color 0.2s;
+    }
+    .share-btn:hover { color: var(--accent); }
+    .share-btn svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.75;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vertical-align: middle;
+    }
+
+    .network-counts { text-align: center; font-size: 12px; color: var(--ink-quiet); padding: 12px 0 4px; }
+
+    /* Sort + future filter controls above the list. Right-aligned utility row. */
+    .list-controls {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0 10px;
+    }
+    .sort-select {
+      padding: 6px 10px;
+      font-size: 12px;
+      font-family: inherit;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--surface);
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    .hidden { display: none !important; }
+
+    /* Landing page */
+    .landing {
+      max-width: 720px;
+      margin: 56px auto;
+      padding: 44px 44px 32px;
+      background: var(--surface);
+      border-radius: 18px;
+      box-shadow: 0 1px 2px oklch(0.18 0.03 50 / 0.06),
+                  0 14px 44px oklch(0.18 0.03 50 / 0.07);
+      text-align: center;
+    }
+    @media (max-width: 600px) {
+      .landing { margin: 20px 12px; padding: 28px 22px 22px; border-radius: 14px; }
+    }
+    .landing h1 {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+      color: var(--ink);
+      margin-bottom: 14px;
+      text-wrap: balance;
+    }
+    .landing p { color: var(--ink-muted); margin-bottom: 30px; }
+
+    .member-card {
+      display: block;
+      padding: 6px 4px;
+      text-align: left;
+      text-decoration: underline;
+      text-decoration-color: var(--ink-faint);
+      text-underline-offset: 2px;
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+    .member-card:hover { color: var(--accent); text-decoration-color: var(--accent); }
+
+    /* Landing top bar: My Shows (left, when logged in) + quiet account button (right). */
+    .landing-topbar { display: flex; align-items: center; gap: 10px; min-height: 30px; margin-bottom: 14px; }
+    .landing-topbar #myShowsLink { margin: 0; }
+    .landing-auth { margin-left: auto; display: inline-flex; gap: 8px; }
+
+    /* Member jump dropdown — replaces the old featured grid + browse-all disclosure. */
+    .member-jump { margin: 4px 0 8px; text-align: center; }
+    .member-jump-label { display: block; font-size: 13px; color: var(--ink-muted); margin-bottom: 6px; }
+    .member-jump-select {
+      width: 100%; max-width: 320px; padding: 10px 12px;
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: 15px; font-family: inherit; background: var(--surface); color: var(--ink); cursor: pointer;
+    }
+    .member-jump-select:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    .modal {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 24px;
+      width: 90%;
+      max-width: 440px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+
+    .modal h2 {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin-bottom: 16px;
+      color: var(--ink);
+    }
+
+    .modal label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-muted);
+      margin-bottom: 4px;
+      margin-top: 12px;
+    }
+    .modal label:first-of-type { margin-top: 0; }
+
+    .modal input, .modal select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    .modal input:focus, .modal select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: var(--focus-ring);
+    }
+
+
+    .checkbox-label {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 14px; color: var(--ink-muted); margin-top: 12px; cursor: pointer;
+    }
+    .checkbox-label input { width: auto; margin: 0; }
+
+    .modal-actions { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
+    .btn-cancel { background: var(--surface-2); color: var(--ink); }
+    .btn-cancel:hover { background: var(--surface); }
+    .btn-save { background: var(--accent); color: var(--ink); font-weight: 700; }
+    .btn-save:hover { background: var(--accent-hover); }
+
+    .loading { text-align: center; padding: 40px; color: var(--ink-quiet); font-size: 15px; }
+    .empty {
+      text-align: center;
+      padding: 48px 20px 36px;
+      color: var(--ink-muted);
+    }
+    .empty .empty-headline {
+      font-family: var(--font-display);
+      font-size: var(--text-md);
+      font-weight: 600;
+      color: var(--ink);
+      margin: 0 0 8px;
+    }
+    .empty .empty-help {
+      font-size: var(--text-sm);
+      color: var(--ink-muted);
+      line-height: 1.55;
+      max-width: 360px;
+      margin: 0 auto 18px;
+    }
+    .empty .btn-empty-cta {
+      background: var(--accent);
+      color: var(--ink);
+      border: none;
+      padding: 8px 22px;
+      border-radius: 999px;
+      font-size: var(--text-sm);
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    .empty .btn-empty-cta:hover { background: var(--accent-hover); }
+
+    .picks-empty {
+      text-align: center;
+      color: var(--ink-muted);
+      font-size: var(--text-sm);
+      font-style: italic;
+      padding: 6px 0 0;
+    }
+
+    @media (max-width: 480px) {
+      .header-title { font-size: 18px; }
+      .tab { padding: 10px 0; font-size: 12px; }
+      .show-row { font-size: 13px; }
+    }
+
+    .popular-members-badge {
+      font-size: 11px;
+      color: var(--ink-quiet);
+      cursor: pointer;
+      text-decoration: underline dotted;
+      text-underline-offset: 2px;
+    }
+    .popular-members-badge:hover { color: var(--ink); }
+
+    /* Toast notifications — bottom-center stack. Used for action feedback
+       (move, archive, share, suggest, save) and undo on archive. */
+    .toast-stack {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: max(16px, env(safe-area-inset-bottom, 16px));
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 0 16px;
+      pointer-events: none;
+      z-index: 300;
+    }
+    .toast {
+      display: inline-flex;
+      align-items: center;
+      gap: 16px;
+      max-width: 480px;
+      background: oklch(0.22 0.025 50);
+      color: var(--surface);
+      padding: 10px 14px 10px 18px;
+      border-radius: 999px;
+      font-size: var(--text-sm);
+      font-weight: 500;
+      box-shadow: 0 4px 12px oklch(0.18 0.03 50 / 0.18),
+                  0 14px 32px oklch(0.18 0.03 50 / 0.22);
+      pointer-events: auto;
+      animation: toast-in 0.22s ease-out;
+    }
+    .toast.error { background: var(--danger-deep); }
+    .toast button {
+      background: transparent;
+      color: var(--accent);
+      border: none;
+      padding: 4px 10px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      border-radius: 999px;
+    }
+    .toast button:hover { color: #fff; background: oklch(0.32 0.04 50); }
+    @keyframes toast-in {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .toast { animation: none; }
+      .show-title .chev svg { transition: none; }
+      .show-actors { transition: none; }
+    }
+
+    .recs-section { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border-soft); }
+    .recs-heading {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      font-weight: 500;
+      letter-spacing: -0.005em;
+      color: var(--ink);
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .recs-explainer { font-size: 12px; color: var(--ink-muted); text-align: center; margin-bottom: 12px; font-style: italic; padding: 0 16px; }
+    .recs-explainer:empty { display: none; }
+    .rec-row .rec-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+    .rec-reason { font-size: 11px; color: var(--ink-quiet); margin-top: 2px; }
+  </style>
+</head>
+<body>
+
+  <!-- Landing Page -->
+  <div id="landingPage" class="hidden">
+    <div class="landing">
+      <div class="landing-topbar">
+        <a id="myShowsLink" href="#" class="member-card hidden">My Shows &rarr;</a>
+        <span class="landing-auth" id="landingAuthBar">
+          <button class="btn btn-quiet btn-small" id="landingLoginBtn" onclick="login()">Log in</button>
+          <button class="btn btn-quiet btn-small hidden" id="landingLogoutBtn" onclick="logout()">Log out</button>
+        </span>
+      </div>
+      <h1>Show Picker Club</h1>
+      <p style="margin: 6px 0 0; font-size: 14px; color: var(--ink-muted); line-height: 1.5;">
+        Paying for streaming you don't watch? <a href="/subscriptions" style="color: var(--accent); text-decoration: none; font-weight: 600;">Audit your subscriptions</a> &mdash; see what to keep, pause, or cancel based on what's actually on your list.
+      </p>
+      <div id="popularSection" style="margin-top: 8px; margin-bottom: 24px; display: none;">
+        <h3 class="section-title">What Members Are Watching</h3>
+        <div id="popularList" class="show-list" style="text-align: left;"></div>
+      </div>
+
+      <div class="member-jump">
+        <label class="member-jump-label" for="memberJump">Go to a member's lists</label>
+        <select id="memberJump" class="member-jump-select" onchange="if(this.value)location.href=this.value">
+          <option value="">Pick a member&hellip;</option>
+        </select>
+      </div>
+      <div style="text-align: center; margin: 16px 0 0;">
+        <button class="btn btn-quiet" onclick="openLandingSearchModal()">Search all libraries</button>
+      </div>
+      <div style="text-align: center; margin-top: 24px;">
+        <a href="/reporting" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic;">Curious?</a>
+        <a href="/vibe" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic; margin-left: 16px;">Vibe</a>
+        <a href="/whats-new" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic; margin-left: 16px;">What's New</a>
+      </div>
+
+      <footer style="padding: 24px 0 20px; font-size: 12px; color: var(--ink-quiet); text-align: center;">
+        &copy; 2025 Patrick Turner.
+        <a id="adminLink" href="/admin" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Admin</a>
+        <a id="joinLink" href="/join" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Join link</a>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Member Show Page -->
+  <div id="showPage" class="hidden">
+    <header>
+      <div class="header-top">
+        <div class="header-actions">
+          <a href="/" style="color: rgba(255,255,255,0.85); text-decoration: none; font-size: 24px; line-height: 1; padding: 6px 10px; margin: -6px 0 -6px -10px; border-radius: 6px;" title="All members" aria-label="Back to all members">&#9664;</a>
+          <button class="btn btn-search" id="searchBtn" title="Search this member's shows" onclick="openSearchModal()">Search</button>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-add hidden" id="addBtn" title="Add a new show" aria-label="Add a new show" onclick="openAddModal()">+</button>
+          <button class="btn btn-login" id="loginBtn" title="Log in to edit your shows" onclick="login()">Log in</button>
+          <button class="btn btn-login hidden" id="logoutBtn" title="Log out" aria-label="Log out" onclick="logout()">Log out</button>
+        </div>
+      </div>
+      <h1 class="header-title" id="appTitle"></h1>
+      <div class="tabs" id="tabs">
+        <div class="tab active" data-list="watching" onclick="switchTab('watching')">Watching</div>
+        <div class="tab" data-list="waiting" onclick="switchTab('waiting')">Waiting</div>
+        <div class="tab" data-list="recommending" onclick="switchTab('recommending')">Recommending</div>
+        <div class="tab" data-list="next" onclick="switchTab('next')">Up Next</div>
+      </div>
+      <div class="section-desc" id="sectionDesc"></div>
+    </header>
+
+    <main>
+      <div class="loading" id="loading">Loading shows...</div>
+      <div class="recs-section hidden" id="recsSection">
+        <h3 class="recs-heading">&#9733; Picks for you</h3>
+        <p class="recs-explainer" id="recsExplainer"></p>
+        <div class="show-list" id="recsList" style="text-align: left;"></div>
+      </div>
+      <div class="list-controls hidden" id="listControls"></div>
+      <div class="show-list" id="showList"></div>
+      <div class="empty hidden" id="empty">No shows in this list yet.</div>
+    </main>
+
+    <div style="text-align: center; margin-top: 24px;">
+      <a href="/reporting" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic;">Curious?</a>
+      <a href="/vibe" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic; margin-left: 16px;">Vibe</a>
+      <a id="calendarFeedLink" href="#" style="display:none; color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic; margin-left: 16px;" title="Subscribe in Calendar to keep upcoming season dates on your phone">📅 Calendar feed</a>
+      <a id="subscriptionsLink" href="/subscriptions" style="display:none; color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic; margin-left: 16px;" title="See which streaming subscriptions you actually need right now">💸 Subscriptions</a>
+    </div>
+
+    <footer style="text-align: center; padding: 24px 16px 32px; font-size: 12px; color: var(--ink-quiet);">
+      &copy; 2025 Patrick Turner.
+      <a class="admin-link" href="/admin" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Admin</a>
+      <a class="admin-link" href="/join" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Join link</a>
+    </footer>
+
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div class="modal-overlay hidden" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2 id="modalTitle">Add Show</h2>
+      <label for="inputTitle">Show Title</label>
+      <input type="text" id="inputTitle" placeholder="e.g. The Night Agent">
+
+      <label for="inputNetwork">Network</label>
+      <select id="inputNetwork">
+        <option value="">Select…</option>
+        <option value="AMC+">AMC+ (including AMC, BBC America, IFC, Sundance, Shudder)</option>
+        <option value="Amazon Prime Video">Amazon Prime Video (including MGM+, Freevee)</option>
+        <option value="Apple TV+">Apple TV+</option>
+        <option value="BritBox">BritBox (British TV from the BBC and ITV)</option>
+        <option value="Disney+">Disney+ (including Marvel, Star Wars, Pixar, Nat Geo)</option>
+        <option value="Food Network">Food Network</option>
+        <option value="Fox">Fox</option>
+        <option value="Hulu">Hulu (including FX, FXX, ABC, Nat Geo, Freeform)</option>
+        <option value="HBO Max">HBO Max (including Discovery, CNN, TNT, TBS, Cartoon Network)</option>
+        <option value="Netflix">Netflix</option>
+        <option value="Paramount+">Paramount+ (including CBS, MTV, Comedy Central, Nickelodeon, BET, Showtime)</option>
+        <option value="Peacock">Peacock (including NBC, Bravo, USA, Syfy, Oxygen, E!)</option>
+        <option value="Starz">Starz</option>
+        <option value="__other">Network not listed</option>
+      </select>
+      <input type="text" id="inputNetworkOther" placeholder="Enter network name" style="display:none; margin-top: 6px;">
+
+      <label for="inputRecommended">Recommended By</label>
+      <input type="text" id="inputRecommended" placeholder="e.g. Whitt, TC">
+
+      <label for="inputNotes">Notes</label>
+      <input type="text" id="inputNotes" placeholder="e.g. Movie, Harlan Coben">
+
+      <label for="inputWatchingWith">Watching With</label>
+      <input type="text" id="inputWatchingWith" placeholder="e.g. Ali, the whole family">
+
+      <label class="checkbox-label"><input type="checkbox" id="inputMovie"> Movie</label>
+      <label class="checkbox-label"><input type="checkbox" id="inputFullSeries"> Series Complete</label>
+
+      <label>List</label>
+      <div class="list-chips" id="inputListChips">
+        <div class="list-chip selected" data-value="watching" style="--chip-color: var(--list-watching);" onclick="selectListChip(this)">Watching</div>
+        <div class="list-chip" data-value="waiting" style="--chip-color: var(--list-waiting);" onclick="selectListChip(this)">Waiting</div>
+        <div class="list-chip" data-value="recommending" style="--chip-color: var(--list-recommending);" onclick="selectListChip(this)">Recommending</div>
+        <div class="list-chip" data-value="next" style="--chip-color: var(--accent);" onclick="selectListChip(this)">Up Next</div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-save" id="modalSave" onclick="saveShow()">Add Show</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Suggest Modal -->
+  <div class="modal-overlay hidden" id="suggestOverlay" onclick="closeSuggestModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2>Suggest a Show</h2>
+      <!-- Hidden — we use the logged-in member's name automatically. Suggest
+           is only reachable when authenticated, so this can never be blank. -->
+      <input type="hidden" id="suggestName">
+
+      <label for="suggestTitle">Show Title</label>
+      <input type="text" id="suggestTitle" placeholder="e.g. The Night Agent">
+
+      <label for="suggestNetwork">Network</label>
+      <select id="suggestNetwork">
+        <option value="">Select…</option>
+        <option value="AMC+">AMC+ (including AMC, BBC America, IFC, Sundance, Shudder)</option>
+        <option value="Amazon Prime Video">Amazon Prime Video (including MGM+, Freevee)</option>
+        <option value="Apple TV+">Apple TV+</option>
+        <option value="BritBox">BritBox (British TV from the BBC and ITV)</option>
+        <option value="Disney+">Disney+ (including Marvel, Star Wars, Pixar, Nat Geo)</option>
+        <option value="Food Network">Food Network</option>
+        <option value="Fox">Fox</option>
+        <option value="Hulu">Hulu (including FX, FXX, ABC, Nat Geo, Freeform)</option>
+        <option value="HBO Max">HBO Max (including Discovery, CNN, TNT, TBS, Cartoon Network)</option>
+        <option value="Netflix">Netflix</option>
+        <option value="Paramount+">Paramount+ (including CBS, MTV, Comedy Central, Nickelodeon, BET, Showtime)</option>
+        <option value="Peacock">Peacock (including NBC, Bravo, USA, Syfy, Oxygen, E!)</option>
+        <option value="Starz">Starz</option>
+        <option value="__other">Network not listed</option>
+      </select>
+      <input type="text" id="suggestNetworkOther" placeholder="Enter network name" style="display:none; margin-top: 6px;">
+
+      <label for="suggestNotes">Notes</label>
+      <input type="text" id="suggestNotes" placeholder="e.g. Great thriller, has Mark Ruffalo">
+
+      <label class="checkbox-label"><input type="checkbox" id="suggestMovie"> Movie</label>
+      <label class="checkbox-label"><input type="checkbox" id="suggestFullSeries"> Series Complete</label>
+
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeSuggestModal()">Cancel</button>
+        <button class="btn btn-save" onclick="submitSuggestion()">Send Suggestion</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Share to Member Modal -->
+  <div class="modal-overlay hidden" id="shareOverlay" onclick="closeShareModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2>Add to a Member's List</h2>
+      <input type="hidden" id="shareShowId">
+
+      <label for="shareTitle">Show</label>
+      <input type="text" id="shareTitle" readonly style="background: var(--surface); color: var(--ink-muted);">
+
+      <label for="shareMember">Send to</label>
+      <select id="shareMember"></select>
+
+      <!-- Hidden — we use the logged-in member's name automatically. Both
+           paths into this modal are gated on auth before getting here. -->
+      <input type="hidden" id="shareName">
+
+      <label for="shareNotes">Notes</label>
+      <input type="text" id="shareNotes" placeholder="e.g. You'll love this one">
+
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeShareModal()">Cancel</button>
+        <button class="btn btn-save" onclick="submitShare()">Share</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add to My List Modal -->
+  <div class="modal-overlay hidden" id="addMyListOverlay" onclick="closeAddMyList(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2>Add to My List</h2>
+
+      <label for="addMyTitle">Show</label>
+      <input type="text" id="addMyTitle" readonly style="background: var(--surface); color: var(--ink-muted);">
+
+      <label for="addMyList">Add to</label>
+      <select id="addMyList">
+        <option value="watching">Watching</option>
+        <option value="waiting">Waiting on Next Showings</option>
+        <option value="recommending">Recommending</option>
+        <option value="next">Up Next</option>
+      </select>
+
+      <label for="addMyNotes">Notes</label>
+      <input type="text" id="addMyNotes" placeholder="e.g. Great thriller">
+
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeAddMyList()">Cancel</button>
+        <button class="btn btn-save" onclick="submitAddMyList()">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="searchOverlay" onclick="closeSearchModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2 id="searchModalTitle">Search Shows</h2>
+      <label for="searchTitleInput">Title</label>
+      <input type="text" id="searchTitleInput" placeholder="e.g. Fargo" oninput="renderSearchResults()" autocomplete="off">
+
+      <label for="searchActorInput">Actor</label>
+      <input type="text" id="searchActorInput" placeholder="e.g. Billy Bob Thornton" oninput="renderSearchResults()" autocomplete="off">
+
+      <div id="searchResults" class="search-results"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeSearchModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="loginOverlay" onclick="closeLoginModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2>Log in</h2>
+
+      <button type="button" class="btn" id="appleSignInBtn" onclick="signInWithApple()"
+              style="width:100%; background:#000; color:#fff; display:flex; align-items:center; justify-content:center; gap:8px;">
+        <svg width="13" height="16" viewBox="0 0 170 170" fill="#fff" aria-hidden="true"><path d="M150.4 130.3c-2.5 5.7-5.4 11-8.9 15.8-4.7 6.6-8.6 11.2-11.6 13.7-4.6 4.2-9.5 6.3-14.8 6.5-3.8 0-8.3-1.1-13.6-3.3-5.3-2.2-10.1-3.3-14.6-3.3-4.7 0-9.7 1.1-15 3.3-5.3 2.2-9.6 3.3-12.9 3.4-5.1.2-10.1-2-15-6.7-3.2-2.7-7.3-7.5-12.2-14.4-5.3-7.3-9.6-15.9-13-25.7-3.6-10.6-5.4-20.9-5.4-30.8 0-11.4 2.5-21.2 7.4-29.4 3.9-6.6 9-11.8 15.4-15.6 6.4-3.8 13.3-5.8 20.8-5.9 4 0 9.3 1.3 15.9 3.7 6.6 2.5 10.9 3.7 12.7 3.7 1.4 0 6.1-1.5 14.1-4.4 7.6-2.7 14-3.8 19.3-3.4 14.3 1.2 25 6.8 32.1 16.9-12.8 7.8-19.1 18.6-19 32.6.1 10.9 4.1 20 11.9 27.2 3.5 3.4 7.5 6 11.9 7.8-1 2.8-2 5.4-3.1 7.9zM119.9 7.3c0 8.5-3.1 16.4-9.3 23.8-7.5 8.8-16.5 13.8-26.3 13-.1-1-.2-2.1-.2-3.2 0-8.1 3.6-16.8 9.9-23.9 3.2-3.6 7.2-6.6 12.1-9 4.9-2.3 9.5-3.6 13.9-3.9.1 1.1.2 2.2.2 3.2z"/></svg>
+        Sign in with Apple
+      </button>
+      <div style="text-align: center; margin: 14px 0; font-size: 12px; color: var(--ink-muted);">or use a code</div>
+
+      <label for="loginPhone">Phone (US)</label>
+      <input type="tel" id="loginPhone" name="phone"
+             autocomplete="tel" inputmode="tel"
+             placeholder="(336) 555-1234">
+      <button type="button" class="btn" id="loginPhoneBtn" style="margin-top: 8px; width: 100%; background: var(--surface-2); color: var(--ink);" onclick="sendPhoneCode()">Text me a code</button>
+
+      <div style="text-align: center; margin: 14px 0; font-size: 12px; color: var(--ink-muted);">or</div>
+
+      <label for="loginEmail">Email</label>
+      <input type="email" id="loginEmail" autocomplete="email" placeholder="you@example.com">
+      <button type="button" class="btn" id="loginEmailBtn" style="margin-top: 8px; width: 100%; background: var(--surface-2); color: var(--ink);" onclick="sendEmailCode()">Email me a code</button>
+      <div id="loginEmailHint" style="font-size: 12px; color: var(--ink-muted); margin-top: 6px;">
+        If you don't receive an email or text, reach out to the group owner with the email or phone you'd like to use.
+      </div>
+
+      <label for="loginCode" style="margin-top: 18px;">Code</label>
+      <input type="text" id="loginCode" inputmode="numeric" autocomplete="one-time-code"
+             pattern="[0-9]*" maxlength="6" placeholder="••••••">
+      <div id="loginCodeHint" style="font-size: 12px; color: var(--ink-muted); margin-top: 4px;"></div>
+
+      <div id="loginErr" style="display:none; margin-top: 14px; padding: 10px; background: var(--danger-soft); color: var(--danger-deep); border-radius: 6px; font-size: 13px;"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeLoginModal()">Cancel</button>
+        <button class="btn btn-save" id="loginSubmitBtn" onclick="submitLoginCode()">Log in</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="text/javascript" src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
+  <script>
+    let shows = [];
+    let currentTab = 'watching';
+    // isEditor removed: per-row actions now always show on own page when logged in.
+    let editingId = null;
+    let memberSlug = null;
+    let memberName = '';
+    let editorName = '';
+    let authMember = null;
+    let searchMode = 'member';
+    let owners = '';
+
+    function parseActors(raw) {
+      if (!raw) return [];
+      try {
+        const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (Array.isArray(arr)) return arr;
+      } catch (_) {}
+      // Legacy plain string fallback
+      return String(raw).split(', ').map(name => ({ name, imdb_id: null }));
+    }
+
+    function renderActors(raw) {
+      const actors = parseActors(raw);
+      if (!actors.length) return '';
+      const tags = actors.map(a => {
+        const label = escapeHtml(a.name);
+        if (a.imdb_id) {
+          return `<a class="actor-tag" href="https://www.imdb.com/name/${encodeURIComponent(a.imdb_id)}/" target="_blank" rel="noopener">${label}</a>`;
+        }
+        return `<span class="actor-tag">${label}</span>`;
+      }).join('');
+      return `<div class="actor-list">${tags}</div>`;
+    }
+
+    function actorNamesText(raw) {
+      return parseActors(raw).map(a => a.name).join(', ');
+    }
+
+    // Show a transient toast at the bottom of the screen.
+    //   showToast("Moved to Recommending")
+    //   showToast("Archived \"Foo\"", { action: { label: "Undo", onClick: fn } })
+    //   showToast("Network error", { tone: "error" })
+    function showToast(message, opts = {}) {
+      let stack = document.getElementById('toastStack');
+      if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'toastStack';
+        stack.className = 'toast-stack';
+        stack.setAttribute('role', 'status');
+        stack.setAttribute('aria-live', 'polite');
+        document.body.appendChild(stack);
+      }
+      const toast = document.createElement('div');
+      toast.className = 'toast' + (opts.tone === 'error' ? ' error' : '');
+      const msg = document.createElement('span');
+      msg.textContent = message;
+      toast.appendChild(msg);
+      let dismissTimer = null;
+      const dismiss = () => {
+        if (dismissTimer) clearTimeout(dismissTimer);
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        toast.style.transition = 'opacity 0.18s, transform 0.18s';
+        setTimeout(() => toast.remove(), 220);
+      };
+      if (opts.action) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = opts.action.label;
+        btn.addEventListener('click', () => {
+          try { opts.action.onClick(); } catch (e) {}
+          dismiss();
+        });
+        toast.appendChild(btn);
+      }
+      stack.appendChild(toast);
+      dismissTimer = setTimeout(dismiss, opts.duration || (opts.action ? 6000 : 3500));
+      return dismiss;
+    }
+
+    const LIST_LABELS = { watching: 'Watching', waiting: 'Waiting', recommending: 'Recommending', next: 'Up Next' };
+
+    // Empty-state copy. own.* is shown when the viewer owns this page; guest.*
+    // is shown to anyone else (no CTA, just acknowledges the list is empty).
+    const EMPTY_COPY = {
+      own: {
+        watching: {
+          headline: "You're not watching anything yet.",
+          help: "Add a show you're actively watching so the club knows what you're into.",
+          cta: { label: 'Add a show', action: 'openAddModal()' },
+        },
+        waiting: {
+          headline: "Nothing waiting on a next season.",
+          help: "When you finish a season but want to come back, move the show here. Premiere dates show on your calendar feed.",
+        },
+        recommending: {
+          headline: "Nothing to recommend yet.",
+          help: "Once you've watched something worth recommending, move it here so the rest of the club sees it.",
+        },
+        next: {
+          headline: "Your Up Next is empty.",
+          help: "Add shows you want to watch later, or wait for picks and suggestions from other members.",
+          cta: { label: 'Add a show', action: 'openAddModal()' },
+        },
+      },
+      guest: {
+        watching:   (name) => `${name} isn't watching anything right now.`,
+        waiting:    (name) => `${name} isn't waiting on any seasons.`,
+        recommending: (name) => `${name} hasn't recommended anything yet.`,
+        next:       (name) => `${name}'s Up Next is empty.`,
+      },
+    };
+
+    function renderEmptyState(currentTab, isOwn, ownerName) {
+      if (isOwn) {
+        const c = EMPTY_COPY.own[currentTab] || { headline: 'Nothing here yet.' };
+        const cta = c.cta ? `<button class="btn-empty-cta" onclick="${c.cta.action}">${escapeHtml(c.cta.label)}</button>` : '';
+        const help = c.help ? `<p class="empty-help">${escapeHtml(c.help)}</p>` : '';
+        return `<p class="empty-headline">${escapeHtml(c.headline)}</p>${help}${cta}`;
+      }
+      const guestFn = EMPTY_COPY.guest[currentTab];
+      const headline = guestFn ? guestFn(ownerName) : 'Nothing here yet.';
+      return `<p class="empty-headline">${escapeHtml(headline)}</p>`;
+    }
+
+    function buildDetailLines(show, opts = {}) {
+      const lines = [];
+      if (show.genres) lines.push(escapeHtml(show.genres));
+      if (show.actors) lines.push(renderActors(show.actors));
+      if (opts.aggregate && show.members && show.members.length) {
+        lines.push(`Watching: ${escapeHtml(show.members.join(', '))}`);
+      }
+      if (!opts.aggregate) {
+        if (show.recommended_by && !opts.skipRecommender) lines.push(`Recommended by ${escapeHtml(show.recommended_by)}`);
+        if (show.next_season_date && !opts.skipNextSeason) {
+          const seasons = seasonsText(show);
+          lines.push(`Next up: ${formatSeasonRange(show)}${seasons ? ` · ${seasons}` : ''}`);
+        } else if (!opts.skipNextSeason && seasonsText(show)) {
+          // No upcoming date but we know the total — still worth showing.
+          lines.push(seasonsText(show));
+        }
+        if (show.watching_with) lines.push(`Watching with ${escapeHtml(show.watching_with)}`);
+        if (show.notes) lines.push(escapeHtml(show.notes));
+      }
+      return lines.map(l => `<div class="show-detail-line">${l}</div>`).join('');
+    }
+
+    function formatSeasonRange(show) {
+      const start = formatDate(show.next_season_date);
+      const end = show.season_end_date ? formatDate(show.season_end_date) : null;
+      return end && end !== start ? `${start} – ${end}` : start;
+    }
+
+    // "3 seasons" / "1 season" — total seasons released so far, when known.
+    function seasonsText(show) {
+      const n = show.seasons_released;
+      return (typeof n === 'number' && n > 0) ? `${n} season${n === 1 ? '' : 's'}` : null;
+    }
+
+    document.getElementById('inputNetwork').addEventListener('change', function() {
+      document.getElementById('inputNetworkOther').style.display = this.value === '__other' ? 'block' : 'none';
+    });
+    document.getElementById('suggestNetwork').addEventListener('change', function() {
+      document.getElementById('suggestNetworkOther').style.display = this.value === '__other' ? 'block' : 'none';
+    });
+
+    function getNetwork(selectId, otherId) {
+      const val = document.getElementById(selectId).value;
+      if (val === '__other') return document.getElementById(otherId).value.trim() || null;
+      return val || null;
+    }
+
+    function selectListChip(el) {
+      el.parentElement.querySelectorAll('.list-chip').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+    }
+
+    function getSelectedList() {
+      const sel = document.querySelector('#inputListChips .list-chip.selected');
+      return sel ? sel.dataset.value : 'watching';
+    }
+
+    function setSelectedList(value) {
+      document.querySelectorAll('#inputListChips .list-chip').forEach(c => {
+        c.classList.toggle('selected', c.dataset.value === value);
+      });
+    }
+
+    function changeSort(value) {
+      // Per-list so each tab keeps its own sort (Waiting -> Next up, etc.).
+      localStorage.setItem('sort_order_' + currentTab, value);
+      renderShows();
+    }
+
+    const SECTION_DESCS = {
+      watching: "What we're watching now.",
+      waiting: "Waiting on the next season to drop.",
+      recommending: "We've watched it and we'd recommend it.",
+      next: "Shows that have been recommended but we haven't watched.",
+    };
+
+    // Determine if we're on landing page or member page
+    const path = window.location.pathname.replace(/\/$/, '');
+    const slug = path.substring(1); // remove leading /
+
+    if (!slug) {
+      // Opening the site root: logged-in members go straight to their own
+      // list; logged-out visitors get the landing/discovery page. We check
+      // auth before rendering so there's no flash of the landing page.
+      landingOrMyList();
+    } else {
+      resolveSlug(slug).then(resolved => {
+        if (resolved) {
+          showMember(resolved);
+        } else {
+          // Slug doesn't match any member even after sanitizing. Fall back to
+          // the landing page rather than rendering a confusing blank profile.
+          history.replaceState(null, '', '/');
+          showLanding();
+        }
+      });
+    }
+
+    async function landingOrMyList() {
+      try {
+        const res = await fetch('/auth/check');
+        const data = await res.json();
+        if (data.authenticated && data.member) {
+          // replace(), not assign(), so Back doesn't bounce to / and
+          // immediately redirect again — it skips straight past the root.
+          window.location.replace('/' + data.member);
+          return;
+        }
+      } catch (e) {}
+      showLanding();
+    }
+
+    async function resolveSlug(raw) {
+      // Slugs are [a-z0-9]+. URL-decode the raw segment, lowercase, then
+      // strip anything that isn't a slug character. Fixes things like
+      // `/annie**` (autolinker grabbed adjacent punctuation), `/Annie`
+      // (case mismatch), or `/annie%20` (encoded trailing space).
+      let decoded;
+      try { decoded = decodeURIComponent(raw); } catch { decoded = raw; }
+      const cleaned = decoded.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!cleaned) return null;
+      try {
+        const res = await fetch('/api/members');
+        const data = await res.json();
+        const hit = (data.members || []).find(m => m.slug === cleaned);
+        if (!hit) return null;
+        if (cleaned !== raw) {
+          history.replaceState(null, '', '/' + cleaned);
+        }
+        return cleaned;
+      } catch {
+        return null;
+      }
+    }
+
+    async function showLanding() {
+      document.getElementById('landingPage').classList.remove('hidden');
+      document.title = 'Show Picker Club';
+      try {
+        const res = await fetch('/api/members');
+        const data = await res.json();
+        const allMembers = data.members || [];
+        // Alphabetical jump dropdown — pick a member, go to their lists.
+        const byName = (a, b) =>
+          (a.display_name || a.first_name || a.name).localeCompare(
+            b.display_name || b.first_name || b.name, undefined, { sensitivity: 'base' });
+        const sorted = allMembers.slice().sort(byName);
+        const jump = document.getElementById('memberJump');
+        jump.innerHTML = '<option value="">Pick a member&hellip;</option>' +
+          sorted.map(h =>
+            `<option value="/${escapeHtml(h.slug)}">${escapeHtml(h.display_name || h.first_name || (h.name || '').split(' ')[0])}</option>`
+          ).join('');
+      } catch (e) {
+        const jump = document.getElementById('memberJump');
+        if (jump) jump.innerHTML = '<option value="">Failed to load members</option>';
+      }
+
+      // Load popular shows
+      try {
+        const popRes = await fetch('/api/popular');
+        const popData = await popRes.json();
+        if (popData.shows && popData.shows.length > 0) {
+          const popList = document.getElementById('popularList');
+          const hasRealUrl = (url) => url && !url.includes('/search') && !url.includes('/s?') && url !== '#';
+          popList.innerHTML = popData.shows.map((show, i) => {
+            const network = show.network
+              ? hasRealUrl(show.network_url)
+                ? ` <span class="show-on">on</span> <a class="show-network" href="${escapeHtml(safeUrl(show.network_url))}" target="_blank" rel="noopener">${escapeHtml(show.network)}</a>`
+                : ` <span class="show-on">on</span> <span class="show-network-plain">${escapeHtml(show.network)}</span>`
+              : '';
+            const rating = show.rating ? ` <span class="show-rating"><span class="star">&#9733;</span>${escapeHtml(show.rating)}</span>` : '';
+            const movieTag = show.movie ? ' <span class="show-movie">(Movie)</span>' : '';
+            const memberList = (show.members || []).join(', ');
+            const badge = ` <span class="popular-members-badge" onclick="toggleExpand(${show.id})" title="Tap to see who's watching">${show.member_count} Members</span>`;
+            const details = buildDetailLines(show, { aggregate: true });
+            return `<div class="show popular-row">
+              <div class="show-row">
+                <button class="share-btn popular-add-btn" style="display:none;" data-title="${escapeHtml(show.title)}" data-network="${escapeHtml(show.network || '')}" data-url="${escapeHtml(show.network_url || '')}" data-movie="${show.movie || 0}" title="Add to my list">+</button>
+                <span class="show-info"><span class="show-title clickable" title="Tap to see more" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${movieTag}${badge}</span>
+              </div>
+              <div class="show-actors" id="actors-${show.id}">${details}</div>
+            </div>`;
+          }).join('');
+          document.getElementById('popularSection').style.display = 'block';
+        }
+      } catch (e) {}
+      // Check auth after popular list is rendered so + buttons can be shown
+      checkAuth();
+    }
+
+    async function showMember(slug) {
+      memberSlug = slug;
+      document.getElementById('showPage').classList.remove('hidden');
+
+      const calLink = document.getElementById('calendarFeedLink');
+      if (calLink) {
+        calLink.href = `webcal://showpicker.club/calendar/${encodeURIComponent(slug)}.ics`;
+        calLink.style.display = 'inline';
+      }
+
+      // Get member name
+      try {
+        const res = await fetch('/api/members');
+        const data = await res.json();
+        const h = data.members.find(h => h.slug === slug);
+        if (h) {
+          owners = h.first_name || h.name.split(' ')[0];
+          const label = h.display_name || owners;
+          memberName = `${label}'s Shows`;
+        } else {
+          memberName = 'Shows';
+          owners = 'the owners';
+        }
+      } catch (e) {
+        memberName = 'Shows';
+        owners = 'the owners';
+      }
+
+      document.title = memberName;
+      document.getElementById('appTitle').textContent = memberName;
+
+      // Check hash for tab
+      const hash = window.location.hash.replace('#', '');
+      if (['watching', 'waiting', 'recommending', 'next'].includes(hash)) {
+        currentTab = hash;
+        document.querySelectorAll('.tab').forEach(t => {
+          t.classList.toggle('active', t.dataset.list === hash);
+        });
+      }
+      updateDesc();
+
+      checkAuth().then(() => {
+        // Enrichment + URL sync mutate the DB, so they're gated to logged-in members only.
+        if (!authMember) return;
+        fetch('/api/enrich', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ member: slug }),
+        }).catch(() => {});
+        // Sync good URLs across members once per day
+        const lastSync = localStorage.getItem('last_url_sync');
+        const now = Date.now();
+        if (!lastSync || now - parseInt(lastSync) > 86400000) {
+          fetch('/api/sync-urls', { method: 'POST' }).then(() => localStorage.setItem('last_url_sync', now)).catch(() => {});
+        }
+      });
+      loadShows();
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+    }
+
+    // Keyboard shortcuts (member page only):
+    //   /    focus search
+    //   1-4  switch tabs in order (Watching, Waiting, Recommending, Up Next)
+    //   n    open Add Show modal (own page, logged in)
+    //   Esc  close any open modal
+    document.addEventListener('keydown', (e) => {
+      // Esc works even from inside inputs — that's the universal "get me out" key.
+      if (e.key === 'Escape') {
+        const open = document.querySelectorAll('.modal-overlay:not(.hidden)');
+        if (open.length > 0) {
+          open.forEach(o => o.classList.add('hidden'));
+          e.preventDefault();
+        }
+        return;
+      }
+      // Skip the rest while typing in a field.
+      const tag = (e.target.tagName || '').toLowerCase();
+      const isTyping = tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable;
+      if (isTyping) return;
+      // Don't hijack browser/system shortcuts.
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Only meaningful on a member page (showPage visible).
+      const showPage = document.getElementById('showPage');
+      if (!showPage || showPage.classList.contains('hidden')) return;
+      // Don't fire when any modal is open.
+      if (document.querySelector('.modal-overlay:not(.hidden)')) return;
+
+      if (e.key === '/') {
+        openSearchModal();
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'n' || e.key === 'N') {
+        if (authMember && authMember === memberSlug) {
+          openAddModal();
+          e.preventDefault();
+        }
+        return;
+      }
+      if (['1', '2', '3', '4'].includes(e.key)) {
+        const tab = ['watching', 'waiting', 'recommending', 'next'][parseInt(e.key, 10) - 1];
+        switchTab(tab);
+        e.preventDefault();
+      }
+    });
+
+    // Header login button: visible only when logged out. Once logged in, the
+    // Log out button takes over; per-row actions show inline on your own page
+    // (no edit-mode toggle needed).
+    function updateLoginBtnLabel() {
+      const btn = document.getElementById('loginBtn');
+      if (!btn) return;
+      if (!authMember) {
+        btn.textContent = 'Log in';
+        btn.title = 'Log in to edit your shows';
+        btn.classList.remove('hidden', 'active');
+      } else {
+        btn.classList.add('hidden');
+        btn.classList.remove('active');
+      }
+    }
+
+    async function checkAuth() {
+      try {
+        const res = await fetch('/auth/check');
+        const data = await res.json();
+        if (data.authenticated) {
+          editorName = data.email || '';
+          authMember = data.member;
+          // Surface Admin link in footers only when this session belongs to
+          // the operator. /auth/check sets is_admin server-side, so we don't
+          // have to hardcode the slug here.
+          if (data.is_admin) {
+            const adminLink = document.getElementById('adminLink');
+            if (adminLink) adminLink.style.display = '';
+            const joinLink = document.getElementById('joinLink');
+            if (joinLink) joinLink.style.display = '';
+            document.querySelectorAll('.admin-link').forEach(a => a.style.display = '');
+          }
+          // Show + buttons on popular list if on landing page
+          document.querySelectorAll('.popular-add-btn').forEach(b => b.style.display = '');
+          // Show "My Shows" link on landing page
+          const myShowsLink = document.getElementById('myShowsLink');
+          if (myShowsLink && authMember) {
+            myShowsLink.href = `/${authMember}`;
+            myShowsLink.classList.remove('hidden');
+          }
+          // On the user's own member page, expose the Add button immediately —
+          // no need to enter edit mode just to add a show.
+          if (authMember && typeof memberSlug !== 'undefined' && authMember === memberSlug) {
+            const addBtn = document.getElementById('addBtn');
+            if (addBtn) addBtn.classList.remove('hidden');
+            // Subscription audit is personal — only on your own page.
+            const subsLink = document.getElementById('subscriptionsLink');
+            if (subsLink) subsLink.style.display = 'inline';
+            loadRecs();
+          }
+          const logoutBtn = document.getElementById('logoutBtn');
+          if (logoutBtn) logoutBtn.classList.remove('hidden');
+          const landingLoginBtn = document.getElementById('landingLoginBtn');
+          const landingLogoutBtn = document.getElementById('landingLogoutBtn');
+          if (landingLoginBtn) landingLoginBtn.classList.add('hidden');
+          if (landingLogoutBtn) landingLogoutBtn.classList.remove('hidden');
+        }
+      } catch (e) {}
+      updateLoginBtnLabel();
+    }
+
+    function login() {
+      // Already logged in and clicked Log in from the landing page → go
+      // straight to their own member page.
+      if (authMember && !memberSlug) {
+        window.location.href = '/' + authMember;
+        return;
+      }
+      // Logged-in users on a member page never see the login button (it
+      // hides), so this only fires for truly logged-out clicks.
+      openLoginModal();
+    }
+
+    async function logout() {
+      try {
+        // GET /auth/logout deletes the session row and 302s back; we don't
+        // follow the redirect, we just refresh state in place so the user
+        // stays on the page they were viewing.
+        await fetch('/auth/logout', { redirect: 'manual' });
+      } catch {}
+      authMember = null;
+      editorName = '';
+      const logoutBtn = document.getElementById('logoutBtn');
+      if (logoutBtn) logoutBtn.classList.add('hidden');
+      const addBtn = document.getElementById('addBtn');
+      if (addBtn) addBtn.classList.add('hidden');
+      const landingLoginBtn = document.getElementById('landingLoginBtn');
+      const landingLogoutBtn = document.getElementById('landingLogoutBtn');
+      if (landingLoginBtn) landingLoginBtn.classList.remove('hidden');
+      if (landingLogoutBtn) landingLogoutBtn.classList.add('hidden');
+      const myShowsLink = document.getElementById('myShowsLink');
+      if (myShowsLink) myShowsLink.classList.add('hidden');
+      updateLoginBtnLabel();
+      if (typeof renderShows === 'function' && typeof shows !== 'undefined') renderShows();
+    }
+
+    function openLoginModal() {
+      document.getElementById('loginOverlay').classList.remove('hidden');
+      document.getElementById('loginErr').style.display = 'none';
+      document.getElementById('loginCode').value = '';
+      document.getElementById('loginEmail').value = '';
+      document.getElementById('loginPhone').value = '';
+      document.getElementById('loginCodeHint').textContent = 'Enter the 6-digit code from your text or email.';
+      // Reset both send buttons to their pristine state — they leave
+      // green / "Code sent" residue if the modal is closed and reopened.
+      ['loginEmailBtn','loginPhoneBtn'].forEach(id => {
+        const b = document.getElementById(id);
+        if (!b) return;
+        b.disabled = false;
+        b.style.background = 'var(--surface-2)';
+        b.style.color = 'var(--ink)';
+        b.textContent = id === 'loginPhoneBtn' ? 'Text me a code' : 'Email me a code';
+      });
+      setTimeout(() => document.getElementById('loginPhone').focus(), 50);
+    }
+
+    function closeLoginModal(e) {
+      if (e && e.target !== e.currentTarget) return;
+      document.getElementById('loginOverlay').classList.add('hidden');
+    }
+
+    function showLoginError(msg) {
+      const el = document.getElementById('loginErr');
+      el.textContent = msg;
+      el.style.display = '';
+    }
+
+    async function sendPhoneCode() {
+      const phone = document.getElementById('loginPhone').value.trim();
+      // Loose validation — server normalises and rejects on its own. We just
+      // want to catch the empty-field case before round-tripping.
+      if (!phone || phone.replace(/\D/g, '').length < 7) {
+        showLoginError('Enter your phone number first.');
+        return;
+      }
+      const btn = document.getElementById('loginPhoneBtn');
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      try {
+        const res = await fetch('/auth/request-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, channel: 'sms' }),
+        });
+        if (res.status === 429) {
+          showLoginError('Too many requests. Try again in an hour.');
+        } else if (!res.ok) {
+          showLoginError('Could not send. Try again, or contact the group owner.');
+        } else {
+          document.getElementById('loginErr').style.display = 'none';
+          btn.textContent = 'Code sent. Check your texts';
+          btn.style.background = 'var(--list-watching)';
+          btn.style.color = '#fff';
+          document.getElementById('loginCode').focus();
+        }
+      } catch {
+        showLoginError('Network error. Try again.');
+      } finally {
+        setTimeout(() => {
+          btn.disabled = false;
+          if (btn.textContent === 'Sending…') btn.textContent = 'Text me a code';
+        }, 600);
+      }
+    }
+
+    async function sendEmailCode() {
+      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showLoginError('Enter a valid email first.');
+        return;
+      }
+      const btn = document.getElementById('loginEmailBtn');
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      try {
+        const res = await fetch('/auth/request-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, channel: 'email' }),
+        });
+        if (res.status === 429) {
+          showLoginError('Too many requests. Try again in an hour.');
+        } else if (!res.ok) {
+          showLoginError('Could not send. Try again, or contact the group owner if your email isn\'t on file.');
+        } else {
+          // Identical reply whether the email is on file or not (account
+          // enumeration hardening). Show the same hint either way.
+          document.getElementById('loginErr').style.display = 'none';
+          btn.textContent = 'Code sent. Check your email';
+          btn.style.background = 'var(--list-watching)';
+          btn.style.color = '#fff';
+          document.getElementById('loginCode').focus();
+        }
+      } catch {
+        showLoginError('Network error. Try again.');
+      } finally {
+        setTimeout(() => {
+          btn.disabled = false;
+          if (btn.textContent === 'Sending…') btn.textContent = 'Email me a code';
+        }, 600);
+      }
+    }
+
+    // Sign in with Apple (web). Uses a Services ID — NOT the iOS bundle id —
+    // which must be created in the Apple Developer portal with the showpicker.club
+    // domain verified and "https://showpicker.club/" registered as a Return URL,
+    // and added to the APPLE_CLIENT_ID Pages env var. Change this to whatever
+    // Services ID you register.
+    const APPLE_WEB_CLIENT_ID = 'club.showpicker.web';
+    let appleInited = false;
+    function initApple() {
+      if (appleInited || !window.AppleID) return;
+      AppleID.auth.init({
+        clientId: APPLE_WEB_CLIENT_ID,
+        scope: 'name email',
+        redirectURI: window.location.origin + '/',
+        usePopup: true,
+      });
+      appleInited = true;
+    }
+    async function signInWithApple() {
+      initApple();
+      if (!window.AppleID) { showLoginError('Apple sign-in is unavailable right now — use a code.'); return; }
+      try {
+        const data = await AppleID.auth.signIn();
+        const idToken = data && data.authorization && data.authorization.id_token;
+        if (!idToken) { showLoginError("Apple didn't return a sign-in token. Try again."); return; }
+        const res = await fetch('/auth/apple', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identity_token: idToken }),
+        });
+        if (res.ok) {
+          location.reload();
+        } else if (res.status === 401) {
+          showLoginError('That Apple ID isn\'t linked to a member. Choose "Share My Email" with the address the owner has on file, or use a code.');
+        } else {
+          showLoginError('Apple sign-in failed. Try a code instead.');
+        }
+      } catch (e) {
+        // Popup closed / user cancelled — stay quiet; surface only real errors.
+        const code = e && e.error;
+        if (code && code !== 'popup_closed_by_user' && code !== 'user_cancelled_authorize' && code !== 'user_trigger_new_signin_flow') {
+          showLoginError('Apple sign-in failed. Try a code instead.');
+        }
+      }
+    }
+
+    async function submitLoginCode() {
+      const code = document.getElementById('loginCode').value.trim();
+      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+      const phone = document.getElementById('loginPhone').value.trim();
+      if (!code) {
+        showLoginError('Enter your code.');
+        return;
+      }
+      if (!phone && !email) {
+        showLoginError('Enter your phone or email first, then the code.');
+        return;
+      }
+      const btn = document.getElementById('loginSubmitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Logging in…';
+      // Phone wins if both are filled — phone OTP is the more recent intent.
+      const body = phone ? { code, phone } : { code, email };
+      try {
+        const res = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          showLoginError('Invalid or expired code.');
+          return;
+        }
+        closeLoginModal();
+        await checkAuth();
+        // From the landing page (memberSlug is null until we navigate to a
+        // member route), drop the user on their own page so the login feels
+        // like "go to my shows" rather than just "you're now authenticated".
+        if (!memberSlug && authMember) {
+          window.location.href = '/' + authMember;
+          return;
+        }
+        updateLoginBtnLabel();
+        renderShows();
+      } catch {
+        showLoginError('Network error. Try again.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Log in';
+      }
+    }
+
+    async function loadShows() {
+      try {
+        const res = await fetch(`/api/shows?member=${memberSlug}`);
+        const data = await res.json();
+        shows = data.shows || [];
+        renderShows();
+      } catch (e) {
+        document.getElementById('loading').textContent = 'Failed to load shows.';
+      }
+    }
+
+    let recsData = null;
+
+    async function loadRecs() {
+      // Only load recs when the viewer is logged in as the page's member.
+      if (!authMember || authMember !== memberSlug) { recsData = null; renderRecs(); return; }
+      try {
+        const res = await fetch(`/api/recommendations?member=${encodeURIComponent(memberSlug)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        // Seed-only members get no picks shown — their list is just seeds.
+        if (data.is_seed_only) { recsData = null; renderRecs(); return; }
+        recsData = data;
+        renderRecs();
+      } catch (e) {}
+    }
+
+    function renderRecs() {
+      const section = document.getElementById('recsSection');
+      if (!section) return;
+      // The section is only relevant when viewing your own Up Next tab and the
+      // server actually returned a pick set (recsData null = seed-only member
+      // or no auth match, both correct reasons to hide entirely).
+      const onOwnUpNext = currentTab === 'next' && authMember && authMember === memberSlug;
+      if (!onOwnUpNext || !recsData) { section.classList.add('hidden'); return; }
+      section.classList.remove('hidden');
+
+      const hasPicks = recsData.picks && recsData.picks.length > 0;
+      if (!hasPicks) {
+        // Don't vanish on the user — show a friendly empty so the section's
+        // existence stays discoverable for future visits.
+        document.getElementById('recsExplainer').innerHTML = '';
+        document.getElementById('recsList').innerHTML =
+          '<p class="picks-empty">All caught up. Check back as the club watches new things.</p>';
+        return;
+      }
+
+      // No subtitle — keep it tight (matches the iOS app); the per-pick
+      // reason lines carry the context.
+      document.getElementById('recsExplainer').innerHTML = '';
+
+      const list = document.getElementById('recsList');
+      const hasRealUrl = (url) => url && !url.includes('/search') && !url.includes('/s?') && url !== '#';
+      list.innerHTML = recsData.picks.map((p, idx) => {
+        const networkHtml = p.network
+          ? hasRealUrl(p.network_url)
+            ? ` <span class="show-on">on</span> <a class="show-network" href="${escapeHtml(safeUrl(p.network_url))}" target="_blank" rel="noopener">${escapeHtml(p.network)}</a>`
+            : ` <span class="show-on">on</span> <span class="show-network-plain">${escapeHtml(p.network)}</span>`
+          : '';
+        const rating = p.rating
+          ? ` <span class="show-rating"><span class="star">&#9733;</span>${escapeHtml(String(p.rating))}</span>`
+          : '';
+        let reason;
+        if (recsData.cold_start) {
+          reason = p.shared_actors > 0
+            ? `${p.shared_actors} shared actor${p.shared_actors === 1 ? '' : 's'} with your shows`
+            : 'Popular in the club';
+        } else {
+          // De-named to match the iOS app — count members, don't list them.
+          const members = (p.who || []).length || p.n_neighbors || 0;
+          reason = members === 1 ? "On 1 member's list" : `On ${members} members' lists`;
+          if (p.shared_actors > 0) reason += ` &middot; ${p.shared_actors} shared actor${p.shared_actors === 1 ? '' : 's'}`;
+        }
+        return `<div class="show rec-row">
+          <div class="show-row">
+            <button class="share-btn rec-add-btn" data-rec-idx="${idx}" title="Add to my Up Next">+</button>
+            <div class="rec-info">
+              <span class="show-info"><span class="show-title">${escapeHtml(p.title)}</span>${networkHtml}${rating}</span>
+              <span class="rec-reason">${reason}</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+
+      list.querySelectorAll('.rec-add-btn').forEach(btn => {
+        btn.addEventListener('click', () => addRecToUpNext(parseInt(btn.dataset.recIdx, 10)));
+      });
+    }
+
+    async function addRecToUpNext(idx) {
+      if (!recsData || !recsData.picks[idx]) return;
+      const pick = recsData.picks[idx];
+      // Optimistic remove
+      recsData.picks.splice(idx, 1);
+      renderRecs();
+      try {
+        const res = await fetch('/api/shows', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: pick.title,
+            network: pick.network || null,
+            network_url: pick.network_url || null,
+            list: 'next',
+          }),
+        });
+        if (!res.ok && res.status !== 409) {
+          // Network/server error — restore the pick so the user can retry.
+          recsData.picks.splice(idx, 0, pick);
+          renderRecs();
+          showToast('Could not add. Try again.', { tone: 'error' });
+          return;
+        }
+        // 200/201 success or 409 (already on list, e.g. archived) — refresh main list.
+        await loadShows();
+        showToast(`Added "${pick.title}" to your Up Next`);
+      } catch (e) {
+        recsData.picks.splice(idx, 0, pick);
+        renderRecs();
+        showToast('Network error. Try again.', { tone: 'error' });
+      }
+    }
+
+    const TAB_LABELS = { watching: 'Watching', waiting: 'Waiting', recommending: 'Recommending', next: 'Up Next' };
+
+    function updateDesc() {
+      const count = shows.filter(s => s.list === currentTab).length;
+      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+      const suggestCount = shows.filter(s => s.list === 'next' && s.recommended_by && s.created_at >= weekAgo).length;
+      const lastSeen = parseInt(localStorage.getItem('suggestions_seen_count') || '0');
+      const isOwnPage = authMember && authMember === memberSlug;
+      const hasNew = isOwnPage && currentTab === 'next' && suggestCount > lastSeen;
+      const desc = SECTION_DESCS[currentTab] + ` (${count} show${count !== 1 ? 's' : ''})`;
+      const el = document.getElementById('sectionDesc');
+      if (hasNew) {
+        el.innerHTML = desc + `<br><span style="color:var(--accent);font-weight:600;">You have new suggestions from members!</span>`;
+      } else {
+        el.textContent = desc;
+      }
+    }
+
+    function updateTabCounts() {
+      document.querySelectorAll('.tab').forEach(t => {
+        t.textContent = TAB_LABELS[t.dataset.list];
+      });
+
+      // Mark suggestions as seen when viewing Up Next
+      if (currentTab === 'next') {
+        const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+        const suggestCount = shows.filter(s => s.list === 'next' && s.recommended_by && s.created_at >= weekAgo).length;
+        localStorage.setItem('suggestions_seen_count', suggestCount);
+      }
+    }
+
+    function switchTab(list) {
+      currentTab = list;
+      window.location.hash = list;
+      document.querySelectorAll('.tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.list === list);
+      });
+      updateDesc();
+      renderShows();
+      // Picks for You visibility is gated on the Up Next tab; re-evaluate
+      // each tab switch so it shows up when you arrive at Up Next from
+      // another tab (not just when you land via the #next hash).
+      renderRecs();
+    }
+
+    function renderShows() {
+      updateDesc();
+      updateTabCounts();
+      const container = document.getElementById('showList');
+      const loading = document.getElementById('loading');
+      const empty = document.getElementById('empty');
+      loading.classList.add('hidden');
+      renderRecs();
+
+      // Each list remembers its own sort. Watching and Waiting default to the
+      // "Next up" premiere date (soonest first); the others default to rating.
+      const savedSort = localStorage.getItem('sort_order_' + currentTab);
+      const dateDefaultTab = currentTab === 'waiting' || currentTab === 'watching';
+      const sortOrder = savedSort || (dateDefaultTab ? 'nextup' : 'rating');
+      const filtered = shows.filter(s => s.list === currentTab)
+        .sort((a, b) => {
+          if (sortOrder === 'alpha') return (a.title || '').localeCompare(b.title || '');
+          if (sortOrder === 'added') return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+          if (sortOrder === 'nextup') {
+            // next_season_date is ISO (YYYY-MM-DD), so a string compare is
+            // chronological; undated shows sink to the bottom, then rating.
+            const da = a.next_season_date || '9999-12-31';
+            const db = b.next_season_date || '9999-12-31';
+            if (da !== db) return da < db ? -1 : 1;
+            return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
+          }
+          return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
+        });
+      if (filtered.length === 0) {
+        container.innerHTML = '';
+        const isOwn = authMember && authMember === memberSlug;
+        empty.innerHTML = renderEmptyState(currentTab, isOwn, owners);
+        empty.classList.remove('hidden');
+        const lc = document.getElementById('listControls');
+        if (lc) lc.classList.add('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      container.innerHTML = filtered.map(show => {
+        const hasRealUrl = show.network_url && !show.network_url.includes('/search') && !show.network_url.includes('/s?') && show.network_url !== '#';
+        const network = show.network
+          ? hasRealUrl
+            ? ` <span class="show-on">on</span> <a class="show-network" href="${escapeHtml(safeUrl(show.network_url))}" target="_blank" rel="noopener">${escapeHtml(show.network)}</a>`
+            : ` <span class="show-on">on</span> <span class="show-network-plain">${escapeHtml(show.network)}</span>`
+          : '';
+        const rating = show.rating
+          ? ` <span class="show-rating"><span class="star">&#9733;</span>${escapeHtml(show.rating)}</span>`
+          : '';
+        const series = show.full_series
+          ? ' <span title="Series Complete">🎬</span>'
+          : '';
+        const movieTag = show.movie ? ' <span class="show-movie">(Movie)</span>' : '';
+
+        let alwaysMeta = '';
+        const detailOpts = {};
+        if ((currentTab === 'waiting' || currentTab === 'watching') && show.next_season_date) {
+          const seasons = seasonsText(show);
+          alwaysMeta = `<div class="show-meta">Next up: ${formatSeasonRange(show)}${seasons ? ` · ${seasons}` : ''}</div>`;
+          detailOpts.skipNextSeason = true;
+        } else if ((currentTab === 'waiting' || currentTab === 'watching') && seasonsText(show)) {
+          alwaysMeta = `<div class="show-meta">${seasonsText(show)}</div>`;
+          detailOpts.skipNextSeason = true;
+        } else if (currentTab === 'next' && show.recommended_by) {
+          alwaysMeta = `<div class="show-meta">Recommended by ${escapeHtml(show.recommended_by)}</div>`;
+          detailOpts.skipRecommender = true;
+        }
+
+        const details = buildDetailLines(show, detailOpts);
+
+        // Per-row actions. Primary quick action is always visible on your own
+        // rows when logged in; secondary actions (Edit, Archive, the second
+        // move target on Watching) live in the row's expand panel.
+        const isOwn = authMember && authMember === memberSlug;
+        let primaryAction = '';
+        let ownerActions = '';
+        if (isOwn) {
+          let pLabel = '', pTarget = '', pColorVar = '', pTitle = '';
+          if (show.list === 'watching') {
+            pLabel = 'Watched it'; pTarget = 'recommending'; pColorVar = '--list-recommending';
+            pTitle = 'Move to Recommending';
+          } else if (show.list === 'waiting') {
+            pLabel = "It's back!"; pTarget = 'watching'; pColorVar = '--list-watching';
+            pTitle = 'Move back to Watching';
+          } else if (show.list === 'recommending') {
+            pLabel = 'Watching again'; pTarget = 'watching'; pColorVar = '--list-watching';
+            pTitle = 'Move back to Watching';
+          } else if (show.list === 'next') {
+            pLabel = 'Start watching'; pTarget = 'watching'; pColorVar = '--list-watching';
+            pTitle = 'Move to Watching';
+          }
+          if (pLabel) {
+            primaryAction = `<button class="btn-row-action" style="--action-color: var(${pColorVar});" title="${pTitle}" onclick="moveShow(${show.id}, '${pTarget}')">${pLabel}</button>`;
+          }
+          const secondaryMove = show.list === 'watching'
+            ? `<button class="btn-row-secondary" title="Move to Waiting for next season" onclick="moveShow(${show.id}, 'waiting')">Season done</button>`
+            : '';
+          ownerActions = `
+            ${secondaryMove}
+            <button class="btn-row-secondary" title="Edit this show's details" onclick="openEditModal(${show.id})">Edit</button>
+            <button class="btn-row-secondary danger" title="Hide from your lists (you can bring it back any time)" onclick="archiveShow(${show.id})">Archive</button>`;
+        }
+        // Standard OS share (text, email, anything) — available on every show,
+        // mine or someone else's. Distinct from the paperplane, which sends the
+        // show into another member's list.
+        const expandedActions = `
+            <div class="show-actions-expanded">
+              <button class="btn-row-secondary" title="Share this show via text, email, or any app" onclick="shareShowExternal(${show.id})">Share</button>
+              ${ownerActions}
+            </div>`;
+
+        return `
+          <div class="show" id="row-${show.id}">
+            <div class="show-row">
+              <button class="share-btn" onclick="openShareModal(${show.id})" title="Send this show to another member" aria-label="Send this show to another member"><svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+              <span class="show-info"><span class="show-title clickable" title="Tap to see more" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${series}${movieTag}</span>
+              ${primaryAction}
+            </div>
+            ${alwaysMeta}
+            <div class="show-actors" id="actors-${show.id}">${expandedActions}${details}</div>
+          </div>`;
+      }).join('');
+
+      // Footer: legend + network counts
+      const hasFullSeries = filtered.some(s => s.full_series);
+      const networkCounts = {};
+      filtered.forEach(s => {
+        if (!s.network) return;
+        networkCounts[s.network] = (networkCounts[s.network] || 0) + 1;
+      });
+      const countsHtml = Object.entries(networkCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([n, c]) => `${n} (${c})`)
+        .join(' &middot; ');
+      const legendParts = [];
+      if (hasFullSeries) legendParts.push('🎬 Series Complete');
+      const legend = legendParts.join(' | ');
+      if (legend) container.innerHTML += `<div class="network-counts">${legend}</div>`;
+      if (countsHtml) container.innerHTML += `<div class="network-counts">${countsHtml}</div>`;
+      // Suggest only makes sense when logged in and viewing someone else's
+      // list. Share-list URL works for any list including your own.
+      const ownPage = authMember && authMember === memberSlug;
+      const suggestBtn = authMember && !ownPage
+        ? `<button class="suggest-btn" title="Suggest a new show for ${escapeHtml(owners)} to watch" onclick="openSuggestModal()">Suggest a Show for ${escapeHtml(owners)}</button>`
+        : '';
+      container.innerHTML += `<div class="suggest-bar" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;"><button class="suggest-btn" title="Copy a link to ${escapeHtml(owners)}'s lists" onclick="shareList()" style="background: var(--ink-quiet);">Share ${escapeHtml(owners)}'s Shows</button>${suggestBtn}</div>`;
+
+      const nextUpOption = dateDefaultTab
+        ? `<option value="nextup"${sortOrder === 'nextup' ? ' selected' : ''}>Sort by Next up</option>`
+        : '';
+      const sortHtml = `<select class="sort-select" onchange="changeSort(this.value)" aria-label="Sort shows">
+        ${nextUpOption}
+        <option value="rating"${sortOrder === 'rating' ? ' selected' : ''}>Sort by Rating</option>
+        <option value="alpha"${sortOrder === 'alpha' ? ' selected' : ''}>Sort A–Z</option>
+        <option value="added"${sortOrder === 'added' ? ' selected' : ''}>Sort by Date Added</option>
+      </select>`;
+      const listControls = document.getElementById('listControls');
+      if (listControls) {
+        listControls.innerHTML = sortHtml;
+        listControls.classList.remove('hidden');
+      }
+    }
+
+    function toggleExpand(showId) {
+      const panel = document.getElementById(`actors-${showId}`);
+      const row = document.getElementById(`row-${showId}`);
+      if (!panel) return;
+      const wasOpen = panel.classList.contains('visible');
+      // Collapse any other open row.
+      document.querySelectorAll('.show-actors.visible').forEach(el => el.classList.remove('visible'));
+      document.querySelectorAll('.show-row.expanded').forEach(el => el.classList.remove('expanded'));
+      if (!wasOpen) {
+        panel.classList.add('visible');
+        if (row) row.classList.add('expanded');
+      }
+    }
+
+    function openAddModal() {
+      editingId = null;
+      document.getElementById('modalTitle').textContent = 'Add Show';
+      document.getElementById('modalSave').textContent = 'Add Show';
+      document.getElementById('inputTitle').value = '';
+      document.getElementById('inputNetwork').value = '';
+      document.getElementById('inputNetworkOther').value = '';
+      document.getElementById('inputNetworkOther').style.display = 'none';
+      document.getElementById('inputRecommended').value = '';
+      document.getElementById('inputNotes').value = '';
+      document.getElementById('inputWatchingWith').value = '';
+      document.getElementById('inputMovie').checked = false;
+      document.getElementById('inputFullSeries').checked = false;
+      setSelectedList(currentTab);
+      document.getElementById('modalOverlay').classList.remove('hidden');
+      document.getElementById('inputTitle').focus();
+    }
+
+    function openEditModal(showId) {
+      const show = shows.find(s => s.id === showId);
+      if (!show) return;
+      editingId = showId;
+      document.getElementById('modalTitle').textContent = 'Edit Show';
+      document.getElementById('modalSave').textContent = 'Save Changes';
+      document.getElementById('inputTitle').value = show.title;
+      const networkSelect = document.getElementById('inputNetwork');
+      const networkOther = document.getElementById('inputNetworkOther');
+      if (show.network && !Array.from(networkSelect.options).some(o => o.value === show.network)) {
+        networkSelect.value = '__other';
+        networkOther.value = show.network;
+        networkOther.style.display = 'block';
+      } else {
+        networkSelect.value = show.network || '';
+        networkOther.value = '';
+        networkOther.style.display = 'none';
+      }
+      document.getElementById('inputRecommended').value = show.recommended_by || '';
+      document.getElementById('inputNotes').value = show.notes || '';
+      document.getElementById('inputWatchingWith').value = show.watching_with || '';
+      document.getElementById('inputMovie').checked = !!show.movie;
+      document.getElementById('inputFullSeries').checked = !!show.full_series;
+      setSelectedList(show.list);
+      document.getElementById('modalOverlay').classList.remove('hidden');
+      document.getElementById('inputTitle').focus();
+    }
+
+    function closeModal(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('modalOverlay').classList.add('hidden');
+    }
+
+
+    async function saveShow() {
+      const title = document.getElementById('inputTitle').value.trim();
+      if (!title) { showToast('Title is required', { tone: 'error' }); return; }
+      const wasEditing = !!editingId;
+
+      const body = {
+        title,
+        network: getNetwork('inputNetwork', 'inputNetworkOther'),
+        recommended_by: document.getElementById('inputRecommended').value.trim() || null,
+        notes: document.getElementById('inputNotes').value.trim() || null,
+        watching_with: document.getElementById('inputWatchingWith').value.trim() || null,
+        movie: document.getElementById('inputMovie').checked ? 1 : 0,
+        full_series: document.getElementById('inputFullSeries').checked ? 1 : 0,
+        list: getSelectedList(),
+      };
+
+      try {
+        let res;
+        if (editingId) {
+          res = await fetch(`/api/shows/${editingId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+        } else {
+          const checkRes = await fetch(`/api/shows/check?title=${encodeURIComponent(title)}&member=${memberSlug}`);
+          const check = await checkRes.json();
+          if (check.exists) {
+            if (check.archived) {
+              const restore = confirm(`"${title}" is already in the database but not on any list. Add it to ${body.list}?`);
+              if (!restore) return;
+              res = await fetch(`/api/shows/${check.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...body, archived: 0 }),
+              });
+            } else {
+              showToast(`"${title}" is already on the ${LIST_LABELS[check.list] || check.list} list.`, { tone: 'error' });
+              return;
+            }
+          } else {
+            res = await fetch('/api/shows', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            });
+          }
+        }
+        if (!res.ok) {
+          const err = await res.json();
+          if (err.error === 'exists_archived') {
+            const restore = confirm(`IMDB knows this as "${err.title}" and it's already in the database but not on any list. Add it to ${body.list}?`);
+            if (restore) {
+              res = await fetch(`/api/shows/${err.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...body, title: err.title, archived: 0 }),
+              });
+              if (!res.ok) { showToast('Failed to restore', { tone: 'error' }); return; }
+            } else { return; }
+          } else if (err.error === 'exists_active') {
+            showToast(`IMDB knows this as "${err.title}". Already on the ${LIST_LABELS[err.list] || err.list} list.`, { tone: 'error' });
+            return;
+          } else {
+            showToast(err.error || 'Failed to save', { tone: 'error' });
+            return;
+          }
+        }
+        const saved = await res.json();
+        closeModal();
+        if (editingId) {
+          const idx = shows.findIndex(s => s.id === editingId);
+          if (idx !== -1) shows[idx] = saved.show;
+        } else {
+          shows.push(saved.show);
+        }
+        renderShows();
+        showToast(wasEditing ? 'Saved changes' : `Added "${saved.show.title}"`);
+      } catch (e) {
+        showToast('Network error. Try again.', { tone: 'error' });
+      }
+    }
+
+    async function moveShow(showId, newList, opts = {}) {
+      if (!newList) return;
+      const show = shows.find(s => s.id === showId);
+      if (!show) return;
+      const oldList = show.list;
+      try {
+        const res = await fetch(`/api/shows/${showId}/move`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ list: newList }),
+        });
+        if (res.ok) {
+          show.list = newList;
+          renderShows();
+          if (!opts.silent) {
+            showToast(`Moved to ${LIST_LABELS[newList] || newList}`, {
+              action: { label: 'Undo', onClick: () => moveShow(showId, oldList, { silent: true }) },
+            });
+          }
+        } else {
+          showToast('Failed to move show', { tone: 'error' });
+        }
+      } catch (e) {
+        showToast('Network error. Try again.', { tone: 'error' });
+      }
+    }
+
+    async function archiveShow(showId) {
+      const show = shows.find(s => s.id === showId);
+      if (!show) return;
+      const savedShow = { ...show };
+      try {
+        const res = await fetch(`/api/shows/${showId}/archive`, { method: 'PUT' });
+        if (res.ok) {
+          shows = shows.filter(s => s.id !== showId);
+          renderShows();
+          showToast(`Archived "${show.title}"`, {
+            action: { label: 'Undo', onClick: () => unarchiveShow(showId, savedShow) },
+          });
+        } else {
+          showToast('Failed to archive show', { tone: 'error' });
+        }
+      } catch (e) {
+        showToast('Network error. Try again.', { tone: 'error' });
+      }
+    }
+
+    async function unarchiveShow(showId, savedShow) {
+      try {
+        const res = await fetch(`/api/shows/${showId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ archived: 0 }),
+        });
+        if (res.ok) {
+          shows.push(savedShow);
+          renderShows();
+          showToast(`Restored "${savedShow.title}"`);
+        } else {
+          showToast('Failed to restore show', { tone: 'error' });
+        }
+      } catch (e) {
+        showToast('Network error. Try again.', { tone: 'error' });
+      }
+    }
+
+    // Suggest
+    const ARCHIVED_QUIPS = [
+      "They've seen this one, but it didn't make the cut!",
+      "Been there, watched that! They moved on from this one.",
+      "They gave it a shot but it's not on their list anymore.",
+    ];
+
+    const QUIPS = {
+      watching: [
+        "Great minds think alike! They're watching this right now!",
+        "You're in sync! They're already binging this one!",
+        "Already on the screen!",
+      ],
+      waiting: [
+        "Same! They're waiting on the next season too!",
+        "They're already counting the days until the next season drops!",
+        "Join the waiting club!",
+      ],
+      recommending: [
+        "Good taste! They loved this one!",
+        "You know what's good! They'd totally recommend this too!",
+      ],
+      next: [
+        "It's already on the list! They're planning to watch this!",
+        "Someone else beat you to it. It's already queued up!",
+        "Already in the queue! Great suggestion though!",
+      ],
+    };
+
+    function getQuip(list) {
+      const q = QUIPS[list];
+      return q[Math.floor(Math.random() * q.length)];
+    }
+
+    function shareList() {
+      const url = `https://showpicker.club/${memberSlug}`;
+      const text = `Check out ${owners}'s show list on Show Picker Club: ${url}`;
+      if (navigator.share) {
+        navigator.share({ title: `${owners}'s Shows`, text, url }).catch(() => {});
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(text)
+          .then(() => showToast('Link copied to clipboard'))
+          .catch(() => prompt('Copy this link', text));
+      } else {
+        prompt('Copy this link', text);
+      }
+    }
+
+    // Hand a single show to the OS share sheet (text, email, AirDrop, any
+    // app). Prefer the real watch link so the recipient lands on the show;
+    // otherwise share the owner's club page. Falls back to clipboard, then a
+    // prompt, on browsers without the Web Share API (most desktop browsers).
+    function shareShowExternal(showId) {
+      const show = shows.find(s => s.id === showId);
+      if (!show) return;
+      const hasRealUrl = show.network_url && !show.network_url.includes('/search') && !show.network_url.includes('/s?') && show.network_url !== '#';
+      const url = hasRealUrl ? safeUrl(show.network_url) : `https://showpicker.club/${memberSlug}`;
+      const where = show.network ? ` on ${show.network}` : '';
+      const text = `Check out ${show.title}${where} — from Show Picker Club`;
+      if (navigator.share) {
+        navigator.share({ title: show.title, text, url }).catch(() => {});
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(`${text} ${url}`)
+          .then(() => showToast('Show details copied to clipboard'))
+          .catch(() => prompt('Copy this show', `${text} ${url}`));
+      } else {
+        prompt('Copy this show', `${text} ${url}`);
+      }
+    }
+
+    let searchableShows = [];
+
+    async function openSearchModal() {
+      searchMode = 'member';
+      const overlay = document.getElementById('searchOverlay');
+      document.getElementById('searchTitleInput').value = '';
+      document.getElementById('searchActorInput').value = '';
+      const titleEl = document.getElementById('appTitle');
+      const memberLabel = (titleEl && titleEl.textContent.trim()) || 'these';
+      document.getElementById('searchModalTitle').textContent = `Search ${memberLabel}`;
+      document.getElementById('searchResults').innerHTML = '<div class="search-empty">Loading…</div>';
+      overlay.classList.remove('hidden');
+
+      try {
+        const res = await fetch(`/api/shows?member=${encodeURIComponent(memberSlug)}&include_archived=1`);
+        const data = await res.json();
+        searchableShows = data.shows || [];
+        renderSearchResults();
+      } catch (e) {
+        document.getElementById('searchResults').innerHTML = '<div class="search-empty" style="color:var(--danger);">Failed to load shows.</div>';
+      }
+      setTimeout(() => document.getElementById('searchTitleInput').focus(), 50);
+    }
+
+    async function openLandingSearchModal() {
+      searchMode = 'all';
+      const overlay = document.getElementById('searchOverlay');
+      document.getElementById('searchTitleInput').value = '';
+      document.getElementById('searchActorInput').value = '';
+      document.getElementById('searchModalTitle').textContent = 'Search all libraries';
+      document.getElementById('searchResults').innerHTML = '<div class="search-empty">Loading…</div>';
+      overlay.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/shows/all');
+        const data = await res.json();
+        searchableShows = data.shows || [];
+        renderSearchResults();
+      } catch (e) {
+        document.getElementById('searchResults').innerHTML = '<div class="search-empty" style="color:var(--danger);">Failed to load shows.</div>';
+      }
+      setTimeout(() => document.getElementById('searchTitleInput').focus(), 50);
+    }
+
+    function closeSearchModal(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('searchOverlay').classList.add('hidden');
+    }
+
+    function toggleSearchExpand(showId) {
+      const el = document.getElementById(`search-actors-${showId}`);
+      if (el) el.classList.toggle('visible');
+    }
+
+    function renderSearchResults() {
+      const titleQ = document.getElementById('searchTitleInput').value.trim().toLowerCase();
+      const actorQ = document.getElementById('searchActorInput').value.trim().toLowerCase();
+      const container = document.getElementById('searchResults');
+
+      if (!titleQ && !actorQ) {
+        container.innerHTML = '<div class="search-empty">Type to search.</div>';
+        return;
+      }
+
+      const matches = searchableShows.filter(show => {
+        const titleHit = !titleQ || (show.title || '').toLowerCase().includes(titleQ);
+        const actorHit = !actorQ || actorNamesText(show.actors).toLowerCase().includes(actorQ);
+        return titleHit && actorHit;
+      });
+
+      if (matches.length === 0) {
+        const where = searchMode === 'all' ? 'across club libraries' : 'in this library';
+        container.innerHTML = `<div class="search-empty">No matches ${where}.</div>`;
+        return;
+      }
+
+      const labelFor = { watching: 'Watching', waiting: 'Waiting', recommending: 'Recommending', next: 'Up Next' };
+
+      const meta = `<div class="search-meta">${matches.length} match${matches.length === 1 ? '' : 'es'}</div>`;
+      container.innerHTML = meta + matches.map(show => {
+        const list = show.archived ? 'Archived' : (labelFor[show.list] || show.list);
+        const network = show.network ? ` <span class="show-on">on</span> <span class="show-network-plain">${escapeHtml(show.network)}</span>` : '';
+        const rating = show.rating ? ` <span class="show-rating"><span class="star">&#9733;</span>${escapeHtml(show.rating)}</span>` : '';
+        const movieTag = show.movie ? ' <span class="show-movie">(Movie)</span>' : '';
+        const series = show.full_series ? ' <span title="Series Complete">🎬</span>' : '';
+        const memberTag = searchMode === 'all'
+          ? ` · ${escapeHtml(show.member_first_name || (show.member_name || '').split(' ')[0] || show.member_slug)}`
+          : '';
+        const listLabel = `<span class="search-list-label">· ${escapeHtml(list)}${memberTag}</span>`;
+        const details = buildDetailLines(show);
+        const addBtn = searchMode === 'all'
+          ? `<button class="share-btn" data-add-idx="${show.id}" title="Add to my list">+</button>`
+          : '';
+        return `
+          <div class="show">
+            <div class="show-row">
+              ${addBtn}
+              <span class="show-info">
+                <span class="show-title clickable" title="Tap to see more" onclick="toggleSearchExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${series}${movieTag}${listLabel}
+              </span>
+            </div>
+            <div class="show-actors" id="search-actors-${show.id}">${details}</div>
+          </div>`;
+      }).join('');
+
+      if (searchMode === 'all') {
+        container.querySelectorAll('button[data-add-idx]').forEach(btn => {
+          const id = parseInt(btn.dataset.addIdx, 10);
+          btn.addEventListener('click', () => {
+            if (!authMember) {
+              showToast('Log in on your member page first to add shows', { tone: 'error' });
+              return;
+            }
+            const s = searchableShows.find(x => x.id === id);
+            if (!s) return;
+            closeSearchModal();
+            openAddMyList(s.title, s.network || '', s.network_url || '', s.movie || 0);
+          });
+        });
+      }
+    }
+
+    function openSuggestModal() {
+      if (!authMember) {
+        openLoginModal();
+        return;
+      }
+      document.getElementById('suggestName').value = editorName || authMember;
+      document.getElementById('suggestTitle').value = '';
+      document.getElementById('suggestNetwork').value = '';
+      document.getElementById('suggestNetworkOther').value = '';
+      document.getElementById('suggestNetworkOther').style.display = 'none';
+      document.getElementById('suggestNotes').value = '';
+      document.getElementById('suggestOverlay').classList.remove('hidden');
+      document.getElementById('suggestTitle').focus();
+    }
+
+    function closeSuggestModal(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('suggestOverlay').classList.add('hidden');
+    }
+
+    async function submitSuggestion() {
+      const name = document.getElementById('suggestName').value.trim();
+      const title = document.getElementById('suggestTitle').value.trim();
+      const network = getNetwork('suggestNetwork', 'suggestNetworkOther');
+      const notes = document.getElementById('suggestNotes').value.trim() || null;
+      if (!title) { showToast('Show title is required', { tone: 'error' }); return; }
+      if (!name) { showToast('Your name is required', { tone: 'error' }); return; }
+
+      try {
+        const res = await fetch('/api/suggestions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, network, recommended_by: name, notes, movie: document.getElementById('suggestMovie').checked ? 1 : 0, full_series: document.getElementById('suggestFullSeries').checked ? 1 : 0, member: memberSlug }),
+        });
+        const data = await res.json();
+        if (data.duplicate) {
+          closeSuggestModal();
+          // Quips for duplicate suggestions stay as alerts — they're playful
+          // multi-line messages that don't fit the toast format.
+          if (data.archived) {
+            alert(ARCHIVED_QUIPS[Math.floor(Math.random() * ARCHIVED_QUIPS.length)]);
+          } else {
+            alert(getQuip(data.list));
+          }
+        } else if (data.success) {
+          closeSuggestModal();
+          showToast(`Suggested to ${owners}`);
+          await loadShows();
+        } else {
+          showToast(data.error || 'Failed to send suggestion', { tone: 'error' });
+        }
+      } catch (e) {
+        showToast('Network error. Try again.', { tone: 'error' });
+      }
+    }
+
+    let allMembers = [];
+
+    async function loadMembers() {
+      if (allMembers.length > 0) return;
+      try {
+        const res = await fetch('/api/members');
+        const data = await res.json();
+        allMembers = data.members || [];
+      } catch (e) {}
+    }
+
+    let popularShowData = null;
+
+    async function openPopularShare(title, network, networkUrl, movie) {
+      if (!authMember) { openLoginModal(); return; }
+      await loadMembers();
+      popularShowData = { title, network, network_url: networkUrl, movie };
+      document.getElementById('shareShowId').value = '';
+      document.getElementById('shareTitle').value = title;
+      document.getElementById('shareNotes').value = '';
+      document.getElementById('shareName').value = editorName || authMember;
+
+      const select = document.getElementById('shareMember');
+      const label = h => h.display_name || h.first_name || h.name.split(' ')[0];
+      select.innerHTML = allMembers
+        .slice()
+        .sort((a, b) => label(a).localeCompare(label(b)))
+        .map(h => `<option value="${h.slug}">${escapeHtml(label(h) + "'s Shows")}</option>`)
+        .join('');
+
+      document.getElementById('shareOverlay').classList.remove('hidden');
+      document.getElementById('shareNotes').focus();
+    }
+
+    async function openShareModal(showId) {
+      if (!authMember) { openLoginModal(); return; }
+      await loadMembers();
+      const show = shows.find(s => s.id === showId);
+      if (!show) return;
+      document.getElementById('shareShowId').value = showId;
+      document.getElementById('shareTitle').value = show.title;
+      document.getElementById('shareNotes').value = '';
+      document.getElementById('shareName').value = editorName || authMember;
+
+      const select = document.getElementById('shareMember');
+      const label = h => h.display_name || h.first_name || h.name.split(' ')[0];
+      select.innerHTML = allMembers
+        .filter(h => h.slug !== memberSlug)
+        .sort((a, b) => label(a).localeCompare(label(b)))
+        .map(h => `<option value="${h.slug}">${escapeHtml(label(h) + "'s Shows")}</option>`)
+        .join('');
+
+      document.getElementById('shareOverlay').classList.remove('hidden');
+      document.getElementById('shareNotes').focus();
+    }
+
+    function closeShareModal(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('shareOverlay').classList.add('hidden');
+    }
+
+    async function submitShare() {
+      const showId = document.getElementById('shareShowId').value;
+      const targetMember = document.getElementById('shareMember').value;
+      const name = document.getElementById('shareName').value.trim();
+      const notes = document.getElementById('shareNotes').value.trim() || null;
+
+      if (!name) { showToast('Your name is required', { tone: 'error' }); return; }
+      if (!targetMember) { showToast('Please select a member', { tone: 'error' }); return; }
+
+      try {
+        let res, data;
+        if (popularShowData && !showId) {
+          // Adding from popular list — use suggestion endpoint
+          res = await fetch('/api/suggestions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: popularShowData.title,
+              network: popularShowData.network || null,
+              recommended_by: name,
+              notes,
+              movie: popularShowData.movie || 0,
+              full_series: 0,
+              member: targetMember,
+            }),
+          });
+          data = await res.json();
+          popularShowData = null;
+        } else {
+          // Sharing from a member list
+          res = await fetch('/api/shows/share', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              show_id: parseInt(showId),
+              source_member: memberSlug,
+              target_member: targetMember,
+              recommended_by: name,
+              notes,
+            }),
+          });
+          data = await res.json();
+        }
+        if (data.duplicate) {
+          closeShareModal();
+          // Quips for duplicate shares stay as alerts — playful messages.
+          if (data.archived) {
+            alert('They had this one but archived it. They must not be fans!');
+          } else {
+            alert(`They already have this on their "${LIST_LABELS[data.list] || data.list}" list!`);
+          }
+        } else if (data.success) {
+          closeShareModal();
+          const target = allMembers.find(h => h.slug === targetMember);
+          const targetName = target ? (target.display_name || target.first_name || target.name.split(' ')[0]) : 'their';
+          showToast(`Sent to ${targetName}'s Up Next`);
+        } else {
+          showToast(data.error || 'Failed to send', { tone: 'error' });
+        }
+      } catch (e) {
+        showToast('Network error. Try again.', { tone: 'error' });
+      }
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const [y, m, d] = dateStr.split('-');
+      return `${parseInt(m)}/${parseInt(d)}`;
+    }
+
+    let addMyListData = null;
+
+    // Popular-list "+" buttons carry their show data in data-* attributes and
+    // are wired here via delegation, so no member-supplied text is ever
+    // interpolated into an inline event handler.
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest && e.target.closest('.popular-add-btn');
+      if (!btn) return;
+      openAddMyList(
+        btn.dataset.title || '',
+        btn.dataset.network || '',
+        btn.dataset.url || '',
+        parseInt(btn.dataset.movie, 10) || 0
+      );
+    });
+
+    function openAddMyList(title, network, networkUrl, movie) {
+      addMyListData = { title, network, network_url: networkUrl, movie };
+      document.getElementById('addMyTitle').value = title;
+      document.getElementById('addMyList').value = 'watching';
+      document.getElementById('addMyNotes').value = '';
+      document.getElementById('addMyListOverlay').classList.remove('hidden');
+    }
+
+    function closeAddMyList(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('addMyListOverlay').classList.add('hidden');
+    }
+
+    async function submitAddMyList() {
+      if (!authMember || !addMyListData) return;
+      const list = document.getElementById('addMyList').value;
+      const notes = document.getElementById('addMyNotes').value.trim() || null;
+
+      try {
+        const res = await fetch('/api/shows', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: addMyListData.title,
+            network: addMyListData.network || null,
+            network_url: addMyListData.network_url || null,
+            notes,
+            movie: addMyListData.movie || 0,
+            full_series: 0,
+            list,
+          }),
+        });
+        const data = await res.json();
+        if (res.status === 409) {
+          closeAddMyList();
+          showToast(
+            data.error === 'exists_archived'
+              ? 'You had this one but archived it.'
+              : `Already on your ${LIST_LABELS[data.list] || data.list} list.`,
+            { tone: 'error' }
+          );
+        } else if (data.show) {
+          closeAddMyList();
+          showToast(`Added to your ${LIST_LABELS[list] || list} list`);
+        } else {
+          showToast(data.error || 'Failed to add', { tone: 'error' });
+        }
+      } catch (e) {
+        showToast('Network error. Try again.', { tone: 'error' });
+      }
+    }
+
+
+    function timeAgo(dateStr) {
+      const now = new Date();
+      const then = new Date(dateStr + 'Z');
+      const mins = Math.floor((now - then) / 60000);
+      if (mins < 1) return 'just now';
+      if (mins < 60) return `${mins}m ago`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return `${hrs}h ago`;
+      const days = Math.floor(hrs / 24);
+      if (days === 1) return 'yesterday';
+      if (days < 7) return `${days}d ago`;
+      return `${Math.floor(days / 7)}w ago`;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      // Encode quotes too — output is interpolated into HTML *attribute*
+      // values (href, title, data-*), where unescaped " or ' breaks out.
+      return String(str).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    // Allow only http(s) URLs into href/data attributes. Blocks javascript:,
+    // data:, and other script-bearing schemes from member-supplied network_url.
+    function safeUrl(url) {
+      if (!url || typeof url !== 'string') return '#';
+      const t = url.trim();
+      return /^https?:\/\//i.test(t) ? t : '#';
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { closeModal(); closeSuggestModal(); closeShareModal(); closeAddMyList(); }
+    });
+  </script>
+</body>
+</html>
