@@ -9,6 +9,10 @@ struct HomeView: View {
     @State private var showingSearch = false
     @State private var showAllMembers = false
     @State private var shakePick: Show?
+    @State private var path: [Route] = []
+    // Auto-open the logged-in member's own list once per launch. Tracked so
+    // tapping Back to Home doesn't immediately bounce them forward again.
+    @State private var didAutoOpen = false
 
     private let memberPreviewCount = 6
 
@@ -19,7 +23,7 @@ struct HomeView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 HStack {
                     Text("Show Picker Club")
@@ -118,7 +122,22 @@ struct HomeView: View {
                 ShakePickView(show: pick).environmentObject(auth)
             }
             .onShake { Task { await handleShake() } }
+            // Auth may resolve after the member list loads (they refresh
+            // concurrently at launch), so react to whichever lands last.
+            .onChange(of: auth.memberSlug) { _, _ in maybeAutoOpen() }
         }
+    }
+
+    // On first launch, drop a logged-in member straight onto their own list.
+    // Needs both the member list and the session resolved, and only fires once
+    // (and only when the stack is still at Home) so it never traps the user.
+    @MainActor
+    private func maybeAutoOpen() {
+        guard !didAutoOpen, path.isEmpty,
+              let slug = auth.memberSlug,
+              let me = members.first(where: { $0.slug == slug }) else { return }
+        didAutoOpen = true
+        path = [.member(me)]
     }
 
     // Easter egg: a shake surfaces a random show from the logged-in member's
@@ -200,6 +219,7 @@ struct HomeView: View {
             return ($0.lastActivityAt ?? "") > ($1.lastActivityAt ?? "")
         }
         popular = pr
+        maybeAutoOpen()
     }
 }
 

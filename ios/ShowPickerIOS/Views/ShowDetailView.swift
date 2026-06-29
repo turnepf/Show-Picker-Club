@@ -123,6 +123,15 @@ struct ShowDetailView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // Standard iOS share sheet — text, mail, AirDrop, anything the
+            // user has. Shares a watch link (or the club page) plus a blurb.
+            ToolbarItem(placement: .topBarTrailing) {
+                ShareLink(item: shareURL,
+                          subject: Text(title),
+                          message: Text(shareText)) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+            }
             if isMine {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Edit") { showingEdit = true }
@@ -146,6 +155,23 @@ struct ShowDetailView: View {
                presenting: addAlert) { _ in
             Button("OK", role: .cancel) { }
         } message: { Text($0.message) }
+    }
+
+    // What the share sheet hands off. Prefer a real deep link so the
+    // recipient lands on the show itself; otherwise fall back to the
+    // owner's club page so the link still goes somewhere useful.
+    private var shareURL: URL {
+        if let u = show?.networkUrl, isRealUrl(u), let url = URL(string: u) {
+            return url
+        }
+        let slug = show?.memberSlug ?? ""
+        return URL(string: "https://showpicker.club/\(slug)")
+            ?? URL(string: "https://showpicker.club")!
+    }
+
+    private var shareText: String {
+        let place = (network.map { " on \($0)" }) ?? ""
+        return "Check out \(title)\(place) — from Show Picker Club"
     }
 
     private func isRealUrl(_ u: String) -> Bool {
