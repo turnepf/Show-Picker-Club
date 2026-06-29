@@ -10,7 +10,7 @@ struct ShowPickerIOSApp: App {
             HomeView()
                 .environmentObject(auth)
                 .task {
-                    await Connectivity.shared.start()
+                    Connectivity.shared.start()
                     await auth.refresh()
                     // Drain anything queued while the app was closed/offline.
                     await OfflineQueue.shared.flush()
