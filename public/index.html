@@ -1114,7 +1114,10 @@
     const slug = path.substring(1); // remove leading /
 
     if (!slug) {
-      showLanding();
+      // Opening the site root: logged-in members go straight to their own
+      // list; logged-out visitors get the landing/discovery page. We check
+      // auth before rendering so there's no flash of the landing page.
+      landingOrMyList();
     } else {
       resolveSlug(slug).then(resolved => {
         if (resolved) {
@@ -1126,6 +1129,20 @@
           showLanding();
         }
       });
+    }
+
+    async function landingOrMyList() {
+      try {
+        const res = await fetch('/auth/check');
+        const data = await res.json();
+        if (data.authenticated && data.member) {
+          // replace(), not assign(), so Back doesn't bounce to / and
+          // immediately redirect again — it skips straight past the root.
+          window.location.replace('/' + data.member);
+          return;
+        }
+      } catch (e) {}
+      showLanding();
     }
 
     async function resolveSlug(raw) {
@@ -1846,7 +1863,7 @@
         // move target on Watching) live in the row's expand panel.
         const isOwn = authMember && authMember === memberSlug;
         let primaryAction = '';
-        let expandedActions = '';
+        let ownerActions = '';
         if (isOwn) {
           let pLabel = '', pTarget = '', pColorVar = '', pTitle = '';
           if (show.list === 'watching') {
@@ -1868,13 +1885,19 @@
           const secondaryMove = show.list === 'watching'
             ? `<button class="btn-row-secondary" title="Move to Waiting for next season" onclick="moveShow(${show.id}, 'waiting')">Season done</button>`
             : '';
-          expandedActions = `
-            <div class="show-actions-expanded">
-              ${secondaryMove}
-              <button class="btn-row-secondary" title="Edit this show's details" onclick="openEditModal(${show.id})">Edit</button>
-              <button class="btn-row-secondary danger" title="Hide from your lists (you can bring it back any time)" onclick="archiveShow(${show.id})">Archive</button>
-            </div>`;
+          ownerActions = `
+            ${secondaryMove}
+            <button class="btn-row-secondary" title="Edit this show's details" onclick="openEditModal(${show.id})">Edit</button>
+            <button class="btn-row-secondary danger" title="Hide from your lists (you can bring it back any time)" onclick="archiveShow(${show.id})">Archive</button>`;
         }
+        // Standard OS share (text, email, anything) — available on every show,
+        // mine or someone else's. Distinct from the paperplane, which sends the
+        // show into another member's list.
+        const expandedActions = `
+            <div class="show-actions-expanded">
+              <button class="btn-row-secondary" title="Share this show via text, email, or any app" onclick="shareShowExternal(${show.id})">Share</button>
+              ${ownerActions}
+            </div>`;
 
         return `
           <div class="show" id="row-${show.id}">
@@ -2188,6 +2211,28 @@
           .catch(() => prompt('Copy this link', text));
       } else {
         prompt('Copy this link', text);
+      }
+    }
+
+    // Hand a single show to the OS share sheet (text, email, AirDrop, any
+    // app). Prefer the real watch link so the recipient lands on the show;
+    // otherwise share the owner's club page. Falls back to clipboard, then a
+    // prompt, on browsers without the Web Share API (most desktop browsers).
+    function shareShowExternal(showId) {
+      const show = shows.find(s => s.id === showId);
+      if (!show) return;
+      const hasRealUrl = show.network_url && !show.network_url.includes('/search') && !show.network_url.includes('/s?') && show.network_url !== '#';
+      const url = hasRealUrl ? safeUrl(show.network_url) : `https://showpicker.club/${memberSlug}`;
+      const where = show.network ? ` on ${show.network}` : '';
+      const text = `Check out ${show.title}${where} — from Show Picker Club`;
+      if (navigator.share) {
+        navigator.share({ title: show.title, text, url }).catch(() => {});
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(`${text} ${url}`)
+          .then(() => showToast('Show details copied to clipboard'))
+          .catch(() => prompt('Copy this show', `${text} ${url}`));
+      } else {
+        prompt('Copy this show', `${text} ${url}`);
       }
     }
 
