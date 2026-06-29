@@ -663,7 +663,7 @@
     <header>
       <div class="header-top">
         <div class="header-actions">
-          <a href="/" style="color: rgba(255,255,255,0.85); text-decoration: none; font-size: 24px; line-height: 1; padding: 6px 10px; margin: -6px 0 -6px -10px; border-radius: 6px;" title="All members" aria-label="Back to all members">&#9664;</a>
+          <a href="/classic" style="color: rgba(255,255,255,0.85); text-decoration: none; font-size: 24px; line-height: 1; padding: 6px 10px; margin: -6px 0 -6px -10px; border-radius: 6px;" title="All members" aria-label="Back to all members">&#9664;</a>
           <button class="btn btn-search" id="searchBtn" title="Search this member's shows" onclick="openSearchModal()">Search</button>
         </div>
         <div class="header-actions">
@@ -1119,8 +1119,11 @@
       next: "Shows that have been recommended but we haven't watched.",
     };
 
-    // Determine if we're on landing page or member page
-    const path = window.location.pathname.replace(/\/$/, '');
+    // Under /classic the whole app is namespaced so it stays a self-contained
+    // fallback (the old UI) while the new iOS-style UI owns the bare paths.
+    const BASE = window.location.pathname.startsWith('/classic') ? '/classic' : '';
+    let path = window.location.pathname.replace(/\/$/, '');
+    if (BASE && path.startsWith(BASE)) path = path.slice(BASE.length);
     const slug = path.substring(1); // remove leading /
 
     if (!slug) {
@@ -1135,7 +1138,7 @@
         } else {
           // Slug doesn't match any member even after sanitizing. Fall back to
           // the landing page rather than rendering a confusing blank profile.
-          history.replaceState(null, '', '/');
+          history.replaceState(null, '', BASE + '/');
           showLanding();
         }
       });
@@ -1148,7 +1151,7 @@
         if (data.authenticated && data.member) {
           // replace(), not assign(), so Back doesn't bounce to / and
           // immediately redirect again — it skips straight past the root.
-          window.location.replace('/' + data.member);
+          window.location.replace(BASE + '/' + data.member);
           return;
         }
       } catch (e) {}
@@ -1170,7 +1173,7 @@
         const hit = (data.members || []).find(m => m.slug === cleaned);
         if (!hit) return null;
         if (cleaned !== raw) {
-          history.replaceState(null, '', '/' + cleaned);
+          history.replaceState(null, '', BASE + '/' + cleaned);
         }
         return cleaned;
       } catch {
@@ -1193,7 +1196,7 @@
         const jump = document.getElementById('memberJump');
         jump.innerHTML = '<option value="">Pick a member&hellip;</option>' +
           sorted.map(h =>
-            `<option value="/${escapeHtml(h.slug)}">${escapeHtml(h.display_name || h.first_name || (h.name || '').split(' ')[0])}</option>`
+            `<option value="${BASE}/${escapeHtml(h.slug)}">${escapeHtml(h.display_name || h.first_name || (h.name || '').split(' ')[0])}</option>`
           ).join('');
       } catch (e) {
         const jump = document.getElementById('memberJump');
@@ -1377,7 +1380,7 @@
           // Show "My Shows" link on landing page
           const myShowsLink = document.getElementById('myShowsLink');
           if (myShowsLink && authMember) {
-            myShowsLink.href = `/${authMember}`;
+            myShowsLink.href = `${BASE}/${authMember}`;
             myShowsLink.classList.remove('hidden');
           }
           // On the user's own member page, expose the Add button immediately —
@@ -1405,7 +1408,7 @@
       // Already logged in and clicked Log in from the landing page → go
       // straight to their own member page.
       if (authMember && !memberSlug) {
-        window.location.href = '/' + authMember;
+        window.location.href = BASE + '/' + authMember;
         return;
       }
       // Logged-in users on a member page never see the login button (it
@@ -1621,7 +1624,7 @@
         // member route), drop the user on their own page so the login feels
         // like "go to my shows" rather than just "you're now authenticated".
         if (!memberSlug && authMember) {
-          window.location.href = '/' + authMember;
+          window.location.href = BASE + '/' + authMember;
           return;
         }
         updateLoginBtnLabel();
