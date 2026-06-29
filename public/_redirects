@@ -2,4 +2,6 @@
 /dorothy/  /whitt  301
 /setup    /admin  301
 /requests /admin  301
+/classic    /classic.html  200
+/classic/*  /classic.html  200
 /*  /index.html  200

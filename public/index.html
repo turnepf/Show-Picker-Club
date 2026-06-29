@@ -613,6 +613,173 @@
     .rec-row .rec-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
     .rec-reason { font-size: 11px; color: var(--ink-quiet); margin-top: 2px; }
   </style>
+  <!-- ===========================================================
+       iOS-style theme. Mirrors the native app: nav-bar header,
+       segmented list control, inset-grouped cards, a pushed show
+       detail screen, and bottom-sheet modals. Layered after the
+       base styles so it overrides them without touching the JS or
+       element ids the app relies on.
+       =========================================================== -->
+  <style id="ios-theme">
+    body { background: var(--surface-2); }
+
+    /* Nav-bar header ------------------------------------------------ */
+    header {
+      padding: 8px 12px 10px;
+      padding-top: calc(8px + env(safe-area-inset-top, 0px));
+    }
+    .header-top { min-height: 34px; }
+    .header-title { font-size: 17px; font-weight: 600; margin: 6px 0 10px; }
+    .btn { border-radius: 9px; }
+    .btn-add { border-radius: 9px; padding: 5px 11px; }
+
+    /* Segmented control (the four lists) ---------------------------- */
+    .tabs {
+      gap: 2px;
+      background: rgba(255,255,255,0.14);
+      padding: 3px;
+      border-radius: 10px;
+    }
+    .tab {
+      border: none !important;
+      border-radius: 7px;
+      padding: 7px 4px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.72);
+      background: transparent;
+    }
+    .tab:hover { background: rgba(255,255,255,0.08); color: #fff; }
+    .tab.active,
+    .tab.active[data-list="watching"],
+    .tab.active[data-list="waiting"],
+    .tab.active[data-list="recommending"],
+    .tab.active[data-list="next"] {
+      background: #fff !important;
+      color: var(--ink) !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+    }
+
+    /* Inset-grouped content ---------------------------------------- */
+    main {
+      background: transparent;
+      box-shadow: none;
+      border-radius: 0;
+      padding: 14px 14px 44px;
+    }
+    @media (max-width: 600px) { main { margin: 8px auto 32px; padding: 12px 12px 32px; } }
+
+    .show-list {
+      background: var(--surface);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px oklch(0.18 0.03 50 / 0.06);
+    }
+    .show-list:empty { display: none; }
+    .show { border-bottom: 1px solid var(--border-soft); }
+    .show-row { padding: 12px 14px; align-items: center; }
+
+    /* Row title becomes a tappable disclosure into the detail screen. */
+    .show-title.clickable { text-decoration: none; }
+    .show-title.clickable .chev { display: none; }
+    .show-title.clickable::after {
+      content: "\203A";
+      color: var(--ink-faint);
+      margin-left: 6px;
+      font-weight: 600;
+    }
+    .show-meta { padding-left: 14px; }
+    .show-actors { padding-left: 14px; }
+
+    /* Recs + popular read as their own grouped cards. */
+    .recs-section {
+      background: var(--surface);
+      border-radius: 14px;
+      border-bottom: none;
+      padding: 14px 14px 12px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 3px oklch(0.18 0.03 50 / 0.06);
+    }
+    #popularList.show-list, #recsList.show-list { box-shadow: none; }
+
+    /* Show detail screen (pushed over everything) ------------------- */
+    #detailPage {
+      position: fixed; inset: 0;
+      background: var(--surface-2);
+      z-index: 250;
+      overflow-y: auto;
+      display: none;
+    }
+    #detailPage.open { display: block; animation: detail-in 0.24s ease-out; }
+    @keyframes detail-in { from { transform: translateX(14px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .detail-nav {
+      position: sticky; top: 0;
+      display: flex; align-items: center; gap: 6px;
+      background: var(--header-bg); color: #fff;
+      padding: 10px 12px;
+      padding-top: calc(10px + env(safe-area-inset-top, 0px));
+      z-index: 1;
+    }
+    .detail-nav button {
+      background: none; border: none; color: #fff;
+      font: inherit; font-size: 16px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 4px 6px; margin-left: -6px;
+    }
+    .detail-nav .detail-nav-title {
+      font-weight: 600; font-size: 16px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .detail-body { max-width: 640px; margin: 16px auto 60px; padding: 0 14px; }
+    .detail-card {
+      background: var(--surface);
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px oklch(0.18 0.03 50 / 0.06);
+    }
+    .detail-card-title {
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.04em; color: var(--ink-quiet);
+      padding: 14px 16px 4px;
+    }
+    .detail-row {
+      display: flex; justify-content: space-between; gap: 14px;
+      padding: 11px 16px;
+      border-top: 1px solid var(--border-soft);
+      font-size: 14px;
+    }
+    .detail-card .detail-row:first-of-type,
+    .detail-card-title + .detail-row { border-top: none; }
+    .detail-row .k { color: var(--ink-muted); flex: 0 0 auto; }
+    .detail-row .v { color: var(--ink); text-align: right; min-width: 0; }
+    .detail-row .v a { color: var(--info); text-decoration: none; }
+    .detail-prose { padding: 12px 16px; font-size: 14px; color: var(--ink-muted); line-height: 1.5; }
+    .detail-action {
+      display: block; width: 100%; box-sizing: border-box;
+      text-align: center; padding: 13px 16px;
+      background: var(--surface); border: none;
+      border-top: 1px solid var(--border-soft);
+      color: var(--accent-hover); font-size: 15px; font-weight: 600;
+      font-family: inherit; cursor: pointer;
+    }
+    .detail-card .detail-action:first-child { border-top: none; }
+    .detail-action:hover { background: var(--accent-soft); }
+    .detail-action.danger { color: var(--danger-deep); }
+    .detail-action.danger:hover { background: var(--danger-soft); }
+
+    /* Bottom-sheet modals ------------------------------------------ */
+    .modal-overlay { align-items: flex-end; }
+    .modal {
+      width: 100%;
+      max-width: 540px;
+      border-radius: 18px 18px 0 0;
+      padding-bottom: max(24px, env(safe-area-inset-bottom, 24px));
+    }
+    @media (min-width: 600px) {
+      .modal-overlay { align-items: center; }
+      .modal { border-radius: 16px; }
+    }
+  </style>
 </head>
 <body>
 
@@ -652,6 +819,7 @@
 
       <footer style="padding: 24px 0 20px; font-size: 12px; color: var(--ink-quiet); text-align: center;">
         &copy; 2025 Patrick Turner.
+        <a href="/classic" style="margin-left: 10px; color: var(--ink-quiet);">Classic view</a>
         <a id="adminLink" href="/admin" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Admin</a>
         <a id="joinLink" href="/join" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Join link</a>
       </footer>
@@ -703,10 +871,20 @@
 
     <footer style="text-align: center; padding: 24px 16px 32px; font-size: 12px; color: var(--ink-quiet);">
       &copy; 2025 Patrick Turner.
+      <a href="/classic" style="margin-left: 10px; color: var(--ink-quiet);">Classic view</a>
       <a class="admin-link" href="/admin" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Admin</a>
       <a class="admin-link" href="/join" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Join link</a>
     </footer>
 
+  </div>
+
+  <!-- Show detail screen — iOS-style pushed view, opened by tapping a show. -->
+  <div id="detailPage">
+    <div class="detail-nav">
+      <button onclick="closeDetail()" aria-label="Back">&#8249; Back</button>
+      <span class="detail-nav-title" id="detailNavTitle"></span>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
   </div>
 
   <!-- Add/Edit Modal -->
@@ -2661,6 +2839,157 @@
 
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') { closeModal(); closeSuggestModal(); closeShareModal(); closeAddMyList(); }
+    });
+  </script>
+
+  <!-- ===========================================================
+       iOS-style show detail screen. Tapping any show (member list,
+       popular, or picks) pushes this view instead of expanding the
+       row inline, mirroring the native ShowDetailView. Reuses the
+       existing globals (shows, authMember, moveShow, archiveShow,
+       openEditModal, openShareModal, showToast, safeUrl, …).
+       =========================================================== -->
+  <script>
+    let detailShow = null;
+
+    // Repoint the old inline-expand entry point at the detail screen so every
+    // existing onclick="toggleExpand(id)" now opens the pushed view.
+    function toggleExpand(id) { openDetail(id); }
+
+    function detailRealUrl(url) {
+      return !!url && !url.includes('/search') && !url.includes('/s?')
+        && !url.includes('?q=') && !url.includes('?query=') && url !== '#';
+    }
+
+    function detailRow(k, v) {
+      return `<div class="detail-row"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+    }
+
+    function detailPromotions(list) {
+      if (list === 'watching') return [{ label: 'Watched it → Recommending', target: 'recommending' }, { label: 'Season done → Waiting', target: 'waiting' }];
+      if (list === 'waiting') return [{ label: "It's back → Watching", target: 'watching' }];
+      if (list === 'recommending') return [{ label: 'Watch again → Watching', target: 'watching' }];
+      if (list === 'next') return [{ label: 'Start watching', target: 'watching' }];
+      return [];
+    }
+
+    async function openDetail(id) {
+      const page = document.getElementById('detailPage');
+      const body = document.getElementById('detailBody');
+      document.getElementById('detailNavTitle').textContent = '';
+      body.innerHTML = '<div class="loading">Loading…</div>';
+      page.classList.add('open');
+      document.body.style.overflow = 'hidden';
+
+      let show = (typeof shows !== 'undefined' && shows.find) ? shows.find(s => s.id === id) : null;
+      try {
+        const res = await fetch('/api/shows/' + id);
+        if (res.ok) { const d = await res.json(); if (d.show) show = d.show; }
+      } catch {}
+      if (!show) { body.innerHTML = '<div class="loading">Couldn’t load this show.</div>'; return; }
+
+      let actors = [];
+      try {
+        const ar = await fetch('/api/shows/' + id + '/actors');
+        if (ar.ok) { const ad = await ar.json(); actors = ad.actors || []; }
+      } catch {}
+      renderDetail(show, actors);
+    }
+
+    function renderDetail(show, actors) {
+      detailShow = show;
+      document.getElementById('detailNavTitle').textContent = show.title;
+      const isOwn = authMember && show.member_slug && authMember === show.member_slug;
+      const loggedIn = !!authMember;
+      const realUrl = detailRealUrl(show.network_url);
+
+      const rows = [detailRow('Title', escapeHtml(show.title))];
+      if (show.network) {
+        rows.push(detailRow('Network', realUrl
+          ? `<a href="${safeUrl(show.network_url)}" target="_blank" rel="noopener">${escapeHtml(show.network)}</a>`
+          : escapeHtml(show.network)));
+      }
+      if (show.rating) rows.push(detailRow('Rating', `★ ${escapeHtml(show.rating)}`));
+      rows.push(detailRow('List', LIST_LABELS[show.list] || show.list));
+      if (show.movie) rows.push(detailRow('Type', 'Movie'));
+      if (show.full_series) rows.push(detailRow('Series', 'Complete'));
+      if (show.genres) rows.push(detailRow('Genres', escapeHtml(show.genres)));
+      if (show.recommended_by) rows.push(detailRow('Recommended by', escapeHtml(show.recommended_by)));
+      if (show.watching_with) rows.push(detailRow('Watching with', escapeHtml(show.watching_with)));
+      if (show.next_season_date) rows.push(detailRow('Next up', escapeHtml(formatSeasonRange(show))));
+      if (seasonsText(show)) rows.push(detailRow('Seasons', escapeHtml(seasonsText(show))));
+
+      let html = `<div class="detail-card">${rows.join('')}</div>`;
+      if (show.notes) html += `<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-prose">${escapeHtml(show.notes)}</div></div>`;
+      if (actors.length) {
+        html += `<div class="detail-card"><div class="detail-card-title">Cast</div><div class="detail-prose">${actors.map(a => escapeHtml(a.name)).join(', ')}</div></div>`;
+      }
+
+      const actions = [];
+      if (realUrl) actions.push(`<a class="detail-action" href="${safeUrl(show.network_url)}" target="_blank" rel="noopener">▶ Watch on ${escapeHtml(show.network || 'streaming')}</a>`);
+      if (isOwn) {
+        detailPromotions(show.list).forEach(p =>
+          actions.push(`<button class="detail-action" onclick="detailMove(${show.id}, '${p.target}')">${escapeHtml(p.label)}</button>`));
+        actions.push(`<button class="detail-action" onclick="detailEdit(${show.id})">Edit</button>`);
+        actions.push(`<button class="detail-action danger" onclick="detailArchive(${show.id})">Archive</button>`);
+      } else if (loggedIn) {
+        actions.push(`<button class="detail-action" onclick="detailAddToMine()">Add to my Up Next</button>`);
+      }
+      const canSend = loggedIn && show.member_slug && typeof shows !== 'undefined' && shows.find && shows.find(s => s.id === show.id);
+      if (canSend) actions.push(`<button class="detail-action" onclick="detailSend(${show.id})">Send to a member</button>`);
+      actions.push(`<button class="detail-action" onclick="detailShare()">Share</button>`);
+      html += `<div class="detail-card">${actions.join('')}</div>`;
+
+      document.getElementById('detailBody').innerHTML = html;
+    }
+
+    function closeDetail() {
+      document.getElementById('detailPage').classList.remove('open');
+      document.body.style.overflow = '';
+      detailShow = null;
+    }
+
+    function detailMove(id, target) {
+      try { moveShow(id, target); } catch {}
+      closeDetail();
+    }
+    function detailEdit(id) { closeDetail(); openEditModal(id); }
+    function detailArchive(id) {
+      try { archiveShow(id); } catch {}
+      closeDetail();
+    }
+    function detailSend(id) { closeDetail(); openShareModal(id); }
+
+    async function detailAddToMine() {
+      if (!detailShow || !authMember) return;
+      const s = detailShow;
+      try {
+        const res = await fetch('/api/shows', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: s.title, network: s.network || null, network_url: s.network_url || null,
+                                 list: 'next', movie: s.movie || 0, full_series: s.full_series || 0 }),
+        });
+        if (res.status === 409) showToast('Already on one of your lists');
+        else if (res.ok) showToast('Added to your Up Next');
+        else showToast("Couldn’t add", { tone: 'error' });
+      } catch { showToast('Network error', { tone: 'error' }); }
+    }
+
+    function detailShare() {
+      if (!detailShow) return;
+      const s = detailShow;
+      const url = detailRealUrl(s.network_url) ? safeUrl(s.network_url)
+        : (s.member_slug ? `https://showpicker.club/${s.member_slug}` : 'https://showpicker.club');
+      const where = s.network ? ` on ${s.network}` : '';
+      const text = `Check out ${s.title}${where} — from Show Picker Club`;
+      if (navigator.share) navigator.share({ title: s.title, text, url }).catch(() => {});
+      else if (navigator.clipboard) navigator.clipboard.writeText(`${text} ${url}`)
+        .then(() => showToast('Show details copied to clipboard')).catch(() => prompt('Copy this show', `${text} ${url}`));
+      else prompt('Copy this show', `${text} ${url}`);
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('detailPage').classList.contains('open')) closeDetail();
     });
   </script>
 </body>
