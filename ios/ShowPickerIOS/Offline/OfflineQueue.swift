@@ -318,7 +318,8 @@ private extension Show {
         Show(id: id, title: title, network: network, networkUrl: networkUrl,
              recommendedBy: recommendedBy, rating: rating, list: list, notes: notes,
              movie: movie, fullSeries: fullSeries, watchingWith: watchingWith,
-             nextSeasonDate: nextSeasonDate, seasonEndDate: seasonEndDate, genres: genres,
+             nextSeasonDate: nextSeasonDate, seasonEndDate: seasonEndDate,
+             seasonsReleased: seasonsReleased, genres: genres,
              actors: actors, archived: archived, memberSlug: memberSlug, createdAt: createdAt)
     }
 
@@ -326,7 +327,8 @@ private extension Show {
         Show(id: id, title: title, network: network, networkUrl: networkUrl,
              recommendedBy: recommendedBy, rating: rating, list: list, notes: notes,
              movie: movie, fullSeries: fullSeries, watchingWith: watchingWith,
-             nextSeasonDate: nextSeasonDate, seasonEndDate: seasonEndDate, genres: genres,
+             nextSeasonDate: nextSeasonDate, seasonEndDate: seasonEndDate,
+             seasonsReleased: seasonsReleased, genres: genres,
              actors: actors, archived: archived ? 1 : 0, memberSlug: memberSlug, createdAt: createdAt)
     }
 }
