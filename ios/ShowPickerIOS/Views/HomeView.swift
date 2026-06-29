@@ -110,6 +110,8 @@ struct HomeView: View {
                     MemberView(member: m)
                 case .detail(let id, let title, let network, let rating):
                     ShowDetailView(id: id, initialTitle: title, initialNetwork: network, initialRating: rating)
+                case .whatsNew:
+                    WhatsNewView()
                 }
             }
             .sheet(isPresented: $showingLogin) {
@@ -159,6 +161,11 @@ struct HomeView: View {
         Group {
             if auth.isLoggedIn {
                 Menu {
+                    Button {
+                        path.append(.whatsNew)
+                    } label: {
+                        Label("What's New", systemImage: "sparkles")
+                    }
                     Button(role: .destructive) {
                         Task { await auth.logout() }
                     } label: {
@@ -227,4 +234,5 @@ struct HomeView: View {
 enum Route: Hashable {
     case member(Member)
     case detail(id: Int, title: String, network: String?, rating: String?)
+    case whatsNew
 }

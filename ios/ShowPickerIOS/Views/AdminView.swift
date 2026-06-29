@@ -25,6 +25,11 @@ struct AdminView: View {
                     Label("Create member", systemImage: "person.badge.plus")
                 }
                 NavigationLink {
+                    ManageMembersView()
+                } label: {
+                    Label("Manage members", systemImage: "person.2.badge.gearshape")
+                }
+                NavigationLink {
                     SignupRequestsView()
                 } label: {
                     Label("Signup requests", systemImage: "tray.and.arrow.down")
@@ -55,6 +60,11 @@ struct AdminView: View {
                     UrlCleanupView()
                 } label: {
                     Label("URL cleanup & titles", systemImage: "link.badge.plus")
+                }
+                NavigationLink {
+                    VibeAdminView()
+                } label: {
+                    Label("Vibe trait scoring", systemImage: "sparkles")
                 }
             }
         }
