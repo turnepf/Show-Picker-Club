@@ -140,10 +140,44 @@ body.admin-page { padding: 32px 16px 80px; }
 .admin-card {
   background: var(--surface);
   padding: 16px 18px;
+  border-radius: 14px;
+  border: none;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 14px;
+}
+
+/* iOS-leaning chrome for the operator pages, so they match the native
+   app's grouped-card look: rounded inputs/buttons, a touch more air, and
+   soft elevated cards. Scoped to .admin-page so it can't reach the main
+   app's own components. */
+body.admin-page {
+  background: var(--surface-2);
+  font-size: 15px;
+}
+.admin-page input,
+.admin-page select,
+.admin-page textarea {
   border-radius: 10px;
   border: 1px solid var(--border-soft);
-  margin-bottom: 12px;
+  padding: 10px 12px;
+  font-size: 15px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--ink);
 }
+.admin-page input:focus,
+.admin-page select:focus,
+.admin-page textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+.admin-page button {
+  border-radius: 10px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.admin-title { font-size: var(--text-xl); }
 
 /*
  * Dark mode — a warm night reading-light, not cold glass. The neutrals keep
