@@ -1053,7 +1053,11 @@
       if (!opts.aggregate) {
         if (show.recommended_by && !opts.skipRecommender) lines.push(`Recommended by ${escapeHtml(show.recommended_by)}`);
         if (show.next_season_date && !opts.skipNextSeason) {
-          lines.push(`Next up: ${formatSeasonRange(show)}`);
+          const seasons = seasonsText(show);
+          lines.push(`Next up: ${formatSeasonRange(show)}${seasons ? ` · ${seasons}` : ''}`);
+        } else if (!opts.skipNextSeason && seasonsText(show)) {
+          // No upcoming date but we know the total — still worth showing.
+          lines.push(seasonsText(show));
         }
         if (show.watching_with) lines.push(`Watching with ${escapeHtml(show.watching_with)}`);
         if (show.notes) lines.push(escapeHtml(show.notes));
@@ -1065,6 +1069,12 @@
       const start = formatDate(show.next_season_date);
       const end = show.season_end_date ? formatDate(show.season_end_date) : null;
       return end && end !== start ? `${start} – ${end}` : start;
+    }
+
+    // "3 seasons" / "1 season" — total seasons released so far, when known.
+    function seasonsText(show) {
+      const n = show.seasons_released;
+      return (typeof n === 'number' && n > 0) ? `${n} season${n === 1 ? '' : 's'}` : null;
     }
 
     document.getElementById('inputNetwork').addEventListener('change', function() {
@@ -1849,7 +1859,11 @@
         let alwaysMeta = '';
         const detailOpts = {};
         if ((currentTab === 'waiting' || currentTab === 'watching') && show.next_season_date) {
-          alwaysMeta = `<div class="show-meta">Next up: ${formatSeasonRange(show)}</div>`;
+          const seasons = seasonsText(show);
+          alwaysMeta = `<div class="show-meta">Next up: ${formatSeasonRange(show)}${seasons ? ` · ${seasons}` : ''}</div>`;
+          detailOpts.skipNextSeason = true;
+        } else if ((currentTab === 'waiting' || currentTab === 'watching') && seasonsText(show)) {
+          alwaysMeta = `<div class="show-meta">${seasonsText(show)}</div>`;
           detailOpts.skipNextSeason = true;
         } else if (currentTab === 'next' && show.recommended_by) {
           alwaysMeta = `<div class="show-meta">Recommended by ${escapeHtml(show.recommended_by)}</div>`;
