@@ -2087,7 +2087,6 @@
         // show into another member's list.
         const expandedActions = `
             <div class="show-actions-expanded">
-              <button class="btn-row-secondary" title="Share this show via text, email, or any app" onclick="shareShowExternal(${show.id})">Share</button>
               ${ownerActions}
             </div>`;
 
@@ -2403,28 +2402,6 @@
           .catch(() => prompt('Copy this link', text));
       } else {
         prompt('Copy this link', text);
-      }
-    }
-
-    // Hand a single show to the OS share sheet (text, email, AirDrop, any
-    // app). Prefer the real watch link so the recipient lands on the show;
-    // otherwise share the owner's club page. Falls back to clipboard, then a
-    // prompt, on browsers without the Web Share API (most desktop browsers).
-    function shareShowExternal(showId) {
-      const show = shows.find(s => s.id === showId);
-      if (!show) return;
-      const hasRealUrl = show.network_url && !show.network_url.includes('/search') && !show.network_url.includes('/s?') && show.network_url !== '#';
-      const url = hasRealUrl ? safeUrl(show.network_url) : `https://showpicker.club/${memberSlug}`;
-      const where = show.network ? ` on ${show.network}` : '';
-      const text = `Check out ${show.title}${where} — from Show Picker Club`;
-      if (navigator.share) {
-        navigator.share({ title: show.title, text, url }).catch(() => {});
-      } else if (navigator.clipboard) {
-        navigator.clipboard.writeText(`${text} ${url}`)
-          .then(() => showToast('Show details copied to clipboard'))
-          .catch(() => prompt('Copy this show', `${text} ${url}`));
-      } else {
-        prompt('Copy this show', `${text} ${url}`);
       }
     }
 
@@ -2937,7 +2914,8 @@
       }
       const canSend = loggedIn && show.member_slug && typeof shows !== 'undefined' && shows.find && shows.find(s => s.id === show.id);
       if (canSend) actions.push(`<button class="detail-action" onclick="detailSend(${show.id})">Send to a member</button>`);
-      actions.push(`<button class="detail-action" onclick="detailShare()">Share</button>`);
+      // No per-show "Share" here — the browser's own share button covers
+      // sharing the page, so a custom one would be redundant on web.
       html += `<div class="detail-card">${actions.join('')}</div>`;
 
       document.getElementById('detailBody').innerHTML = html;
@@ -2973,19 +2951,6 @@
         else if (res.ok) showToast('Added to your Up Next');
         else showToast("Couldn’t add", { tone: 'error' });
       } catch { showToast('Network error', { tone: 'error' }); }
-    }
-
-    function detailShare() {
-      if (!detailShow) return;
-      const s = detailShow;
-      const url = detailRealUrl(s.network_url) ? safeUrl(s.network_url)
-        : (s.member_slug ? `https://showpicker.club/${s.member_slug}` : 'https://showpicker.club');
-      const where = s.network ? ` on ${s.network}` : '';
-      const text = `Check out ${s.title}${where} — from Show Picker Club`;
-      if (navigator.share) navigator.share({ title: s.title, text, url }).catch(() => {});
-      else if (navigator.clipboard) navigator.clipboard.writeText(`${text} ${url}`)
-        .then(() => showToast('Show details copied to clipboard')).catch(() => prompt('Copy this show', `${text} ${url}`));
-      else prompt('Copy this show', `${text} ${url}`);
     }
 
     document.addEventListener('keydown', e => {
