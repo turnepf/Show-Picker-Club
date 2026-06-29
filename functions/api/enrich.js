@@ -227,6 +227,11 @@ export async function onRequestPost(context) {
         // Extract genres
         const genres = (detail.genres || []).map(g => g.name).join(', ') || null;
 
+        // Total seasons released so far (TMDB counts regular seasons, not
+        // specials). Set for every TV show, regardless of list.
+        const seasonsReleased = typeof detail.number_of_seasons === 'number'
+          ? detail.number_of_seasons : null;
+
         // Only get dates for watching/waiting lists
         let newDate = null;
         let endDate = null;
@@ -248,8 +253,8 @@ export async function onRequestPost(context) {
         }
 
         await env.DB.prepare(
-          "UPDATE shows SET next_season_date = ?, season_end_date = ?, full_series = ?, genres = COALESCE(?, genres), enriched_at = datetime('now') WHERE id = ?"
-        ).bind(newDate, endDate, isComplete, genres, show.id).run();
+          "UPDATE shows SET next_season_date = ?, season_end_date = ?, full_series = ?, genres = COALESCE(?, genres), seasons_released = COALESCE(?, seasons_released), enriched_at = datetime('now') WHERE id = ?"
+        ).bind(newDate, endDate, isComplete, genres, seasonsReleased, show.id).run();
         tmdbUpdated++;
       } catch (e) {}
     }
