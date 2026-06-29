@@ -831,7 +831,7 @@
     <header>
       <div class="header-top">
         <div class="header-actions">
-          <a href="/" style="color: rgba(255,255,255,0.85); text-decoration: none; font-size: 24px; line-height: 1; padding: 6px 10px; margin: -6px 0 -6px -10px; border-radius: 6px;" title="All members" aria-label="Back to all members">&#9664;</a>
+          <a href="/?home" style="color: rgba(255,255,255,0.85); text-decoration: none; font-size: 24px; line-height: 1; padding: 6px 10px; margin: -6px 0 -6px -10px; border-radius: 6px;" title="All members" aria-label="Back to all members">&#9664;</a>
           <button class="btn btn-search" id="searchBtn" title="Search this member's shows" onclick="openSearchModal()">Search</button>
         </div>
         <div class="header-actions">
@@ -1320,6 +1320,10 @@
     }
 
     async function landingOrMyList() {
+      // The "All members" back arrow links to /?home — an explicit request for
+      // the directory. Honor it instead of bouncing a logged-in member back to
+      // their own list, otherwise they can never leave their page.
+      if (new URLSearchParams(location.search).has('home')) { showLanding(); return; }
       try {
         const res = await fetch('/auth/check');
         const data = await res.json();
