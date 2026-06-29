@@ -118,6 +118,21 @@
       .trait-row .bar { transition: none; }
     }
   </style>
+  <!-- iOS skin: layered last to refine the page into the native grouped-card
+       look (recessed bg, soft rounded cards, sticky nav-bar). -->
+  <style id="ios-skin">
+    body { background: var(--surface-2); }
+    .topbar {
+      position: sticky; top: 0; z-index: 10;
+      margin: -24px -16px 22px; padding: 14px 16px;
+      background: color-mix(in oklch, var(--surface-2) 86%, transparent);
+      backdrop-filter: saturate(180%) blur(12px);
+      -webkit-backdrop-filter: saturate(180%) blur(12px);
+    }
+    .section { border: none; border-radius: 14px; box-shadow: var(--shadow-card); }
+    .hero, .modal-card { border-radius: 16px; }
+    .topbar select { border-radius: 9px; }
+  </style>
 </head>
 <body>
   <div class="wrap">
