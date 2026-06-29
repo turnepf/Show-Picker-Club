@@ -105,6 +105,24 @@
     .modal-actions .cancel { background: var(--surface-2); color: var(--ink); }
     .modal-actions .submit { background: var(--accent); color: var(--ink); font-weight: 700; }
   </style>
+  <!-- iOS skin: layered last so it refines the page above into the native
+       grouped-card look (recessed bg, soft rounded cards, sticky nav-bar). -->
+  <style id="ios-skin">
+    body { background: var(--surface-2); }
+    .topbar {
+      position: sticky; top: 0; z-index: 10;
+      margin: -24px -16px 18px; padding: 14px 16px;
+      background: color-mix(in oklch, var(--surface-2) 86%, transparent);
+      backdrop-filter: saturate(180%) blur(12px);
+      -webkit-backdrop-filter: saturate(180%) blur(12px);
+    }
+    /* Fully-rounded, softly elevated cards; the verdict pill carries status,
+       so drop the left accent bar and hairline border. */
+    .svc { border: none; border-radius: 14px; box-shadow: var(--shadow-card); }
+    .hero, .modal-card { border-radius: 16px; }
+    .seg { border-radius: 9px; }
+    .addbar button { border-radius: 10px; }
+  </style>
 </head>
 <body>
   <div class="wrap">
