@@ -29,6 +29,13 @@ struct ShowDetailView: View {
 
     var body: some View {
         Form {
+            if let p = show?.posterUrl, !p.isEmpty {
+                Section {
+                    PosterThumb(url: p, width: 130, height: 195)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .listRowBackground(Color.clear)
+                }
+            }
             // Everything factual in one compact card so a show fits on one screen.
             Section {
                 LabeledContent("Title", value: title)
