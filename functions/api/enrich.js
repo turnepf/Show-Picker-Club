@@ -273,6 +273,32 @@ export async function onRequestPost(context) {
     }
   }
 
+  // Movie posters — the pass above is TV-only (movie = 0), so movies need their
+  // own poster fetch (no seasons/dates/network logo apply to movies). Only
+  // touches movies that still lack a poster; stamps enriched_at either way so
+  // titles TMDB can't find rotate to the back instead of blocking the queue.
+  if (tmdbKey) {
+    const movieBase = `SELECT id, title FROM shows
+       WHERE archived = 0 AND movie = 1 AND poster_url IS NULL`;
+    const movieStmt = member
+      ? env.DB.prepare(`${movieBase} AND member_slug = ? ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`).bind(member, maxTmdb)
+      : env.DB.prepare(`${movieBase} ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`).bind(maxTmdb);
+    const { results: movieShows } = await movieStmt.all();
+
+    for (const show of movieShows) {
+      try {
+        const searchRes = await fetch(`https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(show.title)}&api_key=${tmdbKey}`);
+        const searchData = await searchRes.json();
+        const posterPath = searchData.results && searchData.results[0] && searchData.results[0].poster_path;
+        const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
+        await env.DB.prepare(
+          "UPDATE shows SET poster_url = COALESCE(?, poster_url), enriched_at = datetime('now') WHERE id = ?"
+        ).bind(posterUrl, show.id).run();
+        if (posterUrl) tmdbUpdated++;
+      } catch (e) {}
+    }
+  }
+
   // Actor IMDB-id backfill — self-healing, no admin action required.
   // imdb_id is only ever written by the TMDB enrichment path (at add/edit time).
   // Shows added before that path existed, or via one that omits it (OMDB
