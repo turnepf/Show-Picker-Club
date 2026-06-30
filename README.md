@@ -107,6 +107,18 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    country, set the non-secret `WATCHMODE_REGION` var (e.g. `GB`, `CA`) in
    the Cloudflare Pages dashboard → Settings → Environment variables.
 
+   **Reviewer / demo login (optional).** The app is invite-only with no public
+   sign-up, so App Review needs a way in. Create a throwaway demo member with an
+   email (in `member_emails`), then set these two secrets to let that one email
+   log in with a fixed code — no SMS/email round-trip needed:
+   ```bash
+   printf "demo@example.com" | wrangler pages secret put DEMO_LOGIN_EMAIL --project-name shows
+   printf "424242"           | wrangler pages secret put DEMO_LOGIN_CODE  --project-name shows  # 6 digits → iOS auto-submits
+   ```
+   The bypass (in `functions/auth/login.js`) only ever unlocks the configured
+   email and only when both secrets are set; leave them unset to disable it.
+   Put the same email + code in App Store Connect → App Review Information.
+
 5. **Create the Pages project and do the first deploy.**
    ```bash
    wrangler pages project create shows

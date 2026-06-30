@@ -49,6 +49,24 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ error: 'missing' }), { status: 400, headers: corsHeaders() });
   }
 
+  // ---- Reviewer / demo login ----
+  // A single pre-provisioned account can sign in with a fixed code, gated
+  // entirely on two Cloudflare secrets: DEMO_LOGIN_EMAIL and DEMO_LOGIN_CODE.
+  // With either secret unset this branch is inert, so it is not a general
+  // backdoor — it only ever unlocks the one configured email, and the IP
+  // rate-limit above still applies. Used to give App Review a way past the
+  // invite-only login wall without a real SMS/email round-trip.
+  const demoEmail = (env.DEMO_LOGIN_EMAIL || '').trim().toLowerCase();
+  const demoCode = env.DEMO_LOGIN_CODE || '';
+  if (demoEmail && demoCode && email && email === demoEmail && code === demoCode) {
+    const row = await env.DB.prepare(
+      'SELECT member_slug FROM member_emails WHERE LOWER(email) = ? LIMIT 1'
+    ).bind(demoEmail).first();
+    if (row) return await issueSession(env, row.member_slug);
+    // Secret set but no matching member — fall through to the normal flow
+    // rather than silently succeeding on a misconfiguration.
+  }
+
   // ---- SMS path: validate the code through Twilio Verify ----
   if (phone) {
     const e164 = normalizePhone(phone);
