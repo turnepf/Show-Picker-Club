@@ -6,31 +6,13 @@ struct ShowPickerTVApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            // Browsing is open, like iOS — the home screen shows members and
+            // shows whether or not you're signed in. Refreshing the session in
+            // the background lets HomeView jump a logged-in member to their own
+            // list once auth resolves.
+            HomeView()
                 .environmentObject(auth)
+                .task { await auth.refresh() }
         }
-    }
-}
-
-// Gate the member lists behind login. Until the first auth check returns we
-// show a splash so the login screen doesn't flash for already-signed-in TVs;
-// after that it's the lists (logged in) or the login screen.
-struct RootView: View {
-    @EnvironmentObject private var auth: AuthStore
-
-    var body: some View {
-        Group {
-            if !auth.checked {
-                ZStack {
-                    Theme.cream.ignoresSafeArea()
-                    ProgressView()
-                }
-            } else if auth.isLoggedIn {
-                HomeView()
-            } else {
-                LoginView()
-            }
-        }
-        .task { await auth.refresh() }
     }
 }
