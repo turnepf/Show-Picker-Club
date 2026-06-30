@@ -28,19 +28,12 @@ struct ShowDetailView: View {
                     RoundedRectangle(cornerRadius: 18)
                         .fill(Theme.tileColor(for: title))
                         .overlay(
-                            VStack(spacing: 8) {
-                                Text(title)
-                                    .font(.system(size: 40, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .multilineTextAlignment(.center)
-                                if let network, !network.isEmpty {
-                                    Text("on \(network)")
-                                        .font(.system(size: 24, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.85))
-                                }
-                            }
-                            .padding(24)
-                            .minimumScaleFactor(0.5)
+                            Text(title)
+                                .font(.system(size: 40, weight: .bold))
+                                .foregroundColor(.white)
+                                .multilineTextAlignment(.center)
+                                .padding(24)
+                                .minimumScaleFactor(0.5)
                         )
                         .frame(width: 420, height: 280)
 
@@ -49,12 +42,17 @@ struct ShowDetailView: View {
                             .font(.system(size: 54, weight: .bold))
                             .foregroundColor(Theme.ink)
 
+                        // Network intentionally omitted here — it lives on the
+                        // watch button below, so the screen names it once.
                         HStack(spacing: 24) {
                             if let rating, !rating.isEmpty {
                                 Label(rating, systemImage: "star.fill").foregroundColor(.orange)
                             }
-                            if let network, !network.isEmpty {
-                                Text(network).foregroundColor(Theme.ink.opacity(0.7))
+                            if let s = show, let l = ShowList(rawValue: s.list) {
+                                HStack(spacing: 8) {
+                                    Circle().fill(Theme.listColor(s.list)).frame(width: 16, height: 16)
+                                    Text(l.title).foregroundColor(Theme.ink.opacity(0.7))
+                                }
                             }
                             if let s = show, s.isMovie {
                                 Text("Movie").foregroundColor(Theme.ink.opacity(0.5))
@@ -100,7 +98,7 @@ struct ShowDetailView: View {
             if let by = s.recommendedBy, !by.isEmpty {
                 Text("Recommended by \(by)").foregroundColor(Theme.ink.opacity(0.7))
             }
-            if let dates = seasonDates(s) {
+            if let dates = seasonLine(s) {
                 Text(dates).foregroundColor(Theme.ink.opacity(0.7))
             }
             if let w = s.watchingWith, !w.isEmpty {
@@ -113,12 +111,13 @@ struct ShowDetailView: View {
         .font(.system(size: 24))
     }
 
-    private func seasonDates(_ s: Show) -> String? {
-        let start = s.nextSeasonDate, end = s.seasonEndDate
-        if let start, !start.isEmpty, let end, !end.isEmpty { return "Next up: \(start) – \(end)" }
-        if let start, !start.isEmpty { return "Next up: \(start)" }
-        if let end, !end.isEmpty { return "Through \(end)" }
-        return nil
+    // "Next up: 6/29 – 7/13 · 3 seasons" — the same M/D formatting and seasons
+    // count the iOS rows use, instead of raw ISO dates.
+    private func seasonLine(_ s: Show) -> String? {
+        var parts: [String] = []
+        if let r = s.nextUpRange { parts.append("Next up: \(r)") }
+        if let seasons = s.seasonsText { parts.append(seasons) }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     @ViewBuilder private var watchButton: some View {
