@@ -9,6 +9,7 @@ export async function onRequestGet(context) {
     `SELECT LOWER(s.title) as ltitle, s.title, s.rating, s.network, s.network_url, s.movie,
        MAX(s.genres) as genres,
        MAX(s.poster_url) as poster_url,
+       MAX(s.network_logo_url) as network_logo_url,
        MIN(s.id) as id,
        COUNT(DISTINCT s.member_slug) as member_count,
        GROUP_CONCAT(DISTINCT s.member_slug) as member_slugs

@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS shows (
   season_end_date TEXT,
   seasons_released INTEGER,
   poster_url TEXT,
+  network_logo_url TEXT,
   archived INTEGER DEFAULT 0,
   member_slug TEXT REFERENCES members(slug),
   created_at TEXT DEFAULT (datetime('now')),
