@@ -209,6 +209,7 @@ struct Pick: Codable, Identifiable, Hashable {
     let title: String
     let network: String?
     let networkUrl: String?
+    let posterUrl: String?
     let rating: Double?
     let nNeighbors: Int?
     let sharedActors: Int?
@@ -219,6 +220,7 @@ struct Pick: Codable, Identifiable, Hashable {
     enum CodingKeys: String, CodingKey {
         case title, network, rating, who
         case networkUrl = "network_url"
+        case posterUrl = "poster_url"
         case nNeighbors = "n_neighbors"
         case sharedActors = "shared_actors"
     }

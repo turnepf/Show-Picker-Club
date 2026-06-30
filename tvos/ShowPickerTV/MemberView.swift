@@ -80,7 +80,7 @@ struct MemberView: View {
                 LazyHStack(alignment: .top, spacing: 40) {
                     ForEach(picks) { pick in
                         Button { Task { await addPick(pick) } } label: {
-                            ShowCard(title: pick.title, subtitle: pick.reason)
+                            ShowCard(title: pick.title, subtitle: pick.reason, posterUrl: pick.posterUrl)
                         }
                         .buttonStyle(PushButtonStyle())
                     }

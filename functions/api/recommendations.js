@@ -71,6 +71,9 @@ async function memberBased(env, member) {
           CASE WHEN INSTR(LOWER(s2.network_url), LOWER(REPLACE(REPLACE(s2.network, ' ', ''), '+', ''))) > 0 THEN 0 ELSE 1 END,
           s2.id
         LIMIT 1) AS network_url,
+      (SELECT s2.poster_url FROM shows s2
+        WHERE LOWER(s2.title) = LOWER(s.title) AND s2.poster_url IS NOT NULL
+        LIMIT 1) AS poster_url,
       (SELECT COUNT(DISTINCT a.name) FROM actors a
        JOIN shows s2 ON s2.id = a.show_id
        WHERE LOWER(s2.title) = LOWER(s.title) AND s2.archived = 0
@@ -143,6 +146,9 @@ async function contentBased(env, member) {
           CASE WHEN INSTR(LOWER(s2.network_url), LOWER(REPLACE(REPLACE(s2.network, ' ', ''), '+', ''))) > 0 THEN 0 ELSE 1 END,
           s2.id
         LIMIT 1) AS network_url,
+      (SELECT s2.poster_url FROM shows s2
+        WHERE LOWER(s2.title) = LOWER(s.title) AND s2.poster_url IS NOT NULL
+        LIMIT 1) AS poster_url,
       (SELECT COUNT(DISTINCT a.name) FROM actors a
        JOIN shows s2 ON s2.id = a.show_id
        WHERE LOWER(s2.title) = LOWER(s.title) AND s2.archived = 0
@@ -258,6 +264,7 @@ export async function onRequestGet(context) {
       title: p.title,
       network: p.network,
       network_url: p.network_url,
+      poster_url: p.poster_url,
       rating: p.avg_rating,
       n_neighbors: p.n_neighbors,
       shared_actors: p.shared_actors,

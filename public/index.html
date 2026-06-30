@@ -1932,9 +1932,13 @@
           reason = members === 1 ? "On 1 member's list" : `On ${members} members' lists`;
           if (p.shared_actors > 0) reason += ` &middot; ${p.shared_actors} shared actor${p.shared_actors === 1 ? '' : 's'}`;
         }
+        const poster = p.poster_url
+          ? `<img class="row-poster" src="${safeUrl(p.poster_url)}" alt="" loading="lazy">`
+          : `<div class="row-poster row-poster-empty">🎬</div>`;
         return `<div class="show rec-row">
           <div class="show-row">
             <button class="share-btn rec-add-btn" data-rec-idx="${idx}" title="Add to my Up Next">+</button>
+            ${poster}
             <div class="rec-info">
               <span class="show-info"><span class="show-title">${escapeHtml(p.title)}</span>${networkHtml}${rating}</span>
               <span class="rec-reason">${reason}</span>
