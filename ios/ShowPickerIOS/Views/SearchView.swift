@@ -81,6 +81,7 @@ struct SearchView: View {
                 }
                 .disabled(addingId == s.id)
             }
+            PosterThumb(url: s.posterUrl)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(s.title).font(.body)

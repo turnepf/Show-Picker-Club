@@ -1,0 +1,56 @@
+name: Enrich backfill (posters, logos, seasons)
+
+# One-off / on-demand backfill of TMDB enrichment across the whole library —
+# posters, network logos, seasons, genres, dates. /api/enrich processes the
+# oldest-enriched shows first (default 50 TV shows per call) and stamps
+# enriched_at, so looping rotates through everything. Idempotent and cheap once
+# the backlog is clear.
+#
+# Auth: sends X-Cron-Secret, which /api/enrich accepts in place of a member
+# session. No `member` body → all members.
+#
+# Required repo secret (must equal the Pages CRON_SECRET):
+#   CRON_SECRET — Settings → Secrets and variables → Actions.
+
+on:
+  workflow_dispatch:
+    inputs:
+      rounds:
+        description: 'How many batches to run (each ≈ 50 TV shows)'
+        required: false
+        default: '25'
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Backfill enrichment
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          ROUNDS: ${{ github.event.inputs.rounds || '25' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repo secret is not set"
+            exit 1
+          fi
+          URL="https://showpicker.club/api/enrich"
+          total=0
+          for i in $(seq 1 "$ROUNDS"); do
+            resp=$(curl -sS -X POST "$URL" \
+              -H "Content-Type: application/json" \
+              -H "X-Cron-Secret: ${CRON_SECRET}" \
+              -d '{}' \
+              -w $'\n%{http_code}')
+            http=$(printf '%s' "$resp" | tail -n1)
+            body=$(printf '%s' "$resp" | sed '$d')
+            if [ "$http" != "200" ]; then
+              echo "::error::round $i returned HTTP $http (CRON_SECRET rejected, or endpoint error): $body"
+              exit 1
+            fi
+            updated=$(printf '%s' "$body" | python3 -c "import sys,json;print(json.load(sys.stdin).get('tmdbUpdated',0))" 2>/dev/null || echo 0)
+            total=$((total + updated))
+            echo "round $i/$ROUNDS — tmdbUpdated: $updated (running total: $total)"
+            sleep 3
+          done
+          echo "Backfill complete. Total TMDB updates: $total"
