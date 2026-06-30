@@ -42,7 +42,7 @@ struct HomeView: View {
                 .padding(.horizontal, 60)
                 .padding(.bottom, 60)
             }
-            .background(Theme.cream.ignoresSafeArea())
+            .background(Theme.background.ignoresSafeArea())
             .navigationDestination(for: Route.self) { route in
                 switch route {
                 case .member(let m):
@@ -71,7 +71,7 @@ struct HomeView: View {
         HStack(alignment: .firstTextBaseline) {
             Text("Show Picker Club")
                 .font(.system(size: 56, weight: .bold))
-                .foregroundColor(Theme.ink)
+                .foregroundColor(Theme.text)
             Spacer()
             if let me = myMember {
                 HStack(spacing: 24) {
@@ -107,7 +107,7 @@ struct HomeView: View {
                 bannerCard(title: "Log in to see your shows",
                            subtitle: "Browse the club below, or sign in to open your own lists",
                            systemImage: "person.crop.circle.badge.plus",
-                           tint: Theme.ink)
+                           tint: Theme.listColor("waiting"))
             }
             .buttonStyle(PushButtonStyle())
         }
@@ -123,7 +123,8 @@ struct HomeView: View {
                             NavigationLink(value: Route.detail(id: show.id, title: show.title, network: show.network, rating: show.rating)) {
                                 ShowCard(title: show.title,
                                          network: show.network,
-                                         rating: show.rating)
+                                         rating: show.rating,
+                                         posterUrl: show.posterUrl)
                             }
                             .buttonStyle(PushButtonStyle())
                         }
@@ -152,7 +153,7 @@ struct HomeView: View {
     private func sectionHeader(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 32, weight: .semibold))
-            .foregroundColor(Theme.ink)
+            .foregroundColor(Theme.text)
     }
 
     private func bannerCard(title: String, subtitle: String, systemImage: String, tint: Color) -> some View {

@@ -232,6 +232,10 @@ export async function onRequestPost(context) {
         const seasonsReleased = typeof detail.number_of_seasons === 'number'
           ? detail.number_of_seasons : null;
 
+        // Poster (backfills existing TV shows as this pass rotates through them).
+        const posterUrl = detail.poster_path
+          ? `https://image.tmdb.org/t/p/w500${detail.poster_path}` : null;
+
         // Only get dates for watching/waiting lists
         let newDate = null;
         let endDate = null;
@@ -253,8 +257,8 @@ export async function onRequestPost(context) {
         }
 
         await env.DB.prepare(
-          "UPDATE shows SET next_season_date = ?, season_end_date = ?, full_series = ?, genres = COALESCE(?, genres), seasons_released = COALESCE(?, seasons_released), enriched_at = datetime('now') WHERE id = ?"
-        ).bind(newDate, endDate, isComplete, genres, seasonsReleased, show.id).run();
+          "UPDATE shows SET next_season_date = ?, season_end_date = ?, full_series = ?, genres = COALESCE(?, genres), seasons_released = COALESCE(?, seasons_released), poster_url = COALESCE(?, poster_url), enriched_at = datetime('now') WHERE id = ?"
+        ).bind(newDate, endDate, isComplete, genres, seasonsReleased, posterUrl, show.id).run();
         tmdbUpdated++;
       } catch (e) {}
     }
