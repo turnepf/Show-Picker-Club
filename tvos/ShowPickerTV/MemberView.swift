@@ -57,7 +57,9 @@ struct MemberView: View {
             .padding(.bottom, 60)
         }
         .background(Theme.background.ignoresSafeArea())
-        .task { await load() }
+        // Load once. Re-running on re-appear (after popping back from a show)
+        // would rebuild the lists and bounce the scroll position to the top.
+        .task { if loading { await load() } }
     }
 
     // "Picks for you" — recommendations on your own page; tapping adds to Up Next.
@@ -78,9 +80,7 @@ struct MemberView: View {
                 LazyHStack(alignment: .top, spacing: 40) {
                     ForEach(picks) { pick in
                         Button { Task { await addPick(pick) } } label: {
-                            ShowCard(title: pick.title,
-                                     network: pick.network,
-                                     line: pick.reason)
+                            ShowCard(title: pick.title, subtitle: pick.reason)
                         }
                         .buttonStyle(PushButtonStyle())
                     }
@@ -104,9 +104,8 @@ struct MemberView: View {
                     ForEach(sorted(items, for: list)) { show in
                         NavigationLink(value: Route.detail(id: show.id, title: show.title, network: show.network, rating: show.rating)) {
                             ShowCard(title: show.title,
-                                     network: show.network,
-                                     line: nextUpLine(show, list),
-                                     fullSeries: show.isFullSeries,
+                                     nextUp: (list == .watching || list == .waiting) ? show.nextUpRange : nil,
+                                     networkLogoUrl: show.networkLogoUrl,
                                      posterUrl: show.posterUrl)
                         }
                         .buttonStyle(PushButtonStyle())
@@ -120,11 +119,6 @@ struct MemberView: View {
         }
     }
 
-    // "Next up: 6/29 – 7/13" on Watching/Waiting; nil elsewhere.
-    private func nextUpLine(_ s: Show, _ list: ShowList) -> String? {
-        guard list == .watching || list == .waiting, let r = s.nextUpRange else { return nil }
-        return "Next up: \(r)"
-    }
 
     // Match iOS defaults: Watching/Waiting lead with the soonest premiere,
     // the other lists with the highest rating.
@@ -146,7 +140,9 @@ struct MemberView: View {
             try await API.addShow(title: pick.title, network: pick.network, networkUrl: pick.networkUrl,
                                   list: ShowList.next.rawValue, movie: false, fullSeries: false)
             pickMessage = "Added “\(pick.title)” to your Up Next."
-            await load()
+            // Refresh quietly (no loading spinner, which would reset scroll).
+            shows = (try? await API.shows(member: member.slug)) ?? shows
+            await loadPicks()
         } catch API.APIError.badResponse(409) {
             pickMessage = "“\(pick.title)” is already on one of your lists."
         } catch {

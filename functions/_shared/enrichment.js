@@ -115,8 +115,10 @@ export async function fetchEnrichment(title, env, isMovie) {
         );
 
         const posterUrl = tmdbPosterUrl(detail.poster_path || search.results[0].poster_path);
+        const netLogoPath = detail.networks && detail.networks[0] && detail.networks[0].logo_path;
+        const networkLogoUrl = netLogoPath ? `https://image.tmdb.org/t/p/w154${netLogoPath}` : null;
 
-        return { canonicalTitle, rating, actors, posterUrl };
+        return { canonicalTitle, rating, actors, posterUrl, networkLogoUrl };
       }
     } catch (_) {
       // fall through to OMDB
@@ -132,9 +134,10 @@ export async function fetchEnrichment(title, env, isMovie) {
         rating: result.rating,
         actors: result.actors.map(name => ({ name, imdb_id: null })),
         posterUrl: result.posterUrl || null,
+        networkLogoUrl: null,
       };
     }
   }
 
-  return { canonicalTitle: null, rating: null, actors: [], posterUrl: null };
+  return { canonicalTitle: null, rating: null, actors: [], posterUrl: null, networkLogoUrl: null };
 }

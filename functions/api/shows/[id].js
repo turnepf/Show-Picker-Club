@@ -56,8 +56,8 @@ export async function onRequestPut(context) {
   const rating = enriched.rating || existing.rating;
 
   await env.DB.prepare(
-    "UPDATE shows SET title = ?, network = ?, network_url = ?, recommended_by = ?, list = ?, notes = ?, movie = ?, full_series = ?, watching_with = ?, rating = ?, archived = ?, poster_url = COALESCE(?, poster_url), updated_at = datetime('now') WHERE id = ?"
-  ).bind(title, network, network_url, recommended_by, list, notes, movie, full_series, watching_with, rating, archived, enriched.posterUrl || null, params.id).run();
+    "UPDATE shows SET title = ?, network = ?, network_url = ?, recommended_by = ?, list = ?, notes = ?, movie = ?, full_series = ?, watching_with = ?, rating = ?, archived = ?, poster_url = COALESCE(?, poster_url), network_logo_url = COALESCE(?, network_logo_url), updated_at = datetime('now') WHERE id = ?"
+  ).bind(title, network, network_url, recommended_by, list, notes, movie, full_series, watching_with, rating, archived, enriched.posterUrl || null, enriched.networkLogoUrl || null, params.id).run();
 
   if (enriched.actors.length > 0) {
     await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(params.id).run();
