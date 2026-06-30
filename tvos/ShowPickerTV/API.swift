@@ -1,11 +1,16 @@
 import Foundation
 
-// Thin async client over the public, view-only endpoints. No auth — browsing
-// is open on showpicker.club, and editing stays on the phone.
+// Thin async client over the showpicker.club API. Browsing is open; signing in
+// (phone / email OTP) sets the session cookie that URLSession.shared persists
+// automatically, so authenticated reads just work afterwards.
 enum API {
     static let baseString = "https://showpicker.club"
 
-    enum APIError: Error { case badURL, badResponse }
+    // Platform usage tracking: every request advertises the client so
+    // /auth/check can stamp "tvos" onto the session for the reporting dashboard.
+    static let platform = "tvos"
+
+    enum APIError: Error { case badURL, badResponse(Int) }
 
     private static func get<T: Decodable>(_ path: String) async throws -> T {
         // Build from a raw string so query components (?member=…) survive —
@@ -13,11 +18,62 @@ enum API {
         guard let url = URL(string: baseString + path) else { throw APIError.badURL }
         var req = URLRequest(url: url)
         req.cachePolicy = .reloadRevalidatingCacheData
+        req.setValue(platform, forHTTPHeaderField: "X-Client-Platform")
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw APIError.badResponse
+            throw APIError.badResponse((resp as? HTTPURLResponse)?.statusCode ?? -1)
         }
         return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    // POST a JSON body and decode the reply. Used by the auth flow.
+    private static func postJSON<T: Decodable>(_ path: String, body: [String: Any]) async throws -> T {
+        guard let url = URL(string: baseString + path) else { throw APIError.badURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(platform, forHTTPHeaderField: "X-Client-Platform")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw APIError.badResponse((resp as? HTTPURLResponse)?.statusCode ?? -1)
+        }
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    // MARK: Auth
+
+    static func checkAuth() async -> AuthCheckResponse {
+        (try? await get("/auth/check")) ?? AuthCheckResponse(authenticated: false, email: nil, member: nil, isAdmin: nil)
+    }
+
+    static func loginWithEmail(email: String, code: String) async throws -> LoginResponse {
+        try await postJSON("/auth/login", body: ["code": code, "email": email])
+    }
+
+    static func loginWithPhone(phone: String, code: String) async throws -> LoginResponse {
+        try await postJSON("/auth/login", body: ["code": code, "phone": phone])
+    }
+
+    // Server replies 200 even for unknown numbers/addresses (account-enumeration
+    // hardening), so success only means the request was accepted.
+    @discardableResult
+    static func requestSmsCode(phone: String) async throws -> Bool {
+        let r: Ack = try await postJSON("/auth/request-code", body: ["phone": phone, "channel": "sms"])
+        return r.success == true
+    }
+
+    @discardableResult
+    static func requestEmailCode(email: String) async throws -> Bool {
+        let r: Ack = try await postJSON("/auth/request-code", body: ["email": email, "channel": "email"])
+        return r.success == true
+    }
+
+    static func logout() async {
+        guard let url = URL(string: baseString + "/auth/logout") else { return }
+        var req = URLRequest(url: url)
+        req.setValue(platform, forHTTPHeaderField: "X-Client-Platform")
+        _ = try? await URLSession.shared.data(for: req)
     }
 
     static func members() async throws -> [Member] {

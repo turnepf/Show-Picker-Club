@@ -111,6 +111,84 @@
       </div>`;
     }
 
+    // Friendly labels + a stable display order for the platform breakdown.
+    const PLATFORM_LABELS = {
+      'ios': 'iOS',
+      'tvos': 'tvOS',
+      'web-large': 'Web (large)',
+      'web-small': 'Web (small)',
+      'unknown': 'Unknown',
+    };
+    const PLATFORM_ORDER = ['ios', 'tvos', 'web-large', 'web-small', 'unknown'];
+
+    function platformSection(byPlatform) {
+      const bp = byPlatform || {};
+      // Union of every platform seen across the day/week/month windows.
+      const keys = new Set();
+      ['day', 'week', 'month'].forEach(win => {
+        Object.keys(bp[win] || {}).forEach(k => keys.add(k));
+      });
+      if (keys.size === 0) {
+        return `<div class="section">
+          <h2>Active by platform</h2>
+          <div class="empty">No platform data yet. Clients report their platform on each visit; counts will appear here once they do.</div>
+        </div>`;
+      }
+      const ordered = [
+        ...PLATFORM_ORDER.filter(k => keys.has(k)),
+        ...[...keys].filter(k => !PLATFORM_ORDER.includes(k)).sort(),
+      ];
+      const rows = ordered.map(k => {
+        const label = PLATFORM_LABELS[k] || k;
+        return `<tr>
+          <td>${label}</td>
+          <td class="num">${fmt((bp.day || {})[k])}</td>
+          <td class="num">${fmt((bp.week || {})[k])}</td>
+          <td class="num">${fmt((bp.month || {})[k])}</td>
+        </tr>`;
+      }).join('');
+      return `<div class="section">
+        <h2>Active by platform</h2>
+        <table>
+          <thead><tr><th>Platform</th><th class="num">Day</th><th class="num">Week</th><th class="num">Month</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="footer">Distinct active sessions in each window (a member can use more than one platform).</div>
+      </div>`;
+    }
+
+    function neverLoggedInSection(list) {
+      const rows = list || [];
+      const count = rows.length;
+      if (count === 0) {
+        return `<div class="section">
+          <h2>Never logged in</h2>
+          <div class="empty">Everyone has logged in at least once since we started tracking it.</div>
+        </div>`;
+      }
+      // "Seeds only" = nothing beyond the seeded rows: no member-added show,
+      // no archive, no edit. Show their library size for context.
+      const body = rows.map(m => {
+        const name = m.name || m.slug;
+        const status = m.seeds_only
+          ? (m.show_count > 0 ? 'Seeds only' : 'No shows')
+          : 'Has activity';
+        return `<tr>
+          <td>${name}</td>
+          <td class="num">${fmt(m.show_count)}</td>
+          <td>${status}</td>
+        </tr>`;
+      }).join('');
+      return `<div class="section">
+        <h2>Never logged in <span style="color:var(--ink-quiet);font-weight:400;">(${count})</span></h2>
+        <table>
+          <thead><tr><th>Member</th><th class="num">Shows</th><th>Library</th></tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+        <div class="footer">Members with no login since tracking began (migration 013). "Seeds only" means nothing beyond the seeded rows — no adds, edits, or archives.</div>
+      </div>`;
+    }
+
     function renderReport(d) {
       document.getElementById('generated').textContent = 'Generated ' + fmtDate(d.generated_at);
 
@@ -152,6 +230,10 @@
             </div>
           </div>
         </div>
+
+        ${platformSection(d.active_by_platform)}
+
+        ${neverLoggedInSection(d.never_logged_in)}
 
         <div class="section">
           <h2>Top networks</h2>

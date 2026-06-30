@@ -263,8 +263,10 @@ struct Reporting: Codable {
     let archivedShows: ReportWindow
     let newMembers: ReportWindow
     let activeMembers: ActiveWindow
+    let activeByPlatform: PlatformWindows?
     let totals: ReportTotals
     let membersLogin: LoginStats?
+    let neverLoggedIn: [NeverLoggedInMember]?
     let topNetworks: [NetworkCount]
     let topShared: [SharedTitle]
 
@@ -276,10 +278,44 @@ struct Reporting: Codable {
         case archivedShows = "archived_shows"
         case newMembers = "new_members"
         case activeMembers = "active_members"
+        case activeByPlatform = "active_by_platform"
         case membersLogin = "members_login"
+        case neverLoggedIn = "never_logged_in"
         case topNetworks = "top_networks"
         case topShared = "top_shared"
     }
+}
+
+// A member who has never logged in since tracking began (migration 013).
+// seedsOnly is true when nothing beyond the seeded rows has happened.
+struct NeverLoggedInMember: Codable, Identifiable {
+    let slug: String
+    let name: String?
+    let joined: String?
+    let showCount: Int
+    let seedsOnly: Bool
+
+    var id: String { slug }
+
+    enum CodingKeys: String, CodingKey {
+        case slug, name, joined
+        case showCount = "show_count"
+        case seedsOnly = "seeds_only"
+    }
+
+    var displayName: String { name ?? slug }
+    var libraryStatus: String {
+        if !seedsOnly { return "Has activity" }
+        return showCount > 0 ? "Seeds only" : "No shows"
+    }
+}
+
+// Active sessions per client platform (ios / tvos / web-small / web-large),
+// per window. Keyed by the platform string the server reports.
+struct PlatformWindows: Codable {
+    let day: [String: Int]
+    let week: [String: Int]
+    let month: [String: Int]
 }
 
 struct LoginStats: Codable {

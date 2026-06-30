@@ -29,6 +29,29 @@ struct Member: Codable, Identifiable, Hashable {
 
 struct MembersResponse: Codable { let members: [Member] }
 
+// MARK: Auth
+
+struct AuthCheckResponse: Codable {
+    let authenticated: Bool
+    let email: String?
+    let member: String?
+    let isAdmin: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case authenticated, email, member
+        case isAdmin = "is_admin"
+    }
+}
+
+struct LoginResponse: Codable {
+    let success: Bool?
+    let slug: String?
+    let error: String?
+}
+
+// /auth/request-code reply.
+struct Ack: Codable { let success: Bool? }
+
 struct Actor: Codable, Hashable {
     let name: String
     let imdbId: String?
