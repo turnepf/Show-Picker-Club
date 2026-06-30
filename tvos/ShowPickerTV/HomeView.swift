@@ -101,7 +101,7 @@ struct HomeView: View {
                            systemImage: "person.crop.circle.fill",
                            tint: Theme.listColor("watching"))
             }
-            .buttonStyle(.card)
+            .buttonStyle(PushButtonStyle())
         } else if !auth.isLoggedIn {
             Button { showingLogin = true } label: {
                 bannerCard(title: "Log in to see your shows",
@@ -109,7 +109,7 @@ struct HomeView: View {
                            systemImage: "person.crop.circle.badge.plus",
                            tint: Theme.ink)
             }
-            .buttonStyle(.card)
+            .buttonStyle(PushButtonStyle())
         }
     }
 
@@ -125,7 +125,7 @@ struct HomeView: View {
                                          network: show.network,
                                          rating: show.rating)
                             }
-                            .buttonStyle(.card)
+                            .buttonStyle(PushButtonStyle())
                         }
                     }
                     .padding(.horizontal, 4)
@@ -143,7 +143,7 @@ struct HomeView: View {
                     NavigationLink(value: Route.member(member)) {
                         MemberTile(member: member, isMe: member.slug == auth.memberSlug)
                     }
-                    .buttonStyle(.card)
+                    .buttonStyle(PushButtonStyle())
                 }
             }
         }
