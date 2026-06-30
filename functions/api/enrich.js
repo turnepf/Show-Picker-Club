@@ -139,11 +139,6 @@ export async function onRequestPost(context) {
   }
 
   const apiKey = env.OMDB_API_KEY;
-  if (!apiKey) {
-    return new Response(JSON.stringify({ enriched: 0 }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
 
   let body = {};
   try { body = await request.json(); } catch (e) {}
@@ -152,6 +147,12 @@ export async function onRequestPost(context) {
   const maxOmdb = parseInt(body.max_omdb ?? '50', 10);
   const maxTmdb = parseInt(body.max_tmdb ?? '50', 10);
 
+  // OMDB pass (ratings, actors, search URLs). Gated on an OMDB key being
+  // configured: a missing key skips this pass but must NOT short-circuit the
+  // TMDB poster/season passes that follow (that early return was why the
+  // backfill reported tmdbUpdated: 0 even with TMDB credentials present).
+  let enriched = 0;
+  if (apiKey) {
   // Order by most-recent change first so newly-added/edited shows enrich before older backlog.
   const baseSelect = `SELECT s.id, s.title, s.network, s.network_url, s.movie
      FROM shows s
@@ -163,8 +164,6 @@ export async function onRequestPost(context) {
     ? env.DB.prepare(`${baseSelect} AND s.member_slug = ? ORDER BY COALESCE(s.updated_at, s.created_at) DESC LIMIT ?`).bind(member, maxOmdb)
     : env.DB.prepare(`${baseSelect} ORDER BY COALESCE(s.updated_at, s.created_at) DESC LIMIT ?`).bind(maxOmdb);
   const { results: needsRating } = await stmt.all();
-
-  let enriched = 0;
 
   for (const show of needsRating) {
     const omdb = await fetchOMDB(show.title, apiKey, show.movie ? 'movie' : 'series');
@@ -217,6 +216,7 @@ export async function onRequestPost(context) {
     }
 
     enriched++;
+  }
   }
 
   // TMDB: check next season dates for Watching and Waiting shows.
