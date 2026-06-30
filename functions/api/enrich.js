@@ -1,6 +1,24 @@
 import { getSession } from '../_shared/auth.js';
 import { fetchEnrichment } from '../_shared/enrichment.js';
 
+// TMDB GET that works with either credential the worker has configured:
+// the v4 Bearer token (TMDB_TOKEN, what the shared enrichment path uses) is
+// preferred, falling back to a v3 api_key query param (TMDB_API_KEY). The
+// poster passes below originally required TMDB_API_KEY only — if a deployment
+// sets just TMDB_TOKEN, those passes silently no-op'd (tmdbUpdated stayed 0).
+async function tmdbGet(path, env) {
+  const token = env.TMDB_TOKEN;
+  const sep = path.includes('?') ? '&' : '?';
+  if (token) {
+    const res = await fetch(`https://api.themoviedb.org/3${path}`, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+    return res.json();
+  }
+  const res = await fetch(`https://api.themoviedb.org/3${path}${sep}api_key=${env.TMDB_API_KEY}`);
+  return res.json();
+}
+
 // Networks with `param` pass the show name in the search URL query string.
 // Networks without `param` just link to the search page (no show name).
 const NETWORK_SEARCH = {
@@ -203,9 +221,9 @@ export async function onRequestPost(context) {
 
   // TMDB: check next season dates for Watching and Waiting shows.
   // Cap the same way; oldest/least-recently-enriched first so the budget rotates evenly.
-  const tmdbKey = env.TMDB_API_KEY;
+  const hasTmdb = !!(env.TMDB_TOKEN || env.TMDB_API_KEY);
   let tmdbUpdated = 0;
-  if (tmdbKey) {
+  if (hasTmdb) {
     const tmdbBase = `SELECT id, title, movie, list FROM shows
        WHERE archived = 0 AND movie = 0`;
     const tmdbStmt = member
@@ -216,13 +234,11 @@ export async function onRequestPost(context) {
     for (const show of tmdbShows) {
       try {
         // Search TMDB for the show
-        const searchRes = await fetch(`https://api.themoviedb.org/3/search/tv?query=${encodeURIComponent(show.title)}&api_key=${tmdbKey}`);
-        const searchData = await searchRes.json();
+        const searchData = await tmdbGet(`/search/tv?query=${encodeURIComponent(show.title)}`, env);
         if (!searchData.results || searchData.results.length === 0) continue;
 
         const tmdbId = searchData.results[0].id;
-        const detailRes = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${tmdbKey}`);
-        const detail = await detailRes.json();
+        const detail = await tmdbGet(`/tv/${tmdbId}`, env);
 
         // Check if series is complete
         const status = detail.status;
@@ -254,8 +270,7 @@ export async function onRequestPost(context) {
 
           if (nextEp) {
             try {
-              const seasonRes = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/season/${nextEp.season_number}?api_key=${tmdbKey}`);
-              const seasonData = await seasonRes.json();
+              const seasonData = await tmdbGet(`/tv/${tmdbId}/season/${nextEp.season_number}`, env);
               const eps = seasonData.episodes || [];
               if (eps.length > 0) {
                 const lastEp = eps[eps.length - 1];
@@ -277,7 +292,7 @@ export async function onRequestPost(context) {
   // own poster fetch (no seasons/dates/network logo apply to movies). Only
   // touches movies that still lack a poster; stamps enriched_at either way so
   // titles TMDB can't find rotate to the back instead of blocking the queue.
-  if (tmdbKey) {
+  if (hasTmdb) {
     const movieBase = `SELECT id, title FROM shows
        WHERE archived = 0 AND movie = 1 AND poster_url IS NULL`;
     const movieStmt = member
@@ -287,8 +302,7 @@ export async function onRequestPost(context) {
 
     for (const show of movieShows) {
       try {
-        const searchRes = await fetch(`https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(show.title)}&api_key=${tmdbKey}`);
-        const searchData = await searchRes.json();
+        const searchData = await tmdbGet(`/search/movie?query=${encodeURIComponent(show.title)}`, env);
         const posterPath = searchData.results && searchData.results[0] && searchData.results[0].poster_path;
         const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
         await env.DB.prepare(

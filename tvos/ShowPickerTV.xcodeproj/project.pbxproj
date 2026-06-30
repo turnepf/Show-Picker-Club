@@ -58,6 +58,7 @@
 				CDB361652FC7CA68009F34F5 /* Sources */,
 				CDB361662FC7CA68009F34F5 /* Frameworks */,
 				CDB361672FC7CA68009F34F5 /* Resources */,
+				CDB3619900000000009F34F5 /* Set build number */,
 			);
 			buildRules = (
 			);
@@ -74,6 +75,28 @@
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		CDB3619900000000009F34F5 /* Set build number */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Set build number";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Automatic build number: build date + git commit count (e.g. 20260623.142).\n# It always increases (the date bumps daily, the commit count within a day),\n# so there is no manual bump before archiving. Overrides CFBundleVersion in the\n# processed (generated) Info.plist. Runs on every build.\nset -eu\nif commits=$(git -C \"$SRCROOT\" rev-list --count HEAD 2>/dev/null) && [ -n \"$commits\" ]; then\n  :\nelse\n  commits=$(date +%H%M)\nfi\nbuild_number=\"$(date +%Y%m%d).$commits\"\nplist=\"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\nif [ -f \"$plist\" ]; then\n  /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $build_number\" \"$plist\" || /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string $build_number\" \"$plist\"\n  echo \"note: set CFBundleVersion = $build_number\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXProject section */
 		CDB361612FC7CA68009F34F5 /* Project object */ = {
