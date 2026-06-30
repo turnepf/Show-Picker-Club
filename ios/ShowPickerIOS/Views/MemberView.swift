@@ -303,6 +303,7 @@ struct MemberView: View {
                 Image(systemName: "plus.circle.fill").foregroundStyle(Color.accentColor)
             }
             .buttonStyle(.plain)
+            PosterThumb(url: p.posterUrl)
             VStack(alignment: .leading, spacing: 2) {
                 Text(p.title).font(.body)
                 Text(pickCaption(p)).font(.caption).foregroundStyle(.secondary)
