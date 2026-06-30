@@ -236,6 +236,11 @@ export async function onRequestPost(context) {
         const posterUrl = detail.poster_path
           ? `https://image.tmdb.org/t/p/w500${detail.poster_path}` : null;
 
+        // Network logo (TMDB's primary network for the show).
+        const netLogoPath = detail.networks && detail.networks[0] && detail.networks[0].logo_path;
+        const networkLogoUrl = netLogoPath
+          ? `https://image.tmdb.org/t/p/w154${netLogoPath}` : null;
+
         // Only get dates for watching/waiting lists
         let newDate = null;
         let endDate = null;
@@ -257,8 +262,8 @@ export async function onRequestPost(context) {
         }
 
         await env.DB.prepare(
-          "UPDATE shows SET next_season_date = ?, season_end_date = ?, full_series = ?, genres = COALESCE(?, genres), seasons_released = COALESCE(?, seasons_released), poster_url = COALESCE(?, poster_url), enriched_at = datetime('now') WHERE id = ?"
-        ).bind(newDate, endDate, isComplete, genres, seasonsReleased, posterUrl, show.id).run();
+          "UPDATE shows SET next_season_date = ?, season_end_date = ?, full_series = ?, genres = COALESCE(?, genres), seasons_released = COALESCE(?, seasons_released), poster_url = COALESCE(?, poster_url), network_logo_url = COALESCE(?, network_logo_url), enriched_at = datetime('now') WHERE id = ?"
+        ).bind(newDate, endDate, isComplete, genres, seasonsReleased, posterUrl, networkLogoUrl, show.id).run();
         tmdbUpdated++;
       } catch (e) {}
     }

@@ -88,6 +88,7 @@ struct Show: Codable, Identifiable, Hashable {
     let genres: String?
     let memberSlug: String?
     let posterUrl: String?
+    let networkLogoUrl: String?
     // The API returns actors as a JSON-encoded string (from SQLite
     // json_group_array). Decoded lazily via `castMembers`.
     let actors: String?
@@ -103,6 +104,7 @@ struct Show: Codable, Identifiable, Hashable {
         case seasonsReleased = "seasons_released"
         case memberSlug = "member_slug"
         case posterUrl = "poster_url"
+        case networkLogoUrl = "network_logo_url"
     }
 
     var isMovie: Bool { (movie ?? 0) == 1 }
@@ -171,11 +173,13 @@ struct PopularShow: Codable, Identifiable, Hashable {
     let genres: String?
     let members: [String]?
     let posterUrl: String?
+    let networkLogoUrl: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, network, rating, genres, members
         case networkUrl = "network_url"
         case posterUrl = "poster_url"
+        case networkLogoUrl = "network_logo_url"
     }
 }
 

@@ -50,7 +50,7 @@ struct HomeView: View {
                         ForEach(popular) { show in
                             NavigationLink(value: Route.detail(id: show.id, title: show.title, network: show.network, rating: show.rating)) {
                                 ShowCard(title: show.title,
-                                         network: show.network,
+                                         networkLogoUrl: show.networkLogoUrl,
                                          posterUrl: show.posterUrl)
                             }
                             .buttonStyle(PushButtonStyle())
