@@ -80,13 +80,13 @@ struct MemberView: View {
                         Button { Task { await addPick(pick) } } label: {
                             ShowCard(title: pick.title,
                                      network: pick.network,
-                                     rating: pick.rating.map { String(format: "%.1f", $0) },
-                                     metaLine: pick.caption)
+                                     line: pick.reason)
                         }
                         .buttonStyle(PushButtonStyle())
                     }
                 }
-                .padding(.horizontal, 4)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 30)
             }
         }
     }
@@ -105,17 +105,25 @@ struct MemberView: View {
                         NavigationLink(value: Route.detail(id: show.id, title: show.title, network: show.network, rating: show.rating)) {
                             ShowCard(title: show.title,
                                      network: show.network,
-                                     rating: show.rating,
+                                     line: nextUpLine(show, list),
                                      fullSeries: show.isFullSeries,
-                                     metaLine: show.metaLine(for: list),
                                      posterUrl: show.posterUrl)
                         }
                         .buttonStyle(PushButtonStyle())
                     }
                 }
-                .padding(.horizontal, 4)
+                // Room so a focused card can grow without the ScrollView
+                // clipping it ("growing behind a wall").
+                .padding(.horizontal, 14)
+                .padding(.vertical, 30)
             }
         }
+    }
+
+    // "Next up: 6/29 – 7/13" on Watching/Waiting; nil elsewhere.
+    private func nextUpLine(_ s: Show, _ list: ShowList) -> String? {
+        guard list == .watching || list == .waiting, let r = s.nextUpRange else { return nil }
+        return "Next up: \(r)"
     }
 
     // Match iOS defaults: Watching/Waiting lead with the soonest premiere,

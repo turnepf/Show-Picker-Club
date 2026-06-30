@@ -44,9 +44,7 @@ struct SearchView: View {
                             NavigationLink(value: Route.detail(id: show.id, title: show.title, network: show.network, rating: show.rating)) {
                                 ShowCard(title: show.title,
                                          network: show.network,
-                                         rating: show.rating,
                                          fullSeries: show.isFullSeries,
-                                         metaLine: show.metaLine(for: ShowList(rawValue: show.list) ?? .watching),
                                          posterUrl: show.posterUrl)
                             }
                             .buttonStyle(PushButtonStyle())
