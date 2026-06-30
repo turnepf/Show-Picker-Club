@@ -67,6 +67,7 @@ struct Show: Codable, Identifiable, Hashable {
     let archived: Int?
     let memberSlug: String?
     let createdAt: String?
+    let posterUrl: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, network, rating, list, notes, movie, genres, actors, archived
@@ -79,6 +80,7 @@ struct Show: Codable, Identifiable, Hashable {
         case seasonsReleased = "seasons_released"
         case memberSlug = "member_slug"
         case createdAt = "created_at"
+        case posterUrl = "poster_url"
     }
 
     // "3 seasons" / "1 season" — total seasons released, when known.

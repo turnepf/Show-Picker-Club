@@ -278,7 +278,7 @@ final class OfflineQueue: ObservableObject {
              fullSeries: (m.fullSeries ?? false) ? 1 : 0, watchingWith: m.watchingWith,
              nextSeasonDate: nil, seasonEndDate: nil, seasonsReleased: nil, genres: nil, actors: nil,
              archived: (m.archived ?? false) ? 1 : 0, memberSlug: m.memberSlug,
-             createdAt: ISO8601DateFormatter().string(from: m.createdAt))
+             createdAt: ISO8601DateFormatter().string(from: m.createdAt), posterUrl: nil)
     }
 
     private func applyEdits(_ m: PendingMutation, to s: Show) -> Show {
@@ -289,7 +289,7 @@ final class OfflineQueue: ObservableObject {
              nextSeasonDate: s.nextSeasonDate, seasonEndDate: s.seasonEndDate,
              seasonsReleased: s.seasonsReleased, genres: s.genres,
              actors: s.actors, archived: (m.archived ?? false) ? 1 : 0, memberSlug: s.memberSlug,
-             createdAt: s.createdAt)
+             createdAt: s.createdAt, posterUrl: s.posterUrl)
     }
 
     // MARK: - Temp ids & persistence
@@ -320,7 +320,7 @@ private extension Show {
              movie: movie, fullSeries: fullSeries, watchingWith: watchingWith,
              nextSeasonDate: nextSeasonDate, seasonEndDate: seasonEndDate,
              seasonsReleased: seasonsReleased, genres: genres,
-             actors: actors, archived: archived, memberSlug: memberSlug, createdAt: createdAt)
+             actors: actors, archived: archived, memberSlug: memberSlug, createdAt: createdAt, posterUrl: posterUrl)
     }
 
     func with(archived: Bool) -> Show {
@@ -329,6 +329,6 @@ private extension Show {
              movie: movie, fullSeries: fullSeries, watchingWith: watchingWith,
              nextSeasonDate: nextSeasonDate, seasonEndDate: seasonEndDate,
              seasonsReleased: seasonsReleased, genres: genres,
-             actors: actors, archived: archived ? 1 : 0, memberSlug: memberSlug, createdAt: createdAt)
+             actors: actors, archived: archived ? 1 : 0, memberSlug: memberSlug, createdAt: createdAt, posterUrl: posterUrl)
     }
 }
