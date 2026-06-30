@@ -13,6 +13,16 @@ struct ReportingView: View {
                     metric("This week", r.activeMembers.week)
                     metric("This month", r.activeMembers.month)
                 }
+                if let bp = r.activeByPlatform, !platformKeys(bp).isEmpty {
+                    Section("Active by platform (sessions)") {
+                        ForEach(platformKeys(bp), id: \.self) { key in
+                            platformRow(label: platformLabel(key),
+                                        day: bp.day[key] ?? 0,
+                                        week: bp.week[key] ?? 0,
+                                        month: bp.month[key] ?? 0)
+                        }
+                    }
+                }
                 Section("New shows") { windowRows(r.newShows) }
                 Section("Edited shows") { windowRows(r.editedShows) }
                 Section("Archived shows") { windowRows(r.archivedShows) }
@@ -21,6 +31,19 @@ struct ReportingView: View {
                     Section("Logins") {
                         if let e = l.ever { metric("Logged in (ever)", e) }
                         if let n = l.never { metric("Never logged in", n) }
+                    }
+                }
+                if let never = r.neverLoggedIn, !never.isEmpty {
+                    Section("Never logged in (\(never.count))") {
+                        ForEach(never) { m in
+                            HStack {
+                                Text(m.displayName)
+                                Spacer()
+                                Text(m.libraryStatus)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
                 }
                 Section("Totals") {
@@ -65,6 +88,38 @@ struct ReportingView: View {
             Text(label)
             Spacer()
             Text("\(value)").foregroundStyle(.secondary).monospacedDigit()
+        }
+    }
+
+    // Stable display order for the platform breakdown; unknown keys sort last.
+    private static let platformOrder = ["ios", "tvos", "web-large", "web-small", "unknown"]
+
+    private func platformKeys(_ bp: PlatformWindows) -> [String] {
+        var keys = Set(bp.day.keys)
+        keys.formUnion(bp.week.keys)
+        keys.formUnion(bp.month.keys)
+        let known = Self.platformOrder.filter { keys.contains($0) }
+        let extra = keys.subtracting(Self.platformOrder).sorted()
+        return known + extra
+    }
+
+    private func platformLabel(_ key: String) -> String {
+        switch key {
+        case "ios": return "iOS"
+        case "tvos": return "tvOS"
+        case "web-large": return "Web (large)"
+        case "web-small": return "Web (small)"
+        case "unknown": return "Unknown"
+        default: return key
+        }
+    }
+
+    private func platformRow(label: String, day: Int, week: Int, month: Int) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text("\(day) / \(week) / \(month)")
+                .foregroundStyle(.secondary).monospacedDigit()
         }
     }
 
