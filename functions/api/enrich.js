@@ -231,15 +231,6 @@ export async function onRequestPost(context) {
   // TMDB: check next season dates for Watching and Waiting shows.
   // Cap the same way; oldest/least-recently-enriched first so the budget rotates evenly.
   const hasTmdb = !!(env.TMDB_TOKEN || env.TMDB_API_KEY);
-  const debug = {
-    hasToken: !!env.TMDB_TOKEN,
-    hasApiKey: !!env.TMDB_API_KEY,
-    hasOmdb: !!apiKey,
-    tvCandidates: null,
-    movieCandidates: null,
-    tvSample: null,
-    tvError: null,
-  };
   let tmdbUpdated = 0;
   if (hasTmdb) {
     const tmdbBase = `SELECT id, title, movie, list FROM shows
@@ -248,15 +239,11 @@ export async function onRequestPost(context) {
       ? env.DB.prepare(`${tmdbBase} AND member_slug = ? ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`).bind(member, maxTmdb)
       : env.DB.prepare(`${tmdbBase} ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`).bind(maxTmdb);
     const { results: tmdbShows } = await tmdbStmt.all();
-    debug.tvCandidates = tmdbShows.length;
 
     for (const show of tmdbShows) {
       try {
         // Search TMDB for the show
         const searchData = await tmdbGet(`/search/tv?query=${encodeURIComponent(show.title)}`, env);
-        if (debug.tvSample === null) {
-          debug.tvSample = JSON.stringify(searchData).slice(0, 300);
-        }
         if (!searchData.results || searchData.results.length === 0) continue;
 
         const tmdbId = searchData.results[0].id;
@@ -306,9 +293,7 @@ export async function onRequestPost(context) {
           "UPDATE shows SET next_season_date = ?, season_end_date = ?, full_series = ?, genres = COALESCE(?, genres), seasons_released = COALESCE(?, seasons_released), poster_url = COALESCE(?, poster_url), network_logo_url = COALESCE(?, network_logo_url), enriched_at = datetime('now') WHERE id = ?"
         ).bind(newDate, endDate, isComplete, genres, seasonsReleased, posterUrl, networkLogoUrl, show.id).run();
         tmdbUpdated++;
-      } catch (e) {
-        if (!debug.tvError) debug.tvError = String((e && e.stack) || e).slice(0, 300);
-      }
+      } catch (e) {}
     }
   }
 
@@ -323,7 +308,6 @@ export async function onRequestPost(context) {
       ? env.DB.prepare(`${movieBase} AND member_slug = ? ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`).bind(member, maxTmdb)
       : env.DB.prepare(`${movieBase} ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`).bind(maxTmdb);
     const { results: movieShows } = await movieStmt.all();
-    debug.movieCandidates = movieShows.length;
 
     for (const show of movieShows) {
       try {
@@ -381,7 +365,7 @@ export async function onRequestPost(context) {
     }
   }
 
-  return new Response(JSON.stringify({ enriched, tmdbUpdated, actorImdbFilled, debug }), {
+  return new Response(JSON.stringify({ enriched, tmdbUpdated, actorImdbFilled }), {
     headers: { 'Content-Type': 'application/json' },
   });
 }
