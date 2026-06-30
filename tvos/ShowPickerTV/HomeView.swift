@@ -1,28 +1,22 @@
 import SwiftUI
 
+// The "Home" tab: browse what members are watching and the member directory.
+// Auth and the member's own lists live in their own tabs.
 struct HomeView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
     @State private var loading = true
     @State private var errorText: String?
-    @State private var path: [Route] = []
-    @State private var showingLogin = false
-    // Auto-open the logged-in member's own list once per launch, mirroring
-    // iOS. Tracked so backing out to Home doesn't bounce them forward again.
-    @State private var didAutoOpen = false
-
-    // The logged-in member, resolved against the loaded member list.
-    private var myMember: Member? {
-        guard let slug = auth.memberSlug else { return nil }
-        return members.first { $0.slug == slug }
-    }
 
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 50) {
-                    header
+                    Text("Show Picker Club")
+                        .font(.system(size: 56, weight: .bold))
+                        .foregroundColor(Theme.text)
+                        .padding(.top, 20)
 
                     if loading {
                         ProgressView()
@@ -34,7 +28,6 @@ struct HomeView: View {
                             .foregroundColor(Theme.muted)
                             .padding(.top, 40)
                     } else {
-                        accountCard
                         popularShelf
                         membersSection
                     }
@@ -43,74 +36,9 @@ struct HomeView: View {
                 .padding(.bottom, 60)
             }
             .background(Theme.background.ignoresSafeArea())
-            .navigationDestination(for: Route.self) { route in
-                switch route {
-                case .member(let m):
-                    MemberView(member: m)
-                case .detail(let id, let title, let network, let rating):
-                    ShowDetailView(id: id, initialTitle: title, initialNetwork: network, initialRating: rating)
-                }
-            }
-            .task { if loading { await load() } }
-            .fullScreenCover(isPresented: $showingLogin) {
-                LoginView().environmentObject(auth)
-            }
-            // Auth may resolve after the member list loads (they refresh
-            // concurrently at launch), and again on a fresh login. React to
-            // whichever lands: close the login screen and open the member's list.
-            .onChange(of: auth.memberSlug) { _, _ in
-                showingLogin = false
-                maybeAutoOpen()
-            }
+            .showDestinations()
         }
-    }
-
-    // MARK: Sections
-
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("Show Picker Club")
-                .font(.system(size: 56, weight: .bold))
-                .foregroundColor(Theme.text)
-            Spacer()
-            if let me = myMember {
-                HStack(spacing: 24) {
-                    Text("Hi, \(me.label)")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(Theme.muted)
-                    Button("Log out") { Task { await auth.logout() } }
-                        .font(.system(size: 22, weight: .semibold))
-                }
-            } else {
-                Button { showingLogin = true } label: {
-                    Label("Log in", systemImage: "person.crop.circle")
-                        .font(.system(size: 22, weight: .semibold))
-                }
-            }
-        }
-        .padding(.top, 20)
-    }
-
-    // Prominent jump to your own lists when signed in; an invitation to sign
-    // in otherwise. Browsing below works either way.
-    @ViewBuilder private var accountCard: some View {
-        if let me = myMember {
-            Button { path = [.member(me)] } label: {
-                bannerCard(title: "My Shows",
-                           subtitle: "Open \(me.label)'s lists",
-                           systemImage: "person.crop.circle.fill",
-                           tint: Theme.listColor("watching"))
-            }
-            .buttonStyle(PushButtonStyle())
-        } else if !auth.isLoggedIn {
-            Button { showingLogin = true } label: {
-                bannerCard(title: "Log in to see your shows",
-                           subtitle: "Browse the club below, or sign in to open your own lists",
-                           systemImage: "person.crop.circle.badge.plus",
-                           tint: Theme.listColor("waiting"))
-            }
-            .buttonStyle(PushButtonStyle())
-        }
+        .task { if loading { await load() } }
     }
 
     @ViewBuilder private var popularShelf: some View {
@@ -156,55 +84,17 @@ struct HomeView: View {
             .foregroundColor(Theme.text)
     }
 
-    private func bannerCard(title: String, subtitle: String, systemImage: String, tint: Color) -> some View {
-        HStack(spacing: 24) {
-            Image(systemName: systemImage)
-                .font(.system(size: 44))
-                .foregroundColor(.white)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.system(size: 30, weight: .bold))
-                    .foregroundColor(.white)
-                Text(subtitle)
-                    .font(.system(size: 22))
-                    .foregroundColor(.white.opacity(0.85))
-            }
-            Spacer()
-        }
-        .padding(28)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(colors: [tint, tint.opacity(0.8)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-        )
-    }
-
-    // MARK: Behavior
-
-    // Drop a logged-in member straight onto their own list. Needs both the
-    // member list and the session resolved, fires once, and only when the
-    // stack is still at Home so it never traps the user.
-    @MainActor
-    private func maybeAutoOpen() {
-        guard !didAutoOpen, path.isEmpty, let me = myMember else { return }
-        didAutoOpen = true
-        path = [.member(me)]
-    }
-
     private func load() async {
         loading = true
         defer { loading = false }
         do {
             async let m = API.members()
             async let p = API.popular()
-            // Most active first, then most recent activity as a tiebreaker.
             members = try await m.sorted {
                 if $0.activeCount != $1.activeCount { return $0.activeCount > $1.activeCount }
                 return ($0.lastActivityAt ?? "") > ($1.lastActivityAt ?? "")
             }
             popular = try await p
-            maybeAutoOpen()
         } catch {
             errorText = "Couldn't load. Check the connection and try again."
         }
@@ -248,12 +138,4 @@ struct MemberTile: View {
         }
         .frame(height: 170)
     }
-}
-
-// Navigation routes. Hashable so they work with NavigationStack value links.
-// Detail carries minimal info for an instant header; the full record + cast
-// are fetched by id on the detail screen.
-enum Route: Hashable {
-    case member(Member)
-    case detail(id: Int, title: String, network: String?, rating: String?)
 }

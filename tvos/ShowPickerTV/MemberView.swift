@@ -2,9 +2,14 @@ import SwiftUI
 
 struct MemberView: View {
     let member: Member
+    @EnvironmentObject private var auth: AuthStore
     @State private var shows: [Show] = []
+    @State private var picks: [Pick] = []
+    @State private var pickMessage: String?
     @State private var loading = true
     @State private var errorText: String?
+
+    private var isMine: Bool { auth.memberSlug == member.slug }
 
     var body: some View {
         ScrollView {
@@ -18,30 +23,33 @@ struct MemberView: View {
                     ProgressView().padding(.top, 80)
                 } else if let errorText {
                     Text(errorText).foregroundColor(Theme.muted)
-                } else if shows.allSatisfy({ ShowList(rawValue: $0.list) == nil }) {
-                    // Defensive empty-state: tvOS focus engine needs *some*
-                    // visible content to land on, otherwise the screen looks
-                    // hung when every list happens to be empty (e.g. a brand-
-                    // new member, or a member whose rows all carry an
-                    // unrecognised list value).
-                    VStack(spacing: 24) {
-                        Text("\(member.label) hasn't added any shows yet.")
-                            .font(.system(size: 32))
-                            .foregroundColor(Theme.muted)
-                            .multilineTextAlignment(.center)
-                        Text("Check back later, or pick another member from the home page.")
-                            .font(.system(size: 24))
-                            .foregroundColor(Theme.muted)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 80)
                 } else {
-                    ForEach(ShowList.allCases) { list in
-                        let items = shows.filter { $0.list == list.rawValue }
-                        if !items.isEmpty {
-                            shelf(list: list, items: items)
+                    if isMine, !picks.isEmpty { picksShelf }
+
+                    let hasLists = !shows.allSatisfy { ShowList(rawValue: $0.list) == nil }
+                    if hasLists {
+                        ForEach(ShowList.allCases) { list in
+                            let items = shows.filter { $0.list == list.rawValue }
+                            if !items.isEmpty {
+                                shelf(list: list, items: items)
+                            }
                         }
+                    } else if !(isMine && !picks.isEmpty) {
+                        // Defensive empty-state: the tvOS focus engine needs some
+                        // visible content to land on, otherwise the screen looks
+                        // hung when every list is empty.
+                        VStack(spacing: 24) {
+                            Text("\(member.label) hasn't added any shows yet.")
+                                .font(.system(size: 32))
+                                .foregroundColor(Theme.muted)
+                                .multilineTextAlignment(.center)
+                            Text("Check back later, or pick another member from the home page.")
+                                .font(.system(size: 24))
+                                .foregroundColor(Theme.muted)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 80)
                     }
                 }
             }
@@ -50,6 +58,37 @@ struct MemberView: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .task { await load() }
+    }
+
+    // "Picks for you" — recommendations on your own page; tapping adds to Up Next.
+    private var picksShelf: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles").foregroundColor(Theme.orange)
+                Text("Picks for you")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundColor(Theme.text)
+            }
+            if let pickMessage {
+                Text(pickMessage)
+                    .font(.system(size: 22))
+                    .foregroundColor(Theme.muted)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .top, spacing: 40) {
+                    ForEach(picks) { pick in
+                        Button { Task { await addPick(pick) } } label: {
+                            ShowCard(title: pick.title,
+                                     network: pick.network,
+                                     rating: pick.rating.map { String(format: "%.1f", $0) },
+                                     metaLine: pick.caption)
+                        }
+                        .buttonStyle(PushButtonStyle())
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+        }
     }
 
     private func shelf(list: ShowList, items: [Show]) -> some View {
@@ -93,6 +132,21 @@ struct MemberView: View {
         return items.sorted { (Double($0.rating ?? "0") ?? 0) > (Double($1.rating ?? "0") ?? 0) }
     }
 
+    private func addPick(_ pick: Pick) async {
+        picks.removeAll { $0.id == pick.id }   // optimistic
+        do {
+            try await API.addShow(title: pick.title, network: pick.network, networkUrl: pick.networkUrl,
+                                  list: ShowList.next.rawValue, movie: false, fullSeries: false)
+            pickMessage = "Added “\(pick.title)” to your Up Next."
+            await load()
+        } catch API.APIError.badResponse(409) {
+            pickMessage = "“\(pick.title)” is already on one of your lists."
+        } catch {
+            pickMessage = "Couldn't add it. Please try again."
+            await loadPicks()   // restore on real failure
+        }
+    }
+
     private func load() async {
         loading = true
         defer { loading = false }
@@ -100,6 +154,16 @@ struct MemberView: View {
             shows = try await API.shows(member: member.slug)
         } catch {
             errorText = "Couldn't load \(member.label)'s shows."
+        }
+        await loadPicks()
+    }
+
+    private func loadPicks() async {
+        guard isMine else { picks = []; return }
+        if let r = try? await API.recommendations(member: member.slug), r.isSeedOnly != true {
+            picks = Array(r.picks.prefix(8))
+        } else {
+            picks = []
         }
     }
 }

@@ -118,6 +118,20 @@ enum API {
         return r.shows
     }
 
+    // Every active show across all members — backs cross-library search. The
+    // rows carry extra member columns the Show model simply ignores.
+    static func allShows() async throws -> [Show] {
+        let r: ShowsResponse = try await get("/api/shows/all")
+        return r.shows
+    }
+
+    // "Picks for you" for a member's own Up Next. Returns empty picks for
+    // seed-only members; callers can just check picks.isEmpty.
+    static func recommendations(member slug: String) async throws -> Recommendations {
+        let enc = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? slug
+        return try await get("/api/recommendations?member=\(enc)")
+    }
+
     static func shows(member slug: String) async throws -> [Show] {
         let enc = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? slug
         let r: ShowsResponse = try await get("/api/shows?member=\(enc)")
