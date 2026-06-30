@@ -3,7 +3,7 @@ import SwiftUI
 // A focusable show tile. No poster art yet (the backend stores text + URLs,
 // not images), so it renders a gradient card with the title, network, and a
 // metadata line (rating + seasons / next-up) laid over the bottom of the card.
-// No static shadow — tvOS supplies the focus lift via .buttonStyle(.card).
+// No static shadow — PushButtonStyle grows + lifts the card on focus.
 // Built so a `posterURL` can drop in later.
 struct ShowCard: View {
     let title: String

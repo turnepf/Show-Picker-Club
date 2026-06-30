@@ -70,7 +70,7 @@ struct MemberView: View {
                                      fullSeries: show.isFullSeries,
                                      metaLine: show.metaLine(for: list))
                         }
-                        .buttonStyle(.card)
+                        .buttonStyle(PushButtonStyle())
                     }
                 }
                 .padding(.horizontal, 4)
