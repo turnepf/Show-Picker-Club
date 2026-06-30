@@ -226,10 +226,7 @@ struct ShowDetailView: View {
     @ViewBuilder private var watchButton: some View {
         if let s = show, s.hasRealUrl, let urlStr = s.networkUrl, let url = URL(string: urlStr) {
             Button {
-                let target = chooseTarget(serviceUrl: url)
-                openURL(target) { accepted in
-                    openFailed = !accepted
-                }
+                openWatch(serviceUrl: url)
             } label: {
                 HStack(spacing: 12) {
                     Label(buttonLabel, systemImage: "play.fill")
@@ -300,6 +297,21 @@ struct ShowDetailView: View {
         return isHBOSearch ? serviceUrl : deepLinkURL(for: serviceUrl)
     }
 
+    // Try the best target; if the device can't open it (custom scheme not
+    // registered, app hand-off declined), fall back to the universal https URL,
+    // which on a real device can still hand off to the installed app.
+    private func openWatch(serviceUrl: URL) {
+        let primary = chooseTarget(serviceUrl: serviceUrl)
+        openURL(primary) { ok in
+            if ok { openFailed = false; return }
+            if primary.absoluteString != serviceUrl.absoluteString {
+                openURL(serviceUrl) { ok2 in openFailed = !ok2 }
+            } else {
+                openFailed = true
+            }
+        }
+    }
+
     // Per-service URL rewriter. For most services on tvOS, the plain https
     // universal link doesn't even *open* the streaming app — openURL returns
     // accepted=false. Their own custom URL scheme launches the app instead
@@ -309,7 +321,9 @@ struct ShowDetailView: View {
         let lower = url.absoluteString.lowercased()
 
         if lower.contains("watch.amazon.com") || lower.contains("primevideo.com") || lower.contains("amazon.com/gp/video") {
-            if let u = URL(string: "aiv://aiv/landing") { return u }
+            // Bare scheme just launches Prime Video; the "/aiv/landing" path is
+            // unreliable. If even this is declined we fall back to the https URL.
+            if let u = URL(string: "aiv://") { return u }
         }
         if lower.contains("paramountplus.com") || lower.contains("paramount.com") {
             if let u = URL(string: "paramountplus://") { return u }
