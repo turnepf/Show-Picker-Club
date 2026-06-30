@@ -193,7 +193,8 @@ struct HomeView: View {
     }
 
     private func popularRow(_ s: PopularShow) -> some View {
-        HStack {
+        HStack(spacing: 12) {
+            PosterThumb(url: s.posterUrl)
             VStack(alignment: .leading, spacing: 2) {
                 Text(s.title).font(.body)
                 if let n = s.network, !n.isEmpty {
