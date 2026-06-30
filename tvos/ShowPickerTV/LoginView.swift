@@ -56,7 +56,7 @@ struct LoginView: View {
                         .keyboardType(.numberPad)
                         .font(.system(size: 30, weight: .semibold).monospacedDigit())
                         .multilineTextAlignment(.center)
-                        .onChange(of: code) { newValue in
+                        .onChange(of: code) { _, newValue in
                             // Auto-submit once a full 6-digit code is entered.
                             if newValue.filter(\.isNumber).count == 6 && !submitting {
                                 Task { await submit() }
