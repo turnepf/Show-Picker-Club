@@ -1,9 +1,10 @@
 import SwiftUI
 
 // A focusable portrait poster tile — the standard Apple TV card shape. Shows
-// the TMDB poster when we have one, falling back to a gradient tile with the
-// title for shows that haven't been enriched yet. Title + rating/seasons sit
-// below the art. PushButtonStyle grows + lifts it on focus.
+// the TMDB poster when we have one, falling back to a gradient tile. The title
+// + rating/seasons are laid over the bottom of the card on a dark scrim, so the
+// card is a single rounded unit (clean rounded focus shadow) and reads the same
+// with or without a poster. Built so a `posterURL` can drop in later.
 struct ShowCard: View {
     let title: String
     var network: String? = nil
@@ -16,30 +17,47 @@ struct ShowCard: View {
     private static let w: CGFloat = 220
     private static let posterH: CGFloat = 330
 
+    private var hasMeta: Bool {
+        (rating?.isEmpty == false) || (metaLine?.isEmpty == false)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ZStack(alignment: .topTrailing) {
-                poster
-                    .frame(width: Self.w, height: Self.posterH)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        ZStack(alignment: .bottomLeading) {
+            poster
 
-                if fullSeries {
-                    Text("🎬")
-                        .font(.system(size: 22))
-                        .padding(8)
-                        .background(.black.opacity(0.35), in: Circle())
-                        .padding(8)
-                }
-            }
+            // Scrim so the title stays legible over bright posters.
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.25), .black.opacity(0.85)],
+                startPoint: .center, endPoint: .bottom
+            )
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(Theme.text)
-                    .lineLimit(1)
-                metaRow
+                    .font(.system(size: 21, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .minimumScaleFactor(0.7)
+                if let network, !network.isEmpty {
+                    Text(network)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.white.opacity(0.75))
+                        .lineLimit(1)
+                }
+                if hasMeta { metaRow }
             }
-            .frame(width: Self.w, alignment: .leading)
+            .padding(14)
+        }
+        .frame(width: Self.w, height: Self.posterH)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(alignment: .topTrailing) {
+            if fullSeries {
+                Text("🎬")
+                    .font(.system(size: 22))
+                    .padding(8)
+                    .background(.black.opacity(0.4), in: Circle())
+                    .padding(8)
+            }
         }
     }
 
@@ -62,15 +80,6 @@ struct ShowCard: View {
             colors: [Theme.tileColor(for: title), Theme.tileColor(for: title).opacity(0.78)],
             startPoint: .topLeading, endPoint: .bottomTrailing
         )
-        .overlay(
-            Text(title)
-                .font(.system(size: 22, weight: .bold))
-                .foregroundColor(.white)
-                .multilineTextAlignment(.center)
-                .lineLimit(4)
-                .minimumScaleFactor(0.6)
-                .padding(16)
-        )
     }
 
     @ViewBuilder private var metaRow: some View {
@@ -84,11 +93,10 @@ struct ShowCard: View {
             }
             if let metaLine, !metaLine.isEmpty {
                 Text(metaLine)
-                    .foregroundColor(Theme.muted)
+                    .foregroundColor(.white.opacity(0.85))
                     .lineLimit(1)
             }
         }
-        .font(.system(size: 16, weight: .medium))
-        .frame(height: 20, alignment: .leading)
+        .font(.system(size: 15, weight: .semibold))
     }
 }
