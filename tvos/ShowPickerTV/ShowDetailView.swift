@@ -38,17 +38,9 @@ struct ShowDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 40) {
                 HStack(alignment: .top, spacing: 50) {
-                    RoundedRectangle(cornerRadius: 18)
-                        .fill(Theme.tileColor(for: title))
-                        .overlay(
-                            Text(title)
-                                .font(.system(size: 40, weight: .bold))
-                                .foregroundColor(.white)
-                                .multilineTextAlignment(.center)
-                                .padding(24)
-                                .minimumScaleFactor(0.5)
-                        )
-                        .frame(width: 420, height: 280)
+                    detailPoster
+                        .frame(width: 300, height: 450)
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 22) {
                         Text(title)
@@ -171,6 +163,37 @@ struct ShowDetailView: View {
         } catch {
             actionMessage = "Couldn't move it. Please try again."
         }
+    }
+
+    // Portrait poster when we have one; otherwise a gradient tile with the
+    // title so un-enriched shows still read clearly.
+    @ViewBuilder private var detailPoster: some View {
+        if let p = show?.posterUrl, let url = URL(string: p) {
+            AsyncImage(url: url) { phase in
+                if let image = phase.image {
+                    image.resizable().scaledToFill()
+                } else {
+                    posterFallback
+                }
+            }
+        } else {
+            posterFallback
+        }
+    }
+
+    private var posterFallback: some View {
+        LinearGradient(
+            colors: [Theme.tileColor(for: title), Theme.tileColor(for: title).opacity(0.78)],
+            startPoint: .topLeading, endPoint: .bottomTrailing
+        )
+        .overlay(
+            Text(title)
+                .font(.system(size: 36, weight: .bold))
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.5)
+                .padding(24)
+        )
     }
 
     @ViewBuilder private func metaRows(_ s: Show) -> some View {

@@ -68,7 +68,8 @@ struct MemberView: View {
                                      network: show.network,
                                      rating: show.rating,
                                      fullSeries: show.isFullSeries,
-                                     metaLine: show.metaLine(for: list))
+                                     metaLine: show.metaLine(for: list),
+                                     posterUrl: show.posterUrl)
                         }
                         .buttonStyle(PushButtonStyle())
                     }

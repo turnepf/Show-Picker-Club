@@ -58,7 +58,13 @@ async function omdbByTitle(title, apiKey, type) {
     rating: d.imdbRating !== 'N/A' ? d.imdbRating : null,
     canonicalTitle: d.Title || null,
     actors: d.Actors && d.Actors !== 'N/A' ? d.Actors.split(', ') : [],
+    posterUrl: d.Poster && d.Poster !== 'N/A' ? d.Poster : null,
   };
+}
+
+// TMDB poster paths are relative; w500 is a good size for tvOS cards.
+function tmdbPosterUrl(posterPath) {
+  return posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
 }
 
 export async function fetchEnrichment(title, env, isMovie) {
@@ -108,7 +114,9 @@ export async function fetchEnrichment(title, env, isMovie) {
           })
         );
 
-        return { canonicalTitle, rating, actors };
+        const posterUrl = tmdbPosterUrl(detail.poster_path || search.results[0].poster_path);
+
+        return { canonicalTitle, rating, actors, posterUrl };
       }
     } catch (_) {
       // fall through to OMDB
@@ -123,9 +131,10 @@ export async function fetchEnrichment(title, env, isMovie) {
         canonicalTitle: result.canonicalTitle,
         rating: result.rating,
         actors: result.actors.map(name => ({ name, imdb_id: null })),
+        posterUrl: result.posterUrl || null,
       };
     }
   }
 
-  return { canonicalTitle: null, rating: null, actors: [] };
+  return { canonicalTitle: null, rating: null, actors: [], posterUrl: null };
 }
