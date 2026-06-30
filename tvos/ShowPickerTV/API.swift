@@ -26,11 +26,13 @@ enum API {
         return try JSONDecoder().decode(T.self, from: data)
     }
 
-    // POST a JSON body and decode the reply. Used by the auth flow.
-    private static func postJSON<T: Decodable>(_ path: String, body: [String: Any]) async throws -> T {
+    // Send a JSON body with the given method and decode the reply. Used by the
+    // auth flow and the write actions (add / move).
+    private static func sendJSON<T: Decodable>(_ path: String, method: String = "POST",
+                                               body: [String: Any]) async throws -> T {
         guard let url = URL(string: baseString + path) else { throw APIError.badURL }
         var req = URLRequest(url: url)
-        req.httpMethod = "POST"
+        req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(platform, forHTTPHeaderField: "X-Client-Platform")
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -39,6 +41,10 @@ enum API {
             throw APIError.badResponse((resp as? HTTPURLResponse)?.statusCode ?? -1)
         }
         return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    private static func postJSON<T: Decodable>(_ path: String, body: [String: Any]) async throws -> T {
+        try await sendJSON(path, method: "POST", body: body)
     }
 
     // MARK: Auth
@@ -74,6 +80,32 @@ enum API {
         var req = URLRequest(url: url)
         req.setValue(platform, forHTTPHeaderField: "X-Client-Platform")
         _ = try? await URLSession.shared.data(for: req)
+    }
+
+    // MARK: Writes (require the session cookie)
+
+    // Add a show to the logged-in member's list. The server scopes the insert
+    // to the session's member, so we don't pass a slug — this always lands on
+    // *my* list. Used to copy a popular / another member's show onto your own.
+    @discardableResult
+    static func addShow(title: String, network: String?, networkUrl: String?,
+                        list: String, movie: Bool, fullSeries: Bool) async throws -> Show {
+        var body: [String: Any] = [
+            "title": title,
+            "list": list,
+            "movie": movie ? 1 : 0,
+            "full_series": fullSeries ? 1 : 0,
+        ]
+        if let network, !network.isEmpty { body["network"] = network }
+        if let networkUrl, !networkUrl.isEmpty { body["network_url"] = networkUrl }
+        let r: ShowResponse = try await sendJSON("/api/shows", method: "POST", body: body)
+        return r.show
+    }
+
+    // Move one of my own shows to another list.
+    static func moveShow(id: Int, to list: String) async throws {
+        struct Ack: Decodable {}
+        let _: Ack = try await sendJSON("/api/shows/\(id)/move", method: "PUT", body: ["list": list])
     }
 
     static func members() async throws -> [Member] {

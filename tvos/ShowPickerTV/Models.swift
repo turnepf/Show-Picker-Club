@@ -86,6 +86,7 @@ struct Show: Codable, Identifiable, Hashable {
     let seasonEndDate: String?
     let seasonsReleased: Int?
     let genres: String?
+    let memberSlug: String?
     // The API returns actors as a JSON-encoded string (from SQLite
     // json_group_array). Decoded lazily via `castMembers`.
     let actors: String?
@@ -99,6 +100,7 @@ struct Show: Codable, Identifiable, Hashable {
         case nextSeasonDate = "next_season_date"
         case seasonEndDate = "season_end_date"
         case seasonsReleased = "seasons_released"
+        case memberSlug = "member_slug"
     }
 
     var isMovie: Bool { (movie ?? 0) == 1 }
