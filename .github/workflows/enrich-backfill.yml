@@ -48,9 +48,6 @@ jobs:
               echo "::error::round $i returned HTTP $http (CRON_SECRET rejected, or endpoint error): $body"
               exit 1
             fi
-            if [ "$i" = "1" ]; then
-              echo "round 1 raw body: $body"
-            fi
             updated=$(printf '%s' "$body" | python3 -c "import sys,json;print(json.load(sys.stdin).get('tmdbUpdated',0))" 2>/dev/null || echo 0)
             total=$((total + updated))
             echo "round $i/$ROUNDS — tmdbUpdated: $updated (running total: $total)"
