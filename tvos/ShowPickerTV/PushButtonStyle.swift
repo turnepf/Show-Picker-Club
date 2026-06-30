@@ -16,15 +16,16 @@ struct PushButtonStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .scaleEffect(scale)
-                .shadow(color: .black.opacity(focused ? 0.35 : 0),
-                        radius: focused ? 22 : 0, x: 0, y: focused ? 14 : 0)
+                .shadow(color: .black.opacity(focused ? 0.5 : 0),
+                        radius: focused ? 16 : 0, x: 0, y: focused ? 10 : 0)
                 .animation(.easeOut(duration: 0.18), value: focused)
                 .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+                .zIndex(focused ? 1 : 0)
         }
 
         private var scale: CGFloat {
-            if configuration.isPressed { return 1.04 }
-            return focused ? 1.08 : 1.0
+            if configuration.isPressed { return 1.03 }
+            return focused ? 1.06 : 1.0
         }
     }
 }

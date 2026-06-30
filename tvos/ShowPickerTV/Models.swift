@@ -132,13 +132,6 @@ struct Show: Codable, Identifiable, Hashable {
         return "\(m)/\(d)"
     }
 
-    // Secondary line for a card: premiere range on Watching/Waiting, else the
-    // seasons count. nil when neither is known.
-    func metaLine(for list: ShowList) -> String? {
-        if list == .watching || list == .waiting, let r = nextUpRange { return "Next up: \(r)" }
-        return seasonsText
-    }
-
     var castMembers: [Actor] {
         guard let actors, let data = actors.data(using: .utf8) else { return [] }
         return (try? JSONDecoder().decode([Actor].self, from: data)) ?? []
@@ -219,19 +212,15 @@ struct Pick: Codable, Identifiable, Hashable {
         case sharedActors = "shared_actors"
     }
 
-    // Network + a short de-named reason, mirroring iOS.
-    var caption: String {
-        let reason: String
+    // A short de-named reason (no network — the card shows that separately).
+    var reason: String {
         let n = nNeighbors ?? 0
         if n > 0 {
-            reason = n == 1 ? "On 1 member's list" : "On \(n) members' lists"
+            return n == 1 ? "On 1 member's list" : "On \(n) members' lists"
         } else if let a = sharedActors, a > 0 {
-            reason = "\(a) shared actor\(a == 1 ? "" : "s")"
-        } else {
-            reason = "Popular in the club"
+            return "\(a) shared actor\(a == 1 ? "" : "s")"
         }
-        if let net = network, !net.isEmpty { return "\(net) · \(reason)" }
-        return reason
+        return "Popular in the club"
     }
 }
 

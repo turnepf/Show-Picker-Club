@@ -51,13 +51,13 @@ struct HomeView: View {
                             NavigationLink(value: Route.detail(id: show.id, title: show.title, network: show.network, rating: show.rating)) {
                                 ShowCard(title: show.title,
                                          network: show.network,
-                                         rating: show.rating,
                                          posterUrl: show.posterUrl)
                             }
                             .buttonStyle(PushButtonStyle())
                         }
                     }
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 30)
                 }
             }
         }

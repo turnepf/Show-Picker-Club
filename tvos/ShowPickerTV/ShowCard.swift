@@ -1,33 +1,28 @@
 import SwiftUI
 
-// A focusable portrait poster tile — the standard Apple TV card shape. Shows
-// the TMDB poster when we have one, falling back to a gradient tile. The title
-// + rating/seasons are laid over the bottom of the card on a dark scrim, so the
-// card is a single rounded unit (clean rounded focus shadow) and reads the same
-// with or without a poster. Built so a `posterURL` can drop in later.
+// A focusable portrait poster tile — the standard Apple TV card shape. Shows the
+// TMDB poster when we have one, falling back to a gradient tile. Kept minimal:
+// title + network, plus one optional line (e.g. "Next up: …" on Watching/Waiting,
+// or a pick's reason). Everything else — rating, seasons, cast — lives on the
+// detail screen. Text sits over the bottom on a scrim, so the card is a single
+// rounded unit that reads the same with or without a poster.
 struct ShowCard: View {
     let title: String
     var network: String? = nil
-    var rating: String? = nil
+    var line: String? = nil
     var fullSeries: Bool = false
-    // Secondary line, e.g. "3 seasons" or "Next up: 6/1".
-    var metaLine: String? = nil
     var posterUrl: String? = nil
 
     private static let w: CGFloat = 220
     private static let posterH: CGFloat = 330
 
-    private var hasMeta: Bool {
-        (rating?.isEmpty == false) || (metaLine?.isEmpty == false)
-    }
-
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             poster
 
-            // Scrim so the title stays legible over bright posters.
+            // Scrim so the text stays legible over bright posters.
             LinearGradient(
-                colors: [.clear, .black.opacity(0.25), .black.opacity(0.85)],
+                colors: [.clear, .black.opacity(0.35), .black.opacity(0.9)],
                 startPoint: .center, endPoint: .bottom
             )
 
@@ -44,7 +39,12 @@ struct ShowCard: View {
                         .foregroundColor(.white.opacity(0.75))
                         .lineLimit(1)
                 }
-                if hasMeta { metaRow }
+                if let line, !line.isEmpty {
+                    Text(line)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.9))
+                        .lineLimit(1)
+                }
             }
             .padding(14)
         }
@@ -80,23 +80,5 @@ struct ShowCard: View {
             colors: [Theme.tileColor(for: title), Theme.tileColor(for: title).opacity(0.78)],
             startPoint: .topLeading, endPoint: .bottomTrailing
         )
-    }
-
-    @ViewBuilder private var metaRow: some View {
-        HStack(spacing: 10) {
-            if let rating, !rating.isEmpty {
-                HStack(spacing: 3) {
-                    Image(systemName: "star.fill")
-                    Text(rating)
-                }
-                .foregroundColor(Theme.orange)
-            }
-            if let metaLine, !metaLine.isEmpty {
-                Text(metaLine)
-                    .foregroundColor(.white.opacity(0.85))
-                    .lineLimit(1)
-            }
-        }
-        .font(.system(size: 15, weight: .semibold))
     }
 }
