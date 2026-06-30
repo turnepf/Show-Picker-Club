@@ -188,6 +188,53 @@ struct PopularShow: Codable, Identifiable, Hashable {
 
 struct PopularResponse: Codable { let shows: [PopularShow] }
 
+// MARK: Recommendations ("Picks for you")
+
+struct Recommendations: Codable {
+    let coldStart: Bool?
+    let isSeedOnly: Bool?
+    let picks: [Pick]
+
+    enum CodingKeys: String, CodingKey {
+        case picks
+        case coldStart = "cold_start"
+        case isSeedOnly = "is_seed_only"
+    }
+}
+
+struct Pick: Codable, Identifiable, Hashable {
+    let title: String
+    let network: String?
+    let networkUrl: String?
+    let rating: Double?
+    let nNeighbors: Int?
+    let sharedActors: Int?
+
+    var id: String { title }
+
+    enum CodingKeys: String, CodingKey {
+        case title, network, rating
+        case networkUrl = "network_url"
+        case nNeighbors = "n_neighbors"
+        case sharedActors = "shared_actors"
+    }
+
+    // Network + a short de-named reason, mirroring iOS.
+    var caption: String {
+        let reason: String
+        let n = nNeighbors ?? 0
+        if n > 0 {
+            reason = n == 1 ? "On 1 member's list" : "On \(n) members' lists"
+        } else if let a = sharedActors, a > 0 {
+            reason = "\(a) shared actor\(a == 1 ? "" : "s")"
+        } else {
+            reason = "Popular in the club"
+        }
+        if let net = network, !net.isEmpty { return "\(net) · \(reason)" }
+        return reason
+    }
+}
+
 // The four lists, in display order.
 enum ShowList: String, CaseIterable, Identifiable {
     case watching, waiting, recommending, next

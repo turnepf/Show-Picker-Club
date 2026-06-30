@@ -5,7 +5,8 @@ export async function onRequestGet(context) {
   const { env } = context;
   const { results } = await env.DB.prepare(
     `SELECT s.id, s.title, s.network, s.network_url, s.rating, s.movie,
-            s.full_series, s.list, s.member_slug, s.genres,
+            s.full_series, s.list, s.member_slug, s.genres, s.poster_url,
+            s.seasons_released, s.next_season_date, s.season_end_date,
             m.name AS member_name, m.first_name AS member_first_name,
             (SELECT json_group_array(json_object('name', a.name, 'imdb_id', a.imdb_id))
              FROM actors a WHERE a.show_id = s.id) AS actors
