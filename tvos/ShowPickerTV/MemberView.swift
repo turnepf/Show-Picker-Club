@@ -11,7 +11,7 @@ struct MemberView: View {
             VStack(alignment: .leading, spacing: 50) {
                 Text("\(member.label)'s Shows")
                     .font(.system(size: 48, weight: .bold))
-                    .foregroundColor(Theme.ink)
+                    .foregroundColor(Theme.text)
                     .padding(.top, 20)
 
                 if loading {
@@ -48,7 +48,7 @@ struct MemberView: View {
             .padding(.horizontal, 60)
             .padding(.bottom, 60)
         }
-        .background(Theme.cream.ignoresSafeArea())
+        .background(Theme.background.ignoresSafeArea())
         .task { await load() }
     }
 
@@ -58,7 +58,7 @@ struct MemberView: View {
                 Circle().fill(Theme.listColor(list.rawValue)).frame(width: 18, height: 18)
                 Text(list.title)
                     .font(.system(size: 32, weight: .semibold))
-                    .foregroundColor(Theme.ink)
+                    .foregroundColor(Theme.text)
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(alignment: .top, spacing: 40) {

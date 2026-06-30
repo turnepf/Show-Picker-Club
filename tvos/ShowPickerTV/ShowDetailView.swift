@@ -53,7 +53,7 @@ struct ShowDetailView: View {
                     VStack(alignment: .leading, spacing: 22) {
                         Text(title)
                             .font(.system(size: 54, weight: .bold))
-                            .foregroundColor(Theme.ink)
+                            .foregroundColor(Theme.text)
 
                         // Network intentionally omitted here — it lives on the
                         // watch button below, so the screen names it once.
@@ -64,11 +64,11 @@ struct ShowDetailView: View {
                             if let s = show, let l = ShowList(rawValue: s.list) {
                                 HStack(spacing: 8) {
                                     Circle().fill(Theme.listColor(s.list)).frame(width: 16, height: 16)
-                                    Text(l.title).foregroundColor(Theme.ink.opacity(0.7))
+                                    Text(l.title).foregroundColor(Theme.text.opacity(0.7))
                                 }
                             }
                             if let s = show, s.isMovie {
-                                Text("Movie").foregroundColor(Theme.ink.opacity(0.5))
+                                Text("Movie").foregroundColor(Theme.text.opacity(0.5))
                             }
                             if let s = show, s.isFullSeries {
                                 Text("🎬 Complete")
@@ -95,7 +95,7 @@ struct ShowDetailView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Cast")
                             .font(.system(size: 30, weight: .semibold))
-                            .foregroundColor(Theme.ink)
+                            .foregroundColor(Theme.text)
                         Text(cast.prefix(10).map { $0.name }.joined(separator: ", "))
                             .font(.system(size: 24))
                             .foregroundColor(Theme.muted)
@@ -104,7 +104,7 @@ struct ShowDetailView: View {
             }
             .padding(60)
         }
-        .background(Theme.cream.ignoresSafeArea())
+        .background(Theme.background.ignoresSafeArea())
         .task { await load() }
     }
 
@@ -117,7 +117,7 @@ struct ShowDetailView: View {
                 if canAddToMine {
                     Text("Add to my list")
                         .font(.system(size: 28, weight: .semibold))
-                        .foregroundColor(Theme.ink)
+                        .foregroundColor(Theme.text)
                     HStack(spacing: 24) {
                         ForEach(ShowList.allCases) { l in
                             Button(l.title) { Task { await addToMyList(l) } }
@@ -127,7 +127,7 @@ struct ShowDetailView: View {
                 } else if isMine, let cur = ShowList(rawValue: s.list) {
                     Text("Move to")
                         .font(.system(size: 28, weight: .semibold))
-                        .foregroundColor(Theme.ink)
+                        .foregroundColor(Theme.text)
                     HStack(spacing: 24) {
                         ForEach(ShowList.allCases.filter { $0 != cur }) { l in
                             Button(l.title) { Task { await moveTo(l) } }
@@ -176,13 +176,13 @@ struct ShowDetailView: View {
     @ViewBuilder private func metaRows(_ s: Show) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             if let by = s.recommendedBy, !by.isEmpty {
-                Text("Recommended by \(by)").foregroundColor(Theme.ink.opacity(0.7))
+                Text("Recommended by \(by)").foregroundColor(Theme.text.opacity(0.7))
             }
             if let dates = seasonLine(s) {
-                Text(dates).foregroundColor(Theme.ink.opacity(0.7))
+                Text(dates).foregroundColor(Theme.text.opacity(0.7))
             }
             if let w = s.watchingWith, !w.isEmpty {
-                Text("Watching with \(w)").foregroundColor(Theme.ink.opacity(0.7))
+                Text("Watching with \(w)").foregroundColor(Theme.text.opacity(0.7))
             }
             if let notes = s.notes, !notes.isEmpty {
                 Text(notes).italic().foregroundColor(Theme.muted)
