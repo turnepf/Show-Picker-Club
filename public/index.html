@@ -1438,10 +1438,14 @@
             const movieTag = show.movie ? ' <span class="show-movie">(Movie)</span>' : '';
             const memberList = (show.members || []).join(', ');
             const badge = ` <span class="popular-members-badge" onclick="toggleExpand(${show.id})" title="Tap to see who's watching">${show.member_count} Members</span>`;
+            const poster = show.poster_url
+              ? `<img class="row-poster" src="${safeUrl(show.poster_url)}" alt="" loading="lazy">`
+              : `<div class="row-poster row-poster-empty">🎬</div>`;
             const details = buildDetailLines(show, { aggregate: true });
             return `<div class="show popular-row">
               <div class="show-row">
                 <button class="share-btn popular-add-btn" style="display:none;" data-title="${escapeHtml(show.title)}" data-network="${escapeHtml(show.network || '')}" data-url="${escapeHtml(show.network_url || '')}" data-movie="${show.movie || 0}" title="Add to my list">+</button>
+                ${poster}
                 <span class="show-info"><span class="show-title clickable" title="Tap to see more" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${movieTag}${badge}</span>
               </div>
               <div class="show-actors" id="actors-${show.id}">${details}</div>
@@ -2507,10 +2511,14 @@
         const addBtn = searchMode === 'all'
           ? `<button class="share-btn" data-add-idx="${show.id}" title="Add to my list">+</button>`
           : '';
+        const poster = show.poster_url
+          ? `<img class="row-poster" src="${safeUrl(show.poster_url)}" alt="" loading="lazy">`
+          : `<div class="row-poster row-poster-empty">🎬</div>`;
         return `
           <div class="show">
             <div class="show-row">
               ${addBtn}
+              ${poster}
               <span class="show-info">
                 <span class="show-title clickable" title="Tap to see more" onclick="toggleSearchExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${series}${movieTag}${listLabel}
               </span>

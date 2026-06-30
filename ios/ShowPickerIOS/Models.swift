@@ -142,6 +142,7 @@ struct AllShow: Codable, Identifiable, Hashable {
     let memberName: String?
     let memberFirstName: String?
     let actors: String?
+    let posterUrl: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, network, rating, movie, list, genres, actors
@@ -150,6 +151,7 @@ struct AllShow: Codable, Identifiable, Hashable {
         case memberSlug = "member_slug"
         case memberName = "member_name"
         case memberFirstName = "member_first_name"
+        case posterUrl = "poster_url"
     }
 
     var isMovie: Bool { (movie ?? 0) == 1 }
@@ -235,10 +237,12 @@ struct PopularShow: Codable, Identifiable, Hashable {
     let rating: String?
     let genres: String?
     let members: [String]?
+    let posterUrl: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, network, rating, genres, members
         case networkUrl = "network_url"
+        case posterUrl = "poster_url"
     }
 }
 

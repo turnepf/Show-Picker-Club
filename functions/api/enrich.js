@@ -108,8 +108,12 @@ async function fetchOMDB(title, apiKey, type) {
 
 export async function onRequestPost(context) {
   const { env, request } = context;
+  // Normally driven by a logged-in member loading their page. Also allow a
+  // matching X-Cron-Secret so a scheduled/one-off job can backfill the whole
+  // library (e.g. after adding poster/logo enrichment).
   const session = await getSession(request, env);
-  if (!session) {
+  const cronOk = !!env.CRON_SECRET && request.headers.get('X-Cron-Secret') === env.CRON_SECRET;
+  if (!session && !cronOk) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
