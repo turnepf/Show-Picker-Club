@@ -143,16 +143,25 @@ export async function onRequestPost(context) {
   let body = {};
   try { body = await request.json(); } catch (e) {}
   const member = body.member || null;
-  // Soft caps to keep us well clear of OMDB's free-tier 1k/day and TMDB's per-key budget.
+  // Cloudflare's free plan caps a single Worker invocation at 50 fetch
+  // subrequests. Running every pass (OMDB + TMDB TV + movie + actors) at a
+  // cap of 50 blows far past that — the OMDB pass alone exhausts the budget,
+  // so the later TMDB poster fetches all throw "Too many subrequests" and get
+  // swallowed. `mode: 'posters'` (or skip_omdb/skip_actors) runs only the
+  // cheap TMDB poster passes so a backfill can populate artwork within budget.
+  const skipOmdb = body.skip_omdb === true || body.mode === 'posters';
+  const skipActors = body.skip_actors === true || body.mode === 'posters';
+  // Soft caps to keep us well clear of OMDB's free-tier 1k/day, TMDB's
+  // per-key budget, and (above all) the 50-subrequest-per-invocation ceiling.
   const maxOmdb = parseInt(body.max_omdb ?? '50', 10);
-  const maxTmdb = parseInt(body.max_tmdb ?? '50', 10);
+  const maxTmdb = parseInt(body.max_tmdb ?? (skipOmdb ? '10' : '50'), 10);
 
   // OMDB pass (ratings, actors, search URLs). Gated on an OMDB key being
   // configured: a missing key skips this pass but must NOT short-circuit the
   // TMDB poster/season passes that follow (that early return was why the
   // backfill reported tmdbUpdated: 0 even with TMDB credentials present).
   let enriched = 0;
-  if (apiKey) {
+  if (apiKey && !skipOmdb) {
   // Order by most-recent change first so newly-added/edited shows enrich before older backlog.
   const baseSelect = `SELECT s.id, s.title, s.network, s.network_url, s.movie
      FROM shows s
@@ -340,7 +349,7 @@ export async function onRequestPost(context) {
   // via /api/popular's MIN(id). Gated on TMDB_TOKEN: the OMDB fallback can't
   // supply actor ids, so there's nothing to gain (and nothing to wipe) without it.
   let actorImdbFilled = 0;
-  if (env.TMDB_TOKEN) {
+  if (env.TMDB_TOKEN && !skipActors) {
     const maxActorImdb = parseInt(body.max_actor_imdb ?? '8', 10);
     const backfillBase = `SELECT s.title, MAX(s.movie) AS movie
        FROM shows s

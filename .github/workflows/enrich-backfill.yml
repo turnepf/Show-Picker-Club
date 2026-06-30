@@ -16,9 +16,9 @@ on:
   workflow_dispatch:
     inputs:
       rounds:
-        description: 'How many batches to run (each ≈ 50 TV shows)'
+        description: 'How many batches to run (each ≈ 10 TV + 10 movies)'
         required: false
-        default: '25'
+        default: '40'
 
 jobs:
   backfill:
@@ -28,7 +28,7 @@ jobs:
       - name: Backfill enrichment
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          ROUNDS: ${{ github.event.inputs.rounds || '25' }}
+          ROUNDS: ${{ github.event.inputs.rounds || '40' }}
         run: |
           if [ -z "$CRON_SECRET" ]; then
             echo "::error::CRON_SECRET repo secret is not set"
@@ -40,7 +40,7 @@ jobs:
             resp=$(curl -sS -X POST "$URL" \
               -H "Content-Type: application/json" \
               -H "X-Cron-Secret: ${CRON_SECRET}" \
-              -d '{}' \
+              -d '{"mode":"posters"}' \
               -w $'\n%{http_code}')
             http=$(printf '%s' "$resp" | tail -n1)
             body=$(printf '%s' "$resp" | sed '$d')
