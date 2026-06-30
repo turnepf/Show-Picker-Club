@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   member_slug TEXT,
   expires_at TEXT NOT NULL,
   created_at TEXT,
-  last_seen_at TEXT
+  last_seen_at TEXT,
+  platform TEXT
 );
 
 CREATE TABLE IF NOT EXISTS show_traits (
@@ -95,4 +96,5 @@ CREATE INDEX IF NOT EXISTS idx_shows_archived ON shows(archived);
 CREATE INDEX IF NOT EXISTS idx_shows_member ON shows(member_slug);
 CREATE INDEX IF NOT EXISTS idx_actors_show_id ON actors(show_id);
 CREATE INDEX IF NOT EXISTS idx_failed_logins_ip_time ON failed_logins(ip, created_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_last_seen ON sessions(last_seen_at);
 CREATE INDEX IF NOT EXISTS idx_member_subs_slug ON member_subscriptions(member_slug);

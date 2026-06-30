@@ -53,6 +53,25 @@ export async function onRequestGet(context) {
       `SELECT COUNT(DISTINCT member_slug) as cnt FROM sessions WHERE last_seen_at >= datetime('now', '-30 days')`),
   };
 
+  // Active sessions broken down by client platform (ios / tvos / web-small /
+  // web-large). Counts distinct sessions, not members: a member can be active
+  // on more than one platform, and anonymous tvOS devices have no member.
+  // Defensive: the platform column arrives in migration 016, so fall back to
+  // an empty breakdown rather than 500 the whole dashboard if it's missing.
+  const activeByPlatform = { day: {}, week: {}, month: {} };
+  const platWindows = { day: '-1 day', week: '-7 days', month: '-30 days' };
+  try {
+    for (const [label, interval] of Object.entries(platWindows)) {
+      const { results } = await env.DB.prepare(
+        `SELECT COALESCE(platform, 'unknown') AS platform, COUNT(DISTINCT id) AS cnt
+           FROM sessions
+          WHERE last_seen_at >= datetime('now', ?)
+          GROUP BY COALESCE(platform, 'unknown')`
+      ).bind(interval).all();
+      for (const row of results) activeByPlatform[label][row.platform] = row.cnt;
+    }
+  } catch (_) { /* platform column not migrated yet */ }
+
   const totals = await env.DB.prepare(
     `SELECT
       (SELECT COUNT(*) FROM members) as members,
@@ -94,6 +113,36 @@ export async function onRequestGet(context) {
     ).first();
   } catch (_) { /* column not migrated yet */ }
 
+  // Who has never logged in since we started tracking it (migration 013), and
+  // for each, whether their library is still just the seeded rows. seeds_only
+  // is true when nothing beyond the seeds has happened: no member-added show,
+  // no archive, no edit (updated_at moved off created_at). Mirrors the
+  // "engagement beyond seeds" test used by the dormant-member digest.
+  let neverLoggedIn = [];
+  try {
+    const { results } = await env.DB.prepare(
+      `SELECT m.slug, m.name, m.created_at AS joined,
+              (SELECT COUNT(*) FROM shows s WHERE s.member_slug = m.slug) AS show_count,
+              CASE WHEN EXISTS (
+                SELECT 1 FROM shows s
+                WHERE s.member_slug = m.slug
+                  AND (COALESCE(s.added_by, '') != 'seed'
+                       OR s.archived = 1
+                       OR (s.updated_at IS NOT NULL AND s.updated_at != s.created_at))
+              ) THEN 0 ELSE 1 END AS seeds_only
+         FROM members m
+        WHERE m.last_login_at IS NULL
+        ORDER BY m.created_at`
+    ).all();
+    neverLoggedIn = results.map(r => ({
+      slug: r.slug,
+      name: r.name,
+      joined: r.joined,
+      show_count: r.show_count,
+      seeds_only: r.seeds_only === 1,
+    }));
+  } catch (_) { /* last_login_at / added_by not migrated yet */ }
+
   return json({
     generated_at: new Date().toISOString(),
     new_shows: newShows,
@@ -101,8 +150,10 @@ export async function onRequestGet(context) {
     archived_shows: archivedShows,
     new_members: newMembers,
     active_members: activeMembers,
+    active_by_platform: activeByPlatform,
     totals,
     members_login: membersLogin,
+    never_logged_in: neverLoggedIn,
     top_networks: topNetworks,
     top_shared: topShared,
   });

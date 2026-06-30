@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct HomeView: View {
+    @EnvironmentObject private var auth: AuthStore
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
     @State private var loading = true
@@ -10,10 +11,15 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 50) {
-                    Text("Show Picker Club")
-                        .font(.system(size: 56, weight: .bold))
-                        .foregroundColor(Theme.ink)
-                        .padding(.top, 20)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Show Picker Club")
+                            .font(.system(size: 56, weight: .bold))
+                            .foregroundColor(Theme.ink)
+                        Spacer()
+                        Button("Log out") { Task { await auth.logout() } }
+                            .font(.system(size: 22, weight: .semibold))
+                    }
+                    .padding(.top, 20)
 
                     if loading {
                         ProgressView().padding(.top, 80)

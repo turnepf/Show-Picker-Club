@@ -84,7 +84,9 @@
     // Gated by the operator's session cookie — no secret to enter.
     document.addEventListener('DOMContentLoaded', async () => {
       try {
-        const r = await fetch('/auth/check');
+        const r = await fetch('/auth/check', {
+          headers: { 'X-Client-Platform': window.innerWidth < 768 ? 'web-small' : 'web-large' },
+        });
         const d = await r.json();
         if (!d.authenticated) document.getElementById('authWarn').style.display = '';
       } catch {}

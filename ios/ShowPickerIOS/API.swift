@@ -31,6 +31,8 @@ enum API {
         guard let url = URL(string: baseString + path) else { throw APIError.badURL }
         var req = URLRequest(url: url)
         req.cachePolicy = .reloadRevalidatingCacheData
+        // Platform usage tracking: /auth/check stamps this onto the session.
+        req.setValue("ios", forHTTPHeaderField: "X-Client-Platform")
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse else { throw APIError.badResponse(-1) }
         guard (200..<300).contains(http.statusCode) else { throw APIError.badResponse(http.statusCode) }
@@ -506,6 +508,7 @@ enum API {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("ios", forHTTPHeaderField: "X-Client-Platform")
         // Filter out nil values so JSON omits them.
         let compact = body.compactMapValues { $0 }
         req.httpBody = try JSONSerialization.data(withJSONObject: compact)

@@ -518,7 +518,9 @@
     // to render), then pick a default member to display.
     (async () => {
       try {
-        const r = await fetch('/auth/check');
+        const r = await fetch('/auth/check', {
+          headers: { 'X-Client-Platform': window.innerWidth < 768 ? 'web-small' : 'web-large' },
+        });
         if (r.ok) {
           const d = await r.json();
           if (d.authenticated && d.member) authMember = d.member;

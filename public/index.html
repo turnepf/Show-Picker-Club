@@ -1117,6 +1117,15 @@
     let searchMode = 'member';
     let owners = '';
 
+    // Platform usage tracking: tell the server which web form factor this is so
+    // reporting can split web into small- vs large-screen. The breakpoint
+    // matches the layout's mobile/desktop split. Spread into a fetch's headers,
+    // e.g. fetch(url, { headers: clientPlatformHeader() }).
+    function clientPlatformHeader() {
+      const size = window.innerWidth < 768 ? 'web-small' : 'web-large';
+      return { 'X-Client-Platform': size };
+    }
+
     function parseActors(raw) {
       if (!raw) return [];
       try {
@@ -1335,7 +1344,7 @@
       // their own list, otherwise they can never leave their page.
       if (new URLSearchParams(location.search).has('home')) { showLanding(); return; }
       try {
-        const res = await fetch('/auth/check');
+        const res = await fetch('/auth/check', { headers: clientPlatformHeader() });
         const data = await res.json();
         if (data.authenticated && data.member) {
           // replace(), not assign(), so Back doesn't bounce to / and
@@ -1549,7 +1558,7 @@
 
     async function checkAuth() {
       try {
-        const res = await fetch('/auth/check');
+        const res = await fetch('/auth/check', { headers: clientPlatformHeader() });
         const data = await res.json();
         if (data.authenticated) {
           editorName = data.email || '';
