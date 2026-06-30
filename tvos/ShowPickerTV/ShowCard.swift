@@ -44,11 +44,14 @@ struct ShowCard: View {
         if let networkLogoUrl, let u = URL(string: networkLogoUrl) {
             AsyncImage(url: u) { phase in
                 if let image = phase.image {
-                    image.resizable().scaledToFit()
+                    // Template-render so the logo comes through white (uniform,
+                    // matching the Apple TV look) regardless of its brand color.
+                    image.renderingMode(.template).resizable().scaledToFit()
                 } else {
                     Color.clear
                 }
             }
+            .foregroundStyle(.white)
             .frame(maxWidth: 64, maxHeight: 24, alignment: .topTrailing)
             .shadow(color: .black.opacity(0.6), radius: 4, y: 1)
             .padding(12)
