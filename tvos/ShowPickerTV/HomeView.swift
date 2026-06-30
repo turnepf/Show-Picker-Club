@@ -237,7 +237,6 @@ struct MemberTile: View {
                     }
                     .padding(12)
                 )
-                .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 5)
 
             if isMe {
                 Image(systemName: "star.fill")
