@@ -2,10 +2,11 @@ import SwiftUI
 
 // tvOS sign-in: enter a phone or email, get a 6-digit code by text/email, type
 // it in, log in. Mirrors the iOS phone/email OTP flow (Sign in with Apple is
-// iPhone-only). On success the session cookie is set and AuthStore.refresh()
-// flips the app over to the member lists.
+// iPhone-only). Presented over the open home screen; on success the session
+// cookie is set, this screen dismisses, and Home jumps to the member's list.
 struct LoginView: View {
     @EnvironmentObject private var auth: AuthStore
+    @Environment(\.dismiss) private var dismiss
 
     @State private var phone = ""
     @State private var email = ""
@@ -65,12 +66,17 @@ struct LoginView: View {
                 }
                 .frame(maxWidth: 760)
 
-                Button(action: { Task { await submit() } }) {
-                    Text(submitting ? "Logging in…" : "Log in")
-                        .font(.system(size: 26, weight: .semibold))
-                        .frame(maxWidth: 400)
+                HStack(spacing: 24) {
+                    Button("Not now") { dismiss() }
+                        .font(.system(size: 24))
+
+                    Button(action: { Task { await submit() } }) {
+                        Text(submitting ? "Logging in…" : "Log in")
+                            .font(.system(size: 26, weight: .semibold))
+                            .frame(maxWidth: 360)
+                    }
+                    .disabled(code.filter(\.isNumber).count < 4 || submitting)
                 }
-                .disabled(code.filter(\.isNumber).count < 4 || submitting)
 
                 if let errorText {
                     Text(errorText)
@@ -143,6 +149,8 @@ struct LoginView: View {
             } else {
                 try await auth.loginWithEmail(email: trimmedEmail, code: trimmedCode)
             }
+            // Close the sheet; Home reacts to the new session and opens the list.
+            dismiss()
         } catch {
             errorText = "Invalid or expired code. Try again."
             code = ""

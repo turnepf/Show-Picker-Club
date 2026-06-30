@@ -1,52 +1,87 @@
 import SwiftUI
 
 // A focusable show tile. No poster art yet (the backend stores text + URLs,
-// not images), so v1 renders a colored card with "Title on Network" and the
-// rating below. Built so a `posterURL` can drop in later.
+// not images), so it renders a gradient card with the title and network, and
+// a metadata line below (rating + seasons / next-up) that mirrors the iOS row.
+// Built so a `posterURL` can drop in later.
 struct ShowCard: View {
     let title: String
     var network: String? = nil
     var rating: String? = nil
-    var badge: String? = nil
+    var fullSeries: Bool = false
+    // Secondary line under the tile, e.g. "3 seasons" or "Next up: 6/1".
+    var metaLine: String? = nil
+
+    private static let cardWidth: CGFloat = 320
+    private static let cardHeight: CGFloat = 200
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Theme.tileColor(for: title))
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Theme.tileColor(for: title),
+                                     Theme.tileColor(for: title).opacity(0.78)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    // A darker scrim along the bottom keeps the title legible
+                    // over the lighter part of the gradient.
                     .overlay(
-                        VStack(spacing: 6) {
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.28)],
+                            startPoint: .center,
+                            endPoint: .bottom
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    )
+                    .overlay(alignment: .bottomLeading) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text(title)
                                 .font(.system(size: 26, weight: .bold))
                                 .foregroundColor(.white)
-                                .multilineTextAlignment(.center)
+                                .lineLimit(3)
+                                .multilineTextAlignment(.leading)
+                                .minimumScaleFactor(0.6)
                             if let network, !network.isEmpty {
-                                Text("on \(network)")
+                                Text(network)
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(.white.opacity(0.85))
-                                    .multilineTextAlignment(.center)
+                                    .lineLimit(1)
                             }
                         }
-                        .padding(16)
-                        .minimumScaleFactor(0.6)
-                    )
-                    .frame(width: 300, height: 200)
+                        .padding(18)
+                    }
+                    .frame(width: Self.cardWidth, height: Self.cardHeight)
+                    .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 6)
 
-                if let badge {
-                    Text(badge)
-                        .font(.system(size: 28))
-                        .padding(8)
+                if fullSeries {
+                    Text("🎬")
+                        .font(.system(size: 26))
+                        .padding(10)
+                        .background(.black.opacity(0.25), in: Circle())
+                        .padding(10)
                 }
             }
-            // Rating only — no repeated title.
-            if let rating, !rating.isEmpty {
-                Text("★ \(rating)")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.orange)
-                    .frame(width: 300, alignment: .leading)
-            } else {
-                Color.clear.frame(width: 300, height: 22)
+
+            // Metadata line: rating star + seasons / next-up. Reserve the row
+            // height even when empty so cards in a shelf stay aligned.
+            HStack(spacing: 12) {
+                if let rating, !rating.isEmpty {
+                    Label(rating, systemImage: "star.fill")
+                        .labelStyle(.titleAndIcon)
+                        .foregroundColor(Theme.orange)
+                }
+                if let metaLine, !metaLine.isEmpty {
+                    Text(metaLine)
+                        .foregroundColor(Theme.muted)
+                        .lineLimit(1)
+                }
             }
+            .font(.system(size: 18, weight: .semibold))
+            .frame(width: Self.cardWidth, height: 24, alignment: .leading)
         }
     }
 }
