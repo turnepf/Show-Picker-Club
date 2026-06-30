@@ -10,16 +10,29 @@ struct ShowDetailView: View {
     let initialNetwork: String?
     let initialRating: String?
 
+    @EnvironmentObject private var auth: AuthStore
     @State private var show: Show?
     @State private var cast: [Actor] = []
     @State private var appleTVUrl: URL?
     @State private var lookedUp = false
     @State private var openFailed = false
+    @State private var working = false
+    @State private var actionMessage: String?
     @Environment(\.openURL) private var openURL
 
     private var title: String { show?.title ?? initialTitle }
     private var network: String? { show?.network ?? initialNetwork }
     private var rating: String? { show?.rating ?? initialRating }
+
+    // Mine when the loaded show belongs to the signed-in member.
+    private var isMine: Bool {
+        guard let mine = auth.memberSlug, let s = show else { return false }
+        return s.memberSlug == mine
+    }
+    // Signed in and viewing someone else's (or a popular) show → can copy it.
+    private var canAddToMine: Bool {
+        auth.memberSlug != nil && show != nil && !isMine
+    }
 
     var body: some View {
         ScrollView {
@@ -76,6 +89,8 @@ struct ShowDetailView: View {
                     Spacer()
                 }
 
+                actionsSection
+
                 if !cast.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Cast")
@@ -91,6 +106,71 @@ struct ShowDetailView: View {
         }
         .background(Theme.cream.ignoresSafeArea())
         .task { await load() }
+    }
+
+    // Add-to-my-list (when signed in and it isn't already mine) or move-between-
+    // lists (when it's my own show). Mirrors the iOS detail actions; editing,
+    // sharing, and the calendar feed stay off the TV.
+    @ViewBuilder private var actionsSection: some View {
+        if let s = show, canAddToMine || isMine || actionMessage != nil {
+            VStack(alignment: .leading, spacing: 14) {
+                if canAddToMine {
+                    Text("Add to my list")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundColor(Theme.ink)
+                    HStack(spacing: 24) {
+                        ForEach(ShowList.allCases) { l in
+                            Button(l.title) { Task { await addToMyList(l) } }
+                                .disabled(working)
+                        }
+                    }
+                } else if isMine, let cur = ShowList(rawValue: s.list) {
+                    Text("Move to")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundColor(Theme.ink)
+                    HStack(spacing: 24) {
+                        ForEach(ShowList.allCases.filter { $0 != cur }) { l in
+                            Button(l.title) { Task { await moveTo(l) } }
+                                .disabled(working)
+                        }
+                    }
+                }
+
+                if let actionMessage {
+                    Text(actionMessage)
+                        .font(.system(size: 22))
+                        .foregroundColor(Theme.muted)
+                }
+            }
+        }
+    }
+
+    private func addToMyList(_ list: ShowList) async {
+        guard let s = show else { return }
+        working = true
+        defer { working = false }
+        do {
+            try await API.addShow(title: s.title, network: s.network, networkUrl: s.networkUrl,
+                                  list: list.rawValue, movie: s.isMovie, fullSeries: s.isFullSeries)
+            actionMessage = "Added “\(s.title)” to your \(list.title) list."
+        } catch API.APIError.badResponse(409) {
+            actionMessage = "“\(s.title)” is already on one of your lists."
+        } catch {
+            actionMessage = "Couldn't add it. Please try again."
+        }
+    }
+
+    private func moveTo(_ list: ShowList) async {
+        guard let s = show else { return }
+        working = true
+        defer { working = false }
+        do {
+            try await API.moveShow(id: s.id, to: list.rawValue)
+            actionMessage = "Moved to \(list.title)."
+            await load()   // refresh so the list chip reflects the new list
+        } catch {
+            actionMessage = "Couldn't move it. Please try again."
+        }
     }
 
     @ViewBuilder private func metaRows(_ s: Show) -> some View {
