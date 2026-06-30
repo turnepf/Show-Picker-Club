@@ -12,6 +12,8 @@ struct Member: Codable, Identifiable, Hashable {
     let showCount: Int?
     let watchingCount: Int?
     let waitingCount: Int?
+    let recommendingCount: Int?
+    let nextCount: Int?
     let lastActivityAt: String?
 
     enum CodingKeys: String, CodingKey {
@@ -21,10 +23,17 @@ struct Member: Codable, Identifiable, Hashable {
         case showCount = "show_count"
         case watchingCount = "watching_count"
         case waitingCount = "waiting_count"
+        case recommendingCount = "recommending_count"
+        case nextCount = "next_count"
         case lastActivityAt = "last_activity_at"
     }
 
     var label: String { displayName ?? firstName ?? name }
+
+    // "Most active" = engaged lists: Watching + Up Next + Recommending.
+    var activeCount: Int {
+        (watchingCount ?? 0) + (nextCount ?? 0) + (recommendingCount ?? 0)
+    }
 }
 
 struct MembersResponse: Codable { let members: [Member] }
@@ -75,6 +84,7 @@ struct Show: Codable, Identifiable, Hashable {
     let watchingWith: String?
     let nextSeasonDate: String?
     let seasonEndDate: String?
+    let seasonsReleased: Int?
     let genres: String?
     // The API returns actors as a JSON-encoded string (from SQLite
     // json_group_array). Decoded lazily via `castMembers`.
@@ -88,6 +98,7 @@ struct Show: Codable, Identifiable, Hashable {
         case watchingWith = "watching_with"
         case nextSeasonDate = "next_season_date"
         case seasonEndDate = "season_end_date"
+        case seasonsReleased = "seasons_released"
     }
 
     var isMovie: Bool { (movie ?? 0) == 1 }
@@ -95,6 +106,33 @@ struct Show: Codable, Identifiable, Hashable {
 
     var genreList: [String] {
         (genres ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    // "3 seasons" when known. Mirrors the iOS row metadata.
+    var seasonsText: String? {
+        guard let n = seasonsReleased, n > 0 else { return nil }
+        return "\(n) season\(n == 1 ? "" : "s")"
+    }
+
+    // Premiere of the next season ("6/1" or "6/1 – 6/30"), matching iOS/web.
+    var nextUpRange: String? {
+        guard let start = monthDay(nextSeasonDate) else { return nil }
+        if let end = monthDay(seasonEndDate), end != start { return "\(start) – \(end)" }
+        return start
+    }
+
+    private func monthDay(_ s: String?) -> String? {
+        guard let s, !s.isEmpty else { return nil }
+        let p = s.split(separator: "-")
+        guard p.count >= 3, let m = Int(p[1]), let d = Int(p[2]) else { return s }
+        return "\(m)/\(d)"
+    }
+
+    // Secondary line for a card: premiere range on Watching/Waiting, else the
+    // seasons count. nil when neither is known.
+    func metaLine(for list: ShowList) -> String? {
+        if list == .watching || list == .waiting, let r = nextUpRange { return "Next up: \(r)" }
+        return seasonsText
     }
 
     var castMembers: [Actor] {

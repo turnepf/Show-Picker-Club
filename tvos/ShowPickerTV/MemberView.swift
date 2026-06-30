@@ -62,12 +62,13 @@ struct MemberView: View {
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(alignment: .top, spacing: 40) {
-                    ForEach(items.sorted { (Double($0.rating ?? "0") ?? 0) > (Double($1.rating ?? "0") ?? 0) }) { show in
+                    ForEach(sorted(items, for: list)) { show in
                         NavigationLink(value: Route.detail(id: show.id, title: show.title, network: show.network, rating: show.rating)) {
                             ShowCard(title: show.title,
                                      network: show.network,
                                      rating: show.rating,
-                                     badge: show.isFullSeries ? "🎬" : nil)
+                                     fullSeries: show.isFullSeries,
+                                     metaLine: show.metaLine(for: list))
                         }
                         .buttonStyle(.card)
                     }
@@ -75,6 +76,20 @@ struct MemberView: View {
                 .padding(.horizontal, 4)
             }
         }
+    }
+
+    // Match iOS defaults: Watching/Waiting lead with the soonest premiere,
+    // the other lists with the highest rating.
+    private func sorted(_ items: [Show], for list: ShowList) -> [Show] {
+        if list == .watching || list == .waiting {
+            return items.sorted { a, b in
+                let da = (a.nextSeasonDate?.isEmpty == false) ? a.nextSeasonDate! : "9999-12-31"
+                let db = (b.nextSeasonDate?.isEmpty == false) ? b.nextSeasonDate! : "9999-12-31"
+                if da != db { return da < db }
+                return (Double(a.rating ?? "0") ?? 0) > (Double(b.rating ?? "0") ?? 0)
+            }
+        }
+        return items.sorted { (Double($0.rating ?? "0") ?? 0) > (Double($1.rating ?? "0") ?? 0) }
     }
 
     private func load() async {
