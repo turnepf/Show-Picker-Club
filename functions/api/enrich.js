@@ -229,6 +229,7 @@ export async function onRequestPost(context) {
     tvCandidates: null,
     movieCandidates: null,
     tvSample: null,
+    tvError: null,
   };
   let tmdbUpdated = 0;
   if (hasTmdb) {
@@ -296,7 +297,9 @@ export async function onRequestPost(context) {
           "UPDATE shows SET next_season_date = ?, season_end_date = ?, full_series = ?, genres = COALESCE(?, genres), seasons_released = COALESCE(?, seasons_released), poster_url = COALESCE(?, poster_url), network_logo_url = COALESCE(?, network_logo_url), enriched_at = datetime('now') WHERE id = ?"
         ).bind(newDate, endDate, isComplete, genres, seasonsReleased, posterUrl, networkLogoUrl, show.id).run();
         tmdbUpdated++;
-      } catch (e) {}
+      } catch (e) {
+        if (!debug.tvError) debug.tvError = String((e && e.stack) || e).slice(0, 300);
+      }
     }
   }
 
