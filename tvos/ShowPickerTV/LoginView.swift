@@ -20,12 +20,12 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            Theme.cream.ignoresSafeArea()
+            Theme.background.ignoresSafeArea()
 
             VStack(spacing: 36) {
                 Text("Show Picker Club")
                     .font(.system(size: 56, weight: .bold))
-                    .foregroundColor(Theme.ink)
+                    .foregroundColor(Theme.text)
 
                 Text("Sign in to see the club's lists")
                     .font(.system(size: 26))
