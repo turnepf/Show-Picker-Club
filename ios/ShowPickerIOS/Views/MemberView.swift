@@ -257,7 +257,8 @@ struct MemberView: View {
     }
 
     @ViewBuilder private func row(_ s: Show) -> some View {
-        HStack {
+        HStack(spacing: 12) {
+            PosterThumb(url: s.posterUrl)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(s.title).font(.body)
