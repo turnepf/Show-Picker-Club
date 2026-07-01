@@ -707,7 +707,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = ShowPickerWatch;
+				INFOPLIST_KEY_CFBundleDisplayName = "Show Picker Club";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = net.patrickturner.showpickerios;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -743,7 +743,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = ShowPickerWatch;
+				INFOPLIST_KEY_CFBundleDisplayName = "Show Picker Club";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = net.patrickturner.showpickerios;
 				LD_RUNPATH_SEARCH_PATHS = (
