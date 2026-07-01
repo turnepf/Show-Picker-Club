@@ -128,6 +128,19 @@
       main { margin: 16px 12px 40px; padding: 18px 18px 22px; border-radius: 14px; }
     }
 
+    /* On wide screens keep the member page's header controls and list tabs
+       aligned to the content column below (same 720px, centered) instead of
+       spanning the full width — so the back button lines up with the column's
+       left edge, Log out with its right, and the tabs contract to fit. */
+    #showPage header > .header-top,
+    #showPage header > .header-title,
+    #showPage header > .tabs,
+    #showPage header > .section-desc {
+      max-width: 720px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
     .show-list { display: flex; flex-direction: column; gap: 0; }
 
     .show-row {
