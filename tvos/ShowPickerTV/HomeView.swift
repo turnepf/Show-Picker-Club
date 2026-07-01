@@ -3,6 +3,7 @@ import SwiftUI
 // The "Home" tab: browse what members are watching and the member directory.
 // Auth and the member's own lists live in their own tabs.
 struct HomeView: View {
+    @Binding var path: NavigationPath
     @EnvironmentObject private var auth: AuthStore
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
@@ -10,7 +11,7 @@ struct HomeView: View {
     @State private var errorText: String?
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 50) {
                     Text("Show Picker Club")

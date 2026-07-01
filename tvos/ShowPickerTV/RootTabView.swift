@@ -6,20 +6,28 @@ import SwiftUI
 struct RootTabView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var selection = Tab.home
-    // The My Shows navigation stack lives here so re-tapping the tab can pop it
-    // back to the member list (standard tvOS "tap the current tab" behavior).
+    // Each tab owns its navigation stack here so selecting a tab can reset it
+    // to the section root. tvOS's Menu button jumps focus to the tab bar
+    // instead of popping the stack, so without this a show detail you opened
+    // stays pushed and there's no way back to the section's full list.
     @State private var minePath = NavigationPath()
+    @State private var homePath = NavigationPath()
+    @State private var searchPath = NavigationPath()
 
     enum Tab: Hashable { case mine, home, search, account }
 
-    // Re-selecting the My Shows tab while already on it drops any pushed show
-    // detail, returning you to the list you came from.
+    // Selecting any tab (whether switching to it or re-tapping the current one)
+    // pops any show detail open in it, so you always land on the section's
+    // full grid of cards.
     private var tabSelection: Binding<Tab> {
         Binding(
             get: { selection },
             set: { newValue in
-                if newValue == .mine && selection == .mine && !minePath.isEmpty {
-                    minePath = NavigationPath()
+                switch newValue {
+                case .mine: minePath = NavigationPath()
+                case .home: homePath = NavigationPath()
+                case .search: searchPath = NavigationPath()
+                case .account: break
                 }
                 selection = newValue
             }
@@ -33,10 +41,10 @@ struct RootTabView: View {
                     .tabItem { Label("My Shows", systemImage: "play.tv") }
                     .tag(Tab.mine)
             }
-            HomeView()
+            HomeView(path: $homePath)
                 .tabItem { Label("Home", systemImage: "house") }
                 .tag(Tab.home)
-            SearchView()
+            SearchView(path: $searchPath)
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(Tab.search)
             AccountView()
