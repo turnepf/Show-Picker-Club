@@ -5,6 +5,8 @@ const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
 export async function onRequestGet(context) {
   const { env } = context;
 
+  // Top shows by how many members added them in the last 30 days — a rolling
+  // "what the club is picking up right now" feed.
   const { results } = await env.DB.prepare(
     `SELECT LOWER(s.title) as ltitle, s.title, s.rating, s.network, s.network_url, s.movie,
        MAX(s.genres) as genres,
@@ -15,14 +17,14 @@ export async function onRequestGet(context) {
        GROUP_CONCAT(DISTINCT s.member_slug) as member_slugs
      FROM shows s
      WHERE s.archived = 0
-       AND s.list IN ('watching', 'waiting', 'recommending')
        AND s.member_slug NOT IN (${EXCLUDED_SQL})
        -- Seeded rows are the operator's auto-pick, not a member endorsement.
        -- A row "counts" only once a member has actually touched it
        -- (added themselves, or had a list manually loaded by the operator).
        AND COALESCE(s.added_by, '') != 'seed'
+       -- Only adds from the last 30 days feed the ranking.
+       AND s.created_at >= datetime('now', '-30 days')
      GROUP BY LOWER(s.title)
-     HAVING COUNT(DISTINCT s.member_slug) >= 2
      ORDER BY member_count DESC, CAST(s.rating AS REAL) DESC
      LIMIT 10`
   ).all();
