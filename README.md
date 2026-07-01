@@ -1,6 +1,6 @@
 # Show Picker Club
 
-A shared TV-show and movie tracker for a small club. Each member maintains four ranked lists (Watching, Waiting, Recommending, Up Next); the home page surfaces what everyone is watching, suggests picks based on neighbor overlap, and exposes a per-member iCalendar feed for upcoming premiere dates.
+A shared TV-show and movie tracker for a small club. Each member maintains four ranked lists (Watching, Awaiting, Recommending, Up Next); the home page surfaces what everyone is watching and exposes a per-member iCalendar feed for upcoming premiere dates.
 
 Live at [showpicker.club](https://showpicker.club).
 
@@ -9,11 +9,13 @@ Live at [showpicker.club](https://showpicker.club).
 - **Apple TV (tvOS) app:** [`tvos/README.md`](tvos/README.md)
 - **iPhone (iOS) app:** [`ios/README.md`](ios/README.md)
 
+There are native iOS, tvOS, and watchOS apps. They share a `ShowPickerCore` Swift package (at the repo root) and are opened via the `ShowPickerClub.xcworkspace` workspace. iOS and tvOS ship as a single universal App Store app (one bundle id, `net.patrickturner.showpickerios`, running on iPhone + Apple TV).
+
 ## At a glance
 
 - **Multi-tenant.** One deployment, many members. Each member is a slug (`/whitt`, `/patrick`) with their own lists; they sign in with a one-time code (text or email) or Sign in with Apple.
 - **Auto-enriched.** OMDB supplies IMDB ratings and canonical titles; TMDB supplies cast, next-season dates, finale dates, series-ended flags, and genres.
-- **Social.** Suggest a show to another member, share a show across lists, and get "Picks for you" computed from neighbors.
+- **Social.** Suggest a show to another member and share a show across lists.
 - **Vibe.** `/vibe` profiles each member's taste across 27 trait dimensions and assigns one of seven cluster identities.
 - **Calendar feed.** `webcal://showpicker.club/calendar/<slug>.ics` keeps upcoming premieres and finales in Apple Calendar / Google Calendar / Fantastical.
 - **PWA.** Installable to home screen.
