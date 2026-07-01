@@ -3,6 +3,7 @@ import SwiftUI
 // Cross-library search over every member's active shows (one card per title).
 // Reuses the poster ShowCard; tapping a result opens the show detail.
 struct SearchView: View {
+    @Binding var path: NavigationPath
     @State private var all: [Show] = []
     @State private var query = ""
     @State private var loaded = false
@@ -32,7 +33,7 @@ struct SearchView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 if query.trimmingCharacters(in: .whitespaces).isEmpty {
                     hint("Search the club's shows by title, network, or genre.")
