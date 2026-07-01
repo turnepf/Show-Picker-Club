@@ -155,6 +155,7 @@
     <div id="bannerErr"></div>
     <div id="conflicts"></div>
     <div id="mismatches"></div>
+    <div id="badTitles"></div>
     <div id="list"></div>
   </div>
 
@@ -420,6 +421,69 @@
       });
     }
 
+    function renderBadTitles(badTitles) {
+      const root = document.getElementById('badTitles');
+      if (!badTitles.length) { root.innerHTML = ''; return; }
+      root.innerHTML = `
+        <div class="section-head">Wrong titles (no poster match)</div>
+        <div class="section-blurb">These have a working link, but the stored name doesn't match any real show — so enrichment can't pull a poster, rating, or cast. Loading this page already tried recovering the real name from each show's own link; the ones below couldn't be fixed automatically. Fix the name (e.g. "Juul Documentary" &rarr; "Big Vape: The Rise and Fall of Juul") and every member's copy is renamed and re-enriched.</div>
+        ${badTitles.map(show => `
+          <div class="row conflict" data-id="${show.id}">
+            <div class="row-head">
+              <a class="show-link" target="_blank" rel="noopener noreferrer"
+                 href="${googleSearchUrl(show.title, show.network)}">${escapeHtml(show.title)} on ${escapeHtml(show.network || '???')}</a>
+              <span class="show-meta">${show.member_count > 1 ? show.member_count + ' lists &middot; ' : ''}${escapeHtml(show.members)}</span>
+            </div>
+            <div class="row-form">
+              <input type="text" class="title-input" placeholder="Correct title" value="${escapeAttr(show.title)}" autocomplete="off">
+              <button class="btn-update btn-rename" type="button">Rename</button>
+              <div class="row-err"></div>
+            </div>
+          </div>
+        `).join('')}
+      `;
+      root.querySelectorAll('.row').forEach(rowEl => {
+        const titleInput = rowEl.querySelector('.title-input');
+        const renameBtn = rowEl.querySelector('.btn-rename');
+        const errBox = rowEl.querySelector('.row-err');
+        titleInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); renameBtn.click(); }
+        });
+        renameBtn.addEventListener('click', async () => {
+          errBox.textContent = '';
+          const newTitle = titleInput.value.trim();
+          if (!newTitle) { errBox.textContent = 'Enter a title.'; return; }
+          renameBtn.disabled = true;
+          const old = renameBtn.textContent;
+          renameBtn.textContent = '…';
+          try {
+            const res = await fetch('/api/admin-url-cleanup', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'fix_title',
+                id: parseInt(rowEl.dataset.id, 10),
+                new_title: newTitle,
+              }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              errBox.textContent = data.error || `Error (${res.status})`;
+              renameBtn.disabled = false;
+              renameBtn.textContent = old;
+              return;
+            }
+            rowEl.classList.add('removing');
+            setTimeout(() => rowEl.remove(), 250);
+          } catch (e) {
+            errBox.textContent = 'Network error: ' + e.message;
+            renameBtn.disabled = false;
+            renameBtn.textContent = old;
+          }
+        });
+      });
+    }
+
     async function loadList() {
       bannerErr.innerHTML = '';
       remaining.textContent = '';
@@ -445,12 +509,17 @@
         const shows = data.shows || [];
         const conflicts = data.conflicts || [];
         const mismatches = data.mismatches || [];
+        const badTitles = data.bad_titles || [];
+        const autoFixed = data.auto_fixed || [];
         renderConflicts(conflicts);
         renderMismatches(mismatches);
+        renderBadTitles(badTitles);
         const queueSummary = `${shows.length} show${shows.length === 1 ? '' : 's'} remaining`;
         const extras = [];
         if (conflicts.length) extras.push(`${conflicts.length} cross-network conflict${conflicts.length === 1 ? '' : 's'}`);
         if (mismatches.length) extras.push(`${mismatches.length} URL/network mismatch${mismatches.length === 1 ? 'es' : 'es'}`);
+        if (badTitles.length) extras.push(`${badTitles.length} wrong title${badTitles.length === 1 ? '' : 's'}`);
+        if (autoFixed.length) extras.push(`${autoFixed.length} title${autoFixed.length === 1 ? '' : 's'} auto-fixed (${autoFixed.map(f => `"${f.old_title}" → "${f.new_title}"`).join(', ')})`);
         remaining.textContent = extras.length ? `${queueSummary} · ${extras.join(' · ')}` : queueSummary;
         if (shows.length === 0) {
           list.innerHTML = '<div class="empty">🎉 Queue empty. All shows have direct URLs.</div>';
