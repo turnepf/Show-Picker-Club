@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CDE59A532FF5B38900CBD097 /* ShowPickerCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDE59A522FF5B38900CBD097 /* ShowPickerCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CDE59A532FF5B38900CBD097 /* ShowPickerCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -69,12 +71,59 @@
 			);
 			name = ShowPickerTV;
 			packageProductDependencies = (
+				CDE59A522FF5B38900CBD097 /* ShowPickerCore */,
 			);
 			productName = ShowPickerTV;
 			productReference = CDB361692FC7CA68009F34F5 /* ShowPickerTV.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		CDB361612FC7CA68009F34F5 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2650;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					CDB361682FC7CA68009F34F5 = {
+						CreatedOnToolsVersion = 26.5;
+						LastSwiftMigration = 2650;
+					};
+				};
+			};
+			buildConfigurationList = CDB361642FC7CA68009F34F5 /* Build configuration list for PBXProject "ShowPickerTV" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = CDB361602FC7CA68009F34F5;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CDE59A512FF5B38900CBD097 /* XCLocalSwiftPackageReference "../ShowPickerCore" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = CDB3616A2FC7CA68009F34F5 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				CDB361682FC7CA68009F34F5 /* ShowPickerTV */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CDB361672FC7CA68009F34F5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
 		CDB3619900000000009F34F5 /* Set build number */ = {
@@ -98,49 +147,6 @@
 			shellScript = "# Automatic build number: build date + git commit count (e.g. 20260623.142).\n# It always increases (the date bumps daily, the commit count within a day),\n# so there is no manual bump before archiving. Overrides CFBundleVersion in the\n# processed (generated) Info.plist. The Info.plist is declared as an input file\n# for this phase so the build system schedules it AFTER plist generation —\n# otherwise it can run first, find no plist, and silently no-op (build stays 1).\nset -eu\nif commits=$(git -C \"$SRCROOT\" rev-list --count HEAD 2>/dev/null) && [ -n \"$commits\" ]; then\n  :\nelse\n  commits=$(date +%H%M)\nfi\nbuild_number=\"$(date +%Y%m%d).$commits\"\nplist=\"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\necho \"note: Set build number phase running (plist=$plist)\"\nif [ -f \"$plist\" ]; then\n  /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $build_number\" \"$plist\" || /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string $build_number\" \"$plist\"\n  echo \"note: set CFBundleVersion = $build_number\"\nelse\n  echo \"warning: Info.plist not found at $plist — build number NOT set\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
-
-/* Begin PBXProject section */
-		CDB361612FC7CA68009F34F5 /* Project object */ = {
-			isa = PBXProject;
-			attributes = {
-				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2650;
-				LastUpgradeCheck = 2650;
-				TargetAttributes = {
-					CDB361682FC7CA68009F34F5 = {
-						CreatedOnToolsVersion = 26.5;
-						LastSwiftMigration = 2650;
-					};
-				};
-			};
-			buildConfigurationList = CDB361642FC7CA68009F34F5 /* Build configuration list for PBXProject "ShowPickerTV" */;
-			developmentRegion = en;
-			hasScannedForEncodings = 0;
-			knownRegions = (
-				en,
-				Base,
-			);
-			mainGroup = CDB361602FC7CA68009F34F5;
-			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
-			productRefGroup = CDB3616A2FC7CA68009F34F5 /* Products */;
-			projectDirPath = "";
-			projectRoot = "";
-			targets = (
-				CDB361682FC7CA68009F34F5 /* ShowPickerTV */,
-			);
-		};
-/* End PBXProject section */
-
-/* Begin PBXResourcesBuildPhase section */
-		CDB361672FC7CA68009F34F5 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		CDB361652FC7CA68009F34F5 /* Sources */ = {
@@ -211,6 +217,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = appletvos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				TVOS_DEPLOYMENT_TARGET = 26.5;
@@ -268,6 +275,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = appletvos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				TVOS_DEPLOYMENT_TARGET = 26.5;
 				VALIDATE_PRODUCT = YES;
@@ -286,6 +294,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Show Picker Club";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -318,6 +327,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Show Picker Club";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -359,6 +369,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		CDE59A512FF5B38900CBD097 /* XCLocalSwiftPackageReference "../ShowPickerCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../ShowPickerCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CDE59A522FF5B38900CBD097 /* ShowPickerCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ShowPickerCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = CDB361612FC7CA68009F34F5 /* Project object */;
 }
