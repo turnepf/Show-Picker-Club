@@ -601,4 +601,5 @@ let CANONICAL_NETWORKS: [String] = [
     "Paramount+",
     "Peacock",
     "Starz",
+    "YouTube",
 ]
