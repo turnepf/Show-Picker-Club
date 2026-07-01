@@ -6,13 +6,30 @@ import SwiftUI
 struct RootTabView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var selection = Tab.home
+    // The My Shows navigation stack lives here so re-tapping the tab can pop it
+    // back to the member list (standard tvOS "tap the current tab" behavior).
+    @State private var minePath = NavigationPath()
 
     enum Tab: Hashable { case mine, home, search, account }
 
+    // Re-selecting the My Shows tab while already on it drops any pushed show
+    // detail, returning you to the list you came from.
+    private var tabSelection: Binding<Tab> {
+        Binding(
+            get: { selection },
+            set: { newValue in
+                if newValue == .mine && selection == .mine && !minePath.isEmpty {
+                    minePath = NavigationPath()
+                }
+                selection = newValue
+            }
+        )
+    }
+
     var body: some View {
-        TabView(selection: $selection) {
+        TabView(selection: tabSelection) {
             if auth.isLoggedIn {
-                MyShowsView()
+                MyShowsView(path: $minePath)
                     .tabItem { Label("My Shows", systemImage: "play.tv") }
                     .tag(Tab.mine)
             }
@@ -37,11 +54,12 @@ struct RootTabView: View {
 // The signed-in member's own lists, resolved from the member list.
 struct MyShowsView: View {
     @EnvironmentObject private var auth: AuthStore
+    @Binding var path: NavigationPath
     @State private var me: Member?
     @State private var loading = true
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
                 if let me {
                     MemberView(member: me)

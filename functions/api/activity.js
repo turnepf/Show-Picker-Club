@@ -38,7 +38,7 @@ export async function onRequestGet(context) {
 function flushBatch(batch, feed) {
   const firstName = batch[0].member_name.split(' ')[0];
   const list = batch[0].list;
-  const listLabel = { watching: 'Watching', waiting: 'Waiting', recommending: 'Recommending', next: 'Up Next' }[list] || list;
+  const listLabel = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Recommending', next: 'Up Next' }[list] || list;
 
   if (batch.length === 1) {
     feed.push({

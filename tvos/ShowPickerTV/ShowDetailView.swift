@@ -12,6 +12,10 @@ struct ShowDetailView: View {
 
     @EnvironmentObject private var auth: AuthStore
     @State private var show: Show?
+    // My own copy of this title (active or archived), resolved on load so the
+    // list chip and the actions target MY row — not the stranger's copy that
+    // search may have opened by id.
+    @State private var myCopy: Show?
     @State private var cast: [Actor] = []
     @State private var appleTVUrl: URL?
     @State private var lookedUp = false
@@ -24,14 +28,15 @@ struct ShowDetailView: View {
     private var network: String? { show?.network ?? initialNetwork }
     private var rating: String? { show?.rating ?? initialRating }
 
-    // Mine when the loaded show belongs to the signed-in member.
-    private var isMine: Bool {
-        guard let mine = auth.memberSlug, let s = show else { return false }
-        return s.memberSlug == mine
+    // My active copy of this title, if I have one on a list.
+    private var mineActive: Show? {
+        guard let m = myCopy, !m.isArchived else { return nil }
+        return m
     }
-    // Signed in and viewing someone else's (or a popular) show → can copy it.
-    private var canAddToMine: Bool {
-        auth.memberSlug != nil && show != nil && !isMine
+    // My archived copy of this title, if I've shelved it.
+    private var mineArchived: Show? {
+        guard let m = myCopy, m.isArchived else { return nil }
+        return m
     }
 
     var body: some View {
@@ -53,10 +58,15 @@ struct ShowDetailView: View {
                             if let rating, !rating.isEmpty {
                                 Label(rating, systemImage: "star.fill").foregroundColor(.orange)
                             }
-                            if let s = show, let l = ShowList(rawValue: s.list) {
+                            if let m = mineActive, let l = ShowList(rawValue: m.list) {
                                 HStack(spacing: 8) {
-                                    Circle().fill(Theme.listColor(s.list)).frame(width: 16, height: 16)
-                                    Text(l.title).foregroundColor(Theme.text.opacity(0.7))
+                                    Circle().fill(Theme.listColor(m.list)).frame(width: 16, height: 16)
+                                    Text("On \(l.title)").foregroundColor(Theme.text.opacity(0.7))
+                                }
+                            } else if mineArchived != nil {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "archivebox.fill").foregroundColor(Theme.muted)
+                                    Text("Archived").foregroundColor(Theme.text.opacity(0.7))
                                 }
                             }
                             if let s = show, s.isMovie {
@@ -104,25 +114,42 @@ struct ShowDetailView: View {
     // lists (when it's my own show). Mirrors the iOS detail actions; editing,
     // sharing, and the calendar feed stay off the TV.
     @ViewBuilder private var actionsSection: some View {
-        if let s = show, canAddToMine || isMine || actionMessage != nil {
+        if show != nil, auth.memberSlug != nil {
             VStack(alignment: .leading, spacing: 14) {
-                if canAddToMine {
+                if let m = mineActive, let cur = ShowList(rawValue: m.list) {
+                    // On one of my lists → move it around or archive it.
+                    Text("Move to")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundColor(Theme.text)
+                    HStack(spacing: 24) {
+                        ForEach(ShowList.allCases.filter { $0 != cur }) { l in
+                            Button(l.title) { Task { await moveTo(l, id: m.id) } }
+                                .disabled(working)
+                        }
+                        Button(role: .destructive) { Task { await archive(m.id) } } label: {
+                            Label("Archive", systemImage: "archivebox")
+                        }
+                        .disabled(working)
+                    }
+                } else if let m = mineArchived {
+                    // Archived → drop it back onto any list.
+                    Text("Archived — add back to")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundColor(Theme.text)
+                    HStack(spacing: 24) {
+                        ForEach(ShowList.allCases) { l in
+                            Button(l.title) { Task { await restore(l, id: m.id) } }
+                                .disabled(working)
+                        }
+                    }
+                } else {
+                    // Not on my lists → add it to any list.
                     Text("Add to my list")
                         .font(.system(size: 28, weight: .semibold))
                         .foregroundColor(Theme.text)
                     HStack(spacing: 24) {
                         ForEach(ShowList.allCases) { l in
                             Button(l.title) { Task { await addToMyList(l) } }
-                                .disabled(working)
-                        }
-                    }
-                } else if isMine, let cur = ShowList(rawValue: s.list) {
-                    Text("Move to")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundColor(Theme.text)
-                    HStack(spacing: 24) {
-                        ForEach(ShowList.allCases.filter { $0 != cur }) { l in
-                            Button(l.title) { Task { await moveTo(l) } }
                                 .disabled(working)
                         }
                     }
@@ -145,24 +172,62 @@ struct ShowDetailView: View {
             try await API.addShow(title: s.title, network: s.network, networkUrl: s.networkUrl,
                                   list: list.rawValue, movie: s.isMovie, fullSeries: s.isFullSeries)
             actionMessage = "Added “\(s.title)” to your \(list.title) list."
+            await refreshMyCopy()
         } catch API.APIError.badResponse(409) {
-            actionMessage = "“\(s.title)” is already on one of your lists."
+            // Already have it (maybe archived) — reconcile so the right
+            // controls appear.
+            await refreshMyCopy()
+            actionMessage = mineArchived != nil
+                ? "“\(s.title)” is archived — use “add back to” below."
+                : "“\(s.title)” is already on one of your lists."
         } catch {
             actionMessage = "Couldn't add it. Please try again."
         }
     }
 
-    private func moveTo(_ list: ShowList) async {
-        guard let s = show else { return }
+    private func moveTo(_ list: ShowList, id: Int) async {
         working = true
         defer { working = false }
         do {
-            try await API.moveShow(id: s.id, to: list.rawValue)
+            try await API.moveShow(id: id, to: list.rawValue)
             actionMessage = "Moved to \(list.title)."
-            await load()   // refresh so the list chip reflects the new list
+            await refreshMyCopy()
         } catch {
             actionMessage = "Couldn't move it. Please try again."
         }
+    }
+
+    private func archive(_ id: Int) async {
+        working = true
+        defer { working = false }
+        do {
+            try await API.archiveShow(id: id)
+            actionMessage = "Archived."
+            await refreshMyCopy()
+        } catch {
+            actionMessage = "Couldn't archive it. Please try again."
+        }
+    }
+
+    private func restore(_ list: ShowList, id: Int) async {
+        working = true
+        defer { working = false }
+        do {
+            try await API.restoreShow(id: id, to: list.rawValue)
+            actionMessage = "Added back to \(list.title)."
+            await refreshMyCopy()
+        } catch {
+            actionMessage = "Couldn't restore it. Please try again."
+        }
+    }
+
+    // Find my own row for this title (active or archived) so the actions and
+    // list chip reflect MY copy, regardless of whose copy opened the screen.
+    private func refreshMyCopy() async {
+        guard let slug = auth.memberSlug else { myCopy = nil; return }
+        let t = (show?.title ?? initialTitle).lowercased()
+        let mine = (try? await API.myShows(slug: slug, includeArchived: true)) ?? []
+        myCopy = mine.first { $0.title.lowercased() == t }
     }
 
     // Portrait poster when we have one; otherwise a gradient tile with the
@@ -354,6 +419,7 @@ struct ShowDetailView: View {
         if skipITunes {
             if let s = try? await detail { show = s }
             cast = (try? await actors) ?? []
+            await refreshMyCopy()
             lookedUp = true
             return
         }
@@ -362,6 +428,7 @@ struct ShowDetailView: View {
         if let s = try? await detail { show = s }
         cast = (try? await actors) ?? []
         appleTVUrl = await appleURL
+        await refreshMyCopy()
         lookedUp = true
     }
 }

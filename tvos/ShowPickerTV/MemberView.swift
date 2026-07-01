@@ -7,6 +7,7 @@ struct MemberView: View {
     @State private var picks: [Pick] = []
     @State private var pickMessage: String?
     @State private var loading = true
+    @State private var didInitialLoad = false
     @State private var errorText: String?
 
     private var isMine: Bool { auth.memberSlug == member.slug }
@@ -57,9 +58,18 @@ struct MemberView: View {
             .padding(.bottom, 60)
         }
         .background(Theme.background.ignoresSafeArea())
-        // Load once. Re-running on re-appear (after popping back from a show)
-        // would rebuild the lists and bounce the scroll position to the top.
-        .task { if loading { await load() } }
+        // First appearance: full load (with the spinner).
+        .task { if !didInitialLoad { await load(); didInitialLoad = true } }
+        // Returning here (e.g. after archiving / moving a show from its detail):
+        // refresh quietly — no `loading` toggle, so the scroll position holds
+        // and the lists reflect the change instead of showing stale data.
+        .onAppear {
+            guard didInitialLoad else { return }
+            Task {
+                if let s = try? await API.shows(member: member.slug) { shows = s }
+                await loadPicks()
+            }
+        }
     }
 
     // "Picks for you" — recommendations on your own page; tapping adds to Up Next.

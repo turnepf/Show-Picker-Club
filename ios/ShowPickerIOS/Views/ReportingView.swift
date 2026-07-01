@@ -51,7 +51,7 @@ struct ReportingView: View {
                     metric("Active shows", r.totals.activeShows)
                     metric("Archived shows", r.totals.archivedShows)
                     metric("Watching", r.totals.watching)
-                    metric("Waiting", r.totals.waiting)
+                    metric("Awaiting", r.totals.waiting)
                     metric("Recommending", r.totals.recommending)
                     metric("Up Next", r.totals.next)
                 }

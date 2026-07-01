@@ -874,7 +874,7 @@
       <h1 class="header-title" id="appTitle"></h1>
       <div class="tabs" id="tabs">
         <div class="tab active" data-list="watching" onclick="switchTab('watching')">Watching</div>
-        <div class="tab" data-list="waiting" onclick="switchTab('waiting')">Waiting</div>
+        <div class="tab" data-list="waiting" onclick="switchTab('waiting')">Awaiting</div>
         <div class="tab" data-list="recommending" onclick="switchTab('recommending')">Recommending</div>
         <div class="tab" data-list="next" onclick="switchTab('next')">Up Next</div>
       </div>
@@ -959,7 +959,7 @@
       <label>List</label>
       <div class="list-chips" id="inputListChips">
         <div class="list-chip selected" data-value="watching" style="--chip-color: var(--list-watching);" onclick="selectListChip(this)">Watching</div>
-        <div class="list-chip" data-value="waiting" style="--chip-color: var(--list-waiting);" onclick="selectListChip(this)">Waiting</div>
+        <div class="list-chip" data-value="waiting" style="--chip-color: var(--list-waiting);" onclick="selectListChip(this)">Awaiting</div>
         <div class="list-chip" data-value="recommending" style="--chip-color: var(--list-recommending);" onclick="selectListChip(this)">Recommending</div>
         <div class="list-chip" data-value="next" style="--chip-color: var(--accent);" onclick="selectListChip(this)">Up Next</div>
       </div>
@@ -1052,7 +1052,7 @@
       <label for="addMyList">Add to</label>
       <select id="addMyList">
         <option value="watching">Watching</option>
-        <option value="waiting">Waiting on Next Showings</option>
+        <option value="waiting">Awaiting Next Season</option>
         <option value="recommending">Recommending</option>
         <option value="next">Up Next</option>
       </select>
@@ -1215,7 +1215,7 @@
       return dismiss;
     }
 
-    const LIST_LABELS = { watching: 'Watching', waiting: 'Waiting', recommending: 'Recommending', next: 'Up Next' };
+    const LIST_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Recommending', next: 'Up Next' };
 
     // Empty-state copy. own.* is shown when the viewer owns this page; guest.*
     // is shown to anyone else (no CTA, just acknowledges the list is empty).
@@ -1227,7 +1227,7 @@
           cta: { label: 'Add a show', action: 'openAddModal()' },
         },
         waiting: {
-          headline: "Nothing waiting on a next season.",
+          headline: "Nothing awaiting a next season.",
           help: "When you finish a season but want to come back, move the show here. Premiere dates show on your calendar feed.",
         },
         recommending: {
@@ -1242,7 +1242,7 @@
       },
       guest: {
         watching:   (name) => `${name} isn't watching anything right now.`,
-        waiting:    (name) => `${name} isn't waiting on any seasons.`,
+        waiting:    (name) => `${name} isn't awaiting any seasons.`,
         recommending: (name) => `${name} hasn't recommended anything yet.`,
         next:       (name) => `${name}'s Up Next is empty.`,
       },
@@ -1331,7 +1331,7 @@
 
     const SECTION_DESCS = {
       watching: "What we're watching now.",
-      waiting: "Waiting on the next season to drop.",
+      waiting: "Awaiting the next season to drop.",
       recommending: "We've watched it and we'd recommend it.",
       next: "Shows that have been recommended but we haven't watched.",
     };
@@ -1986,7 +1986,7 @@
       }
     }
 
-    const TAB_LABELS = { watching: 'Watching', waiting: 'Waiting', recommending: 'Recommending', next: 'Up Next' };
+    const TAB_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Recommending', next: 'Up Next' };
 
     function updateDesc() {
       const count = shows.filter(s => s.list === currentTab).length;
@@ -2388,7 +2388,7 @@
         "Already on the screen!",
       ],
       waiting: [
-        "Same! They're waiting on the next season too!",
+        "Same! They're awaiting the next season too!",
         "They're already counting the days until the next season drops!",
         "Join the waiting club!",
       ],
@@ -2498,7 +2498,7 @@
         return;
       }
 
-      const labelFor = { watching: 'Watching', waiting: 'Waiting', recommending: 'Recommending', next: 'Up Next' };
+      const labelFor = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Recommending', next: 'Up Next' };
 
       const meta = `<div class="search-meta">${matches.length} match${matches.length === 1 ? '' : 'es'}</div>`;
       container.innerHTML = meta + matches.map(show => {
@@ -2864,7 +2864,7 @@
     }
 
     function detailPromotions(list) {
-      if (list === 'watching') return [{ label: 'Watched it → Recommending', target: 'recommending' }, { label: 'Season done → Waiting', target: 'waiting' }];
+      if (list === 'watching') return [{ label: 'Watched it → Recommending', target: 'recommending' }, { label: 'Season done → Awaiting', target: 'waiting' }];
       if (list === 'waiting') return [{ label: "It's back → Watching", target: 'watching' }];
       if (list === 'recommending') return [{ label: 'Watch again → Watching', target: 'watching' }];
       if (list === 'next') return [{ label: 'Start watching', target: 'watching' }];

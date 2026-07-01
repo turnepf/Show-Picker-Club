@@ -23,7 +23,7 @@ func listPromotions(for list: ShowList) -> [ListPromotion] {
         return [
             ListPromotion(label: "Watched", detailLabel: "Watched it → Recommending",
                           systemImage: "checkmark.circle.fill", target: .recommending, tint: .purple),
-            ListPromotion(label: "Season Done", detailLabel: "Season done → Waiting",
+            ListPromotion(label: "Season Done", detailLabel: "Season done → Awaiting",
                           systemImage: "hourglass", target: .waiting, tint: .blue),
         ]
     case .waiting:
