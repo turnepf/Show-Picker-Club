@@ -312,6 +312,15 @@ struct UrlCleanupResponse: Codable {
     // a different service than the stored network. Present on the list action.
     let conflicts: [UrlConflict]?
     let mismatches: [UrlMismatch]?
+    // Titles enrichment couldn't match to a real show (no poster after a
+    // pass) — usually a made-up name like "Juul Documentary". The link may be
+    // fine; only the title needs fixing. POST action: fix_title.
+    let badTitles: [UrlQueueItem]?
+
+    enum CodingKeys: String, CodingKey {
+        case shows, networks, conflicts, mismatches
+        case badTitles = "bad_titles"
+    }
 }
 
 // A title two or more members carry on different networks — operator picks the

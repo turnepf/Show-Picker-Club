@@ -166,7 +166,7 @@ Recently removed: "Most active members," "Recently archived," "Seed-only members
 Three secret-protected admin pages (all require the `ADMIN_SECRET` value to be entered in the page):
 
 - **/setup** — create a new member. Enter a name plus the phone and/or email they'll receive login codes at; the page generates a slug, picks 8 seed shows from highly-rated club picks (2 per list), and copies them in as `added_by='seed'` rows. The new member sees these on first login.
-- **/url-cleanup** — queue of shows missing a real network URL (still on a generic search link). Operator can paste a deep link; the page pushes it to every member's copy of that show.
+- **/url-cleanup** — queue of shows missing a real network URL (still on a generic search link). Operator can paste a deep link; the page pushes it to every member's copy of that show. Also surfaces **wrong titles**: shows whose name never matched a real title (no poster after enrichment) even though their link works — renaming re-enriches every copy and pulls the right poster.
 - **/vibe-admin** — batch-score show traits using Claude. Picks shows missing a `show_traits` row, sends each title to Claude with a calibration prompt that asks for 27 trait scores (0–1), writes the result back. Used to backfill the trait data that powers Vibe.
 
 There is no admin role in the session model — admin actions are gated purely by knowing the `ADMIN_SECRET`.

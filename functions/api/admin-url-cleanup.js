@@ -147,6 +147,57 @@ async function fetchQueue(env) {
   }));
 }
 
+// Titles whose enrichment ran but never found a poster. A missing poster is
+// the observable symptom of a wrong title: TMDB search can't match "Juul
+// Documentary" to "Big Vape: The Rise and Fall of Juul", so the row keeps
+// cycling through enrichment with no artwork. These rows often have a
+// perfectly good network_url (the member pasted the right link), which is
+// exactly why the URL queue never surfaces them — so they get their own
+// section. Titles already in the URL queue are excluded; that queue's rows
+// carry the same rename control.
+async function fetchBadTitles(env) {
+  const { results } = await env.DB.prepare(`
+    SELECT
+      LOWER(s.title) AS ltitle,
+      MIN(s.id) AS id,
+      MIN(s.title) AS title,
+      (SELECT s2.network FROM shows s2
+        WHERE LOWER(s2.title) = LOWER(s.title) AND s2.archived = 0
+          AND s2.network IS NOT NULL AND s2.network != ''
+        ORDER BY s2.id LIMIT 1) AS network,
+      (SELECT s3.network_url FROM shows s3
+        WHERE LOWER(s3.title) = LOWER(s.title) AND s3.archived = 0
+        ORDER BY s3.id LIMIT 1) AS network_url,
+      COUNT(*) AS member_count,
+      GROUP_CONCAT(
+        COALESCE(
+          CASE WHEN m.first_name IS NOT NULL AND m.last_initial IS NOT NULL
+               THEN m.first_name || ' ' || m.last_initial
+               ELSE m.first_name END,
+          s.member_slug),
+        ', ') AS members
+    FROM shows s
+    LEFT JOIN members m ON m.slug = s.member_slug
+    WHERE s.archived = 0
+    GROUP BY LOWER(s.title)
+    HAVING MAX(s.poster_url IS NOT NULL) = 0
+       -- Only titles enrichment has actually attempted — brand-new rows get
+       -- their first pass within minutes and usually resolve on their own.
+       AND MAX(s.enriched_at IS NOT NULL) = 1
+       -- Skip anything the URL queue already lists (it has a rename box too).
+       AND MAX(CASE WHEN ${BAD_URL} THEN 1 ELSE 0 END) = 0
+    ORDER BY LOWER(s.title)
+  `).all();
+  return (results || []).map(r => ({
+    id: r.id,
+    title: r.title,
+    network: r.network,
+    network_url: r.network_url,
+    member_count: r.member_count,
+    members: r.members,
+  }));
+}
+
 // Titles where two or more members carry the show on different networks.
 // Often a typo (member picked the wrong service) but sometimes legitimate
 // (a title that lives on multiple services). Surface so the operator can
@@ -339,11 +390,17 @@ export async function onRequestPost(context) {
     const enriched = await fetchEnrichment(rawNew, env, !!row.movie);
     const finalTitle = enriched.canonicalTitle || rawNew;
 
+    // Poster/logo: prefer the new title's artwork — the old title either had
+    // none (search missed) or the wrong show's (search mismatched). Only keep
+    // the old value when the new lookup returned nothing.
     const upd = await env.DB.prepare(
       `UPDATE shows
-          SET title = ?, rating = COALESCE(?, rating), enriched_at = datetime('now')
+          SET title = ?, rating = COALESCE(?, rating),
+              poster_url = COALESCE(?, poster_url),
+              network_logo_url = COALESCE(?, network_logo_url),
+              enriched_at = datetime('now')
         WHERE LOWER(title) = LOWER(?) AND archived = 0`
-    ).bind(finalTitle, enriched.rating, oldTitle).run();
+    ).bind(finalTitle, enriched.rating, enriched.posterUrl, enriched.networkLogoUrl, oldTitle).run();
 
     // Refresh cast on each renamed copy.
     if (enriched.actors.length > 0) {
@@ -365,5 +422,6 @@ export async function onRequestPost(context) {
   const networks = await fetchNetworks(env);
   const conflicts = await fetchConflicts(env);
   const mismatches = await fetchMismatches(env);
-  return json({ shows, networks, conflicts, mismatches });
+  const bad_titles = await fetchBadTitles(env);
+  return json({ shows, networks, conflicts, mismatches, bad_titles });
 }
