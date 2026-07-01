@@ -38,93 +38,6 @@ struct Member: Codable, Identifiable, Hashable {
 
 struct MembersResponse: Codable { let members: [Member] }
 
-struct Actor: Codable, Hashable {
-    let name: String
-    let imdbId: String?
-    enum CodingKeys: String, CodingKey {
-        case name
-        case imdbId = "imdb_id"
-    }
-}
-
-struct Show: Codable, Identifiable, Hashable {
-    let id: Int
-    let title: String
-    let network: String?
-    let networkUrl: String?
-    let recommendedBy: String?
-    let rating: String?
-    let list: String
-    let notes: String?
-    let movie: Int?
-    let fullSeries: Int?
-    let watchingWith: String?
-    let nextSeasonDate: String?
-    let seasonEndDate: String?
-    let seasonsReleased: Int?
-    let genres: String?
-    let actors: String?
-    let archived: Int?
-    let memberSlug: String?
-    let createdAt: String?
-    let posterUrl: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id, title, network, rating, list, notes, movie, genres, actors, archived
-        case networkUrl = "network_url"
-        case recommendedBy = "recommended_by"
-        case fullSeries = "full_series"
-        case watchingWith = "watching_with"
-        case nextSeasonDate = "next_season_date"
-        case seasonEndDate = "season_end_date"
-        case seasonsReleased = "seasons_released"
-        case memberSlug = "member_slug"
-        case createdAt = "created_at"
-        case posterUrl = "poster_url"
-    }
-
-    // "3 seasons" / "1 season" — total seasons released, when known.
-    var seasonsText: String? {
-        guard let n = seasonsReleased, n > 0 else { return nil }
-        return "\(n) season\(n == 1 ? "" : "s")"
-    }
-
-    var isMovie: Bool { (movie ?? 0) == 1 }
-    var isFullSeries: Bool { (fullSeries ?? 0) == 1 }
-    var isArchived: Bool { (archived ?? 0) == 1 }
-    var genreList: [String] {
-        (genres ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-    }
-
-    // Format an ISO "YYYY-MM-DD" as "M/D", matching the web's formatDate.
-    private func monthDay(_ s: String?) -> String? {
-        guard let s, !s.isEmpty else { return nil }
-        let p = s.split(separator: "-")
-        guard p.count >= 3, let m = Int(p[1]), let d = Int(p[2]) else { return s }
-        return "\(m)/\(d)"
-    }
-
-    // Premiere of the next season ("6/1" or "6/1 – 6/30"); nil without a
-    // premiere date. Used on the Watching/Waiting list rows.
-    var nextUpRange: String? {
-        guard let start = monthDay(nextSeasonDate) else { return nil }
-        if let end = monthDay(seasonEndDate), end != start { return "\(start) – \(end)" }
-        return start
-    }
-
-    // Whatever season dates exist, for the detail view (falls back to a
-    // finale-only "through M/D").
-    var seasonDatesText: String? {
-        if let r = nextUpRange { return r }
-        if let end = monthDay(seasonEndDate) { return "through \(end)" }
-        return nil
-    }
-}
-
-struct ShowsResponse: Codable { let shows: [Show] }
-struct ShowResponse: Codable { let show: Show }
-struct ActorsResponse: Codable { let actors: [Actor] }
-
 // One row from /api/shows/all — every active show across all members, used by
 // cross-library search. Carries member attribution + cast so results can read
 // "on Watching · William" and be filtered by actor.
@@ -710,18 +623,6 @@ struct LoginResponse: Codable {
 }
 
 // The four lists, in display order.
-enum ShowList: String, CaseIterable, Identifiable {
-    case watching, waiting, recommending, next
-    var id: String { rawValue }
-    var title: String {
-        switch self {
-        case .watching: return "Watching"
-        case .waiting: return "Awaiting"
-        case .recommending: return "Recommending"
-        case .next: return "Up Next"
-        }
-    }
-}
 
 // Canonical networks for the picker. Keep in sync with
 // functions/_shared/networks.js on the backend.
