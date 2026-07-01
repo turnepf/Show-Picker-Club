@@ -82,7 +82,7 @@ struct UrlCleanupView: View {
                 } header: {
                     Text("Wrong titles (no poster match)")
                 } footer: {
-                    Text("The link works, but the stored name doesn't match any real show — so no poster, rating, or cast. Fix the name to re-enrich every copy.")
+                    Text("The link works, but the stored name doesn't match any real show — so no poster, rating, or cast. Loading this list already tried recovering each name from the show's own link; these need a human. Fix the name to re-enrich every copy.")
                 }
             }
         }

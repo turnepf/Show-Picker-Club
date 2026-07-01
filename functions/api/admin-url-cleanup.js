@@ -2,6 +2,7 @@ import { canonicalNetwork, networkFromUrl } from '../_shared/networks.js';
 import { extractUrl } from '../_shared/url-utils.js';
 import { isAdmin } from '../_shared/admin.js';
 import { fetchEnrichment } from '../_shared/enrichment.js';
+import { titleFromUrl, renameShowCopies } from '../_shared/title-fix.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -168,6 +169,7 @@ async function fetchBadTitles(env) {
       (SELECT s3.network_url FROM shows s3
         WHERE LOWER(s3.title) = LOWER(s.title) AND s3.archived = 0
         ORDER BY s3.id LIMIT 1) AS network_url,
+      MAX(s.movie) AS movie,
       COUNT(*) AS member_count,
       GROUP_CONCAT(
         COALESCE(
@@ -193,9 +195,69 @@ async function fetchBadTitles(env) {
     title: r.title,
     network: r.network,
     network_url: r.network_url,
+    movie: r.movie,
     member_count: r.member_count,
     members: r.members,
   }));
+}
+
+// Apply a title correction: enrich the new title, rename every active copy
+// (member-safely — see renameShowCopies), and stamp the new title's artwork,
+// rating, and cast onto the renamed rows. Shared by the operator's fix_title
+// action and the automatic pass below.
+async function commitTitleFix(env, oldTitle, rawNew, enriched) {
+  const finalTitle = enriched.canonicalTitle || rawNew;
+  const renamed = await renameShowCopies(env, oldTitle, finalTitle);
+
+  // Prefer the new title's artwork — the old title either had none (search
+  // missed) or the wrong show's (search mismatched). Only keep the old value
+  // when the new lookup returned nothing.
+  await env.DB.prepare(
+    `UPDATE shows
+        SET rating = COALESCE(?, rating),
+            poster_url = COALESCE(?, poster_url),
+            network_logo_url = COALESCE(?, network_logo_url)
+      WHERE LOWER(title) = LOWER(?) AND archived = 0`
+  ).bind(enriched.rating, enriched.posterUrl, enriched.networkLogoUrl, finalTitle).run();
+
+  if (enriched.actors.length > 0) {
+    const { results: copies } = await env.DB.prepare(
+      'SELECT id FROM shows WHERE LOWER(title) = LOWER(?) AND archived = 0'
+    ).bind(finalTitle).all();
+    const ins = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id) VALUES (?, ?, ?)');
+    for (const c of copies) {
+      await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(c.id).run();
+      await env.DB.batch(enriched.actors.map(a => ins.bind(c.id, a.name, a.imdb_id || null)));
+    }
+  }
+
+  return { finalTitle, updated: renamed };
+}
+
+// Try to fix bad titles without a human: the row's own deep link points at
+// the streaming service's title page, whose og:title carries the show's real
+// name. Recover it, re-enrich, and only commit when enrichment found a poster
+// (proof the recovered name matches a real show). Whatever this pass can't
+// fix stays in the queue for manual cleanup.
+//
+// Budget: this endpoint's only other fetch work is DB queries, but Cloudflare
+// caps an invocation at 50 subrequests. Each attempt costs 1 page fetch and
+// each commit costs a fetchEnrichment (~7 fetches), so scan/commit are capped;
+// leftovers get attempted on the next page load.
+async function autoFixBadTitles(env, candidates) {
+  const MAX_SCAN = 8;
+  const MAX_COMMITS = 4;
+  const fixed = [];
+  for (const c of candidates.slice(0, MAX_SCAN)) {
+    if (fixed.length >= MAX_COMMITS) break;
+    const guess = await titleFromUrl(c.network_url);
+    if (!guess || guess.toLowerCase() === c.title.toLowerCase()) continue;
+    const enriched = await fetchEnrichment(guess, env, !!c.movie);
+    if (!enriched.posterUrl) continue; // not confident — leave for the human
+    const { finalTitle } = await commitTitleFix(env, c.title, guess, enriched);
+    fixed.push({ old_title: c.title, new_title: finalTitle });
+  }
+  return fixed;
 }
 
 // Titles where two or more members carry the show on different networks.
@@ -388,40 +450,19 @@ export async function onRequestPost(context) {
     const oldTitle = row.title;
 
     const enriched = await fetchEnrichment(rawNew, env, !!row.movie);
-    const finalTitle = enriched.canonicalTitle || rawNew;
+    const { finalTitle, updated } = await commitTitleFix(env, oldTitle, rawNew, enriched);
 
-    // Poster/logo: prefer the new title's artwork — the old title either had
-    // none (search missed) or the wrong show's (search mismatched). Only keep
-    // the old value when the new lookup returned nothing.
-    const upd = await env.DB.prepare(
-      `UPDATE shows
-          SET title = ?, rating = COALESCE(?, rating),
-              poster_url = COALESCE(?, poster_url),
-              network_logo_url = COALESCE(?, network_logo_url),
-              enriched_at = datetime('now')
-        WHERE LOWER(title) = LOWER(?) AND archived = 0`
-    ).bind(finalTitle, enriched.rating, enriched.posterUrl, enriched.networkLogoUrl, oldTitle).run();
-
-    // Refresh cast on each renamed copy.
-    if (enriched.actors.length > 0) {
-      const { results: copies } = await env.DB.prepare(
-        'SELECT id FROM shows WHERE LOWER(title) = LOWER(?) AND archived = 0'
-      ).bind(finalTitle).all();
-      const ins = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id) VALUES (?, ?, ?)');
-      for (const c of copies) {
-        await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(c.id).run();
-        await env.DB.batch(enriched.actors.map(a => ins.bind(c.id, a.name, a.imdb_id || null)));
-      }
-    }
-
-    return json({ ok: true, old_title: oldTitle, new_title: finalTitle, updated: upd.meta.changes });
+    return json({ ok: true, old_title: oldTitle, new_title: finalTitle, updated });
   }
 
   await propagateGoodUrls(env);
+  // Auto-heal what we can before surfacing the rest for manual cleanup.
+  let bad_titles = await fetchBadTitles(env);
+  const auto_fixed = await autoFixBadTitles(env, bad_titles);
+  if (auto_fixed.length) bad_titles = await fetchBadTitles(env);
   const shows = await fetchQueue(env);
   const networks = await fetchNetworks(env);
   const conflicts = await fetchConflicts(env);
   const mismatches = await fetchMismatches(env);
-  const bad_titles = await fetchBadTitles(env);
-  return json({ shows, networks, conflicts, mismatches, bad_titles });
+  return json({ shows, networks, conflicts, mismatches, bad_titles, auto_fixed });
 }

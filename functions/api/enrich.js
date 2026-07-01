@@ -1,5 +1,6 @@
 import { getSession } from '../_shared/auth.js';
 import { fetchEnrichment } from '../_shared/enrichment.js';
+import { titleFromUrl, renameShowCopies } from '../_shared/title-fix.js';
 
 // TMDB GET that works with either credential the worker has configured:
 // the v4 Bearer token (TMDB_TOKEN, what the shared enrichment path uses) is
@@ -42,6 +43,23 @@ async function tmdbSearchFirst(title, type, env) {
     } catch (e) {}
   }
   return null;
+}
+
+// Last resort when no title spelling matches TMDB: the stored name is likely
+// made up ("Juul Documentary"), but the row's own deep link points at the
+// streaming service's title page, whose og:title carries the real name.
+// Recover it, re-search, and rename every copy to the matched title so the
+// bad name heals for good. Returns the TMDB result or null. Costs 1 page
+// fetch + up to 3 searches, and only fires for shows whose title search
+// already failed — rare after the first healing pass.
+async function recoverTitleFromUrl(show, type, env) {
+  const guess = await titleFromUrl(show.network_url);
+  if (!guess || guess.toLowerCase() === show.title.toLowerCase()) return null;
+  const first = await tmdbSearchFirst(guess, type, env);
+  if (!first) return null;
+  const realTitle = (type === 'movie' ? first.title : first.name) || guess;
+  await renameShowCopies(env, show.title, realTitle);
+  return first;
 }
 
 // Networks with `param` pass the show name in the search URL query string.
@@ -269,14 +287,16 @@ export async function onRequestPost(context) {
     if (member) { tvWhere += ` AND member_slug = ?`; tvBinds.push(member); }
     if (titles) { tvWhere += ` AND LOWER(title) IN (${titles.map(() => '?').join(',')})`; tvBinds.push(...titles); }
     const tmdbStmt = env.DB.prepare(
-      `SELECT id, title, movie, list FROM shows WHERE ${tvWhere} ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`
+      `SELECT id, title, movie, list, network_url FROM shows WHERE ${tvWhere} ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`
     ).bind(...tvBinds, maxTmdb);
     const { results: tmdbShows } = await tmdbStmt.all();
 
     for (const show of tmdbShows) {
       try {
-        // Search TMDB for the show (trying a few title spellings).
-        const first = await tmdbSearchFirst(show.title, 'tv', env);
+        // Search TMDB for the show (trying a few title spellings), falling
+        // back to recovering the real title from the row's own deep link.
+        const first = await tmdbSearchFirst(show.title, 'tv', env)
+          || await recoverTitleFromUrl(show, 'tv', env);
         if (!first) {
           // Stamp enriched_at so a title TMDB can't match rotates to the back
           // of the oldest-first queue instead of blocking it every round. (A DB
@@ -346,13 +366,14 @@ export async function onRequestPost(context) {
     if (member) { mvWhere += ` AND member_slug = ?`; mvBinds.push(member); }
     if (titles) { mvWhere += ` AND LOWER(title) IN (${titles.map(() => '?').join(',')})`; mvBinds.push(...titles); }
     const movieStmt = env.DB.prepare(
-      `SELECT id, title FROM shows WHERE ${mvWhere} ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`
+      `SELECT id, title, network_url FROM shows WHERE ${mvWhere} ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`
     ).bind(...mvBinds, maxTmdb);
     const { results: movieShows } = await movieStmt.all();
 
     for (const show of movieShows) {
       try {
-        const first = await tmdbSearchFirst(show.title, 'movie', env);
+        const first = await tmdbSearchFirst(show.title, 'movie', env)
+          || await recoverTitleFromUrl(show, 'movie', env);
         const posterPath = first && first.poster_path;
         const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
         await env.DB.prepare(
