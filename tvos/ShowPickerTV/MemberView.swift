@@ -64,7 +64,6 @@ struct MemberView: View {
         }
     }
 
-    // "Picks for you" — recommendations on your own page; tapping adds to Up Next.
     private func shelf(list: ShowList, items: [Show]) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {

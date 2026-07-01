@@ -125,13 +125,6 @@ enum API {
         return r.shows
     }
 
-    // "Picks for you" for a member's own Up Next. Returns empty picks for
-    // seed-only members; callers can just check picks.isEmpty.
-    static func recommendations(member slug: String) async throws -> Recommendations {
-        let enc = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? slug
-        return try await get("/api/recommendations?member=\(enc)")
-    }
-
     static func shows(member slug: String) async throws -> [Show] {
         let enc = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? slug
         let r: ShowsResponse = try await get("/api/shows?member=\(enc)")

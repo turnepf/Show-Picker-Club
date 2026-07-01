@@ -4,6 +4,8 @@ Native SwiftUI iOS client for [showpicker.club](https://showpicker.club). Full f
 
 Talks to the same `/api/*` endpoints as the web. Session cookie is managed automatically by `URLSession.shared` via `HTTPCookieStorage`, so login persists across launches.
 
+The app depends on the shared **`ShowPickerCore`** Swift package (at the repo root; `Show` / `Actor` / `ShowList` models + response wrappers), which is also used by the tvOS and watchOS apps. iOS and tvOS are opened together via **`ShowPickerClub.xcworkspace`** and share a single bundle id (`net.patrickturner.showpickerios`), shipping as one universal App Store app (iPhone + Apple TV). A paired **watchOS** app (`watch/ShowPickerWatch`) receives its session from this phone app over WatchConnectivity.
+
 ## What's here
 
 ```
@@ -25,7 +27,7 @@ ios/ShowPickerIOS/
 
 The Xcode project is committed at `ios/ShowPickerIOS.xcodeproj` with **two targets already wired up** — the `ShowPickerIOS` app and the `ShowPickerShareExtension` (the share-sheet integration). You don't create anything by hand; just open and run.
 
-1. **Open `ios/ShowPickerIOS.xcodeproj`** in Xcode (double-click it, or `open ios/ShowPickerIOS.xcodeproj` from the repo root).
+1. **Open `ShowPickerClub.xcworkspace`** (at the repo root) in Xcode — it contains the iOS and tvOS apps plus the shared `ShowPickerCore` package. (Opening `ios/ShowPickerIOS.xcodeproj` on its own still works, but the workspace is the intended entry point.)
 2. **Signing & Capabilities** → for *both* the `ShowPickerIOS` and `ShowPickerShareExtension` targets, select your Team. The project ships with `DEVELOPMENT_TEAM = NQ6AJVVBBJ` (the same team as the tvOS app); if that's not your team, change it on both targets.
    - The bundle IDs are `net.patrickturner.showpickerios` (app) and `net.patrickturner.showpickerios.ShareExtension` (extension). Change the prefix on both if you need a different one — keep the extension ID as a child of the app ID.
    - The **App Group** `group.net.patrickturner.showpickerios` is already declared in both targets' entitlements. Xcode's automatic signing will register it for you; if you change the group ID, update both `.entitlements` files **and** `ios/Shared/SharedSession.swift` (the `appGroupID` constant).
@@ -176,7 +178,7 @@ Offline/
   `OfflineCache`; when a later GET fails *because the device is offline* (a
   `URLError` like `.notConnectedToInternet`), the last good copy is served
   instead of throwing. Members, popular, a member's shows, a show's detail,
-  cast, cross-library search, and recommendations are all cached. Real server
+  cast, and cross-library search are all cached. Real server
   errors (4xx/5xx, decode failures) still propagate as before.
 
 - **Writes (add / edit offline).** Each write in `API` is split into a
@@ -199,7 +201,7 @@ Offline/
 ### Limits
 
 - Only edits to *your own* library queue offline — add / edit / move / archive /
-  delete, including adding a cached search result or a "Picks for you" pick onto
+  delete, including adding a cached search result onto
   one of your lists. Suggesting or sending a show to *another* member, login,
   and the admin tools still need a connection and surface their usual errors
   offline.
@@ -226,12 +228,12 @@ Offline/
 | Watch on streaming service (deep link) | ✅ for services that support it |
 | Share from Netflix / Apple TV / etc. → Up Next | ✅ (Share Extension) |
 | Calendar feed (Subscribe in Calendar) | ✅ (per-member webcal:// button at the bottom of their list) |
-| Recommendations / "Picks for you" | ✅ (above your own Up Next; top 3, de-named reasons) |
+| Recommendations / "Picks for you" | ❌ Removed from the client (see note) |
 | Offline browsing + offline edits | ✅ (cached reads, queued add/edit/move/archive, auto-sync on reconnect) |
 | Field toggle pills (hide ratings/networks/etc.) | ❌ Not planned for iOS |
 | Vibe profile | ❌ Not planned for iOS |
 
-> **Picks parity:** the ranking logic is server-side only (`functions/api/recommendations.js`); every client just renders `GET /api/recommendations`. iOS shows the top 3 with de-named reasons — same picks as the web, different presentation.
+> **Picks for You was removed.** The feature is gone from all clients (web, iOS, tvOS); iOS no longer renders a picks section. The backend endpoint (`functions/api/recommendations.js`, `GET /api/recommendations`) is retained for backwards compatibility but is no longer called.
 
 Anything in "not in v1" is straightforward to add later; it's the same backend endpoints, just more views.
 

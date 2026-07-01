@@ -4,6 +4,8 @@ A native, **view-only** tvOS client for [showpicker.club](https://showpicker.clu
 
 Built with SwiftUI. Talks to the same public `/api/*` endpoints as the web app; no auth, no backend changes.
 
+This tvOS app ships **bundled with the iOS app as a single universal App Store listing** — they share one bundle id (`net.patrickturner.showpickerios`, iPhone + Apple TV), not two separate apps. It depends on the shared **`ShowPickerCore`** Swift package (at the repo root; models + response wrappers, also used by iOS and watchOS) and is opened together with iOS via **`ShowPickerClub.xcworkspace`**.
+
 ## What's here
 
 ```
@@ -23,10 +25,10 @@ tvos/
 
 ## Build it (on your Mac)
 
-The Xcode project is committed at `tvos/ShowPickerTV.xcodeproj` — just open and run.
+The tvOS target is committed at `tvos/ShowPickerTV.xcodeproj` and is part of the repo-root `ShowPickerClub.xcworkspace` — open the workspace to build it alongside iOS.
 
-1. **Open `tvos/ShowPickerTV.xcodeproj`** in Xcode (double-click it, or `open tvos/ShowPickerTV.xcodeproj` from the repo root).
-2. **Signing & Capabilities** → select your Team. The project ships with `DEVELOPMENT_TEAM = NQ6AJVVBBJ` and bundle id `net.patrickturner.ShowPickerTV`; change the team to yours (and the bundle id if it collides with an existing app).
+1. **Open `ShowPickerClub.xcworkspace`** (at the repo root) in Xcode. (Opening `tvos/ShowPickerTV.xcodeproj` on its own still works, but the workspace is the intended entry point since it also wires in the shared `ShowPickerCore` package.)
+2. **Signing & Capabilities** → select your Team. The project ships with `DEVELOPMENT_TEAM = NQ6AJVVBBJ` and shares the iOS app's bundle id `net.patrickturner.showpickerios` (one universal app); change the team to yours if it isn't `NQ6AJVVBBJ`.
 3. Pick the **Apple TV** simulator and **Cmd+R**. You should see the home screen load from the live API.
 
 No `Info.plist` edits needed — showpicker.club is HTTPS, so App Transport Security passes by default.
