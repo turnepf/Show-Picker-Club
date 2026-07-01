@@ -4,7 +4,7 @@ This is the product-level reference for what Show Picker Club does, who it's for
 
 ## What it is
 
-A shared tracker for a small private TV/movie club. Each member maintains their own four ranked lists. The home page combines those into a club view: most-watched shows, member browsing, cross-library search. Logged-in members get personalized recommendations and a calendar feed of upcoming premieres.
+A shared tracker for a small private TV/movie club. Each member maintains their own four ranked lists. The home page combines those into a club view: most-watched shows, member browsing, cross-library search. Logged-in members get a calendar feed of upcoming premieres.
 
 ## Who it's for
 
@@ -17,7 +17,7 @@ Every member has exactly four lists. They are intentionally narrow and force a c
 | List           | What it means                                              | Color  |
 |----------------|------------------------------------------------------------|--------|
 | **Watching**   | Currently watching a season or movie.                      | Green  |
-| **Waiting**    | Finished the current season; waiting on the next.          | Blue   |
+| **Awaiting**   | Finished the current season; waiting on the next.          | Blue   |
 | **Recommending** | Watched and would recommend; happy to talk about it.    | Purple |
 | **Up Next**    | Heard about it, want to watch — not committed yet.         | Orange |
 
@@ -28,9 +28,9 @@ Shows can also be **Archived** (hidden from lists, kept in DB for de-dupe and hi
 The Watching list has one-tap promotions to keep the lists honest:
 
 - **Watched it →** moves to Recommending.
-- **Season done →** moves to Waiting.
+- **Season done →** moves to Awaiting.
 
-Waiting and Recommending each have a **back to Watching** button. Up Next has **Start watching**.
+Awaiting and Recommending each have a **back to Watching** button. Up Next has **Start watching**.
 
 ## Show data
 
@@ -53,8 +53,8 @@ Anyone can browse any member's lists without logging in. Only the logged-in memb
 The landing page (`/`) shows:
 
 1. **My Shows link** — appears for logged-in members, jumps to their own page.
-2. **What Members Are Watching** — top 10 shows by overlap across the club's Watching lists. Tap + to add to your own list. Seed-only members are excluded from this calculation.
-3. **Members** — the six members with the longest Watching lists are featured at the top (Waiting count is the tiebreaker). A "Browse all members ▾" disclosure underneath reveals the rest of the roster, alphabetized, so anyone is reachable. The point of the featured row is to lead with members who actually have something on their list worth looking at.
+2. **Trending** — top 10 shows by how many members added them in the last 30 days. Tap + to add to your own list. Seed-only members are excluded from this calculation.
+3. **Members** — the six members with the longest Watching lists are featured at the top (Awaiting count is the tiebreaker). A "Browse all members ▾" disclosure underneath reveals the rest of the roster, alphabetized, so anyone is reachable. The point of the featured row is to lead with members who actually have something on their list worth looking at.
 4. **Search all libraries** — opens a modal that searches every active show across every member by title or actor. Each result shows the owning member and the list it's on; logged-in users can tap + to add to their own list.
 5. **What's New** — a dated changelog of recent features (collapsed by default after a few entries).
 
@@ -64,14 +64,8 @@ Tabs across the top for the four lists. Each show row collapses to one line (tit
 
 Two pieces of metadata are **always visible** under the row (not collapsed):
 
-- **Waiting list:** "Next up: 5/9 – 6/15" — premiere date (and finale if known). The label is "Next up" rather than "Next season" because midseason episode dates can also appear here.
+- **Awaiting list:** "Next up: 5/9 – 6/15" — premiere date (and finale if known). The label is "Next up" rather than "Next season" because midseason episode dates can also appear here.
 - **Up Next list:** "Recommended by Whitt" — surfaces attribution without an expand.
-
-### Up Next — "Picks for you"
-
-Logged-in members viewing their own Up Next list see a "★ Picks for you" section **above** the actual list (placed there in May 2026 because picks were getting buried). The picks are computed server-side and explained in [`ARCHITECTURE.md`](ARCHITECTURE.md#recommendations).
-
-Each pick has a + button to one-tap-add to your Up Next list. After being added, it disappears from the picks section.
 
 ### Suggest a show
 
@@ -83,7 +77,11 @@ The **+** button on any show row opens a share modal. The original member can co
 
 ### Edit, archive
 
-Logged in as yourself, every row gets Edit and Archive buttons inline. Editing re-runs enrichment if the title changes. Archive sets `archived=1`; archived shows are still searchable but don't appear in lists, popular, picks, recommendations, or vibe.
+Logged in as yourself, every row gets Edit and Archive buttons inline. Editing re-runs enrichment if the title changes. Archive sets `archived=1`; archived shows are still searchable but don't appear in lists, trending, or vibe.
+
+## Native apps
+
+Alongside the web app / PWA there are native iOS, tvOS, and watchOS clients. The watchOS app (paired to the iPhone) shows the four lists → shows → detail; its session is handed off from the phone, and reads are public.
 
 ## Sort and toggle controls
 
@@ -110,7 +108,7 @@ https://showpicker.club/calendar/<slug>.ics       (HTTPS for Google / Fantastica
 webcal://showpicker.club/calendar/<slug>.ics      (Subscribe in Apple Calendar)
 ```
 
-The feed contains one all-day event per known **next-season premiere date** and per known **season finale date** for shows on that member's Watching and Waiting lists. Event titles are `<Show> on <Network>` (no "next season" wording because midseason dates also appear). Event URL deep-links to the show on the network's site (when known); event description includes the recommender and a link back to the member's app page.
+The feed contains one all-day event per known **next-season premiere date** and per known **season finale date** for shows on that member's Watching and Awaiting lists. Event titles are `<Show> on <Network>` (no "next season" wording because midseason dates also appear). Event URL deep-links to the show on the network's site (when known); event description includes the recommender and a link back to the member's app page.
 
 Calendar apps re-fetch the feed on their own schedule (Apple Calendar typically every hour; the feed sets a 24-hour `REFRESH-INTERVAL` hint).
 
@@ -188,7 +186,6 @@ A few intentional omissions:
 - No notifications (calendar feed substitutes for premiere alerts).
 - No comments or threads — discussion happens off-app.
 - No public sign-up or invitation tokens.
-- No mobile app — the PWA covers it.
 
 ## Backlog
 
