@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import WatchConnectivity
 
 // Receives the session (member slug + cookie header) handed off from the
