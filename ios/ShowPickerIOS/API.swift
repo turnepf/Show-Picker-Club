@@ -441,6 +441,12 @@ enum API {
         let _: Ack = try await putJSON("/api/shows/\(id)/archive", body: [:])
     }
 
+    // Restore an archived show and drop it back onto a list in one call.
+    static func restoreShow(id: Int, to list: String) async throws {
+        struct Ack: Decodable {}
+        let _: Ack = try await putJSON("/api/shows/\(id)", body: ["archived": 0, "list": list])
+    }
+
     static func deleteShow(id: Int) async throws {
         do {
             try await deleteShowRemote(id: id)

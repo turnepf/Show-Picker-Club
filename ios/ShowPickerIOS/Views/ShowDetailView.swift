@@ -8,6 +8,10 @@ struct ShowDetailView: View {
 
     @EnvironmentObject private var auth: AuthStore
     @State private var show: Show?
+    // My own copy of this title (active or archived), resolved on load so the
+    // actions and the List row reflect MY row — not the copy that search may
+    // have opened by id.
+    @State private var myCopy: Show?
     @State private var cast: [Actor] = []
     @State private var showingEdit = false
     @State private var showingShare = false
@@ -18,13 +22,15 @@ struct ShowDetailView: View {
     private var title: String { show?.title ?? initialTitle }
     private var network: String? { show?.network ?? initialNetwork }
     private var rating: String? { show?.rating ?? initialRating }
-    private var isMine: Bool {
-        guard let mine = auth.memberSlug, let s = show else { return false }
-        return s.memberSlug == mine
+    // My active copy of this title, if it's on one of my lists.
+    private var mineActive: Show? {
+        guard let m = myCopy, !m.isArchived else { return nil }
+        return m
     }
-    // Logged in, viewing someone else's (or a popular) show → can copy it onto a list of mine.
-    private var canAddToMine: Bool {
-        auth.memberSlug != nil && show != nil && !isMine
+    // My archived copy of this title, if I've shelved it.
+    private var mineArchived: Show? {
+        guard let m = myCopy, m.isArchived else { return nil }
+        return m
     }
 
     var body: some View {
@@ -46,7 +52,11 @@ struct ShowDetailView: View {
                     }
                 }
                 if let s = show {
-                    LabeledContent("List", value: ShowList(rawValue: s.list)?.title ?? s.list.capitalized)
+                    if let m = mineActive {
+                        LabeledContent("List", value: ShowList(rawValue: m.list)?.title ?? m.list.capitalized)
+                    } else if mineArchived != nil {
+                        LabeledContent("List", value: "Archived")
+                    }
                     if s.isMovie { LabeledContent("Type", value: "Movie") }
                     if s.isFullSeries { LabeledContent("Series", value: "Complete") }
                     if !s.genreList.isEmpty {
@@ -92,7 +102,28 @@ struct ShowDetailView: View {
                 }
             }
 
-            if canAddToMine {
+            if let m = mineActive, let cur = ShowList(rawValue: m.list) {
+                // On one of my lists → move it to any list, or archive it.
+                Section("Move to") {
+                    ForEach(ShowList.allCases.filter { $0 != cur }) { l in
+                        Button(l.title) { Task { await move(to: l, id: m.id) } }
+                    }
+                }
+                Section {
+                    Button(role: .destructive) { Task { await archive(m.id) } } label: {
+                        Label("Archive", systemImage: "archivebox")
+                    }
+                    .disabled(addingToMine)
+                }
+            } else if let m = mineArchived {
+                // Archived → add it back onto any list.
+                Section("Archived — add back to") {
+                    ForEach(ShowList.allCases) { l in
+                        Button(l.title) { Task { await restore(to: l, id: m.id) } }
+                    }
+                }
+            } else if auth.memberSlug != nil {
+                // Not on my lists → add to any list.
                 Section {
                     Menu {
                         ForEach(ShowList.allCases) { l in
@@ -102,19 +133,6 @@ struct ShowDetailView: View {
                         Label("Add to My List", systemImage: "plus.circle.fill")
                     }
                     .disabled(addingToMine)
-                }
-            }
-
-            // Quick promotions — move this show to the list it belongs on next.
-            if isMine, let s = show, let cur = ShowList(rawValue: s.list) {
-                Section("Move") {
-                    ForEach(listPromotions(for: cur)) { p in
-                        Button {
-                            Task { try? await API.moveShow(id: s.id, to: p.target.rawValue); await load() }
-                        } label: {
-                            Label(p.detailLabel, systemImage: p.systemImage).tint(p.tint)
-                        }
-                    }
                 }
             }
 
@@ -142,7 +160,7 @@ struct ShowDetailView: View {
                     Image(systemName: "square.and.arrow.up")
                 }
             }
-            if isMine {
+            if myCopy != nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Edit") { showingEdit = true }
                 }
@@ -150,8 +168,8 @@ struct ShowDetailView: View {
         }
         .task { await load() }
         .sheet(isPresented: $showingEdit) {
-            if let s = show {
-                AddEditShowView(memberSlug: s.memberSlug ?? "", existing: s) { await load() }
+            if let m = myCopy {
+                AddEditShowView(memberSlug: m.memberSlug ?? (auth.memberSlug ?? ""), existing: m) { await load() }
             }
         }
         .sheet(isPresented: $showingShare) {
@@ -193,6 +211,48 @@ struct ShowDetailView: View {
     private func load() async {
         if let s = try? await API.showDetail(id: id) { show = s }
         cast = (try? await API.actors(showId: id)) ?? []
+        await refreshMyCopy()
+    }
+
+    // Find my own row for this title (active or archived) so the actions and
+    // the List row reflect MY copy, regardless of whose copy opened the screen.
+    private func refreshMyCopy() async {
+        guard let mine = auth.memberSlug else { myCopy = nil; return }
+        let t = (show?.title ?? initialTitle).lowercased()
+        let list = (try? await API.shows(member: mine, includeArchived: true)) ?? []
+        myCopy = list.first { $0.title.lowercased() == t }
+    }
+
+    private func move(to list: ShowList, id: Int) async {
+        do {
+            try await API.moveShow(id: id, to: list.rawValue)
+            await refreshMyCopy()
+        } catch {
+            addAlert = AddAlert(title: "Couldn’t move",
+                                message: "Something went wrong. Please try again.")
+        }
+    }
+
+    private func archive(_ id: Int) async {
+        do {
+            try await API.archiveShow(id: id)
+            await refreshMyCopy()
+        } catch {
+            addAlert = AddAlert(title: "Couldn’t archive",
+                                message: "Something went wrong. Please try again.")
+        }
+    }
+
+    private func restore(to list: ShowList, id: Int) async {
+        do {
+            try await API.restoreShow(id: id, to: list.rawValue)
+            await refreshMyCopy()
+            addAlert = AddAlert(title: "Added back",
+                                message: "“\(title)” was added to your \(list.title) list.")
+        } catch {
+            addAlert = AddAlert(title: "Couldn’t restore",
+                                message: "Something went wrong. Please try again.")
+        }
     }
 
     // Copy this show onto one of the logged-in member's lists. The POST is
@@ -216,9 +276,15 @@ struct ShowDetailView: View {
             )
             addAlert = AddAlert(title: "Added",
                                 message: "“\(s.title)” was added to your \(list.title) list.")
+            await refreshMyCopy()
         } catch API.APIError.badResponse(409) {
-            addAlert = AddAlert(title: "Already on a list",
-                                message: "“\(s.title)” is already on one of your lists.")
+            // Already have it (maybe archived) — reconcile so the right
+            // controls appear.
+            await refreshMyCopy()
+            addAlert = AddAlert(title: mineArchived != nil ? "Archived" : "Already on a list",
+                                message: mineArchived != nil
+                                    ? "“\(s.title)” is archived — use “add back to” below."
+                                    : "“\(s.title)” is already on one of your lists.")
         } catch {
             addAlert = AddAlert(title: "Couldn’t add",
                                 message: "Something went wrong. Please try again.")
