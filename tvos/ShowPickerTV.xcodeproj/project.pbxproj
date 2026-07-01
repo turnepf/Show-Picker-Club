@@ -86,6 +86,7 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
 			);
 			name = "Set build number";
 			outputFileListPaths = (
@@ -94,7 +95,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Automatic build number: build date + git commit count (e.g. 20260623.142).\n# It always increases (the date bumps daily, the commit count within a day),\n# so there is no manual bump before archiving. Overrides CFBundleVersion in the\n# processed (generated) Info.plist. Runs on every build.\nset -eu\nif commits=$(git -C \"$SRCROOT\" rev-list --count HEAD 2>/dev/null) && [ -n \"$commits\" ]; then\n  :\nelse\n  commits=$(date +%H%M)\nfi\nbuild_number=\"$(date +%Y%m%d).$commits\"\nplist=\"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\nif [ -f \"$plist\" ]; then\n  /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $build_number\" \"$plist\" || /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string $build_number\" \"$plist\"\n  echo \"note: set CFBundleVersion = $build_number\"\nfi\n";
+			shellScript = "# Automatic build number: build date + git commit count (e.g. 20260623.142).\n# It always increases (the date bumps daily, the commit count within a day),\n# so there is no manual bump before archiving. Overrides CFBundleVersion in the\n# processed (generated) Info.plist. The Info.plist is declared as an input file\n# for this phase so the build system schedules it AFTER plist generation —\n# otherwise it can run first, find no plist, and silently no-op (build stays 1).\nset -eu\nif commits=$(git -C \"$SRCROOT\" rev-list --count HEAD 2>/dev/null) && [ -n \"$commits\" ]; then\n  :\nelse\n  commits=$(date +%H%M)\nfi\nbuild_number=\"$(date +%Y%m%d).$commits\"\nplist=\"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\necho \"note: Set build number phase running (plist=$plist)\"\nif [ -f \"$plist\" ]; then\n  /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $build_number\" \"$plist\" || /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string $build_number\" \"$plist\"\n  echo \"note: set CFBundleVersion = $build_number\"\nelse\n  echo \"warning: Info.plist not found at $plist — build number NOT set\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
