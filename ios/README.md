@@ -4,7 +4,7 @@ Native SwiftUI iOS client for [showpicker.club](https://showpicker.club). Full f
 
 Talks to the same `/api/*` endpoints as the web. Session cookie is managed automatically by `URLSession.shared` via `HTTPCookieStorage`, so login persists across launches.
 
-The app depends on the shared **`ShowPickerCore`** Swift package (at the repo root; `Show` / `Actor` / `ShowList` models + response wrappers), which is also used by the tvOS and watchOS apps. iOS and tvOS are opened together via **`ShowPickerClub.xcworkspace`** and share a single bundle id (`net.patrickturner.showpickerios`), shipping as one universal App Store app (iPhone + Apple TV). A paired **watchOS** app (`watch/ShowPickerWatch`) receives its session from this phone app over WatchConnectivity.
+The app depends on the shared **`ShowPickerCore`** Swift package (at the repo root; `Show` / `Actor` / `ShowList` models + response wrappers), which is also used by the tvOS and watchOS apps. iOS and tvOS are opened together via **`ShowPickerClub.xcworkspace`** and share a single bundle id (`net.patrickturner.showpickerios`), shipping as one universal App Store app (iPhone + Apple TV). A paired **watchOS** app (`ios/ShowPickerWatch Watch App`, embedded in this project) receives its session from this phone app over WatchConnectivity, and ships a **Next Premiere complication** (`ios/ShowPickerWatchComplication`) for the watch face.
 
 ## What's here
 
