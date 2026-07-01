@@ -110,6 +110,13 @@ export const NETWORKS = [
     domains: ['britbox.com', 'britbox.co.uk'],
     search: { base: 'https://www.britbox.com/us/search' },
   },
+  {
+    stored: 'YouTube',
+    display: 'YouTube',
+    aliases: ['YouTube Premium'],
+    domains: ['youtube.com', 'youtu.be'],
+    search: { base: 'https://www.youtube.com/results', param: 'search_query' },
+  },
 ];
 
 // Map alias-or-stored name (case-insensitive) to canonical stored value.
