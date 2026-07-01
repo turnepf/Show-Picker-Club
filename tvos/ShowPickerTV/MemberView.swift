@@ -2,15 +2,10 @@ import SwiftUI
 
 struct MemberView: View {
     let member: Member
-    @EnvironmentObject private var auth: AuthStore
     @State private var shows: [Show] = []
-    @State private var picks: [Pick] = []
-    @State private var pickMessage: String?
     @State private var loading = true
     @State private var didInitialLoad = false
     @State private var errorText: String?
-
-    private var isMine: Bool { auth.memberSlug == member.slug }
 
     var body: some View {
         ScrollView {
@@ -25,8 +20,6 @@ struct MemberView: View {
                 } else if let errorText {
                     Text(errorText).foregroundColor(Theme.muted)
                 } else {
-                    if isMine, !picks.isEmpty { picksShelf }
-
                     let hasLists = !shows.allSatisfy { ShowList(rawValue: $0.list) == nil }
                     if hasLists {
                         ForEach(ShowList.allCases) { list in
@@ -35,7 +28,7 @@ struct MemberView: View {
                                 shelf(list: list, items: items)
                             }
                         }
-                    } else if !(isMine && !picks.isEmpty) {
+                    } else {
                         // Defensive empty-state: the tvOS focus engine needs some
                         // visible content to land on, otherwise the screen looks
                         // hung when every list is empty.
@@ -67,46 +60,11 @@ struct MemberView: View {
             guard didInitialLoad else { return }
             Task {
                 if let s = try? await API.shows(member: member.slug) { shows = s }
-                await loadPicks()
             }
         }
     }
 
     // "Picks for you" — recommendations on your own page; tapping adds to Up Next.
-    private var picksShelf: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 12) {
-                Image(systemName: "sparkles").foregroundColor(Theme.orange)
-                Text("Picks for you")
-                    .font(.system(size: 32, weight: .semibold))
-                    .foregroundColor(Theme.text)
-            }
-            if let pickMessage {
-                Text(pickMessage)
-                    .font(.system(size: 22))
-                    .foregroundColor(Theme.muted)
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(alignment: .top, spacing: 40) {
-                    ForEach(picks) { pick in
-                        // Open the card so the user chooses a list — don't add silently.
-                        NavigationLink(value: Route.pick(title: pick.title, network: pick.network,
-                                                         rating: pick.rating.map { String($0) },
-                                                         posterUrl: pick.posterUrl, networkUrl: pick.networkUrl)) {
-                            ShowCard(title: pick.title, subtitle: pick.reason, posterUrl: pick.posterUrl)
-                        }
-                        .buttonStyle(PushButtonStyle())
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 30)
-            }
-        }
-        // Let the tvOS focus engine move up/down between shelves. Without this,
-        // focus can drop into a lower row but won't climb back out of it.
-        .focusSection()
-    }
-
     private func shelf(list: ShowList, items: [Show]) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
@@ -160,16 +118,6 @@ struct MemberView: View {
             shows = try await API.shows(member: member.slug)
         } catch {
             errorText = "Couldn't load \(member.label)'s shows."
-        }
-        await loadPicks()
-    }
-
-    private func loadPicks() async {
-        guard isMine else { picks = []; return }
-        if let r = try? await API.recommendations(member: member.slug), r.isSeedOnly != true {
-            picks = Array(r.picks.prefix(8))
-        } else {
-            picks = []
         }
     }
 }

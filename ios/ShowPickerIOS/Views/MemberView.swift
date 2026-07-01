@@ -25,8 +25,6 @@ struct MemberView: View {
     @State private var showingAdd = false
     @State private var editingShow: Show?
     @State private var sortByList: [String: SortOption] = [:]
-    @State private var picks: [Pick] = []
-    @State private var picksColdStart = false
 
     private var isMine: Bool { auth.isMe(member.slug) }
 
@@ -49,17 +47,6 @@ struct MemberView: View {
                 .padding(.vertical, 6)
 
             List {
-                // "Picks for you" sits above your own Up Next. Compact (max 3,
-                // tight rows) so the first Up Next titles still show. De-named
-                // reasons — no member names.
-                if isMine, currentList == .next, !picks.isEmpty {
-                    Section {
-                        ForEach(picks) { pickRow($0) }
-                    } header: {
-                        Text("★ Picks for you")
-                    }
-                }
-
                 let items = sortedItems()
                 if items.isEmpty {
                     Text("No shows on this list.")
@@ -197,7 +184,7 @@ struct MemberView: View {
         case .watching:     return "Shows you're actively watching."
         case .waiting:      return "Between seasons — premiere dates show on the calendar feed."
         case .recommending: return "Shows worth recommending to the club."
-        case .next:         return "Saved to watch later, plus picks and suggestions from others."
+        case .next:         return "Saved to watch later, plus suggestions from others."
         }
     }
 
@@ -295,62 +282,9 @@ struct MemberView: View {
         }
     }
 
-    @ViewBuilder private func pickRow(_ p: Pick) -> some View {
-        // Open the card so the user chooses a list — don't add silently.
-        NavigationLink(value: Route.pick(title: p.title, network: p.network,
-                                         rating: p.rating.map { String(format: "%.1f", $0) },
-                                         posterUrl: p.posterUrl, networkUrl: p.networkUrl)) {
-            HStack(alignment: .top, spacing: 10) {
-                PosterThumb(url: p.posterUrl)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(p.title).font(.body)
-                    Text(pickCaption(p)).font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                if let r = p.rating {
-                    Label(String(format: "%.1f", r), systemImage: "star.fill")
-                        .font(.caption).labelStyle(.titleAndIcon).foregroundStyle(.orange)
-                }
-            }
-        }
-    }
-
-    // Network + a de-named reason, e.g. "Netflix · On 2 members' lists".
-    private func pickCaption(_ p: Pick) -> String {
-        let reason = pickReason(p)
-        if let n = p.network, !n.isEmpty { return "\(n) · \(reason)" }
-        return reason
-    }
-
-    private func pickReason(_ p: Pick) -> String {
-        if picksColdStart {
-            if let a = p.sharedActors, a > 0 {
-                return "\(a) shared actor\(a == 1 ? "" : "s") with your shows"
-            }
-            return "Popular in the club"
-        }
-        let members = p.who?.count ?? p.nNeighbors ?? 0
-        var reason = members == 1 ? "On 1 member's list" : "On \(members) members' lists"
-        if let a = p.sharedActors, a > 0 {
-            reason += " · \(a) shared actor\(a == 1 ? "" : "s")"
-        }
-        return reason
-    }
-
-    private func loadPicks() async {
-        guard isMine else { picks = []; return }
-        if let r = try? await API.recommendations(member: member.slug), r.isSeedOnly != true {
-            picks = Array(r.picks.prefix(3))
-            picksColdStart = r.coldStart == true
-        } else {
-            picks = []
-        }
-    }
-
     private func load() async {
         loading = true
         defer { loading = false }
         shows = (try? await API.shows(member: member.slug)) ?? []
-        await loadPicks()
     }
 }

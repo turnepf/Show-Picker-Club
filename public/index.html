@@ -883,11 +883,6 @@
 
     <main>
       <div class="loading" id="loading">Loading shows...</div>
-      <div class="recs-section hidden" id="recsSection">
-        <h3 class="recs-heading">&#9733; Picks for you</h3>
-        <p class="recs-explainer" id="recsExplainer"></p>
-        <div class="show-list" id="recsList" style="text-align: left;"></div>
-      </div>
       <div class="list-controls hidden" id="listControls"></div>
       <div class="show-list" id="showList"></div>
       <div class="empty hidden" id="empty">No shows in this list yet.</div>
@@ -1613,7 +1608,6 @@
             // Subscription audit is personal — only on your own page.
             const subsLink = document.getElementById('subscriptionsLink');
             if (subsLink) subsLink.style.display = 'inline';
-            loadRecs();
           }
           const logoutBtn = document.getElementById('logoutBtn');
           if (logoutBtn) logoutBtn.classList.remove('hidden');
@@ -1870,146 +1864,6 @@
       }
     }
 
-    let recsData = null;
-
-    async function loadRecs() {
-      // Only load recs when the viewer is logged in as the page's member.
-      if (!authMember || authMember !== memberSlug) { recsData = null; renderRecs(); return; }
-      try {
-        const res = await fetch(`/api/recommendations?member=${encodeURIComponent(memberSlug)}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        // Seed-only members get no picks shown — their list is just seeds.
-        if (data.is_seed_only) { recsData = null; renderRecs(); return; }
-        recsData = data;
-        renderRecs();
-      } catch (e) {}
-    }
-
-    function renderRecs() {
-      const section = document.getElementById('recsSection');
-      if (!section) return;
-      // The section is only relevant when viewing your own Up Next tab and the
-      // server actually returned a pick set (recsData null = seed-only member
-      // or no auth match, both correct reasons to hide entirely).
-      const onOwnUpNext = currentTab === 'next' && authMember && authMember === memberSlug;
-      if (!onOwnUpNext || !recsData) { section.classList.add('hidden'); return; }
-      section.classList.remove('hidden');
-
-      const hasPicks = recsData.picks && recsData.picks.length > 0;
-      if (!hasPicks) {
-        // Don't vanish on the user — show a friendly empty so the section's
-        // existence stays discoverable for future visits.
-        document.getElementById('recsExplainer').innerHTML = '';
-        document.getElementById('recsList').innerHTML =
-          '<p class="picks-empty">All caught up. Check back as the club watches new things.</p>';
-        return;
-      }
-
-      // No subtitle — keep it tight (matches the iOS app); the per-pick
-      // reason lines carry the context.
-      document.getElementById('recsExplainer').innerHTML = '';
-
-      const list = document.getElementById('recsList');
-      const hasRealUrl = (url) => url && !url.includes('/search') && !url.includes('/s?') && url !== '#';
-      list.innerHTML = recsData.picks.map((p, idx) => {
-        const networkHtml = p.network
-          ? hasRealUrl(p.network_url)
-            ? ` <span class="show-on">on</span> <a class="show-network" href="${escapeHtml(safeUrl(p.network_url))}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(p.network)}</a>`
-            : ` <span class="show-on">on</span> <span class="show-network-plain">${escapeHtml(p.network)}</span>`
-          : '';
-        const rating = p.rating
-          ? ` <span class="show-rating"><span class="star">&#9733;</span>${escapeHtml(String(p.rating))}</span>`
-          : '';
-        let reason;
-        if (recsData.cold_start) {
-          reason = p.shared_actors > 0
-            ? `${p.shared_actors} shared actor${p.shared_actors === 1 ? '' : 's'} with your shows`
-            : 'Popular in the club';
-        } else {
-          // De-named to match the iOS app — count members, don't list them.
-          const members = (p.who || []).length || p.n_neighbors || 0;
-          reason = members === 1 ? "On 1 member's list" : `On ${members} members' lists`;
-          if (p.shared_actors > 0) reason += ` &middot; ${p.shared_actors} shared actor${p.shared_actors === 1 ? '' : 's'}`;
-        }
-        const poster = p.poster_url
-          ? `<img class="row-poster" src="${safeUrl(p.poster_url)}" alt="" loading="lazy">`
-          : `<div class="row-poster row-poster-empty">🎬</div>`;
-        return `<div class="show rec-row" data-rec-idx="${idx}" style="cursor:pointer">
-          <div class="show-row">
-            ${poster}
-            <div class="rec-info">
-              <span class="show-info"><span class="show-title">${escapeHtml(p.title)}</span>${networkHtml}${rating}</span>
-              <span class="rec-reason">${reason}</span>
-            </div>
-          </div>
-        </div>`;
-      }).join('');
-
-      // Tapping a pick opens the card so the user chooses a list — it doesn't
-      // add silently.
-      list.querySelectorAll('.rec-row').forEach(row => {
-        row.addEventListener('click', () => {
-          const p = recsData && recsData.picks[parseInt(row.dataset.recIdx, 10)];
-          if (p) openPickDetail(p);
-        });
-      });
-    }
-
-    // Open the detail card for a recommendation (which has no backing show row
-    // yet) using a synthetic show, so the user gets the full add-to-any-list UI.
-    async function openPickDetail(p) {
-      const page = document.getElementById('detailPage');
-      const body = document.getElementById('detailBody');
-      document.getElementById('detailNavTitle').textContent = '';
-      body.innerHTML = '<div class="loading">Loading…</div>';
-      page.classList.add('open');
-      document.body.style.overflow = 'hidden';
-      detailShow = {
-        title: p.title,
-        network: p.network || null,
-        network_url: p.network_url || null,
-        poster_url: p.poster_url || null,
-        rating: (p.rating != null && p.rating !== '') ? String(p.rating) : null,
-      };
-      detailActors = [];
-      await resolveMyCopy();
-      renderDetail(detailShow, []);
-    }
-
-    async function addRecToUpNext(idx) {
-      if (!recsData || !recsData.picks[idx]) return;
-      const pick = recsData.picks[idx];
-      // Optimistic remove
-      recsData.picks.splice(idx, 1);
-      renderRecs();
-      try {
-        const res = await fetch('/api/shows', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: pick.title,
-            network: pick.network || null,
-            network_url: pick.network_url || null,
-            list: 'next',
-          }),
-        });
-        if (!res.ok && res.status !== 409) {
-          // Network/server error — restore the pick so the user can retry.
-          recsData.picks.splice(idx, 0, pick);
-          renderRecs();
-          showToast('Could not add. Try again.', { tone: 'error' });
-          return;
-        }
-        // 200/201 success or 409 (already on list, e.g. archived) — refresh main list.
-        await loadShows();
-        showToast(`Added "${pick.title}" to your Up Next`);
-      } catch (e) {
-        recsData.picks.splice(idx, 0, pick);
-        renderRecs();
-        showToast('Network error. Try again.', { tone: 'error' });
-      }
-    }
 
     const TAB_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Recommending', next: 'Up Next' };
 
@@ -2050,10 +1904,6 @@
       });
       updateDesc();
       renderShows();
-      // Picks for You visibility is gated on the Up Next tab; re-evaluate
-      // each tab switch so it shows up when you arrive at Up Next from
-      // another tab (not just when you land via the #next hash).
-      renderRecs();
     }
 
     function renderShows() {
@@ -2063,7 +1913,6 @@
       const loading = document.getElementById('loading');
       const empty = document.getElementById('empty');
       loading.classList.add('hidden');
-      renderRecs();
 
       // Each list remembers its own sort. Watching and Waiting default to the
       // "Next up" premiere date (soonest first); the others default to rating.
