@@ -2849,6 +2849,11 @@
        =========================================================== -->
   <script>
     let detailShow = null;
+    let detailActors = [];
+    // My own row for the open show (active or archived), so the detail's
+    // actions manage MY copy — not whatever copy opened the screen.
+    let detailMyCopy = null;
+    const ALL_LISTS = ['watching', 'waiting', 'recommending', 'next'];
 
     // Repoint the old inline-expand entry point at the detail screen so every
     // existing onclick="toggleExpand(id)" now opens the pushed view.
@@ -2891,13 +2896,29 @@
         const ar = await fetch('/api/shows/' + id + '/actors');
         if (ar.ok) { const ad = await ar.json(); actors = ad.actors || []; }
       } catch {}
+      detailShow = show;
+      await resolveMyCopy();
       renderDetail(show, actors);
+    }
+
+    // Find my own row for the open title (active or archived) so the detail
+    // reflects — and acts on — MY copy regardless of whose copy opened it.
+    async function resolveMyCopy() {
+      detailMyCopy = null;
+      if (!authMember || !detailShow) return;
+      try {
+        const res = await fetch(`/api/shows?member=${encodeURIComponent(authMember)}&include_archived=1`);
+        if (!res.ok) return;
+        const d = await res.json();
+        const t = (detailShow.title || '').toLowerCase();
+        detailMyCopy = (d.shows || []).find(s => (s.title || '').toLowerCase() === t) || null;
+      } catch {}
     }
 
     function renderDetail(show, actors) {
       detailShow = show;
+      detailActors = actors || [];
       document.getElementById('detailNavTitle').textContent = show.title;
-      const isOwn = authMember && show.member_slug && authMember === show.member_slug;
       const loggedIn = !!authMember;
       const realUrl = detailRealUrl(show.network_url);
 
@@ -2908,7 +2929,12 @@
           : escapeHtml(show.network)));
       }
       if (show.rating) rows.push(detailRow('Rating', `★ ${escapeHtml(show.rating)}`));
-      rows.push(detailRow('List', LIST_LABELS[show.list] || show.list));
+      // Reflect MY status, not the copy that opened this screen.
+      if (detailMyCopy && !detailMyCopy.archived) {
+        rows.push(detailRow('List', LIST_LABELS[detailMyCopy.list] || detailMyCopy.list));
+      } else if (detailMyCopy && detailMyCopy.archived) {
+        rows.push(detailRow('List', 'Archived'));
+      }
       if (show.movie) rows.push(detailRow('Type', 'Movie'));
       if (show.full_series) rows.push(detailRow('Series', 'Complete'));
       if (show.genres) rows.push(detailRow('Genres', escapeHtml(show.genres)));
@@ -2930,16 +2956,24 @@
 
       const actions = [];
       if (realUrl) actions.push(`<a class="detail-action" href="${safeUrl(show.network_url)}" target="_blank" rel="noopener">▶ Watch on ${escapeHtml(show.network || 'streaming')}</a>`);
-      if (isOwn) {
-        detailPromotions(show.list).forEach(p =>
-          actions.push(`<button class="detail-action" onclick="detailMove(${show.id}, '${p.target}')">${escapeHtml(p.label)}</button>`));
-        actions.push(`<button class="detail-action" onclick="detailEdit(${show.id})">Edit</button>`);
-        actions.push(`<button class="detail-action danger" onclick="detailArchive(${show.id})">Archive</button>`);
+      const mine = detailMyCopy;
+      if (mine && !mine.archived) {
+        // On one of my lists → move it to any other list, edit, or archive.
+        ALL_LISTS.filter(l => l !== mine.list).forEach(l =>
+          actions.push(`<button class="detail-action" onclick="detailMoveMine(${mine.id}, '${l}')">Move to ${escapeHtml(LIST_LABELS[l] || l)}</button>`));
+        actions.push(`<button class="detail-action" onclick="detailEdit(${mine.id})">Edit</button>`);
+        actions.push(`<button class="detail-action danger" onclick="detailArchive(${mine.id})">Archive</button>`);
+      } else if (mine && mine.archived) {
+        // Archived → add it back onto any list.
+        ALL_LISTS.forEach(l =>
+          actions.push(`<button class="detail-action" onclick="detailRestore(${mine.id}, '${l}')">Add back to ${escapeHtml(LIST_LABELS[l] || l)}</button>`));
       } else if (loggedIn) {
-        actions.push(`<button class="detail-action" onclick="detailAddToMine()">Add to my Up Next</button>`);
+        // Not on my lists → add it to any list.
+        ALL_LISTS.forEach(l =>
+          actions.push(`<button class="detail-action" onclick="detailAdd('${l}')">Add to ${escapeHtml(LIST_LABELS[l] || l)}</button>`));
       }
-      const canSend = loggedIn && show.member_slug && typeof shows !== 'undefined' && shows.find && shows.find(s => s.id === show.id);
-      if (canSend) actions.push(`<button class="detail-action" onclick="detailSend(${show.id})">Send to a member</button>`);
+      // Send to another member — only meaningful for a show that's on my list.
+      if (mine && !mine.archived) actions.push(`<button class="detail-action" onclick="detailSend(${mine.id})">Send to a member</button>`);
       // No per-show "Share" here — the browser's own share button covers
       // sharing the page, so a custom one would be redundant on web.
       html += `<div class="detail-card">${actions.join('')}</div>`;
@@ -2953,29 +2987,73 @@
       detailShow = null;
     }
 
-    function detailMove(id, target) {
-      try { moveShow(id, target); } catch {}
-      closeDetail();
-    }
     function detailEdit(id) { closeDetail(); openEditModal(id); }
-    function detailArchive(id) {
-      try { archiveShow(id); } catch {}
-      closeDetail();
-    }
     function detailSend(id) { closeDetail(); openShareModal(id); }
 
-    async function detailAddToMine() {
+    // Re-resolve my copy and re-render, so the detail's actions reflect the
+    // new state (e.g. after archiving it offers "Add back to").
+    async function reRenderDetail() {
+      await resolveMyCopy();
+      if (detailShow) renderDetail(detailShow, detailActors);
+    }
+
+    async function detailMoveMine(id, list) {
+      try {
+        const res = await fetch(`/api/shows/${id}/move`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ list }),
+        });
+        if (!res.ok) { showToast("Couldn’t move", { tone: 'error' }); return; }
+        showToast(`Moved to ${LIST_LABELS[list] || list}`);
+        if (typeof loadShows === 'function') loadShows();
+        await reRenderDetail();
+      } catch { showToast('Network error', { tone: 'error' }); }
+    }
+
+    async function detailArchive(id) {
+      try {
+        const res = await fetch(`/api/shows/${id}/archive`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{}',
+        });
+        if (!res.ok) { showToast("Couldn’t archive", { tone: 'error' }); return; }
+        showToast('Archived');
+        if (typeof loadShows === 'function') loadShows();
+        await reRenderDetail();
+      } catch { showToast('Network error', { tone: 'error' }); }
+    }
+
+    async function detailRestore(id, list) {
+      try {
+        const res = await fetch(`/api/shows/${id}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ archived: 0, list }),
+        });
+        if (!res.ok) { showToast("Couldn’t restore", { tone: 'error' }); return; }
+        showToast(`Added back to ${LIST_LABELS[list] || list}`);
+        if (typeof loadShows === 'function') loadShows();
+        await reRenderDetail();
+      } catch { showToast('Network error', { tone: 'error' }); }
+    }
+
+    async function detailAdd(list) {
       if (!detailShow || !authMember) return;
       const s = detailShow;
       try {
         const res = await fetch('/api/shows', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: s.title, network: s.network || null, network_url: s.network_url || null,
-                                 list: 'next', movie: s.movie || 0, full_series: s.full_series || 0 }),
+                                 list, movie: s.movie || 0, full_series: s.full_series || 0 }),
         });
-        if (res.status === 409) showToast('Already on one of your lists');
-        else if (res.ok) showToast('Added to your Up Next');
-        else showToast("Couldn’t add", { tone: 'error' });
+        if (res.status === 409) {
+          await reRenderDetail();
+          showToast(detailMyCopy && detailMyCopy.archived
+            ? 'It’s archived — use “Add back to” below' : 'Already on one of your lists');
+          return;
+        }
+        if (!res.ok) { showToast("Couldn’t add", { tone: 'error' }); return; }
+        showToast(`Added to ${LIST_LABELS[list] || list}`);
+        if (typeof loadShows === 'function') loadShows();
+        await reRenderDetail();
       } catch { showToast('Network error', { tone: 'error' }); }
     }
 

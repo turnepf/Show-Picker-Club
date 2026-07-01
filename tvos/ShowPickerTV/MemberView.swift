@@ -99,6 +99,9 @@ struct MemberView: View {
                 .padding(.vertical, 30)
             }
         }
+        // Let the tvOS focus engine move up/down between shelves. Without this,
+        // focus can drop into a lower row but won't climb back out of it.
+        .focusSection()
     }
 
     private func shelf(list: ShowList, items: [Show]) -> some View {
@@ -127,6 +130,9 @@ struct MemberView: View {
                 .padding(.vertical, 30)
             }
         }
+        // Let the tvOS focus engine move up/down between shelves. Without this,
+        // focus can drop into a lower row but won't climb back out of it.
+        .focusSection()
     }
 
 
