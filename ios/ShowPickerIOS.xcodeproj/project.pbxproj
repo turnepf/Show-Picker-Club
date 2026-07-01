@@ -7,11 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A100000000000000000000E2 /* SharedSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* SharedSession.swift */; };
-		A100000000000000000000E3 /* SharedSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* SharedSession.swift */; };
-		A100000000000000000000E6 /* ShareTitleParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E5 /* ShareTitleParser.swift */; };
-		A100000000000000000000E7 /* ShareTitleParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E5 /* ShareTitleParser.swift */; };
+		A100000000000000000000E2 /* Shared/SharedSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* Shared/SharedSession.swift */; };
+		A100000000000000000000E3 /* Shared/SharedSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* Shared/SharedSession.swift */; };
+		A100000000000000000000E6 /* Shared/ShareTitleParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E5 /* Shared/ShareTitleParser.swift */; };
+		A100000000000000000000E7 /* Shared/ShareTitleParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E5 /* Shared/ShareTitleParser.swift */; };
 		A1000000000000000000010D /* ShowPickerShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A100000000000000000000C2 /* ShowPickerShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CDE59A2E2FF5B30D00CBD097 /* ShowPickerCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDE59A2D2FF5B30D00CBD097 /* ShowPickerCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,24 +42,16 @@
 /* Begin PBXFileReference section */
 		A100000000000000000000C1 /* ShowPickerIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShowPickerIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A100000000000000000000C2 /* ShowPickerShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShowPickerShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		A100000000000000000000E1 /* SharedSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/SharedSession.swift; sourceTree = "<group>"; };
-		A100000000000000000000E5 /* ShareTitleParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/ShareTitleParser.swift; sourceTree = "<group>"; };
 		A100000000000000000000C3 /* ShowPickerShareExtensionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShowPickerShareExtensionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A100000000000000000000E1 /* Shared/SharedSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/SharedSession.swift; sourceTree = "<group>"; };
+		A100000000000000000000E5 /* Shared/ShareTitleParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/ShareTitleParser.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		A10000000000000000000401 /* Exceptions for "ShowPickerIOS" folder in "ShowPickerIOS" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				ShowPickerIOS.entitlements,
-			);
-			target = A100000000000000000000B1 /* ShowPickerIOS */;
-		};
 		A10000000000000000000402 /* Exceptions for "ShowPickerShareExtension" folder in "ShowPickerShareExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				ShareExtension.entitlements,
 			);
 			target = A100000000000000000000B2 /* ShowPickerShareExtension */;
 		};
@@ -67,9 +60,6 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A100000000000000000000D3 /* ShowPickerIOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				A10000000000000000000401 /* Exceptions for "ShowPickerIOS" folder in "ShowPickerIOS" target */,
-			);
 			path = ShowPickerIOS;
 			sourceTree = "<group>";
 		};
@@ -93,17 +83,18 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CDE59A2E2FF5B30D00CBD097 /* ShowPickerCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A1000000000000000000010B /* Frameworks */ = {
+		A100000000000000000000F6 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A100000000000000000000F6 /* Frameworks */ = {
+		A1000000000000000000010B /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -119,8 +110,9 @@
 				A100000000000000000000D3 /* ShowPickerIOS */,
 				A100000000000000000000D4 /* ShowPickerShareExtension */,
 				A100000000000000000000D5 /* ShowPickerShareExtensionTests */,
-				A100000000000000000000E1 /* SharedSession.swift */,
-				A100000000000000000000E5 /* ShareTitleParser.swift */,
+				A100000000000000000000E1 /* Shared/SharedSession.swift */,
+				A100000000000000000000E5 /* Shared/ShareTitleParser.swift */,
+				CDE59A2C2FF5B30D00CBD097 /* Frameworks */,
 				A100000000000000000000D2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -133,6 +125,13 @@
 				A100000000000000000000C3 /* ShowPickerShareExtensionTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		CDE59A2C2FF5B30D00CBD097 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -158,6 +157,7 @@
 			);
 			name = ShowPickerIOS;
 			packageProductDependencies = (
+				CDE59A2D2FF5B30D00CBD097 /* ShowPickerCore */,
 			);
 			productName = ShowPickerIOS;
 			productReference = A100000000000000000000C1 /* ShowPickerIOS.app */;
@@ -237,6 +237,9 @@
 			);
 			mainGroup = A100000000000000000000D1;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CDE59A2B2FF5B08200CBD097 /* XCLocalSwiftPackageReference "../ShowPickerCore" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A100000000000000000000D2 /* Products */;
 			projectDirPath = "";
@@ -312,16 +315,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A100000000000000000000E2 /* SharedSession.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		A1000000000000000000010A /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				A100000000000000000000E3 /* SharedSession.swift in Sources */,
-				A100000000000000000000E6 /* ShareTitleParser.swift in Sources */,
+				A100000000000000000000E2 /* Shared/SharedSession.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -329,7 +323,16 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A100000000000000000000E7 /* ShareTitleParser.swift in Sources */,
+				A100000000000000000000E7 /* Shared/ShareTitleParser.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000000000000000000010A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A100000000000000000000E3 /* Shared/SharedSession.swift in Sources */,
+				A100000000000000000000E6 /* Shared/ShareTitleParser.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -379,7 +382,6 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 9;
-				MARKETING_VERSION = 1.0;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = NQ6AJVVBBJ;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -401,6 +403,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -445,7 +448,6 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 9;
-				MARKETING_VERSION = 1.0;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = NQ6AJVVBBJ;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -461,6 +463,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
@@ -494,7 +497,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -523,7 +526,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -546,7 +549,7 @@
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -569,7 +572,7 @@
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -586,7 +589,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -603,7 +606,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -647,6 +650,21 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		CDE59A2B2FF5B08200CBD097 /* XCLocalSwiftPackageReference "../ShowPickerCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../ShowPickerCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CDE59A2D2FF5B30D00CBD097 /* ShowPickerCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CDE59A2B2FF5B08200CBD097 /* XCLocalSwiftPackageReference "../ShowPickerCore" */;
+			productName = ShowPickerCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A100000000000000000000A1 /* Project object */;
 }
