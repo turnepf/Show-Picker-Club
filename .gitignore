@@ -6,3 +6,5 @@ backups/
 node_modules/
 CLAUDE.md
 infrastructure/
+*.xcuserstate
+xcuserdata/
