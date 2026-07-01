@@ -1,10 +1,12 @@
 import SwiftUI
 
 struct ShowDetailView: View {
-    let id: Int
+    let id: Int?
     let initialTitle: String
     let initialNetwork: String?
     let initialRating: String?
+    var initialPoster: String? = nil
+    var initialNetworkUrl: String? = nil
 
     @EnvironmentObject private var auth: AuthStore
     @State private var show: Show?
@@ -35,7 +37,7 @@ struct ShowDetailView: View {
 
     var body: some View {
         Form {
-            if let p = show?.posterUrl, !p.isEmpty {
+            if let p = (show?.posterUrl ?? initialPoster), !p.isEmpty {
                 Section {
                     PosterThumb(url: p, width: 130, height: 195)
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -209,8 +211,10 @@ struct ShowDetailView: View {
     }
 
     private func load() async {
-        if let s = try? await API.showDetail(id: id) { show = s }
-        cast = (try? await API.actors(showId: id)) ?? []
+        if let id {
+            if let s = try? await API.showDetail(id: id) { show = s }
+            cast = (try? await API.actors(showId: id)) ?? []
+        }
         await refreshMyCopy()
     }
 
@@ -258,24 +262,26 @@ struct ShowDetailView: View {
     // Copy this show onto one of the logged-in member's lists. The POST is
     // session-scoped, so it lands on *my* lists regardless of whose show this is.
     private func addToMyList(_ list: ShowList) async {
-        guard let s = show, let mine = auth.memberSlug else { return }
+        guard let mine = auth.memberSlug else { return }
+        // Works from a loaded show or a recommendation (no `show` yet).
+        let addTitle = show?.title ?? initialTitle
         addingToMine = true
         defer { addingToMine = false }
         do {
             _ = try await API.addShow(
                 memberSlug: mine,
-                title: s.title,
-                network: s.network,
-                networkUrl: s.networkUrl,
+                title: addTitle,
+                network: show?.network ?? initialNetwork,
+                networkUrl: show?.networkUrl ?? initialNetworkUrl,
                 list: list.rawValue,
                 notes: nil,
                 recommendedBy: nil,
-                movie: s.isMovie,
-                fullSeries: s.isFullSeries,
+                movie: show?.isMovie ?? false,
+                fullSeries: show?.isFullSeries ?? false,
                 watchingWith: nil
             )
             addAlert = AddAlert(title: "Added",
-                                message: "“\(s.title)” was added to your \(list.title) list.")
+                                message: "“\(addTitle)” was added to your \(list.title) list.")
             await refreshMyCopy()
         } catch API.APIError.badResponse(409) {
             // Already have it (maybe archived) — reconcile so the right
@@ -283,8 +289,8 @@ struct ShowDetailView: View {
             await refreshMyCopy()
             addAlert = AddAlert(title: mineArchived != nil ? "Archived" : "Already on a list",
                                 message: mineArchived != nil
-                                    ? "“\(s.title)” is archived — use “add back to” below."
-                                    : "“\(s.title)” is already on one of your lists.")
+                                    ? "“\(addTitle)” is archived — use “add back to” below."
+                                    : "“\(addTitle)” is already on one of your lists.")
         } catch {
             addAlert = AddAlert(title: "Couldn’t add",
                                 message: "Something went wrong. Please try again.")

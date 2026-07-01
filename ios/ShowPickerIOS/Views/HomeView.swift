@@ -118,6 +118,9 @@ struct HomeView: View {
                     MemberView(member: m)
                 case .detail(let id, let title, let network, let rating):
                     ShowDetailView(id: id, initialTitle: title, initialNetwork: network, initialRating: rating)
+                case .pick(let title, let network, let rating, let posterUrl, let networkUrl):
+                    ShowDetailView(id: nil, initialTitle: title, initialNetwork: network,
+                                   initialRating: rating, initialPoster: posterUrl, initialNetworkUrl: networkUrl)
                 case .whatsNew:
                     WhatsNewView()
                 }
@@ -243,5 +246,9 @@ struct HomeView: View {
 enum Route: Hashable {
     case member(Member)
     case detail(id: Int, title: String, network: String?, rating: String?)
+    // A recommendation ("Picks for you") has no backing show row yet — open the
+    // detail from its title so the user chooses a list, rather than adding it
+    // silently.
+    case pick(title: String, network: String?, rating: String?, posterUrl: String?, networkUrl: String?)
     case whatsNew
 }
