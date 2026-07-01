@@ -426,7 +426,7 @@
       if (!badTitles.length) { root.innerHTML = ''; return; }
       root.innerHTML = `
         <div class="section-head">Wrong titles (no poster match)</div>
-        <div class="section-blurb">These have a working link, but the stored name doesn't match any real show — so enrichment can't pull a poster, rating, or cast. Fix the name (e.g. "Juul Documentary" &rarr; "Big Vape: The Rise and Fall of Juul") and every member's copy is renamed and re-enriched.</div>
+        <div class="section-blurb">These have a working link, but the stored name doesn't match any real show — so enrichment can't pull a poster, rating, or cast. Loading this page already tried recovering the real name from each show's own link; the ones below couldn't be fixed automatically. Fix the name (e.g. "Juul Documentary" &rarr; "Big Vape: The Rise and Fall of Juul") and every member's copy is renamed and re-enriched.</div>
         ${badTitles.map(show => `
           <div class="row conflict" data-id="${show.id}">
             <div class="row-head">
@@ -510,6 +510,7 @@
         const conflicts = data.conflicts || [];
         const mismatches = data.mismatches || [];
         const badTitles = data.bad_titles || [];
+        const autoFixed = data.auto_fixed || [];
         renderConflicts(conflicts);
         renderMismatches(mismatches);
         renderBadTitles(badTitles);
@@ -518,6 +519,7 @@
         if (conflicts.length) extras.push(`${conflicts.length} cross-network conflict${conflicts.length === 1 ? '' : 's'}`);
         if (mismatches.length) extras.push(`${mismatches.length} URL/network mismatch${mismatches.length === 1 ? 'es' : 'es'}`);
         if (badTitles.length) extras.push(`${badTitles.length} wrong title${badTitles.length === 1 ? '' : 's'}`);
+        if (autoFixed.length) extras.push(`${autoFixed.length} title${autoFixed.length === 1 ? '' : 's'} auto-fixed (${autoFixed.map(f => `"${f.old_title}" → "${f.new_title}"`).join(', ')})`);
         remaining.textContent = extras.length ? `${queueSummary} · ${extras.join(' · ')}` : queueSummary;
         if (shows.length === 0) {
           list.innerHTML = '<div class="empty">🎉 Queue empty. All shows have direct URLs.</div>';
