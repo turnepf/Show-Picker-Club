@@ -7,6 +7,7 @@ struct UrlCleanupView: View {
     @State private var networks: [String] = []
     @State private var conflicts: [UrlConflict] = []
     @State private var mismatches: [UrlMismatch] = []
+    @State private var badTitles: [UrlQueueItem] = []
     @State private var loading = true
 
     var body: some View {
@@ -64,6 +65,26 @@ struct UrlCleanupView: View {
                     Text("The link's domain disagrees with the stored network. Keep whichever is right.")
                 }
             }
+
+            if !badTitles.isEmpty {
+                Section {
+                    ForEach(badTitles) { item in
+                        NavigationLink {
+                            BadTitleItemView(item: item) { await load() }
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.title).font(.body)
+                                Text("\(item.network ?? "no network") · \(item.members ?? "")")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Wrong titles (no poster match)")
+                } footer: {
+                    Text("The link works, but the stored name doesn't match any real show — so no poster, rating, or cast. Loading this list already tried recovering each name from the show's own link; these need a human. Fix the name to re-enrich every copy.")
+                }
+            }
         }
         .navigationTitle("URL Cleanup")
         .navigationBarTitleDisplayMode(.inline)
@@ -80,7 +101,71 @@ struct UrlCleanupView: View {
             networks = r.networks
             conflicts = r.conflicts ?? []
             mismatches = r.mismatches ?? []
+            badTitles = r.badTitles ?? []
         }
+    }
+}
+
+// Rename-only detail for a show whose title didn't match anything — the URL
+// is usually fine, so no link controls here. Reuses the fix_title action:
+// renames every member's copy, then re-pulls title/rating/cast/poster.
+private struct BadTitleItemView: View {
+    let item: UrlQueueItem
+    let onChange: () async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var newTitle: String
+    @State private var working = false
+    @State private var banner: String?
+
+    init(item: UrlQueueItem, onChange: @escaping () async -> Void) {
+        self.item = item
+        self.onChange = onChange
+        _newTitle = State(initialValue: item.title)
+    }
+
+    var body: some View {
+        Form {
+            Section("Show") {
+                LabeledContent("Title", value: item.title)
+                if let n = item.network { LabeledContent("Network", value: n) }
+                if let m = item.members, !m.isEmpty { LabeledContent("On", value: m) }
+            }
+            Section {
+                TextField("Correct title", text: $newTitle)
+                    .textInputAutocapitalization(.words)
+                Button("Rename & re-enrich") { Task { await rename() } }
+                    .disabled(newTitle.trimmingCharacters(in: .whitespaces) == item.title
+                              || newTitle.trimmingCharacters(in: .whitespaces).isEmpty || working)
+            } header: {
+                Text("Fix the title")
+            } footer: {
+                Text("Renames every member's copy and re-pulls the canonical title, rating, cast, and poster.")
+            }
+            if let b = banner {
+                Section { Text(b).foregroundStyle(b.hasPrefix("✓") ? .green : .red) }
+            }
+        }
+        .navigationTitle("Wrong title")
+        .navigationBarTitleDisplayMode(.inline)
+        .overlay { if working { ProgressView().controlSize(.large) } }
+    }
+
+    private func rename() async {
+        working = true
+        defer { working = false }
+        banner = nil
+        do {
+            let r = try await API.fixShowTitle(id: item.id,
+                                               newTitle: newTitle.trimmingCharacters(in: .whitespaces))
+            if let e = r.error { banner = e }
+            else {
+                banner = "✓ Renamed to \(r.newTitle ?? newTitle)"
+                await onChange()
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                dismiss()
+            }
+        } catch { banner = "Network error. Try again." }
     }
 }
 

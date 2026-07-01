@@ -409,6 +409,10 @@ Body: `{secret, count}`. Runs the vibe trait-backfill loop described above. The 
 ### `POST /api/admin-url-cleanup`
 Body: `{secret}`. Before listing, runs `propagateGoodUrls` to push every known good URL out to any sibling row still on a placeholder (so the queue never surfaces a title that someone has already fixed). Then returns the residual queue: titles where *no* copy has a good URL yet. The companion `url-cleanup.html` UI lets the operator paste a real deep link, then push it to every member's copy of that title in one go.
 
+The list response also carries a `bad_titles` section: titles enrichment has attempted (`enriched_at` set) but never matched to a poster on any copy. A missing poster is the observable symptom of a made-up name (e.g. "Juul Documentary" for *Big Vape: The Rise and Fall of Juul*) — the row's URL may be perfectly good, which is exactly why the URL queue misses it. The `fix_title` action renames every active copy, re-enriches, and now also pulls the new title's poster and network logo (preferring fresh artwork over whatever the old title had).
+
+Bad titles are fixed automatically where possible (`functions/_shared/title-fix.js`): when the row carries a real deep link, the streaming service's title page is a public SEO page whose `og:title` holds the show's actual name. Both the cleanup list action (capped pass before listing, reported as `auto_fixed`) and `/api/enrich`'s TMDB passes (fallback when no title spelling matches) recover the name that way, re-search TMDB, and rename every copy — member-safely: a member who already carries the show under its real name gets their wrong-titled duplicate archived instead of renamed. Only titles the automation can't confidently match (no poster from the recovered name) remain in `bad_titles` for manual cleanup.
+
 ## Seed-only definition
 
 A member is "seed-only" iff every one of their show rows satisfies:
