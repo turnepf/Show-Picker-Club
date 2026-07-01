@@ -19,6 +19,31 @@ async function tmdbGet(path, env) {
   return res.json();
 }
 
+// A few title spellings to try against TMDB, since an exact-title search misses
+// shows stored with a year suffix, a "Title: Subtitle", or a leading "The".
+// Kept to 3 so an unmatched title costs at most 3 searches (stays well under
+// Cloudflare's 50-subrequest budget even at batch size).
+function titleVariants(raw) {
+  const out = [];
+  const push = (t) => { const s = (t || '').replace(/\s+/g, ' ').trim(); if (s && !out.includes(s)) out.push(s); };
+  push(raw);
+  push(raw.replace(/\s*\(\d{4}\)\s*$/, '').replace(/\s+\d{4}$/, '').split(':')[0]);
+  if (/^the\s+/i.test(raw)) push(raw.replace(/^the\s+/i, ''));
+  else push('The ' + raw);
+  return out.slice(0, 3);
+}
+
+// First TMDB result across the title variants (or null). type is 'tv' | 'movie'.
+async function tmdbSearchFirst(title, type, env) {
+  for (const q of titleVariants(title)) {
+    try {
+      const data = await tmdbGet(`/search/${type}?query=${encodeURIComponent(q)}`, env);
+      if (data && data.results && data.results.length) return data.results[0];
+    } catch (e) {}
+  }
+  return null;
+}
+
 // Networks with `param` pass the show name in the search URL query string.
 // Networks without `param` just link to the search page (no show name).
 const NETWORK_SEARCH = {
@@ -151,10 +176,16 @@ export async function onRequestPost(context) {
   // cheap TMDB poster passes so a backfill can populate artwork within budget.
   const skipOmdb = body.skip_omdb === true || body.mode === 'posters';
   const skipActors = body.skip_actors === true || body.mode === 'posters';
+  // Optional: restrict the TMDB passes to a specific set of titles (e.g. the
+  // Trending shelf), so we can prioritise the most-visible shows first.
+  const titles = Array.isArray(body.titles) && body.titles.length
+    ? body.titles.map(t => String(t).toLowerCase()) : null;
   // Soft caps to keep us well clear of OMDB's free-tier 1k/day, TMDB's
   // per-key budget, and (above all) the 50-subrequest-per-invocation ceiling.
+  // The poster passes now try up to 3 title spellings per show, so the default
+  // batch is smaller to stay under budget when many titles miss.
   const maxOmdb = parseInt(body.max_omdb ?? '50', 10);
-  const maxTmdb = parseInt(body.max_tmdb ?? (skipOmdb ? '10' : '50'), 10);
+  const maxTmdb = parseInt(body.max_tmdb ?? (skipOmdb ? '6' : '50'), 10);
 
   // OMDB pass (ratings, actors, search URLs). Gated on an OMDB key being
   // configured: a missing key skips this pass but must NOT short-circuit the
@@ -233,20 +264,22 @@ export async function onRequestPost(context) {
   const hasTmdb = !!(env.TMDB_TOKEN || env.TMDB_API_KEY);
   let tmdbUpdated = 0;
   if (hasTmdb) {
-    const tmdbBase = `SELECT id, title, movie, list FROM shows
-       WHERE archived = 0 AND movie = 0`;
-    const tmdbStmt = member
-      ? env.DB.prepare(`${tmdbBase} AND member_slug = ? ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`).bind(member, maxTmdb)
-      : env.DB.prepare(`${tmdbBase} ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`).bind(maxTmdb);
+    let tvWhere = `archived = 0 AND movie = 0`;
+    const tvBinds = [];
+    if (member) { tvWhere += ` AND member_slug = ?`; tvBinds.push(member); }
+    if (titles) { tvWhere += ` AND LOWER(title) IN (${titles.map(() => '?').join(',')})`; tvBinds.push(...titles); }
+    const tmdbStmt = env.DB.prepare(
+      `SELECT id, title, movie, list FROM shows WHERE ${tvWhere} ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`
+    ).bind(...tvBinds, maxTmdb);
     const { results: tmdbShows } = await tmdbStmt.all();
 
     for (const show of tmdbShows) {
       try {
-        // Search TMDB for the show
-        const searchData = await tmdbGet(`/search/tv?query=${encodeURIComponent(show.title)}`, env);
-        if (!searchData.results || searchData.results.length === 0) continue;
+        // Search TMDB for the show (trying a few title spellings).
+        const first = await tmdbSearchFirst(show.title, 'tv', env);
+        if (!first) continue;
 
-        const tmdbId = searchData.results[0].id;
+        const tmdbId = first.id;
         const detail = await tmdbGet(`/tv/${tmdbId}`, env);
 
         // Check if series is complete
@@ -302,17 +335,19 @@ export async function onRequestPost(context) {
   // touches movies that still lack a poster; stamps enriched_at either way so
   // titles TMDB can't find rotate to the back instead of blocking the queue.
   if (hasTmdb) {
-    const movieBase = `SELECT id, title FROM shows
-       WHERE archived = 0 AND movie = 1 AND poster_url IS NULL`;
-    const movieStmt = member
-      ? env.DB.prepare(`${movieBase} AND member_slug = ? ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`).bind(member, maxTmdb)
-      : env.DB.prepare(`${movieBase} ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`).bind(maxTmdb);
+    let mvWhere = `archived = 0 AND movie = 1 AND poster_url IS NULL`;
+    const mvBinds = [];
+    if (member) { mvWhere += ` AND member_slug = ?`; mvBinds.push(member); }
+    if (titles) { mvWhere += ` AND LOWER(title) IN (${titles.map(() => '?').join(',')})`; mvBinds.push(...titles); }
+    const movieStmt = env.DB.prepare(
+      `SELECT id, title FROM shows WHERE ${mvWhere} ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`
+    ).bind(...mvBinds, maxTmdb);
     const { results: movieShows } = await movieStmt.all();
 
     for (const show of movieShows) {
       try {
-        const searchData = await tmdbGet(`/search/movie?query=${encodeURIComponent(show.title)}`, env);
-        const posterPath = searchData.results && searchData.results[0] && searchData.results[0].poster_path;
+        const first = await tmdbSearchFirst(show.title, 'movie', env);
+        const posterPath = first && first.poster_path;
         const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
         await env.DB.prepare(
           "UPDATE shows SET poster_url = COALESCE(?, poster_url), enriched_at = datetime('now') WHERE id = ?"
