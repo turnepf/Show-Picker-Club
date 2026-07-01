@@ -78,6 +78,7 @@ struct Show: Codable, Identifiable, Hashable {
     let recommendedBy: String?
     let rating: String?
     let list: String
+    let archived: Int?
     let notes: String?
     let movie: Int?
     let fullSeries: Int?
@@ -94,7 +95,7 @@ struct Show: Codable, Identifiable, Hashable {
     let actors: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, network, rating, list, notes, movie, genres, actors
+        case id, title, network, rating, list, archived, notes, movie, genres, actors
         case networkUrl = "network_url"
         case recommendedBy = "recommended_by"
         case fullSeries = "full_series"
@@ -109,6 +110,7 @@ struct Show: Codable, Identifiable, Hashable {
 
     var isMovie: Bool { (movie ?? 0) == 1 }
     var isFullSeries: Bool { (fullSeries ?? 0) == 1 }
+    var isArchived: Bool { (archived ?? 0) == 1 }
 
     var genreList: [String] {
         (genres ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
@@ -237,7 +239,7 @@ enum ShowList: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .watching: return "Watching"
-        case .waiting: return "Waiting"
+        case .waiting: return "Awaiting"
         case .recommending: return "Recommending"
         case .next: return "Up Next"
         }

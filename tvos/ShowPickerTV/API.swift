@@ -138,6 +138,28 @@ enum API {
         return r.shows
     }
 
+    // My own rows, optionally including archived ones — used by the detail
+    // screen to find *my* copy of a show (so actions target my row, not the
+    // stranger's copy that search may have surfaced by id).
+    static func myShows(slug: String, includeArchived: Bool) async throws -> [Show] {
+        let enc = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? slug
+        let suffix = includeArchived ? "&include_archived=1" : ""
+        let r: ShowsResponse = try await get("/api/shows?member=\(enc)\(suffix)")
+        return r.shows
+    }
+
+    // Soft-archive one of my shows.
+    static func archiveShow(id: Int) async throws {
+        struct Ack: Decodable {}
+        let _: Ack = try await sendJSON("/api/shows/\(id)", method: "PUT", body: ["archived": 1])
+    }
+
+    // Restore an archived show and drop it onto a list in one call.
+    static func restoreShow(id: Int, to list: String) async throws {
+        struct Ack: Decodable {}
+        let _: Ack = try await sendJSON("/api/shows/\(id)", method: "PUT", body: ["archived": 0, "list": list])
+    }
+
     // Full row for one show (genres, notes, recommender, dates, URL) — but
     // not cast, which lives at a separate endpoint.
     static func showDetail(id: Int) async throws -> Show {
