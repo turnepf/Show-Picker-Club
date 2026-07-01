@@ -21,6 +21,7 @@ final class AuthStore: ObservableObject {
         isAdmin = r.authenticated ? (r.isAdmin ?? false) : false
         if r.authenticated, let slug = memberSlug {
             SharedSession.sync(memberSlug: slug)
+            WatchBridge.shared.send(memberSlug: slug, cookie: WatchBridge.currentCookieHeader())
         }
     }
 
@@ -61,6 +62,7 @@ final class AuthStore: ObservableObject {
         email = nil
         isAdmin = false
         SharedSession.clear()
+        WatchBridge.shared.clear()
         // Drop cached reads and any queued offline edits so the next person to
         // sign in on this device starts clean.
         OfflineQueue.shared.reset()
