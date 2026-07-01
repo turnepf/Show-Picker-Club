@@ -72,7 +72,7 @@ struct HomeView: View {
                         }
                     }
                     if !popular.isEmpty {
-                        Section("What members are watching") {
+                        Section("Trending") {
                             ForEach(popular) { show in
                                 NavigationLink(value: Route.detail(id: show.id, title: show.title, network: show.network, rating: show.rating)) {
                                     popularRow(show)
