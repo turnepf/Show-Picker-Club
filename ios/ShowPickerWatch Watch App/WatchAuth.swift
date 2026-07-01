@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import WatchConnectivity
 
+
 // Receives the session (member slug + cookie header) handed off from the
 // paired iPhone. Reads are public (GET /api/shows?member=…), so the slug alone
 // is enough to show your lists; the cookie is kept for any future writes.
