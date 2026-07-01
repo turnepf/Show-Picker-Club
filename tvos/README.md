@@ -33,18 +33,19 @@ The tvOS target is committed at `tvos/ShowPickerTV.xcodeproj` and is part of the
 
 No `Info.plist` edits needed — showpicker.club is HTTPS, so App Transport Security passes by default.
 
-## Distribute via TestFlight (no public App Store listing)
+## Distribute
 
-1. In Xcode: set the run destination to **Any tvOS Device**, then **Product → Archive**.
+The tvOS build uploads to the **same App Store Connect app record as iOS** (shared
+bundle id), so iPhone and Apple TV ship as one universal app. Archive and upload
+the same way for both TestFlight and a public App Store release.
+
+1. In Xcode (via `ShowPickerClub.xcworkspace`): set the run destination to **Any tvOS Device**, then **Product → Archive**.
 2. In the Organizer, **Distribute App → TestFlight & App Store Connect → Upload**.
-3. In [App Store Connect](https://appstoreconnect.apple.com): your app → **TestFlight** tab.
-4. Add members as **External testers** (a group), or use the **Public Link** and share that one URL.
-5. First build triggers a one-time **Beta App Review** (usually ~a day). After that, members:
-   - Install **TestFlight** from the App Store on their Apple TV,
-   - Sign in with their Apple ID and accept the invite / open the public link,
-   - Install Show Picker Club from inside TestFlight.
+3. In [App Store Connect](https://appstoreconnect.apple.com): the **Show Picker Club** app.
+   - **TestFlight tab** — add members as **External testers** (a group) or share the **Public Link**. The first build triggers a one-time **Beta App Review** (~a day). Testers install the **TestFlight** app on their Apple TV, accept the invite, and install from there.
+   - **App Store tab** — when you're ready for a public listing, add the Apple TV screenshots/metadata to the same app and submit for review. Because it's one universal app, a single submission covers iPhone + Apple TV (and the paired Apple Watch app rides along with the iOS build).
 
-**Builds expire after 90 days.** To refresh: bump the build number, Archive, Upload — testers auto-update. ~10-minute chore quarterly.
+**TestFlight builds expire after 90 days.** To refresh: Archive + Upload (the build number auto-bumps) — testers auto-update.
 
 ## Known limitations / next steps
 
