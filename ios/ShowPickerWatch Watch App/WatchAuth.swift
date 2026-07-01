@@ -1,6 +1,8 @@
 import Foundation
 import Combine
 import WatchConnectivity
+import WidgetKit
+import ShowPickerCore
 
 
 // Receives the session (member slug + cookie header) handed off from the
@@ -10,15 +12,13 @@ final class WatchAuth: NSObject, ObservableObject, WCSessionDelegate {
     @Published var memberSlug: String?
     @Published var cookieHeader: String?
 
-    private let slugKey = "memberSlug"
-    private let cookieKey = "cookieHeader"
-
     override init() {
         super.init()
-        // Cached from a previous hand-off, so the watch works at launch before
-        // the phone re-sends.
-        memberSlug = UserDefaults.standard.string(forKey: slugKey)
-        cookieHeader = UserDefaults.standard.string(forKey: cookieKey)
+        // Cached from a previous hand-off (in the shared App Group, which the
+        // complication also reads), so the watch works at launch before the
+        // phone re-sends.
+        memberSlug = WatchShared.memberSlug
+        cookieHeader = WatchShared.cookieHeader
         if WCSession.isSupported() {
             WCSession.default.delegate = self
             WCSession.default.activate()
@@ -33,8 +33,11 @@ final class WatchAuth: NSObject, ObservableObject, WCSessionDelegate {
         DispatchQueue.main.async {
             self.memberSlug = (slug?.isEmpty == false) ? slug : nil
             self.cookieHeader = (cookie?.isEmpty == false) ? cookie : nil
-            UserDefaults.standard.set(self.memberSlug, forKey: self.slugKey)
-            UserDefaults.standard.set(self.cookieHeader, forKey: self.cookieKey)
+            // Persist to the shared App Group so the complication's timeline
+            // provider can fetch your shows, then nudge it to refresh.
+            WatchShared.memberSlug = self.memberSlug
+            WatchShared.cookieHeader = self.cookieHeader
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 
