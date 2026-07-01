@@ -36,6 +36,25 @@ jobs:
           fi
           URL="https://showpicker.club/api/enrich"
           total=0
+
+          # Prioritise the Trending shelf first — those are the most-visible
+          # shows, so populate their posters before the general rotation.
+          trending=$(curl -sS "https://showpicker.club/api/popular" \
+            | python3 -c "import sys,json; print(json.dumps([s['title'] for s in json.load(sys.stdin).get('shows',[])]))" 2>/dev/null || echo '[]')
+          if [ "$trending" != "[]" ] && [ -n "$trending" ]; then
+            tresp=$(curl -sS -X POST "$URL" \
+              -H "Content-Type: application/json" \
+              -H "X-Cron-Secret: ${CRON_SECRET}" \
+              -d "{\"mode\":\"posters\",\"titles\":${trending},\"max_tmdb\":12}" \
+              -w $'\n%{http_code}')
+            thttp=$(printf '%s' "$tresp" | tail -n1)
+            tbody=$(printf '%s' "$tresp" | sed '$d')
+            tup=$(printf '%s' "$tbody" | python3 -c "import sys,json;print(json.load(sys.stdin).get('tmdbUpdated',0))" 2>/dev/null || echo 0)
+            total=$((total + tup))
+            echo "trending pass (HTTP $thttp) — tmdbUpdated: $tup"
+            sleep 3
+          fi
+
           for i in $(seq 1 "$ROUNDS"); do
             resp=$(curl -sS -X POST "$URL" \
               -H "Content-Type: application/json" \
