@@ -6,15 +6,24 @@ export async function onRequestGet(context) {
   const { env } = context;
 
   // Top shows by how many members added them in the last 30 days — a rolling
-  // "what the club is picking up right now" feed.
+  // "what the club is picking up right now" feed. The RANKING uses only recent
+  // adds, but the DISPLAY fields (poster, logo, rating, network) are pulled
+  // from the best available row for the title regardless of when it was added —
+  // otherwise a show trending on brand-new (un-enriched) rows shows no poster
+  // even though an older copy on someone's list already has the art.
   const { results } = await env.DB.prepare(
-    `SELECT LOWER(s.title) as ltitle, s.title, s.rating, s.network, s.network_url, s.movie,
-       MAX(s.genres) as genres,
-       MAX(s.poster_url) as poster_url,
-       MAX(s.network_logo_url) as network_logo_url,
+    `SELECT LOWER(s.title) as ltitle, s.title, s.movie,
        MIN(s.id) as id,
        COUNT(DISTINCT s.member_slug) as member_count,
-       GROUP_CONCAT(DISTINCT s.member_slug) as member_slugs
+       GROUP_CONCAT(DISTINCT s.member_slug) as member_slugs,
+       (SELECT x.poster_url FROM shows x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.poster_url IS NOT NULL LIMIT 1) as poster_url,
+       (SELECT x.network_logo_url FROM shows x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.network_logo_url IS NOT NULL LIMIT 1) as network_logo_url,
+       (SELECT x.rating FROM shows x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.rating IS NOT NULL LIMIT 1) as rating,
+       (SELECT x.genres FROM shows x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.genres IS NOT NULL LIMIT 1) as genres,
+       (SELECT x.network FROM shows x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.network IS NOT NULL LIMIT 1) as network,
+       (SELECT x.network_url FROM shows x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0
+          AND x.network_url IS NOT NULL AND x.network_url NOT LIKE '%/search%' AND x.network_url NOT LIKE '%/s?%'
+          AND x.network_url NOT LIKE '%?q=%' AND x.network_url NOT LIKE '%?query=%' LIMIT 1) as network_url
      FROM shows s
      WHERE s.archived = 0
        AND s.member_slug NOT IN (${EXCLUDED_SQL})
@@ -25,7 +34,7 @@ export async function onRequestGet(context) {
        -- Only adds from the last 30 days feed the ranking.
        AND s.created_at >= datetime('now', '-30 days')
      GROUP BY LOWER(s.title)
-     ORDER BY member_count DESC, CAST(s.rating AS REAL) DESC
+     ORDER BY member_count DESC, CAST(rating AS REAL) DESC
      LIMIT 10`
   ).all();
 

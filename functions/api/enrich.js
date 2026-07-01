@@ -277,7 +277,13 @@ export async function onRequestPost(context) {
       try {
         // Search TMDB for the show (trying a few title spellings).
         const first = await tmdbSearchFirst(show.title, 'tv', env);
-        if (!first) continue;
+        if (!first) {
+          // Stamp enriched_at so a title TMDB can't match rotates to the back
+          // of the oldest-first queue instead of blocking it every round. (A DB
+          // write, not a fetch — it doesn't count against the subrequest cap.)
+          await env.DB.prepare("UPDATE shows SET enriched_at = datetime('now') WHERE id = ?").bind(show.id).run();
+          continue;
+        }
 
         const tmdbId = first.id;
         const detail = await tmdbGet(`/tv/${tmdbId}`, env);
