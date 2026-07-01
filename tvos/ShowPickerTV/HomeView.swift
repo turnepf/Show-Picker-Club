@@ -45,7 +45,7 @@ struct HomeView: View {
     @ViewBuilder private var popularShelf: some View {
         if !popular.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
-                sectionHeader("What Members Are Watching")
+                sectionHeader("Trending")
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 40) {
                         ForEach(popular) { show in
