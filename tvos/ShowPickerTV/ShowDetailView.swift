@@ -5,10 +5,12 @@ import SwiftUI
 // title/network/rating instantly, then fills in genres, notes, recommender,
 // dates, cast, and the real watch URL once loaded.
 struct ShowDetailView: View {
-    let id: Int
+    let id: Int?
     let initialTitle: String
     let initialNetwork: String?
     let initialRating: String?
+    var initialPoster: String? = nil
+    var initialNetworkUrl: String? = nil
 
     @EnvironmentObject private var auth: AuthStore
     @State private var show: Show?
@@ -114,7 +116,7 @@ struct ShowDetailView: View {
     // lists (when it's my own show). Mirrors the iOS detail actions; editing,
     // sharing, and the calendar feed stay off the TV.
     @ViewBuilder private var actionsSection: some View {
-        if show != nil, auth.memberSlug != nil {
+        if auth.memberSlug != nil, (show != nil || id == nil) {
             VStack(alignment: .leading, spacing: 14) {
                 if let m = mineActive, let cur = ShowList(rawValue: m.list) {
                     // On one of my lists → move it around or archive it.
@@ -165,21 +167,26 @@ struct ShowDetailView: View {
     }
 
     private func addToMyList(_ list: ShowList) async {
-        guard let s = show else { return }
+        // Works from a loaded show or a recommendation (no `show` yet).
+        let addTitle = show?.title ?? initialTitle
         working = true
         defer { working = false }
         do {
-            try await API.addShow(title: s.title, network: s.network, networkUrl: s.networkUrl,
-                                  list: list.rawValue, movie: s.isMovie, fullSeries: s.isFullSeries)
-            actionMessage = "Added “\(s.title)” to your \(list.title) list."
+            try await API.addShow(title: addTitle,
+                                  network: show?.network ?? initialNetwork,
+                                  networkUrl: show?.networkUrl ?? initialNetworkUrl,
+                                  list: list.rawValue,
+                                  movie: show?.isMovie ?? false,
+                                  fullSeries: show?.isFullSeries ?? false)
+            actionMessage = "Added “\(addTitle)” to your \(list.title) list."
             await refreshMyCopy()
         } catch API.APIError.badResponse(409) {
             // Already have it (maybe archived) — reconcile so the right
             // controls appear.
             await refreshMyCopy()
             actionMessage = mineArchived != nil
-                ? "“\(s.title)” is archived — use “add back to” below."
-                : "“\(s.title)” is already on one of your lists."
+                ? "“\(addTitle)” is archived — use “add back to” below."
+                : "“\(addTitle)” is already on one of your lists."
         } catch {
             actionMessage = "Couldn't add it. Please try again."
         }
@@ -233,7 +240,7 @@ struct ShowDetailView: View {
     // Portrait poster when we have one; otherwise a gradient tile with the
     // title so un-enriched shows still read clearly.
     @ViewBuilder private var detailPoster: some View {
-        if let p = show?.posterUrl, let url = URL(string: p) {
+        if let p = (show?.posterUrl ?? initialPoster), let url = URL(string: p) {
             AsyncImage(url: url) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFill()
@@ -407,6 +414,13 @@ struct ShowDetailView: View {
     }
 
     private func load() async {
+        guard let id else {
+            // Opened from a recommendation (no backing row yet) — show the
+            // passed-in info and let the user pick a list to add it to.
+            await refreshMyCopy()
+            lookedUp = true
+            return
+        }
         // HBO Max + Apple TV+ honor direct https URLs in their tvOS apps,
         // and HBO content rarely lives on Apple TV anyway — iTunes Search
         // for those just slows the Watch button down for no gain. Skip

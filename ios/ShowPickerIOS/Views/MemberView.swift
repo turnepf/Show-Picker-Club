@@ -296,22 +296,21 @@ struct MemberView: View {
     }
 
     @ViewBuilder private func pickRow(_ p: Pick) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Button {
-                Task { await addPick(p) }
-            } label: {
-                Image(systemName: "plus.circle.fill").foregroundStyle(Color.accentColor)
-            }
-            .buttonStyle(.plain)
-            PosterThumb(url: p.posterUrl)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(p.title).font(.body)
-                Text(pickCaption(p)).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            if let r = p.rating {
-                Label(String(format: "%.1f", r), systemImage: "star.fill")
-                    .font(.caption).labelStyle(.titleAndIcon).foregroundStyle(.orange)
+        // Open the card so the user chooses a list — don't add silently.
+        NavigationLink(value: Route.pick(title: p.title, network: p.network,
+                                         rating: p.rating.map { String(format: "%.1f", $0) },
+                                         posterUrl: p.posterUrl, networkUrl: p.networkUrl)) {
+            HStack(alignment: .top, spacing: 10) {
+                PosterThumb(url: p.posterUrl)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(p.title).font(.body)
+                    Text(pickCaption(p)).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if let r = p.rating {
+                    Label(String(format: "%.1f", r), systemImage: "star.fill")
+                        .font(.caption).labelStyle(.titleAndIcon).foregroundStyle(.orange)
+                }
             }
         }
     }
@@ -336,24 +335,6 @@ struct MemberView: View {
             reason += " · \(a) shared actor\(a == 1 ? "" : "s")"
         }
         return reason
-    }
-
-    // Copy a pick onto my Up Next. 409 means it's already on a list (e.g.
-    // archived) — still a success from the user's view, so refresh either way.
-    private func addPick(_ p: Pick) async {
-        picks.removeAll { $0.id == p.id }   // optimistic
-        do {
-            try await API.addShow(memberSlug: member.slug, title: p.title,
-                                  network: p.network, networkUrl: p.networkUrl,
-                                  list: ShowList.next.rawValue, notes: nil,
-                                  recommendedBy: nil, movie: false, fullSeries: false,
-                                  watchingWith: nil)
-            await load()
-        } catch API.APIError.badResponse(409) {
-            await load()
-        } catch {
-            await loadPicks()   // restore on real failure
-        }
     }
 
     private func loadPicks() async {

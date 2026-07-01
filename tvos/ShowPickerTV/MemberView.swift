@@ -89,7 +89,10 @@ struct MemberView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(alignment: .top, spacing: 40) {
                     ForEach(picks) { pick in
-                        Button { Task { await addPick(pick) } } label: {
+                        // Open the card so the user chooses a list — don't add silently.
+                        NavigationLink(value: Route.pick(title: pick.title, network: pick.network,
+                                                         rating: pick.rating.map { String($0) },
+                                                         posterUrl: pick.posterUrl, networkUrl: pick.networkUrl)) {
                             ShowCard(title: pick.title, subtitle: pick.reason, posterUrl: pick.posterUrl)
                         }
                         .buttonStyle(PushButtonStyle())
@@ -148,23 +151,6 @@ struct MemberView: View {
             }
         }
         return items.sorted { (Double($0.rating ?? "0") ?? 0) > (Double($1.rating ?? "0") ?? 0) }
-    }
-
-    private func addPick(_ pick: Pick) async {
-        picks.removeAll { $0.id == pick.id }   // optimistic
-        do {
-            try await API.addShow(title: pick.title, network: pick.network, networkUrl: pick.networkUrl,
-                                  list: ShowList.next.rawValue, movie: false, fullSeries: false)
-            pickMessage = "Added “\(pick.title)” to your Up Next."
-            // Refresh quietly (no loading spinner, which would reset scroll).
-            shows = (try? await API.shows(member: member.slug)) ?? shows
-            await loadPicks()
-        } catch API.APIError.badResponse(409) {
-            pickMessage = "“\(pick.title)” is already on one of your lists."
-        } catch {
-            pickMessage = "Couldn't add it. Please try again."
-            await loadPicks()   // restore on real failure
-        }
     }
 
     private func load() async {

@@ -1915,7 +1915,7 @@
       list.innerHTML = recsData.picks.map((p, idx) => {
         const networkHtml = p.network
           ? hasRealUrl(p.network_url)
-            ? ` <span class="show-on">on</span> <a class="show-network" href="${escapeHtml(safeUrl(p.network_url))}" target="_blank" rel="noopener">${escapeHtml(p.network)}</a>`
+            ? ` <span class="show-on">on</span> <a class="show-network" href="${escapeHtml(safeUrl(p.network_url))}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(p.network)}</a>`
             : ` <span class="show-on">on</span> <span class="show-network-plain">${escapeHtml(p.network)}</span>`
           : '';
         const rating = p.rating
@@ -1935,9 +1935,8 @@
         const poster = p.poster_url
           ? `<img class="row-poster" src="${safeUrl(p.poster_url)}" alt="" loading="lazy">`
           : `<div class="row-poster row-poster-empty">🎬</div>`;
-        return `<div class="show rec-row">
+        return `<div class="show rec-row" data-rec-idx="${idx}" style="cursor:pointer">
           <div class="show-row">
-            <button class="share-btn rec-add-btn" data-rec-idx="${idx}" title="Add to my Up Next">+</button>
             ${poster}
             <div class="rec-info">
               <span class="show-info"><span class="show-title">${escapeHtml(p.title)}</span>${networkHtml}${rating}</span>
@@ -1947,9 +1946,35 @@
         </div>`;
       }).join('');
 
-      list.querySelectorAll('.rec-add-btn').forEach(btn => {
-        btn.addEventListener('click', () => addRecToUpNext(parseInt(btn.dataset.recIdx, 10)));
+      // Tapping a pick opens the card so the user chooses a list — it doesn't
+      // add silently.
+      list.querySelectorAll('.rec-row').forEach(row => {
+        row.addEventListener('click', () => {
+          const p = recsData && recsData.picks[parseInt(row.dataset.recIdx, 10)];
+          if (p) openPickDetail(p);
+        });
       });
+    }
+
+    // Open the detail card for a recommendation (which has no backing show row
+    // yet) using a synthetic show, so the user gets the full add-to-any-list UI.
+    async function openPickDetail(p) {
+      const page = document.getElementById('detailPage');
+      const body = document.getElementById('detailBody');
+      document.getElementById('detailNavTitle').textContent = '';
+      body.innerHTML = '<div class="loading">Loading…</div>';
+      page.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      detailShow = {
+        title: p.title,
+        network: p.network || null,
+        network_url: p.network_url || null,
+        poster_url: p.poster_url || null,
+        rating: (p.rating != null && p.rating !== '') ? String(p.rating) : null,
+      };
+      detailActors = [];
+      await resolveMyCopy();
+      renderDetail(detailShow, []);
     }
 
     async function addRecToUpNext(idx) {
