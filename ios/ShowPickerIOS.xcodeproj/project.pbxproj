@@ -15,6 +15,7 @@
 		CD0077142FF5CADE00DCCF4D /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CD0077132FF5CADE00DCCF4D /* WidgetKit.framework */; };
 		CD0077162FF5CADE00DCCF4D /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CD0077152FF5CADE00DCCF4D /* SwiftUI.framework */; };
 		CD0077232FF5CAE000DCCF4D /* ShowPickerWatchComplicationExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CD0077122FF5CADE00DCCF4D /* ShowPickerWatchComplicationExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CDBC96832FF68C3A00672D08 /* ShowPickerCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDBC96822FF68C3A00672D08 /* ShowPickerCore */; };
 		CDD1EA862FF5BE6300F095DE /* ShowPickerWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = CDD1EA7C2FF5BE6200F095DE /* ShowPickerWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CDD1EA982FF5C17700F095DE /* ShowPickerCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDD1EA972FF5C17700F095DE /* ShowPickerCore */; };
 		CDE59A2E2FF5B30D00CBD097 /* ShowPickerCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDE59A2D2FF5B30D00CBD097 /* ShowPickerCore */; };
@@ -170,6 +171,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CDBC96832FF68C3A00672D08 /* ShowPickerCore in Frameworks */,
 				CD0077162FF5CADE00DCCF4D /* SwiftUI.framework in Frameworks */,
 				CD0077142FF5CADE00DCCF4D /* WidgetKit.framework in Frameworks */,
 			);
@@ -314,6 +316,7 @@
 			);
 			name = ShowPickerWatchComplicationExtension;
 			packageProductDependencies = (
+				CDBC96822FF68C3A00672D08 /* ShowPickerCore */,
 			);
 			productName = ShowPickerWatchComplicationExtension;
 			productReference = CD0077122FF5CADE00DCCF4D /* ShowPickerWatchComplicationExtension.appex */;
@@ -1000,6 +1003,10 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		CDBC96822FF68C3A00672D08 /* ShowPickerCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ShowPickerCore;
+		};
 		CDD1EA972FF5C17700F095DE /* ShowPickerCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ShowPickerCore;
