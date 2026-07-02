@@ -35,3 +35,28 @@ struct PosterThumb: View {
         }
     }
 }
+
+// Full-screen poster viewer: the detail screen presents this when the poster
+// thumbnail is tapped; tapping anywhere sends it back to the thumbnail.
+struct FullScreenPoster: View {
+    let url: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            if let u = URL(string: url) {
+                AsyncImage(url: u) { phase in
+                    if let image = phase.image {
+                        image.resizable().scaledToFit()
+                    } else {
+                        ProgressView().tint(.white)
+                    }
+                }
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { dismiss() }
+        .statusBarHidden()
+    }
+}

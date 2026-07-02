@@ -772,6 +772,19 @@
     .detail-poster img {
       width: 160px; max-width: 45%; height: auto;
       border-radius: 12px; box-shadow: var(--shadow-card, 0 4px 16px rgba(0,0,0,0.18));
+      cursor: zoom-in;
+    }
+    /* Click the detail poster to view it full screen; click again to close. */
+    .poster-lightbox {
+      position: fixed; inset: 0; z-index: 400;
+      background: rgba(0, 0, 0, 0.92);
+      display: flex; align-items: center; justify-content: center;
+      cursor: zoom-out;
+    }
+    .poster-lightbox img {
+      max-width: 94vw; max-height: 94vh;
+      border-radius: 12px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
     }
     .detail-card {
       background: var(--surface);
@@ -2724,8 +2737,27 @@
       return /^https?:\/\//i.test(t) ? t : '#';
     }
 
+    // Click the detail poster to view it full screen; click anywhere (or hit
+    // Escape) to send it back to the thumbnail.
+    function togglePosterLightbox(img) {
+      const existing = document.querySelector('.poster-lightbox');
+      if (existing) { existing.remove(); return; }
+      const box = document.createElement('div');
+      box.className = 'poster-lightbox';
+      const big = document.createElement('img');
+      big.src = img.src;
+      big.alt = '';
+      box.appendChild(big);
+      box.addEventListener('click', () => box.remove());
+      document.body.appendChild(box);
+    }
+    function closePosterLightbox() {
+      const box = document.querySelector('.poster-lightbox');
+      if (box) box.remove();
+    }
+
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { closeModal(); closeSuggestModal(); closeShareModal(); closeAddMyList(); }
+      if (e.key === 'Escape') { closeModal(); closeSuggestModal(); closeShareModal(); closeAddMyList(); closePosterLightbox(); }
     });
   </script>
 
@@ -2833,7 +2865,7 @@
       if (seasonsText(show)) rows.push(detailRow('Seasons', escapeHtml(seasonsText(show))));
 
       let html = '';
-      if (show.poster_url) html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy"></div>`;
+      if (show.poster_url) html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy" onclick="togglePosterLightbox(this)"></div>`;
       html += `<div class="detail-card">${rows.join('')}</div>`;
       if (show.notes) html += `<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-prose">${escapeHtml(show.notes)}</div></div>`;
       if (actors.length) {

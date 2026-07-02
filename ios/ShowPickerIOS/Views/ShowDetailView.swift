@@ -17,6 +17,7 @@ struct ShowDetailView: View {
     @State private var cast: [Actor] = []
     @State private var showingEdit = false
     @State private var showingShare = false
+    @State private var posterExpanded = false
     @State private var addingToMine = false
     @State private var addAlert: AddAlert?
     @Environment(\.openURL) private var openURL
@@ -39,9 +40,13 @@ struct ShowDetailView: View {
         Form {
             if let p = (show?.posterUrl ?? initialPoster), !p.isEmpty {
                 Section {
-                    PosterThumb(url: p, width: 130, height: 195)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .listRowBackground(Color.clear)
+                    // Tap to view the poster full screen; tap again to return.
+                    Button { posterExpanded = true } label: {
+                        PosterThumb(url: p, width: 130, height: 195)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .listRowBackground(Color.clear)
                 }
             }
             // Everything factual in one compact card so a show fits on one screen.
@@ -169,6 +174,11 @@ struct ShowDetailView: View {
             }
         }
         .task { await load() }
+        .fullScreenCover(isPresented: $posterExpanded) {
+            if let p = (show?.posterUrl ?? initialPoster), !p.isEmpty {
+                FullScreenPoster(url: p)
+            }
+        }
         .sheet(isPresented: $showingEdit) {
             if let m = myCopy {
                 AddEditShowView(memberSlug: m.memberSlug ?? (auth.memberSlug ?? ""), existing: m) { await load() }
