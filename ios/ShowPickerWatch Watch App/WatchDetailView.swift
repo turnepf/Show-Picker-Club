@@ -8,6 +8,7 @@ struct WatchDetailView: View {
     @EnvironmentObject private var auth: WatchAuth
     @State private var full: Show?
     @State private var cast: [Actor] = []
+    @State private var posterExpanded = false
 
     private var s: Show { full ?? show }
 
@@ -25,6 +26,8 @@ struct WatchDetailView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 120)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    // Tap to view full screen; tap again to come back.
+                    .onTapGesture { posterExpanded = true }
                 }
 
                 Text(s.title).font(.headline)
@@ -48,6 +51,22 @@ struct WatchDetailView: View {
         .navigationTitle(s.title)
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
+        .sheet(isPresented: $posterExpanded) {
+            if let p = s.posterUrl, let url = URL(string: p) {
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image {
+                            image.resizable().scaledToFit()
+                        } else {
+                            ProgressView()
+                        }
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { posterExpanded = false }
+            }
+        }
     }
 
     private func row(_ label: String, _ value: String) -> some View {
