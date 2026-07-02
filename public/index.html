@@ -2373,11 +2373,6 @@
       document.getElementById('searchOverlay').classList.add('hidden');
     }
 
-    function toggleSearchExpand(showId) {
-      const el = document.getElementById(`search-actors-${showId}`);
-      if (el) el.classList.toggle('visible');
-    }
-
     function renderSearchResults() {
       const titleQ = document.getElementById('searchTitleInput').value.trim().toLowerCase();
       const actorQ = document.getElementById('searchActorInput').value.trim().toLowerCase();
@@ -2413,7 +2408,6 @@
           ? ` · ${escapeHtml(show.member_first_name || (show.member_name || '').split(' ')[0] || show.member_slug)}`
           : '';
         const listLabel = `<span class="search-list-label">· ${escapeHtml(list)}${memberTag}</span>`;
-        const details = buildDetailLines(show);
         const addBtn = searchMode === 'all'
           ? `<button class="share-btn" data-add-idx="${show.id}" title="Add to my list">+</button>`
           : '';
@@ -2421,22 +2415,22 @@
           ? `<img class="row-poster" src="${safeUrl(show.poster_url)}" alt="" loading="lazy">`
           : `<div class="row-poster row-poster-empty">🎬</div>`;
         return `
-          <div class="show">
+          <div class="show ios-row" onclick="openDetail(${show.id})">
             <div class="show-row">
               ${addBtn}
               ${poster}
               <span class="show-info">
-                <span class="show-title clickable" title="Tap to see more" onclick="toggleSearchExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${series}${movieTag}${listLabel}
+                <span class="show-title clickable">${escapeHtml(show.title)}</span>${network}${rating}${series}${movieTag}${listLabel}
               </span>
             </div>
-            <div class="show-actors" id="search-actors-${show.id}">${details}</div>
           </div>`;
       }).join('');
 
       if (searchMode === 'all') {
         container.querySelectorAll('button[data-add-idx]').forEach(btn => {
           const id = parseInt(btn.dataset.addIdx, 10);
-          btn.addEventListener('click', () => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
             if (!authMember) {
               showToast('Log in on your member page first to add shows', { tone: 'error' });
               return;
