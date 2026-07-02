@@ -733,6 +733,36 @@
     #popularList.show-list, #recsList.show-list { box-shadow: none; }
 
     /* Show detail screen (pushed over everything) ------------------- */
+    /* Type-ahead results under the title inputs in Add Show / Suggest. */
+    .title-suggest {
+      margin-top: 6px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      max-height: 264px;
+      overflow-y: auto;
+    }
+    .title-suggest.hidden { display: none; }
+    .title-suggest-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .title-suggest-item:last-child { border-bottom: none; }
+    .title-suggest-item:hover, .title-suggest-item:active { background: var(--surface-2); }
+    .title-suggest-item img, .title-suggest-empty-poster {
+      width: 32px; height: 48px; flex-shrink: 0;
+      border-radius: 4px; object-fit: cover;
+      background: var(--surface-2);
+    }
+    .title-suggest-empty-poster {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; opacity: 0.5;
+    }
+    .title-suggest-name { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+    .title-suggest-meta { font-size: 12px; color: var(--ink-muted); margin-top: 1px; }
+
     #detailPage {
       position: fixed; inset: 0;
       background: var(--surface-2);
@@ -943,7 +973,8 @@
     <div class="modal" onclick="event.stopPropagation()">
       <h2 id="modalTitle">Add Show</h2>
       <label for="inputTitle">Show Title</label>
-      <input type="text" id="inputTitle" placeholder="e.g. The Night Agent">
+      <input type="text" id="inputTitle" placeholder="e.g. The Night Agent" autocomplete="off">
+      <div class="title-suggest hidden" id="inputTitleSuggest"></div>
 
       <label for="inputNetwork">Network</label>
       <select id="inputNetwork">
@@ -1002,7 +1033,8 @@
       <input type="hidden" id="suggestName">
 
       <label for="suggestTitle">Show Title</label>
-      <input type="text" id="suggestTitle" placeholder="e.g. The Night Agent">
+      <input type="text" id="suggestTitle" placeholder="e.g. The Night Agent" autocomplete="off">
+      <div class="title-suggest hidden" id="suggestTitleSuggest"></div>
 
       <label for="suggestNetwork">Network</label>
       <select id="suggestNetwork">
@@ -2075,8 +2107,73 @@
       }
     }
 
+    // ── Title type-ahead ────────────────────────────────────────────────
+    // As the member types a title, search TMDB (via /api/title-search, which
+    // keeps the token server-side) and let them pick the exact show. The pick
+    // fills the canonical name, sets the Movie flag from TMDB's media type,
+    // and rides along on submit as tmdb_id/tmdb_type so enrichment hits the
+    // exact entry — no after-the-fact title fixing. Free text still works:
+    // no pick simply means the old title-search enrichment path.
+    const titlePickers = {};
+    function attachTitlePicker(inputId, boxId, movieCheckboxId) {
+      const input = document.getElementById(inputId);
+      const box = document.getElementById(boxId);
+      const state = { pick: null, timer: null, seq: 0 };
+      titlePickers[inputId] = state;
+
+      function hide() { box.classList.add('hidden'); box.innerHTML = ''; }
+      state.clear = () => { state.pick = null; clearTimeout(state.timer); hide(); };
+
+      input.addEventListener('input', () => {
+        state.pick = null; // typing again invalidates a previous pick
+        clearTimeout(state.timer);
+        const q = input.value.trim();
+        if (q.length < 2) { hide(); return; }
+        state.timer = setTimeout(() => search(q), 300);
+      });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+
+      async function search(q) {
+        const seq = ++state.seq;
+        try {
+          const res = await fetch(`/api/title-search?q=${encodeURIComponent(q)}`);
+          if (!res.ok) { hide(); return; }
+          const data = await res.json();
+          // Stale response (member kept typing) — a newer search owns the box.
+          if (seq !== state.seq) return;
+          render(data.results || []);
+        } catch { hide(); }
+      }
+
+      function render(results) {
+        if (!results.length) { hide(); return; }
+        box.innerHTML = results.map((r, i) => `
+          <div class="title-suggest-item" data-i="${i}">
+            ${r.poster_url ? `<img src="${safeUrl(r.poster_url)}" alt="" loading="lazy">` : '<div class="title-suggest-empty-poster">🎬</div>'}
+            <div>
+              <div class="title-suggest-name">${escapeHtml(r.title)}</div>
+              <div class="title-suggest-meta">${r.year ? `${r.year} · ` : ''}${r.media_type === 'movie' ? 'Movie' : 'TV series'}</div>
+            </div>
+          </div>`).join('');
+        box.classList.remove('hidden');
+        box.querySelectorAll('.title-suggest-item').forEach(el => {
+          el.addEventListener('click', () => {
+            const r = results[parseInt(el.dataset.i, 10)];
+            state.pick = { tmdb_id: r.tmdb_id, tmdb_type: r.media_type };
+            input.value = r.title;
+            const movieBox = document.getElementById(movieCheckboxId);
+            if (movieBox) movieBox.checked = r.media_type === 'movie';
+            hide();
+          });
+        });
+      }
+    }
+    attachTitlePicker('inputTitle', 'inputTitleSuggest', 'inputMovie');
+    attachTitlePicker('suggestTitle', 'suggestTitleSuggest', 'suggestMovie');
+
     function openAddModal() {
       editingId = null;
+      titlePickers.inputTitle.clear();
       document.getElementById('modalTitle').textContent = 'Add Show';
       document.getElementById('modalSave').textContent = 'Add Show';
       document.getElementById('inputTitle').value = '';
@@ -2097,6 +2194,7 @@
       const show = shows.find(s => s.id === showId);
       if (!show) return;
       editingId = showId;
+      titlePickers.inputTitle.clear();
       document.getElementById('modalTitle').textContent = 'Edit Show';
       document.getElementById('modalSave').textContent = 'Save Changes';
       document.getElementById('inputTitle').value = show.title;
@@ -2142,6 +2240,12 @@
         full_series: document.getElementById('inputFullSeries').checked ? 1 : 0,
         list: getSelectedList(),
       };
+      // Member picked the show from type-ahead — enrich that exact entry.
+      const titlePick = titlePickers.inputTitle.pick;
+      if (titlePick) {
+        body.tmdb_id = titlePick.tmdb_id;
+        body.tmdb_type = titlePick.tmdb_type;
+      }
 
       try {
         let res;
@@ -2373,11 +2477,6 @@
       document.getElementById('searchOverlay').classList.add('hidden');
     }
 
-    function toggleSearchExpand(showId) {
-      const el = document.getElementById(`search-actors-${showId}`);
-      if (el) el.classList.toggle('visible');
-    }
-
     function renderSearchResults() {
       const titleQ = document.getElementById('searchTitleInput').value.trim().toLowerCase();
       const actorQ = document.getElementById('searchActorInput').value.trim().toLowerCase();
@@ -2413,7 +2512,6 @@
           ? ` · ${escapeHtml(show.member_first_name || (show.member_name || '').split(' ')[0] || show.member_slug)}`
           : '';
         const listLabel = `<span class="search-list-label">· ${escapeHtml(list)}${memberTag}</span>`;
-        const details = buildDetailLines(show);
         const addBtn = searchMode === 'all'
           ? `<button class="share-btn" data-add-idx="${show.id}" title="Add to my list">+</button>`
           : '';
@@ -2421,22 +2519,22 @@
           ? `<img class="row-poster" src="${safeUrl(show.poster_url)}" alt="" loading="lazy">`
           : `<div class="row-poster row-poster-empty">🎬</div>`;
         return `
-          <div class="show">
+          <div class="show ios-row" onclick="openDetail(${show.id})">
             <div class="show-row">
               ${addBtn}
               ${poster}
               <span class="show-info">
-                <span class="show-title clickable" title="Tap to see more" onclick="toggleSearchExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${series}${movieTag}${listLabel}
+                <span class="show-title clickable">${escapeHtml(show.title)}</span>${network}${rating}${series}${movieTag}${listLabel}
               </span>
             </div>
-            <div class="show-actors" id="search-actors-${show.id}">${details}</div>
           </div>`;
       }).join('');
 
       if (searchMode === 'all') {
         container.querySelectorAll('button[data-add-idx]').forEach(btn => {
           const id = parseInt(btn.dataset.addIdx, 10);
-          btn.addEventListener('click', () => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
             if (!authMember) {
               showToast('Log in on your member page first to add shows', { tone: 'error' });
               return;
@@ -2456,6 +2554,7 @@
         return;
       }
       document.getElementById('suggestName').value = editorName || authMember;
+      titlePickers.suggestTitle.clear();
       document.getElementById('suggestTitle').value = '';
       document.getElementById('suggestNetwork').value = '';
       document.getElementById('suggestNetworkOther').value = '';
@@ -2478,11 +2577,24 @@
       if (!title) { showToast('Show title is required', { tone: 'error' }); return; }
       if (!name) { showToast('Your name is required', { tone: 'error' }); return; }
 
+      const suggestBody = {
+        title, network, recommended_by: name, notes,
+        movie: document.getElementById('suggestMovie').checked ? 1 : 0,
+        full_series: document.getElementById('suggestFullSeries').checked ? 1 : 0,
+        member: memberSlug,
+      };
+      // Member picked the show from type-ahead — enrich that exact entry.
+      const suggestPick = titlePickers.suggestTitle.pick;
+      if (suggestPick) {
+        suggestBody.tmdb_id = suggestPick.tmdb_id;
+        suggestBody.tmdb_type = suggestPick.tmdb_type;
+      }
+
       try {
         const res = await fetch('/api/suggestions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, network, recommended_by: name, notes, movie: document.getElementById('suggestMovie').checked ? 1 : 0, full_series: document.getElementById('suggestFullSeries').checked ? 1 : 0, member: memberSlug }),
+          body: JSON.stringify(suggestBody),
         });
         const data = await res.json();
         if (data.duplicate) {

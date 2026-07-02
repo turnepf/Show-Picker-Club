@@ -67,58 +67,89 @@ function tmdbPosterUrl(posterPath) {
   return posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
 }
 
+// Full enrichment payload for a known TMDB id: details + credits +
+// external_ids in one call, IMDB rating via OMDB (by exact IMDB id), and
+// actor IMDB ids. Shared by the title-search path below and the exact-pick
+// path (fetchEnrichmentById) used when a member selected the show themselves.
+async function enrichFromTmdbId(tmdbId, mediaType, env, fallbackPoster = null) {
+  const token = env.TMDB_TOKEN;
+  const omdbKey = env.OMDB_API_KEY;
+
+  const detail = await tmdbFetch(
+    `/${mediaType}/${tmdbId}?append_to_response=credits,external_ids&language=en-US`,
+    token
+  );
+
+  const imdbShowId = detail.external_ids?.imdb_id || null;
+  let canonicalTitle = (mediaType === 'movie' ? detail.title : detail.name) || null;
+  let rating = null;
+  if (imdbShowId && omdbKey) {
+    const omdb = await omdbById(imdbShowId, omdbKey);
+    rating = omdb.rating;
+    if (omdb.canonicalTitle) canonicalTitle = omdb.canonicalTitle;
+  }
+
+  // Actor IMDB IDs in parallel
+  const cast = (detail.credits?.cast || []).slice(0, 4);
+  const actors = await Promise.all(
+    cast.map(async (person) => {
+      try {
+        const ext = await tmdbFetch(`/person/${person.id}/external_ids`, token);
+        return { name: person.name, imdb_id: ext.imdb_id || null };
+      } catch (_) {
+        return { name: person.name, imdb_id: null };
+      }
+    })
+  );
+
+  const posterUrl = tmdbPosterUrl(detail.poster_path) || fallbackPoster;
+  const netLogoPath = detail.networks && detail.networks[0] && detail.networks[0].logo_path;
+  const networkLogoUrl = netLogoPath ? `https://image.tmdb.org/t/p/w154${netLogoPath}` : null;
+
+  return { canonicalTitle, rating, actors, posterUrl, networkLogoUrl };
+}
+
+// Exact-pick enrichment: the member chose this TMDB entry from type-ahead
+// search, so skip title-guessing entirely. Returns the empty shape when the
+// lookup fails (caller falls back to fetchEnrichment's title search).
+export async function fetchEnrichmentById(tmdbId, mediaType, env) {
+  const empty = { canonicalTitle: null, rating: null, actors: [], posterUrl: null, networkLogoUrl: null };
+  if (!env.TMDB_TOKEN || !tmdbId) return empty;
+  try {
+    return await enrichFromTmdbId(tmdbId, mediaType === 'movie' ? 'movie' : 'tv', env);
+  } catch (_) {
+    return empty;
+  }
+}
+
 export async function fetchEnrichment(title, env, isMovie) {
   const token = env.TMDB_TOKEN;
   const omdbKey = env.OMDB_API_KEY;
-  const mediaType = isMovie ? 'movie' : 'tv';
+  // Try the stored media type first, then the other one. Documentaries and
+  // stand-up specials often live under TMDB's *movie* index even when a
+  // member added them as a show (and vice versa) — without the flip, a
+  // correctly-spelled title can never match, so it never gets a poster.
+  const mediaTypes = isMovie ? ['movie', 'tv'] : ['tv', 'movie'];
 
   // ── TMDB path ──────────────────────────────────────────────────────────────
   if (token) {
     try {
-      const search = await tmdbFetch(
-        `/search/${mediaType}?query=${encodeURIComponent(title)}&language=en-US&page=1`,
-        token
-      );
-
-      if (search.results?.length) {
-        const tmdbId = search.results[0].id;
-
-        // One call: details + credits + external_ids
-        const detail = await tmdbFetch(
-          `/${mediaType}/${tmdbId}?append_to_response=credits,external_ids&language=en-US`,
+      let search = null;
+      let mediaType = mediaTypes[0];
+      for (const t of mediaTypes) {
+        const s = await tmdbFetch(
+          `/search/${t}?query=${encodeURIComponent(title)}&language=en-US&page=1`,
           token
         );
+        if (s.results?.length) { search = s; mediaType = t; break; }
+      }
 
-        const imdbShowId = detail.external_ids?.imdb_id || null;
-        const canonicalTmdb = (isMovie ? detail.title : detail.name) || title;
-        const cast = (detail.credits?.cast || []).slice(0, 4);
-
-        // IMDB rating via OMDB using exact show IMDB ID (no title-guessing)
-        let rating = null;
-        let canonicalTitle = canonicalTmdb;
-        if (imdbShowId && omdbKey) {
-          const omdb = await omdbById(imdbShowId, omdbKey);
-          rating = omdb.rating;
-          if (omdb.canonicalTitle) canonicalTitle = omdb.canonicalTitle;
-        }
-
-        // Actor IMDB IDs in parallel
-        const actors = await Promise.all(
-          cast.map(async (person) => {
-            try {
-              const ext = await tmdbFetch(`/person/${person.id}/external_ids`, token);
-              return { name: person.name, imdb_id: ext.imdb_id || null };
-            } catch (_) {
-              return { name: person.name, imdb_id: null };
-            }
-          })
+      if (search) {
+        const result = await enrichFromTmdbId(
+          search.results[0].id, mediaType, env,
+          tmdbPosterUrl(search.results[0].poster_path)
         );
-
-        const posterUrl = tmdbPosterUrl(detail.poster_path || search.results[0].poster_path);
-        const netLogoPath = detail.networks && detail.networks[0] && detail.networks[0].logo_path;
-        const networkLogoUrl = netLogoPath ? `https://image.tmdb.org/t/p/w154${netLogoPath}` : null;
-
-        return { canonicalTitle, rating, actors, posterUrl, networkLogoUrl };
+        return { ...result, canonicalTitle: result.canonicalTitle || title };
       }
     } catch (_) {
       // fall through to OMDB
@@ -127,7 +158,10 @@ export async function fetchEnrichment(title, env, isMovie) {
 
   // ── OMDB fallback ──────────────────────────────────────────────────────────
   if (omdbKey) {
-    const result = await omdbByTitle(title, omdbKey, isMovie ? 'movie' : 'series');
+    // Same cross-type retry as TMDB: OMDB files docs/specials under the
+    // other type too, so a typed miss gets one untyped-flip attempt.
+    const result = await omdbByTitle(title, omdbKey, isMovie ? 'movie' : 'series')
+      || await omdbByTitle(title, omdbKey, isMovie ? 'series' : 'movie');
     if (result) {
       return {
         canonicalTitle: result.canonicalTitle,

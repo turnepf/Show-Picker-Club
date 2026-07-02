@@ -1,4 +1,5 @@
 import { getSession } from '../_shared/auth.js';
+import { fetchEnrichmentById } from '../_shared/enrichment.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
@@ -85,7 +86,16 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ duplicate: true, archived: false, list: existing.list }), { headers: corsHeaders() });
   }
 
-  const omdb = await fetchOMDB(title, env);
+  // Exact pick from type-ahead search: enrich the chosen TMDB entry directly
+  // (poster/cast/rating included) instead of guessing from the typed title.
+  const tmdbId = parseInt(body.tmdb_id, 10);
+  const tmdbType = body.tmdb_type === 'movie' || body.tmdb_type === 'tv' ? body.tmdb_type : null;
+  let omdb = null;
+  if (Number.isInteger(tmdbId) && tmdbType) {
+    const byId = await fetchEnrichmentById(tmdbId, tmdbType, env);
+    if (byId.canonicalTitle) omdb = byId;
+  }
+  if (!omdb) omdb = await fetchOMDB(title, env);
   const finalTitle = omdb.canonicalTitle || title;
 
   // Check again with canonical title
@@ -104,13 +114,17 @@ export async function onRequestPost(context) {
   const suggestionNote = notes ? `Suggested · ${notes}` : 'Suggested';
 
   const result = await env.DB.prepare(
-    'INSERT INTO shows (title, network, recommended_by, rating, list, notes, movie, full_series, member_slug, added_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).bind(finalTitle, network || null, recommended_by || null, omdb.rating, 'next', suggestionNote, movie || 0, full_series || 0, member, recommended_by || 'Anonymous').run();
+    'INSERT INTO shows (title, network, recommended_by, rating, list, notes, movie, full_series, poster_url, network_logo_url, member_slug, added_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).bind(finalTitle, network || null, recommended_by || null, omdb.rating, 'next', suggestionNote, movie || 0, full_series || 0, omdb.posterUrl || null, omdb.networkLogoUrl || null, member, recommended_by || 'Anonymous').run();
 
   const showId = result.meta.last_row_id;
   if (omdb.actors.length > 0) {
-    const stmt = env.DB.prepare('INSERT INTO actors (show_id, name) VALUES (?, ?)');
-    await env.DB.batch(omdb.actors.map(actor => stmt.bind(showId, actor)));
+    // OMDB path yields plain name strings; the exact-pick path yields
+    // {name, imdb_id} objects. Normalise so both insert cleanly.
+    const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id) VALUES (?, ?, ?)');
+    await env.DB.batch(omdb.actors.map(actor => typeof actor === 'string'
+      ? stmt.bind(showId, actor, null)
+      : stmt.bind(showId, actor.name, actor.imdb_id || null)));
   }
 
   // Backfill network/URL from other members if missing

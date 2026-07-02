@@ -69,7 +69,19 @@ struct SearchView: View {
         }
     }
 
+    // Tapping the row opens the full show card; the plus stays as a
+    // quick-add shortcut (Menu swallows its own taps, so it doesn't navigate).
     @ViewBuilder private func resultRow(_ s: AllShow) -> some View {
+        NavigationLink {
+            ShowDetailView(id: s.id, initialTitle: s.title,
+                           initialNetwork: s.network, initialRating: s.rating,
+                           initialPoster: s.posterUrl, initialNetworkUrl: s.networkUrl)
+        } label: {
+            resultRowLabel(s)
+        }
+    }
+
+    @ViewBuilder private func resultRowLabel(_ s: AllShow) -> some View {
         HStack(alignment: .top, spacing: 10) {
             if auth.isLoggedIn {
                 Menu {
@@ -79,6 +91,9 @@ struct SearchView: View {
                 } label: {
                     Image(systemName: "plus.circle.fill").foregroundStyle(Color.accentColor)
                 }
+                // Borderless so the plus keeps its own tap target inside the
+                // NavigationLink row instead of the tap navigating.
+                .buttonStyle(.borderless)
                 .disabled(addingId == s.id)
             }
             PosterThumb(url: s.posterUrl)

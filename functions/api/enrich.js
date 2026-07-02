@@ -45,6 +45,19 @@ async function tmdbSearchFirst(title, type, env) {
   return null;
 }
 
+// Single raw-title search against the *other* media type. Documentaries and
+// stand-up specials often live under TMDB's movie index even when a member
+// added them as a show (and vice versa), so a typed miss gets exactly one
+// flipped attempt — raw title only, to keep the subrequest cost at 1.
+async function tmdbSearchFlipped(title, type, env) {
+  const flipped = type === 'movie' ? 'tv' : 'movie';
+  try {
+    const data = await tmdbGet(`/search/${flipped}?query=${encodeURIComponent(title)}`, env);
+    if (data && data.results && data.results.length) return data.results[0];
+  } catch (e) {}
+  return null;
+}
+
 // Last resort when no title spelling matches TMDB: the stored name is likely
 // made up ("Juul Documentary"), but the row's own deep link points at the
 // streaming service's title page, whose og:title carries the real name.
@@ -339,6 +352,13 @@ export async function onRequestPost(context) {
         const first = await tmdbSearchFirst(show.title, 'tv', env)
           || await recoverTitleFromUrl(show, 'tv', env);
         if (!first) {
+          // Before writing the title off, check TMDB's movie index — docs and
+          // stand-up specials members add as shows usually live there. A hit
+          // only yields artwork (no seasons/dates apply), which is enough to
+          // keep a correctly-named title out of the bad-titles queue.
+          const flipped = await tmdbSearchFlipped(show.title, 'tv', env);
+          const flippedPoster = flipped && flipped.poster_path
+            ? `https://image.tmdb.org/t/p/w500${flipped.poster_path}` : null;
           // Stamp enriched_at so a title TMDB can't match rotates to the back
           // of the oldest-first queue instead of blocking it every round. (A DB
           // write, not a fetch — it doesn't count against the subrequest cap.)
@@ -346,10 +366,12 @@ export async function onRequestPost(context) {
           // groups by title and sorts by the group's oldest stamp, so one
           // unstamped sibling would pin a hopeless title to the front forever.
           await env.DB.prepare(
-            `UPDATE shows SET enriched_at = datetime('now')
+            `UPDATE shows SET poster_url = COALESCE(?, poster_url),
+                              enriched_at = datetime('now')
               WHERE archived = 0
                 AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
-          ).bind(show.id).run();
+          ).bind(flippedPoster, show.id).run();
+          if (flippedPoster) tmdbUpdated++;
           continue;
         }
 
@@ -439,7 +461,10 @@ export async function onRequestPost(context) {
     for (const show of movieShows) {
       try {
         const first = await tmdbSearchFirst(show.title, 'movie', env)
-          || await recoverTitleFromUrl(show, 'movie', env);
+          || await recoverTitleFromUrl(show, 'movie', env)
+          // Cross-type rescue, mirroring the TV pass: a "movie" that's
+          // really filed as a TV title still gets its artwork.
+          || await tmdbSearchFlipped(show.title, 'movie', env);
         const posterPath = first && first.poster_path;
         const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
         // Title-scoped: fills every member's copy in one go, and stamps

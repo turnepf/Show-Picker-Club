@@ -189,6 +189,26 @@ A few intentional omissions:
 
 ## Backlog
 
+- **Retire the after-the-fact title-healing bandaids.** Since July 2026,
+  adding or suggesting a show searches TMDB as you type and the member
+  picks the exact entry (`/api/title-search` + `tmdb_id`/`tmdb_type`
+  pins through `POST /api/shows`, `PUT /api/shows/:id`, and
+  `POST /api/suggestions`) — so new rows arrive with the canonical
+  title, correct movie flag, poster, rating, and cast, and the guessing
+  machinery only serves legacy rows and free-text stragglers. Once the
+  queues have drained (give it a few weeks of enrich rotations), strip
+  in roughly this order: the bad-titles queue + its auto-fix pass and
+  the `title_ok` dismiss control (`admin-url-cleanup.js`, web
+  `url-cleanup.html`, iOS `UrlCleanupView`); `titleFromUrl` og:title
+  recovery (`_shared/title-fix.js` callers in `enrich.js` and the
+  cleanup endpoint); the title-variant spelling retries and cross-type
+  flip searches in `enrich.js`'s poster passes; and the OMDB
+  title-guessing fallbacks in `_shared/enrichment.js` /
+  `suggestions.js`. Keep `fetchEnrichmentById`, the artwork
+  sync/propagation passes, and the URL queue (links still rot
+  independently of titles). Check each queue is actually empty before
+  deleting the tool that drains it.
+
 - **Social login — Google.** ~~Sign in with Apple~~ shipped in the iOS app
   (`/auth/apple`, mapping the Apple ID email back to an existing member's
   `member_emails` row, then remembering the Apple `sub` in
