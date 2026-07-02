@@ -234,8 +234,8 @@
 				A100000000000000000000F1 /* Sources */,
 				A100000000000000000000F2 /* Frameworks */,
 				A100000000000000000000F3 /* Resources */,
-				A10000000000000000000F7 /* Set build number */,
 				A100000000000000000000F4 /* Embed Foundation Extensions */,
+				A10000000000000000000F7 /* Set build number */,
 				CDD1EA872FF5BE6300F095DE /* Embed Watch Content */,
 			);
 			buildRules = (
@@ -330,7 +330,6 @@
 				CDD1EA782FF5BE6200F095DE /* Sources */,
 				CDD1EA792FF5BE6200F095DE /* Frameworks */,
 				CDD1EA7A2FF5BE6200F095DE /* Resources */,
-				CD00BEEF00000000000000A2 /* Set build number */,
 				CD0077242FF5CAE000DCCF4D /* Embed Foundation Extensions */,
 				CD00BEEF00000000000000A2 /* Set build number */,
 			);
@@ -445,7 +444,6 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
-				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
 			);
 			name = "Set build number";
 			outputFileListPaths = (
@@ -465,7 +463,6 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
-				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
 			);
 			name = "Set build number";
 			outputFileListPaths = (
