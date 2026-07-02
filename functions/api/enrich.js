@@ -62,6 +62,34 @@ async function recoverTitleFromUrl(show, type, env) {
   return first;
 }
 
+// Fill missing artwork from sibling copies of the same title — a poster
+// fetched for one member's copy covers everyone's, so no TMDB budget should
+// ever be spent on a title that already has artwork somewhere. Pure DB work,
+// zero subrequests. (New fetches also propagate at write time; this sweep
+// catches the backlog from before that existed.)
+async function syncArtworkAcrossCopies(env) {
+  await env.DB.prepare(
+    `UPDATE shows SET poster_url = (
+        SELECT s2.poster_url FROM shows s2
+         WHERE LOWER(s2.title) = LOWER(shows.title)
+           AND s2.archived = 0 AND s2.poster_url IS NOT NULL LIMIT 1)
+      WHERE archived = 0 AND poster_url IS NULL
+        AND EXISTS (SELECT 1 FROM shows s2
+                     WHERE LOWER(s2.title) = LOWER(shows.title)
+                       AND s2.archived = 0 AND s2.poster_url IS NOT NULL)`
+  ).run();
+  await env.DB.prepare(
+    `UPDATE shows SET network_logo_url = (
+        SELECT s2.network_logo_url FROM shows s2
+         WHERE LOWER(s2.title) = LOWER(shows.title)
+           AND s2.archived = 0 AND s2.network_logo_url IS NOT NULL LIMIT 1)
+      WHERE archived = 0 AND network_logo_url IS NULL
+        AND EXISTS (SELECT 1 FROM shows s2
+                     WHERE LOWER(s2.title) = LOWER(shows.title)
+                       AND s2.archived = 0 AND s2.network_logo_url IS NOT NULL)`
+  ).run();
+}
+
 // Networks with `param` pass the show name in the search URL query string.
 // Networks without `param` just link to the search page (no show name).
 const NETWORK_SEARCH = {
@@ -282,13 +310,26 @@ export async function onRequestPost(context) {
   const hasTmdb = !!(env.TMDB_TOKEN || env.TMDB_API_KEY);
   let tmdbUpdated = 0;
   if (hasTmdb) {
+    // Cover everything a sibling copy already covers before spending budget.
+    await syncArtworkAcrossCopies(env);
+
     let tvWhere = `archived = 0 AND movie = 0`;
     const tvBinds = [];
     if (member) { tvWhere += ` AND member_slug = ?`; tvBinds.push(member); }
     if (titles) { tvWhere += ` AND LOWER(title) IN (${titles.map(() => '?').join(',')})`; tvBinds.push(...titles); }
-    const tmdbStmt = env.DB.prepare(
-      `SELECT id, title, movie, list, network_url FROM shows WHERE ${tvWhere} ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`
-    ).bind(...tvBinds, maxTmdb);
+    // Posters mode exists to catch artwork up, so don't spend its small batch
+    // on shows that already have a poster (the sync above just filled every
+    // row a sibling could cover — poster_url NULL now means no copy has one),
+    // and take one row per title since the fetch propagates to all copies.
+    const tvSelect = skipOmdb
+      ? `SELECT id, title, movie, list, network_url FROM shows
+          WHERE ${tvWhere} AND poster_url IS NULL
+          GROUP BY LOWER(title)
+          ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
+      : `SELECT id, title, movie, list, network_url FROM shows
+          WHERE ${tvWhere}
+          ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`;
+    const tmdbStmt = env.DB.prepare(tvSelect).bind(...tvBinds, maxTmdb);
     const { results: tmdbShows } = await tmdbStmt.all();
 
     for (const show of tmdbShows) {
@@ -301,7 +342,14 @@ export async function onRequestPost(context) {
           // Stamp enriched_at so a title TMDB can't match rotates to the back
           // of the oldest-first queue instead of blocking it every round. (A DB
           // write, not a fetch — it doesn't count against the subrequest cap.)
-          await env.DB.prepare("UPDATE shows SET enriched_at = datetime('now') WHERE id = ?").bind(show.id).run();
+          // Every copy of the title, not just this row: the posters-mode batch
+          // groups by title and sorts by the group's oldest stamp, so one
+          // unstamped sibling would pin a hopeless title to the front forever.
+          await env.DB.prepare(
+            `UPDATE shows SET enriched_at = datetime('now')
+              WHERE archived = 0
+                AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
+          ).bind(show.id).run();
           continue;
         }
 
@@ -379,8 +427,12 @@ export async function onRequestPost(context) {
     const mvBinds = [];
     if (member) { mvWhere += ` AND member_slug = ?`; mvBinds.push(member); }
     if (titles) { mvWhere += ` AND LOWER(title) IN (${titles.map(() => '?').join(',')})`; mvBinds.push(...titles); }
+    // One row per title — the fetch propagates to every copy, and the artwork
+    // sync above already filled anything a sibling could cover.
     const movieStmt = env.DB.prepare(
-      `SELECT id, title, network_url FROM shows WHERE ${mvWhere} ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`
+      `SELECT id, title, network_url FROM shows WHERE ${mvWhere}
+        GROUP BY LOWER(title)
+        ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
     ).bind(...mvBinds, maxTmdb);
     const { results: movieShows } = await movieStmt.all();
 
@@ -390,18 +442,15 @@ export async function onRequestPost(context) {
           || await recoverTitleFromUrl(show, 'movie', env);
         const posterPath = first && first.poster_path;
         const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
+        // Title-scoped: fills every member's copy in one go, and stamps
+        // enriched_at on all of them so a title TMDB can't match rotates to
+        // the back of the grouped-by-title queue instead of pinning it.
         await env.DB.prepare(
-          "UPDATE shows SET poster_url = COALESCE(?, poster_url), enriched_at = datetime('now') WHERE id = ?"
+          `UPDATE shows SET poster_url = COALESCE(?, poster_url), enriched_at = datetime('now')
+            WHERE archived = 0
+              AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
         ).bind(posterUrl, show.id).run();
-        // Same cross-copy propagation as the TV pass (fill-only, by title).
-        if (posterUrl) {
-          await env.DB.prepare(
-            `UPDATE shows SET poster_url = COALESCE(poster_url, ?)
-              WHERE archived = 0
-                AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
-          ).bind(posterUrl, show.id).run();
-          tmdbUpdated++;
-        }
+        if (posterUrl) tmdbUpdated++;
       } catch (e) {}
     }
   }
