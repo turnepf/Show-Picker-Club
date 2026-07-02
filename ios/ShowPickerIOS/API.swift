@@ -334,14 +334,28 @@ enum API {
     // connectivity returns. Real server rejections still surface to the caller.
 
     @discardableResult
+    // Type-ahead title search while adding/suggesting a show. Session-gated
+    // TMDB proxy; empty result list means "let them type freely".
+    static func titleSearch(_ q: String) async throws -> [TitleHit] {
+        // URLComponents escapes &/=/# in the value ( .urlQueryAllowed wouldn't,
+        // truncating titles like "Law & Order"); "+" needs one extra step so
+        // URLSearchParams server-side doesn't read it as a space.
+        var comps = URLComponents()
+        comps.queryItems = [URLQueryItem(name: "q", value: q)]
+        let query = (comps.percentEncodedQuery ?? "").replacingOccurrences(of: "+", with: "%2B")
+        let r: TitleSearchResponse = try await get("/api/title-search?\(query)")
+        return r.results
+    }
+
     static func addShow(memberSlug: String, title: String, network: String?, networkUrl: String? = nil,
                         list: String, notes: String?, recommendedBy: String?, movie: Bool, fullSeries: Bool,
-                        watchingWith: String?) async throws -> Show {
+                        watchingWith: String?, tmdbId: Int? = nil, tmdbType: String? = nil) async throws -> Show {
         do {
             let show = try await addShowRemote(memberSlug: memberSlug, title: title, network: network,
                                                networkUrl: networkUrl, list: list, notes: notes,
                                                recommendedBy: recommendedBy, movie: movie,
-                                               fullSeries: fullSeries, watchingWith: watchingWith)
+                                               fullSeries: fullSeries, watchingWith: watchingWith,
+                                               tmdbId: tmdbId, tmdbType: tmdbType)
             await OfflineQueue.shared.upsert(show, slug: memberSlug)
             return show
         } catch {
@@ -358,7 +372,7 @@ enum API {
     @discardableResult
     static func addShowRemote(memberSlug: String, title: String, network: String?, networkUrl: String? = nil,
                               list: String, notes: String?, recommendedBy: String?, movie: Bool, fullSeries: Bool,
-                              watchingWith: String?) async throws -> Show {
+                              watchingWith: String?, tmdbId: Int? = nil, tmdbType: String? = nil) async throws -> Show {
         struct Wrapper: Decodable { let show: Show }
         let body: [String: Any?] = [
             "title": title,
@@ -370,6 +384,10 @@ enum API {
             "movie": movie ? 1 : 0,
             "full_series": fullSeries ? 1 : 0,
             "watching_with": watchingWith,
+            // Exact type-ahead pick — the server enriches this TMDB entry
+            // directly instead of re-guessing from the title.
+            "tmdb_id": tmdbId,
+            "tmdb_type": tmdbType,
         ]
         let r: Wrapper = try await postJSON("/api/shows", body: body)
         return r.show
@@ -378,12 +396,13 @@ enum API {
     @discardableResult
     static func updateShow(id: Int, title: String, network: String?, list: String,
                            notes: String?, recommendedBy: String?, movie: Bool, fullSeries: Bool,
-                           watchingWith: String?, archived: Bool, memberSlug: String? = nil) async throws -> Show {
+                           watchingWith: String?, archived: Bool, memberSlug: String? = nil,
+                           tmdbId: Int? = nil, tmdbType: String? = nil) async throws -> Show {
         do {
             let show = try await updateShowRemote(id: id, title: title, network: network, list: list,
                                                   notes: notes, recommendedBy: recommendedBy, movie: movie,
                                                   fullSeries: fullSeries, watchingWith: watchingWith,
-                                                  archived: archived)
+                                                  archived: archived, tmdbId: tmdbId, tmdbType: tmdbType)
             if let slug = show.memberSlug ?? memberSlug { await OfflineQueue.shared.upsert(show, slug: slug) }
             return show
         } catch {
@@ -400,7 +419,8 @@ enum API {
     @discardableResult
     static func updateShowRemote(id: Int, title: String, network: String?, list: String,
                                  notes: String?, recommendedBy: String?, movie: Bool, fullSeries: Bool,
-                                 watchingWith: String?, archived: Bool) async throws -> Show {
+                                 watchingWith: String?, archived: Bool,
+                                 tmdbId: Int? = nil, tmdbType: String? = nil) async throws -> Show {
         struct Wrapper: Decodable { let show: Show }
         let body: [String: Any?] = [
             "title": title,
@@ -412,6 +432,8 @@ enum API {
             "full_series": fullSeries ? 1 : 0,
             "watching_with": watchingWith,
             "archived": archived ? 1 : 0,
+            "tmdb_id": tmdbId,
+            "tmdb_type": tmdbType,
         ]
         let r: Wrapper = try await putJSON("/api/shows/\(id)", body: body)
         return r.show
@@ -491,7 +513,8 @@ enum API {
     }
 
     static func suggest(to member: String, title: String, network: String?, notes: String?,
-                        recommendedBy: String?, movie: Bool, fullSeries: Bool) async throws {
+                        recommendedBy: String?, movie: Bool, fullSeries: Bool,
+                        tmdbId: Int? = nil, tmdbType: String? = nil) async throws {
         let body: [String: Any?] = [
             "member": member,
             "title": title,
@@ -500,6 +523,8 @@ enum API {
             "recommended_by": recommendedBy,
             "movie": movie ? 1 : 0,
             "full_series": fullSeries ? 1 : 0,
+            "tmdb_id": tmdbId,
+            "tmdb_type": tmdbType,
         ]
         struct Ack: Decodable {}
         let _: Ack? = try? await postJSON("/api/suggestions", body: body)
