@@ -24,7 +24,13 @@ struct ShowDetailView: View {
     @State private var openFailed = false
     @State private var working = false
     @State private var actionMessage: String?
+    @State private var posterExpanded = false
     @Environment(\.openURL) private var openURL
+
+    private var posterUrlString: String? {
+        let p = show?.posterUrl ?? initialPoster
+        return (p?.isEmpty == false) ? p : nil
+    }
 
     private var title: String { show?.title ?? initialTitle }
     private var network: String? { show?.network ?? initialNetwork }
@@ -45,9 +51,20 @@ struct ShowDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 40) {
                 HStack(alignment: .top, spacing: 50) {
-                    detailPoster
-                        .frame(width: 300, height: 450)
-                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    // Click the poster to view it full screen (click again to
+                    // come back). The no-poster gradient tile stays inert.
+                    if posterUrlString != nil {
+                        Button { posterExpanded = true } label: {
+                            detailPoster
+                                .frame(width: 300, height: 450)
+                                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        }
+                        .buttonStyle(PushButtonStyle())
+                    } else {
+                        detailPoster
+                            .frame(width: 300, height: 450)
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
 
                     VStack(alignment: .leading, spacing: 22) {
                         Text(title)
@@ -110,6 +127,11 @@ struct ShowDetailView: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .task { await load() }
+        .fullScreenCover(isPresented: $posterExpanded) {
+            if let p = posterUrlString {
+                FullScreenPosterTV(url: p)
+            }
+        }
     }
 
     // Add-to-my-list (when signed in and it isn't already mine) or move-between-
@@ -235,6 +257,33 @@ struct ShowDetailView: View {
         let t = (show?.title ?? initialTitle).lowercased()
         let mine = (try? await API.myShows(slug: slug, includeArchived: true)) ?? []
         myCopy = mine.first { $0.title.lowercased() == t }
+    }
+
+    // Full-screen poster: the whole screen is one button, so a click on the
+    // remote sends it back to the thumbnail (Menu/back works too).
+    private struct FullScreenPosterTV: View {
+        let url: String
+        @Environment(\.dismiss) private var dismiss
+
+        var body: some View {
+            Button { dismiss() } label: {
+                ZStack {
+                    Color.black
+                    if let u = URL(string: url) {
+                        AsyncImage(url: u) { phase in
+                            if let image = phase.image {
+                                image.resizable().scaledToFit()
+                            } else {
+                                ProgressView()
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .buttonStyle(.plain)
+            .ignoresSafeArea()
+        }
     }
 
     // Portrait poster when we have one; otherwise a gradient tile with the
