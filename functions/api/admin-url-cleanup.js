@@ -440,8 +440,13 @@ export async function onRequestPost(context) {
     // title (canonical title + rating + cast), then rename every active copy
     // of the old title and refresh their cast. Fixes both failure modes:
     // enrichment matched the wrong show, or matched nothing and the typo stuck.
+    // Optional `network`: the operator can correct the service at the same
+    // time (same semantics as resolve_conflict — every active copy moves to
+    // the chosen network, and URLs that pointed at the old service are
+    // cleared so the next fill pass picks the right one).
     const id = parseInt(body.id, 10);
     const rawNew = String(body.new_title || '').trim();
+    const submittedNetwork = String(body.network || '').trim();
     if (!Number.isInteger(id)) return json({ error: 'id required' }, 400);
     if (!rawNew) return json({ error: 'new title required' }, 400);
 
@@ -452,7 +457,19 @@ export async function onRequestPost(context) {
     const enriched = await fetchEnrichment(rawNew, env, !!row.movie);
     const { finalTitle, updated } = await commitTitleFix(env, oldTitle, rawNew, enriched);
 
-    return json({ ok: true, old_title: oldTitle, new_title: finalTitle, updated });
+    let network = null;
+    if (submittedNetwork) {
+      network = canonicalNetwork(submittedNetwork);
+      await env.DB.prepare(
+        `UPDATE shows
+            SET network_url = CASE WHEN network = ? THEN network_url ELSE NULL END,
+                network = ?,
+                enriched_at = datetime('now')
+          WHERE LOWER(title) = LOWER(?) AND archived = 0`
+      ).bind(network, network, finalTitle).run();
+    }
+
+    return json({ ok: true, old_title: oldTitle, new_title: finalTitle, network, updated });
   }
 
   await propagateGoodUrls(env);

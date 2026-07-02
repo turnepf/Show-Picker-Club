@@ -426,17 +426,19 @@
       if (!badTitles.length) { root.innerHTML = ''; return; }
       root.innerHTML = `
         <div class="section-head">Wrong titles (no poster match)</div>
-        <div class="section-blurb">These have a working link, but the stored name doesn't match any real show — so enrichment can't pull a poster, rating, or cast. Loading this page already tried recovering the real name from each show's own link; the ones below couldn't be fixed automatically. Fix the name (e.g. "Juul Documentary" &rarr; "Big Vape: The Rise and Fall of Juul") and every member's copy is renamed and re-enriched.</div>
+        <div class="section-blurb">These have a working link, but the stored name doesn't match any real show — so enrichment can't pull a poster, rating, or cast. Loading this page already tried recovering the real name from each show's own link; the ones below couldn't be fixed automatically. Fix the name (e.g. "Juul Documentary" &rarr; "Big Vape: The Rise and Fall of Juul") — and the network too if it's wrong — and every member's copy is updated and re-enriched.</div>
         ${badTitles.map(show => `
-          <div class="row conflict" data-id="${show.id}">
+          <div class="row" data-id="${show.id}">
             <div class="row-head">
               <a class="show-link" target="_blank" rel="noopener noreferrer"
                  href="${googleSearchUrl(show.title, show.network)}">${escapeHtml(show.title)} on ${escapeHtml(show.network || '???')}</a>
               <span class="show-meta">${show.member_count > 1 ? show.member_count + ' lists &middot; ' : ''}${escapeHtml(show.members)}</span>
             </div>
             <div class="row-form">
+              <select class="net-select">${networkOptionsHtml(show.network)}</select>
               <input type="text" class="title-input" placeholder="Correct title" value="${escapeAttr(show.title)}" autocomplete="off">
-              <button class="btn-update btn-rename" type="button">Rename</button>
+              <button class="btn-update btn-rename" type="button">Save</button>
+              <input type="text" class="other-input" placeholder="New network name">
               <div class="row-err"></div>
             </div>
           </div>
@@ -444,14 +446,21 @@
       `;
       root.querySelectorAll('.row').forEach(rowEl => {
         const titleInput = rowEl.querySelector('.title-input');
+        const netSelect = rowEl.querySelector('.net-select');
+        const otherInput = rowEl.querySelector('.other-input');
         const renameBtn = rowEl.querySelector('.btn-rename');
         const errBox = rowEl.querySelector('.row-err');
+        netSelect.addEventListener('change', () => {
+          if (netSelect.value === '__other') { otherInput.classList.add('show'); otherInput.focus(); }
+          else otherInput.classList.remove('show');
+        });
         titleInput.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') { e.preventDefault(); renameBtn.click(); }
         });
         renameBtn.addEventListener('click', async () => {
           errBox.textContent = '';
           const newTitle = titleInput.value.trim();
+          const network = (netSelect.value === '__other' ? otherInput.value : netSelect.value).trim();
           if (!newTitle) { errBox.textContent = 'Enter a title.'; return; }
           renameBtn.disabled = true;
           const old = renameBtn.textContent;
@@ -464,6 +473,7 @@
                 action: 'fix_title',
                 id: parseInt(rowEl.dataset.id, 10),
                 new_title: newTitle,
+                network: network || undefined,
               }),
             });
             const data = await res.json().catch(() => ({}));
