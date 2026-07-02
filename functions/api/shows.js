@@ -34,7 +34,32 @@ export async function onRequestGet(context) {
        (SELECT json_group_array(json_object('name', a.name, 'imdb_id', a.imdb_id)) FROM actors a WHERE a.show_id = s.id) as actors
      FROM shows s WHERE s.member_slug = ? ${archivedFilter} ORDER BY s.title COLLATE NOCASE`
   ).bind(member).all();
+  await borrowArtworkAcrossCopies(env, results);
   return new Response(JSON.stringify({ shows: results }), { headers: corsHeaders() });
+}
+
+// Posters and network logos live on each member's own row and backfill one
+// row at a time, so a title can have artwork on one member's copy while
+// another member's identical copy is still waiting its turn in the
+// enrichment rotation. For display, borrow artwork from any active copy of
+// the same title. (Enrichment also propagates on write now; this covers the
+// backlog and anything the rotation hasn't reached.)
+async function borrowArtworkAcrossCopies(env, rows) {
+  if (!rows.some(r => !r.poster_url || !r.network_logo_url)) return;
+  const { results: art } = await env.DB.prepare(
+    `SELECT LOWER(title) AS ltitle, MAX(poster_url) AS poster_url,
+            MAX(network_logo_url) AS network_logo_url
+       FROM shows
+      WHERE archived = 0 AND (poster_url IS NOT NULL OR network_logo_url IS NOT NULL)
+      GROUP BY LOWER(title)`
+  ).all();
+  const byTitle = new Map(art.map(a => [a.ltitle, a]));
+  for (const r of rows) {
+    const a = byTitle.get((r.title || '').toLowerCase());
+    if (!a) continue;
+    if (!r.poster_url) r.poster_url = a.poster_url;
+    if (!r.network_logo_url) r.network_logo_url = a.network_logo_url;
+  }
 }
 
 async function findGoodCopyAcrossMembers(env, title) {
