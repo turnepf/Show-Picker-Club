@@ -186,6 +186,9 @@ async function fetchBadTitles(env) {
        -- Only titles enrichment has actually attempted — brand-new rows get
        -- their first pass within minutes and usually resolve on their own.
        AND MAX(s.enriched_at IS NOT NULL) = 1
+       -- Skip titles the operator has vouched for (dismiss_title): the name
+       -- and network are right — the poster databases just don't carry it.
+       AND MAX(COALESCE(s.title_ok, 0)) = 0
        -- Skip anything the URL queue already lists (it has a rename box too).
        AND MAX(CASE WHEN ${BAD_URL} THEN 1 ELSE 0 END) = 0
     ORDER BY LOWER(s.title)
@@ -433,6 +436,20 @@ export async function onRequestPost(context) {
       `UPDATE shows SET network_url = NULL, enriched_at = datetime('now') WHERE id = ?`
     ).bind(id).run();
     return json({ ok: true, cleared_url: true });
+  }
+
+  if (action === 'dismiss_title') {
+    // Operator vouches for a bad-titles row: the name and network are right
+    // as stored — the poster databases just don't carry the show. Mark every
+    // active copy of the title so the queue stops flagging it.
+    const id = parseInt(body.id, 10);
+    if (!Number.isInteger(id)) return json({ error: 'id required' }, 400);
+    const row = await env.DB.prepare('SELECT title FROM shows WHERE id = ?').bind(id).first();
+    if (!row) return json({ error: 'Show not found' }, 404);
+    const result = await env.DB.prepare(
+      `UPDATE shows SET title_ok = 1 WHERE LOWER(title) = LOWER(?) AND archived = 0`
+    ).bind(row.title).run();
+    return json({ ok: true, updated: result.meta.changes });
   }
 
   if (action === 'fix_title') {

@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS shows (
   seasons_released INTEGER,
   poster_url TEXT,
   network_logo_url TEXT,
+  -- Operator marker: the title/network are right as stored even though no
+  -- poster ever matched — keeps the row out of the bad-titles cleanup queue.
+  title_ok INTEGER DEFAULT 0,
   archived INTEGER DEFAULT 0,
   member_slug TEXT REFERENCES members(slug),
   created_at TEXT DEFAULT (datetime('now')),

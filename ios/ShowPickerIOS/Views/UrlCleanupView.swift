@@ -82,7 +82,7 @@ struct UrlCleanupView: View {
                 } header: {
                     Text("Wrong titles (no poster match)")
                 } footer: {
-                    Text("The link works, but the stored name doesn't match any real show — so no poster, rating, or cast. Loading this list already tried recovering each name from the show's own link; these need a human. Fix the name to re-enrich every copy.")
+                    Text("The link works, but no poster ever matched the stored name — so no rating or cast either. Loading this list already tried recovering each name from the show's own link; these need a human. Fix the name to re-enrich every copy, or mark it as right if the name isn't the problem.")
                 }
             }
         }
@@ -152,6 +152,12 @@ private struct BadTitleItemView: View {
             } footer: {
                 Text("Updates every member's copy and re-pulls the canonical title, rating, cast, and poster. Changing the network clears links that pointed at the old service.")
             }
+            Section {
+                Button("Title is right — stop flagging it") { Task { await dismissTitle() } }
+                    .disabled(working)
+            } footer: {
+                Text("Keeps the show exactly as stored and removes it from this queue for good — for real titles the poster databases simply don't carry.")
+            }
             if let b = banner {
                 Section { Text(b).foregroundStyle(b.hasPrefix("✓") ? .green : .red) }
             }
@@ -172,6 +178,22 @@ private struct BadTitleItemView: View {
             if let e = r.error { banner = e }
             else {
                 banner = "✓ Saved as \(r.newTitle ?? trimmedTitle)"
+                await onChange()
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                dismiss()
+            }
+        } catch { banner = "Network error. Try again." }
+    }
+
+    private func dismissTitle() async {
+        working = true
+        defer { working = false }
+        banner = nil
+        do {
+            let r = try await API.dismissBadTitle(id: item.id)
+            if let e = r.error { banner = e }
+            else {
+                banner = "✓ Kept as-is — won't be flagged again"
                 await onChange()
                 try? await Task.sleep(nanoseconds: 700_000_000)
                 dismiss()
