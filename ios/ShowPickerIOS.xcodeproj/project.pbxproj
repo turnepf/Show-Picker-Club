@@ -306,6 +306,7 @@
 				CD00770E2FF5CADE00DCCF4D /* Sources */,
 				CD00770F2FF5CADE00DCCF4D /* Frameworks */,
 				CD0077102FF5CADE00DCCF4D /* Resources */,
+				CD00BEEF00000000000000A1 /* Set build number */,
 			);
 			buildRules = (
 			);
@@ -330,6 +331,7 @@
 				CDD1EA792FF5BE6200F095DE /* Frameworks */,
 				CDD1EA7A2FF5BE6200F095DE /* Resources */,
 				CD0077242FF5CAE000DCCF4D /* Embed Foundation Extensions */,
+				CD00BEEF00000000000000A2 /* Set build number */,
 			);
 			buildRules = (
 			);
@@ -470,6 +472,46 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "# Automatic build number: build date + git commit count (e.g. 20260623.142).\n# It always increases (the date bumps daily, the commit count within a day)\n# and is identical for the app and its extension since both derive it from the\n# same HEAD. Overrides CFBundleVersion in the processed Info.plist, so there is\n# no manual bump before archiving. Runs on every build so the app and its\n# extension never drift apart (the parent/extension CFBundleVersion must match).\nset -eu\nif commits=$(git -C \"$SRCROOT\" rev-list --count HEAD 2>/dev/null) && [ -n \"$commits\" ]; then\n  :\nelse\n  commits=$(date +%H%M)\nfi\nbuild_number=\"$(date +%Y%m%d).$commits\"\nplist=\"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\nif [ -f \"$plist\" ]; then\n  /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $build_number\" \"$plist\" || /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string $build_number\" \"$plist\"\n  echo \"note: set CFBundleVersion = $build_number\"\nfi\n";
+		};
+		CD00BEEF00000000000000A1 /* Set build number */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			name = "Set build number";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Automatic build number: build date + git commit count (e.g. 20260623.142).\n# Matches the iOS app + share extension so this watch extension's\n# CFBundleVersion never drifts from its containing app (App Store validation\n# requires parent/extension to match). Info.plist is declared as an input so\n# this runs after the plist is generated.\nset -eu\nif commits=$(git -C \"$SRCROOT\" rev-list --count HEAD 2>/dev/null) && [ -n \"$commits\" ]; then\n  :\nelse\n  commits=$(date +%H%M)\nfi\nbuild_number=\"$(date +%Y%m%d).$commits\"\nplist=\"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\nif [ -f \"$plist\" ]; then\n  /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $build_number\" \"$plist\" || /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string $build_number\" \"$plist\"\n  echo \"note: set CFBundleVersion = $build_number\"\nfi\n";
+		};
+		CD00BEEF00000000000000A2 /* Set build number */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			name = "Set build number";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Automatic build number: build date + git commit count (e.g. 20260623.142).\n# Matches the iOS app so the embedded Watch app's CFBundleVersion never drifts\n# from its containing iOS app (App Store validation requires them to match).\n# Info.plist is declared as an input so this runs after the plist is generated.\nset -eu\nif commits=$(git -C \"$SRCROOT\" rev-list --count HEAD 2>/dev/null) && [ -n \"$commits\" ]; then\n  :\nelse\n  commits=$(date +%H%M)\nfi\nbuild_number=\"$(date +%Y%m%d).$commits\"\nplist=\"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\nif [ -f \"$plist\" ]; then\n  /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $build_number\" \"$plist\" || /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string $build_number\" \"$plist\"\n  echo \"note: set CFBundleVersion = $build_number\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

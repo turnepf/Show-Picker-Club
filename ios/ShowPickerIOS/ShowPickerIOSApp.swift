@@ -7,7 +7,7 @@ struct ShowPickerIOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            RootView()
                 .environmentObject(auth)
                 .task {
                     Connectivity.shared.start()
