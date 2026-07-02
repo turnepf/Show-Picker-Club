@@ -789,11 +789,17 @@
     @keyframes detail-in { from { transform: translateX(14px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     .detail-nav {
       position: sticky; top: 0;
-      display: flex; align-items: center; gap: 6px;
       background: var(--header-bg); color: #fff;
-      padding: 10px 12px;
+      padding: 10px 0;
       padding-top: calc(10px + env(safe-area-inset-top, 0px));
       z-index: 1;
+    }
+    /* Inner column matches .detail-body's width/padding so Back and the title
+       align with the centered content column rather than the viewport edge. */
+    .detail-nav-inner {
+      max-width: 640px; margin: 0 auto; padding: 0 14px;
+      display: flex; align-items: center; gap: 6px;
+      position: relative;
     }
     .detail-nav button {
       background: none; border: none; color: #fff;
@@ -977,8 +983,10 @@
   <!-- Show detail screen — iOS-style pushed view, opened by tapping a show. -->
   <div id="detailPage">
     <div class="detail-nav">
-      <button onclick="closeDetail()" aria-label="Back">&#8249; Back</button>
-      <span class="detail-nav-title" id="detailNavTitle"></span>
+      <div class="detail-nav-inner">
+        <button onclick="closeDetail()" aria-label="Back">&#8249; Back</button>
+        <span class="detail-nav-title" id="detailNavTitle"></span>
+      </div>
     </div>
     <div class="detail-body" id="detailBody"></div>
   </div>
