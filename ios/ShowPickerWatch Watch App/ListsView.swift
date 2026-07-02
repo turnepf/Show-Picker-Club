@@ -38,7 +38,7 @@ struct ListsView: View {
                     }
                 }
             }
-            .navigationTitle("My Shows")
+            .navigationTitle("Show Picker")
         }
         .task(id: auth.memberSlug) { await load() }
     }
