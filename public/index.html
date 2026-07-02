@@ -454,6 +454,21 @@
       box-shadow: 0 20px 60px rgba(0,0,0,0.2);
     }
 
+    /* Add Show / Suggest grow while typing (title type-ahead results), and a
+       centered modal grows upward too — shoving the title field off-screen
+       above an unscrollable overlay. Anchor them to the top like the search
+       modal, so results only extend downward, and let the modal itself
+       scroll when it outgrows the viewport. */
+    #modalOverlay, #suggestOverlay {
+      align-items: flex-start;
+      padding-top: 6vh;
+      padding-bottom: 6vh;
+    }
+    #modalOverlay .modal, #suggestOverlay .modal {
+      max-height: 88vh;
+      overflow-y: auto;
+    }
+
     .modal h2 {
       font-family: var(--font-display);
       font-size: var(--text-lg);
