@@ -1,4 +1,4 @@
-import { fetchEnrichment } from '../../_shared/enrichment.js';
+import { fetchEnrichment, fetchEnrichmentById } from '../../_shared/enrichment.js';
 import { getSession } from '../../_shared/auth.js';
 import { canonicalNetwork, networkFromUrl } from '../../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../../_shared/watch-providers.js';
@@ -52,7 +52,16 @@ export async function onRequestPut(context) {
   const watching_with = val('watching_with');
   const archived = val('archived');
 
-  const enriched = await fetchEnrichment(title, env, !!movie);
+  // Exact pick from type-ahead search (edit flow): enrich the chosen TMDB
+  // entry directly; fall back to the title search when absent or failed.
+  const tmdbId = parseInt(body.tmdb_id, 10);
+  const tmdbType = body.tmdb_type === 'movie' || body.tmdb_type === 'tv' ? body.tmdb_type : null;
+  let enriched = null;
+  if (Number.isInteger(tmdbId) && tmdbType) {
+    const byId = await fetchEnrichmentById(tmdbId, tmdbType, env);
+    if (byId.canonicalTitle) enriched = byId;
+  }
+  if (!enriched) enriched = await fetchEnrichment(title, env, !!movie);
   const rating = enriched.rating || existing.rating;
 
   await env.DB.prepare(

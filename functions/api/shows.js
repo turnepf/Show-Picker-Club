@@ -1,4 +1,4 @@
-import { fetchEnrichment } from '../_shared/enrichment.js';
+import { fetchEnrichment, fetchEnrichmentById } from '../_shared/enrichment.js';
 import { getSession } from '../_shared/auth.js';
 import { NETWORK_SEARCH, canonicalNetwork, networkFromUrl } from '../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../_shared/watch-providers.js';
@@ -96,7 +96,17 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ error: 'invalid network_url' }), { status: 400, headers: corsHeaders() });
   }
 
-  const omdb = await fetchEnrichment(title, env, !!movie);
+  // When the member picked the show from type-ahead search, the client sends
+  // the exact TMDB id — enrich that entry directly instead of re-guessing
+  // from the title. Falls back to the title search if the lookup fails.
+  const tmdbId = parseInt(body.tmdb_id, 10);
+  const tmdbType = body.tmdb_type === 'movie' || body.tmdb_type === 'tv' ? body.tmdb_type : null;
+  let omdb = null;
+  if (Number.isInteger(tmdbId) && tmdbType) {
+    const byId = await fetchEnrichmentById(tmdbId, tmdbType, env);
+    if (byId.canonicalTitle) omdb = byId;
+  }
+  if (!omdb) omdb = await fetchEnrichment(title, env, !!movie);
   const finalTitle = omdb.canonicalTitle || title;
 
   const existing = await env.DB.prepare(
