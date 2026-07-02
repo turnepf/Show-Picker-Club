@@ -151,9 +151,12 @@ enum API {
     }
 
     // Rename a wrong/typo'd title across all copies and re-enrich it (operator).
-    static func fixShowTitle(id: Int, newTitle: String) async throws -> AdminActionResult {
-        try await postDecoding("/api/admin-url-cleanup",
-                               body: ["action": "fix_title", "id": id, "new_title": newTitle])
+    // Optional network correction rides along: every copy moves to the chosen
+    // service and wrong-service URLs are cleared for the next fill pass.
+    static func fixShowTitle(id: Int, newTitle: String, network: String? = nil) async throws -> AdminActionResult {
+        var body: [String: Any] = ["action": "fix_title", "id": id, "new_title": newTitle]
+        if let n = network, !n.isEmpty { body["network"] = n }
+        return try await postDecoding("/api/admin-url-cleanup", body: body)
     }
 
     // POST + decode the body regardless of HTTP status, so admin tools can show

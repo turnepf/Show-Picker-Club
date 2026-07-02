@@ -106,15 +106,17 @@ struct UrlCleanupView: View {
     }
 }
 
-// Rename-only detail for a show whose title didn't match anything — the URL
-// is usually fine, so no link controls here. Reuses the fix_title action:
-// renames every member's copy, then re-pulls title/rating/cast/poster.
+// Fix a show whose title didn't match anything — the URL is usually fine, so
+// no link controls here. Reuses the fix_title action: renames every member's
+// copy, then re-pulls title/rating/cast/poster. The network can be corrected
+// in the same save; wrong-service URLs are cleared for the next fill pass.
 private struct BadTitleItemView: View {
     let item: UrlQueueItem
     let onChange: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var newTitle: String
+    @State private var network: String
     @State private var working = false
     @State private var banner: String?
 
@@ -122,7 +124,12 @@ private struct BadTitleItemView: View {
         self.item = item
         self.onChange = onChange
         _newTitle = State(initialValue: item.title)
+        _network = State(initialValue: item.network ?? "")
     }
+
+    private var trimmedTitle: String { newTitle.trimmingCharacters(in: .whitespaces) }
+    private var titleChanged: Bool { trimmedTitle != item.title }
+    private var networkChanged: Bool { network != (item.network ?? "") }
 
     var body: some View {
         Form {
@@ -134,13 +141,16 @@ private struct BadTitleItemView: View {
             Section {
                 TextField("Correct title", text: $newTitle)
                     .textInputAutocapitalization(.words)
-                Button("Rename & re-enrich") { Task { await rename() } }
-                    .disabled(newTitle.trimmingCharacters(in: .whitespaces) == item.title
-                              || newTitle.trimmingCharacters(in: .whitespaces).isEmpty || working)
+                Picker("Network", selection: $network) {
+                    Text("Keep current").tag(item.network ?? "")
+                    ForEach(CANONICAL_NETWORKS.filter { $0 != item.network }, id: \.self) { Text($0).tag($0) }
+                }
+                Button("Save & re-enrich") { Task { await save() } }
+                    .disabled(trimmedTitle.isEmpty || (!titleChanged && !networkChanged) || working)
             } header: {
-                Text("Fix the title")
+                Text("Fix the title / network")
             } footer: {
-                Text("Renames every member's copy and re-pulls the canonical title, rating, cast, and poster.")
+                Text("Updates every member's copy and re-pulls the canonical title, rating, cast, and poster. Changing the network clears links that pointed at the old service.")
             }
             if let b = banner {
                 Section { Text(b).foregroundStyle(b.hasPrefix("✓") ? .green : .red) }
@@ -151,16 +161,17 @@ private struct BadTitleItemView: View {
         .overlay { if working { ProgressView().controlSize(.large) } }
     }
 
-    private func rename() async {
+    private func save() async {
         working = true
         defer { working = false }
         banner = nil
         do {
             let r = try await API.fixShowTitle(id: item.id,
-                                               newTitle: newTitle.trimmingCharacters(in: .whitespaces))
+                                               newTitle: trimmedTitle,
+                                               network: networkChanged ? network : nil)
             if let e = r.error { banner = e }
             else {
-                banner = "✓ Renamed to \(r.newTitle ?? newTitle)"
+                banner = "✓ Saved as \(r.newTitle ?? trimmedTitle)"
                 await onChange()
                 try? await Task.sleep(nanoseconds: 700_000_000)
                 dismiss()
