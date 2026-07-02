@@ -351,6 +351,20 @@ export async function onRequestPost(context) {
         await env.DB.prepare(
           "UPDATE shows SET next_season_date = ?, season_end_date = ?, full_series = ?, genres = COALESCE(?, genres), seasons_released = COALESCE(?, seasons_released), poster_url = COALESCE(?, poster_url), network_logo_url = COALESCE(?, network_logo_url), enriched_at = datetime('now') WHERE id = ?"
         ).bind(newDate, endDate, isComplete, genres, seasonsReleased, posterUrl, networkLogoUrl, show.id).run();
+        // Artwork is per-row; push it to every member's copy of this title so
+        // one lookup fills all lists instead of each copy waiting its own turn
+        // in the rotation. Fill-only (COALESCE keeps existing artwork). Keyed
+        // on the row's current title — it may just have been renamed by
+        // recoverTitleFromUrl. A DB write, not a fetch, so it doesn't count
+        // against the subrequest budget.
+        if (posterUrl || networkLogoUrl) {
+          await env.DB.prepare(
+            `UPDATE shows SET poster_url = COALESCE(poster_url, ?),
+                              network_logo_url = COALESCE(network_logo_url, ?)
+              WHERE archived = 0
+                AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
+          ).bind(posterUrl, networkLogoUrl, show.id).run();
+        }
         tmdbUpdated++;
       } catch (e) {}
     }
@@ -379,7 +393,15 @@ export async function onRequestPost(context) {
         await env.DB.prepare(
           "UPDATE shows SET poster_url = COALESCE(?, poster_url), enriched_at = datetime('now') WHERE id = ?"
         ).bind(posterUrl, show.id).run();
-        if (posterUrl) tmdbUpdated++;
+        // Same cross-copy propagation as the TV pass (fill-only, by title).
+        if (posterUrl) {
+          await env.DB.prepare(
+            `UPDATE shows SET poster_url = COALESCE(poster_url, ?)
+              WHERE archived = 0
+                AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
+          ).bind(posterUrl, show.id).run();
+          tmdbUpdated++;
+        }
       } catch (e) {}
     }
   }
