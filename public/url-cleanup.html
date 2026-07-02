@@ -102,6 +102,17 @@
     .btn-update:hover { background: var(--accent-hover); }
     .btn-update:disabled { background: var(--ink-faint); cursor: not-allowed; }
 
+    /* Quiet escape hatch: the title is right, stop flagging it. */
+    .btn-dismiss {
+      grid-column: 1 / -1;
+      padding: 8px 14px;
+      background: transparent; color: var(--ink-muted);
+      border: 1px solid var(--border); border-radius: 5px;
+      font-size: 13px; cursor: pointer; font-family: inherit;
+    }
+    .btn-dismiss:hover { color: var(--ink); border-color: var(--ink-faint); }
+    .btn-dismiss:disabled { opacity: 0.5; cursor: not-allowed; }
+
     .row-err {
       grid-column: 1 / -1;
       font-size: 12px; color: var(--danger-deep); margin-top: 4px;
@@ -426,7 +437,7 @@
       if (!badTitles.length) { root.innerHTML = ''; return; }
       root.innerHTML = `
         <div class="section-head">Wrong titles (no poster match)</div>
-        <div class="section-blurb">These have a working link, but the stored name doesn't match any real show — so enrichment can't pull a poster, rating, or cast. Loading this page already tried recovering the real name from each show's own link; the ones below couldn't be fixed automatically. Fix the name (e.g. "Juul Documentary" &rarr; "Big Vape: The Rise and Fall of Juul") — and the network too if it's wrong — and every member's copy is updated and re-enriched.</div>
+        <div class="section-blurb">These have a working link, but no poster ever matched the stored name — usually a made-up title ("Juul Documentary" &rarr; "Big Vape: The Rise and Fall of Juul"), sometimes a real one the poster databases just don't carry. Loading this page already tried recovering the real name from each show's own link; the ones below couldn't be fixed automatically. Fix the name — and the network too if it's wrong — and every member's copy is updated and re-enriched. If the name and network are already right, dismiss it and it stays off this list for good.</div>
         ${badTitles.map(show => `
           <div class="row" data-id="${show.id}">
             <div class="row-head">
@@ -439,6 +450,7 @@
               <input type="text" class="title-input" placeholder="Correct title" value="${escapeAttr(show.title)}" autocomplete="off">
               <button class="btn-update btn-rename" type="button">Save</button>
               <input type="text" class="other-input" placeholder="New network name">
+              <button class="btn-dismiss" type="button">Title is right — stop flagging it</button>
               <div class="row-err"></div>
             </div>
           </div>
@@ -449,7 +461,34 @@
         const netSelect = rowEl.querySelector('.net-select');
         const otherInput = rowEl.querySelector('.other-input');
         const renameBtn = rowEl.querySelector('.btn-rename');
+        const dismissBtn = rowEl.querySelector('.btn-dismiss');
         const errBox = rowEl.querySelector('.row-err');
+        dismissBtn.addEventListener('click', async () => {
+          errBox.textContent = '';
+          dismissBtn.disabled = true;
+          const old = dismissBtn.textContent;
+          dismissBtn.textContent = '…';
+          try {
+            const res = await fetch('/api/admin-url-cleanup', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'dismiss_title', id: parseInt(rowEl.dataset.id, 10) }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              errBox.textContent = data.error || `Error (${res.status})`;
+              dismissBtn.disabled = false;
+              dismissBtn.textContent = old;
+              return;
+            }
+            rowEl.classList.add('removing');
+            setTimeout(() => rowEl.remove(), 250);
+          } catch (e) {
+            errBox.textContent = 'Network error: ' + e.message;
+            dismissBtn.disabled = false;
+            dismissBtn.textContent = old;
+          }
+        });
         netSelect.addEventListener('change', () => {
           if (netSelect.value === '__other') { otherInput.classList.add('show'); otherInput.focus(); }
           else otherInput.classList.remove('show');
