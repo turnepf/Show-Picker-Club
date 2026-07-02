@@ -70,17 +70,26 @@ function tmdbPosterUrl(posterPath) {
 export async function fetchEnrichment(title, env, isMovie) {
   const token = env.TMDB_TOKEN;
   const omdbKey = env.OMDB_API_KEY;
-  const mediaType = isMovie ? 'movie' : 'tv';
+  // Try the stored media type first, then the other one. Documentaries and
+  // stand-up specials often live under TMDB's *movie* index even when a
+  // member added them as a show (and vice versa) — without the flip, a
+  // correctly-spelled title can never match, so it never gets a poster.
+  const mediaTypes = isMovie ? ['movie', 'tv'] : ['tv', 'movie'];
 
   // ── TMDB path ──────────────────────────────────────────────────────────────
   if (token) {
     try {
-      const search = await tmdbFetch(
-        `/search/${mediaType}?query=${encodeURIComponent(title)}&language=en-US&page=1`,
-        token
-      );
+      let search = null;
+      let mediaType = mediaTypes[0];
+      for (const t of mediaTypes) {
+        const s = await tmdbFetch(
+          `/search/${t}?query=${encodeURIComponent(title)}&language=en-US&page=1`,
+          token
+        );
+        if (s.results?.length) { search = s; mediaType = t; break; }
+      }
 
-      if (search.results?.length) {
+      if (search) {
         const tmdbId = search.results[0].id;
 
         // One call: details + credits + external_ids
@@ -90,7 +99,7 @@ export async function fetchEnrichment(title, env, isMovie) {
         );
 
         const imdbShowId = detail.external_ids?.imdb_id || null;
-        const canonicalTmdb = (isMovie ? detail.title : detail.name) || title;
+        const canonicalTmdb = (mediaType === 'movie' ? detail.title : detail.name) || title;
         const cast = (detail.credits?.cast || []).slice(0, 4);
 
         // IMDB rating via OMDB using exact show IMDB ID (no title-guessing)
@@ -127,7 +136,10 @@ export async function fetchEnrichment(title, env, isMovie) {
 
   // ── OMDB fallback ──────────────────────────────────────────────────────────
   if (omdbKey) {
-    const result = await omdbByTitle(title, omdbKey, isMovie ? 'movie' : 'series');
+    // Same cross-type retry as TMDB: OMDB files docs/specials under the
+    // other type too, so a typed miss gets one untyped-flip attempt.
+    const result = await omdbByTitle(title, omdbKey, isMovie ? 'movie' : 'series')
+      || await omdbByTitle(title, omdbKey, isMovie ? 'series' : 'movie');
     if (result) {
       return {
         canonicalTitle: result.canonicalTitle,

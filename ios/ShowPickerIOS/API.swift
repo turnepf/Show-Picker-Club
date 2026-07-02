@@ -159,6 +159,13 @@ enum API {
         return try await postDecoding("/api/admin-url-cleanup", body: body)
     }
 
+    // Vouch for a bad-titles row: the name/network are right as stored — the
+    // poster databases just don't carry it. Keeps it out of the queue for good.
+    static func dismissBadTitle(id: Int) async throws -> AdminActionResult {
+        try await postDecoding("/api/admin-url-cleanup",
+                               body: ["action": "dismiss_title", "id": id])
+    }
+
     // POST + decode the body regardless of HTTP status, so admin tools can show
     // the server's error message instead of a bare status code.
     private static func postDecoding<T: Decodable>(_ path: String, body: [String: Any]) async throws -> T {
