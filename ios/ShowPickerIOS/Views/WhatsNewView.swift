@@ -13,18 +13,14 @@ struct WhatsNewView: View {
     }
 
     private let entries: [Entry] = [
-        .init(date: "7/4", title: "iPad layout.", body: "A purpose-built iPad design: your four lists (Watching, Awaiting, Recommending, Up Next) sit at the top of a slimmer sidebar, members live in a compact scrolling window sorted by recent activity, and shows open side-by-side in the wide column. Admins get an Admin entry right in the sidebar."),
-        .init(date: "7/4", title: "What's New, easier to find.", body: "This changelog now sits right under My Shows \u{2014} on the iPhone home screen, the iPad sidebar, and the web home page \u{2014} instead of hiding in the account menu."),
+        .init(date: "7/4", title: "Subscription Audit.", body: "Paying for streaming you don't watch? Open the Subscription audit from your member page to see which services to keep, pause, or cancel based on what's actually on your lists."),
         .init(date: "6/29", title: "Shake to pick.", body: "Give your phone a shake to pull a random show from your Up Next list \u{2014} an instant answer to \u{201C}what should we watch?\u{201D}"),
         .init(date: "6/29", title: "Share a show.", body: "Send any show to a friend through the standard share sheet \u{2014} Messages, Mail, AirDrop, anything. Tap the share button on a show's detail screen."),
         .init(date: "6/29", title: "Seasons released.", body: "Show rows now tell you how many seasons have dropped, right next to the Next up date (e.g. \u{201C}Next up: 6/1 \u{00B7} 3 seasons\u{201D})."),
         .init(date: "6/29", title: "Straight to your shows.", body: "Open the app while you're logged in and you land right on your own list, instead of the home screen."),
-        .init(date: "6/29", title: "Subscription Audit & Vibe.", body: "The subscription audit and taste-vibe pages are now in the app \u{2014} find them on your member page. This changelog moved into the account menu, too."),
-        .init(date: "6/29", title: "BritBox.", body: "Added BritBox as a network option for British TV from the BBC and ITV."),
+        .init(date: "6/29", title: "Vibe in the app.", body: "The taste-vibe page is now in the app, alongside the web \u{2014} find Vibe on your member page. This changelog is in the app too."),
         .init(date: "5/21", title: "Calendar feed.", body: "Each member page now has a 📅 Calendar feed link at the bottom. Subscribe in Apple Calendar, Google Calendar, or Fantastical to get upcoming season premieres and finales from that member's Watching and Waiting lists, updated daily."),
         .init(date: "5/9", title: "Vibe.", body: "See a personality fingerprint based on each member's taste: cluster name, top trait signals, balance read, and shows aligned with the vibe. Open Vibe from any member's page."),
-        .init(date: "5/9", title: "Picks for You.", body: "Log in and visit your Up Next list to see suggestions tailored to what your closest matches are watching. Tap + on any pick to add it straight to your Up Next."),
-        .init(date: "4/28", title: "Search.", body: "Tap Search in the header to find shows by title or actor across all four lists plus archived. Each result shows the list it's on; tap a result to expand the full details."),
         .init(date: "4/28", title: "One-tap Add.", body: "The + Add button appears on your member page as soon as you're logged in. No need to enter edit mode first."),
         .init(date: "4/26", title: "Cleaner show rows.", body: "Each show is one tidy line: title, network, rating. Tap the title to expand and see genre, cast, who recommended it, next season dates, who you're watching with, and notes; only the lines with data show up."),
         .init(date: "4/21", title: "My Shows link.", body: "When logged in, a quick \u{201C}My Shows\u{201D} link appears on the home page just below the title."),
