@@ -1,21 +1,22 @@
 import SwiftUI
 
-// Purpose-built iPad layout: a persistent sidebar (your shows, Trending, and
-// every member) beside a detail column that reuses the same MemberView and
-// ShowDetailView screens the iPhone uses. Selecting a member fills the detail
-// column with their lists; tapping a show pushes its detail within that column.
+// Purpose-built iPad layout: a compact persistent sidebar beside a detail
+// column that reuses the same MemberView and ShowDetailView screens the iPhone
+// uses. The sidebar leads with the four show lists (Watching, Awaiting,
+// Recommending, Up Next) for whichever member is in focus — you by default —
+// so the segmented list picker isn't needed on iPad. Members live in a short
+// scrolling window (top five by recent activity visible); tapping one refocuses
+// the lists on them.
 //
 // iPhone keeps the single-stack HomeView untouched — RootView switches by
 // device idiom.
 
-// What the sidebar can point at. `myShows` is kept distinct from the member
-// rows so your own entry (which also appears in the Members list) doesn't share
-// a selection tag with it.
+// What the sidebar can point at. The show lists apply to the focused member,
+// which is tracked separately so switching members keeps the same list open.
 enum SidebarItem: Hashable {
-    case myShows
+    case list(ShowList)
     case trending
     case admin
-    case member(Member)
 }
 
 struct IPadHomeView: View {
@@ -24,12 +25,23 @@ struct IPadHomeView: View {
     @State private var popular: [PopularShow] = []
     @State private var loading = true
     @State private var selection: SidebarItem?
+    // Whose lists the sidebar's list entries show. Defaults to the logged-in
+    // member once auth resolves; tapping a member row moves focus to them.
+    @State private var focusedSlug: String?
     @State private var showingLogin = false
     @State private var showingSearch = false
     @State private var showingWhatsNew = false
 
+    private let memberRowHeight: CGFloat = 38
+    private let memberWindowRows = 5
+
     private var myMember: Member? {
         guard let slug = auth.memberSlug else { return nil }
+        return members.first { $0.slug == slug }
+    }
+
+    private var focusedMember: Member? {
+        guard let slug = focusedSlug else { return nil }
         return members.first { $0.slug == slug }
     }
 
@@ -37,6 +49,9 @@ struct IPadHomeView: View {
         NavigationSplitView {
             sidebar
                 .navigationTitle("Show Picker Club")
+                // Roughly a quarter narrower than the stock iPad sidebar; the
+                // detail column gets the reclaimed width.
+                .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 260)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button { showingSearch = true } label: {
@@ -47,35 +62,43 @@ struct IPadHomeView: View {
                 }
         } detail: {
             // The detail column is its own stack so MemberView's NavigationLinks
-            // (to show detail, Vibe, etc.) push here. `.id(selection)` resets it
-            // to the section root whenever the sidebar choice changes.
+            // (to show detail, Vibe, etc.) push here. The id resets it to the
+            // section root whenever the sidebar choice or focused member changes.
             NavigationStack {
                 detailRoot
                     .navigationDestination(for: Route.self) { route in
                         destination(route)
                     }
             }
-            .id(selection)
+            .id(detailKey)
         }
         .task { if loading { await load() } }
         .sheet(isPresented: $showingLogin) { LoginView().environmentObject(auth) }
         .sheet(isPresented: $showingSearch) { SearchView().environmentObject(auth) }
         .sheet(isPresented: $showingWhatsNew) { WhatsNewView() }
-        // Auth may resolve after the member list loads; land on My Shows once it
-        // does (unless the user has already picked something).
+        // Auth may resolve after the member list loads; land on your Watching
+        // list once it does (unless the user has already picked something).
         .onChange(of: auth.memberSlug) { _, _ in applyInitialSelection() }
+    }
+
+    // Distinguishes both "which section" and "whose lists" so switching members
+    // rebuilds the detail stack even when the same list stays selected.
+    private var detailKey: String {
+        "\(String(describing: selection))|\(focusedSlug ?? "")"
     }
 
     // MARK: Sidebar
 
     private var sidebar: some View {
         List(selection: $selection) {
-            if myMember != nil {
-                Section {
-                    Label("My Shows", systemImage: "person.crop.circle")
-                        .tag(SidebarItem.myShows)
+            if focusedMember != nil {
+                Section(listsHeader) {
+                    ForEach(ShowList.allCases) { l in
+                        Label(l.title, systemImage: listIcon(l))
+                            .tag(SidebarItem.list(l))
+                    }
                 }
-            } else if !auth.isLoggedIn {
+            } else if !auth.isLoggedIn && !loading {
                 Section {
                     Button { showingLogin = true } label: {
                         Label("Log in to see your shows", systemImage: "person.crop.circle.badge.plus")
@@ -94,9 +117,10 @@ struct IPadHomeView: View {
                         .tag(SidebarItem.trending)
                 }
             }
-            Section("Members") {
-                ForEach(members) { m in
-                    memberRow(m).tag(SidebarItem.member(m))
+            if !members.isEmpty {
+                Section("Members") {
+                    membersWindow
+                        .listRowInsets(EdgeInsets())
                 }
             }
             // Attribution required by the TMDB API terms; OMDb credited too.
@@ -110,14 +134,60 @@ struct IPadHomeView: View {
         .refreshable { await load() }
     }
 
-    private func memberRow(_ m: Member) -> some View {
-        HStack {
-            Text(m.label)
-            Spacer()
-            if m.activeCount > 0 {
-                Text("\(m.activeCount)").font(.caption).foregroundStyle(.secondary)
+    private var listsHeader: String {
+        guard let m = focusedMember else { return "Shows" }
+        return auth.isMe(m.slug) ? "My Shows" : "\(m.label)'s Shows"
+    }
+
+    private func listIcon(_ l: ShowList) -> String {
+        switch l {
+        case .watching:     return "play.circle"
+        case .waiting:      return "hourglass"
+        case .recommending: return "hand.thumbsup"
+        case .next:         return "text.badge.plus"
+        }
+    }
+
+    // A fixed-height window over the member roster: the five most recently
+    // active members are visible, the rest scroll within the window. When more
+    // exist, a half row peeks out at the bottom to hint at the scroll.
+    private var membersWindow: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(members) { m in memberRow(m) }
             }
         }
+        .frame(height: memberWindowHeight)
+    }
+
+    private var memberWindowHeight: CGFloat {
+        let visible = min(CGFloat(members.count), CGFloat(memberWindowRows))
+        let peek: CGFloat = members.count > memberWindowRows ? memberRowHeight / 2 : 0
+        return visible * memberRowHeight + peek
+    }
+
+    private func memberRow(_ m: Member) -> some View {
+        Button {
+            focusedSlug = m.slug
+            // Keep the open list open when refocusing; otherwise land on Watching.
+            if case .list = selection {} else { selection = .list(.watching) }
+        } label: {
+            HStack {
+                Text(m.label).lineLimit(1)
+                Spacer()
+                if m.activeCount > 0 {
+                    Text("\(m.activeCount)").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 12)
+            .frame(height: memberRowHeight)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(
+            focusedSlug == m.slug ? Color.accentColor.opacity(0.15) : Color.clear,
+            in: RoundedRectangle(cornerRadius: 8)
+        )
     }
 
     private var accountControl: some View {
@@ -148,21 +218,19 @@ struct IPadHomeView: View {
     @ViewBuilder private var detailRoot: some View {
         if let selection {
             switch selection {
-            case .myShows:
-                if let me = myMember {
-                    MemberView(member: me)
+            case .list(let l):
+                if let m = focusedMember {
+                    MemberView(member: m, fixedList: l)
                 } else {
-                    placeholder("Log in on this iPad to see your shows.", "person.crop.circle")
+                    placeholder("Pick a member to see their lists.", "person.crop.circle")
                 }
-            case .member(let m):
-                MemberView(member: m)
             case .trending:
                 TrendingListView(shows: popular)
             case .admin:
                 AdminView().environmentObject(auth)
             }
         } else {
-            placeholder("Pick a member or Trending from the sidebar.", "sidebar.left")
+            placeholder("Pick a list or Trending from the sidebar.", "sidebar.left")
         }
     }
 
@@ -194,9 +262,12 @@ struct IPadHomeView: View {
     }
 
     private func applyInitialSelection() {
+        if focusedSlug == nil, let me = myMember {
+            focusedSlug = me.slug
+        }
         guard selection == nil else { return }
-        if myMember != nil {
-            selection = .myShows
+        if focusedSlug != nil {
+            selection = .list(.watching)
         } else if !popular.isEmpty {
             selection = .trending
         }
@@ -209,10 +280,12 @@ struct IPadHomeView: View {
         async let p = try? await API.popular()
         let mr = (await m) ?? []
         let pr = (await p) ?? []
-        // Most active first, then most recent activity — same as HomeView.
+        // Most recently active first (the window shows the top five), then most
+        // shows as the tiebreaker.
         members = mr.sorted {
-            if $0.activeCount != $1.activeCount { return $0.activeCount > $1.activeCount }
-            return ($0.lastActivityAt ?? "") > ($1.lastActivityAt ?? "")
+            let la = $0.lastActivityAt ?? "", lb = $1.lastActivityAt ?? ""
+            if la != lb { return la > lb }
+            return $0.activeCount > $1.activeCount
         }
         popular = pr
         applyInitialSelection()

@@ -16,15 +16,24 @@ private enum SortOption: String, CaseIterable {
 
 struct MemberView: View {
     let member: Member
+    // When set, the view is pinned to a single list (the iPad sidebar exposes
+    // each list as its own entry) and the segmented picker is hidden.
+    let fixedList: ShowList?
     @EnvironmentObject private var auth: AuthStore
     @Environment(\.openURL) private var openURL
     @State private var shows: [Show] = []
-    @State private var currentList: ShowList = .watching
+    @State private var currentList: ShowList
     @State private var loading = true
     @State private var showingLogin = false
     @State private var showingAdd = false
     @State private var editingShow: Show?
     @State private var sortByList: [String: SortOption] = [:]
+
+    init(member: Member, fixedList: ShowList? = nil) {
+        self.member = member
+        self.fixedList = fixedList
+        _currentList = State(initialValue: fixedList ?? .watching)
+    }
 
     private var isMine: Bool { auth.isMe(member.slug) }
 
@@ -32,12 +41,14 @@ struct MemberView: View {
         VStack(spacing: 0) {
             OfflineBanner()
 
-            Picker("List", selection: $currentList) {
-                ForEach(ShowList.allCases) { l in Text(l.title).tag(l) }
+            if fixedList == nil {
+                Picker("List", selection: $currentList) {
+                    ForEach(ShowList.allCases) { l in Text(l.title).tag(l) }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.top, 8)
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.top, 8)
 
             Text(listHelp(currentList))
                 .font(.caption)
@@ -117,7 +128,9 @@ struct MemberView: View {
                 }
             }
         }
-        .navigationTitle("\(member.label)'s Shows")
+        .navigationTitle(fixedList.map { list in
+            isMine ? list.title : "\(member.label) · \(list.title)"
+        } ?? "\(member.label)'s Shows")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { sortMenu }
