@@ -419,6 +419,12 @@
     }
     .member-card:hover { color: var(--accent); text-decoration-color: var(--accent); }
 
+    /* My Shows / What's New: centered links above Trending set in the same
+       .section-title face as the Trending heading, with tighter spacing so
+       they read as a group. */
+    .landing-nav-link { display: block; text-decoration: none; margin: 18px 0 0; }
+    .landing-nav-link:hover { color: var(--accent); }
+
     /* Landing top bar: quiet account button (right). My Shows lives in the
        page body above Trending, mirroring the iPhone home layout. */
     .landing-topbar { display: flex; align-items: center; gap: 10px; min-height: 30px; margin-bottom: 14px; }
@@ -905,27 +911,10 @@
       <p style="margin: 6px 0 0; font-size: 14px; color: var(--ink-muted); line-height: 1.5;">
         Paying for streaming you don't watch? <a href="/subscriptions" style="color: var(--accent); text-decoration: none; font-weight: 600;">Audit your subscriptions</a> &mdash; see what to keep, pause, or cancel based on what's actually on your list.
       </p>
-      <!-- My Shows + What's New: an iOS-style grouped card above Trending,
-           mirroring the iPhone home layout. Same card treatment as the
-           Trending list below (shadow off to match #popularList). -->
-      <div style="margin-top: 18px;">
-        <div class="show-list" style="text-align: left; box-shadow: none;">
-          <a id="myShowsLink" href="#" class="show ios-row hidden" style="display: block; text-decoration: none;">
-            <div class="ios-row-main">
-              <span class="ios-row-title">My Shows</span>
-              <span style="flex: 1;"></span>
-              <span class="ios-row-chevron">&rsaquo;</span>
-            </div>
-          </a>
-          <a href="/whats-new" class="show ios-row" style="display: block; text-decoration: none;">
-            <div class="ios-row-main">
-              <span class="ios-row-title">What's New</span>
-              <span style="flex: 1;"></span>
-              <span class="ios-row-chevron">&rsaquo;</span>
-            </div>
-          </a>
-        </div>
-      </div>
+      <!-- My Shows + What's New: centered header-style links above Trending,
+           set in the same .section-title face as the Trending heading. -->
+      <a id="myShowsLink" href="#" class="section-title landing-nav-link hidden">My Shows</a>
+      <a href="/whats-new" class="section-title landing-nav-link">What's New</a>
       <div id="popularSection" style="margin-top: 8px; margin-bottom: 24px; display: none;">
         <h3 class="section-title">Trending</h3>
         <div id="popularList" class="show-list" style="text-align: left;"></div>
