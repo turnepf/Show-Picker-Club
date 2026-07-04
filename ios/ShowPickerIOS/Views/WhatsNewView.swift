@@ -2,7 +2,8 @@ import SwiftUI
 
 // Changelog, ported from public/whats-new.html. There's no API for this, so
 // the entries live here; keep roughly in sync with the web page when it
-// changes. Reachable from the account menu in HomeView.
+// changes. Reachable from under My Shows on the iPhone home screen and from
+// the iPad sidebar.
 struct WhatsNewView: View {
     private struct Entry: Identifiable {
         let date: String
@@ -12,6 +13,8 @@ struct WhatsNewView: View {
     }
 
     private let entries: [Entry] = [
+        .init(date: "7/4", title: "iPad layout.", body: "A purpose-built iPad design: your four lists (Watching, Awaiting, Recommending, Up Next) sit at the top of a slimmer sidebar, members live in a compact scrolling window sorted by recent activity, and shows open side-by-side in the wide column. Admins get an Admin entry right in the sidebar."),
+        .init(date: "7/4", title: "What's New, easier to find.", body: "This changelog now sits right under My Shows \u{2014} on the iPhone home screen, the iPad sidebar, and the web home page \u{2014} instead of hiding in the account menu."),
         .init(date: "6/29", title: "Shake to pick.", body: "Give your phone a shake to pull a random show from your Up Next list \u{2014} an instant answer to \u{201C}what should we watch?\u{201D}"),
         .init(date: "6/29", title: "Share a show.", body: "Send any show to a friend through the standard share sheet \u{2014} Messages, Mail, AirDrop, anything. Tap the share button on a show's detail screen."),
         .init(date: "6/29", title: "Seasons released.", body: "Show rows now tell you how many seasons have dropped, right next to the Next up date (e.g. \u{201C}Next up: 6/1 \u{00B7} 3 seasons\u{201D})."),

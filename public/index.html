@@ -905,13 +905,26 @@
       <p style="margin: 6px 0 0; font-size: 14px; color: var(--ink-muted); line-height: 1.5;">
         Paying for streaming you don't watch? <a href="/subscriptions" style="color: var(--accent); text-decoration: none; font-weight: 600;">Audit your subscriptions</a> &mdash; see what to keep, pause, or cancel based on what's actually on your list.
       </p>
-      <!-- My Shows + What's New sit at the top of the page content (matching
-           the iPhone home layout), above Trending. -->
-      <div style="margin-top: 14px;">
-        <a id="myShowsLink" href="#" class="member-card hidden">My Shows &rarr;</a>
-      </div>
-      <div style="margin-top: 6px;">
-        <a href="/whats-new" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic;">What's New</a>
+      <!-- My Shows + What's New: an iOS-style grouped card above Trending,
+           mirroring the iPhone home layout. Same card treatment as the
+           Trending list below (shadow off to match #popularList). -->
+      <div style="margin-top: 18px;">
+        <div class="show-list" style="text-align: left; box-shadow: none;">
+          <a id="myShowsLink" href="#" class="show ios-row hidden" style="display: block; text-decoration: none;">
+            <div class="ios-row-main">
+              <span class="ios-row-title">My Shows</span>
+              <span style="flex: 1;"></span>
+              <span class="ios-row-chevron">&rsaquo;</span>
+            </div>
+          </a>
+          <a href="/whats-new" class="show ios-row" style="display: block; text-decoration: none;">
+            <div class="ios-row-main">
+              <span class="ios-row-title">What's New</span>
+              <span style="flex: 1;"></span>
+              <span class="ios-row-chevron">&rsaquo;</span>
+            </div>
+          </a>
+        </div>
       </div>
       <div id="popularSection" style="margin-top: 8px; margin-bottom: 24px; display: none;">
         <h3 class="section-title">Trending</h3>
