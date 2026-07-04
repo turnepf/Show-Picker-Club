@@ -17,6 +17,7 @@ enum SidebarItem: Hashable {
     case list(ShowList)
     case trending
     case admin
+    case whatsNew
 }
 
 struct IPadHomeView: View {
@@ -30,7 +31,6 @@ struct IPadHomeView: View {
     @State private var focusedSlug: String?
     @State private var showingLogin = false
     @State private var showingSearch = false
-    @State private var showingWhatsNew = false
 
     private let memberRowHeight: CGFloat = 38
     private let memberWindowRows = 5
@@ -75,7 +75,6 @@ struct IPadHomeView: View {
         .task { if loading { await load() } }
         .sheet(isPresented: $showingLogin) { LoginView().environmentObject(auth) }
         .sheet(isPresented: $showingSearch) { SearchView().environmentObject(auth) }
-        .sheet(isPresented: $showingWhatsNew) { WhatsNewView() }
         // Auth may resolve after the member list loads; land on your Watching
         // list once it does (unless the user has already picked something).
         .onChange(of: auth.memberSlug) { _, _ in applyInitialSelection() }
@@ -97,12 +96,14 @@ struct IPadHomeView: View {
                         Label(l.title, systemImage: listIcon(l))
                             .tag(SidebarItem.list(l))
                     }
+                    whatsNewRow
                 }
             } else if !auth.isLoggedIn && !loading {
                 Section {
                     Button { showingLogin = true } label: {
                         Label("Log in to see your shows", systemImage: "person.crop.circle.badge.plus")
                     }
+                    whatsNewRow
                 }
             }
             if auth.isAdmin {
@@ -132,6 +133,13 @@ struct IPadHomeView: View {
         }
         .overlay { if loading && members.isEmpty { ProgressView() } }
         .refreshable { await load() }
+    }
+
+    // Lives under Up Next in the lists section (or under the login prompt when
+    // logged out) rather than in the account menu.
+    private var whatsNewRow: some View {
+        Label("What's New", systemImage: "sparkles")
+            .tag(SidebarItem.whatsNew)
     }
 
     private var listsHeader: String {
@@ -194,9 +202,6 @@ struct IPadHomeView: View {
         Group {
             if auth.isLoggedIn {
                 Menu {
-                    Button { showingWhatsNew = true } label: {
-                        Label("What's New", systemImage: "sparkles")
-                    }
                     Button(role: .destructive) {
                         Task { await auth.logout() }
                     } label: {
@@ -228,6 +233,8 @@ struct IPadHomeView: View {
                 TrendingListView(shows: popular)
             case .admin:
                 AdminView().environmentObject(auth)
+            case .whatsNew:
+                WhatsNewView()
             }
         } else {
             placeholder("Pick a list or Trending from the sidebar.", "sidebar.left")

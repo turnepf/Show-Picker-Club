@@ -419,9 +419,9 @@
     }
     .member-card:hover { color: var(--accent); text-decoration-color: var(--accent); }
 
-    /* Landing top bar: My Shows (left, when logged in) + quiet account button (right). */
+    /* Landing top bar: quiet account button (right). My Shows lives in the
+       page body above Trending, mirroring the iPhone home layout. */
     .landing-topbar { display: flex; align-items: center; gap: 10px; min-height: 30px; margin-bottom: 14px; }
-    .landing-topbar #myShowsLink { margin: 0; }
     .landing-auth { margin-left: auto; display: inline-flex; gap: 8px; }
 
     /* Member jump dropdown — replaces the old featured grid + browse-all disclosure. */
@@ -896,7 +896,6 @@
   <div id="landingPage" class="hidden">
     <div class="landing">
       <div class="landing-topbar">
-        <a id="myShowsLink" href="#" class="member-card hidden">My Shows &rarr;</a>
         <span class="landing-auth" id="landingAuthBar">
           <button class="btn btn-quiet btn-small" id="landingLoginBtn" onclick="login()">Log in</button>
           <button class="btn btn-quiet btn-small hidden" id="landingLogoutBtn" onclick="logout()">Log out</button>
@@ -906,6 +905,14 @@
       <p style="margin: 6px 0 0; font-size: 14px; color: var(--ink-muted); line-height: 1.5;">
         Paying for streaming you don't watch? <a href="/subscriptions" style="color: var(--accent); text-decoration: none; font-weight: 600;">Audit your subscriptions</a> &mdash; see what to keep, pause, or cancel based on what's actually on your list.
       </p>
+      <!-- My Shows + What's New sit at the top of the page content (matching
+           the iPhone home layout), above Trending. -->
+      <div style="margin-top: 14px;">
+        <a id="myShowsLink" href="#" class="member-card hidden">My Shows &rarr;</a>
+      </div>
+      <div style="margin-top: 6px;">
+        <a href="/whats-new" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic;">What's New</a>
+      </div>
       <div id="popularSection" style="margin-top: 8px; margin-bottom: 24px; display: none;">
         <h3 class="section-title">Trending</h3>
         <div id="popularList" class="show-list" style="text-align: left;"></div>
@@ -923,7 +930,6 @@
       <div style="text-align: center; margin-top: 24px;">
         <a href="/reporting" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic;">Curious?</a>
         <a href="/vibe" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic; margin-left: 16px;">Vibe</a>
-        <a href="/whats-new" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic; margin-left: 16px;">What's New</a>
       </div>
 
       <footer style="padding: 24px 0 20px; font-size: 12px; color: var(--ink-quiet); text-align: center;">

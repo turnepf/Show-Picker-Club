@@ -52,6 +52,7 @@ struct HomeView: View {
                                 Label("My Shows", systemImage: "person.crop.circle")
                                     .font(.body.weight(.semibold))
                             }
+                            whatsNewRow
                         }
                     } else if !auth.isLoggedIn {
                         Section {
@@ -60,6 +61,7 @@ struct HomeView: View {
                             } label: {
                                 Label("Log in to see your shows", systemImage: "person.crop.circle.badge.plus")
                             }
+                            whatsNewRow
                         }
                     }
                     if auth.isAdmin {
@@ -166,17 +168,20 @@ struct HomeView: View {
         }
     }
 
+    // Sits under My Shows (or under the login prompt when logged out) rather
+    // than in the account menu.
+    private var whatsNewRow: some View {
+        NavigationLink(value: Route.whatsNew) {
+            Label("What's New", systemImage: "sparkles")
+        }
+    }
+
     // Account control shown on the title line: a menu (Log out) when signed in,
     // otherwise a tap target that opens the login sheet.
     private var accountControl: some View {
         Group {
             if auth.isLoggedIn {
                 Menu {
-                    Button {
-                        path.append(.whatsNew)
-                    } label: {
-                        Label("What's New", systemImage: "sparkles")
-                    }
                     Button(role: .destructive) {
                         Task { await auth.logout() }
                     } label: {
