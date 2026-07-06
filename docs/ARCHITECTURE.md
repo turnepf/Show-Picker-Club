@@ -452,5 +452,5 @@ The moment a member edits a seeded row (changes list, notes, etc.), archives one
 - **Seeded rows have NULL `created_at` and `updated_at`.** This is intentional — it makes the seed-only query single-sided and cheap.
 - **Network URLs that look like `/search`, `/s?`, or `/?q=` are placeholders.** The frontend renders these as plain text instead of links; sync-urls and calendar feed treat them as missing.
 - **Member display names disambiguate dynamically.** `/api/members` counts first-name collisions and appends `last_initial` only when it would otherwise be ambiguous.
-- **Slug `dorothy` was renamed to `whitt`.** A permanent 301 in `_redirects` covers the old URL.
+- **Slug `dorothy` was renamed to `whitt`.** A permanent 301 in `_redirects` covers the old URL. She has since gone back to displaying as Dorothy (migration 025 updated her name and login email) — the slug stays `whitt`.
 - **Always clean up branches when a chunk of work is done.** After the work is merged to `main` and pushed live, delete the feature branch — local and remote. Caveat: in the Claude-Code-on-the-web remote environment the git proxy rejects remote-branch deletion (HTTP 403) and the GitHub MCP server has no delete-branch tool, so the remote branch may have to be deleted from GitHub's UI/API outside that environment. The local branch can always be deleted.
