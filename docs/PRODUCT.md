@@ -65,7 +65,7 @@ Tabs across the top for the four lists. Each show row collapses to one line (tit
 Two pieces of metadata are **always visible** under the row (not collapsed):
 
 - **Awaiting list:** "Next up: 5/9 – 6/15" — premiere date (and finale if known). The label is "Next up" rather than "Next season" because midseason episode dates can also appear here.
-- **Up Next list:** "Recommended by Whitt" — surfaces attribution without an expand.
+- **Up Next list:** "Recommended by Dorothy" — surfaces attribution without an expand.
 
 ### Suggest a show
 
