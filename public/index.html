@@ -1205,6 +1205,16 @@
         <button class="icon-btn" title="Search all libraries" aria-label="Search all libraries" onclick="openLandingSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
         <button class="icon-btn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
       </div>
+      <!-- One-tap way home while browsing someone else's lists — the lists
+           group below belongs to whoever's page this is, so without this
+           there's no visible route back to your own shows. Toggled by
+           updateSideListsHeader(); keeps the open list via location.hash. -->
+      <nav class="ios-group hidden" id="sideBackHome">
+        <a class="ios-item" id="sideBackHomeLink" href="/" onclick="if (authMember) this.href = '/' + authMember + location.hash">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-person"/></svg></span>
+          <span class="ios-item-label">Back to My Shows</span>
+        </a>
+      </nav>
       <h3 class="ios-group-header" id="sideListsHeader">Shows</h3>
       <nav class="ios-group">
         <button class="ios-item side-list-row selected" data-list="watching" onclick="switchTab('watching')">
@@ -2004,9 +2014,18 @@
     function updateSideListsHeader() {
       const el = document.getElementById('sideListsHeader');
       if (!el || !memberSlug) return;
-      el.textContent = (authMember && authMember === memberSlug)
+      const mine = !!(authMember && authMember === memberSlug);
+      el.textContent = mine
         ? 'My Shows'
         : (memberLabel ? `${memberLabel}'s Shows` : 'Shows');
+      // Pinned "Back to My Shows" at the top of the sidebar while browsing
+      // another member's page (logged-in only); hidden on your own page.
+      const back = document.getElementById('sideBackHome');
+      if (back) {
+        back.classList.toggle('hidden', !authMember || mine);
+        const link = document.getElementById('sideBackHomeLink');
+        if (link && authMember) link.href = '/' + authMember;
+      }
     }
 
     function renderSideMembers(members) {
