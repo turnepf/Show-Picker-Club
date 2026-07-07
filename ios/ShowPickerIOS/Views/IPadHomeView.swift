@@ -90,6 +90,21 @@ struct IPadHomeView: View {
 
     private var sidebar: some View {
         List(selection: $selection) {
+            // One-tap way home while browsing someone else's lists. The lists
+            // section below re-points at whoever is focused, so without this
+            // there's no visible route back to your own shows (your row in the
+            // Members window may even be scrolled out of view).
+            if let me = myMember, focusedSlug != me.slug {
+                Section {
+                    Button {
+                        focusedSlug = me.slug
+                        // Keep the open list open, matching the member rows.
+                        if case .list = selection {} else { selection = .list(.watching) }
+                    } label: {
+                        Label("Back to My Shows", systemImage: "person.crop.circle")
+                    }
+                }
+            }
             if focusedMember != nil {
                 Section(listsHeader) {
                     ForEach(ShowList.allCases) { l in
