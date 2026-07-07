@@ -11,12 +11,12 @@
 		A100000000000000000000E3 /* Shared/SharedSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* Shared/SharedSession.swift */; };
 		A100000000000000000000E6 /* Shared/ShareTitleParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E5 /* Shared/ShareTitleParser.swift */; };
 		A100000000000000000000E7 /* Shared/ShareTitleParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E5 /* Shared/ShareTitleParser.swift */; };
-		A1000000000000000000010D /* ShowPickerShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A100000000000000000000C2 /* ShowPickerShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A1000000000000000000010D /* ShowPickerShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A100000000000000000000C2 /* ShowPickerShareExtension.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CD0077142FF5CADE00DCCF4D /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CD0077132FF5CADE00DCCF4D /* WidgetKit.framework */; };
 		CD0077162FF5CADE00DCCF4D /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CD0077152FF5CADE00DCCF4D /* SwiftUI.framework */; };
 		CD0077232FF5CAE000DCCF4D /* ShowPickerWatchComplicationExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CD0077122FF5CADE00DCCF4D /* ShowPickerWatchComplicationExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CDBC96832FF68C3A00672D08 /* ShowPickerCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDBC96822FF68C3A00672D08 /* ShowPickerCore */; };
-		CDD1EA862FF5BE6300F095DE /* ShowPickerWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = CDD1EA7C2FF5BE6200F095DE /* ShowPickerWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CDD1EA862FF5BE6300F095DE /* ShowPickerWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = CDD1EA7C2FF5BE6200F095DE /* ShowPickerWatch Watch App.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CDD1EA982FF5C17700F095DE /* ShowPickerCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDD1EA972FF5C17700F095DE /* ShowPickerCore */; };
 		CDE59A2E2FF5B30D00CBD097 /* ShowPickerCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDE59A2D2FF5B30D00CBD097 /* ShowPickerCore */; };
 /* End PBXBuildFile section */
@@ -478,6 +478,7 @@
 /* Begin PBXTargetDependency section */
 		A1000000000000000000010E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = A100000000000000000000B2 /* ShowPickerShareExtension */;
 			targetProxy = A1000000000000000000010F /* PBXContainerItemProxy */;
 		};
@@ -488,6 +489,7 @@
 		};
 		CDD1EA852FF5BE6300F095DE /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = CDD1EA7B2FF5BE6200F095DE /* ShowPickerWatch Watch App */;
 			targetProxy = CDD1EA842FF5BE6300F095DE /* PBXContainerItemProxy */;
 		};
@@ -631,6 +633,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Show Picker Club";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -642,6 +645,8 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = net.patrickturner.showpickerios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -660,6 +665,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Show Picker Club";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -671,6 +677,8 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = net.patrickturner.showpickerios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

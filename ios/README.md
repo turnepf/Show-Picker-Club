@@ -4,7 +4,7 @@ Native SwiftUI iOS client for [showpicker.club](https://showpicker.club). Full f
 
 Talks to the same `/api/*` endpoints as the web. Session cookie is managed automatically by `URLSession.shared` via `HTTPCookieStorage`, so login persists across launches.
 
-The app depends on the shared **`ShowPickerCore`** Swift package (at the repo root; `Show` / `Actor` / `ShowList` models + response wrappers), which is also used by the tvOS and watchOS apps. iOS and tvOS are opened together via **`ShowPickerClub.xcworkspace`** and share a single bundle id (`net.patrickturner.showpickerios`), shipping as one universal App Store app (iPhone + Apple TV). A paired **watchOS** app (`ios/ShowPickerWatch Watch App`, embedded in this project) receives its session from this phone app over WatchConnectivity, and ships a **Next Premiere complication** (`ios/ShowPickerWatchComplication`) for the watch face.
+The app depends on the shared **`ShowPickerCore`** Swift package (at the repo root; `Show` / `Actor` / `ShowList` models + response wrappers), which is also used by the tvOS and watchOS apps. iOS and tvOS are opened together via **`ShowPickerClub.xcworkspace`** and share a single bundle id (`net.patrickturner.showpickerios`), shipping as one universal App Store app (iPhone + iPad + Apple TV, plus a **Mac Catalyst** build of this same target that reuses the iPad split-view layout on macOS). A paired **watchOS** app (`ios/ShowPickerWatch Watch App`, embedded in this project) receives its session from this phone app over WatchConnectivity, and ships a **Next Premiere complication** (`ios/ShowPickerWatchComplication`) for the watch face.
 
 ## What's here
 
@@ -38,26 +38,13 @@ The Xcode project is committed at `ios/ShowPickerIOS.xcodeproj` with **two targe
 
 The app is **already in TestFlight**, so shipping a new build is just *archive + upload* — no app-record or first-time setup.
 
-**The build number is now set automatically.** A *Set build number* run-script
-phase (on both the app and the share-extension targets) rewrites
-`CFBundleVersion` in the processed `Info.plist` at build time to
-`<build date>.<git commit count>` — e.g. `20260623.142`. You don't touch it
-before archiving. The scheme is monotonic (the date bumps daily, the commit
-count within a day) so App Store Connect always accepts the next upload, and
-both targets derive it from the same `HEAD` so the app and extension always
-match. Because the date integer dwarfs the old plain counters, every
-date-based build also sorts above the old builds 1–7.
-
-The script runs on **every** build (debug and release), not just Archive —
-Apple requires the parent app and its embedded extension to carry the same
-`CFBundleVersion`, and stamping both on each build keeps them from drifting
-apart (e.g. when an incremental build regenerates one target's `Info.plist`
-but not the other's).
-
-> The script reads the commit count via `git`, so the app/extension targets
-> have `ENABLE_USER_SCRIPT_SANDBOXING = NO`. `CURRENT_PROJECT_VERSION` is left
-> in the project as a fallback for builds made outside a git checkout (where the
-> script falls back to `HHMM`), but it no longer needs hand-editing.
+**The build number is a fixed value shared by every target.** All targets
+(app, share extension, watch app, complication) carry the same
+`CURRENT_PROJECT_VERSION` (currently 9), set at the project level, so Apple's
+parent/extension version-match rule always passes. Bump that one value before
+archiving a new build for App Store Connect. (Earlier date-based auto-stamping
+scripts were removed — they conflicted with the Xcode build graph once the
+watch targets were added.)
 
 > A TestFlight **tester group** has been set up for this app, so builds can be assigned to it for external testing (internal testers still auto-update).
 
