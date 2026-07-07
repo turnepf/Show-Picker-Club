@@ -9,15 +9,21 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="apple-touch-icon" href="/favicon.svg">
-  <meta name="theme-color" content="#2e2825">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
   <link rel="stylesheet" href="/styles.css?v=4">
   <style>
+    /* Light iOS nav bar with a tint back link, matching the app chrome. */
+    :root { --tint: #6D63EB; }
+    @media (prefers-color-scheme: dark) { :root { --tint: #8D87F5; } }
     body { padding-top: 0; }
     header {
-      background: var(--header-bg);
-      color: #fff;
-      padding: 20px;
-      padding-top: calc(20px + env(safe-area-inset-top, 0px));
+      background: color-mix(in srgb, var(--surface) 88%, transparent);
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      color: var(--ink);
+      border-bottom: 1px solid var(--border-soft);
+      padding: 12px 20px;
+      padding-top: calc(12px + env(safe-area-inset-top, 0px));
       position: sticky;
       top: 0;
       z-index: 10;
@@ -28,21 +34,23 @@
       gap: 8px;
       max-width: 720px;
       margin: 0 auto;
+      position: relative;
     }
     .header-top a.back {
-      color: rgba(255,255,255,0.85);
+      color: var(--tint);
       text-decoration: none;
-      font-size: 24px;
+      font-size: 16px;
       line-height: 1;
-      padding: 6px 10px;
-      margin: -6px 0 -6px -10px;
-      border-radius: 6px;
+      padding: 6px 10px 6px 0;
+      position: relative; z-index: 1;
     }
     .header-top h1 {
-      font-family: var(--font-display);
-      font-size: var(--text-xl);
+      font-family: var(--font-sans);
+      font-size: 17px;
       font-weight: 600;
-      letter-spacing: -0.01em;
+      position: absolute;
+      left: 50%; transform: translateX(-50%);
+      white-space: nowrap;
     }
     main {
       max-width: 720px;
@@ -70,7 +78,7 @@
 <body>
   <header>
     <div class="header-top">
-      <a class="back" href="/" title="Home" aria-label="Back to home">&#9664;</a>
+      <a class="back" href="/" title="Home" aria-label="Back to home">&#8249; Home</a>
       <h1>What's New</h1>
     </div>
   </header>
