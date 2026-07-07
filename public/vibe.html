@@ -4,13 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vibe — Show Picker Club</title>
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
   <link rel="stylesheet" href="/styles.css?v=4">
   <style>
+    /* The native app's tint, so chrome and actions match iOS. */
+    :root { --tint: #6D63EB; }
+    @media (prefers-color-scheme: dark) { :root { --tint: #8D87F5; } }
     body { padding: 24px 16px 60px; }
     .wrap { max-width: 720px; margin: 0 auto; }
     .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
-    .topbar a.back { color: var(--ink-quiet); text-decoration: none; font-size: 22px; }
-    .topbar h1 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; letter-spacing: -0.01em; color: var(--ink); flex: 0 0 auto; }
+    .topbar a.back { color: var(--tint); text-decoration: none; font-size: 16px; padding: 4px 4px 4px 0; white-space: nowrap; }
+    .topbar h1 { font-family: var(--font-sans); font-size: 17px; font-weight: 600; color: var(--ink); flex: 0 0 auto; }
     .topbar select {
       flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px;
       font-size: 15px; background: var(--surface); font-family: inherit;
@@ -20,19 +25,19 @@
       background: var(--surface); border-radius: 12px; padding: 32px 24px; text-align: center;
       box-shadow: var(--shadow-card); margin-bottom: 20px;
     }
-    .hero .star { color: var(--accent); font-size: 14px; letter-spacing: 2px; }
-    .hero .cluster-name { font-family: var(--font-display); font-size: var(--text-xl); color: var(--ink); margin: 8px 0 12px; font-weight: 600; letter-spacing: -0.015em; }
+    .hero .star { color: var(--tint); font-size: 14px; letter-spacing: 2px; }
+    .hero .cluster-name { font-family: var(--font-sans); font-size: var(--text-xl); color: var(--ink); margin: 8px 0 12px; font-weight: 700; letter-spacing: -0.015em; }
     .hero .cluster-tag { color: var(--ink-muted); font-size: 15px; line-height: 1.5; max-width: 540px; margin: 0 auto; font-style: italic; }
     .hero .similarity { color: var(--ink-quiet); font-size: 12px; margin-top: 14px; }
 
     .section { background: var(--surface); border-radius: 10px; padding: 20px 24px; margin-bottom: 16px; border: 1px solid var(--border-soft); }
-    .section h2 { font-family: var(--font-display); font-size: var(--text-md); letter-spacing: -0.01em; color: var(--ink); margin-bottom: 14px; font-weight: 600; }
+    .section h2 { font-family: var(--font-sans); font-size: 16px; color: var(--ink); margin-bottom: 14px; font-weight: 600; }
 
     .trait-block { margin-bottom: 10px; }
     .trait-row { display: flex; align-items: center; gap: 12px; font-size: 14px; }
     .trait-row .lbl { flex: 0 0 38%; color: var(--ink); }
     .trait-row .bar-bg { flex: 1; height: 10px; background: var(--surface-2); border-radius: 5px; overflow: hidden; }
-    .trait-row .bar { height: 100%; background: var(--accent); border-radius: 5px; transition: width 0.6s ease-out; }
+    .trait-row .bar { height: 100%; background: var(--tint); border-radius: 5px; transition: width 0.6s ease-out; }
     .trait-row .val { flex: 0 0 42px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
     .trait-explain { font-size: 11px; color: var(--ink-quiet); margin: 2px 0 0 calc(38% + 12px); line-height: 1.35; }
     @media (max-width: 480px) {
@@ -40,7 +45,7 @@
       .trait-explain { margin-left: 0; }
     }
 
-    .toggle-more { display: block; text-align: center; padding: 10px 0 0; background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .toggle-more { display: block; text-align: center; padding: 10px 0 0; background: none; border: none; color: var(--tint); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
     .blend-note { font-size: 12px; color: var(--ink-muted); margin-bottom: 12px; font-style: italic; }
 
     .balance-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
@@ -58,15 +63,15 @@
     .pick-row .pick-line { display: flex; align-items: center; gap: 10px; }
     .pick-row .pick-add {
       flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
-      background: var(--accent); color: #fff; border: none; font-size: 16px; line-height: 1;
+      background: var(--tint); color: #fff; border: none; font-size: 16px; line-height: 1;
       cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center;
     }
-    .pick-row .pick-add:hover { background: var(--accent-hover); }
+    .pick-row .pick-add:hover { filter: brightness(0.92); }
     .pick-row .pick-info { flex: 1; min-width: 0; }
     .pick-row .pick-title { font-weight: 600; color: var(--ink); cursor: pointer; }
-    .pick-row .pick-title:hover { color: var(--accent); }
+    .pick-row .pick-title:hover { color: var(--tint); }
     .pick-row .pick-network { color: var(--ink-muted); }
-    .pick-row .pick-network a { color: var(--accent); text-decoration: none; }
+    .pick-row .pick-network a { color: var(--tint); text-decoration: none; }
     .pick-row .pick-rating { color: var(--ink-quiet); }
     .pick-row .pick-list-tag { color: var(--ink-quiet); font-size: 12px; margin-left: 6px; text-transform: capitalize; }
     .pick-detail { display: none; padding: 8px 0 4px; font-size: 13px; color: var(--ink-muted); line-height: 1.5; }
@@ -85,7 +90,7 @@
       max-width: 420px; width: 100%; max-height: calc(100vh - 32px); overflow-y: auto;
       box-shadow: 0 20px 60px rgba(0,0,0,0.2);
     }
-    .modal-card h2 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; letter-spacing: -0.01em; color: var(--ink); margin-bottom: 4px; }
+    .modal-card h2 { font-family: var(--font-sans); font-size: 17px; text-align: center; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
     .modal-pick-info {
       background: var(--surface-2); padding: 10px 12px; border-radius: 6px;
       font-size: 13px; margin: 12px 0;
@@ -124,10 +129,11 @@
     body { background: var(--surface-2); }
     .topbar {
       position: sticky; top: 0; z-index: 10;
-      margin: -24px -16px 22px; padding: 14px 16px;
-      background: color-mix(in oklch, var(--surface-2) 86%, transparent);
+      margin: -24px -16px 22px; padding: 10px 16px;
+      background: color-mix(in srgb, var(--surface) 88%, transparent);
       backdrop-filter: saturate(180%) blur(12px);
       -webkit-backdrop-filter: saturate(180%) blur(12px);
+      border-bottom: 1px solid var(--border-soft);
     }
     .section { border: none; border-radius: 14px; box-shadow: var(--shadow-card); }
     .hero, .modal-card { border-radius: 16px; }
@@ -137,7 +143,7 @@
 <body>
   <div class="wrap">
     <div class="topbar">
-      <a class="back" href="/" title="Home">&#9664;</a>
+      <a class="back" href="/" title="Home">&#8249; Home</a>
       <h1>Vibe</h1>
       <select id="memberSelect" aria-label="Pick a member"></select>
     </div>

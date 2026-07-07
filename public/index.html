@@ -11,7 +11,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="apple-touch-icon" href="/favicon.svg">
-  <meta name="theme-color" content="#2e2825">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
   <link rel="stylesheet" href="/styles.css?v=4">
   <style>
     header {
@@ -58,20 +59,6 @@
       transition: all 0.2s;
     }
 
-    .btn-login {
-      background: rgba(255,255,255,0.15);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.3);
-    }
-    .btn-login:hover { background: rgba(255,255,255,0.25); }
-
-    .btn-add { background: var(--accent); color: var(--ink); padding: 6px 12px; font-size: 18px; line-height: 1; font-weight: 700; }
-    .btn-add:hover { background: var(--accent-hover); }
-    .btn-search { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); }
-    .btn-search:hover { background: rgba(255,255,255,0.25); }
-    /* Quiet button for light surfaces (landing): paper-toned, not ghost-on-dark. */
-    .btn-quiet { background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); }
-    .btn-quiet:hover { background: var(--surface); }
     /* Search modal sits anchored to the top so the box doesn't jump as result count changes. */
     #searchOverlay { align-items: flex-start; padding-top: 6vh; padding-bottom: 6vh; }
     #searchOverlay .modal { max-height: 88vh; display: flex; flex-direction: column; }
@@ -379,66 +366,156 @@
 
     .hidden { display: none !important; }
 
-    /* Landing page */
-    .landing {
-      max-width: 720px;
-      margin: 56px auto;
-      padding: 44px 44px 32px;
+    /* ── iOS-style Home ────────────────────────────────────────────
+       Small screens mirror the iPhone HomeView: a bold large-title
+       bar over an inset-grouped list (My Shows / What's New,
+       Trending, Members). At ≥1024px the same sections become the
+       iPad sidebar (IPadHomeView) and Trending moves into a detail
+       column beside it. */
+    .home-shell { max-width: 680px; margin: 0 auto; padding: 4px 16px 48px; }
+    .home-titlebar {
+      display: flex; align-items: center; gap: 4px;
+      padding: 14px 0 12px;
+      padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    }
+    .home-title {
+      flex: 1; min-width: 0;
+      font-family: var(--font-sans);
+      font-size: clamp(26px, 6vw, 34px);
+      font-weight: 700; letter-spacing: -0.01em;
+      color: var(--ink);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .home-title a { color: inherit; text-decoration: none; }
+    .home-detail { display: none; }
+    .home-side-trending { display: none; }
+
+    /* Detail-column title bar (desktop split view) */
+    .detail-bar {
+      position: sticky; top: 0; z-index: 5;
+      background: color-mix(in srgb, var(--surface-2) 86%, transparent);
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-soft);
+      padding: 13px 0; margin: 0 -24px 18px; text-align: center;
+    }
+    .detail-bar h2 { font-family: var(--font-sans); font-size: 17px; font-weight: 600; color: var(--ink); }
+
+    @media (min-width: 1024px) {
+      .home-shell {
+        display: grid; grid-template-columns: 300px minmax(0, 1fr);
+        max-width: none; margin: 0; padding: 0;
+        height: 100vh; height: 100dvh; overflow: hidden;
+      }
+      .home-side {
+        overflow-y: auto;
+        padding: 0 14px 24px;
+        border-right: 1px solid var(--border-soft);
+      }
+      .home-side .home-titlebar { padding-top: 12px; }
+      .home-side .home-title { font-size: 20px; }
+      .home-detail { display: block; overflow-y: auto; padding: 0 24px 48px; }
+      .home-detail-inner { max-width: 720px; margin: 0 auto; }
+      /* Trending is a sidebar entry with a detail column on wide screens
+         (iPad); an inline section on small ones (iPhone). */
+      .home-side-trending:not(.hidden) { display: block; }
+      #popularSection { display: none !important; }
+      #membersList { max-height: 250px; overflow-y: auto; }
+    }
+
+    /* ── Inset-grouped list vocabulary (Home + sidebars + extras) ── */
+    .ic { width: 20px; height: 20px; flex: 0 0 auto; }
+    .ios-group {
       background: var(--surface);
-      border-radius: 18px;
-      box-shadow: 0 1px 2px oklch(0.18 0.03 50 / 0.06),
-                  0 14px 44px oklch(0.18 0.03 50 / 0.07);
-      text-align: center;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 22px;
+      box-shadow: 0 1px 3px oklch(0.18 0.03 50 / 0.06);
     }
-    @media (max-width: 600px) {
-      .landing { margin: 20px 12px; padding: 28px 22px 22px; border-radius: 14px; }
+    .ios-group-header {
+      font-size: 13px; font-weight: 400;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--ink-quiet);
+      padding: 0 16px 7px; margin-top: 2px;
     }
-    .landing h1 {
-      font-family: var(--font-display);
-      font-size: var(--text-2xl);
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      line-height: 1.05;
-      color: var(--ink);
-      margin-bottom: 14px;
-      text-wrap: balance;
+    .ios-item {
+      position: relative;
+      display: flex; align-items: center; gap: 12px;
+      width: 100%; min-height: 44px;
+      padding: 10px 14px;
+      background: none; border: none;
+      font-family: inherit; font-size: 16px; line-height: 1.3; text-align: left;
+      color: var(--ink); text-decoration: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
     }
-    .landing p { color: var(--ink-muted); margin-bottom: 30px; }
+    .ios-item:active { background: var(--surface-2); }
+    .ios-item + .ios-item::after {
+      content: ""; position: absolute; left: 48px; right: 0; top: 0;
+      height: 1px; background: var(--border-soft);
+    }
+    .ios-item.no-icon + .ios-item.no-icon::after { left: 14px; }
+    /* No stray hairline on the first *visible* row when the row above it
+       is hidden (the My Shows / Log in swap)… */
+    .ios-item.hidden + .ios-item::after { display: none; }
+    /* …but rows that always have a visible row somewhere above keep theirs. */
+    .ios-item + .ios-item.always-sep::after { display: block; }
+    .ios-item-icon { display: inline-flex; color: var(--tint); }
+    .ios-item-icon .ic { width: 22px; height: 22px; }
+    .ios-item-label { flex: 1; min-width: 0; }
+    .ios-item-detail { color: var(--ink-quiet); font-size: 13px; white-space: nowrap; }
+    .ios-item-chev { width: 15px; height: 15px; color: var(--ink-faint); }
+    .ios-item.selected { background: color-mix(in srgb, var(--tint) 13%, transparent); }
+    .side-list-row.selected { background: var(--tint); color: #fff; }
+    .side-list-row.selected .ios-item-icon { color: #fff; }
+    .ios-footnote { font-size: 12px; color: var(--ink-quiet); line-height: 1.5; padding: 0 16px; margin: -10px 0 22px; }
+    .ios-footnote a { color: inherit; }
 
-    .member-card {
-      display: block;
-      padding: 6px 4px;
-      text-align: left;
-      text-decoration: underline;
-      text-decoration-color: var(--ink-faint);
-      text-underline-offset: 2px;
-      color: var(--ink);
-      font-size: 14px;
-      font-weight: 600;
-      transition: color 0.2s;
+    /* Orange star rating, matching the iOS rows' .orange Label */
+    .ios-rating { display: inline-flex; align-items: center; gap: 3px; color: var(--ios-orange); font-size: 13px; font-weight: 500; white-space: nowrap; }
+    .ios-rating .ic { width: 13px; height: 13px; }
+
+    /* Round tint icon buttons (nav bars / title bars) */
+    .icon-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px; flex: 0 0 auto;
+      background: none; border: none; padding: 0;
+      color: var(--tint); cursor: pointer; border-radius: 50%;
+      -webkit-tap-highlight-color: transparent;
     }
-    .member-card:hover { color: var(--accent); text-decoration-color: var(--accent); }
-
-    /* My Shows / What's New: centered links above Trending set in the same
-       .section-title face as the Trending heading, with tighter spacing so
-       they read as a group. */
-    .landing-nav-link { display: block; text-decoration: none; margin: 18px 0 0; }
-    .landing-nav-link:hover { color: var(--accent); }
-
-    /* Landing top bar: quiet account button (right). My Shows lives in the
-       page body above Trending, mirroring the iPhone home layout. */
-    .landing-topbar { display: flex; align-items: center; gap: 10px; min-height: 30px; margin-bottom: 14px; }
-    .landing-auth { margin-left: auto; display: inline-flex; gap: 8px; }
-
-    /* Member jump dropdown — replaces the old featured grid + browse-all disclosure. */
-    .member-jump { margin: 4px 0 8px; text-align: center; }
-    .member-jump-label { display: block; font-size: 13px; color: var(--ink-muted); margin-bottom: 6px; }
-    .member-jump-select {
-      width: 100%; max-width: 320px; padding: 10px 12px;
-      border: 1px solid var(--border); border-radius: 6px;
-      font-size: 15px; font-family: inherit; background: var(--surface); color: var(--ink); cursor: pointer;
+    .icon-btn:hover { background: color-mix(in srgb, var(--tint) 10%, transparent); }
+    .icon-btn .ic { width: 23px; height: 23px; }
+    .btn-nav-text {
+      background: none; border: none;
+      color: var(--tint); font: inherit; font-size: 16px;
+      cursor: pointer; padding: 4px 8px;
     }
-    .member-jump-select:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+    .back-link {
+      display: inline-flex; align-items: center;
+      color: var(--tint); text-decoration: none;
+      font-size: 16px; padding: 4px 8px 4px 0; margin-left: -6px;
+    }
+    .back-link .ic { width: 21px; height: 21px; }
+
+    /* Account popover (Log out) — mirrors the iOS account Menu */
+    .account-menu {
+      position: fixed; z-index: 500;
+      min-width: 180px;
+      background: var(--surface);
+      border-radius: 13px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.22), 0 1px 3px rgba(0,0,0,0.12);
+      padding: 4px 0;
+      overflow: hidden;
+    }
+    .account-menu button {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      width: 100%; padding: 11px 16px;
+      background: none; border: none;
+      font: inherit; font-size: 16px;
+      color: var(--danger); cursor: pointer;
+    }
+    .account-menu button:hover { background: var(--surface-2); }
+    .account-menu .ic { width: 19px; height: 19px; }
 
     /* Modal */
     .modal-overlay {
@@ -570,15 +647,6 @@
       .show-row { font-size: 13px; }
     }
 
-    .popular-members-badge {
-      font-size: 11px;
-      color: var(--ink-quiet);
-      cursor: pointer;
-      text-decoration: underline dotted;
-      text-underline-offset: 2px;
-    }
-    .popular-members-badge:hover { color: var(--ink); }
-
     /* Toast notifications — bottom-center stack. Used for action feedback
        (move, archive, share, suggest, save) and undo on archive. */
     .toast-stack {
@@ -655,43 +723,82 @@
        element ids the app relies on.
        =========================================================== -->
   <style id="ios-theme">
+    /* The native app's tint (AccentColor asset) and toolbars, so web
+       chrome uses the same accent, icons and fonts as iOS. */
+    :root {
+      --tint: #6D63EB;          /* iOS AccentColor, light */
+      --ios-orange: #FF9500;    /* SwiftUI .orange — star ratings */
+      --seg-track: color-mix(in srgb, var(--ink) 9%, transparent);
+      --seg-active: #ffffff;
+      --nav-bg: color-mix(in srgb, var(--surface) 88%, transparent);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --tint: #8D87F5;        /* iOS AccentColor, dark */
+        --ios-orange: #FF9F0A;
+        --seg-active: oklch(0.40 0.012 50);
+      }
+    }
+
     body { background: var(--surface-2); }
 
-    /* Nav-bar header ------------------------------------------------ */
+    /* Nav-bar header — light iOS bar (blurred material + hairline),
+       replacing the old dark header band. ---------------------------- */
     header {
+      background: var(--nav-bg);
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      color: var(--ink);
+      border-bottom: 1px solid var(--border-soft);
       padding: 8px 12px 10px;
       padding-top: calc(8px + env(safe-area-inset-top, 0px));
     }
     .header-top { min-height: 34px; }
-    .header-title { font-size: 17px; font-weight: 600; margin: 6px 0 10px; }
+    .header-title { font-size: 17px; font-weight: 600; margin: 6px 0 10px; color: var(--ink); }
     .btn { border-radius: 9px; }
-    .btn-add { border-radius: 9px; padding: 5px 11px; }
 
-    /* Segmented control (the four lists) ---------------------------- */
+    /* Segmented control (the four lists) — iOS gray track on the light
+       bar, white (elevated in dark mode) sliding pill. ---------------- */
     .tabs {
       gap: 2px;
-      background: rgba(255,255,255,0.14);
-      padding: 3px;
-      border-radius: 10px;
+      background: var(--seg-track);
+      padding: 2px;
+      border-radius: 9px;
     }
     .tab {
       border: none !important;
       border-radius: 7px;
       padding: 7px 4px;
-      font-weight: 600;
-      color: rgba(255,255,255,0.72);
+      font-weight: 500;
+      font-size: 13px;
+      color: var(--ink);
       background: transparent;
     }
-    .tab:hover { background: rgba(255,255,255,0.08); color: #fff; }
+    .tab:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); color: var(--ink); }
     .tab.active,
     .tab.active[data-list="watching"],
     .tab.active[data-list="waiting"],
     .tab.active[data-list="recommending"],
     .tab.active[data-list="next"] {
-      background: #fff !important;
+      background: var(--seg-active) !important;
       color: var(--ink) !important;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.16), 0 0 0 0.5px rgba(0,0,0,0.04);
     }
+
+    /* List help caption under the picker — leading-aligned like iOS */
+    .section-desc {
+      text-align: left;
+      color: var(--ink-muted);
+      font-style: normal;
+      padding: 8px 2px 2px;
+    }
+
+    /* Sheet titles + empty states use the system face, matching iOS */
+    .modal h2, .empty .empty-headline, .recs-heading {
+      font-family: var(--font-sans);
+      letter-spacing: 0;
+    }
+    .modal h2 { font-size: 17px; text-align: center; }
 
     /* Inset-grouped content ---------------------------------------- */
     main {
@@ -795,7 +902,9 @@
     @keyframes detail-in { from { transform: translateX(14px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     .detail-nav {
       position: sticky; top: 0;
-      background: var(--header-bg); color: #fff;
+      background: var(--nav-bg); color: var(--ink);
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-soft);
       padding: 10px 0;
       padding-top: calc(10px + env(safe-area-inset-top, 0px));
       z-index: 1;
@@ -808,7 +917,7 @@
       position: relative;
     }
     .detail-nav button {
-      background: none; border: none; color: #fff;
+      background: none; border: none; color: var(--tint);
       font: inherit; font-size: 16px; cursor: pointer;
       display: inline-flex; align-items: center; gap: 3px;
       padding: 4px 6px; margin-left: -6px;
@@ -874,11 +983,11 @@
       text-align: center; padding: 13px 16px;
       background: var(--surface); border: none;
       border-top: 1px solid var(--border-soft);
-      color: var(--accent-hover); font-size: 15px; font-weight: 600;
+      color: var(--tint); font-size: 15px; font-weight: 600;
       font-family: inherit; cursor: pointer;
     }
     .detail-card .detail-action:first-child { border-top: none; }
-    .detail-action:hover { background: var(--accent-soft); }
+    .detail-action:hover { background: color-mix(in srgb, var(--tint) 8%, transparent); }
     .detail-action.danger { color: var(--danger-deep); }
     .detail-action.danger:hover { background: var(--danger-soft); }
 
@@ -894,98 +1003,259 @@
       .modal-overlay { align-items: center; }
       .modal { border-radius: 16px; }
     }
+
+    /* Insights + calendar groups under the list (mirrors the iOS
+       MemberView's grouped sections). */
+    .member-extras { max-width: 720px; margin: 4px auto 0; padding: 0 14px; }
+
+    /* ── iPad-style split view for the member page (≥1024px) ────────
+       A persistent sidebar (lists for this member, What's New,
+       Trending, Members) beside the detail column, mirroring
+       IPadHomeView. Below the breakpoint the page keeps the iPhone
+       single-stack layout and the sidebar stays hidden. */
+    .split-side { display: none; }
+    @media (min-width: 1024px) {
+      #showPage:not(.hidden) {
+        display: grid; grid-template-columns: 300px minmax(0, 1fr);
+        height: 100vh; height: 100dvh; overflow: hidden;
+      }
+      .split-side {
+        display: block;
+        overflow-y: auto;
+        padding: 0 14px 24px;
+        border-right: 1px solid var(--border-soft);
+      }
+      .split-side .home-titlebar { padding-top: 12px; }
+      .split-side .home-title { font-size: 20px; }
+      .side-members { max-height: 250px; overflow-y: auto; flex: 0 0 auto; }
+      .split-detail { overflow-y: auto; min-width: 0; }
+      /* The sidebar owns navigation: list switching moves there and the
+         sidebar title links Home, so the mobile back link and segmented
+         control disappear from the detail bar. */
+      #showPage .back-link { display: none; }
+      #showPage .tabs { display: none; }
+      /* Pushed show detail covers the detail column, not the sidebar. */
+      #detailPage { left: 300px; }
+      #detailPage .detail-nav { border-left: 1px solid var(--border-soft); }
+    }
   </style>
 </head>
 <body>
 
-  <!-- Landing Page -->
+  <!-- SF Symbol-style icon sprite — the same glyph vocabulary the iOS
+       app uses (person.crop.circle, sparkles, flame, play.circle, …). -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.6"/><path d="M15.7 15.7 20.6 20.6"/></g></symbol>
+    <symbol id="i-person" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9.2"/><circle cx="12" cy="9.6" r="3.1"/><path d="M5.9 18.9C7.3 15.9 9.4 14.7 12 14.7s4.7 1.2 6.1 4.2" stroke-linecap="round"/></g></symbol>
+    <symbol id="i-person-plus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M20.8 13.2A8.7 8.7 0 1 1 12.6 3.3"/><circle cx="11.7" cy="10" r="3"/><path d="M5.9 18.7c1.3-2.7 3.3-3.8 5.8-3.8 2.4 0 4.4 1.1 5.7 3.7"/><path d="M18.6 3.4v5M16.1 5.9h5"/></g></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><g fill="currentColor"><path d="M9.5 6.5 11.1 11 15.5 12.6 11.1 14.2 9.5 18.7 7.9 14.2 3.5 12.6 7.9 11Z"/><path d="M17.5 3 18.4 5.6 21 6.5 18.4 7.4 17.5 10 16.6 7.4 14 6.5 16.6 5.6Z"/><path d="M17.8 13.6 18.5 15.5 20.4 16.2 18.5 16.9 17.8 18.8 17.1 16.9 15.2 16.2 17.1 15.5Z"/></g></symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M12 3c.8 2.6 2.6 4.3 3.9 6.2 1.2 1.8 1.8 3.5 1.8 5.2 0 3.5-2.5 6.1-5.7 6.1s-5.7-2.6-5.7-6.1c0-2.2 1-4 2.3-5.5.4 1.1 1.1 2 2.1 2.4-.3-2.8.3-5.9 1.3-8.3z"/></symbol>
+    <symbol id="i-play-circle" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><circle cx="12" cy="12" r="9.2"/><path d="M10.1 8.6 15.4 12 10.1 15.4Z"/></g></symbol>
+    <symbol id="i-hourglass" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M7.2 3.5h9.6M7.2 20.5h9.6M8.4 3.5v2.6c0 2.4 3.6 3.5 3.6 5.9 0-2.4 3.6-3.5 3.6-5.9V3.5M8.4 20.5v-2.6c0-2.4 3.6-3.5 3.6-5.9 0 2.4 3.6 3.5 3.6 5.9v2.6"/></symbol>
+    <symbol id="i-thumbsup" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></symbol>
+    <symbol id="i-text-plus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6.5h9M3.5 12h13M3.5 17.5h13"/><path d="M18.5 3.9v5M16 6.4h5"/></g></symbol>
+    <symbol id="i-star-fill" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3.2 14.6 8.6 20.5 9.4 16.2 13.5 17.3 19.4 12 16.5 6.7 19.4 7.8 13.5 3.5 9.4 9.4 8.6Z"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M9 5.5 15.7 12 9 18.5"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M15 5.5 8.3 12 15 18.5"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5.5 9 12 15.7 18.5 9"/></symbol>
+    <symbol id="i-chevron-up" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5.5 15 12 8.3 18.5 15"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5H7.8A1.8 1.8 0 0 0 6 6.3v11.4a1.8 1.8 0 0 0 1.8 1.8h5.7M10.5 12h10M17 8.5 20.5 12 17 15.5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5.2v13.6M5.2 12h13.6"/></symbol>
+    <symbol id="i-creditcard" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.8" y="5.5" width="18.4" height="13" rx="2.2"/><path d="M2.8 9.8h18.4" stroke-width="2.2"/></g></symbol>
+    <symbol id="i-calendar-plus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.4"/><path d="M3.5 9.7h17M8 2.8v4M16 2.8v4M12 12.3v5.4M9.3 15h5.4"/></g></symbol>
+  </svg>
+
+  <!-- Landing Page — mirrors the iOS HomeView: large-title bar with
+       search + account, then an inset-grouped list (My Shows / What's
+       New, Trending, Members). At desktop widths the sections become
+       the iPad sidebar and Trending renders in the detail column. -->
   <div id="landingPage" class="hidden">
-    <div class="landing">
-      <div class="landing-topbar">
-        <span class="landing-auth" id="landingAuthBar">
-          <button class="btn btn-quiet btn-small" id="landingLoginBtn" onclick="login()">Log in</button>
-          <button class="btn btn-quiet btn-small hidden" id="landingLogoutBtn" onclick="logout()">Log out</button>
-        </span>
-      </div>
-      <h1>Show Picker Club</h1>
-      <p style="margin: 6px 0 0; font-size: 14px; color: var(--ink-muted); line-height: 1.5;">
-        Paying for streaming you don't watch? <a href="/subscriptions" style="color: var(--accent); text-decoration: none; font-weight: 600;">Audit your subscriptions</a> &mdash; see what to keep, pause, or cancel based on what's actually on your list.
-      </p>
-      <!-- My Shows + What's New: centered header-style links above Trending,
-           set in the same .section-title face as the Trending heading. -->
-      <a id="myShowsLink" href="#" class="section-title landing-nav-link hidden">My Shows</a>
-      <a href="/whats-new" class="section-title landing-nav-link">What's New</a>
-      <div id="popularSection" style="margin-top: 8px; margin-bottom: 24px; display: none;">
-        <h3 class="section-title">Trending</h3>
-        <div id="popularList" class="show-list" style="text-align: left;"></div>
-      </div>
+    <div class="home-shell">
+      <aside class="home-side">
+        <div class="home-titlebar">
+          <h1 class="home-title">Show Picker Club</h1>
+          <button class="icon-btn" title="Search all libraries" aria-label="Search all libraries" onclick="openLandingSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
+          <button class="icon-btn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
+        </div>
 
-      <div class="member-jump">
-        <label class="member-jump-label" for="memberJump">Go to a member's lists</label>
-        <select id="memberJump" class="member-jump-select" onchange="if(this.value)location.href=this.value">
-          <option value="">Pick a member&hellip;</option>
-        </select>
-      </div>
-      <div style="text-align: center; margin: 16px 0 0;">
-        <button class="btn btn-quiet" onclick="openLandingSearchModal()">Search all libraries</button>
-      </div>
-      <div style="text-align: center; margin-top: 24px;">
-        <a href="/reporting" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic;">Curious?</a>
-        <a href="/vibe" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic; margin-left: 16px;">Vibe</a>
-      </div>
+        <nav class="ios-group">
+          <a id="myShowsLink" class="ios-item hidden" href="#" style="font-weight: 600;">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-person"/></svg></span>
+            <span class="ios-item-label">My Shows</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <button id="homeLoginRow" class="ios-item" onclick="login()">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-person-plus"/></svg></span>
+            <span class="ios-item-label">Log in to see your shows</span>
+          </button>
+          <a class="ios-item always-sep" href="/whats-new">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
+            <span class="ios-item-label">What's New</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+        </nav>
 
-      <footer style="padding: 24px 0 20px; font-size: 12px; color: var(--ink-quiet); text-align: center;">
-        &copy; 2025 Patrick Turner.
-        <a id="adminLink" href="/admin" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Admin</a>
-        <a id="joinLink" href="/join" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Join link</a>
-      </footer>
+        <nav class="ios-group hidden side-admin">
+          <a class="ios-item" href="/admin">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-wrench"/></svg></span>
+            <span class="ios-item-label">Admin</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+        </nav>
+
+        <!-- Desktop only: Trending as a sidebar entry; its rows render in
+             the detail column beside it. -->
+        <nav class="ios-group home-side-trending hidden" id="trendingSideGroup">
+          <span class="ios-item side-list-row selected">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-flame"/></svg></span>
+            <span class="ios-item-label">Trending</span>
+          </span>
+        </nav>
+
+        <!-- Small screens: Trending inline, iPhone-style. -->
+        <div id="popularSection" style="display: none;">
+          <h3 class="ios-group-header">Trending</h3>
+          <div id="popularList" class="show-list" style="margin-bottom: 22px;"></div>
+        </div>
+
+        <div id="membersSection" class="hidden">
+          <h3 class="ios-group-header">Members</h3>
+          <nav class="ios-group" id="membersList"></nav>
+        </div>
+
+        <p class="ios-footnote">Ratings and metadata from IMDb (via OMDb) and TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+
+        <footer class="ios-footnote" style="margin-top: 26px;">
+          &copy; 2025 Patrick Turner.
+          <a href="/reporting">Curious?</a>
+          <a href="/vibe" style="margin-left: 8px;">Vibe</a>
+          <a id="adminLink" href="/admin" style="display:none; margin-left: 8px;">Admin</a>
+          <a id="joinLink" href="/join" style="display:none; margin-left: 8px;">Join link</a>
+        </footer>
+      </aside>
+
+      <section class="home-detail">
+        <div class="detail-bar"><h2>Trending</h2></div>
+        <div class="home-detail-inner">
+          <div id="popularDetailList" class="show-list"></div>
+          <div id="popularDetailStatus" class="loading">Loading&hellip;</div>
+        </div>
+      </section>
     </div>
   </div>
 
-  <!-- Member Show Page -->
+  <!-- Member Show Page — iPhone-style single stack on small screens;
+       at ≥1024px an iPad-style sidebar (this member's lists, What's
+       New, Trending, Members) appears beside the detail column. -->
   <div id="showPage" class="hidden">
-    <header>
-      <div class="header-top">
-        <div class="header-actions">
-          <a href="/?home" style="color: rgba(255,255,255,0.85); text-decoration: none; font-size: 24px; line-height: 1; padding: 6px 10px; margin: -6px 0 -6px -10px; border-radius: 6px;" title="All members" aria-label="Back to all members">&#9664;</a>
-          <button class="btn btn-search" id="searchBtn" title="Search this member's shows" onclick="openSearchModal()">Search</button>
-        </div>
-        <div class="header-actions">
-          <button class="btn btn-add hidden" id="addBtn" title="Add a new show" aria-label="Add a new show" onclick="openAddModal()">+</button>
-          <button class="btn btn-login" id="loginBtn" title="Log in to edit your shows" onclick="login()">Log in</button>
-          <button class="btn btn-login hidden" id="logoutBtn" title="Log out" aria-label="Log out" onclick="logout()">Log out</button>
-        </div>
+    <aside class="split-side" id="memberSideNav">
+      <div class="home-titlebar">
+        <h1 class="home-title"><a href="/?home">Show Picker Club</a></h1>
+        <button class="icon-btn" title="Search all libraries" aria-label="Search all libraries" onclick="openLandingSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
+        <button class="icon-btn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
       </div>
-      <h1 class="header-title" id="appTitle"></h1>
-      <div class="tabs" id="tabs">
-        <div class="tab active" data-list="watching" onclick="switchTab('watching')">Watching</div>
-        <div class="tab" data-list="waiting" onclick="switchTab('waiting')">Awaiting</div>
-        <div class="tab" data-list="recommending" onclick="switchTab('recommending')">Recommending</div>
-        <div class="tab" data-list="next" onclick="switchTab('next')">Up Next</div>
+      <h3 class="ios-group-header" id="sideListsHeader">Shows</h3>
+      <nav class="ios-group">
+        <button class="ios-item side-list-row selected" data-list="watching" onclick="switchTab('watching')">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-play-circle"/></svg></span>
+          <span class="ios-item-label">Watching</span>
+        </button>
+        <button class="ios-item side-list-row" data-list="waiting" onclick="switchTab('waiting')">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-hourglass"/></svg></span>
+          <span class="ios-item-label">Awaiting</span>
+        </button>
+        <button class="ios-item side-list-row" data-list="recommending" onclick="switchTab('recommending')">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-thumbsup"/></svg></span>
+          <span class="ios-item-label">Recommending</span>
+        </button>
+        <button class="ios-item side-list-row" data-list="next" onclick="switchTab('next')">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-text-plus"/></svg></span>
+          <span class="ios-item-label">Up Next</span>
+        </button>
+        <a class="ios-item" href="/whats-new">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
+          <span class="ios-item-label">What's New</span>
+        </a>
+      </nav>
+      <nav class="ios-group hidden side-admin">
+        <a class="ios-item" href="/admin">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-wrench"/></svg></span>
+          <span class="ios-item-label">Admin</span>
+        </a>
+      </nav>
+      <nav class="ios-group">
+        <a class="ios-item" href="/?home">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-flame"/></svg></span>
+          <span class="ios-item-label">Trending</span>
+        </a>
+      </nav>
+      <h3 class="ios-group-header">Members</h3>
+      <nav class="ios-group side-members" id="sideMembersList"></nav>
+      <p class="ios-footnote">Ratings and metadata from IMDb (via OMDb) and TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+    </aside>
+
+    <div class="split-detail">
+      <header>
+        <div class="header-top">
+          <div class="header-actions">
+            <a href="/?home" class="back-link" title="All members" aria-label="Back to all members"><svg class="ic"><use href="#i-chevron-left"/></svg>Home</a>
+          </div>
+          <div class="header-actions">
+            <button class="icon-btn" id="searchBtn" title="Search this member's shows" aria-label="Search this member's shows" onclick="openSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
+            <button class="icon-btn hidden" id="addBtn" title="Add a new show" aria-label="Add a new show" onclick="openAddModal()"><svg class="ic"><use href="#i-plus"/></svg></button>
+            <button class="btn-nav-text" id="loginBtn" title="Log in to edit your shows" onclick="login()">Log in</button>
+            <button class="icon-btn hidden" id="logoutBtn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
+          </div>
+        </div>
+        <h1 class="header-title" id="appTitle"></h1>
+        <div class="tabs" id="tabs">
+          <div class="tab active" data-list="watching" onclick="switchTab('watching')">Watching</div>
+          <div class="tab" data-list="waiting" onclick="switchTab('waiting')">Awaiting</div>
+          <div class="tab" data-list="recommending" onclick="switchTab('recommending')">Recommending</div>
+          <div class="tab" data-list="next" onclick="switchTab('next')">Up Next</div>
+        </div>
+        <div class="section-desc" id="sectionDesc"></div>
+      </header>
+
+      <main>
+        <div class="loading" id="loading">Loading shows...</div>
+        <div class="list-controls hidden" id="listControls"></div>
+        <div class="show-list" id="showList"></div>
+        <div class="empty hidden" id="empty">No shows in this list yet.</div>
+      </main>
+
+      <!-- Insights + calendar — the same grouped sections (and icons)
+           the iOS MemberView puts under the list. -->
+      <div class="member-extras">
+        <nav class="ios-group">
+          <a class="ios-item" href="/vibe">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
+            <span class="ios-item-label">Vibe</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden" id="subscriptionsLink" href="/subscriptions" title="See which streaming subscriptions you actually need right now">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
+            <span class="ios-item-label">Subscription audit</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+        </nav>
+        <nav class="ios-group hidden" id="calendarGroup" style="margin-bottom: 10px;">
+          <a class="ios-item" id="calendarFeedLink" href="#" title="Subscribe in Calendar to keep upcoming season dates on your phone">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-calendar-plus"/></svg></span>
+            <span class="ios-item-label">Subscribe in Calendar</span>
+          </a>
+        </nav>
+        <p class="ios-footnote" id="calendarFootnote" style="margin: 0 0 22px;"></p>
       </div>
-      <div class="section-desc" id="sectionDesc"></div>
-    </header>
 
-    <main>
-      <div class="loading" id="loading">Loading shows...</div>
-      <div class="list-controls hidden" id="listControls"></div>
-      <div class="show-list" id="showList"></div>
-      <div class="empty hidden" id="empty">No shows in this list yet.</div>
-    </main>
-
-    <div style="text-align: center; margin-top: 24px;">
-      <a href="/reporting" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic;">Curious?</a>
-      <a href="/vibe" style="color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic; margin-left: 16px;">Vibe</a>
-      <a id="calendarFeedLink" href="#" style="display:none; color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic; margin-left: 16px;" title="Subscribe in Calendar to keep upcoming season dates on your phone">📅 Calendar feed</a>
-      <a id="subscriptionsLink" href="/subscriptions" style="display:none; color: var(--ink-quiet); font-size: 13px; text-decoration: none; font-style: italic; margin-left: 16px;" title="See which streaming subscriptions you actually need right now">💸 Subscriptions</a>
+      <footer style="text-align: center; padding: 24px 16px 32px; font-size: 12px; color: var(--ink-quiet);">
+        &copy; 2025 Patrick Turner.
+        <a href="/reporting" style="color: inherit; margin-left: 6px;">Curious?</a>
+        <a class="admin-link" href="/admin" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Admin</a>
+        <a class="admin-link" href="/join" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Join link</a>
+      </footer>
     </div>
-
-    <footer style="text-align: center; padding: 24px 16px 32px; font-size: 12px; color: var(--ink-quiet);">
-      &copy; 2025 Patrick Turner.
-      <a class="admin-link" href="/admin" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Admin</a>
-      <a class="admin-link" href="/join" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Join link</a>
-    </footer>
-
   </div>
 
   <!-- Show detail screen — iOS-style pushed view, opened by tapping a show. -->
@@ -1218,6 +1488,7 @@
     let editingId = null;
     let memberSlug = null;
     let memberName = '';
+    let memberLabel = '';
     let editorName = '';
     let authMember = null;
     let searchMode = 'member';
@@ -1485,62 +1756,108 @@
       }
     }
 
+    // ── iOS-style Home rendering ──────────────────────────────────────
+    function memberActiveCount(m) {
+      // "Active" matches the iOS Home rows: Watching + Up Next + Recommending.
+      return (m.watching_count || 0) + (m.recommending_count || 0) + (m.next_count || 0);
+    }
+
+    // Trending row, mirroring the iOS popularRow: poster, title, network
+    // caption, orange star rating, disclosure chevron into the detail.
+    function trendingRowHtml(show) {
+      const poster = show.poster_url
+        ? `<img class="row-poster" src="${safeUrl(show.poster_url)}" alt="" loading="lazy">`
+        : `<div class="row-poster row-poster-empty">🎬</div>`;
+      const network = show.network ? `<div class="show-sub">${escapeHtml(show.network)}</div>` : '';
+      const rating = show.rating
+        ? `<span class="ios-rating"><svg class="ic"><use href="#i-star-fill"/></svg>${escapeHtml(show.rating)}</span>`
+        : '';
+      return `<div class="show ios-row" onclick="openDetail(${show.id})">
+        <div class="ios-row-main">
+          ${poster}
+          <div class="ios-row-text">
+            <div class="ios-row-title">${escapeHtml(show.title)}</div>
+            ${network}
+          </div>
+          ${rating}
+          <span class="ios-row-chevron">&#8250;</span>
+        </div>
+      </div>`;
+    }
+
+    // Member row for Home and the sidebar roster. keepHash carries the open
+    // list across to the next member's page, like the iPad's member refocus.
+    function memberRowHtml(m, opts = {}) {
+      const label = m.display_name || m.first_name || (m.name || '').split(' ')[0];
+      const active = memberActiveCount(m);
+      const detail = active > 0 ? `<span class="ios-item-detail">${active} active</span>` : '';
+      const hashJs = opts.keepHash ? ` onclick="this.href='/'+this.dataset.slug+location.hash"` : '';
+      return `<a class="ios-item no-icon${opts.selected ? ' selected' : ''}" href="/${escapeHtml(m.slug)}" data-slug="${escapeHtml(m.slug)}"${hashJs}>
+        <span class="ios-item-label">${escapeHtml(label)}</span>${detail}
+        <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+      </a>`;
+    }
+
+    let allHomeMembers = [];
+    let homeShowAllMembers = false;
+    const HOME_MEMBER_PREVIEW = 6;
+
+    function renderHomeMembers() {
+      const list = document.getElementById('membersList');
+      if (!list || !allHomeMembers.length) return;
+      const visible = homeShowAllMembers ? allHomeMembers : allHomeMembers.slice(0, HOME_MEMBER_PREVIEW);
+      let html = visible.map(m => memberRowHtml(m)).join('');
+      if (allHomeMembers.length > HOME_MEMBER_PREVIEW) {
+        const label = homeShowAllMembers ? 'Show fewer' : `Show all ${allHomeMembers.length} members`;
+        html += `<button class="ios-item" onclick="toggleHomeMembers()" style="color: var(--tint); font-size: 15px;">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-chevron-${homeShowAllMembers ? 'up' : 'down'}"/></svg></span>
+          <span class="ios-item-label">${label}</span>
+        </button>`;
+      }
+      list.innerHTML = html;
+      document.getElementById('membersSection').classList.remove('hidden');
+    }
+
+    function toggleHomeMembers() {
+      homeShowAllMembers = !homeShowAllMembers;
+      renderHomeMembers();
+    }
+
     async function showLanding() {
       document.getElementById('landingPage').classList.remove('hidden');
       document.title = 'Show Picker Club';
       try {
         const res = await fetch('/api/members');
         const data = await res.json();
-        const allMembers = data.members || [];
-        // Alphabetical jump dropdown — pick a member, go to their lists.
-        const byName = (a, b) =>
-          (a.display_name || a.first_name || a.name).localeCompare(
-            b.display_name || b.first_name || b.name, undefined, { sensitivity: 'base' });
-        const sorted = allMembers.slice().sort(byName);
-        const jump = document.getElementById('memberJump');
-        jump.innerHTML = '<option value="">Pick a member&hellip;</option>' +
-          sorted.map(h =>
-            `<option value="/${escapeHtml(h.slug)}">${escapeHtml(h.display_name || h.first_name || (h.name || '').split(' ')[0])}</option>`
-          ).join('');
-      } catch (e) {
-        const jump = document.getElementById('memberJump');
-        if (jump) jump.innerHTML = '<option value="">Failed to load members</option>';
-      }
+        // Most active first (Watching + Up Next + Recommending), then most
+        // recent activity — the same order as the iPhone home screen.
+        allHomeMembers = (data.members || []).slice().sort((a, b) => {
+          const aa = memberActiveCount(a), ba = memberActiveCount(b);
+          if (aa !== ba) return ba - aa;
+          return (b.last_activity_at || '').localeCompare(a.last_activity_at || '');
+        });
+        renderHomeMembers();
+      } catch (e) {}
 
-      // Load popular shows
+      // Trending renders twice: inline for the iPhone layout, and into the
+      // detail column the iPad-style split view shows beside the sidebar.
+      const detailStatus = document.getElementById('popularDetailStatus');
       try {
         const popRes = await fetch('/api/popular');
         const popData = await popRes.json();
-        if (popData.shows && popData.shows.length > 0) {
-          const popList = document.getElementById('popularList');
-          const hasRealUrl = (url) => url && !url.includes('/search') && !url.includes('/s?') && url !== '#';
-          popList.innerHTML = popData.shows.map((show, i) => {
-            const network = show.network
-              ? hasRealUrl(show.network_url)
-                ? ` <span class="show-on">on</span> <a class="show-network" href="${escapeHtml(safeUrl(show.network_url))}" target="_blank" rel="noopener">${escapeHtml(show.network)}</a>`
-                : ` <span class="show-on">on</span> <span class="show-network-plain">${escapeHtml(show.network)}</span>`
-              : '';
-            const rating = show.rating ? ` <span class="show-rating"><span class="star">&#9733;</span>${escapeHtml(show.rating)}</span>` : '';
-            const movieTag = show.movie ? ' <span class="show-movie">(Movie)</span>' : '';
-            const memberList = (show.members || []).join(', ');
-            const badge = ` <span class="popular-members-badge" onclick="toggleExpand(${show.id})" title="Tap to see who's watching">${show.member_count} Members</span>`;
-            const poster = show.poster_url
-              ? `<img class="row-poster" src="${safeUrl(show.poster_url)}" alt="" loading="lazy">`
-              : `<div class="row-poster row-poster-empty">🎬</div>`;
-            const details = buildDetailLines(show, { aggregate: true });
-            return `<div class="show popular-row">
-              <div class="show-row">
-                <button class="share-btn popular-add-btn" style="display:none;" data-title="${escapeHtml(show.title)}" data-network="${escapeHtml(show.network || '')}" data-url="${escapeHtml(show.network_url || '')}" data-movie="${show.movie || 0}" title="Add to my list">+</button>
-                ${poster}
-                <span class="show-info"><span class="show-title clickable" title="Tap to see more" onclick="toggleExpand(${show.id})">${escapeHtml(show.title)}<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></span>${network}${rating}${movieTag}${badge}</span>
-              </div>
-              <div class="show-actors" id="actors-${show.id}">${details}</div>
-            </div>`;
-          }).join('');
+        const rows = (popData.shows || []).map(trendingRowHtml).join('');
+        if (rows) {
+          document.getElementById('popularList').innerHTML = rows;
+          document.getElementById('popularDetailList').innerHTML = rows;
           document.getElementById('popularSection').style.display = 'block';
+          document.getElementById('trendingSideGroup').classList.remove('hidden');
+          detailStatus.remove();
+        } else {
+          detailStatus.textContent = 'Nothing trending yet.';
         }
-      } catch (e) {}
-      // Check auth after popular list is rendered so + buttons can be shown
+      } catch (e) {
+        detailStatus.textContent = 'Failed to load trending shows.';
+      }
       checkAuth();
     }
 
@@ -1551,22 +1868,23 @@
       const calLink = document.getElementById('calendarFeedLink');
       if (calLink) {
         calLink.href = `webcal://showpicker.club/calendar/${encodeURIComponent(slug)}.ics`;
-        calLink.style.display = 'inline';
+        document.getElementById('calendarGroup').classList.remove('hidden');
       }
 
-      // Get member name
+      // Get member name (and fill the iPad-style sidebar roster)
       try {
         const res = await fetch('/api/members');
         const data = await res.json();
         const h = data.members.find(h => h.slug === slug);
         if (h) {
           owners = h.first_name || h.name.split(' ')[0];
-          const label = h.display_name || owners;
-          memberName = `${label}'s Shows`;
+          memberLabel = h.display_name || owners;
+          memberName = `${memberLabel}'s Shows`;
         } else {
           memberName = 'Shows';
           owners = 'the owners';
         }
+        renderSideMembers(data.members || []);
       } catch (e) {
         memberName = 'Shows';
         owners = 'the owners';
@@ -1574,15 +1892,19 @@
 
       document.title = memberName;
       document.getElementById('appTitle').textContent = memberName;
+      const calNote = document.getElementById('calendarFootnote');
+      if (calNote && memberLabel) {
+        calNote.textContent = `Adds ${memberLabel}'s upcoming season premieres and finales to your calendar app.`;
+      }
+      updateSideListsHeader();
 
       // Check hash for tab
       const hash = window.location.hash.replace('#', '');
       if (['watching', 'waiting', 'recommending', 'next'].includes(hash)) {
         currentTab = hash;
-        document.querySelectorAll('.tab').forEach(t => {
-          t.classList.toggle('active', t.dataset.list === hash);
-        });
+        syncListSelection(hash);
       }
+      updateHeaderTitle();
       updateDesc();
 
       checkAuth().then(() => {
@@ -1602,6 +1924,89 @@
       });
       loadShows();
       if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+    }
+
+    // ── iPad-style sidebar sync (≥1024px split view) ─────────────────
+    // Selection state lives in two places: the segmented control (iPhone
+    // layout) and the sidebar list rows (iPad layout). Keep both in step.
+    function syncListSelection(list) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.list === list));
+      document.querySelectorAll('.side-list-row').forEach(r => r.classList.toggle('selected', r.dataset.list === list));
+    }
+
+    const desktopSplit = window.matchMedia('(min-width: 1024px)');
+    // On the split layout the detail bar titles the open list, like iOS
+    // ("Watching", or "Pat · Watching" on someone else's page); on mobile
+    // it stays "{Name}'s Shows".
+    function updateHeaderTitle() {
+      const el = document.getElementById('appTitle');
+      if (!el || !memberSlug) return;
+      if (desktopSplit.matches) {
+        const mine = authMember && authMember === memberSlug;
+        const listTitle = TAB_LABELS[currentTab] || '';
+        el.textContent = mine ? listTitle : `${memberLabel || memberName} · ${listTitle}`;
+      } else {
+        el.textContent = memberName;
+      }
+    }
+    desktopSplit.addEventListener('change', updateHeaderTitle);
+
+    function updateSideListsHeader() {
+      const el = document.getElementById('sideListsHeader');
+      if (!el || !memberSlug) return;
+      el.textContent = (authMember && authMember === memberSlug)
+        ? 'My Shows'
+        : (memberLabel ? `${memberLabel}'s Shows` : 'Shows');
+    }
+
+    function renderSideMembers(members) {
+      const list = document.getElementById('sideMembersList');
+      if (!list) return;
+      // Most recently active first — the iPad sidebar's roster order.
+      const sorted = members.slice().sort((a, b) => {
+        const la = a.last_activity_at || '', lb = b.last_activity_at || '';
+        if (la !== lb) return lb.localeCompare(la);
+        return memberActiveCount(b) - memberActiveCount(a);
+      });
+      list.innerHTML = sorted.map(m =>
+        memberRowHtml(m, { selected: m.slug === memberSlug, keepHash: true })
+      ).join('');
+    }
+
+    // ── Account control ──────────────────────────────────────────────
+    // One person-circle button everywhere, like iOS: logged out it opens
+    // the login sheet; logged in it opens a small menu with Log out.
+    let accountMenuEl = null;
+    function accountTapped(e) {
+      const btn = e.currentTarget || e.target;
+      if (authMember) toggleAccountMenu(btn);
+      else login();
+    }
+    function toggleAccountMenu(btn) {
+      if (accountMenuEl) { closeAccountMenu(); return; }
+      const menu = document.createElement('div');
+      menu.className = 'account-menu';
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.innerHTML = 'Log out <svg class="ic"><use href="#i-logout"/></svg>';
+      item.addEventListener('click', () => { closeAccountMenu(); logout(); });
+      menu.appendChild(item);
+      document.body.appendChild(menu);
+      const r = btn.getBoundingClientRect();
+      menu.style.top = (r.bottom + 6) + 'px';
+      // Hang from the button's right edge, but keep the menu on-screen for
+      // buttons near the left (sidebar) edge.
+      menu.style.right = Math.max(8, Math.min(window.innerWidth - r.right, window.innerWidth - 190)) + 'px';
+      accountMenuEl = menu;
+      setTimeout(() => document.addEventListener('click', accountMenuOutside), 0);
+    }
+    function accountMenuOutside(e) {
+      if (accountMenuEl && !accountMenuEl.contains(e.target)) closeAccountMenu();
+    }
+    function closeAccountMenu() {
+      if (accountMenuEl) accountMenuEl.remove();
+      accountMenuEl = null;
+      document.removeEventListener('click', accountMenuOutside);
     }
 
     // Keyboard shortcuts (member page only):
@@ -1682,15 +2087,17 @@
             const joinLink = document.getElementById('joinLink');
             if (joinLink) joinLink.style.display = '';
             document.querySelectorAll('.admin-link').forEach(a => a.style.display = '');
+            // Admin group in the Home list and the sidebar (wrench row).
+            document.querySelectorAll('.side-admin').forEach(el => el.classList.remove('hidden'));
           }
-          // Show + buttons on popular list if on landing page
-          document.querySelectorAll('.popular-add-btn').forEach(b => b.style.display = '');
-          // Show "My Shows" link on landing page
+          // Home: swap the login row for the My Shows row.
           const myShowsLink = document.getElementById('myShowsLink');
           if (myShowsLink && authMember) {
             myShowsLink.href = `/${authMember}`;
             myShowsLink.classList.remove('hidden');
           }
+          const homeLoginRow = document.getElementById('homeLoginRow');
+          if (homeLoginRow && authMember) homeLoginRow.classList.add('hidden');
           // On the user's own member page, expose the Add button immediately —
           // no need to enter edit mode just to add a show.
           if (authMember && typeof memberSlug !== 'undefined' && authMember === memberSlug) {
@@ -1698,17 +2105,15 @@
             if (addBtn) addBtn.classList.remove('hidden');
             // Subscription audit is personal — only on your own page.
             const subsLink = document.getElementById('subscriptionsLink');
-            if (subsLink) subsLink.style.display = 'inline';
+            if (subsLink) subsLink.classList.remove('hidden');
           }
           const logoutBtn = document.getElementById('logoutBtn');
           if (logoutBtn) logoutBtn.classList.remove('hidden');
-          const landingLoginBtn = document.getElementById('landingLoginBtn');
-          const landingLogoutBtn = document.getElementById('landingLogoutBtn');
-          if (landingLoginBtn) landingLoginBtn.classList.add('hidden');
-          if (landingLogoutBtn) landingLogoutBtn.classList.remove('hidden');
         }
       } catch (e) {}
       updateLoginBtnLabel();
+      updateSideListsHeader();
+      updateHeaderTitle();
     }
 
     function login() {
@@ -1732,17 +2137,21 @@
       } catch {}
       authMember = null;
       editorName = '';
+      closeAccountMenu();
       const logoutBtn = document.getElementById('logoutBtn');
       if (logoutBtn) logoutBtn.classList.add('hidden');
       const addBtn = document.getElementById('addBtn');
       if (addBtn) addBtn.classList.add('hidden');
-      const landingLoginBtn = document.getElementById('landingLoginBtn');
-      const landingLogoutBtn = document.getElementById('landingLogoutBtn');
-      if (landingLoginBtn) landingLoginBtn.classList.remove('hidden');
-      if (landingLogoutBtn) landingLogoutBtn.classList.add('hidden');
       const myShowsLink = document.getElementById('myShowsLink');
       if (myShowsLink) myShowsLink.classList.add('hidden');
+      const homeLoginRow = document.getElementById('homeLoginRow');
+      if (homeLoginRow) homeLoginRow.classList.remove('hidden');
+      const subsLink = document.getElementById('subscriptionsLink');
+      if (subsLink) subsLink.classList.add('hidden');
+      document.querySelectorAll('.side-admin').forEach(el => el.classList.add('hidden'));
       updateLoginBtnLabel();
+      updateSideListsHeader();
+      updateHeaderTitle();
       if (typeof renderShows === 'function' && typeof shows !== 'undefined') renderShows();
     }
 
@@ -1990,9 +2399,8 @@
     function switchTab(list) {
       currentTab = list;
       window.location.hash = list;
-      document.querySelectorAll('.tab').forEach(t => {
-        t.classList.toggle('active', t.dataset.list === list);
-      });
+      syncListSelection(list);
+      updateHeaderTitle();
       updateDesc();
       renderShows();
     }
@@ -2466,9 +2874,7 @@
       const overlay = document.getElementById('searchOverlay');
       document.getElementById('searchTitleInput').value = '';
       document.getElementById('searchActorInput').value = '';
-      const titleEl = document.getElementById('appTitle');
-      const memberLabel = (titleEl && titleEl.textContent.trim()) || 'these';
-      document.getElementById('searchModalTitle').textContent = `Search ${memberLabel}`;
+      document.getElementById('searchModalTitle').textContent = `Search ${memberName || 'these shows'}`;
       document.getElementById('searchResults').innerHTML = '<div class="search-empty">Loading…</div>';
       overlay.classList.remove('hidden');
 
@@ -2662,27 +3068,6 @@
 
     let popularShowData = null;
 
-    async function openPopularShare(title, network, networkUrl, movie) {
-      if (!authMember) { openLoginModal(); return; }
-      await loadMembers();
-      popularShowData = { title, network, network_url: networkUrl, movie };
-      document.getElementById('shareShowId').value = '';
-      document.getElementById('shareTitle').value = title;
-      document.getElementById('shareNotes').value = '';
-      document.getElementById('shareName').value = editorName || authMember;
-
-      const select = document.getElementById('shareMember');
-      const label = h => h.display_name || h.first_name || h.name.split(' ')[0];
-      select.innerHTML = allMembers
-        .slice()
-        .sort((a, b) => label(a).localeCompare(label(b)))
-        .map(h => `<option value="${h.slug}">${escapeHtml(label(h) + "'s Shows")}</option>`)
-        .join('');
-
-      document.getElementById('shareOverlay').classList.remove('hidden');
-      document.getElementById('shareNotes').focus();
-    }
-
     async function openShareModal(showId) {
       if (!authMember) { openLoginModal(); return; }
       await loadMembers();
@@ -2781,20 +3166,6 @@
     }
 
     let addMyListData = null;
-
-    // Popular-list "+" buttons carry their show data in data-* attributes and
-    // are wired here via delegation, so no member-supplied text is ever
-    // interpolated into an inline event handler.
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest && e.target.closest('.popular-add-btn');
-      if (!btn) return;
-      openAddMyList(
-        btn.dataset.title || '',
-        btn.dataset.network || '',
-        btn.dataset.url || '',
-        parseInt(btn.dataset.movie, 10) || 0
-      );
-    });
 
     function openAddMyList(title, network, networkUrl, movie) {
       addMyListData = { title, network, network_url: networkUrl, movie };

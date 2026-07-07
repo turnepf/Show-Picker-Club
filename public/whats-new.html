@@ -9,15 +9,21 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="apple-touch-icon" href="/favicon.svg">
-  <meta name="theme-color" content="#2e2825">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
   <link rel="stylesheet" href="/styles.css?v=4">
   <style>
+    /* Light iOS nav bar with a tint back link, matching the app chrome. */
+    :root { --tint: #6D63EB; }
+    @media (prefers-color-scheme: dark) { :root { --tint: #8D87F5; } }
     body { padding-top: 0; }
     header {
-      background: var(--header-bg);
-      color: #fff;
-      padding: 20px;
-      padding-top: calc(20px + env(safe-area-inset-top, 0px));
+      background: color-mix(in srgb, var(--surface) 88%, transparent);
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      color: var(--ink);
+      border-bottom: 1px solid var(--border-soft);
+      padding: 12px 20px;
+      padding-top: calc(12px + env(safe-area-inset-top, 0px));
       position: sticky;
       top: 0;
       z-index: 10;
@@ -28,21 +34,23 @@
       gap: 8px;
       max-width: 720px;
       margin: 0 auto;
+      position: relative;
     }
     .header-top a.back {
-      color: rgba(255,255,255,0.85);
+      color: var(--tint);
       text-decoration: none;
-      font-size: 24px;
+      font-size: 16px;
       line-height: 1;
-      padding: 6px 10px;
-      margin: -6px 0 -6px -10px;
-      border-radius: 6px;
+      padding: 6px 10px 6px 0;
+      position: relative; z-index: 1;
     }
     .header-top h1 {
-      font-family: var(--font-display);
-      font-size: var(--text-xl);
+      font-family: var(--font-sans);
+      font-size: 17px;
       font-weight: 600;
-      letter-spacing: -0.01em;
+      position: absolute;
+      left: 50%; transform: translateX(-50%);
+      white-space: nowrap;
     }
     main {
       max-width: 720px;
@@ -70,13 +78,14 @@
 <body>
   <header>
     <div class="header-top">
-      <a class="back" href="/" title="Home" aria-label="Back to home">&#9664;</a>
+      <a class="back" href="/" title="Home" aria-label="Back to home">&#8249; Home</a>
       <h1>What's New</h1>
     </div>
   </header>
 
   <main>
     <div class="changelog">
+      <p><span class="cl-date">7/7</span><span class="cl-title">The web looks like the app now.</span> The website has been redesigned to mirror the iOS app: the same home screen, icons, and fonts on your phone, and an iPad-style sidebar layout on bigger screens.</p>
       <p><span class="cl-date">7/4</span><span class="cl-title">Subscription Audit.</span> Paying for streaming you don't watch? Visit <a href="/subscriptions">the Subscription Audit</a> to see which services to keep, pause, or cancel based on what's actually on your lists.</p>
       <p><span class="cl-date">6/29</span><span class="cl-title">Shake to pick.</span> On iPhone, give your phone a shake to pull a random show from your Up Next list &mdash; an instant answer to "what should we watch?"</p>
       <p><span class="cl-date">6/29</span><span class="cl-title">Share a show.</span> Send any show to a friend through the standard share sheet &mdash; text, email, or any app &mdash; from the web or the iOS app. Tap <strong>Share</strong> on a show.</p>
