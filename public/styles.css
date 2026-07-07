@@ -123,9 +123,9 @@ body.admin-page { padding: 32px 16px 80px; }
 }
 .admin-nav a.back:hover { color: var(--ink); text-decoration: none; }
 .admin-title {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-size: var(--text-lg);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--ink);
   margin-bottom: 6px;
