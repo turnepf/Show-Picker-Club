@@ -389,6 +389,8 @@
     .home-title a { color: inherit; text-decoration: none; }
     .home-detail { display: none; }
     .home-side-trending { display: none; }
+    /* Desktop-only affordances (four-list group header + rows). */
+    .ios-item.home-list-row, #homeListsHeader { display: none; }
 
     /* Detail-column title bar (desktop split view) */
     .detail-bar {
@@ -403,8 +405,13 @@
     @media (min-width: 1024px) {
       .home-shell {
         display: grid; grid-template-columns: 300px minmax(0, 1fr);
-        max-width: none; margin: 0; padding: 0;
+        margin: 0 auto; padding: 0;
         height: 100vh; height: 100dvh; overflow: hidden;
+        /* Letterboxed shell, matching the member page's split view. */
+        max-width: var(--shell-max, 1180px);
+        background: var(--surface-2);
+        border-left: 1px solid var(--border-soft);
+        border-right: 1px solid var(--border-soft);
       }
       .home-side {
         overflow-y: auto;
@@ -420,6 +427,11 @@
       .home-side-trending:not(.hidden) { display: block; }
       #popularSection { display: none !important; }
       #membersList { max-height: 250px; overflow-y: auto; }
+      /* The single My Shows row expands into the four lists (iPad). */
+      .ios-item.home-list-row:not(.hidden) { display: flex; }
+      #homeListsHeader:not(.hidden) { display: block; }
+      #myShowsLink { display: none !important; }
+      #myShowsLink + .home-list-row::after { display: none; }
     }
 
     /* ── Inset-grouped list vocabulary (Home + sidebars + extras) ── */
@@ -730,7 +742,11 @@
       --ios-orange: #FF9500;    /* SwiftUI .orange — star ratings */
       --seg-track: color-mix(in srgb, var(--ink) 9%, transparent);
       --seg-active: #ffffff;
-      --nav-bg: color-mix(in srgb, var(--surface) 88%, transparent);
+      /* Bars share the page's recessed tone (iOS nav material over a
+         grouped background) so chrome and content read as one surface. */
+      --nav-bg: color-mix(in srgb, var(--surface-2) 86%, transparent);
+      /* Width of the letterboxed split-view shell on desktop. */
+      --shell-max: 1180px;
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -753,7 +769,7 @@
       padding-top: calc(8px + env(safe-area-inset-top, 0px));
     }
     .header-top { min-height: 34px; }
-    .header-title { font-size: 17px; font-weight: 600; margin: 6px 0 10px; color: var(--ink); }
+    .header-title { font-family: var(--font-sans); letter-spacing: 0; font-size: 17px; font-weight: 600; margin: 6px 0 10px; color: var(--ink); }
     .btn { border-radius: 9px; }
 
     /* Segmented control (the four lists) — iOS gray track on the light
@@ -1015,9 +1031,19 @@
        single-stack layout and the sidebar stays hidden. */
     .split-side { display: none; }
     @media (min-width: 1024px) {
+      /* Letterbox the split view: the sidebar + detail form one centered
+         app shell (like the iPad app in a window), with the warm taupe
+         page showing in the leftover space on either side — so the detail
+         content sits tucked against the nav instead of floating. */
+      body { background: var(--body); }
       #showPage:not(.hidden) {
         display: grid; grid-template-columns: 300px minmax(0, 1fr);
         height: 100vh; height: 100dvh; overflow: hidden;
+        max-width: var(--shell-max, 1180px);
+        margin: 0 auto;
+        background: var(--surface-2);
+        border-left: 1px solid var(--border-soft);
+        border-right: 1px solid var(--border-soft);
       }
       .split-side {
         display: block;
@@ -1034,8 +1060,12 @@
          control disappear from the detail bar. */
       #showPage .back-link { display: none; }
       #showPage .tabs { display: none; }
-      /* Pushed show detail covers the detail column, not the sidebar. */
-      #detailPage { left: 300px; }
+      /* Pushed show detail covers the detail column, not the sidebar —
+         offset by the letterbox margin plus the sidebar width. */
+      #detailPage {
+        left: calc((100vw - min(100vw, var(--shell-max, 1180px))) / 2 + 300px);
+        right: calc((100vw - min(100vw, var(--shell-max, 1180px))) / 2);
+      }
       #detailPage .detail-nav { border-left: 1px solid var(--border-soft); }
     }
   </style>
@@ -1079,11 +1109,31 @@
           <button class="icon-btn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
         </div>
 
+        <!-- iPhone home shows a single "My Shows" row; the desktop split
+             view expands it into the four lists, exactly like the iPad
+             sidebar (the rows deep-link to your page with the list open). -->
+        <h3 class="ios-group-header hidden" id="homeListsHeader">My Shows</h3>
         <nav class="ios-group">
           <a id="myShowsLink" class="ios-item hidden" href="#" style="font-weight: 600;">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-person"/></svg></span>
             <span class="ios-item-label">My Shows</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden home-list-row" data-list="watching" href="#">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-play-circle"/></svg></span>
+            <span class="ios-item-label">Watching</span>
+          </a>
+          <a class="ios-item hidden home-list-row" data-list="waiting" href="#">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-hourglass"/></svg></span>
+            <span class="ios-item-label">Awaiting</span>
+          </a>
+          <a class="ios-item hidden home-list-row" data-list="recommending" href="#">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-thumbsup"/></svg></span>
+            <span class="ios-item-label">Recommending</span>
+          </a>
+          <a class="ios-item hidden home-list-row" data-list="next" href="#">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-text-plus"/></svg></span>
+            <span class="ios-item-label">Up Next</span>
           </a>
           <button id="homeLoginRow" class="ios-item" onclick="login()">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-person-plus"/></svg></span>
@@ -2090,11 +2140,20 @@
             // Admin group in the Home list and the sidebar (wrench row).
             document.querySelectorAll('.side-admin').forEach(el => el.classList.remove('hidden'));
           }
-          // Home: swap the login row for the My Shows row.
+          // Home: swap the login row for My Shows — a single row on small
+          // screens, the four lists (iPad sidebar) on the split view.
           const myShowsLink = document.getElementById('myShowsLink');
           if (myShowsLink && authMember) {
             myShowsLink.href = `/${authMember}`;
             myShowsLink.classList.remove('hidden');
+          }
+          if (authMember) {
+            const listsHeader = document.getElementById('homeListsHeader');
+            if (listsHeader) listsHeader.classList.remove('hidden');
+            document.querySelectorAll('.home-list-row').forEach(r => {
+              r.href = `/${authMember}#${r.dataset.list}`;
+              r.classList.remove('hidden');
+            });
           }
           const homeLoginRow = document.getElementById('homeLoginRow');
           if (homeLoginRow && authMember) homeLoginRow.classList.add('hidden');
@@ -2144,6 +2203,9 @@
       if (addBtn) addBtn.classList.add('hidden');
       const myShowsLink = document.getElementById('myShowsLink');
       if (myShowsLink) myShowsLink.classList.add('hidden');
+      const listsHeader = document.getElementById('homeListsHeader');
+      if (listsHeader) listsHeader.classList.add('hidden');
+      document.querySelectorAll('.home-list-row').forEach(r => r.classList.add('hidden'));
       const homeLoginRow = document.getElementById('homeLoginRow');
       if (homeLoginRow) homeLoginRow.classList.remove('hidden');
       const subsLink = document.getElementById('subscriptionsLink');
