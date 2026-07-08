@@ -34,15 +34,31 @@ function titleVariants(raw) {
   return out.slice(0, 3);
 }
 
-// First TMDB result across the title variants (or null). type is 'tv' | 'movie'.
+// Best TMDB result across the title variants (or null). type is 'tv' | 'movie'.
+//
+// TMDB sorts search results by popularity, not title match, so a popular
+// spin-off outranks the exact-title original it was named after — a search for
+// "Below Deck" returns the more-popular "Below Deck Mediterranean" first, and
+// blindly taking results[0] pins the wrong poster on the original. So prefer a
+// result whose title matches the query exactly (case-insensitive); only fall
+// back to the first (most-popular) result when nothing matches exactly.
+function tmdbResultTitle(r, type) {
+  return ((type === 'movie' ? r.title : r.name) || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
 async function tmdbSearchFirst(title, type, env) {
+  let fallback = null;
   for (const q of titleVariants(title)) {
     try {
       const data = await tmdbGet(`/search/${type}?query=${encodeURIComponent(q)}`, env);
-      if (data && data.results && data.results.length) return data.results[0];
+      const results = (data && data.results) || [];
+      if (!results.length) continue;
+      const want = q.toLowerCase();
+      const exact = results.find((r) => tmdbResultTitle(r, type) === want);
+      if (exact) return exact;
+      if (!fallback) fallback = results[0];
     } catch (e) {}
   }
-  return null;
+  return fallback;
 }
 
 // Single raw-title search against the *other* media type. Documentaries and

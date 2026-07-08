@@ -145,9 +145,18 @@ export async function fetchEnrichment(title, env, isMovie) {
       }
 
       if (search) {
+        // TMDB sorts by popularity, so a popular spin-off ("Below Deck
+        // Mediterranean") can outrank the exact-title original ("Below Deck")
+        // and hand it the wrong poster. Prefer a result whose title matches
+        // exactly (case-insensitive); fall back to the most-popular result.
+        const want = title.replace(/\s+/g, ' ').trim().toLowerCase();
+        const pick = search.results.find(
+          (r) => ((mediaType === 'movie' ? r.title : r.name) || '')
+            .replace(/\s+/g, ' ').trim().toLowerCase() === want
+        ) || search.results[0];
         const result = await enrichFromTmdbId(
-          search.results[0].id, mediaType, env,
-          tmdbPosterUrl(search.results[0].poster_path)
+          pick.id, mediaType, env,
+          tmdbPosterUrl(pick.poster_path)
         );
         return { ...result, canonicalTitle: result.canonicalTitle || title };
       }
