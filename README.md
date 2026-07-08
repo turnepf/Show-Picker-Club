@@ -121,6 +121,18 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    email and only when both secrets are set; leave them unset to disable it.
    Put the same email + code in App Store Connect → App Review Information.
 
+   To also let **Sign in with Apple** reach the demo — which App Review tests
+   directly, and the reason a prior submission was rejected under Guideline
+   2.1(a) — turn on the Apple fallback. Any Apple ID that isn't a real member
+   then signs into the same demo member (resolved from `DEMO_LOGIN_EMAIL`);
+   real members still match first, and the demo link is never persisted:
+   ```bash
+   printf "1" | wrangler pages secret put DEMO_APPLE_FALLBACK --project-name shows
+   ```
+   Set it for review, or leave it on to let anyone try the app via Sign in with
+   Apple. Unset it to return to a strict invite-only wall. See the full
+   pre-submission steps in [`docs/APP_STORE_SUBMISSION.md`](docs/APP_STORE_SUBMISSION.md).
+
 5. **Create the Pages project and do the first deploy.**
    ```bash
    wrangler pages project create shows
