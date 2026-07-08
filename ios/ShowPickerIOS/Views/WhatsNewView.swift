@@ -20,7 +20,6 @@ struct WhatsNewView: View {
         .init(date: "6/29", title: "Share a show.", body: "Send any show to a friend through the standard share sheet \u{2014} Messages, Mail, AirDrop, anything. Tap the share button on a show's detail screen."),
         .init(date: "6/29", title: "Seasons released.", body: "Show rows now tell you how many seasons have dropped, right next to the Next up date (e.g. \u{201C}Next up: 6/1 \u{00B7} 3 seasons\u{201D})."),
         .init(date: "6/29", title: "Straight to your shows.", body: "Open the app while you're logged in and you land right on your own list, instead of the home screen."),
-        .init(date: "6/29", title: "Vibe in the app.", body: "The taste-vibe page is now in the app, alongside the web \u{2014} find Vibe on your member page. This changelog is in the app too."),
         .init(date: "5/21", title: "Calendar feed.", body: "Each member page now has a 📅 Calendar feed link at the bottom. Subscribe in Apple Calendar, Google Calendar, or Fantastical to get upcoming season premieres and finales from that member's Watching and Waiting lists, updated daily."),
         .init(date: "5/9", title: "Vibe.", body: "See a personality fingerprint based on each member's taste: cluster name, top trait signals, balance read, and shows aligned with the vibe. Open Vibe from any member's page."),
         .init(date: "4/28", title: "One-tap Add.", body: "The + Add button appears on your member page as soon as you're logged in. No need to enter edit mode first."),
@@ -33,13 +32,11 @@ struct WhatsNewView: View {
         .init(date: "4/15", title: "New domain!", body: "Show Picker Club is now at showpicker.club. The old link still works too."),
         .init(date: "4/15", title: "Share shows to other members.", body: "See a show on someone else's list that you want to add to yours? Send it to another member's Up Next. It carries over the rating, network link, actors, and all the details."),
         .init(date: "4/15", title: "Sort your lists.", body: "Sort any list by Rating (default), A\u{2013}Z, Date Added, or Next up."),
-        .init(date: "4/15", title: "Network links sync across members.", body: "When someone finds a good direct link for a show, it automatically copies to matching shows on other members' lists (runs once per day)."),
         .init(date: "4/15", title: "Watching With field.", body: "Track who you're watching a show with."),
         .init(date: "4/14", title: "Series Complete icon.", body: "Shows that have ended get a 🎬 badge."),
         .init(date: "4/13", title: "Suggest a Show.", body: "Logged-in members can suggest shows to any other member."),
         .init(date: "4/13", title: "Season dates.", body: "See when the next season starts (and when it ends) pulled automatically from TMDB."),
         .init(date: "4/13", title: "Multi-member support.", body: "One app, multiple members, each with their own lists and login codes."),
-        .init(date: "4/13", title: "PWA support.", body: "Add Show Picker Club to your phone's home screen for an app-like experience."),
         .init(date: "4/12", title: "Initial launch.", body: "Add, edit, move, and archive shows across four lists: Watching, Waiting, Recommending, and Up Next. Auto-enriched with IMDb ratings, actors, and network links."),
     ]
 
