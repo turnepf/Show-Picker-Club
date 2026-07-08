@@ -189,6 +189,17 @@ A few intentional omissions:
 
 ## Backlog
 
+- **Pending What's New entries — publish with the app builds.** These
+  features shipped in code but their changelog entries are held until the
+  matching build reaches TestFlight (add to both `public/whats-new.html`
+  and `ios/ShowPickerIOS/Views/WhatsNewView.swift`):
+  - **Show Picker on your wrist** — companion Apple Watch app, lists synced
+    from iPhone (7/1).
+  - **Your next premiere, at a glance** — watch-face complication showing the
+    soonest upcoming season premiere from your lists (7/1).
+  - **Show Picker on your Mac** — the iPhone app running natively on macOS
+    via Catalyst (7/7).
+
 - **Retire the after-the-fact title-healing bandaids.** Since July 2026,
   adding or suggesting a show searches TMDB as you type and the member
   picks the exact entry (`/api/title-search` + `tmdb_id`/`tmdb_type`
