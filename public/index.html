@@ -2502,6 +2502,11 @@
     }
 
     function switchTab(list) {
+      // If a show's detail is open, picking a list should jump straight to that
+      // list — otherwise the detail overlay stays on top (it only covers the
+      // detail column on the split view, so the sidebar is still clickable) and
+      // the list change happens invisibly behind it.
+      if (document.getElementById('detailPage').classList.contains('open')) closeDetail();
       currentTab = list;
       window.location.hash = list;
       syncListSelection(list);
