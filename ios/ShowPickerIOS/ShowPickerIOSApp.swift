@@ -11,6 +11,9 @@ struct ShowPickerIOSApp: App {
                 .environmentObject(auth)
                 .task {
                     Connectivity.shared.start()
+                    // Activate WatchConnectivity early so the phone is ready to
+                    // push the session and answer the watch's live request.
+                    WatchBridge.shared.start()
                     await auth.refresh()
                     // Drain anything queued while the app was closed/offline.
                     await OfflineQueue.shared.flush()

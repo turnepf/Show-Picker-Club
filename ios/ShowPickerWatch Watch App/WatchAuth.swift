@@ -41,17 +41,33 @@ final class WatchAuth: NSObject, ObservableObject, WCSessionDelegate {
         }
     }
 
+    // Ask the phone for the current session, if it's reachable right now.
+    private func requestLiveSession(_ session: WCSession) {
+        guard session.isReachable else { return }
+        session.sendMessage(["request": "session"], replyHandler: { [weak self] reply in
+            self?.apply(reply)
+        }, errorHandler: { _ in })
+    }
+
     // MARK: WCSessionDelegate
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
-        apply(session.receivedApplicationContext)
-        if session.isReachable {
-            session.sendMessage(["request": "session"], replyHandler: { [weak self] reply in
-                self?.apply(reply)
-            }, errorHandler: { _ in })
+        // Only apply a context the phone has actually sent. An empty dictionary
+        // means "nothing handed off yet" — applying it would wipe the session
+        // we just restored from the cache in init(). An explicit sign-out
+        // arrives as ["member": "", …] (keys present) and still clears.
+        if !session.receivedApplicationContext.isEmpty {
+            apply(session.receivedApplicationContext)
         }
+        requestLiveSession(session)
     }
 
     func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
         apply(applicationContext)
+    }
+
+    // The phone came within reach after launch (e.g. its app was just opened) —
+    // pull the session live instead of waiting for the next hand-off.
+    func sessionReachabilityDidChange(_ session: WCSession) {
+        requestLiveSession(session)
     }
 }
