@@ -132,19 +132,11 @@ struct IPadHomeView: View {
                     }
                 }
             }
-            if let focused = focusedMember {
+            if focusedMember != nil {
                 Section(listsHeader) {
                     ForEach(ShowList.allCases) { l in
                         Label(l.title, systemImage: listIcon(l))
                             .tag(SidebarItem.list(l))
-                    }
-                    whatsNewRow
-                    // Subscription audit is personal, so it only appears when
-                    // the lists in focus are your own — matching the web sidebar
-                    // and the row under your own MemberView.
-                    if auth.isMe(focused.slug) {
-                        Label("Subscription audit", systemImage: "creditcard")
-                            .tag(SidebarItem.subscriptionAudit)
                     }
                 }
             } else if !auth.isLoggedIn && !loading {
@@ -152,11 +144,23 @@ struct IPadHomeView: View {
                     Button { showingLogin = true } label: {
                         Label("Log in to see your shows", systemImage: "person.crop.circle.badge.plus")
                     }
-                    whatsNewRow
                 }
             }
-            if auth.isAdmin {
-                Section {
+            // Discovery + account group, kept separate from the member lists
+            // above: Trending, What's New, Subscription audit, then Admin.
+            Section {
+                if !popular.isEmpty {
+                    Label("Trending", systemImage: "flame")
+                        .tag(SidebarItem.trending)
+                }
+                whatsNewRow
+                // Subscription audit is personal, so it only appears once you're
+                // signed in — matching the web sidebar and your own MemberView.
+                if myMember != nil {
+                    Label("Subscription audit", systemImage: "creditcard")
+                        .tag(SidebarItem.subscriptionAudit)
+                }
+                if auth.isAdmin {
                     DisclosureGroup(isExpanded: $adminExpanded) {
                         Label("Reporting", systemImage: "chart.bar.xaxis")
                             .tag(SidebarItem.adminReporting)
@@ -180,12 +184,6 @@ struct IPadHomeView: View {
                     }
                 }
             }
-            if !popular.isEmpty {
-                Section {
-                    Label("Trending", systemImage: "flame")
-                        .tag(SidebarItem.trending)
-                }
-            }
             if !members.isEmpty {
                 Section("Members") {
                     membersWindow
@@ -203,8 +201,8 @@ struct IPadHomeView: View {
         .refreshable { await load() }
     }
 
-    // Lives under Up Next in the lists section (or under the login prompt when
-    // logged out) rather than in the account menu.
+    // Lives in the discovery group beneath the member lists, rather than in
+    // the account menu.
     private var whatsNewRow: some View {
         Label("What's New", systemImage: "sparkles")
             .tag(SidebarItem.whatsNew)

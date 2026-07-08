@@ -388,7 +388,11 @@
     }
     .home-title a { color: inherit; text-decoration: none; }
     .home-detail { display: none; }
-    .home-side-trending { display: none; }
+    /* The Trending row only belongs to the desktop split view; on the iPhone
+       layout Trending is the inline section below. Hidden here, and its
+       trailing hairline suppressed so the What's New row leads the card. */
+    .ios-item.home-side-trending { display: none; }
+    .ios-item.home-side-trending + .ios-item::after { display: none; }
     /* Desktop-only affordances (four-list group header + rows). */
     .ios-item.home-list-row, #homeListsHeader { display: none; }
 
@@ -423,8 +427,11 @@
       .home-detail { display: block; overflow-y: auto; padding: 0 24px 48px; }
       .home-detail-inner { max-width: 720px; margin: 0 auto; }
       /* Trending is a sidebar entry with a detail column on wide screens
-         (iPad); an inline section on small ones (iPhone). */
-      .home-side-trending:not(.hidden) { display: block; }
+         (iPad); an inline section on small ones (iPhone). Once its data has
+         loaded it leads the discovery card, so the What's New row below it
+         gets its hairline back. */
+      .ios-item.home-side-trending:not(.hidden) { display: flex; }
+      .ios-item.home-side-trending:not(.hidden) + .ios-item::after { display: block; }
       #popularSection { display: none !important; }
       #membersList { max-height: 250px; overflow-y: auto; }
       /* The single My Shows row expands into the four lists (iPad). */
@@ -1142,7 +1149,19 @@
             <span class="ios-item-icon"><svg class="ic"><use href="#i-person-plus"/></svg></span>
             <span class="ios-item-label">Log in to see your shows</span>
           </button>
-          <a class="ios-item always-sep" href="/whats-new">
+        </nav>
+
+        <!-- Discovery + account group, kept separate from My Shows above:
+             Trending, What's New, Subscription audit, then Admin. On the
+             desktop split view Trending is a sidebar entry (its rows render
+             in the detail column beside it); on the iPhone layout it becomes
+             the inline section below, so its row here is hidden. -->
+        <nav class="ios-group">
+          <span class="ios-item side-list-row selected home-side-trending hidden" id="trendingSideGroup">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-flame"/></svg></span>
+            <span class="ios-item-label">Trending</span>
+          </span>
+          <a class="ios-item" href="/whats-new">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
             <span class="ios-item-label">What's New</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
@@ -1152,23 +1171,11 @@
             <span class="ios-item-label">Subscription audit</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
-        </nav>
-
-        <nav class="ios-group hidden side-admin">
-          <a class="ios-item" href="/admin">
+          <a class="ios-item hidden side-admin" href="/admin">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-wrench"/></svg></span>
             <span class="ios-item-label">Admin</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
-        </nav>
-
-        <!-- Desktop only: Trending as a sidebar entry; its rows render in
-             the detail column beside it. -->
-        <nav class="ios-group home-side-trending hidden" id="trendingSideGroup">
-          <span class="ios-item side-list-row selected">
-            <span class="ios-item-icon"><svg class="ic"><use href="#i-flame"/></svg></span>
-            <span class="ios-item-label">Trending</span>
-          </span>
         </nav>
 
         <!-- Small screens: Trending inline, iPhone-style. -->
@@ -1241,6 +1248,14 @@
           <span class="ios-item-icon"><svg class="ic"><use href="#i-text-plus"/></svg></span>
           <span class="ios-item-label">Up Next</span>
         </button>
+      </nav>
+      <!-- Discovery + account group, kept separate from the lists above:
+           Trending, What's New, Subscription audit, then Admin. -->
+      <nav class="ios-group">
+        <a class="ios-item" href="/?home">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-flame"/></svg></span>
+          <span class="ios-item-label">Trending</span>
+        </a>
         <a class="ios-item" href="/whats-new">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
           <span class="ios-item-label">What's New</span>
@@ -1249,17 +1264,9 @@
           <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
           <span class="ios-item-label">Subscription audit</span>
         </a>
-      </nav>
-      <nav class="ios-group hidden side-admin">
-        <a class="ios-item" href="/admin">
+        <a class="ios-item hidden side-admin" href="/admin">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-wrench"/></svg></span>
           <span class="ios-item-label">Admin</span>
-        </a>
-      </nav>
-      <nav class="ios-group">
-        <a class="ios-item" href="/?home">
-          <span class="ios-item-icon"><svg class="ic"><use href="#i-flame"/></svg></span>
-          <span class="ios-item-label">Trending</span>
         </a>
       </nav>
       <h3 class="ios-group-header">Members</h3>

@@ -4,7 +4,8 @@
  * Secondary pages (What's New, Subscriptions, Vibe, Reporting) include this
  * with <script src="/shell.js" defer></script>. On ≥1024px screens it wraps
  * the page in the same letterboxed split view as the main app: the sidebar
- * (My Shows lists, What's New, Trending, Members) on the left, the page
+ * (My Shows lists; then Trending, What's New, Subscription audit, Admin;
+ * then Members) on the left, the page
  * itself as the detail column. Small screens are untouched — the sidebar
  * stays hidden and the page keeps its own single-column layout.
  *
@@ -216,14 +217,18 @@
       if (authMember) {
         html += '<h3 class="ios-group-header">My Shows</h3><div class="ios-group">' +
           LISTS.map(function (l) { return iconRow('/' + authMember + '#' + l.list, l.label, l.icon); }).join('') +
-          iconRow('/whats-new', "What's New", 'sparkles', { selected: location.pathname === '/whats-new' }) +
-          iconRow('/subscriptions', 'Subscription audit', 'creditcard', { selected: location.pathname === '/subscriptions' }) +
           '</div>';
       } else {
         html += '<div class="ios-group">' +
           iconRow('/?home', 'Log in to see your shows', 'person-plus') +
-          iconRow('/whats-new', "What's New", 'sparkles', { selected: location.pathname === '/whats-new' }) +
           '</div>';
+      }
+      // Discovery + account group, kept separate from My Shows above:
+      // Trending, What's New, Subscription audit, then Admin.
+      var discover = iconRow('/?home', 'Trending', 'flame') +
+        iconRow('/whats-new', "What's New", 'sparkles', { selected: location.pathname === '/whats-new' });
+      if (authMember) {
+        discover += iconRow('/subscriptions', 'Subscription audit', 'creditcard', { selected: location.pathname === '/subscriptions' });
       }
       if (auth.is_admin) {
         // Accordion: expanded automatically on an admin page, with the
@@ -233,16 +238,15 @@
           return '<a class="ios-item no-icon' + (p.href === location.pathname ? ' selected' : '') + '" href="' + p.href + '">' +
             '<span class="ios-item-label">' + esc(p.label) + '</span></a>';
         }).join('');
-        html += '<div class="ios-group">' +
+        discover +=
           '<button class="ios-item shell-admin-toggle' + (onAdminPage ? ' open' : '') + '" type="button">' +
           '<span class="ios-item-icon"><svg class="ic"><use href="#s-wrench"/></svg></span>' +
           '<span class="ios-item-label">Admin</span>' +
           '<svg class="ic ios-item-chev"><use href="#s-chevron-right"/></svg>' +
           '</button>' +
-          '<div class="shell-admin-sub"' + (onAdminPage ? '' : ' hidden') + '>' + subRows + '</div>' +
-          '</div>';
+          '<div class="shell-admin-sub"' + (onAdminPage ? '' : ' hidden') + '>' + subRows + '</div>';
       }
-      html += '<div class="ios-group">' + iconRow('/?home', 'Trending', 'flame') + '</div>';
+      html += '<div class="ios-group">' + discover + '</div>';
       if (members.length) {
         // Most recently active first — the sidebar roster order.
         var sorted = members.slice().sort(function (a, b) {

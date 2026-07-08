@@ -52,7 +52,6 @@ struct HomeView: View {
                                 Label("My Shows", systemImage: "person.crop.circle")
                                     .font(.body.weight(.semibold))
                             }
-                            whatsNewRow
                         }
                     } else if !auth.isLoggedIn {
                         Section {
@@ -61,11 +60,21 @@ struct HomeView: View {
                             } label: {
                                 Label("Log in to see your shows", systemImage: "person.crop.circle.badge.plus")
                             }
-                            whatsNewRow
                         }
                     }
-                    if auth.isAdmin {
-                        Section {
+                    // Discovery + account group, separated from My Shows above:
+                    // What's New, Subscription audit (personal), then Admin.
+                    // Trending is its own content section further down.
+                    Section {
+                        whatsNewRow
+                        if myMember != nil {
+                            NavigationLink {
+                                SubscriptionAuditView()
+                            } label: {
+                                Label("Subscription audit", systemImage: "creditcard")
+                            }
+                        }
+                        if auth.isAdmin {
                             NavigationLink {
                                 AdminView().environmentObject(auth)
                             } label: {
@@ -168,8 +177,8 @@ struct HomeView: View {
         }
     }
 
-    // Sits under My Shows (or under the login prompt when logged out) rather
-    // than in the account menu.
+    // Leads the discovery group beneath My Shows, rather than living in the
+    // account menu.
     private var whatsNewRow: some View {
         NavigationLink(value: Route.whatsNew) {
             Label("What's New", systemImage: "sparkles")
