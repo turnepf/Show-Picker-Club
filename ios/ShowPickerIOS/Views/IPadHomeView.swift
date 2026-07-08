@@ -18,6 +18,7 @@ enum SidebarItem: Hashable {
     case trending
     case admin
     case whatsNew
+    case subscriptionAudit
 }
 
 struct IPadHomeView: View {
@@ -105,13 +106,20 @@ struct IPadHomeView: View {
                     }
                 }
             }
-            if focusedMember != nil {
+            if let focused = focusedMember {
                 Section(listsHeader) {
                     ForEach(ShowList.allCases) { l in
                         Label(l.title, systemImage: listIcon(l))
                             .tag(SidebarItem.list(l))
                     }
                     whatsNewRow
+                    // Subscription audit is personal, so it only appears when
+                    // the lists in focus are your own — matching the web sidebar
+                    // and the row under your own MemberView.
+                    if auth.isMe(focused.slug) {
+                        Label("Subscription audit", systemImage: "creditcard")
+                            .tag(SidebarItem.subscriptionAudit)
+                    }
                 }
             } else if !auth.isLoggedIn && !loading {
                 Section {
@@ -250,6 +258,8 @@ struct IPadHomeView: View {
                 AdminView().environmentObject(auth)
             case .whatsNew:
                 WhatsNewView()
+            case .subscriptionAudit:
+                SubscriptionAuditView()
             }
         } else {
             placeholder("Pick a list or Trending from the sidebar.", "sidebar.left")
