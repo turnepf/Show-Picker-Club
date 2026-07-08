@@ -1060,6 +1060,9 @@
          control disappear from the detail bar. */
       #showPage .back-link { display: none; }
       #showPage .tabs { display: none; }
+      /* Subscription audit lives in the sidebar on the split view, so the
+         duplicate under-list row hides (Vibe + Calendar stay). */
+      #showPage .member-extras #subscriptionsLink { display: none; }
       /* Pushed show detail covers the detail column, not the sidebar —
          offset by the letterbox margin plus the sidebar width. */
       #detailPage {
@@ -1142,6 +1145,11 @@
           <a class="ios-item always-sep" href="/whats-new">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
             <span class="ios-item-label">What's New</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden home-subs-row" href="/subscriptions">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
+            <span class="ios-item-label">Subscription audit</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
         </nav>
@@ -1236,6 +1244,10 @@
         <a class="ios-item" href="/whats-new">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
           <span class="ios-item-label">What's New</span>
+        </a>
+        <a class="ios-item hidden member-subs-row" href="/subscriptions">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
+          <span class="ios-item-label">Subscription audit</span>
         </a>
       </nav>
       <nav class="ios-group hidden side-admin">
@@ -2173,6 +2185,9 @@
               r.href = `/${authMember}#${r.dataset.list}`;
               r.classList.remove('hidden');
             });
+            // Subscription audit is personal — surfaced in the Home sidebar
+            // once you're logged in.
+            document.querySelectorAll('.home-subs-row').forEach(r => r.classList.remove('hidden'));
           }
           const homeLoginRow = document.getElementById('homeLoginRow');
           if (homeLoginRow && authMember) homeLoginRow.classList.add('hidden');
@@ -2181,9 +2196,11 @@
           if (authMember && typeof memberSlug !== 'undefined' && authMember === memberSlug) {
             const addBtn = document.getElementById('addBtn');
             if (addBtn) addBtn.classList.remove('hidden');
-            // Subscription audit is personal — only on your own page.
+            // Subscription audit is personal — only on your own page. Shown
+            // both under the list (mobile) and in the sidebar (split view).
             const subsLink = document.getElementById('subscriptionsLink');
             if (subsLink) subsLink.classList.remove('hidden');
+            document.querySelectorAll('.member-subs-row').forEach(r => r.classList.remove('hidden'));
           }
           const logoutBtn = document.getElementById('logoutBtn');
           if (logoutBtn) logoutBtn.classList.remove('hidden');
@@ -2229,6 +2246,7 @@
       if (homeLoginRow) homeLoginRow.classList.remove('hidden');
       const subsLink = document.getElementById('subscriptionsLink');
       if (subsLink) subsLink.classList.add('hidden');
+      document.querySelectorAll('.home-subs-row, .member-subs-row').forEach(r => r.classList.add('hidden'));
       document.querySelectorAll('.side-admin').forEach(el => el.classList.add('hidden'));
       updateLoginBtnLabel();
       updateSideListsHeader();
