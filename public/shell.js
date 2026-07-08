@@ -33,6 +33,7 @@
     '<symbol id="s-text-plus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6.5h9M3.5 12h13M3.5 17.5h13"/><path d="M18.5 3.9v5M16 6.4h5"/></g></symbol>' +
     '<symbol id="s-chevron-right" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M9 5.5 15.7 12 9 18.5"/></symbol>' +
     '<symbol id="s-logout" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5H7.8A1.8 1.8 0 0 0 6 6.3v11.4a1.8 1.8 0 0 0 1.8 1.8h5.7M10.5 12h10M17 8.5 20.5 12 17 15.5"/></symbol>' +
+    '<symbol id="s-creditcard" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.8" y="5.5" width="18.4" height="13" rx="2.2"/><path d="M2.8 9.8h18.4" stroke-width="2.2"/></g></symbol>' +
     '</svg>';
 
   var CSS =
@@ -53,8 +54,10 @@
     '  }' +
     '  .shell-side { display: block; overflow-y: auto; padding: 0 14px 24px; border-right: 1px solid var(--border-soft); }' +
     '  .shell-detail { overflow-y: auto; min-width: 0; padding: var(--shell-page-pad, 0); }' +
-    /* The sidebar owns admin navigation; the top pill nav bows out. */
+    /* The sidebar owns navigation, so a page's own top pill nav / back
+       link is redundant on the split view and bows out. */
     '  .shell-detail .admin-nav { display: none; }' +
+    '  .shell-detail .topbar a.back, .shell-detail .header-top a.back { display: none; }' +
     '}' +
     '.shell-titlebar { display: flex; align-items: center; gap: 4px; padding: 12px 0; }' +
     '.shell-title { flex: 1; min-width: 0; font-family: var(--font-sans); font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }' +
@@ -203,6 +206,7 @@
         html += '<h3 class="ios-group-header">My Shows</h3><div class="ios-group">' +
           LISTS.map(function (l) { return iconRow('/' + authMember + '#' + l.list, l.label, l.icon); }).join('') +
           iconRow('/whats-new', "What's New", 'sparkles', { selected: location.pathname === '/whats-new' }) +
+          iconRow('/subscriptions', 'Subscription audit', 'creditcard', { selected: location.pathname === '/subscriptions' }) +
           '</div>';
       } else {
         html += '<div class="ios-group">' +
