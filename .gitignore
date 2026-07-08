@@ -4,7 +4,6 @@ deployments.local.md
 backups/
 .wrangler/
 node_modules/
-CLAUDE.md
 infrastructure/
 *.xcuserstate
 xcuserdata/

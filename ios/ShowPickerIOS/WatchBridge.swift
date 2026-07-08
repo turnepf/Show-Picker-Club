@@ -8,6 +8,13 @@ import WatchConnectivity
 final class WatchBridge: NSObject, WCSessionDelegate {
     static let shared = WatchBridge()
 
+    // The latest context we want the watch to have. Held until the session
+    // finishes activating (activation is async), then flushed. Without this,
+    // the first send() at launch races activation, throws WCSessionNotActivated,
+    // gets swallowed by `try?`, and the watch never receives the session — so
+    // it never logs in.
+    private var pendingContext: [String: Any]?
+
     private override init() {
         super.init()
         guard WCSession.isSupported() else { return }
@@ -15,7 +22,8 @@ final class WatchBridge: NSObject, WCSessionDelegate {
         WCSession.default.activate()
     }
 
-    // Touch this once at launch so the session activates early.
+    // Touch this once at launch so the session activates early, so the phone is
+    // ready to answer the watch's live request even before anyone signs in.
     func start() {}
 
     // Push the current session to the watch (empty strings = signed out).
@@ -25,7 +33,14 @@ final class WatchBridge: NSObject, WCSessionDelegate {
             "member": memberSlug ?? "",
             "cookie": cookie ?? "",
         ]
-        try? WCSession.default.updateApplicationContext(ctx)
+        let session = WCSession.default
+        guard session.activationState == .activated else {
+            // Not activated yet — remember it and flush on activation.
+            pendingContext = ctx
+            return
+        }
+        pendingContext = nil
+        try? session.updateApplicationContext(ctx)
     }
 
     func clear() { send(memberSlug: nil, cookie: nil) }
@@ -38,7 +53,12 @@ final class WatchBridge: NSObject, WCSessionDelegate {
     }
 
     // MARK: WCSessionDelegate
-    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {}
+    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+        // Activation is async; flush any session we queued before it finished.
+        guard activationState == .activated, let ctx = pendingContext else { return }
+        pendingContext = nil
+        try? session.updateApplicationContext(ctx)
+    }
     func sessionDidBecomeInactive(_ session: WCSession) {}
     func sessionDidDeactivate(_ session: WCSession) { WCSession.default.activate() }
 
