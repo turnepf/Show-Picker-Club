@@ -132,12 +132,11 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         return "\(m)/\(d)"
     }
 
-    // Premiere of the next season ("6/1" or "6/1 – 6/30"); nil without a
-    // premiere date. Used on the Watching/Awaiting list rows.
+    // Premiere of the next season ("6/1"); nil without a premiere date.
+    // Used on the Watching/Awaiting list rows. Deliberately just the one
+    // date — the finale date stays off "Next up" everywhere.
     public var nextUpRange: String? {
-        guard let start = monthDay(nextSeasonDate) else { return nil }
-        if let end = monthDay(seasonEndDate), end != start { return "\(start) – \(end)" }
-        return start
+        monthDay(nextSeasonDate)
     }
 
     // Whatever season dates exist, for the detail view (falls back to a

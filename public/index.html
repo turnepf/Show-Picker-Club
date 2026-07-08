@@ -1718,10 +1718,9 @@
       return lines.map(l => `<div class="show-detail-line">${l}</div>`).join('');
     }
 
+    // Just the premiere date — the finale date stays off "Next up" everywhere.
     function formatSeasonRange(show) {
-      const start = formatDate(show.next_season_date);
-      const end = show.season_end_date ? formatDate(show.season_end_date) : null;
-      return end && end !== start ? `${start} – ${end}` : start;
+      return formatDate(show.next_season_date);
     }
 
     // "3 seasons" / "1 season" — total seasons released so far, when known.

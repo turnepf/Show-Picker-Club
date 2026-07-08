@@ -335,7 +335,7 @@ struct ShowDetailView: View {
         .font(.system(size: 24))
     }
 
-    // "Next up: 6/29 – 7/13 · 3 seasons" — the same M/D formatting and seasons
+    // "Next up: 6/29 · 3 seasons" — the same M/D formatting and seasons
     // count the iOS rows use, instead of raw ISO dates.
     private func seasonLine(_ s: Show) -> String? {
         var parts: [String] = []
