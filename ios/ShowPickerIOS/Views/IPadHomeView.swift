@@ -16,9 +16,17 @@ import SwiftUI
 enum SidebarItem: Hashable {
     case list(ShowList)
     case trending
-    case admin
     case whatsNew
     case subscriptionAudit
+    // Admin sub-tools. The sidebar's Admin row is a disclosure accordion
+    // whose entries mirror the iPhone AdminView's options, each opening its
+    // screen in the detail column.
+    case adminReporting
+    case adminCreateMember
+    case adminManageMembers
+    case adminNewMembers
+    case adminUrlCleanup
+    case adminVibe
 }
 
 struct IPadHomeView: View {
@@ -35,6 +43,10 @@ struct IPadHomeView: View {
 
     private let memberRowHeight: CGFloat = 38
     private let memberWindowRows = 5
+    // Admin accordion expansion; opens automatically when an admin tool is in
+    // focus (e.g. after a detail-column reset) so the current page stays visible.
+    @State private var adminExpanded = false
+    private let joinURL = URL(string: "https://showpicker.club/join")!
 
     private var myMember: Member? {
         guard let slug = auth.memberSlug else { return nil }
@@ -79,6 +91,20 @@ struct IPadHomeView: View {
         // Auth may resolve after the member list loads; land on your Watching
         // list once it does (unless the user has already picked something).
         .onChange(of: auth.memberSlug) { _, _ in applyInitialSelection() }
+        // Keep the Admin accordion open whenever one of its tools is selected.
+        .onChange(of: selection) { _, sel in
+            if sel.map(isAdminItem) == true { adminExpanded = true }
+        }
+    }
+
+    private func isAdminItem(_ item: SidebarItem) -> Bool {
+        switch item {
+        case .adminReporting, .adminCreateMember, .adminManageMembers,
+             .adminNewMembers, .adminUrlCleanup, .adminVibe:
+            return true
+        default:
+            return false
+        }
     }
 
     // Distinguishes both "which section" and "whose lists" so switching members
@@ -131,8 +157,27 @@ struct IPadHomeView: View {
             }
             if auth.isAdmin {
                 Section {
-                    Label("Admin", systemImage: "wrench.and.screwdriver")
-                        .tag(SidebarItem.admin)
+                    DisclosureGroup(isExpanded: $adminExpanded) {
+                        Label("Reporting", systemImage: "chart.bar.xaxis")
+                            .tag(SidebarItem.adminReporting)
+                        Label("Create member", systemImage: "person.badge.plus")
+                            .tag(SidebarItem.adminCreateMember)
+                        Label("Manage members", systemImage: "person.2.badge.gearshape")
+                            .tag(SidebarItem.adminManageMembers)
+                        Label("New members", systemImage: "tray.and.arrow.down")
+                            .tag(SidebarItem.adminNewMembers)
+                        Label("URL cleanup & titles", systemImage: "link.badge.plus")
+                            .tag(SidebarItem.adminUrlCleanup)
+                        Label("Vibe trait scoring", systemImage: "sparkles")
+                            .tag(SidebarItem.adminVibe)
+                        ShareLink(item: joinURL,
+                                  subject: Text("Show Picker Club"),
+                                  message: Text("Join Show Picker Club")) {
+                            Label("Sign-up link", systemImage: "square.and.arrow.up")
+                        }
+                    } label: {
+                        Label("Admin", systemImage: "wrench.and.screwdriver")
+                    }
                 }
             }
             if !popular.isEmpty {
@@ -254,12 +299,22 @@ struct IPadHomeView: View {
                 }
             case .trending:
                 TrendingListView(shows: popular)
-            case .admin:
-                AdminView().environmentObject(auth)
             case .whatsNew:
                 WhatsNewView()
             case .subscriptionAudit:
                 SubscriptionAuditView()
+            case .adminReporting:
+                ReportingView().environmentObject(auth)
+            case .adminCreateMember:
+                CreateMemberView().environmentObject(auth)
+            case .adminManageMembers:
+                ManageMembersView().environmentObject(auth)
+            case .adminNewMembers:
+                SignupRequestsView().environmentObject(auth)
+            case .adminUrlCleanup:
+                UrlCleanupView().environmentObject(auth)
+            case .adminVibe:
+                VibeAdminView().environmentObject(auth)
             }
         } else {
             placeholder("Pick a list or Trending from the sidebar.", "sidebar.left")

@@ -32,7 +32,7 @@ struct AdminView: View {
                 NavigationLink {
                     SignupRequestsView()
                 } label: {
-                    Label("Signup requests", systemImage: "tray.and.arrow.down")
+                    Label("New members", systemImage: "tray.and.arrow.down")
                 }
             }
             Section {
@@ -53,7 +53,7 @@ struct AdminView: View {
             } header: {
                 Text("Invite")
             } footer: {
-                Text("Send this to someone you want in the club — they fill out the form and land in Signup requests.")
+                Text("Send this to someone you want in the club — they fill out the form and land in New members.")
             }
             Section("Content") {
                 NavigationLink {
