@@ -24,6 +24,27 @@ function allowedClientIds(env) {
   return configured.length ? configured : DEFAULT_CLIENT_IDS;
 }
 
+// When enabled, an Apple ID we don't recognize is signed into the shared demo
+// member instead of being turned away. Off unless DEMO_APPLE_FALLBACK is a
+// truthy string. Flip it on for App Review (who sign in with their own Apple
+// ID and would otherwise hit the invite-only wall), or leave it on to let
+// anyone try the app.
+function demoFallbackEnabled(env) {
+  const v = (env.DEMO_APPLE_FALLBACK || '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+}
+
+// The demo member is the one behind DEMO_LOGIN_EMAIL — a single source of truth
+// shared with the email/code reviewer login in auth/login.js.
+async function demoMemberSlug(env) {
+  const demoEmail = (env.DEMO_LOGIN_EMAIL || '').trim().toLowerCase();
+  if (!demoEmail) return null;
+  const row = await env.DB.prepare(
+    'SELECT member_slug FROM member_emails WHERE LOWER(email) = ? LIMIT 1'
+  ).bind(demoEmail).first();
+  return row?.member_slug || null;
+}
+
 async function failureCount(env, ip) {
   const since = new Date(Date.now() - WINDOW_MIN * 60 * 1000).toISOString();
   const row = await env.DB.prepare(
@@ -152,6 +173,15 @@ export async function onRequestPost(context) {
         'INSERT OR REPLACE INTO member_apple_ids (apple_sub, member_slug, email, created_at) VALUES (?, ?, ?, ?)'
       ).bind(sub, memberSlug, email, new Date().toISOString()).run();
     }
+  }
+
+  // 3) Demo / public trial fallback: no real member matched, but the demo
+  // fallback is on — sign this Apple ID into the shared demo member. The link
+  // is deliberately NOT persisted to member_apple_ids: if this person is later
+  // added as a real member, their next sign-in re-resolves to their own
+  // account instead of staying pinned to the demo.
+  if (!memberSlug && demoFallbackEnabled(env)) {
+    memberSlug = await demoMemberSlug(env);
   }
 
   if (!memberSlug) {
