@@ -29,7 +29,7 @@ struct SignupRequestsView: View {
                 }
             }
         }
-        .navigationTitle("Signup Requests")
+        .navigationTitle("New members")
         .navigationBarTitleDisplayMode(.inline)
         .overlay { if loading && requests.isEmpty { ProgressView() } }
         .task { await load() }

@@ -111,7 +111,7 @@
   // Operator pages, in the same order as the old top pill nav (Reporting
   // added; it lives under Admin on iOS).
   var ADMIN_PAGES = [
-    { href: '/admin', label: 'Overview' },
+    { href: '/admin', label: 'New members' },
     { href: '/members', label: 'Members' },
     { href: '/url-cleanup', label: 'URL cleanup' },
     { href: '/vibe-admin', label: 'Vibe admin' },

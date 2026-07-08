@@ -3472,15 +3472,18 @@
       if (show.movie) rows.push(detailRow('Type', 'Movie'));
       if (show.full_series) rows.push(detailRow('Series', 'Complete'));
       if (show.genres) rows.push(detailRow('Genres', escapeHtml(show.genres)));
-      if (show.recommended_by) rows.push(detailRow('Recommended by', escapeHtml(show.recommended_by)));
-      if (show.watching_with) rows.push(detailRow('Watching with', escapeHtml(show.watching_with)));
+      // Recommended-by / watching-with / notes are per-member, so they reflect
+      // MY copy — not whatever row (a trending pick, or another member's list)
+      // opened this screen. Hidden if I don't have this title.
+      if (detailMyCopy && detailMyCopy.recommended_by) rows.push(detailRow('Recommended by', escapeHtml(detailMyCopy.recommended_by)));
+      if (detailMyCopy && detailMyCopy.watching_with) rows.push(detailRow('Watching with', escapeHtml(detailMyCopy.watching_with)));
       if (show.next_season_date) rows.push(detailRow('Next up', escapeHtml(formatSeasonRange(show))));
       if (seasonsText(show)) rows.push(detailRow('Seasons', escapeHtml(seasonsText(show))));
 
       let html = '';
       if (show.poster_url) html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy" onclick="togglePosterLightbox(this)"></div>`;
       html += `<div class="detail-card">${rows.join('')}</div>`;
-      if (show.notes) html += `<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-prose">${escapeHtml(show.notes)}</div></div>`;
+      if (detailMyCopy && detailMyCopy.notes) html += `<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-prose">${escapeHtml(detailMyCopy.notes)}</div></div>`;
       if (actors.length) {
         const cast = actors.map(a => a.imdb_id
           ? `<a href="https://www.imdb.com/name/${encodeURIComponent(a.imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(a.name)}</a>`

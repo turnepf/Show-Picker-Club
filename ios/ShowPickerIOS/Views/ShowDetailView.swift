@@ -69,10 +69,13 @@ struct ShowDetailView: View {
                     if !s.genreList.isEmpty {
                         LabeledContent("Genres", value: s.genreList.joined(separator: " · "))
                     }
-                    if let by = s.recommendedBy, !by.isEmpty {
+                    // Recommended-by / watching-with are per-member, so they
+                    // reflect MY copy — not whatever row (a trending pick, or
+                    // another member's list) happened to open this screen.
+                    if let by = myCopy?.recommendedBy, !by.isEmpty {
                         LabeledContent("Recommended by", value: by)
                     }
-                    if let w = s.watchingWith, !w.isEmpty {
+                    if let w = myCopy?.watchingWith, !w.isEmpty {
                         LabeledContent("Watching with", value: w)
                     }
                     if let dates = s.seasonDatesText {
@@ -84,7 +87,8 @@ struct ShowDetailView: View {
                 }
             }
 
-            if let s = show, let notes = s.notes, !notes.isEmpty {
+            // Notes are per-member too — show mine, if I have this title.
+            if let notes = myCopy?.notes, !notes.isEmpty {
                 Section("Notes") {
                     Text(notes).font(.callout).foregroundStyle(.secondary)
                 }
