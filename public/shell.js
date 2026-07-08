@@ -58,6 +58,17 @@
        link is redundant on the split view and bows out. */
     '  .shell-detail .admin-nav { display: none; }' +
     '  .shell-detail .topbar a.back, .shell-detail .header-top a.back { display: none; }' +
+    /* The page title is absolutely positioned (an iOS-nav centering trick
+       against the back link). With the back link hidden the bar has no
+       in-flow content and collapses to its padding, so following content
+       slides under it. Return the title to normal flow, centered, so the
+       bar keeps its full height. */
+    '  .shell-detail .topbar h1, .shell-detail .header-top h1 { position: static; transform: none; flex: 1; text-align: center; }' +
+    /* The .topbar pages pull the sticky bar up 24px (to cancel the standalone
+       body padding). Inside the padded detail column that negative margin
+       offsets the painted bar from where content flows, so the row below
+       tucks under it — drop it; the sticky bar still pins flush when scrolled. */
+    '  .shell-detail .topbar { margin-top: 0; }' +
     '}' +
     '.shell-titlebar { display: flex; align-items: center; gap: 4px; padding: 12px 0; }' +
     '.shell-title { flex: 1; min-width: 0; font-family: var(--font-sans); font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }' +
