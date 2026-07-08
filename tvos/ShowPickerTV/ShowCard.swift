@@ -8,7 +8,7 @@ import SwiftUI
 struct ShowCard: View {
     let title: String
     var subtitle: String? = nil          // shown under the title (e.g. a pick's reason)
-    var nextUp: String? = nil            // top-left, e.g. "6/29 – 7/13"
+    var nextUp: String? = nil            // top-left, e.g. "6/29"
     var networkLogoUrl: String? = nil    // top-right
     var posterUrl: String? = nil
 
