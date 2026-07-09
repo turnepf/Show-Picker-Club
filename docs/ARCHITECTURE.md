@@ -161,18 +161,19 @@ The complete map:
 | `POST /api/shows`                      | `functions/api/shows.js`                   | POST    | session |
 | `GET /api/shows/all`                   | `functions/api/shows/all.js`               | GET     | session |
 | `GET /api/shows/check`                 | `functions/api/shows/check.js`             | GET     | session |
-| `POST /api/shows/share`                | `functions/api/shows/share.js`             | POST    | session (demo member blocked) |
-| `GET /api/shows/[id]`                  | `functions/api/shows/[id].js`              | GET     | none, but personal fields (notes, list, owner…) redacted without a session |
+| `POST /api/shows/share`                | `functions/api/shows/share.js`             | POST    | retired 2026-07 — returns 410 Gone |
+| `GET /api/shows/[id]`                  | `functions/api/shows/[id].js`              | GET     | none; catalog fields only unless the session owns the show (notes, watching_with, recommended_by are owner-only) |
 | `PUT /api/shows/[id]`                  | `functions/api/shows/[id].js`              | PUT     | session |
 | `DELETE /api/shows/[id]`               | `functions/api/shows/[id].js`              | DELETE  | session |
 | `PUT /api/shows/[id]/move`             | `functions/api/shows/[id]/move.js`         | PUT     | session |
 | `PUT /api/shows/[id]/archive`          | `functions/api/shows/[id]/archive.js`      | PUT     | session |
 | `GET /api/shows/[id]/actors`           | `functions/api/shows/[id]/actors.js`       | GET     | none |
-| `POST /api/suggestions`                | `functions/api/suggestions.js`             | POST    | session (demo member blocked) |
+| `POST /api/suggestions`                | `functions/api/suggestions.js`             | POST    | retired 2026-07 — returns 410 Gone |
 | `POST /api/enrich`                     | `functions/api/enrich.js`                  | POST    | session or `CRON_SECRET` header |
 | `POST /api/sync-urls`                  | `functions/api/sync-urls.js`               | POST    | session (demo member's rows excluded as URL sources) |
 | `GET /api/reporting`                   | `functions/api/reporting.js`               | GET     | admin session |
 | `POST /api/admin-create-member`        | `functions/api/admin-create-member.js`     | POST    | admin session |
+| `POST /api/admin-member-disable`       | `functions/api/admin-member-disable.js`    | POST    | admin session |
 | `POST /api/admin-vibe-fill`            | `functions/api/admin-vibe-fill.js`         | POST    | admin session or `CRON_SECRET` header |
 | `POST /api/admin-url-cleanup`          | `functions/api/admin-url-cleanup.js`       | POST    | admin session |
 | `POST /api/admin-sms-test`             | `functions/api/admin-sms-test.js`          | POST    | admin session |
@@ -211,7 +212,7 @@ The `[slug]` param matches the full final segment (including `.ics`); the handle
 4. On success: insert a `sessions` row (UUID id, member's name as `email`, 30-day `expires_at`), set an HttpOnly + Secure + SameSite=Lax `session=` cookie, return the slug.
 5. On failure: insert a `failed_logins` row, return 401.
 
-`functions/_shared/auth.js` exports `getSession(request, env)` which reads the cookie, queries the session row, checks `expires_at`, and returns `{email, member_slug}` or `null`. Every mutating endpoint and `/api/reporting` calls `getSession` first.
+`functions/_shared/auth.js` exports `getSession(request, env)` which reads the cookie, queries the session row, checks `expires_at` and that the member isn't disabled (`members.disabled`, migration 030), and returns `{email, member_slug}` or `null`. Every mutating endpoint and `/api/reporting` calls `getSession` first. Disabling a member (`POST /api/admin-member-disable`, or the Disable button on `/members`) also deletes their sessions, so bans are immediate.
 
 Admin endpoints are gated by `_shared/admin.js#isAdmin()` — a valid session whose member row has `members.is_admin = 1` (migration 029). Admin rights live in the database, so admins are added/removed with an `UPDATE members SET is_admin = ...`, not a code change. There is no separate admin secret; an admin just needs to be logged in. Endpoints that need to know *which* admin acted (e.g. `reviewed_by` on signup requests) use `getAdminSession()` from the same module.
 
@@ -223,7 +224,7 @@ Scheduled-job endpoints accept an `X-Cron-Secret` header compared in constant ti
 
 `DEMO_LOGIN_EMAIL` + `DEMO_LOGIN_CODE` (Cloudflare secrets) enable a reviewer/demo login: that one email signs in with a fixed code. `DEMO_APPLE_FALLBACK=true` additionally routes unrecognized Apple IDs into the same demo member. With the secrets unset, all of it is inert.
 
-The demo member's data auto-resets (`_shared/demo.js`): each demo sign-in snapshots the account's shows/actors/subscriptions as a baseline (if clean) and arms a reset for one hour later. The reset runs lazily at the next demo sign-in and hourly via the `demo-reset.yml` GitHub Action → `POST /api/admin-demo-reset`. The demo member is also blocked from cross-member writes (suggestions, shares) and its rows are ignored as URL-sync sources.
+The demo member's data auto-resets (`_shared/demo.js`): each demo sign-in snapshots the account's shows/actors/subscriptions as a baseline (if clean) and arms a reset for one hour later. The reset runs lazily at the next demo sign-in and hourly via the `demo-reset.yml` GitHub Action → `POST /api/admin-demo-reset`. The demo member's rows are ignored as URL-sync sources. (Cross-member writes — suggestions, shares — were retired for everyone in 2026-07.)
 
 ### Session activity tracking
 
@@ -239,7 +240,7 @@ Single-page app. Detects whether `window.location.pathname` is empty (landing) o
 
 - **Landing:** `My Shows` link (logged in), Trending shows shelf, featured Members row + "Browse all members" disclosure, `Search all libraries` button, What's New changelog.
 - **Member page:** title + tabs (Watching, Awaiting, Recommending, Up Next), search button, `+ Add` button (when logged in), per-tab list of show rows with always-visible meta (Next up on Awaiting, Recommended by on Up Next), sort + toggle pills at the bottom, footer with `Curious?` / `Vibe` / `📅 Calendar feed` links.
-- **Modals:** Add/Edit Show, Share to another member, Suggest a Show, Add to My List (used from Popular and from cross-library search), Search.
+- **Modals:** Add/Edit Show, Add to My List (used from Popular and from cross-library search), Search. (Share-to-member and Suggest-a-Show were retired 2026-07.)
 
 State lives in a handful of top-level `let` vars (`shows`, `currentTab`, `isEditor`, `memberSlug`, `authMember`, `searchMode`, etc.). No framework. All API I/O is `fetch()` to relative paths.
 

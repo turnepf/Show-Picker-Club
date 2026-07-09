@@ -35,8 +35,11 @@ export async function onRequestGet(context) {
   // in the last 30 days. Excludes seeded rows (they're the operator's
   // auto-pick, not member activity) and archived rows.
   const since = "datetime('now', '-30 days')";
-  const { results } = await env.DB.prepare(`
+  // disabled (migration 030) with a column-less retry so the page keeps
+  // working if the migration hasn't been applied yet.
+  const memberQuery = (withDisabled) => env.DB.prepare(`
     SELECT m.slug, m.name, m.first_name, m.last_initial, m.last_name,
+           ${withDisabled ? 'm.disabled,' : '0 AS disabled,'}
            (SELECT GROUP_CONCAT(email, ',')
               FROM (SELECT email FROM member_emails
                      WHERE member_slug = m.slug
@@ -65,10 +68,13 @@ export async function onRequestGet(context) {
                AND COALESCE(updated_at, created_at) >= ${since}) AS act_next
       FROM members m
      ORDER BY m.first_name COLLATE NOCASE
-  `).all();
+  `);
+  const { results } = await memberQuery(true).all()
+    .catch(() => memberQuery(false).all());
   const members = (results || []).map(r => ({
     slug: r.slug,
     name: r.name,
+    disabled: !!r.disabled,
     first_name: r.first_name,
     last_initial: r.last_initial,
     last_name: r.last_name,

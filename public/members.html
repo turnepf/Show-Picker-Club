@@ -235,9 +235,10 @@
         const activityRow = total === 0
           ? `<div class="activity zero">no list activity in the last 30 days</div>`
           : `<div class="activity">last 30 days: ${activityPills(act)}</div>`;
+        if (m.disabled) card.style.opacity = '0.6';
         card.innerHTML = `
           <div class="top">
-            <div class="name"><a href="/${escapeHtml(m.slug)}" target="_blank">${escapeHtml(displayName)}</a> <span class="meta">${escapeHtml(m.slug)}</span></div>
+            <div class="name"><a href="/${escapeHtml(m.slug)}" target="_blank">${escapeHtml(displayName)}</a> <span class="meta">${escapeHtml(m.slug)}</span>${m.disabled ? ' <span class="meta" style="color:#C0392B;font-weight:600;">DISABLED</span>' : ''}</div>
             <div class="meta">${formatLastLogin(m.last_login)}</div>
           </div>
           ${activityRow}
@@ -250,12 +251,45 @@
             <input class="phones" type="text" value="${escapeHtml(m.phones.join(', '))}" placeholder="+1 336 555 1234">
           </div>
           <button class="save" data-slug="${escapeHtml(m.slug)}">Save</button>
+          <button class="save toggle-disable" data-slug="${escapeHtml(m.slug)}" data-disabled="${m.disabled ? 1 : 0}"
+            style="margin-left:8px;background:${m.disabled ? '#27AE60' : '#C0392B'};">
+            ${m.disabled ? 'Enable' : 'Disable'}
+          </button>
         `;
         list.appendChild(card);
       }
-      list.querySelectorAll('button.save').forEach(btn => {
+      list.querySelectorAll('button.save:not(.toggle-disable)').forEach(btn => {
         btn.addEventListener('click', () => save(btn));
       });
+      list.querySelectorAll('button.toggle-disable').forEach(btn => {
+        btn.addEventListener('click', () => toggleDisable(btn));
+      });
+    }
+
+    // Disable = ban: flips members.disabled and kills every session the
+    // member holds (server-side), so the lockout is immediate.
+    async function toggleDisable(btn) {
+      const slug = btn.dataset.slug;
+      const disabling = btn.dataset.disabled !== '1';
+      if (disabling && !confirm(`Disable ${slug}? They'll be logged out everywhere and can't log back in until re-enabled.`)) return;
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/admin-member-disable', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug, action: disabling ? 'disable' : 'enable' }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || `Failed (${res.status})`);
+          return;
+        }
+        load();
+      } catch (e) {
+        alert('Network error: ' + e.message);
+      } finally {
+        btn.disabled = false;
+      }
     }
 
     async function save(btn) {

@@ -26,12 +26,19 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: corsHeaders() });
   }
   const session = await getSession(request, env);
-  if (!session) {
-    const redacted = {};
-    for (const k of PUBLIC_SHOW_FIELDS) if (k in show) redacted[k] = show[k];
-    return new Response(JSON.stringify({ show: redacted }), { headers: corsHeaders() });
+  // Full row (notes, watching_with, recommended_by, added_by) is for the
+  // show's owner only. Other members get catalog fields plus enough context
+  // to say "on Watching · <member>"; logged-out visitors get catalog only.
+  if (session && session.member_slug === show.member_slug) {
+    return new Response(JSON.stringify({ show }), { headers: corsHeaders() });
   }
-  return new Response(JSON.stringify({ show }), { headers: corsHeaders() });
+  const redacted = {};
+  for (const k of PUBLIC_SHOW_FIELDS) if (k in show) redacted[k] = show[k];
+  if (session) {
+    redacted.list = show.list;
+    redacted.member_slug = show.member_slug;
+  }
+  return new Response(JSON.stringify({ show: redacted }), { headers: corsHeaders() });
 }
 
 export async function onRequestPut(context) {

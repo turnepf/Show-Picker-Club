@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS members (
   is_admin INTEGER NOT NULL DEFAULT 0,
   -- Secret for the member's /calendar/<slug>.ics feed (migration 029).
   calendar_token TEXT,
+  -- Banned/disabled member (migration 030): can't log in, sessions refused.
+  disabled INTEGER NOT NULL DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
