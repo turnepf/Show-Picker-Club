@@ -260,11 +260,21 @@ left sidebar broken into the same inset-grouped sections, in the same order —
    Subscription audit, Admin), and
 3. **Members** (the roster, most-recently-active first),
 
-with the TMDB/OMDb attribution footnote beneath. Each group is a **distinct
-inset-grouped card** (the web's `.ios-group`; SwiftUI's `.insetGrouped` list
-style), separated from its neighbors — never a single flat, continuous list.
-When a section, an item, or its ordering changes on one large-screen platform,
-change it on the others so they stay mirrors of each other.
+with the TMDB/OMDb attribution footnote beneath. The **sections, their items,
+and their order are identical everywhere**; each group reads as its own
+distinct block, never a single flat, continuous list. When a section, an item,
+or its ordering changes on one large-screen platform, change it on the others
+so they stay mirrors of each other.
+
+**Rendering is platform-idiomatic, not pixel-identical.** The web and iPad
+draw each group as a **distinct inset-grouped card** (the web's `.ios-group`;
+SwiftUI's `.insetGrouped` list style). **Mac Catalyst deliberately keeps the
+native macOS source-list sidebar** — AppKit renders the split-view sidebar as a
+source list and ignores `.insetGrouped`, and fighting that (e.g. "Scale
+Interface to Match iPad") would cost the app its native-Mac feel everywhere
+else. So on Mac the same sections separate the macOS way rather than as rounded
+cards. Parity is about *which* sections exist and their order — not identical
+pixels.
 
 tvOS is the deliberate exception: the living-room, focus-driven, remote-first
 paradigm uses a top **tab bar** (`RootTabView`) instead of a sidebar. It shares
