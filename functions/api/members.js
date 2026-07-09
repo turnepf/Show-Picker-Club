@@ -2,9 +2,10 @@ import { getSession } from '../_shared/auth.js';
 
 export async function onRequestGet(context) {
   const { env, request } = context;
-  // The roster stays public (the landing page and pre-login apps render it),
-  // but full names and calendar tokens are for logged-in members only —
-  // visitors get first-name-level display names.
+  // The roster stays public (the landing page and pre-login apps render it).
+  // Everyone — logged in or not — gets first-name-level display names only;
+  // full names never leave the server. calendar_token is a per-member secret:
+  // each member gets exactly their own, never anyone else's.
   const session = await getSession(request, env);
   // Members are returned ordered by their most-recent non-seed activity
   // (newest first), then alphabetically. The frontend decides how many to
@@ -47,10 +48,12 @@ export async function onRequestGet(context) {
       : fn;
     return {
       slug: m.slug,
-      // Logged out, `name` degrades to the display name so the shipped app
-      // decoders keep working without exposing members' full names.
-      name: session ? m.name : displayName,
-      ...(session && m.calendar_token ? { calendar_token: m.calendar_token } : {}),
+      // `name` is the display name for everyone — with self-enrollment open,
+      // members are no longer all friends, so full names stay server-side.
+      // Shipped app decoders read `name` and keep working.
+      name: displayName,
+      ...(session && session.member_slug === m.slug && m.calendar_token
+        ? { calendar_token: m.calendar_token } : {}),
       first_name: fn,
       display_name: displayName,
       show_count: m.show_count,

@@ -15,7 +15,7 @@ There are native iOS, tvOS, and watchOS apps. They share a `ShowPickerCore` Swif
 
 - **Multi-tenant.** One deployment, many members. Each member is a slug (`/whitt`, `/patrick`) with their own lists; they sign in with a one-time code (text or email) or Sign in with Apple.
 - **Auto-enriched.** OMDB supplies IMDB ratings and canonical titles; TMDB supplies cast, next-season dates, finale dates, series-ended flags, and genres.
-- **Social.** Suggest a show to another member and share a show across lists.
+- **Social.** Browse every member's lists and cross-library search; add anything you see to your own lists. (Push-style "suggest to another member" was retired 2026-07 — near-zero usage.)
 - **Vibe.** `/vibe` profiles each member's taste across 27 trait dimensions and assigns one of seven cluster identities.
 - **Calendar feed.** `webcal://showpicker.club/calendar/<slug>.ics?key=<calendar_token>` keeps upcoming premieres and finales in Apple Calendar / Google Calendar / Fantastical. The per-member `key` is required (calendar apps can't log in); the member page shows the full link to logged-in members.
 - **PWA.** Installable to home screen.

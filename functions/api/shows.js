@@ -41,6 +41,17 @@ export async function onRequestGet(context) {
        (SELECT json_group_array(json_object('name', a.name, 'imdb_id', a.imdb_id)) FROM actors a WHERE a.show_id = s.id) as actors
      FROM shows s WHERE s.member_slug = ? ${archivedFilter} ORDER BY s.title COLLATE NOCASE`
   ).bind(member).all();
+  // Personal fields are for the list's owner only. Notes, who's watching
+  // with them, and who recommended a show were written as private memos —
+  // with self-enrollment open, other members are not all friends.
+  if (session.member_slug !== member) {
+    for (const r of results) {
+      delete r.notes;
+      delete r.watching_with;
+      delete r.recommended_by;
+      delete r.added_by;
+    }
+  }
   await borrowArtworkAcrossCopies(env, results);
   return new Response(JSON.stringify({ shows: results }), { headers: corsHeaders() });
 }
@@ -91,6 +102,16 @@ export async function onRequestPost(context) {
   const session = await getSession(request, env);
   if (!session) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders() });
+  }
+
+  // Per-member daily cap. Far above any human pace (the whole club adds a
+  // few shows a day), but each add fans out to OMDB/TMDB/Watchmode calls, so
+  // a scripted session could otherwise spam rows and drain API quotas.
+  const { cnt: addsToday } = (await env.DB.prepare(
+    "SELECT COUNT(*) AS cnt FROM shows WHERE member_slug = ? AND created_at > datetime('now', '-1 day')"
+  ).bind(session.member_slug).first()) || { cnt: 0 };
+  if (addsToday >= 50) {
+    return new Response(JSON.stringify({ error: 'rate_limited' }), { status: 429, headers: corsHeaders() });
   }
 
   const body = await request.json();

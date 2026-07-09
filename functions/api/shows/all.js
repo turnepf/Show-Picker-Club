@@ -4,7 +4,10 @@ import { getSession } from '../../_shared/auth.js';
 
 export async function onRequestGet(context) {
   const { env, request } = context;
-  // Every member's full library (with notes-adjacent metadata) — members only.
+  // Every member's library — members only. Catalog fields only: personal
+  // fields (notes, watching_with, recommended_by, added_by) never appear
+  // here, and member names are display names (first name, plus last initial
+  // only when two members share a first name) — full names stay server-side.
   const session = await getSession(request, env);
   if (!session) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -25,7 +28,8 @@ export async function onRequestGet(context) {
               WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0
                 AND x.network_logo_url IS NOT NULL LIMIT 1)) AS network_logo_url,
             s.seasons_released, s.next_season_date, s.season_end_date,
-            m.name AS member_name, m.first_name AS member_first_name,
+            m.name AS member_raw_name, m.first_name AS member_raw_first,
+            m.last_initial AS member_last_initial,
             (SELECT json_group_array(json_object('name', a.name, 'imdb_id', a.imdb_id))
              FROM actors a WHERE a.show_id = s.id) AS actors
      FROM shows s
@@ -33,6 +37,27 @@ export async function onRequestGet(context) {
      WHERE s.archived = 0
      ORDER BY s.title COLLATE NOCASE`
   ).all();
+
+  // First-name display, disambiguated with a last initial only on collision
+  // (same policy as /api/members).
+  const firstNameCounts = {};
+  const memberFirst = new Map();
+  for (const r of results) {
+    if (memberFirst.has(r.member_slug)) continue;
+    const fn = r.member_raw_first || (r.member_raw_name || '').split(' ')[0];
+    memberFirst.set(r.member_slug, fn);
+    firstNameCounts[fn] = (firstNameCounts[fn] || 0) + 1;
+  }
+  for (const r of results) {
+    const fn = memberFirst.get(r.member_slug);
+    r.member_first_name = fn;
+    r.member_name = firstNameCounts[fn] > 1 && r.member_last_initial
+      ? `${fn} ${r.member_last_initial}`
+      : fn;
+    delete r.member_raw_name;
+    delete r.member_raw_first;
+    delete r.member_last_initial;
+  }
   return new Response(JSON.stringify({ shows: results }), {
     headers: { 'Content-Type': 'application/json' },
   });

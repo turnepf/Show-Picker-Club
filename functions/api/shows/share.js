@@ -1,86 +1,19 @@
-import { getSession } from '../../_shared/auth.js';
-import { isDemoMember } from '../../_shared/demo.js';
-import { safeNetworkUrl } from '../../_shared/url-utils.js';
-
+// Retired 2026-07: share-to-member copied a show into ANOTHER member's list.
+// Nearly all use was the operator's own; retiring it removes a cross-member
+// write surface before self-enrollment opens the club to strangers. The pull
+// model remains: browse another member's list and add to your own.
+//
+// Kept as a 410 stub (not deleted) so shipped iOS/tvOS builds that still
+// carry the button get a clear error instead of an HTML 404 page.
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
 }
 
-export async function onRequestPost(context) {
-  const { env, request } = context;
-  const session = await getSession(request, env);
-  if (!session) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders() });
-  }
-  // Shares copy rows into OTHER members' lists. The shared demo account is
-  // used by strangers and wipes itself hourly — keep its writes to itself.
-  if (await isDemoMember(env, session.member_slug)) {
-    return new Response(JSON.stringify({ error: 'demo_restricted' }), { status: 403, headers: corsHeaders() });
-  }
-
-  const body = await request.json();
-  const { show_id, source_member, target_member, recommended_by, notes } = body;
-
-  if (!show_id || !source_member || !target_member) {
-    return new Response(JSON.stringify({ error: 'show_id, source_member, and target_member are required' }), { status: 400, headers: corsHeaders() });
-  }
-
-  // You can only share FROM your own list. Without this, any logged-in member
-  // could copy any other member's show into any third member's list.
-  if (source_member !== session.member_slug) {
-    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders() });
-  }
-
-  // Fetch the source show
-  const show = await env.DB.prepare(
-    'SELECT * FROM shows WHERE id = ? AND member_slug = ?'
-  ).bind(show_id, source_member).first();
-
-  if (!show) {
-    return new Response(JSON.stringify({ error: 'Show not found' }), { status: 404, headers: corsHeaders() });
-  }
-
-  // Check for duplicate in target member
-  const existing = await env.DB.prepare(
-    'SELECT id, list, archived FROM shows WHERE LOWER(title) = LOWER(?) AND member_slug = ?'
-  ).bind(show.title, target_member).first();
-
-  if (existing) {
-    if (existing.archived) {
-      return new Response(JSON.stringify({ duplicate: true, archived: true }), { headers: corsHeaders() });
-    }
-    return new Response(JSON.stringify({ duplicate: true, archived: false, list: existing.list }), { headers: corsHeaders() });
-  }
-
-  // Insert into target member's "next" list, carrying over all data
-  const result = await env.DB.prepare(
-    `INSERT INTO shows (title, network, network_url, recommended_by, rating, list, notes, movie, full_series, member_slug, added_by)
-     VALUES (?, ?, ?, ?, ?, 'next', ?, ?, ?, ?, ?)`
-  ).bind(
-    show.title,
-    show.network || null,
-    safeNetworkUrl(show.network_url),
-    recommended_by || null,
-    show.rating || null,
-    notes || null,
-    show.movie || 0,
-    show.full_series || 0,
-    target_member,
-    recommended_by || 'Anonymous'
-  ).run();
-
-  // Copy actors too
-  const showId = result.meta.last_row_id;
-  const { results: actors } = await env.DB.prepare(
-    'SELECT name FROM actors WHERE show_id = ?'
-  ).bind(show_id).all();
-
-  if (actors.length > 0) {
-    const stmt = env.DB.prepare('INSERT INTO actors (show_id, name) VALUES (?, ?)');
-    await env.DB.batch(actors.map(a => stmt.bind(showId, a.name)));
-  }
-
-  return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders() });
+export async function onRequestPost() {
+  return new Response(
+    JSON.stringify({ error: 'retired', message: 'Sharing to another member was retired. They can add it from your list.' }),
+    { status: 410, headers: corsHeaders() }
+  );
 }
 
 export async function onRequestOptions() {

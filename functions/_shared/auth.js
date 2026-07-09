@@ -3,9 +3,20 @@ export async function getSession(request, env) {
   const match = cookie.match(/session=([^;]+)/);
   if (!match) return null;
   try {
-    const session = await env.DB.prepare(
+    // A disabled (banned) member's sessions are refused at the gate, so a
+    // ban takes effect immediately even if a session row survives. If the
+    // disabled column doesn't exist yet (pre-migration 030), fall back to
+    // the plain lookup so logins keep working mid-rollout.
+    const withDisabled = env.DB.prepare(
+      `SELECT s.email, s.member_slug, s.expires_at
+         FROM sessions s
+         LEFT JOIN members m ON m.slug = s.member_slug
+        WHERE s.id = ? AND COALESCE(m.disabled, 0) = 0`
+    ).bind(match[1]);
+    const plain = env.DB.prepare(
       'SELECT email, member_slug, expires_at FROM sessions WHERE id = ?'
-    ).bind(match[1]).first();
+    ).bind(match[1]);
+    const session = await withDisabled.first().catch(() => plain.first());
     if (session && new Date(session.expires_at) > new Date()) return session;
   } catch (e) {}
   return null;

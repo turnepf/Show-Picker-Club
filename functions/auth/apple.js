@@ -189,9 +189,16 @@ export async function onRequestPost(context) {
 }
 
 async function issueSession(env, memberSlug) {
+  // disabled = banned (migration 030): refuse to mint a session. Falls back
+  // to the column-less select mid-rollout.
   const m = await env.DB.prepare(
-    'SELECT first_name, name FROM members WHERE slug = ?'
-  ).bind(memberSlug).first();
+    'SELECT first_name, name, disabled FROM members WHERE slug = ?'
+  ).bind(memberSlug).first().catch(() =>
+    env.DB.prepare('SELECT first_name, name FROM members WHERE slug = ?').bind(memberSlug).first()
+  );
+  if (m?.disabled) {
+    return new Response(JSON.stringify({ error: 'account_disabled' }), { status: 403, headers: corsHeaders() });
+  }
   const editorName = m?.first_name || m?.name || memberSlug;
 
   const sessionId = crypto.randomUUID();
