@@ -1,4 +1,5 @@
 import { getSession } from '../_shared/auth.js';
+import { cronAuthorized } from '../_shared/secrets.js';
 import { fetchEnrichment } from '../_shared/enrichment.js';
 import { titleFromUrl, renameShowCopies } from '../_shared/title-fix.js';
 
@@ -230,7 +231,7 @@ export async function onRequestPost(context) {
   // matching X-Cron-Secret so a scheduled/one-off job can backfill the whole
   // library (e.g. after adding poster/logo enrichment).
   const session = await getSession(request, env);
-  const cronOk = !!env.CRON_SECRET && request.headers.get('X-Cron-Secret') === env.CRON_SECRET;
+  const cronOk = await cronAuthorized(request, env);
   if (!session && !cronOk) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,

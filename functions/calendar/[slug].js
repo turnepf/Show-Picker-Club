@@ -1,18 +1,34 @@
 // Per-member ICS calendar feed.
-// URL: /calendar/<slug>.ics — subscribe in Apple Calendar / Google Calendar /
-// Fantastical to get an always-updating view of upcoming season dates for the
-// member's Watching and Waiting shows.
+// URL: /calendar/<slug>.ics?key=<calendar_token> — subscribe in Apple
+// Calendar / Google Calendar / Fantastical to get an always-updating view of
+// upcoming season dates for the member's Watching and Waiting shows.
+//
+// Calendar apps can't log in, so the feed authenticates with a per-member
+// secret token (members.calendar_token) instead of a session. A bare
+// /calendar/<slug>.ics (the pre-token URL) 404s — subscribers re-add the
+// feed once using the link from the member page.
+
+import { timingSafeEqual } from '../_shared/secrets.js';
 
 export async function onRequestGet(context) {
-  const { env, params } = context;
+  const { env, request, params } = context;
   let slug = String(params.slug || '');
   if (slug.endsWith('.ics')) slug = slug.slice(0, -4);
   if (!slug) return new Response('Not found', { status: 404 });
 
+  // .catch: pre-migration database (no calendar_token column) → 404, same
+  // as a missing member.
   const member = await env.DB.prepare(
-    `SELECT slug, name, first_name FROM members WHERE slug = ?`
-  ).bind(slug).first();
+    `SELECT slug, name, first_name, calendar_token FROM members WHERE slug = ?`
+  ).bind(slug).first().catch(() => null);
   if (!member) return new Response('Not found', { status: 404 });
+
+  // Same 404 for a wrong key as for an unknown member — no oracle for
+  // guessing which slugs exist.
+  const key = new URL(request.url).searchParams.get('key') || '';
+  if (!member.calendar_token || !(await timingSafeEqual(key, member.calendar_token))) {
+    return new Response('Not found', { status: 404 });
+  }
 
   const { results } = await env.DB.prepare(
     `SELECT id, title, network, network_url, list, recommended_by,

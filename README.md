@@ -17,7 +17,7 @@ There are native iOS, tvOS, and watchOS apps. They share a `ShowPickerCore` Swif
 - **Auto-enriched.** OMDB supplies IMDB ratings and canonical titles; TMDB supplies cast, next-season dates, finale dates, series-ended flags, and genres.
 - **Social.** Suggest a show to another member and share a show across lists.
 - **Vibe.** `/vibe` profiles each member's taste across 27 trait dimensions and assigns one of seven cluster identities.
-- **Calendar feed.** `webcal://showpicker.club/calendar/<slug>.ics` keeps upcoming premieres and finales in Apple Calendar / Google Calendar / Fantastical.
+- **Calendar feed.** `webcal://showpicker.club/calendar/<slug>.ics?key=<calendar_token>` keeps upcoming premieres and finales in Apple Calendar / Google Calendar / Fantastical. The per-member `key` is required (calendar apps can't log in); the member page shows the full link to logged-in members.
 - **PWA.** Installable to home screen.
 
 ## Tech stack
@@ -120,6 +120,12 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    The bypass (in `functions/auth/login.js`) only ever unlocks the configured
    email and only when both secrets are set; leave them unset to disable it.
    Put the same email + code in App Store Connect → App Review Information.
+
+   The demo member's data resets itself: each demo sign-in snapshots the
+   account as a baseline and anything a visitor changes is wiped back to it
+   one hour later (`functions/_shared/demo.js`, backstopped hourly by
+   `.github/workflows/demo-reset.yml`). The demo account also can't suggest
+   or share shows into real members' lists.
 
    To also let **Sign in with Apple** reach the demo — which App Review tests
    directly, and the reason a prior submission was rejected under Guideline

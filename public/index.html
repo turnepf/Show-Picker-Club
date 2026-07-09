@@ -1943,17 +1943,19 @@
       memberSlug = slug;
       document.getElementById('showPage').classList.remove('hidden');
 
-      const calLink = document.getElementById('calendarFeedLink');
-      if (calLink) {
-        calLink.href = `webcal://showpicker.club/calendar/${encodeURIComponent(slug)}.ics`;
-        document.getElementById('calendarGroup').classList.remove('hidden');
-      }
-
       // Get member name (and fill the iPad-style sidebar roster)
       try {
         const res = await fetch('/api/members');
         const data = await res.json();
         const h = data.members.find(h => h.slug === slug);
+        // Calendar feeds authenticate with a per-member token; the API only
+        // shares tokens with logged-in sessions, so logged-out visitors
+        // simply don't see the calendar link.
+        const calLink = document.getElementById('calendarFeedLink');
+        if (calLink && h && h.calendar_token) {
+          calLink.href = `webcal://showpicker.club/calendar/${encodeURIComponent(slug)}.ics?key=${encodeURIComponent(h.calendar_token)}`;
+          document.getElementById('calendarGroup').classList.remove('hidden');
+        }
         if (h) {
           owners = h.first_name || h.name.split(' ')[0];
           memberLabel = h.display_name || owners;
@@ -2231,10 +2233,11 @@
 
     async function logout() {
       try {
-        // GET /auth/logout deletes the session row and 302s back; we don't
+        // POST /auth/logout deletes the session row and 302s back; we don't
         // follow the redirect, we just refresh state in place so the user
-        // stays on the page they were viewing.
-        await fetch('/auth/logout', { redirect: 'manual' });
+        // stays on the page they were viewing. (POST, not GET, so a cross-site
+        // link can't log members out.)
+        await fetch('/auth/logout', { method: 'POST', redirect: 'manual' });
       } catch {}
       authMember = null;
       editorName = '';
@@ -2449,7 +2452,9 @@
           return;
         }
         updateLoginBtnLabel();
-        renderShows();
+        // Re-fetch, not just re-render: the pre-login fetch got a 401, so the
+        // page is holding the members-only prompt with no data.
+        loadShows();
       } catch {
         showLoginError('Network error. Try again.');
       } finally {
@@ -2461,12 +2466,30 @@
     async function loadShows() {
       try {
         const res = await fetch(`/api/shows?member=${memberSlug}`);
+        // Member lists are members-only. Logged out → invite to log in instead
+        // of an empty page.
+        if (res.status === 401) {
+          renderMembersOnly();
+          return;
+        }
         const data = await res.json();
         shows = data.shows || [];
         renderShows();
       } catch (e) {
         document.getElementById('loading').textContent = 'Failed to load shows.';
       }
+    }
+
+    // Logged-out visitor on a member page: show lists need a login.
+    function renderMembersOnly() {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('showList').innerHTML = '';
+      const lc = document.getElementById('listControls');
+      if (lc) lc.classList.add('hidden');
+      const empty = document.getElementById('empty');
+      empty.innerHTML = `<p>Show lists are for club members.</p>
+        <button class="btn btn-save" onclick="login()">Log in</button>`;
+      empty.classList.remove('hidden');
     }
 
 
@@ -2990,6 +3013,10 @@
 
       try {
         const res = await fetch(`/api/shows?member=${encodeURIComponent(memberSlug)}&include_archived=1`);
+        if (res.status === 401) {
+          document.getElementById('searchResults').innerHTML = '<div class="search-empty">Log in to search show lists.</div>';
+          return;
+        }
         const data = await res.json();
         searchableShows = data.shows || [];
         renderSearchResults();
@@ -3010,6 +3037,10 @@
 
       try {
         const res = await fetch('/api/shows/all');
+        if (res.status === 401) {
+          document.getElementById('searchResults').innerHTML = '<div class="search-empty">Log in to search show lists.</div>';
+          return;
+        }
         const data = await res.json();
         searchableShows = data.shows || [];
         renderSearchResults();

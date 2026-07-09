@@ -1,5 +1,15 @@
+import { getSession } from '../_shared/auth.js';
+
 export async function onRequestGet(context) {
-  const { env } = context;
+  const { env, request } = context;
+  // Who-added-what activity is club-internal — members only.
+  const session = await getSession(request, env);
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   const { results } = await env.DB.prepare(
     `SELECT s.title, s.list, s.member_slug, h.name as member_name, s.created_at

@@ -1,8 +1,9 @@
 import { getSession } from '../../_shared/auth.js';
+import { isDemoMember } from '../../_shared/demo.js';
 import { safeNetworkUrl } from '../../_shared/url-utils.js';
 
 function corsHeaders() {
-  return { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
 }
 
 export async function onRequestPost(context) {
@@ -10,6 +11,11 @@ export async function onRequestPost(context) {
   const session = await getSession(request, env);
   if (!session) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders() });
+  }
+  // Shares copy rows into OTHER members' lists. The shared demo account is
+  // used by strangers and wipes itself hourly — keep its writes to itself.
+  if (await isDemoMember(env, session.member_slug)) {
+    return new Response(JSON.stringify({ error: 'demo_restricted' }), { status: 403, headers: corsHeaders() });
   }
 
   const body = await request.json();
@@ -80,7 +86,7 @@ export async function onRequestPost(context) {
 export async function onRequestOptions() {
   return new Response(null, {
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': 'https://showpicker.club',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },

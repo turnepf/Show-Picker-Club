@@ -1,5 +1,6 @@
 import { canonicalNetwork } from '../_shared/networks.js';
 import { isAdmin } from '../_shared/admin.js';
+import { cronAuthorized } from '../_shared/secrets.js';
 
 // Backfills network_url for rows missing a real deep link, using Watchmode's
 // /title/{id}/sources endpoint. For each candidate row:
@@ -37,8 +38,7 @@ function json(data, status = 200) {
 // drains on its own without anyone logged in. Mirrors admin-vibe-fill.js.
 async function authorized(request, env) {
   if (await isAdmin(request, env)) return true;
-  const provided = request.headers.get('X-Cron-Secret');
-  return !!env.CRON_SECRET && provided === env.CRON_SECRET;
+  return await cronAuthorized(request, env);
 }
 
 // Auth uses the X-API-Key header (Watchmode's recommended scheme for new
@@ -82,7 +82,7 @@ async function watchmodeSources(env, titleId) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  if (!(await authorized(request, env))) return json({ error: 'Forbidden — log in as the operator' }, 403);
+  if (!(await authorized(request, env))) return json({ error: 'Forbidden' }, 403);
   if (!env.WATCHMODE_API_KEY) return json({ error: 'WATCHMODE_API_KEY not configured' }, 500);
 
   let body;

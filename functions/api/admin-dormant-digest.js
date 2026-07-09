@@ -1,5 +1,6 @@
 import { sendSms } from '../_shared/sms.js';
 import { isAdmin } from '../_shared/admin.js';
+import { cronAuthorized } from '../_shared/secrets.js';
 
 // Monthly "dormant members" digest. Finds members who have done nothing with
 // their library (no non-seed shows, no edits, no archives) AND haven't pinged
@@ -23,8 +24,7 @@ function json(data, status = 200) {
 
 async function authorized(request, env) {
   if (await isAdmin(request, env)) return true;
-  const provided = request.headers.get('X-Cron-Secret');
-  return !!env.CRON_SECRET && provided === env.CRON_SECRET;
+  return await cronAuthorized(request, env);
 }
 
 export async function onRequestPost(context) {

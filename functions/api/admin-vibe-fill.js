@@ -1,6 +1,7 @@
 import { TRAIT_NAMES, SYSTEM_PROMPT } from '../_shared/vibe-traits.js';
 import { EXCLUDED_FROM_TASTE } from '../_shared/excluded-members.js';
 import { isAdmin } from '../_shared/admin.js';
+import { cronAuthorized } from '../_shared/secrets.js';
 
 const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
 
@@ -16,8 +17,7 @@ function json(data, status = 200) {
 // queue draining without anyone logged in.
 async function authorized(request, env) {
   if (await isAdmin(request, env)) return true;
-  const provided = request.headers.get('X-Cron-Secret');
-  return !!env.CRON_SECRET && provided === env.CRON_SECRET;
+  return await cronAuthorized(request, env);
 }
 
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
@@ -149,7 +149,7 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  if (!(await authorized(request, env))) return json({ error: 'Forbidden — log in as the operator' }, 403);
+  if (!(await authorized(request, env))) return json({ error: 'Forbidden' }, 403);
 
   let body;
   try { body = await request.json(); }

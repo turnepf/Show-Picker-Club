@@ -1,4 +1,4 @@
-import { isAdmin, ADMIN_SLUG } from '../_shared/admin.js';
+import { isAdmin, getAdminSession } from '../_shared/admin.js';
 import { createMember } from './admin-create-member.js';
 
 function json(data, status = 200) {
@@ -31,7 +31,10 @@ export async function onRequestGet(context) {
 //   { id, action: 'reject', notes: '...' } → mark rejected
 export async function onRequestPost(context) {
   const { request, env } = context;
-  if (!(await isAdmin(request, env))) return json({ error: 'forbidden' }, 403);
+  // reviewed_by stamps the acting admin's slug, so we need the session, not
+  // just a yes/no.
+  const adminSession = await getAdminSession(request, env);
+  if (!adminSession) return json({ error: 'forbidden' }, 403);
 
   let body;
   try { body = await request.json(); }
@@ -69,7 +72,7 @@ export async function onRequestPost(context) {
               reviewed_by = ?,
               created_member_slug = ?
         WHERE id = ?`
-    ).bind(ADMIN_SLUG, created.slug, id).run();
+    ).bind(adminSession.member_slug, created.slug, id).run();
     return json({ ok: true, action: 'approve', created });
   }
 
@@ -82,7 +85,7 @@ export async function onRequestPost(context) {
               reviewed_by = ?,
               notes = ?
         WHERE id = ?`
-    ).bind(ADMIN_SLUG, notes, id).run();
+    ).bind(adminSession.member_slug, notes, id).run();
     return json({ ok: true, action: 'reject' });
   }
 

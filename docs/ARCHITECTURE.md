@@ -151,34 +151,42 @@ The complete map:
 |----------------------------------------|--------------------------------------------|---------|------|
 | `POST /auth/login`                     | `functions/auth/login.js`                  | POST    | none |
 | `GET /auth/check`                      | `functions/auth/check.js`                  | GET     | none (reads cookie) |
-| `GET /auth/logout`                     | `functions/auth/logout.js`                 | GET     | none |
-| `GET /api/members`                     | `functions/api/members.js`                 | GET     | none |
+| `GET/POST /auth/logout`                | `functions/auth/logout.js`                 | GET, POST | none (POST is canonical; GET kept for shipped app builds) |
+| `GET /api/members`                     | `functions/api/members.js`                 | GET     | none (full names + calendar tokens only with a session) |
 | `GET /api/popular`                     | `functions/api/popular.js`                 | GET     | none |
-| `GET /api/activity`                    | `functions/api/activity.js`                | GET     | none |
-| `GET /api/recommendations`             | `functions/api/recommendations.js`         | GET     | none (legacy — no longer called by any client) |
+| `GET /api/activity`                    | `functions/api/activity.js`                | GET     | session |
+| `GET /api/recommendations`             | `functions/api/recommendations.js`         | GET     | session (legacy — no longer called by any client) |
 | `GET /api/vibe`                        | `functions/api/vibe.js`                    | GET     | session |
-| `GET /api/shows`                       | `functions/api/shows.js`                   | GET     | none |
+| `GET /api/shows`                       | `functions/api/shows.js`                   | GET     | session |
 | `POST /api/shows`                      | `functions/api/shows.js`                   | POST    | session |
-| `GET /api/shows/all`                   | `functions/api/shows/all.js`               | GET     | none |
-| `GET /api/shows/check`                 | `functions/api/shows/check.js`             | GET     | none |
-| `POST /api/shows/share`                | `functions/api/shows/share.js`             | POST    | session |
-| `GET /api/shows/[id]`                  | `functions/api/shows/[id].js`              | GET     | none |
+| `GET /api/shows/all`                   | `functions/api/shows/all.js`               | GET     | session |
+| `GET /api/shows/check`                 | `functions/api/shows/check.js`             | GET     | session |
+| `POST /api/shows/share`                | `functions/api/shows/share.js`             | POST    | session (demo member blocked) |
+| `GET /api/shows/[id]`                  | `functions/api/shows/[id].js`              | GET     | none, but personal fields (notes, list, owner…) redacted without a session |
 | `PUT /api/shows/[id]`                  | `functions/api/shows/[id].js`              | PUT     | session |
 | `DELETE /api/shows/[id]`               | `functions/api/shows/[id].js`              | DELETE  | session |
 | `PUT /api/shows/[id]/move`             | `functions/api/shows/[id]/move.js`         | PUT     | session |
 | `PUT /api/shows/[id]/archive`          | `functions/api/shows/[id]/archive.js`      | PUT     | session |
 | `GET /api/shows/[id]/actors`           | `functions/api/shows/[id]/actors.js`       | GET     | none |
-| `POST /api/suggestions`                | `functions/api/suggestions.js`             | POST    | session |
-| `POST /api/enrich`                     | `functions/api/enrich.js`                  | POST    | session |
-| `POST /api/sync-urls`                  | `functions/api/sync-urls.js`               | POST    | session |
-| `GET /api/reporting`                   | `functions/api/reporting.js`               | GET     | session |
-| `POST /api/admin-create-member`        | `functions/api/admin-create-member.js`     | POST    | patrick session |
-| `POST /api/admin-vibe-fill`            | `functions/api/admin-vibe-fill.js`         | POST    | patrick session |
-| `POST /api/admin-url-cleanup`          | `functions/api/admin-url-cleanup.js`       | POST    | patrick session |
-| `POST /api/admin-sms-test`             | `functions/api/admin-sms-test.js`          | POST    | patrick session |
-| `POST /api/admin-fill-watch-urls`      | `functions/api/admin-fill-watch-urls.js`   | POST    | patrick session |
-| `POST /api/admin-dormant-digest`       | `functions/api/admin-dormant-digest.js`    | POST    | patrick session or `CRON_SECRET` header |
-| `GET /calendar/[slug].ics`             | `functions/calendar/[slug].js`             | GET     | none |
+| `POST /api/suggestions`                | `functions/api/suggestions.js`             | POST    | session (demo member blocked) |
+| `POST /api/enrich`                     | `functions/api/enrich.js`                  | POST    | session or `CRON_SECRET` header |
+| `POST /api/sync-urls`                  | `functions/api/sync-urls.js`               | POST    | session (demo member's rows excluded as URL sources) |
+| `GET /api/reporting`                   | `functions/api/reporting.js`               | GET     | admin session |
+| `POST /api/admin-create-member`        | `functions/api/admin-create-member.js`     | POST    | admin session |
+| `POST /api/admin-vibe-fill`            | `functions/api/admin-vibe-fill.js`         | POST    | admin session or `CRON_SECRET` header |
+| `POST /api/admin-url-cleanup`          | `functions/api/admin-url-cleanup.js`       | POST    | admin session |
+| `POST /api/admin-sms-test`             | `functions/api/admin-sms-test.js`          | POST    | admin session |
+| `POST /api/admin-fill-watch-urls`      | `functions/api/admin-fill-watch-urls.js`   | POST    | admin session or `CRON_SECRET` header |
+| `POST /api/admin-dormant-digest`       | `functions/api/admin-dormant-digest.js`    | POST    | admin session or `CRON_SECRET` header |
+| `POST /api/admin-demo-reset`           | `functions/api/admin-demo-reset.js`        | POST    | admin session or `CRON_SECRET` header |
+| `GET /calendar/[slug].ics`             | `functions/calendar/[slug].js`             | GET     | `?key=<calendar_token>` (per-member secret) |
+
+The public (no-session) surface is deliberately small: the member roster
+(first names + counts), Trending, catalog-level show detail + cast for the
+Trending screen, and the auth/signup endpoints. Everything derived from
+members' libraries — lists, notes, activity, cross-library search — needs a
+logged-in session. "Admin session" = a session whose member row has
+`members.is_admin = 1` (see Authentication).
 
 The `[slug]` param matches the full final segment (including `.ics`); the handler strips the suffix.
 
@@ -205,7 +213,17 @@ The `[slug]` param matches the full final segment (including `.ics`); the handle
 
 `functions/_shared/auth.js` exports `getSession(request, env)` which reads the cookie, queries the session row, checks `expires_at`, and returns `{email, member_slug}` or `null`. Every mutating endpoint and `/api/reporting` calls `getSession` first.
 
-Admin endpoints are gated by `_shared/admin.js#isAdmin()` — a valid session whose `member_slug` is the operator (`patrick`). There is no separate admin secret; the operator just needs to be logged in. This strengthens automatically once login moves to SMS one-time codes.
+Admin endpoints are gated by `_shared/admin.js#isAdmin()` — a valid session whose member row has `members.is_admin = 1` (migration 029). Admin rights live in the database, so admins are added/removed with an `UPDATE members SET is_admin = ...`, not a code change. There is no separate admin secret; an admin just needs to be logged in. Endpoints that need to know *which* admin acted (e.g. `reviewed_by` on signup requests) use `getAdminSession()` from the same module.
+
+Rate limits on `POST /auth/login`: 5 failed attempts per IP **and** 10 failed attempts per member account per 15 minutes → 429 with `Retry-After`. The per-member cap stops a distributed guesser who knows a member's email/phone from brute-forcing a 6-digit code across many IPs.
+
+Scheduled-job endpoints accept an `X-Cron-Secret` header compared in constant time (`_shared/secrets.js#cronAuthorized`).
+
+### Demo account
+
+`DEMO_LOGIN_EMAIL` + `DEMO_LOGIN_CODE` (Cloudflare secrets) enable a reviewer/demo login: that one email signs in with a fixed code. `DEMO_APPLE_FALLBACK=true` additionally routes unrecognized Apple IDs into the same demo member. With the secrets unset, all of it is inert.
+
+The demo member's data auto-resets (`_shared/demo.js`): each demo sign-in snapshots the account's shows/actors/subscriptions as a baseline (if clean) and arms a reset for one hour later. The reset runs lazily at the next demo sign-in and hourly via the `demo-reset.yml` GitHub Action → `POST /api/admin-demo-reset`. The demo member is also blocked from cross-member writes (suggestions, shares) and its rows are ignored as URL-sync sources.
 
 ### Session activity tracking
 
@@ -326,7 +344,7 @@ Source of truth: `functions/_shared/networks.js`. Each entry has:
 
 ## Calendar feed
 
-`functions/calendar/[slug].js` builds an RFC 5545 iCalendar document on every request.
+`functions/calendar/[slug].js` builds an RFC 5545 iCalendar document on every request. The feed authenticates with `?key=<members.calendar_token>` (calendar apps can't log in); a missing or wrong key 404s, indistinguishable from an unknown member. The web member page and the iOS app only surface the subscribe link to logged-in sessions, since `/api/members` withholds tokens otherwise.
 
 - **Slug param:** `params.slug` is the full final segment, e.g. `whitt.ics`. The handler strips `.ics`.
 - **Membership check:** 404 if the slug isn't a known member.
@@ -398,7 +416,7 @@ Compute the **deviation from the club mean** for both the member fingerprint and
 
 ## Admin endpoints
 
-All require an operator (`patrick`) session via `isAdmin()`. No separate secret.
+All require an admin session via `isAdmin()` (`members.is_admin = 1`). No separate secret.
 
 ### `POST /api/admin-create-member`
 Body: `{secret, full_name, phone, emails}`. Generates a slug from `full_name`, inserts into `members` plus `member_phones`/`member_emails` (the contacts the member's login codes are sent to), then picks 8 seed shows (2 per list) drawn from the existing club's highly-rated picks with cast and a real network URL. Shows are inserted with `added_by='seed'`, `created_at=NULL`, `updated_at=NULL` so the seed-only check (which looks for exactly that signature) recognizes them.

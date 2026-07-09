@@ -1,7 +1,21 @@
 CREATE TABLE IF NOT EXISTS members (
   slug TEXT PRIMARY KEY,
   name TEXT NOT NULL,
+  -- Database-backed admin role (migration 029). Admin endpoints check this,
+  -- not a hardcoded slug in source.
+  is_admin INTEGER NOT NULL DEFAULT 0,
+  -- Secret for the member's /calendar/<slug>.ics feed (migration 029).
+  calendar_token TEXT,
   created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Key/value state for the demo-account auto-reset (migration 029):
+-- 'baseline' = JSON snapshot of the demo member's data, 'reset_due_at' =
+-- when the demo data should be restored to that snapshot.
+CREATE TABLE IF NOT EXISTS demo_state (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS member_phones (

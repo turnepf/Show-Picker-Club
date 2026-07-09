@@ -4,8 +4,10 @@
 // member_emails), thereafter by the stable Apple user id (`sub`). No public
 // sign-up: an unrecognized identity is rejected, never auto-created.
 
+import { demoMemberSlug, noteDemoLogin } from '../_shared/demo.js';
+
 function corsHeaders() {
-  return { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
 }
 
 const MAX_FAILS = 5;
@@ -34,16 +36,8 @@ function demoFallbackEnabled(env) {
   return v === '1' || v === 'true' || v === 'yes' || v === 'on';
 }
 
-// The demo member is the one behind DEMO_LOGIN_EMAIL — a single source of truth
-// shared with the email/code reviewer login in auth/login.js.
-async function demoMemberSlug(env) {
-  const demoEmail = (env.DEMO_LOGIN_EMAIL || '').trim().toLowerCase();
-  if (!demoEmail) return null;
-  const row = await env.DB.prepare(
-    'SELECT member_slug FROM member_emails WHERE LOWER(email) = ? LIMIT 1'
-  ).bind(demoEmail).first();
-  return row?.member_slug || null;
-}
+// The demo member is the one behind DEMO_LOGIN_EMAIL — a single source of
+// truth shared with the email/code reviewer login (see _shared/demo.js).
 
 async function failureCount(env, ip) {
   const since = new Date(Date.now() - WINDOW_MIN * 60 * 1000).toISOString();
@@ -182,6 +176,8 @@ export async function onRequestPost(context) {
   // account instead of staying pinned to the demo.
   if (!memberSlug && demoFallbackEnabled(env)) {
     memberSlug = await demoMemberSlug(env);
+    // Demo sign-ins arm the one-hour auto-reset (see _shared/demo.js).
+    if (memberSlug) await noteDemoLogin(env, memberSlug);
   }
 
   if (!memberSlug) {
@@ -221,7 +217,7 @@ async function issueSession(env, memberSlug) {
 export async function onRequestOptions() {
   return new Response(null, {
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': 'https://showpicker.club',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },

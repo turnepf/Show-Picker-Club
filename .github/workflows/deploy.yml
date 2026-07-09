@@ -68,7 +68,12 @@ jobs:
             "POST /api/shows/share" \
             "GET  /api/vibe" \
             "POST /api/enrich" \
-            "POST /api/sync-urls"
+            "POST /api/sync-urls" \
+            "GET  /api/shows" \
+            "GET  /api/shows/all" \
+            "GET  /api/shows/check" \
+            "GET  /api/activity" \
+            "GET  /api/recommendations"
           do
             method=$(echo "$probe" | awk '{print $1}')
             path=$(echo "$probe" | awk '{print $2}')
@@ -85,6 +90,13 @@ jobs:
             "https://showpicker.club/api/reporting?nocache=$RANDOM")
           if [ "$code" != "403" ]; then
             echo "::error::GET /api/reporting returned $code, expected 403"
+            fail=1
+          fi
+          # Calendar feeds require the per-member key: bare slug must 404.
+          code=$(curl -sS -o /dev/null -w "%{http_code}" \
+            "https://showpicker.club/calendar/patrick.ics?nocache=$RANDOM")
+          if [ "$code" != "404" ]; then
+            echo "::error::GET /calendar/patrick.ics without key returned $code, expected 404"
             fail=1
           fi
           exit $fail

@@ -1,8 +1,17 @@
-// Returns all active shows across every member, for the landing-page
-// cross-library search. Includes member info so results can show
-// "on Watching · William".
+// Returns all active shows across every member, for the cross-library
+// search. Includes member info so results can show "on Watching · William".
+import { getSession } from '../../_shared/auth.js';
+
 export async function onRequestGet(context) {
-  const { env } = context;
+  const { env, request } = context;
+  // Every member's full library (with notes-adjacent metadata) — members only.
+  const session = await getSession(request, env);
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   const { results } = await env.DB.prepare(
     `SELECT s.id, s.title, s.network, s.network_url, s.rating, s.movie,
             s.full_series, s.list, s.member_slug, s.genres,

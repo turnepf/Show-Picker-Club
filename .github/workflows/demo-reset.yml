@@ -1,0 +1,33 @@
+name: Hourly demo-account reset
+
+# The demo account (DEMO_LOGIN_EMAIL) auto-restores to its baseline snapshot
+# one hour after each demo sign-in. The login path runs the check lazily, but
+# if nobody signs in again the junk would linger — this hourly job is the
+# backstop that runs the same check on a clock. A no-op whenever the demo
+# login is unconfigured, the data is clean, or the hour hasn't passed.
+#
+# Required repo secret (Settings → Secrets and variables → Actions):
+#   CRON_SECRET — must match the CRON_SECRET Pages secret set on the project
+
+on:
+  schedule:
+    # Hourly, five past the hour (GitHub delays :00 crons the most).
+    - cron: '5 * * * *'
+  workflow_dispatch:  # Manual trigger from Actions tab
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Run demo reset check
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          resp=$(curl -sS -X POST https://showpicker.club/api/admin-demo-reset \
+            -H "Content-Type: application/json" \
+            -H "X-Cron-Secret: ${CRON_SECRET}" \
+            -d '{}')
+          echo "$resp"
+          # Fail the run if the endpoint rejected us (bad/missing secret).
+          echo "$resp" | grep -q '"error":"Forbidden"' && { echo "::error::CRON_SECRET rejected"; exit 1; } || true

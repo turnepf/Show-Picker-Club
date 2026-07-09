@@ -338,7 +338,7 @@
 
       html += `<div class="cal-note">
         💡 Set a <strong>resubscribe date</strong> on a paused service and it lands on your
-        <a href="webcal://showpicker.club/calendar/${encodeURIComponent(data.member)}.ics">Shows calendar</a>
+        <a href="webcal://showpicker.club/calendar/${encodeURIComponent(data.member)}.ics?key=${encodeURIComponent(data.calendar_token || '')}">Shows calendar</a>
         as a reminder — right next to your premiere and finale dates.
       </div>`;
 

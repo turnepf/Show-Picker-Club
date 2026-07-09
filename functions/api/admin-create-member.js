@@ -118,8 +118,9 @@ export async function createMember(env, { full_name, phone, emails }) {
   const editorName = firstName;
   const lastInitialUpper = lastInitial ? lastInitial.toUpperCase() : null;
 
+  // calendar_token: per-member secret for the /calendar/<slug>.ics feed.
   await env.DB.prepare(
-    'INSERT INTO members (slug, name, first_name, last_initial, last_name) VALUES (?, ?, ?, ?, ?)'
+    "INSERT INTO members (slug, name, first_name, last_initial, last_name, calendar_token) VALUES (?, ?, ?, ?, ?, lower(hex(randomblob(16))))"
   ).bind(slug, displayName, firstName, lastInitialUpper, lastName).run();
   if (phoneE164) {
     await env.DB.prepare(
@@ -168,7 +169,7 @@ export async function onRequestPost(context) {
   const { request, env } = context;
 
   if (!(await isAdmin(request, env))) {
-    return json({ error: 'Forbidden — log in as the operator' }, 403);
+    return json({ error: 'Forbidden' }, 403);
   }
 
   let body;

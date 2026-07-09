@@ -338,7 +338,7 @@ export async function onRequestPost(context) {
   const { request, env } = context;
 
   if (!(await isAdmin(request, env))) {
-    return json({ error: 'Forbidden — log in as the operator' }, 403);
+    return json({ error: 'Forbidden' }, 403);
   }
 
   let body;

@@ -1,8 +1,10 @@
 import Foundation
 
-// Thin async client over the showpicker.club API. Browsing is open; signing in
-// (phone / email OTP) sets the session cookie that URLSession.shared persists
-// automatically, so authenticated reads just work afterwards.
+// Thin async client over the showpicker.club API. The member roster and
+// Trending are open; member show lists now require a session, so browsing
+// them means signing in first (phone / email OTP). Signing in sets the
+// session cookie that URLSession.shared persists automatically, so
+// authenticated reads just work afterwards.
 enum API {
     static let baseString = "https://showpicker.club"
 
