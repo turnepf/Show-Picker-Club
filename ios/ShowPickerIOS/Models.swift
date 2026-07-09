@@ -118,22 +118,6 @@ struct TitleHit: Codable, Identifiable, Hashable {
 
 struct TitleSearchResponse: Codable { let results: [TitleHit] }
 
-// /api/shows/share response. `duplicate` means the target already had it; if
-// `archived` they'd archived it, otherwise `list` is where it currently sits.
-struct ShareResponse: Codable {
-    let success: Bool?
-    let duplicate: Bool?
-    let archived: Bool?
-    let list: String?
-    let error: String?
-}
-
-enum ShareOutcome {
-    case sent
-    case duplicate(list: String?)
-    case duplicateArchived
-}
-
 struct PopularShow: Codable, Identifiable, Hashable {
     let id: Int
     let title: String
@@ -614,10 +598,27 @@ struct AdminActionResult: Codable {
     }
 }
 
-// Login response.
+// Login response. `needsName` (self-enroll only) means the code/identity
+// checked out for an unknown email or Apple ID: collect a name and finish via
+// /auth/enroll (email) or a second /auth/apple call (Apple).
 struct LoginResponse: Codable {
     let success: Bool?
     let slug: String?
+    let needsName: Bool?
+    let error: String?
+
+    enum CodingKeys: String, CodingKey {
+        case success, slug, error
+        case needsName = "needs_name"
+    }
+}
+
+// /api/account-delete response — `sent` for the send-a-code step, `deleted`
+// for the confirm step; `error` carries no_email / admin_must_demote_first /
+// invalid / rate_limited on failure.
+struct AccountDeleteResponse: Codable {
+    let sent: Bool?
+    let deleted: Bool?
     let error: String?
 }
 

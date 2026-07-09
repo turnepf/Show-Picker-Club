@@ -6,6 +6,7 @@ struct HomeView: View {
     @State private var popular: [PopularShow] = []
     @State private var loading = true
     @State private var showingLogin = false
+    @State private var showingDeleteAccount = false
     @State private var showingSearch = false
     @State private var showAllMembers = false
     @State private var shakePick: Show?
@@ -136,6 +137,9 @@ struct HomeView: View {
                     WhatsNewView()
                 }
             }
+            .sheet(isPresented: $showingDeleteAccount) {
+                DeleteAccountView().environmentObject(auth)
+            }
             .sheet(isPresented: $showingLogin) {
                 LoginView().environmentObject(auth)
             }
@@ -195,6 +199,11 @@ struct HomeView: View {
                         Task { await auth.logout() }
                     } label: {
                         Label("Log out", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                    Button(role: .destructive) {
+                        showingDeleteAccount = true
+                    } label: {
+                        Label("Delete Account…", systemImage: "trash")
                     }
                 } label: {
                     Image(systemName: "person.crop.circle").font(.title)

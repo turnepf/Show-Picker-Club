@@ -291,9 +291,20 @@ enum API {
     }
 
     // Sign in with Apple: hand the verified identity token to the server, which
-    // maps it to an existing member and sets the session cookie.
-    static func loginWithApple(identityToken: String) async throws -> LoginResponse {
-        try await postJSON("/auth/apple", body: ["identity_token": identityToken])
+    // maps it to an existing member and sets the session cookie. With
+    // self-enroll on, an unrecognized identity gets { needs_name: true } —
+    // re-post the same token with fullName to create the account (Apple only
+    // gives the name to the client, and only on first authorization).
+    static func loginWithApple(identityToken: String, fullName: String? = nil) async throws -> LoginResponse {
+        try await postJSON("/auth/apple", body: ["identity_token": identityToken, "full_name": fullName])
+    }
+
+    // Complete an email self-enrollment: /auth/login answered { needs_name }
+    // for this email+code, and now we have the person's name. Creates the
+    // member and sets the session cookie. Throws badResponse(401) invalid
+    // code, (409) already a member, (403) signups closed, (429) paused.
+    static func enroll(email: String, code: String, fullName: String) async throws -> LoginResponse {
+        try await postJSON("/auth/enroll", body: ["email": email, "code": code, "full_name": fullName])
     }
 
     // Ask Twilio Verify to text a 6-digit OTP. Server replies 200 even for
@@ -325,6 +336,23 @@ enum API {
         _ = try? await URLSession.shared.data(for: URLRequest(url: url))
     }
 
+    // MARK: Account deletion (App Store 5.1.1(v))
+    //
+    // Two-step hard delete, decoded regardless of HTTP status so the UI can
+    // speak to the server's error (no_email / admin_must_demote_first /
+    // invalid / rate_limited) instead of a bare status code.
+
+    // Step 1: email a deletion code to the member's primary address.
+    static func requestAccountDeleteCode() async throws -> AccountDeleteResponse {
+        try await postDecoding("/api/account-delete", body: [:])
+    }
+
+    // Step 2: verify the code and hard-delete the account. On { deleted: true }
+    // the server has already cleared the session cookie.
+    static func confirmAccountDelete(code: String) async throws -> AccountDeleteResponse {
+        try await postDecoding("/api/account-delete", body: ["code": code])
+    }
+
     // MARK: Writes (require session cookie)
     //
     // Each write has a `…Remote` core that hits the network and throws on
@@ -334,7 +362,7 @@ enum API {
     // connectivity returns. Real server rejections still surface to the caller.
 
     @discardableResult
-    // Type-ahead title search while adding/suggesting a show. Session-gated
+    // Type-ahead title search while adding a show. Session-gated
     // TMDB proxy; empty result list means "let them type freely".
     static func titleSearch(_ q: String) async throws -> [TitleHit] {
         // URLComponents escapes &/=/# in the value ( .urlQueryAllowed wouldn't,
@@ -490,44 +518,6 @@ enum API {
         guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw APIError.badResponse((resp as? HTTPURLResponse)?.statusCode ?? -1)
         }
-    }
-
-    // Send an existing show to another member's Up Next, carrying over its
-    // enrichment (rating, network link, cast, movie/series flags). Returns the
-    // outcome so the UI can speak to duplicates.
-    @discardableResult
-    static func shareShow(showId: Int, sourceMember: String, targetMember: String,
-                          recommendedBy: String, notes: String?) async throws -> ShareOutcome {
-        let body: [String: Any?] = [
-            "show_id": showId,
-            "source_member": sourceMember,
-            "target_member": targetMember,
-            "recommended_by": recommendedBy,
-            "notes": notes,
-        ]
-        let r: ShareResponse = try await postJSON("/api/shows/share", body: body)
-        if r.duplicate == true {
-            return r.archived == true ? .duplicateArchived : .duplicate(list: r.list)
-        }
-        return .sent
-    }
-
-    static func suggest(to member: String, title: String, network: String?, notes: String?,
-                        recommendedBy: String?, movie: Bool, fullSeries: Bool,
-                        tmdbId: Int? = nil, tmdbType: String? = nil) async throws {
-        let body: [String: Any?] = [
-            "member": member,
-            "title": title,
-            "network": network,
-            "notes": notes,
-            "recommended_by": recommendedBy,
-            "movie": movie ? 1 : 0,
-            "full_series": fullSeries ? 1 : 0,
-            "tmdb_id": tmdbId,
-            "tmdb_type": tmdbType,
-        ]
-        struct Ack: Decodable {}
-        let _: Ack? = try? await postJSON("/api/suggestions", body: body)
     }
 
     // MARK: Internal

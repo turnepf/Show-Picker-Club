@@ -142,11 +142,7 @@ struct MemberView: View {
                 if isMine {
                     Button { showingAdd = true } label: { Image(systemName: "plus") }
                 } else if auth.isLoggedIn {
-                    Menu {
-                        Button { showingAdd = true } label: { Label("Suggest a show", systemImage: "paperplane") }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
+                    EmptyView()
                 } else {
                     Button("Log in") { showingLogin = true }
                 }
@@ -170,8 +166,6 @@ struct MemberView: View {
         .sheet(isPresented: $showingAdd) {
             if isMine {
                 AddEditShowView(memberSlug: member.slug, existing: nil) { await load() }
-            } else {
-                SuggestShowView(targetSlug: member.slug, targetName: member.label)
             }
         }
         .sheet(item: $editingShow) { show in
