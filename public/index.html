@@ -305,8 +305,9 @@
     a.actor-tag:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
     a.actor-tag:hover::after { opacity: 1; }
 
-    .suggest-bar { text-align: center; padding: 16px 0 4px; }
-    .suggest-btn {
+    /* Bar under the list with the "Share …'s Shows" copy-link button. */
+    .share-list-bar { text-align: center; padding: 16px 0 4px; }
+    .share-list-btn {
       padding: 10px 24px;
       font-size: 14px;
       font-weight: 600;
@@ -317,9 +318,10 @@
       border-radius: 24px;
       cursor: pointer;
     }
-    .suggest-btn:hover { background: var(--header-bg); }
+    .share-list-btn:hover { background: var(--header-bg); }
 
-    .share-btn {
+    /* "+" add-to-my-list button on club-wide search result rows. */
+    .search-add-btn {
       background: none;
       border: none;
       color: var(--ink-quiet);
@@ -331,17 +333,7 @@
       font-family: inherit;
       transition: color 0.2s;
     }
-    .share-btn:hover { color: var(--accent); }
-    .share-btn svg {
-      width: 18px;
-      height: 18px;
-      stroke: currentColor;
-      fill: none;
-      stroke-width: 1.75;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      vertical-align: middle;
-    }
+    .search-add-btn:hover { color: var(--accent); }
 
     .network-counts { text-align: center; font-size: 12px; color: var(--ink-quiet); padding: 12px 0 4px; }
 
@@ -556,17 +548,17 @@
       box-shadow: 0 20px 60px rgba(0,0,0,0.2);
     }
 
-    /* Add Show / Suggest grow while typing (title type-ahead results), and a
+    /* Add Show grows while typing (title type-ahead results), and a
        centered modal grows upward too — shoving the title field off-screen
-       above an unscrollable overlay. Anchor them to the top like the search
+       above an unscrollable overlay. Anchor it to the top like the search
        modal, so results only extend downward, and let the modal itself
        scroll when it outgrows the viewport. */
-    #modalOverlay, #suggestOverlay {
+    #modalOverlay {
       align-items: flex-start;
       padding-top: 6vh;
       padding-bottom: 6vh;
     }
-    #modalOverlay .modal, #suggestOverlay .modal {
+    #modalOverlay .modal {
       max-height: 88vh;
       overflow-y: auto;
     }
@@ -667,7 +659,7 @@
     }
 
     /* Toast notifications — bottom-center stack. Used for action feedback
-       (move, archive, share, suggest, save) and undo on archive. */
+       (move, archive, save) and undo on archive. */
     .toast-stack {
       position: fixed;
       left: 0;
@@ -884,7 +876,7 @@
     #popularList.show-list, #recsList.show-list { box-shadow: none; }
 
     /* Show detail screen (pushed over everything) ------------------- */
-    /* Type-ahead results under the title inputs in Add Show / Suggest. */
+    /* Type-ahead results under the title input in Add Show. */
     .title-suggest {
       margin-top: 6px;
       border: 1px solid var(--border);
@@ -1404,78 +1396,6 @@
     </div>
   </div>
 
-  <!-- Suggest Modal -->
-  <div class="modal-overlay hidden" id="suggestOverlay" onclick="closeSuggestModal(event)">
-    <div class="modal" onclick="event.stopPropagation()">
-      <h2>Suggest a Show</h2>
-      <!-- Hidden — we use the logged-in member's name automatically. Suggest
-           is only reachable when authenticated, so this can never be blank. -->
-      <input type="hidden" id="suggestName">
-
-      <label for="suggestTitle">Show Title</label>
-      <input type="text" id="suggestTitle" placeholder="e.g. The Night Agent" autocomplete="off">
-      <div class="title-suggest hidden" id="suggestTitleSuggest"></div>
-
-      <label for="suggestNetwork">Network</label>
-      <select id="suggestNetwork">
-        <option value="">Select…</option>
-        <option value="AMC+">AMC+ (including AMC, BBC America, IFC, Sundance, Shudder)</option>
-        <option value="Amazon Prime Video">Amazon Prime Video (including MGM+, Freevee)</option>
-        <option value="Apple TV+">Apple TV+</option>
-        <option value="BritBox">BritBox (British TV from the BBC and ITV)</option>
-        <option value="Disney+">Disney+ (including Marvel, Star Wars, Pixar, Nat Geo)</option>
-        <option value="Food Network">Food Network</option>
-        <option value="Fox">Fox</option>
-        <option value="Hulu">Hulu (including FX, FXX, ABC, Nat Geo, Freeform)</option>
-        <option value="HBO Max">HBO Max (including Discovery, CNN, TNT, TBS, Cartoon Network)</option>
-        <option value="Netflix">Netflix</option>
-        <option value="Paramount+">Paramount+ (including CBS, MTV, Comedy Central, Nickelodeon, BET, Showtime)</option>
-        <option value="Peacock">Peacock (including NBC, Bravo, USA, Syfy, Oxygen, E!)</option>
-        <option value="Starz">Starz</option>
-        <option value="YouTube">YouTube</option>
-        <option value="__other">Network not listed</option>
-      </select>
-      <input type="text" id="suggestNetworkOther" placeholder="Enter network name" style="display:none; margin-top: 6px;">
-
-      <label for="suggestNotes">Notes</label>
-      <input type="text" id="suggestNotes" placeholder="e.g. Great thriller, has Mark Ruffalo">
-
-      <label class="checkbox-label"><input type="checkbox" id="suggestMovie"> Movie</label>
-      <label class="checkbox-label"><input type="checkbox" id="suggestFullSeries"> Series Complete</label>
-
-      <div class="modal-actions">
-        <button class="btn btn-cancel" onclick="closeSuggestModal()">Cancel</button>
-        <button class="btn btn-save" onclick="submitSuggestion()">Send Suggestion</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Share to Member Modal -->
-  <div class="modal-overlay hidden" id="shareOverlay" onclick="closeShareModal(event)">
-    <div class="modal" onclick="event.stopPropagation()">
-      <h2>Add to a Member's List</h2>
-      <input type="hidden" id="shareShowId">
-
-      <label for="shareTitle">Show</label>
-      <input type="text" id="shareTitle" readonly style="background: var(--surface); color: var(--ink-muted);">
-
-      <label for="shareMember">Send to</label>
-      <select id="shareMember"></select>
-
-      <!-- Hidden — we use the logged-in member's name automatically. Both
-           paths into this modal are gated on auth before getting here. -->
-      <input type="hidden" id="shareName">
-
-      <label for="shareNotes">Notes</label>
-      <input type="text" id="shareNotes" placeholder="e.g. You'll love this one">
-
-      <div class="modal-actions">
-        <button class="btn btn-cancel" onclick="closeShareModal()">Cancel</button>
-        <button class="btn btn-save" onclick="submitShare()">Share</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Add to My List Modal -->
   <div class="modal-overlay hidden" id="addMyListOverlay" onclick="closeAddMyList(event)">
     <div class="modal" onclick="event.stopPropagation()">
@@ -1732,9 +1652,6 @@
     document.getElementById('inputNetwork').addEventListener('change', function() {
       document.getElementById('inputNetworkOther').style.display = this.value === '__other' ? 'block' : 'none';
     });
-    document.getElementById('suggestNetwork').addEventListener('change', function() {
-      document.getElementById('suggestNetworkOther').style.display = this.value === '__other' ? 'block' : 'none';
-    });
 
     function getNetwork(selectId, otherId) {
       const val = document.getElementById(selectId).value;
@@ -1949,8 +1866,8 @@
         const data = await res.json();
         const h = data.members.find(h => h.slug === slug);
         // Calendar feeds authenticate with a per-member token; the API only
-        // shares tokens with logged-in sessions, so logged-out visitors
-        // simply don't see the calendar link.
+        // returns your OWN token, so the calendar link renders only on your
+        // own member page.
         const calLink = document.getElementById('calendarFeedLink');
         if (calLink && h && h.calendar_token) {
           calLink.href = `webcal://showpicker.club/calendar/${encodeURIComponent(slug)}.ics?key=${encodeURIComponent(h.calendar_token)}`;
@@ -2497,31 +2414,14 @@
 
     function updateDesc() {
       const count = shows.filter(s => s.list === currentTab).length;
-      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-      const suggestCount = shows.filter(s => s.list === 'next' && s.recommended_by && s.created_at >= weekAgo).length;
-      const lastSeen = parseInt(localStorage.getItem('suggestions_seen_count') || '0');
-      const isOwnPage = authMember && authMember === memberSlug;
-      const hasNew = isOwnPage && currentTab === 'next' && suggestCount > lastSeen;
       const desc = SECTION_DESCS[currentTab] + ` (${count} show${count !== 1 ? 's' : ''})`;
-      const el = document.getElementById('sectionDesc');
-      if (hasNew) {
-        el.innerHTML = desc + `<br><span style="color:var(--accent);font-weight:600;">You have new suggestions from members!</span>`;
-      } else {
-        el.textContent = desc;
-      }
+      document.getElementById('sectionDesc').textContent = desc;
     }
 
     function updateTabCounts() {
       document.querySelectorAll('.tab').forEach(t => {
         t.textContent = TAB_LABELS[t.dataset.list];
       });
-
-      // Mark suggestions as seen when viewing Up Next
-      if (currentTab === 'next') {
-        const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-        const suggestCount = shows.filter(s => s.list === 'next' && s.recommended_by && s.created_at >= weekAgo).length;
-        localStorage.setItem('suggestions_seen_count', suggestCount);
-      }
     }
 
     function switchTab(list) {
@@ -2641,13 +2541,8 @@
       const legend = legendParts.join(' | ');
       if (legend) container.innerHTML += `<div class="network-counts">${legend}</div>`;
       if (countsHtml) container.innerHTML += `<div class="network-counts">${countsHtml}</div>`;
-      // Suggest only makes sense when logged in and viewing someone else's
-      // list. Share-list URL works for any list including your own.
-      const ownPage = authMember && authMember === memberSlug;
-      const suggestBtn = authMember && !ownPage
-        ? `<button class="suggest-btn" title="Suggest a new show for ${escapeHtml(owners)} to watch" onclick="openSuggestModal()">Suggest a Show for ${escapeHtml(owners)}</button>`
-        : '';
-      container.innerHTML += `<div class="suggest-bar" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;"><button class="suggest-btn" title="Copy a link to ${escapeHtml(owners)}'s lists" onclick="shareList()" style="background: var(--ink-quiet);">Share ${escapeHtml(owners)}'s Shows</button>${suggestBtn}</div>`;
+      // Share-list URL works for any list including your own.
+      container.innerHTML += `<div class="share-list-bar"><button class="share-list-btn" title="Copy a link to ${escapeHtml(owners)}'s lists" onclick="shareList()" style="background: var(--ink-quiet);">Share ${escapeHtml(owners)}'s Shows</button></div>`;
 
       const nextUpOption = dateDefaultTab
         ? `<option value="nextup"${sortOrder === 'nextup' ? ' selected' : ''}>Sort by Next up</option>`
@@ -2741,7 +2636,6 @@
       }
     }
     attachTitlePicker('inputTitle', 'inputTitleSuggest', 'inputMovie');
-    attachTitlePicker('suggestTitle', 'suggestTitleSuggest', 'suggestMovie');
 
     function openAddModal() {
       editingId = null;
@@ -2952,40 +2846,6 @@
       }
     }
 
-    // Suggest
-    const ARCHIVED_QUIPS = [
-      "They've seen this one, but it didn't make the cut!",
-      "Been there, watched that! They moved on from this one.",
-      "They gave it a shot but it's not on their list anymore.",
-    ];
-
-    const QUIPS = {
-      watching: [
-        "Great minds think alike! They're watching this right now!",
-        "You're in sync! They're already binging this one!",
-        "Already on the screen!",
-      ],
-      waiting: [
-        "Same! They're awaiting the next season too!",
-        "They're already counting the days until the next season drops!",
-        "Join the waiting club!",
-      ],
-      recommending: [
-        "Good taste! They loved this one!",
-        "You know what's good! They'd totally recommend this too!",
-      ],
-      next: [
-        "It's already on the list! They're planning to watch this!",
-        "Someone else beat you to it. It's already queued up!",
-        "Already in the queue! Great suggestion though!",
-      ],
-    };
-
-    function getQuip(list) {
-      const q = QUIPS[list];
-      return q[Math.floor(Math.random() * q.length)];
-    }
-
     function shareList() {
       const url = `https://showpicker.club/${memberSlug}`;
       const text = `Check out ${owners}'s show list on Show Picker Club: ${url}`;
@@ -3091,7 +2951,7 @@
           : '';
         const listLabel = `<span class="search-list-label">· ${escapeHtml(list)}${memberTag}</span>`;
         const addBtn = searchMode === 'all'
-          ? `<button class="share-btn" data-add-idx="${show.id}" title="Add to my list">+</button>`
+          ? `<button class="search-add-btn" data-add-idx="${show.id}" title="Add to my list">+</button>`
           : '';
         const poster = show.poster_url
           ? `<img class="row-poster" src="${safeUrl(show.poster_url)}" alt="" loading="lazy">`
@@ -3123,180 +2983,6 @@
             openAddMyList(s.title, s.network || '', s.network_url || '', s.movie || 0);
           });
         });
-      }
-    }
-
-    function openSuggestModal() {
-      if (!authMember) {
-        openLoginModal();
-        return;
-      }
-      document.getElementById('suggestName').value = editorName || authMember;
-      titlePickers.suggestTitle.clear();
-      document.getElementById('suggestTitle').value = '';
-      document.getElementById('suggestNetwork').value = '';
-      document.getElementById('suggestNetworkOther').value = '';
-      document.getElementById('suggestNetworkOther').style.display = 'none';
-      document.getElementById('suggestNotes').value = '';
-      document.getElementById('suggestOverlay').classList.remove('hidden');
-      document.getElementById('suggestTitle').focus();
-    }
-
-    function closeSuggestModal(event) {
-      if (event && event.target !== event.currentTarget) return;
-      document.getElementById('suggestOverlay').classList.add('hidden');
-    }
-
-    async function submitSuggestion() {
-      const name = document.getElementById('suggestName').value.trim();
-      const title = document.getElementById('suggestTitle').value.trim();
-      const network = getNetwork('suggestNetwork', 'suggestNetworkOther');
-      const notes = document.getElementById('suggestNotes').value.trim() || null;
-      if (!title) { showToast('Show title is required', { tone: 'error' }); return; }
-      if (!name) { showToast('Your name is required', { tone: 'error' }); return; }
-
-      const suggestBody = {
-        title, network, recommended_by: name, notes,
-        movie: document.getElementById('suggestMovie').checked ? 1 : 0,
-        full_series: document.getElementById('suggestFullSeries').checked ? 1 : 0,
-        member: memberSlug,
-      };
-      // Member picked the show from type-ahead — enrich that exact entry.
-      const suggestPick = titlePickers.suggestTitle.pick;
-      if (suggestPick) {
-        suggestBody.tmdb_id = suggestPick.tmdb_id;
-        suggestBody.tmdb_type = suggestPick.tmdb_type;
-      }
-
-      try {
-        const res = await fetch('/api/suggestions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(suggestBody),
-        });
-        const data = await res.json();
-        if (data.duplicate) {
-          closeSuggestModal();
-          // Quips for duplicate suggestions stay as alerts — they're playful
-          // multi-line messages that don't fit the toast format.
-          if (data.archived) {
-            alert(ARCHIVED_QUIPS[Math.floor(Math.random() * ARCHIVED_QUIPS.length)]);
-          } else {
-            alert(getQuip(data.list));
-          }
-        } else if (data.success) {
-          closeSuggestModal();
-          showToast(`Suggested to ${owners}`);
-          await loadShows();
-        } else {
-          showToast(data.error || 'Failed to send suggestion', { tone: 'error' });
-        }
-      } catch (e) {
-        showToast('Network error. Try again.', { tone: 'error' });
-      }
-    }
-
-    let allMembers = [];
-
-    async function loadMembers() {
-      if (allMembers.length > 0) return;
-      try {
-        const res = await fetch('/api/members');
-        const data = await res.json();
-        allMembers = data.members || [];
-      } catch (e) {}
-    }
-
-    let popularShowData = null;
-
-    async function openShareModal(showId) {
-      if (!authMember) { openLoginModal(); return; }
-      await loadMembers();
-      const show = shows.find(s => s.id === showId);
-      if (!show) return;
-      document.getElementById('shareShowId').value = showId;
-      document.getElementById('shareTitle').value = show.title;
-      document.getElementById('shareNotes').value = '';
-      document.getElementById('shareName').value = editorName || authMember;
-
-      const select = document.getElementById('shareMember');
-      const label = h => h.display_name || h.first_name || h.name.split(' ')[0];
-      select.innerHTML = allMembers
-        .filter(h => h.slug !== memberSlug)
-        .sort((a, b) => label(a).localeCompare(label(b)))
-        .map(h => `<option value="${h.slug}">${escapeHtml(label(h) + "'s Shows")}</option>`)
-        .join('');
-
-      document.getElementById('shareOverlay').classList.remove('hidden');
-      document.getElementById('shareNotes').focus();
-    }
-
-    function closeShareModal(event) {
-      if (event && event.target !== event.currentTarget) return;
-      document.getElementById('shareOverlay').classList.add('hidden');
-    }
-
-    async function submitShare() {
-      const showId = document.getElementById('shareShowId').value;
-      const targetMember = document.getElementById('shareMember').value;
-      const name = document.getElementById('shareName').value.trim();
-      const notes = document.getElementById('shareNotes').value.trim() || null;
-
-      if (!name) { showToast('Your name is required', { tone: 'error' }); return; }
-      if (!targetMember) { showToast('Please select a member', { tone: 'error' }); return; }
-
-      try {
-        let res, data;
-        if (popularShowData && !showId) {
-          // Adding from popular list — use suggestion endpoint
-          res = await fetch('/api/suggestions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              title: popularShowData.title,
-              network: popularShowData.network || null,
-              recommended_by: name,
-              notes,
-              movie: popularShowData.movie || 0,
-              full_series: 0,
-              member: targetMember,
-            }),
-          });
-          data = await res.json();
-          popularShowData = null;
-        } else {
-          // Sharing from a member list
-          res = await fetch('/api/shows/share', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              show_id: parseInt(showId),
-              source_member: memberSlug,
-              target_member: targetMember,
-              recommended_by: name,
-              notes,
-            }),
-          });
-          data = await res.json();
-        }
-        if (data.duplicate) {
-          closeShareModal();
-          // Quips for duplicate shares stay as alerts — playful messages.
-          if (data.archived) {
-            alert('They had this one but archived it. They must not be fans!');
-          } else {
-            alert(`They already have this on their "${LIST_LABELS[data.list] || data.list}" list!`);
-          }
-        } else if (data.success) {
-          closeShareModal();
-          const target = allMembers.find(h => h.slug === targetMember);
-          const targetName = target ? (target.display_name || target.first_name || target.name.split(' ')[0]) : 'their';
-          showToast(`Sent to ${targetName}'s Up Next`);
-        } else {
-          showToast(data.error || 'Failed to send', { tone: 'error' });
-        }
-      } catch (e) {
-        showToast('Network error. Try again.', { tone: 'error' });
       }
     }
 
@@ -3412,7 +3098,7 @@
     }
 
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { closeModal(); closeSuggestModal(); closeShareModal(); closeAddMyList(); closePosterLightbox(); }
+      if (e.key === 'Escape') { closeModal(); closeAddMyList(); closePosterLightbox(); }
     });
   </script>
 
@@ -3421,7 +3107,7 @@
        popular, or picks) pushes this view instead of expanding the
        row inline, mirroring the native ShowDetailView. Reuses the
        existing globals (shows, authMember, moveShow, archiveShow,
-       openEditModal, openShareModal, showToast, safeUrl, …).
+       openEditModal, showToast, safeUrl, …).
        =========================================================== -->
   <script>
     let detailShow = null;
@@ -3551,8 +3237,6 @@
         ALL_LISTS.forEach(l =>
           actions.push(`<button class="detail-action" onclick="detailAdd('${l}')">Add to ${escapeHtml(LIST_LABELS[l] || l)}</button>`));
       }
-      // Send to another member — only meaningful for a show that's on my list.
-      if (mine && !mine.archived) actions.push(`<button class="detail-action" onclick="detailSend(${mine.id})">Send to a member</button>`);
       // No per-show "Share" here — the browser's own share button covers
       // sharing the page, so a custom one would be redundant on web.
       html += `<div class="detail-card">${actions.join('')}</div>`;
@@ -3567,7 +3251,6 @@
     }
 
     function detailEdit(id) { closeDetail(); openEditModal(id); }
-    function detailSend(id) { closeDetail(); openShareModal(id); }
 
     // Re-resolve my copy and re-render, so the detail's actions reflect the
     // new state (e.g. after archiving it offers "Add back to").
