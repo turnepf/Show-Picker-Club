@@ -13,11 +13,11 @@ There are native iOS, tvOS, and watchOS apps. They share a `ShowPickerCore` Swif
 
 ## At a glance
 
-- **Multi-tenant.** One deployment, many members. Each member is a slug (`/whitt`, `/patrick`) with their own lists; they sign in with a one-time code (text or email) or Sign in with Apple.
+- **Multi-tenant.** One deployment, many members. Each member is a slug (`/whitt`, `/patrick`) with their own lists; they sign in with a one-time code (text or email), Sign in with Apple, or Sign in with Google (web). With `SELF_ENROLL` on, anyone can join — new members are held off the roster until the operator approves.
 - **Auto-enriched.** OMDB supplies IMDB ratings and canonical titles; TMDB supplies cast, next-season dates, finale dates, series-ended flags, and genres.
 - **Social.** Browse every member's lists and cross-library search; add anything you see to your own lists. (Push-style "suggest to another member" was retired 2026-07 — near-zero usage.)
 - **Vibe.** `/vibe` profiles each member's taste across 27 trait dimensions and assigns one of seven cluster identities.
-- **Calendar feed.** `webcal://showpicker.club/calendar/<slug>.ics?key=<calendar_token>` keeps upcoming premieres and finales in Apple Calendar / Google Calendar / Fantastical. The per-member `key` is required (calendar apps can't log in); the member page shows the full link to logged-in members.
+- **Calendar feed.** `webcal://showpicker.club/calendar/<slug>.ics?key=<calendar_token>` keeps upcoming premieres and finales in Apple Calendar / Google Calendar / Fantastical. The per-member `key` is required (calendar apps can't log in); you see your own feed link on your own member page.
 - **PWA.** Installable to home screen.
 
 ## Tech stack
@@ -27,7 +27,7 @@ There are native iOS, tvOS, and watchOS apps. They share a `ShowPickerCore` Swif
 - **Database:** Cloudflare D1 (SQLite at the edge).
 - **Enrichment:** OMDB API + TMDB API.
 - **Vibe trait scoring:** Claude API (Sonnet 4.6 with prompt caching), admin-triggered batch only.
-- **Auth:** One-time codes (SMS via Twilio Verify, email via Resend) plus Sign in with Apple; HttpOnly session cookies, 30-day expiry.
+- **Auth:** One-time codes (SMS via Twilio Verify, email via Resend) plus Sign in with Apple and Sign in with Google (web); HttpOnly session cookies, 30-day expiry. Optional self-enrollment behind the `SELF_ENROLL` kill switch, with self-service account deletion.
 
 ## Project structure
 
@@ -135,9 +135,31 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    ```bash
    printf "1" | wrangler pages secret put DEMO_APPLE_FALLBACK --project-name shows
    ```
-   Set it for review, or leave it on to let anyone try the app via Sign in with
-   Apple. Unset it to return to a strict invite-only wall. See the full
+   The fallback is inert while `SELF_ENROLL` is on (unknown Apple IDs become
+   real accounts instead); unset it once self-enrollment launches. See the full
    pre-submission steps in [`docs/APP_STORE_SUBMISSION.md`](docs/APP_STORE_SUBMISSION.md).
+
+   **Self-enrollment (optional).** With `SELF_ENROLL` set, anyone can create an
+   account: Sign in with Apple, Sign in with Google, or an emailed signup code
+   (the login form becomes "Log in or sign up"). New members get full personal
+   use immediately but are held off the home roster, vibe pages, search,
+   activity, and trending until approved on `/members`; each signup emails the
+   operator. Guards: a global circuit breaker (20 signups/day, tune with the
+   non-secret `SELF_ENROLL_MAX_PER_DAY` var), 3 attempts/IP/day, per-email code
+   caps, optional Cloudflare Turnstile, and a reserved-slug blocklist. Unset
+   `SELF_ENROLL` to revert to invite-only instantly — no deploy needed.
+   ```bash
+   printf "1"            | wrangler pages secret put SELF_ENROLL          --project-name shows
+   # Optional — Sign in with Google on the web (create an OAuth client id in
+   # Google Cloud console with showpicker.club as an authorized origin):
+   printf "xxx.apps.googleusercontent.com" | wrangler pages secret put GOOGLE_CLIENT_ID --project-name shows
+   # Optional — Cloudflare Turnstile on email signups (create a widget in the
+   # Cloudflare dashboard; fail-open when unset):
+   printf "0x4AAA..."    | wrangler pages secret put TURNSTILE_SITE_KEY   --project-name shows
+   printf "0x4AAB..."    | wrangler pages secret put TURNSTILE_SECRET_KEY --project-name shows
+   ```
+   Members can also permanently delete their own account (account menu →
+   "Delete account…", confirmed with an emailed code).
 
 5. **Create the Pages project and do the first deploy.**
    ```bash
