@@ -197,6 +197,12 @@ struct IPadHomeView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        // Inset-grouped cards rather than the flat `.sidebar` source-list style,
+        // so each section (My Shows / the discovery group / Members) reads as a
+        // distinct card the way it does in the web desktop split view
+        // (styles.css `.ios-group`). All large-screen surfaces share this
+        // sectioned sidebar vocabulary — see DESIGN.md §6 (Platform parity).
+        .listStyle(.insetGrouped)
         .overlay { if loading && members.isEmpty { ProgressView() } }
         .refreshable { await load() }
     }

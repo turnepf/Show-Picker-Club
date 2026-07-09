@@ -247,7 +247,30 @@ The four-list switcher in the dark header is the system's signature element.
 - **Style:** centered, serif `title` headline + `ink-muted` help line (max 360px) + a pill accent CTA.
 - **Voice:** teaches the list's purpose in the moment ("Once you've watched something worth recommending, move it here"), never a blank "nothing here." Different copy for own page vs. guest view.
 
-## 6. Do's and Don'ts
+## 6. Platform Parity (Large Screens)
+
+**All large-screen surfaces share the same design elements.** The web desktop
+split view, the iPad layout (`IPadHomeView`), and the Mac Catalyst build (which
+reuses that same iPad layout) must present the *same* chrome: a persistent
+left sidebar broken into the same inset-grouped sections, in the same order —
+
+1. **My Shows** (the focused member's four lists: Watching, Awaiting,
+   Recommending, Up Next),
+2. an unlabeled **discovery + account group** (Trending, What's New,
+   Subscription audit, Admin), and
+3. **Members** (the roster, most-recently-active first),
+
+with the TMDB/OMDb attribution footnote beneath. Each group is a **distinct
+inset-grouped card** (the web's `.ios-group`; SwiftUI's `.insetGrouped` list
+style), separated from its neighbors — never a single flat, continuous list.
+When a section, an item, or its ordering changes on one large-screen platform,
+change it on the others so they stay mirrors of each other.
+
+tvOS is the deliberate exception: the living-room, focus-driven, remote-first
+paradigm uses a top **tab bar** (`RootTabView`) instead of a sidebar. It shares
+the color, type, and list vocabulary but not the sidebar layout.
+
+## 7. Do's and Don'ts
 
 ### Do:
 - **Do** anchor every new surface on the member page: taupe body, near-white card, serif headers, sans body, one orange accent.
