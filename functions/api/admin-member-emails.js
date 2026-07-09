@@ -35,11 +35,12 @@ export async function onRequestGet(context) {
   // in the last 30 days. Excludes seeded rows (they're the operator's
   // auto-pick, not member activity) and archived rows.
   const since = "datetime('now', '-30 days')";
-  // disabled (migration 030) with a column-less retry so the page keeps
-  // working if the migration hasn't been applied yet.
-  const memberQuery = (withDisabled) => env.DB.prepare(`
+  // disabled (migration 030) / approved + enrolled_via (migration 031) with
+  // column-less retries so the page keeps working mid-rollout.
+  const memberQuery = (extras) => env.DB.prepare(`
     SELECT m.slug, m.name, m.first_name, m.last_initial, m.last_name,
-           ${withDisabled ? 'm.disabled,' : '0 AS disabled,'}
+           ${extras >= 1 ? 'm.disabled,' : '0 AS disabled,'}
+           ${extras >= 2 ? 'm.approved, m.enrolled_via,' : '1 AS approved, NULL AS enrolled_via,'}
            (SELECT GROUP_CONCAT(email, ',')
               FROM (SELECT email FROM member_emails
                      WHERE member_slug = m.slug
@@ -69,12 +70,15 @@ export async function onRequestGet(context) {
       FROM members m
      ORDER BY m.first_name COLLATE NOCASE
   `);
-  const { results } = await memberQuery(true).all()
-    .catch(() => memberQuery(false).all());
+  const { results } = await memberQuery(2).all()
+    .catch(() => memberQuery(1).all())
+    .catch(() => memberQuery(0).all());
   const members = (results || []).map(r => ({
     slug: r.slug,
     name: r.name,
     disabled: !!r.disabled,
+    approved: !!r.approved,
+    enrolled_via: r.enrolled_via || null,
     first_name: r.first_name,
     last_initial: r.last_initial,
     last_name: r.last_name,

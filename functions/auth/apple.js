@@ -1,10 +1,17 @@
 // Sign in with Apple. The native app sends Apple's identity token (a JWT signed
 // by Apple); we verify the signature against Apple's published keys, then map
 // the token to an existing member — first by the email Apple shares (against
-// member_emails), thereafter by the stable Apple user id (`sub`). No public
-// sign-up: an unrecognized identity is rejected, never auto-created.
+// member_emails), thereafter by the stable Apple user id (`sub`).
+//
+// With SELF_ENROLL on, an unrecognized identity becomes a new (unapproved)
+// member: the client is asked for a name via { needs_name: true } if it
+// didn't send one (Apple only provides the name to the client, and only on
+// the very first authorization). With SELF_ENROLL off, unrecognized
+// identities are rejected as before (or land in the demo, if that's on).
 
 import { demoMemberSlug, noteDemoLogin } from '../_shared/demo.js';
+import { issueSession } from '../_shared/session.js';
+import { selfEnrollEnabled, enrollmentThrottled, enrollMember } from '../_shared/enroll.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -127,10 +134,12 @@ export async function onRequestPost(context) {
     });
   }
 
-  let identityToken;
+  let identityToken, fullName;
   try {
     const body = await request.json();
     identityToken = body.identity_token || body.identityToken;
+    // Optional; used only for self-enrollment of an unrecognized identity.
+    fullName = String(body.full_name || body.fullName || '').trim();
   } catch (e) {
     return new Response(JSON.stringify({ error: 'invalid_body' }), { status: 400, headers: corsHeaders() });
   }
@@ -169,11 +178,45 @@ export async function onRequestPost(context) {
     }
   }
 
-  // 3) Demo / public trial fallback: no real member matched, but the demo
+  // 3) Self-enrollment: unrecognized identity + SELF_ENROLL on → create a
+  // new (unapproved) member. Needs a name: Apple gives it to the CLIENT only
+  // (and only on first authorization), so if none came with the request we
+  // answer { needs_name: true } and the client re-posts the same token with
+  // full_name. The token is re-verified on that second call.
+  if (!memberSlug && selfEnrollEnabled(env)) {
+    if (!email) {
+      // No email claim at all (rare; e.g. token from a prior app install
+      // whose relay was deleted). Nothing to key the account to — refuse.
+      await recordFailure(env, ip, null);
+      return new Response(JSON.stringify({ error: 'unrecognized' }), { status: 401, headers: corsHeaders() });
+    }
+    if (!fullName) {
+      return new Response(JSON.stringify({ needs_name: true }), { status: 200, headers: corsHeaders() });
+    }
+    const throttled = await enrollmentThrottled(env, ip);
+    if (throttled) {
+      return new Response(JSON.stringify({ error: throttled }), { status: 429, headers: corsHeaders() });
+    }
+    const created = await enrollMember(env, context, {
+      full_name: fullName,
+      email,
+      via: 'apple',
+      appleSub: sub,
+      ip,
+    });
+    if (!created.ok) {
+      return new Response(JSON.stringify({ error: created.error }), { status: created.status || 400, headers: corsHeaders() });
+    }
+    return await issueSession(env, created.slug);
+  }
+
+  // 4) Demo / public trial fallback: no real member matched, but the demo
   // fallback is on — sign this Apple ID into the shared demo member. The link
   // is deliberately NOT persisted to member_apple_ids: if this person is later
   // added as a real member, their next sign-in re-resolves to their own
-  // account instead of staying pinned to the demo.
+  // account instead of staying pinned to the demo. Inert while SELF_ENROLL is
+  // on (the enrollment branch above wins) — unset DEMO_APPLE_FALLBACK once
+  // self-enroll launches; the fixed email/code demo login covers App Review.
   if (!memberSlug && demoFallbackEnabled(env)) {
     memberSlug = await demoMemberSlug(env);
     // Demo sign-ins arm the one-hour auto-reset (see _shared/demo.js).
@@ -188,38 +231,6 @@ export async function onRequestPost(context) {
   return await issueSession(env, memberSlug);
 }
 
-async function issueSession(env, memberSlug) {
-  // disabled = banned (migration 030): refuse to mint a session. Falls back
-  // to the column-less select mid-rollout.
-  const m = await env.DB.prepare(
-    'SELECT first_name, name, disabled FROM members WHERE slug = ?'
-  ).bind(memberSlug).first().catch(() =>
-    env.DB.prepare('SELECT first_name, name FROM members WHERE slug = ?').bind(memberSlug).first()
-  );
-  if (m?.disabled) {
-    return new Response(JSON.stringify({ error: 'account_disabled' }), { status: 403, headers: corsHeaders() });
-  }
-  const editorName = m?.first_name || m?.name || memberSlug;
-
-  const sessionId = crypto.randomUUID();
-  const sessionExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-  await env.DB.prepare(
-    'INSERT INTO sessions (id, email, member_slug, expires_at, created_at) VALUES (?, ?, ?, ?, ?)'
-  ).bind(sessionId, editorName, memberSlug, sessionExpires.toISOString(), new Date().toISOString()).run();
-
-  // Durable login timestamp (migration 013). Best-effort — never break login.
-  await env.DB.prepare("UPDATE members SET last_login_at = datetime('now') WHERE slug = ?")
-    .bind(memberSlug).run().catch(() => {});
-
-  return new Response(JSON.stringify({ success: true, slug: memberSlug }), {
-    status: 200,
-    headers: {
-      ...corsHeaders(),
-      'Set-Cookie': `session=${sessionId}; Path=/; Expires=${sessionExpires.toUTCString()}; HttpOnly; Secure; SameSite=Lax`,
-    },
-  });
-}
 
 export async function onRequestOptions() {
   return new Response(null, {

@@ -52,14 +52,32 @@ async function pickSeeds(env) {
   return picks;
 }
 
-// Core member-creation routine. Used both by the operator-facing POST
-// endpoint below and by the /admin page's "Approve" action.
+// Slugs that live at the root path (or could) — member pages are routed as
+// /<slug>, so a member slug must never shadow a page, an API prefix, or a
+// plausible future route. Candidates on this list are skipped, so a
+// self-enrolled "Admin Smith" just lands on "admins"/"admin2" instead.
+export const RESERVED_SLUGS = new Set([
+  // static pages (public/*.html) and their extensionless routes
+  'index', 'admin', 'join', 'members', 'privacy', 'reporting', 'setup',
+  'sms', 'subscriptions', 'terms', 'url-cleanup', 'vibe', 'vibe-admin',
+  'whats-new', 'requests',
+  // routing prefixes and assets
+  'api', 'auth', 'calendar', 'favicon', 'manifest', 'styles', 'shell', 'sw',
+  // likely future routes / confusing names
+  'about', 'account', 'app', 'delete', 'demo', 'help', 'login', 'logout',
+  'me', 'new', 'settings', 'signup', 'support', 'test', 'www',
+]);
+
+// Core member-creation routine. Used by the operator-facing POST endpoint
+// below, the /admin page's "Approve" action, and self-enrollment
+// (_shared/enroll.js — which passes allowNoContact for Apple/Google-only
+// identities, approved: 0 for the roster hold, and enrolledVia).
 // Returns either { ok: true, ...details } or { ok: false, status, error }.
-export async function createMember(env, { full_name, phone, emails }) {
+export async function createMember(env, { full_name, phone, emails, allowNoContact = false, approved = 1, enrolledVia = null }) {
   if (!full_name) {
     return { ok: false, status: 400, error: 'Full name required' };
   }
-  if (!phone && !emails) {
+  if (!phone && !emails && !allowNoContact) {
     return { ok: false, status: 400, error: 'Provide a phone number, at least one email, or both' };
   }
 
@@ -107,6 +125,7 @@ export async function createMember(env, { full_name, phone, emails }) {
 
   let slug = null;
   for (const cand of candidates) {
+    if (RESERVED_SLUGS.has(cand)) continue;
     const hit = await env.DB.prepare('SELECT slug FROM members WHERE slug = ?').bind(cand).first();
     if (!hit) { slug = cand; break; }
   }
@@ -119,9 +138,15 @@ export async function createMember(env, { full_name, phone, emails }) {
   const lastInitialUpper = lastInitial ? lastInitial.toUpperCase() : null;
 
   // calendar_token: per-member secret for the /calendar/<slug>.ics feed.
+  // approved/enrolled_via (migration 031) with a column-less retry so the
+  // operator flow keeps working if the migration hasn't been applied yet.
   await env.DB.prepare(
-    "INSERT INTO members (slug, name, first_name, last_initial, last_name, calendar_token) VALUES (?, ?, ?, ?, ?, lower(hex(randomblob(16))))"
-  ).bind(slug, displayName, firstName, lastInitialUpper, lastName).run();
+    "INSERT INTO members (slug, name, first_name, last_initial, last_name, calendar_token, approved, enrolled_via) VALUES (?, ?, ?, ?, ?, lower(hex(randomblob(16))), ?, ?)"
+  ).bind(slug, displayName, firstName, lastInitialUpper, lastName, approved ? 1 : 0, enrolledVia).run().catch(() =>
+    env.DB.prepare(
+      "INSERT INTO members (slug, name, first_name, last_initial, last_name, calendar_token) VALUES (?, ?, ?, ?, ?, lower(hex(randomblob(16))))"
+    ).bind(slug, displayName, firstName, lastInitialUpper, lastName).run()
+  );
   if (phoneE164) {
     await env.DB.prepare(
       'INSERT INTO member_phones (phone, member_slug, label, is_primary) VALUES (?, ?, NULL, 1)'
