@@ -15,6 +15,9 @@ struct Member: Codable, Identifiable, Hashable {
     let recommendingCount: Int?
     let nextCount: Int?
     let lastActivityAt: String?
+    // Per-member secret for the /calendar/<slug>.ics feed. Only present when
+    // the request carried a logged-in session.
+    let calendarToken: String?
 
     enum CodingKeys: String, CodingKey {
         case slug, name
@@ -26,6 +29,7 @@ struct Member: Codable, Identifiable, Hashable {
         case recommendingCount = "recommending_count"
         case nextCount = "next_count"
         case lastActivityAt = "last_activity_at"
+        case calendarToken = "calendar_token"
     }
 
     var label: String { displayName ?? firstName ?? name }

@@ -1,5 +1,15 @@
+import { getSession } from '../../_shared/auth.js';
+
 export async function onRequestGet(context) {
   const { env, request } = context;
+  // Reveals whether a title is on a member's list — members only.
+  const session = await getSession(request, env);
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   const url = new URL(request.url);
   const title = url.searchParams.get('title');
   const member = url.searchParams.get('member');

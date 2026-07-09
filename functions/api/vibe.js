@@ -10,7 +10,7 @@ const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
 const LIST_WEIGHT = { recommending: 1.0, watching: 0.8, waiting: 0.6, next: 0.3 };
 
 function corsHeaders() {
-  return { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
 }
 
 function disambiguatedNames(rows) {

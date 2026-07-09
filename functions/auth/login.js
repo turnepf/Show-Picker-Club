@@ -1,11 +1,17 @@
 import { checkVerification, normalizePhone } from '../_shared/twilio-verify.js';
+import { noteDemoLogin } from '../_shared/demo.js';
 
 function corsHeaders() {
-  return { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
 }
 
 const MAX_FAILS = 5;
 const WINDOW_MIN = 15;
+// Per-ACCOUNT cap, on top of the per-IP one: the IP cap alone doesn't stop a
+// distributed guesser who knows a member's email/phone and rotates addresses.
+// Ten wrong codes against one member inside the window locks that member's
+// code login until the window rolls over, whatever IPs the guesses came from.
+const MAX_MEMBER_FAILS = 10;
 
 async function failureCount(env, ip) {
   const since = new Date(Date.now() - WINDOW_MIN * 60 * 1000).toISOString();
@@ -13,6 +19,21 @@ async function failureCount(env, ip) {
     'SELECT COUNT(*) AS cnt FROM failed_logins WHERE ip = ? AND created_at > ?'
   ).bind(ip, since).first();
   return row?.cnt || 0;
+}
+
+async function memberFailureCount(env, member) {
+  const since = new Date(Date.now() - WINDOW_MIN * 60 * 1000).toISOString();
+  const row = await env.DB.prepare(
+    'SELECT COUNT(*) AS cnt FROM failed_logins WHERE member_slug = ? AND created_at > ?'
+  ).bind(member, since).first();
+  return row?.cnt || 0;
+}
+
+function rateLimited() {
+  return new Response(JSON.stringify({ error: 'rate_limited' }), {
+    status: 429,
+    headers: { ...corsHeaders(), 'Retry-After': String(WINDOW_MIN * 60) },
+  });
 }
 
 async function recordFailure(env, ip, member) {
@@ -62,7 +83,12 @@ export async function onRequestPost(context) {
     const row = await env.DB.prepare(
       'SELECT member_slug FROM member_emails WHERE LOWER(email) = ? LIMIT 1'
     ).bind(demoEmail).first();
-    if (row) return await issueSession(env, row.member_slug);
+    if (row) {
+      // Restore the baseline if a previous visitor's hour is up, then arm
+      // the next auto-reset for one hour from now.
+      await noteDemoLogin(env, row.member_slug);
+      return await issueSession(env, row.member_slug);
+    }
     // Secret set but no matching member — fall through to the normal flow
     // rather than silently succeeding on a misconfiguration.
   }
@@ -79,6 +105,9 @@ export async function onRequestPost(context) {
     if (!row) {
       await recordFailure(env, ip, null);
       return new Response(JSON.stringify({ error: 'invalid' }), { status: 401, headers: corsHeaders() });
+    }
+    if (await memberFailureCount(env, row.member_slug) >= MAX_MEMBER_FAILS) {
+      return rateLimited();
     }
     const check = await checkVerification(env, { to: e164, code });
     if (!check.ok || !check.approved) {
@@ -98,6 +127,10 @@ export async function onRequestPost(context) {
       return new Response(JSON.stringify({ error: 'invalid' }), { status: 401, headers: corsHeaders() });
     }
     member = row.member_slug;
+  }
+
+  if (await memberFailureCount(env, member) >= MAX_MEMBER_FAILS) {
+    return rateLimited();
   }
 
   const nowISO = new Date().toISOString();
@@ -147,7 +180,7 @@ async function issueSession(env, memberSlug) {
 export async function onRequestOptions() {
   return new Response(null, {
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': 'https://showpicker.club',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },

@@ -1,5 +1,3 @@
-import { ADMIN_SLUG } from '../_shared/admin.js';
-
 // Platform usage tracking. Clients self-identify with X-Client-Platform; we
 // only accept a known value so a stray header can't pollute the breakdown.
 const KNOWN_PLATFORMS = new Set(['ios', 'tvos', 'web-small', 'web-large']);
@@ -40,11 +38,17 @@ export async function onRequestGet(context) {
      WHERE id = ?1 AND (last_seen_at IS NULL OR last_seen_at < datetime('now', '-1 hour'))`
   ).bind(match[1], platform).run().catch(() => {}));
 
+  // Admin flag comes from the database (members.is_admin), not a hardcoded
+  // slug. Fail closed if the column doesn't exist yet (pre-migration).
+  const memberRow = await env.DB.prepare(
+    'SELECT is_admin FROM members WHERE slug = ?'
+  ).bind(session.member_slug).first().catch(() => null);
+
   return new Response(JSON.stringify({
     authenticated: true,
     email: session.email,
     member: session.member_slug,
-    is_admin: session.member_slug === ADMIN_SLUG,
+    is_admin: !!memberRow?.is_admin,
   }), {
     headers: { 'Content-Type': 'application/json' },
   });

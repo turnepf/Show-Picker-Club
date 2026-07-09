@@ -1,8 +1,9 @@
 import SwiftUI
 
-// Standard tvOS top tab-bar navigation. Browsing is open; "My Shows" appears
-// once you're signed in, and signing in jumps you straight to it. Account is
-// where you log in / out.
+// Standard tvOS top tab-bar navigation. The roster and Trending are open;
+// member show lists are members-only (the server 401s them without a
+// session). "My Shows" appears once you're signed in, and signing in jumps
+// you straight to it. Account is where you log in / out.
 struct RootTabView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var selection = Tab.home

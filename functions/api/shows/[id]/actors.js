@@ -1,6 +1,6 @@
 function corsHeaders() {
   return {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': 'https://showpicker.club',
     'Content-Type': 'application/json',
   };
 }
@@ -16,7 +16,7 @@ export async function onRequestGet(context) {
 export async function onRequestOptions() {
   return new Response(null, {
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': 'https://showpicker.club',
       'Access-Control-Allow-Methods': 'GET, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },

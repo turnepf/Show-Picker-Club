@@ -16,11 +16,18 @@ function generateNetworkUrl(network, title) {
 }
 
 function corsHeaders() {
-  return { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
 }
 
 export async function onRequestGet(context) {
   const { env, request } = context;
+  // Member lists (including per-show notes) are club-internal — any logged-in
+  // member can read any list, but logged-out visitors only get the public
+  // surface (/api/members, /api/popular).
+  const session = await getSession(request, env);
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders() });
+  }
   const url = new URL(request.url);
   const member = url.searchParams.get('member');
   if (!member) {
@@ -174,7 +181,7 @@ export async function onRequestPost(context) {
 export async function onRequestOptions() {
   return new Response(null, {
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': 'https://showpicker.club',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },

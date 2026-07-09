@@ -2,7 +2,7 @@ import { getSession } from '../_shared/auth.js';
 import { canonicalNetwork, defaultPriceCents } from '../_shared/networks.js';
 
 function corsHeaders() {
-  return { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
 }
 
 const VALID_STATUS = new Set(['subscribed', 'paused', 'cancelled']);
@@ -133,8 +133,15 @@ export async function onRequestGet(context) {
     }
   }
 
+  // calendar_token: the page links "Shows calendar", and the feed now
+  // authenticates with this per-member secret. Null pre-migration.
+  const memberRow = await env.DB.prepare(
+    'SELECT calendar_token FROM members WHERE slug = ?'
+  ).bind(slug).first().catch(() => null);
+
   return new Response(JSON.stringify({
     member: slug,
+    calendar_token: memberRow?.calendar_token || null,
     today,
     services,
     totals: {
@@ -209,7 +216,7 @@ export async function onRequestPut(context) {
 export async function onRequestOptions() {
   return new Response(null, {
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': 'https://showpicker.club',
       'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },

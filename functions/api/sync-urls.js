@@ -1,4 +1,5 @@
 import { getSession } from '../_shared/auth.js';
+import { demoMemberSlug } from '../_shared/demo.js';
 
 export async function onRequestPost(context) {
   const { env, request } = context;
@@ -9,6 +10,10 @@ export async function onRequestPost(context) {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  // Never treat the shared demo account's rows as a URL source — strangers
+  // can edit them, and this endpoint propagates URLs to every member.
+  const demoSlug = await demoMemberSlug(env);
 
   // Find shows with "good" URLs (not generic search pages), grouped by
   // (title, network) so we never copy a URL from one network's row onto
@@ -24,8 +29,9 @@ export async function onRequestPost(context) {
        AND network_url != '#'
        AND network_url NOT LIKE '%/search%'
        AND network_url NOT LIKE '%/s?%'
+       AND (?1 IS NULL OR member_slug != ?1)
      GROUP BY LOWER(title), network`
-  ).all();
+  ).bind(demoSlug).all();
 
   if (withUrls.length === 0) {
     return new Response(JSON.stringify({ synced: 0 }), {

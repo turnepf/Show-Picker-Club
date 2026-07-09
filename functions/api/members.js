@@ -1,5 +1,11 @@
+import { getSession } from '../_shared/auth.js';
+
 export async function onRequestGet(context) {
-  const { env } = context;
+  const { env, request } = context;
+  // The roster stays public (the landing page and pre-login apps render it),
+  // but full names and calendar tokens are for logged-in members only —
+  // visitors get first-name-level display names.
+  const session = await getSession(request, env);
   // Members are returned ordered by their most-recent non-seed activity
   // (newest first), then alphabetically. The frontend decides how many to
   // feature on the home page; the rest tuck into a "Browse all" disclosure.
@@ -8,8 +14,10 @@ export async function onRequestGet(context) {
   // count — only owning a real (self-added, suggested-in, or shared-in)
   // show registers as activity. NULL added_by predates the column and is
   // treated as engaged since only member-added shows ever had NULL there.
-  const { results } = await env.DB.prepare(
-    `SELECT h.slug, h.name, h.first_name, h.last_initial,
+  // If members.calendar_token doesn't exist yet (pre-migration 029), retry
+  // without it so the home page keeps rendering.
+  const query = (withToken) => env.DB.prepare(
+    `SELECT h.slug, h.name, h.first_name, h.last_initial,${withToken ? ' h.calendar_token,' : ''}
             COUNT(CASE WHEN s.archived = 0 THEN s.id END) as show_count,
             COUNT(CASE WHEN s.archived = 0 AND s.list = 'watching' THEN s.id END) as watching_count,
             COUNT(CASE WHEN s.archived = 0 AND s.list = 'waiting' THEN s.id END) as waiting_count,
@@ -24,6 +32,7 @@ export async function onRequestGet(context) {
      GROUP BY h.slug, h.name, h.first_name, h.last_initial
      ORDER BY last_activity_at DESC NULLS LAST, h.name`
   ).all();
+  const { results } = await query(true).catch(() => query(false));
 
   const firstNameCounts = {};
   for (const m of results) {
@@ -38,7 +47,10 @@ export async function onRequestGet(context) {
       : fn;
     return {
       slug: m.slug,
-      name: m.name,
+      // Logged out, `name` degrades to the display name so the shipped app
+      // decoders keep working without exposing members' full names.
+      name: session ? m.name : displayName,
+      ...(session && m.calendar_token ? { calendar_token: m.calendar_token } : {}),
       first_name: fn,
       display_name: displayName,
       show_count: m.show_count,

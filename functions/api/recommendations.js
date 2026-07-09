@@ -1,7 +1,8 @@
 import { EXCLUDED_FROM_TASTE } from '../_shared/excluded-members.js';
+import { getSession } from '../_shared/auth.js';
 
 function corsHeaders() {
-  return { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
 }
 
 const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
@@ -207,6 +208,11 @@ function buildNameResolver(members) {
 
 export async function onRequestGet(context) {
   const { env, request } = context;
+  // Taste-based picks derived from members' libraries — members only.
+  const session = await getSession(request, env);
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders() });
+  }
   const url = new URL(request.url);
   const member = url.searchParams.get('member');
   if (!member) {

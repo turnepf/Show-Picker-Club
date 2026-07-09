@@ -5,16 +5,31 @@ import { lookupWatchmodeUrl } from '../../_shared/watch-providers.js';
 import { safeNetworkUrl } from '../../_shared/url-utils.js';
 
 function corsHeaders() {
-  return { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
 }
 
 
 
+// Fields safe to show a logged-out visitor (the Trending detail screen):
+// catalog facts about the show itself. Everything personal — notes,
+// recommended_by, watching_with, whose list it's on — needs a session.
+const PUBLIC_SHOW_FIELDS = [
+  'id', 'title', 'network', 'network_url', 'rating', 'movie', 'full_series',
+  'genres', 'poster_url', 'network_logo_url', 'seasons_released',
+  'next_season_date', 'season_end_date',
+];
+
 export async function onRequestGet(context) {
-  const { env, params } = context;
+  const { env, request, params } = context;
   const show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(params.id).first();
   if (!show) {
     return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: corsHeaders() });
+  }
+  const session = await getSession(request, env);
+  if (!session) {
+    const redacted = {};
+    for (const k of PUBLIC_SHOW_FIELDS) if (k in show) redacted[k] = show[k];
+    return new Response(JSON.stringify({ show: redacted }), { headers: corsHeaders() });
   }
   return new Response(JSON.stringify({ show }), { headers: corsHeaders() });
 }
@@ -109,7 +124,7 @@ export async function onRequestDelete(context) {
 export async function onRequestOptions() {
   return new Response(null, {
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': 'https://showpicker.club',
       'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },

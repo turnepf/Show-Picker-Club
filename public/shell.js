@@ -155,7 +155,7 @@
     item.innerHTML = 'Log out <svg class="ic"><use href="#s-logout"/></svg>';
     item.addEventListener('click', function () {
       closeMenu();
-      fetch('/auth/logout', { redirect: 'manual' }).catch(function () {}).finally(function () { location.reload(); });
+      fetch('/auth/logout', { method: 'POST', redirect: 'manual' }).catch(function () {}).finally(function () { location.reload(); });
     });
     menu.appendChild(item);
     document.body.appendChild(menu);

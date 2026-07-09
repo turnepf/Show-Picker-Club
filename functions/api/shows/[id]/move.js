@@ -1,7 +1,7 @@
 import { getSession } from '../../../_shared/auth.js';
 
 function corsHeaders() {
-  return { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
 }
 
 export async function onRequestPut(context) {
@@ -29,7 +29,7 @@ export async function onRequestPut(context) {
 export async function onRequestOptions() {
   return new Response(null, {
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': 'https://showpicker.club',
       'Access-Control-Allow-Methods': 'PUT, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },

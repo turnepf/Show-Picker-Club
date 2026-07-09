@@ -113,18 +113,22 @@ struct MemberView: View {
                 }
 
                 // Subscribe to this member's premiere/finale feed. webcal:// makes
-                // iOS offer to add it as a subscription calendar.
-                Section {
-                    Button {
-                        let enc = member.slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? member.slug
-                        if let url = URL(string: "webcal://showpicker.club/calendar/\(enc).ics") {
-                            openURL(url)
+                // iOS offer to add it as a subscription calendar. The feed
+                // authenticates with the member's calendar token (only returned
+                // to logged-in sessions), so the row hides without one.
+                if let token = member.calendarToken {
+                    Section {
+                        Button {
+                            let enc = member.slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? member.slug
+                            if let url = URL(string: "webcal://showpicker.club/calendar/\(enc).ics?key=\(token)") {
+                                openURL(url)
+                            }
+                        } label: {
+                            Label("Subscribe in Calendar", systemImage: "calendar.badge.plus")
                         }
-                    } label: {
-                        Label("Subscribe in Calendar", systemImage: "calendar.badge.plus")
+                    } footer: {
+                        Text("Adds \(member.label)'s upcoming season premieres and finales to your calendar app.")
                     }
-                } footer: {
-                    Text("Adds \(member.label)'s upcoming season premieres and finales to your calendar app.")
                 }
             }
         }
