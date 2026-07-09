@@ -1439,42 +1439,105 @@
     </div>
   </div>
 
+  <!-- Delete account — immediate hard delete, re-verified with an emailed
+       code so a stolen session cookie alone can't destroy an account. -->
+  <div class="modal-overlay hidden" id="deleteAccountOverlay" onclick="closeDeleteAccountModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div id="deleteStepIntro">
+        <h2 style="color:var(--danger-deep);">Delete your account?</h2>
+        <p style="font-size:14px; line-height:1.55; margin-bottom:10px;">
+          This permanently deletes your account, all four lists, your
+          subscriptions, and your calendar feed. <strong>It cannot be undone.</strong>
+        </p>
+        <p style="font-size:13px; color:var(--ink-muted);">
+          To confirm it's really you, we'll email a code to your address on file.
+        </p>
+        <button type="button" class="btn" id="deleteSendBtn" style="margin-top:12px; width:100%; background:var(--danger-deep); color:#fff;" onclick="sendDeleteCode()">Email me a deletion code</button>
+      </div>
+      <div id="deleteStepCode" class="hidden">
+        <h2 style="color:var(--danger-deep);">Enter the deletion code</h2>
+        <p id="deleteCodeSent" style="font-size:13px; color:var(--ink-muted); margin-bottom:10px;"></p>
+        <label for="deleteCode">Code</label>
+        <input type="text" id="deleteCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" placeholder="••••••">
+        <button type="button" class="btn" id="deleteConfirmBtn" style="margin-top:12px; width:100%; background:var(--danger-deep); color:#fff;" onclick="confirmDeleteAccount()">Permanently delete my account</button>
+      </div>
+      <div id="deleteErr" style="display:none; margin-top:14px; padding:10px; background:var(--danger-soft); color:var(--danger-deep); border-radius:6px; font-size:13px;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeDeleteAccountModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log in / sign up — identifier-first, one decision per screen. Step 1
+       picks a channel (Apple / Google / email / phone), step 2 takes the
+       identifier, step 3 the code, and step 4 (new signups only) a name.
+       Which buttons render is driven by GET /auth/config. -->
   <div class="modal-overlay hidden" id="loginOverlay" onclick="closeLoginModal(event)">
     <div class="modal" onclick="event.stopPropagation()">
-      <h2>Log in</h2>
 
-      <button type="button" class="btn" id="appleSignInBtn" onclick="signInWithApple()"
-              style="width:100%; background:#000; color:#fff; display:flex; align-items:center; justify-content:center; gap:8px;">
-        <svg width="13" height="16" viewBox="0 0 170 170" fill="#fff" aria-hidden="true"><path d="M150.4 130.3c-2.5 5.7-5.4 11-8.9 15.8-4.7 6.6-8.6 11.2-11.6 13.7-4.6 4.2-9.5 6.3-14.8 6.5-3.8 0-8.3-1.1-13.6-3.3-5.3-2.2-10.1-3.3-14.6-3.3-4.7 0-9.7 1.1-15 3.3-5.3 2.2-9.6 3.3-12.9 3.4-5.1.2-10.1-2-15-6.7-3.2-2.7-7.3-7.5-12.2-14.4-5.3-7.3-9.6-15.9-13-25.7-3.6-10.6-5.4-20.9-5.4-30.8 0-11.4 2.5-21.2 7.4-29.4 3.9-6.6 9-11.8 15.4-15.6 6.4-3.8 13.3-5.8 20.8-5.9 4 0 9.3 1.3 15.9 3.7 6.6 2.5 10.9 3.7 12.7 3.7 1.4 0 6.1-1.5 14.1-4.4 7.6-2.7 14-3.8 19.3-3.4 14.3 1.2 25 6.8 32.1 16.9-12.8 7.8-19.1 18.6-19 32.6.1 10.9 4.1 20 11.9 27.2 3.5 3.4 7.5 6 11.9 7.8-1 2.8-2 5.4-3.1 7.9zM119.9 7.3c0 8.5-3.1 16.4-9.3 23.8-7.5 8.8-16.5 13.8-26.3 13-.1-1-.2-2.1-.2-3.2 0-8.1 3.6-16.8 9.9-23.9 3.2-3.6 7.2-6.6 12.1-9 4.9-2.3 9.5-3.6 13.9-3.9.1 1.1.2 2.2.2 3.2z"/></svg>
-        Sign in with Apple
-      </button>
-      <div style="text-align: center; margin: 14px 0; font-size: 12px; color: var(--ink-muted);">or use a code</div>
-
-      <label for="loginPhone">Phone (US)</label>
-      <input type="tel" id="loginPhone" name="phone"
-             autocomplete="tel" inputmode="tel"
-             placeholder="(336) 555-1234">
-      <button type="button" class="btn" id="loginPhoneBtn" style="margin-top: 8px; width: 100%; background: var(--surface-2); color: var(--ink);" onclick="sendPhoneCode()">Text me a code</button>
-
-      <div style="text-align: center; margin: 14px 0; font-size: 12px; color: var(--ink-muted);">or</div>
-
-      <label for="loginEmail">Email</label>
-      <input type="email" id="loginEmail" autocomplete="email" placeholder="you@example.com">
-      <button type="button" class="btn" id="loginEmailBtn" style="margin-top: 8px; width: 100%; background: var(--surface-2); color: var(--ink);" onclick="sendEmailCode()">Email me a code</button>
-      <div id="loginEmailHint" style="font-size: 12px; color: var(--ink-muted); margin-top: 6px;">
-        If you don't receive an email or text, reach out to the group owner with the email or phone you'd like to use.
+      <div class="login-step" id="loginStepChoose">
+        <h2 id="loginTitle" style="text-align:center;">Log in</h2>
+        <button type="button" class="btn" id="appleSignInBtn" onclick="signInWithApple()"
+                style="width:100%; background:#000; color:#fff; display:flex; align-items:center; justify-content:center; gap:8px;">
+          <svg width="13" height="16" viewBox="0 0 170 170" fill="#fff" aria-hidden="true"><path d="M150.4 130.3c-2.5 5.7-5.4 11-8.9 15.8-4.7 6.6-8.6 11.2-11.6 13.7-4.6 4.2-9.5 6.3-14.8 6.5-3.8 0-8.3-1.1-13.6-3.3-5.3-2.2-10.1-3.3-14.6-3.3-4.7 0-9.7 1.1-15 3.3-5.3 2.2-9.6 3.3-12.9 3.4-5.1.2-10.1-2-15-6.7-3.2-2.7-7.3-7.5-12.2-14.4-5.3-7.3-9.6-15.9-13-25.7-3.6-10.6-5.4-20.9-5.4-30.8 0-11.4 2.5-21.2 7.4-29.4 3.9-6.6 9-11.8 15.4-15.6 6.4-3.8 13.3-5.8 20.8-5.9 4 0 9.3 1.3 15.9 3.7 6.6 2.5 10.9 3.7 12.7 3.7 1.4 0 6.1-1.5 14.1-4.4 7.6-2.7 14-3.8 19.3-3.4 14.3 1.2 25 6.8 32.1 16.9-12.8 7.8-19.1 18.6-19 32.6.1 10.9 4.1 20 11.9 27.2 3.5 3.4 7.5 6 11.9 7.8-1 2.8-2 5.4-3.1 7.9zM119.9 7.3c0 8.5-3.1 16.4-9.3 23.8-7.5 8.8-16.5 13.8-26.3 13-.1-1-.2-2.1-.2-3.2 0-8.1 3.6-16.8 9.9-23.9 3.2-3.6 7.2-6.6 12.1-9 4.9-2.3 9.5-3.6 13.9-3.9.1 1.1.2 2.2.2 3.2z"/></svg>
+          Continue with Apple
+        </button>
+        <div id="googleBtnWrap" class="hidden" style="margin-top:10px; display:flex; justify-content:center;"></div>
+        <button type="button" class="btn" style="margin-top:10px; width:100%; background:var(--surface-2); color:var(--ink);" onclick="loginChoose('email')">Continue with email</button>
+        <button type="button" class="btn" style="margin-top:10px; width:100%; background:var(--surface-2); color:var(--ink);" onclick="loginChoose('phone')">Continue with phone</button>
+        <p id="loginTermsLine" class="hidden" style="margin-top:16px; font-size:12px; color:var(--ink-muted); text-align:center; line-height:1.5;">
+          By continuing, you agree to the <a href="/terms" target="_blank" style="color:var(--accent);">Terms</a> and acknowledge the <a href="/privacy" target="_blank" style="color:var(--accent);">Privacy Policy</a>.
+        </p>
       </div>
 
-      <label for="loginCode" style="margin-top: 18px;">Code</label>
-      <input type="text" id="loginCode" inputmode="numeric" autocomplete="one-time-code"
-             pattern="[0-9]*" maxlength="6" placeholder="••••••">
-      <div id="loginCodeHint" style="font-size: 12px; color: var(--ink-muted); margin-top: 4px;"></div>
+      <div class="login-step hidden" id="loginStepEmail">
+        <h2>What's your email?</h2>
+        <label for="loginEmail">Email</label>
+        <input type="email" id="loginEmail" autocomplete="email" placeholder="you@example.com"
+               onkeydown="if(event.key==='Enter')continueWithEmail()">
+        <div id="turnstileWrap" style="margin-top:10px;"></div>
+        <button type="button" class="btn btn-save" id="loginEmailBtn" style="margin-top:12px; width:100%;" onclick="continueWithEmail()">Continue</button>
+      </div>
+
+      <div class="login-step hidden" id="loginStepPhone">
+        <h2>What's your phone number?</h2>
+        <label for="loginPhone">Phone (US)</label>
+        <input type="tel" id="loginPhone" name="phone" autocomplete="tel" inputmode="tel"
+               placeholder="(336) 555-1234" onkeydown="if(event.key==='Enter')continueWithPhone()">
+        <div style="font-size:12px; color:var(--ink-muted); margin-top:6px;">
+          Phone login is for members with a number on file. New here? Go back and use Apple, Google, or email.
+        </div>
+        <button type="button" class="btn btn-save" id="loginPhoneBtn" style="margin-top:12px; width:100%;" onclick="continueWithPhone()">Text me a code</button>
+      </div>
+
+      <div class="login-step hidden" id="loginStepCode">
+        <h2>Enter your code</h2>
+        <p id="loginCodeSent" style="font-size:13px; color:var(--ink-muted); margin-bottom:10px;"></p>
+        <label for="loginCode">Code</label>
+        <input type="text" id="loginCode" inputmode="numeric" autocomplete="one-time-code"
+               pattern="[0-9]*" maxlength="6" placeholder="••••••">
+        <div id="loginCodeHint" style="font-size:12px; color:var(--ink-muted); margin-top:6px;">
+          Codes are good for 10 minutes. If nothing arrives, check spam — or reach out to the group owner.
+        </div>
+        <button type="button" class="btn btn-save" id="loginSubmitBtn" style="margin-top:12px; width:100%;" onclick="submitLoginCode()">Continue</button>
+      </div>
+
+      <div class="login-step hidden" id="loginStepName">
+        <h2>What's your name?</h2>
+        <p style="font-size:13px; color:var(--ink-muted); margin-bottom:10px;">
+          Other members see your first name (plus a last initial if two members share it).
+        </p>
+        <label for="loginFullName">First and last name</label>
+        <input type="text" id="loginFullName" autocomplete="name" placeholder="e.g. Robin Askins" maxlength="60"
+               onkeydown="if(event.key==='Enter')submitEnrollName()">
+        <button type="button" class="btn btn-save" id="loginNameBtn" style="margin-top:12px; width:100%;" onclick="submitEnrollName()">Create my account</button>
+      </div>
 
       <div id="loginErr" style="display:none; margin-top: 14px; padding: 10px; background: var(--danger-soft); color: var(--danger-deep); border-radius: 6px; font-size: 13px;"></div>
 
       <div class="modal-actions">
+        <button class="btn btn-cancel hidden" id="loginBackBtn" onclick="loginBack()">Back</button>
         <button class="btn btn-cancel" onclick="closeLoginModal()">Cancel</button>
-        <button class="btn btn-save" id="loginSubmitBtn" onclick="submitLoginCode()">Log in</button>
       </div>
     </div>
   </div>
@@ -1997,6 +2060,12 @@
       item.innerHTML = 'Log out <svg class="ic"><use href="#i-logout"/></svg>';
       item.addEventListener('click', () => { closeAccountMenu(); logout(); });
       menu.appendChild(item);
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.style.color = 'var(--danger-deep)';
+      del.textContent = 'Delete account…';
+      del.addEventListener('click', () => { closeAccountMenu(); openDeleteAccountModal(); });
+      menu.appendChild(del);
       document.body.appendChild(menu);
       const r = btn.getBoundingClientRect();
       menu.style.top = (r.bottom + 6) + 'px';
@@ -2180,24 +2249,63 @@
       if (typeof renderShows === 'function' && typeof shows !== 'undefined') renderShows();
     }
 
-    function openLoginModal() {
-      document.getElementById('loginOverlay').classList.remove('hidden');
+    // ---- Log in / sign up flow ----
+    // Identifier-first, one decision per screen. State machine over the
+    // .login-step divs; /auth/config decides which buttons exist (Google,
+    // signup wording, Turnstile).
+    let loginState = { step: 'choose', channel: null, email: '', phone: '', appleToken: null, googleCredential: null };
+    let authConfig = null;
+    let turnstileWidget = null;
+
+    async function loadAuthConfig() {
+      if (authConfig) return authConfig;
+      try {
+        const res = await fetch('/auth/config');
+        authConfig = await res.json();
+      } catch { authConfig = { self_enroll: false, google_client_id: null, turnstile_site_key: null }; }
+      return authConfig;
+    }
+
+    function loginShowStep(step) {
+      loginState.step = step;
+      document.querySelectorAll('#loginOverlay .login-step').forEach(el => el.classList.add('hidden'));
+      const stepEl = document.getElementById('loginStep' + step.charAt(0).toUpperCase() + step.slice(1));
+      if (stepEl) stepEl.classList.remove('hidden');
       document.getElementById('loginErr').style.display = 'none';
-      document.getElementById('loginCode').value = '';
-      document.getElementById('loginEmail').value = '';
-      document.getElementById('loginPhone').value = '';
-      document.getElementById('loginCodeHint').textContent = 'Enter the 6-digit code from your text or email.';
-      // Reset both send buttons to their pristine state — they leave
-      // green / "Code sent" residue if the modal is closed and reopened.
-      ['loginEmailBtn','loginPhoneBtn'].forEach(id => {
-        const b = document.getElementById(id);
-        if (!b) return;
-        b.disabled = false;
-        b.style.background = 'var(--surface-2)';
-        b.style.color = 'var(--ink)';
-        b.textContent = id === 'loginPhoneBtn' ? 'Text me a code' : 'Email me a code';
+      document.getElementById('loginBackBtn').classList.toggle('hidden', step === 'choose');
+      const focusTarget = { email: 'loginEmail', phone: 'loginPhone', code: 'loginCode', name: 'loginFullName' }[step];
+      if (focusTarget) setTimeout(() => document.getElementById(focusTarget).focus(), 50);
+    }
+
+    function loginBack() {
+      // From the code screen, go back to whichever identifier screen sent it;
+      // from anywhere else, back to the channel chooser.
+      if (loginState.step === 'code' && (loginState.channel === 'email' || loginState.channel === 'phone')) {
+        loginShowStep(loginState.channel);
+      } else {
+        loginShowStep('choose');
+      }
+    }
+
+    function loginChoose(channel) {
+      loginState.channel = channel;
+      loginShowStep(channel);
+      if (channel === 'email') mountTurnstile();
+    }
+
+    async function openLoginModal() {
+      document.getElementById('loginOverlay').classList.remove('hidden');
+      loginState = { step: 'choose', channel: null, email: '', phone: '', appleToken: null, googleCredential: null };
+      ['loginCode', 'loginEmail', 'loginPhone', 'loginFullName'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
       });
-      setTimeout(() => document.getElementById('loginPhone').focus(), 50);
+      loginShowStep('choose');
+      const cfg = await loadAuthConfig();
+      // Signup wording + terms line only when enrollment is actually open.
+      document.getElementById('loginTitle').textContent = cfg.self_enroll ? 'Log in or sign up' : 'Log in';
+      document.getElementById('loginTermsLine').classList.toggle('hidden', !cfg.self_enroll);
+      mountGoogleButton(cfg);
     }
 
     function closeLoginModal(e) {
@@ -2211,80 +2319,275 @@
       el.style.display = '';
     }
 
-    async function sendPhoneCode() {
+    // ---- Google (web only; needs GOOGLE_CLIENT_ID configured) ----
+    let googleScriptLoading = false;
+    function mountGoogleButton(cfg) {
+      const wrap = document.getElementById('googleBtnWrap');
+      if (!cfg.google_client_id) { wrap.classList.add('hidden'); return; }
+      wrap.classList.remove('hidden');
+      const render = () => {
+        if (!window.google || !google.accounts || wrap.dataset.rendered) return;
+        google.accounts.id.initialize({
+          client_id: cfg.google_client_id,
+          callback: onGoogleCredential,
+        });
+        google.accounts.id.renderButton(wrap, { theme: 'outline', size: 'large', text: 'continue_with', width: 280 });
+        wrap.dataset.rendered = '1';
+      };
+      if (window.google && google.accounts) { render(); return; }
+      if (!googleScriptLoading) {
+        googleScriptLoading = true;
+        const sc = document.createElement('script');
+        sc.src = 'https://accounts.google.com/gsi/client';
+        sc.async = true;
+        sc.onload = render;
+        document.head.appendChild(sc);
+      }
+    }
+
+    async function onGoogleCredential(resp) {
+      if (!resp || !resp.credential) return;
+      loginState.channel = 'google';
+      loginState.googleCredential = resp.credential;
+      try {
+        const res = await fetch('/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: resp.credential }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) { await finishLogin(); return; }
+        if (res.ok && data.needs_name) { loginShowStep('name'); return; }
+        if (res.status === 401) {
+          showLoginError("That Google account isn't linked to a member. Use the email the group owner has on file, or ask them to add you.");
+        } else {
+          showLoginError('Google sign-in failed. Try email instead.');
+        }
+      } catch { showLoginError('Network error. Try again.'); }
+    }
+
+    // ---- Turnstile (email signups; only when TURNSTILE_SITE_KEY is set) ----
+    let turnstileScriptLoading = false;
+    function mountTurnstile() {
+      const cfg = authConfig || {};
+      const wrap = document.getElementById('turnstileWrap');
+      if (!cfg.turnstile_site_key || !cfg.self_enroll || wrap.dataset.rendered) return;
+      const render = () => {
+        if (!window.turnstile || wrap.dataset.rendered) return;
+        turnstileWidget = turnstile.render(wrap, { sitekey: cfg.turnstile_site_key });
+        wrap.dataset.rendered = '1';
+      };
+      if (window.turnstile) { render(); return; }
+      if (!turnstileScriptLoading) {
+        turnstileScriptLoading = true;
+        const sc = document.createElement('script');
+        sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        sc.async = true;
+        sc.onload = render;
+        document.head.appendChild(sc);
+      }
+    }
+
+    // ---- Identifier steps ----
+    async function continueWithEmail() {
+      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showLoginError('Enter a valid email first.');
+        return;
+      }
+      loginState.email = email;
+      const btn = document.getElementById('loginEmailBtn');
+      btn.disabled = true; btn.textContent = 'Sending…';
+      const body = { email };
+      if (turnstileWidget !== null && window.turnstile) {
+        body.turnstile_token = turnstile.getResponse(turnstileWidget) || '';
+      }
+      try {
+        const res = await fetch('/auth/request-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (res.status === 429) { showLoginError('Too many requests. Try again in an hour.'); return; }
+        if (!res.ok) { showLoginError('Could not send. Try again in a minute.'); return; }
+        document.getElementById('loginCodeSent').textContent = 'We sent a code to ' + email + '.';
+        loginShowStep('code');
+      } catch { showLoginError('Network error. Try again.'); }
+      finally {
+        btn.disabled = false; btn.textContent = 'Continue';
+        if (turnstileWidget !== null && window.turnstile) turnstile.reset(turnstileWidget);
+      }
+    }
+
+    async function continueWithPhone() {
       const phone = document.getElementById('loginPhone').value.trim();
-      // Loose validation — server normalises and rejects on its own. We just
-      // want to catch the empty-field case before round-tripping.
       if (!phone || phone.replace(/\D/g, '').length < 7) {
         showLoginError('Enter your phone number first.');
         return;
       }
+      loginState.phone = phone;
       const btn = document.getElementById('loginPhoneBtn');
-      btn.disabled = true;
-      btn.textContent = 'Sending…';
+      btn.disabled = true; btn.textContent = 'Sending…';
       try {
         const res = await fetch('/auth/request-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone, channel: 'sms' }),
         });
-        if (res.status === 429) {
-          showLoginError('Too many requests. Try again in an hour.');
-        } else if (!res.ok) {
-          showLoginError('Could not send. Try again, or contact the group owner.');
-        } else {
-          document.getElementById('loginErr').style.display = 'none';
-          btn.textContent = 'Code sent. Check your texts';
-          btn.style.background = 'var(--list-watching)';
-          btn.style.color = '#fff';
-          document.getElementById('loginCode').focus();
-        }
-      } catch {
-        showLoginError('Network error. Try again.');
-      } finally {
-        setTimeout(() => {
-          btn.disabled = false;
-          if (btn.textContent === 'Sending…') btn.textContent = 'Text me a code';
-        }, 600);
-      }
+        if (res.status === 429) { showLoginError('Too many requests. Try again in an hour.'); return; }
+        if (!res.ok) { showLoginError('Could not send. Try again, or contact the group owner.'); return; }
+        document.getElementById('loginCodeSent').textContent = 'We texted a code to ' + phone + '.';
+        loginShowStep('code');
+      } catch { showLoginError('Network error. Try again.'); }
+      finally { btn.disabled = false; btn.textContent = 'Text me a code'; }
     }
 
-    async function sendEmailCode() {
-      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showLoginError('Enter a valid email first.');
-        return;
-      }
-      const btn = document.getElementById('loginEmailBtn');
-      btn.disabled = true;
-      btn.textContent = 'Sending…';
+    // ---- Code + (signup) name steps ----
+    async function submitLoginCode() {
+      const code = document.getElementById('loginCode').value.trim();
+      if (code.length < 6) { showLoginError('Enter the 6-digit code.'); return; }
+      const btn = document.getElementById('loginSubmitBtn');
+      btn.disabled = true; btn.textContent = 'Checking…';
+      const body = loginState.channel === 'phone'
+        ? { code, phone: loginState.phone }
+        : { code, email: loginState.email };
       try {
-        const res = await fetch('/auth/request-code', {
+        const res = await fetch('/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, channel: 'email' }),
+          body: JSON.stringify(body),
         });
-        if (res.status === 429) {
-          showLoginError('Too many requests. Try again in an hour.');
-        } else if (!res.ok) {
-          showLoginError('Could not send. Try again, or contact the group owner if your email isn\'t on file.');
-        } else {
-          // Identical reply whether the email is on file or not (account
-          // enumeration hardening). Show the same hint either way.
-          document.getElementById('loginErr').style.display = 'none';
-          btn.textContent = 'Code sent. Check your email';
-          btn.style.background = 'var(--list-watching)';
-          btn.style.color = '#fff';
-          document.getElementById('loginCode').focus();
-        }
-      } catch {
-        showLoginError('Network error. Try again.');
-      } finally {
-        setTimeout(() => {
-          btn.disabled = false;
-          if (btn.textContent === 'Sending…') btn.textContent = 'Email me a code';
-        }, 600);
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) { await finishLogin(); return; }
+        // New signup: the code checked out but there's no account yet —
+        // collect a name, then /auth/enroll completes it.
+        if (res.ok && data.needs_name) { loginShowStep('name'); return; }
+        if (res.status === 429) { showLoginError('Too many attempts. Try again in 15 minutes.'); return; }
+        showLoginError('Invalid or expired code.');
+      } catch { showLoginError('Network error. Try again.'); }
+      finally { btn.disabled = false; btn.textContent = 'Continue'; }
+    }
+
+    async function submitEnrollName() {
+      const fullName = document.getElementById('loginFullName').value.trim();
+      if (fullName.length < 2) { showLoginError('Enter your name.'); return; }
+      const btn = document.getElementById('loginNameBtn');
+      btn.disabled = true; btn.textContent = 'Creating…';
+      let url, body;
+      if (loginState.channel === 'apple') {
+        url = '/auth/apple';
+        body = { identity_token: loginState.appleToken, full_name: fullName };
+      } else if (loginState.channel === 'google') {
+        url = '/auth/google';
+        body = { credential: loginState.googleCredential, full_name: fullName };
+      } else {
+        url = '/auth/enroll';
+        body = { email: loginState.email, code: document.getElementById('loginCode').value.trim(), full_name: fullName };
       }
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) { await finishLogin(); return; }
+        if (res.status === 429) { showLoginError('Signups are paused right now. Try again tomorrow.'); return; }
+        showLoginError(data.error === 'already_member'
+          ? 'That email already belongs to a member — go back and log in.'
+          : (typeof data.error === 'string' && data.error.length > 20 ? data.error : 'Could not create your account. Try again.'));
+      } catch { showLoginError('Network error. Try again.'); }
+      finally { btn.disabled = false; btn.textContent = 'Create my account'; }
+    }
+
+    // Auto-submit the moment 6 digits are in, like the iOS app.
+    document.addEventListener('DOMContentLoaded', () => {
+      const codeEl = document.getElementById('loginCode');
+      if (codeEl) codeEl.addEventListener('input', () => {
+        if (codeEl.value.trim().length === 6 && loginState.step === 'code') submitLoginCode();
+      });
+    });
+
+    // ---- Delete account ----
+    function openDeleteAccountModal() {
+      document.getElementById('deleteAccountOverlay').classList.remove('hidden');
+      document.getElementById('deleteStepIntro').classList.remove('hidden');
+      document.getElementById('deleteStepCode').classList.add('hidden');
+      document.getElementById('deleteErr').style.display = 'none';
+      document.getElementById('deleteCode').value = '';
+    }
+    function closeDeleteAccountModal(e) {
+      if (e && e.target !== e.currentTarget) return;
+      document.getElementById('deleteAccountOverlay').classList.add('hidden');
+    }
+    function showDeleteError(msg) {
+      const el = document.getElementById('deleteErr');
+      el.textContent = msg;
+      el.style.display = '';
+    }
+    async function sendDeleteCode() {
+      const btn = document.getElementById('deleteSendBtn');
+      btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        const res = await fetch('/api/account-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.sent) {
+          document.getElementById('deleteStepIntro').classList.add('hidden');
+          document.getElementById('deleteStepCode').classList.remove('hidden');
+          document.getElementById('deleteCodeSent').textContent = 'We emailed a 6-digit code to your address on file.';
+          document.getElementById('deleteErr').style.display = 'none';
+          setTimeout(() => document.getElementById('deleteCode').focus(), 50);
+        } else if (data.error === 'no_email') {
+          showDeleteError('Your account has no email on file — contact the group owner to delete it.');
+        } else if (data.error === 'admin_must_demote_first') {
+          showDeleteError("Admins can't self-delete — hand off admin first.");
+        } else if (res.status === 429) {
+          showDeleteError('Too many codes requested. Try again in an hour.');
+        } else {
+          showDeleteError('Could not send the code. Try again.');
+        }
+      } catch { showDeleteError('Network error. Try again.'); }
+      finally { btn.disabled = false; btn.textContent = 'Email me a deletion code'; }
+    }
+    async function confirmDeleteAccount() {
+      const code = document.getElementById('deleteCode').value.trim();
+      if (code.length < 6) { showDeleteError('Enter the 6-digit code from the email.'); return; }
+      const btn = document.getElementById('deleteConfirmBtn');
+      btn.disabled = true; btn.textContent = 'Deleting…';
+      try {
+        const res = await fetch('/api/account-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.deleted) {
+          window.location.href = '/';
+          return;
+        }
+        showDeleteError(res.status === 429 ? 'Too many attempts. Try again later.' : 'Invalid or expired code.');
+      } catch { showDeleteError('Network error. Try again.'); }
+      finally { btn.disabled = false; btn.textContent = 'Permanently delete my account'; }
+    }
+
+    async function finishLogin() {
+      closeLoginModal();
+      await checkAuth();
+      // From the landing page (memberSlug is null until we navigate to a
+      // member route), drop the user on their own page so the login feels
+      // like "go to my shows" rather than just "you're now authenticated".
+      if (!memberSlug && authMember) {
+        window.location.href = '/' + authMember;
+        return;
+      }
+      updateLoginBtnLabel();
+      // Re-fetch, not just re-render: the pre-login fetch got a 401, so the
+      // page is holding the members-only prompt with no data.
+      loadShows();
     }
 
     // Sign in with Apple (web). Uses a Services ID — NOT the iOS bundle id —
@@ -2306,77 +2609,43 @@
     }
     async function signInWithApple() {
       initApple();
-      if (!window.AppleID) { showLoginError('Apple sign-in is unavailable right now — use a code.'); return; }
+      if (!window.AppleID) { showLoginError('Apple sign-in is unavailable right now — use email instead.'); return; }
       try {
         const data = await AppleID.auth.signIn();
         const idToken = data && data.authorization && data.authorization.id_token;
         if (!idToken) { showLoginError("Apple didn't return a sign-in token. Try again."); return; }
+        loginState.channel = 'apple';
+        loginState.appleToken = idToken;
+        // First-ever authorization is the only time Apple shares the name —
+        // pass it along so new signups skip the name screen.
+        const nm = data.user && data.user.name
+          ? ((data.user.name.firstName || '') + ' ' + (data.user.name.lastName || '')).trim()
+          : '';
+        const body = { identity_token: idToken };
+        if (nm) body.full_name = nm;
         const res = await fetch('/auth/apple', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identity_token: idToken }),
+          body: JSON.stringify(body),
         });
-        if (res.ok) {
-          location.reload();
+        const payload = await res.json().catch(() => ({}));
+        if (res.ok && payload.success) {
+          await finishLogin();
+        } else if (res.ok && payload.needs_name) {
+          loginShowStep('name');
         } else if (res.status === 401) {
-          showLoginError('That Apple ID isn\'t linked to a member. Choose "Share My Email" with the address the owner has on file, or use a code.');
+          showLoginError('That Apple ID isn\'t linked to a member. Choose "Share My Email" with the address the owner has on file, or use email.');
+        } else if (res.status === 429) {
+          showLoginError('Signups are paused right now. Try again tomorrow.');
         } else {
-          showLoginError('Apple sign-in failed. Try a code instead.');
+          showLoginError('Apple sign-in failed. Try email instead.');
         }
       } catch (e) {
         // Popup closed / user cancelled — stay quiet; surface only real errors.
         const code = e && e.error;
         if (code && code !== 'popup_closed_by_user' && code !== 'user_cancelled_authorize' && code !== 'user_trigger_new_signin_flow') {
-          showLoginError('Apple sign-in failed. Try a code instead.');
+          showLoginError('Apple sign-in failed. Try email instead.');
         }
-      }
-    }
-
-    async function submitLoginCode() {
-      const code = document.getElementById('loginCode').value.trim();
-      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
-      const phone = document.getElementById('loginPhone').value.trim();
-      if (!code) {
-        showLoginError('Enter your code.');
-        return;
-      }
-      if (!phone && !email) {
-        showLoginError('Enter your phone or email first, then the code.');
-        return;
-      }
-      const btn = document.getElementById('loginSubmitBtn');
-      btn.disabled = true;
-      btn.textContent = 'Logging in…';
-      // Phone wins if both are filled — phone OTP is the more recent intent.
-      const body = phone ? { code, phone } : { code, email };
-      try {
-        const res = await fetch('/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) {
-          showLoginError('Invalid or expired code.');
-          return;
-        }
-        closeLoginModal();
-        await checkAuth();
-        // From the landing page (memberSlug is null until we navigate to a
-        // member route), drop the user on their own page so the login feels
-        // like "go to my shows" rather than just "you're now authenticated".
-        if (!memberSlug && authMember) {
-          window.location.href = '/' + authMember;
-          return;
-        }
-        updateLoginBtnLabel();
-        // Re-fetch, not just re-render: the pre-login fetch got a 401, so the
-        // page is holding the members-only prompt with no data.
-        loadShows();
-      } catch {
-        showLoginError('Network error. Try again.');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Log in';
       }
     }
 
