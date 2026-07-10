@@ -2,6 +2,11 @@
 
 ## Working preferences
 
+- **Never put `#` comments in terminal commands meant for the user to paste.**
+  Pasted into their zsh, comment lines execute as garbage commands and break
+  the sequence. Give bare commands in separate code blocks and explain them
+  in prose around the blocks instead.
+
 - **Never watch PRs, CI, or deployments, and never offer to.** Watching burns
   tokens while polling. When work involves a PR or deploy, just give the link
   and let the user watch it themselves.
