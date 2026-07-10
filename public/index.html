@@ -331,15 +331,20 @@
       padding: 4px 0 10px;
     }
 
-    /* Title + add-show share one line; centered on phones (matching the old
-       centered title), left-aligned in the split view. */
+    /* Title + add-show share one centered line. The sort control lives in
+       this row too: on phones it wraps to its own right-aligned line below
+       the title; on the split view it pins to the right of the same line
+       (inside the sticky header, so it can't hide behind it). */
     .header-title-row {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: center;
       gap: 8px;
+      position: relative;
     }
     .header-title-row .header-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .header-title-row .list-controls { flex: 1 1 100%; padding: 2px 0 8px; }
     .sort-select {
       padding: 6px 10px;
       font-size: 12px;
@@ -1094,12 +1099,14 @@
          page-specific and has no sidebar counterpart. */
       #showPage #searchBtn, #showPage #loginBtn, #showPage #logoutBtn { display: none; }
       #showPage .header-top { min-height: 0; }
-      /* One consolidated top line: title + add-show on the left, the sort
-         control (which lives in <main> for the phone layout) pinned to the
-         same line on the right. */
-      #showPage .header-title-row { justify-content: flex-start; padding-right: 180px; }
-      .split-detail { position: relative; }
-      #showPage #listControls { position: absolute; top: 12px; right: max(24px, calc((100% - 720px) / 2)); padding: 0; margin: 0; }
+      /* One consolidated top line: title (+ add-show) centered over the
+         content column, sort pinned to the right of the same line. Absolute
+         inside the row keeps the title's centering unaffected, and the row
+         is capped to the 720px column so right:0 lines up with the list. */
+      #showPage .header-title-row #listControls {
+        position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+        flex: none; padding: 0;
+      }
       /* Subscription audit lives in the sidebar on the split view, so the
          duplicate under-list row hides (Vibe + Calendar stay). */
       #showPage .member-extras #subscriptionsLink { display: none; }
@@ -1322,6 +1329,7 @@
         <div class="header-title-row">
           <h1 class="header-title" id="appTitle"></h1>
           <button class="icon-btn hidden" id="addBtn" title="Add a new show" aria-label="Add a new show" onclick="openAddModal()"><svg class="ic"><use href="#i-plus"/></svg></button>
+          <div class="list-controls hidden" id="listControls"></div>
         </div>
         <div class="tabs" id="tabs">
           <div class="tab active" data-list="watching" onclick="switchTab('watching')">Watching</div>
@@ -1334,7 +1342,6 @@
 
       <main>
         <div class="loading" id="loading">Loading shows...</div>
-        <div class="list-controls hidden" id="listControls"></div>
         <div class="show-list" id="showList"></div>
         <div class="empty hidden" id="empty">No shows in this list yet.</div>
       </main>
