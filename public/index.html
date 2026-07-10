@@ -120,7 +120,7 @@
        spanning the full width — so the back button lines up with the column's
        left edge, Log out with its right, and the tabs contract to fit. */
     #showPage header > .header-top,
-    #showPage header > .header-title,
+    #showPage header > .header-title-row,
     #showPage header > .tabs,
     #showPage header > .section-desc {
       max-width: 720px;
@@ -305,21 +305,6 @@
     a.actor-tag:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
     a.actor-tag:hover::after { opacity: 1; }
 
-    /* Bar under the list with the "Share …'s Shows" copy-link button. */
-    .share-list-bar { text-align: center; padding: 16px 0 4px; }
-    .share-list-btn {
-      padding: 10px 24px;
-      font-size: 14px;
-      font-weight: 600;
-      font-family: inherit;
-      background: var(--ink);
-      color: #fff;
-      border: none;
-      border-radius: 24px;
-      cursor: pointer;
-    }
-    .share-list-btn:hover { background: var(--header-bg); }
-
     /* "+" add-to-my-list button on club-wide search result rows. */
     .search-add-btn {
       background: none;
@@ -345,6 +330,16 @@
       gap: 8px;
       padding: 4px 0 10px;
     }
+
+    /* Title + add-show share one line; centered on phones (matching the old
+       centered title), left-aligned in the split view. */
+    .header-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .header-title-row .header-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .sort-select {
       padding: 6px 10px;
       font-size: 12px;
@@ -562,6 +557,39 @@
       max-height: 88vh;
       overflow-y: auto;
     }
+
+    /* Log in / sign up chooser: a narrow centered column of pill buttons.
+       Google's GIS button is an iframe capped at 400px that can't inherit our
+       styles — constraining the whole stack to its width and matching its
+       pill shape makes everything read as one set. */
+    .login-choose-stack {
+      max-width: 340px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .login-choose-stack .btn {
+      width: 100%;
+      height: 44px;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: 0;
+      padding: 0 18px;
+    }
+    .login-choose-btn {
+      background: var(--surface);
+      color: var(--ink);
+      border: 1px solid var(--border);
+    }
+    .login-choose-btn:hover { background: var(--surface-2); }
+    #googleBtnWrap { display: flex; justify-content: center; min-height: 44px; align-items: center; }
+    #googleBtnWrap.hidden { display: none; }
 
     .modal h2 {
       font-family: var(--font-display);
@@ -1059,6 +1087,19 @@
          control disappear from the detail bar. */
       #showPage .back-link { display: none; }
       #showPage .tabs { display: none; }
+      /* Search + account also live in the sidebar titlebar on the split
+         view — the header copies hide (their logged-in/out state kept
+         drifting out of sync with the sidebar's), and the emptied top row
+         collapses so the content pulls up. The + (add show) stays: it's
+         page-specific and has no sidebar counterpart. */
+      #showPage #searchBtn, #showPage #loginBtn, #showPage #logoutBtn { display: none; }
+      #showPage .header-top { min-height: 0; }
+      /* One consolidated top line: title + add-show on the left, the sort
+         control (which lives in <main> for the phone layout) pinned to the
+         same line on the right. */
+      #showPage .header-title-row { justify-content: flex-start; padding-right: 180px; }
+      .split-detail { position: relative; }
+      #showPage #listControls { position: absolute; top: 12px; right: max(24px, calc((100% - 720px) / 2)); padding: 0; margin: 0; }
       /* Subscription audit lives in the sidebar on the split view, so the
          duplicate under-list row hides (Vibe + Calendar stay). */
       #showPage .member-extras #subscriptionsLink { display: none; }
@@ -1274,12 +1315,14 @@
           </div>
           <div class="header-actions">
             <button class="icon-btn" id="searchBtn" title="Search this member's shows" aria-label="Search this member's shows" onclick="openSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
-            <button class="icon-btn hidden" id="addBtn" title="Add a new show" aria-label="Add a new show" onclick="openAddModal()"><svg class="ic"><use href="#i-plus"/></svg></button>
             <button class="btn-nav-text" id="loginBtn" title="Log in to edit your shows" onclick="login()">Log in</button>
             <button class="icon-btn hidden" id="logoutBtn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
           </div>
         </div>
-        <h1 class="header-title" id="appTitle"></h1>
+        <div class="header-title-row">
+          <h1 class="header-title" id="appTitle"></h1>
+          <button class="icon-btn hidden" id="addBtn" title="Add a new show" aria-label="Add a new show" onclick="openAddModal()"><svg class="ic"><use href="#i-plus"/></svg></button>
+        </div>
         <div class="tabs" id="tabs">
           <div class="tab active" data-list="watching" onclick="switchTab('watching')">Watching</div>
           <div class="tab" data-list="waiting" onclick="switchTab('waiting')">Awaiting</div>
@@ -1477,14 +1520,16 @@
 
       <div class="login-step" id="loginStepChoose">
         <h2 id="loginTitle" style="text-align:center;">Log in</h2>
+        <div class="login-choose-stack">
         <button type="button" class="btn" id="appleSignInBtn" onclick="signInWithApple()"
-                style="width:100%; background:#000; color:#fff; display:flex; align-items:center; justify-content:center; gap:8px;">
+                style="background:#000; color:#fff;">
           <svg width="13" height="16" viewBox="0 0 170 170" fill="#fff" aria-hidden="true"><path d="M150.4 130.3c-2.5 5.7-5.4 11-8.9 15.8-4.7 6.6-8.6 11.2-11.6 13.7-4.6 4.2-9.5 6.3-14.8 6.5-3.8 0-8.3-1.1-13.6-3.3-5.3-2.2-10.1-3.3-14.6-3.3-4.7 0-9.7 1.1-15 3.3-5.3 2.2-9.6 3.3-12.9 3.4-5.1.2-10.1-2-15-6.7-3.2-2.7-7.3-7.5-12.2-14.4-5.3-7.3-9.6-15.9-13-25.7-3.6-10.6-5.4-20.9-5.4-30.8 0-11.4 2.5-21.2 7.4-29.4 3.9-6.6 9-11.8 15.4-15.6 6.4-3.8 13.3-5.8 20.8-5.9 4 0 9.3 1.3 15.9 3.7 6.6 2.5 10.9 3.7 12.7 3.7 1.4 0 6.1-1.5 14.1-4.4 7.6-2.7 14-3.8 19.3-3.4 14.3 1.2 25 6.8 32.1 16.9-12.8 7.8-19.1 18.6-19 32.6.1 10.9 4.1 20 11.9 27.2 3.5 3.4 7.5 6 11.9 7.8-1 2.8-2 5.4-3.1 7.9zM119.9 7.3c0 8.5-3.1 16.4-9.3 23.8-7.5 8.8-16.5 13.8-26.3 13-.1-1-.2-2.1-.2-3.2 0-8.1 3.6-16.8 9.9-23.9 3.2-3.6 7.2-6.6 12.1-9 4.9-2.3 9.5-3.6 13.9-3.9.1 1.1.2 2.2.2 3.2z"/></svg>
           Continue with Apple
         </button>
-        <div id="googleBtnWrap" class="hidden" style="margin-top:10px; display:flex; justify-content:center;"></div>
-        <button type="button" class="btn" style="margin-top:10px; width:100%; background:var(--surface-2); color:var(--ink);" onclick="loginChoose('email')">Continue with email</button>
-        <button type="button" class="btn" style="margin-top:10px; width:100%; background:var(--surface-2); color:var(--ink);" onclick="loginChoose('phone')">Continue with phone</button>
+        <div id="googleBtnWrap" class="hidden"></div>
+        <button type="button" class="btn login-choose-btn" onclick="loginChoose('email')">Continue with email</button>
+        <button type="button" class="btn login-choose-btn" onclick="loginChoose('phone')">Continue with phone</button>
+        </div>
         <p id="loginTermsLine" class="hidden" style="margin-top:16px; font-size:12px; color:var(--ink-muted); text-align:center; line-height:1.5;">
           By continuing, you agree to the <a href="/terms" target="_blank" style="color:var(--accent);">Terms</a> and acknowledge the <a href="/privacy" target="_blank" style="color:var(--accent);">Privacy Policy</a>.
         </p>
@@ -2331,7 +2376,10 @@
           client_id: cfg.google_client_id,
           callback: onGoogleCredential,
         });
-        google.accounts.id.renderButton(wrap, { theme: 'outline', size: 'large', text: 'continue_with', width: 280 });
+        // Pill + width matched to the stack so the iframe button lines up
+        // with the custom ones (GIS caps width at 400).
+        const w = Math.min(340, Math.max(200, wrap.clientWidth || 340));
+        google.accounts.id.renderButton(wrap, { theme: 'outline', size: 'large', text: 'continue_with', shape: 'pill', width: w });
         wrap.dataset.rendered = '1';
       };
       if (window.google && google.accounts) { render(); return; }
@@ -2810,8 +2858,6 @@
       const legend = legendParts.join(' | ');
       if (legend) container.innerHTML += `<div class="network-counts">${legend}</div>`;
       if (countsHtml) container.innerHTML += `<div class="network-counts">${countsHtml}</div>`;
-      // Share-list URL works for any list including your own.
-      container.innerHTML += `<div class="share-list-bar"><button class="share-list-btn" title="Copy a link to ${escapeHtml(owners)}'s lists" onclick="shareList()" style="background: var(--ink-quiet);">Share ${escapeHtml(owners)}'s Shows</button></div>`;
 
       const nextUpOption = dateDefaultTab
         ? `<option value="nextup"${sortOrder === 'nextup' ? ' selected' : ''}>Sort by Next up</option>`
@@ -3112,20 +3158,6 @@
         }
       } catch (e) {
         showToast('Network error. Try again.', { tone: 'error' });
-      }
-    }
-
-    function shareList() {
-      const url = `https://showpicker.club/${memberSlug}`;
-      const text = `Check out ${owners}'s show list on Show Picker Club: ${url}`;
-      if (navigator.share) {
-        navigator.share({ title: `${owners}'s Shows`, text, url }).catch(() => {});
-      } else if (navigator.clipboard) {
-        navigator.clipboard.writeText(text)
-          .then(() => showToast('Link copied to clipboard'))
-          .catch(() => prompt('Copy this link', text));
-      } else {
-        prompt('Copy this link', text);
       }
     }
 
