@@ -1,5 +1,7 @@
 import { checkVerification, normalizePhone } from '../_shared/twilio-verify.js';
+import { issueSession } from '../_shared/session.js';
 import { noteDemoLogin } from '../_shared/demo.js';
+import { selfEnrollEnabled } from '../_shared/enroll.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -123,6 +125,20 @@ export async function onRequestPost(context) {
       'SELECT member_slug FROM member_emails WHERE LOWER(email) = ? LIMIT 1'
     ).bind(email).first();
     if (!row) {
+      // Unknown email: with self-enroll on, the code may be a signup code
+      // (enroll_otps). If it checks out, tell the client to collect a name
+      // and finish via POST /auth/enroll — the code is NOT consumed here,
+      // so the two-step stays within the code's 10-minute TTL.
+      if (selfEnrollEnabled(env)) {
+        const pending = await env.DB.prepare(
+          `SELECT id FROM enroll_otps
+             WHERE email = ? AND code = ? AND used_at IS NULL AND expires_at > ?
+             ORDER BY created_at DESC LIMIT 1`
+        ).bind(email, code, new Date().toISOString()).first().catch(() => null);
+        if (pending) {
+          return new Response(JSON.stringify({ needs_name: true }), { status: 200, headers: corsHeaders() });
+        }
+      }
       await recordFailure(env, ip, null);
       return new Response(JSON.stringify({ error: 'invalid' }), { status: 401, headers: corsHeaders() });
     }
@@ -150,39 +166,6 @@ export async function onRequestPost(context) {
   return await issueSession(env, member);
 }
 
-async function issueSession(env, memberSlug) {
-  // disabled = banned (migration 030): refuse to mint a session. Falls back
-  // to the column-less select mid-rollout.
-  const m = await env.DB.prepare(
-    'SELECT first_name, name, disabled FROM members WHERE slug = ?'
-  ).bind(memberSlug).first().catch(() =>
-    env.DB.prepare('SELECT first_name, name FROM members WHERE slug = ?').bind(memberSlug).first()
-  );
-  if (m?.disabled) {
-    return new Response(JSON.stringify({ error: 'account_disabled' }), { status: 403, headers: corsHeaders() });
-  }
-  const editorName = m?.first_name || m?.name || memberSlug;
-
-  const sessionId = crypto.randomUUID();
-  const sessionExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-  await env.DB.prepare(
-    'INSERT INTO sessions (id, email, member_slug, expires_at, created_at) VALUES (?, ?, ?, ?, ?)'
-  ).bind(sessionId, editorName, memberSlug, sessionExpires.toISOString(), new Date().toISOString()).run();
-
-  // Durable login timestamp (migration 013). Best-effort: never let a missing
-  // column or write error break the login itself.
-  await env.DB.prepare("UPDATE members SET last_login_at = datetime('now') WHERE slug = ?")
-    .bind(memberSlug).run().catch(() => {});
-
-  return new Response(JSON.stringify({ success: true, slug: memberSlug }), {
-    status: 200,
-    headers: {
-      ...corsHeaders(),
-      'Set-Cookie': `session=${sessionId}; Path=/; Expires=${sessionExpires.toUTCString()}; HttpOnly; Secure; SameSite=Lax`,
-    },
-  });
-}
 
 export async function onRequestOptions() {
   return new Response(null, {

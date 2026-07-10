@@ -173,6 +173,11 @@ The complete map:
 | `POST /api/sync-urls`                  | `functions/api/sync-urls.js`               | POST    | session (demo member's rows excluded as URL sources) |
 | `GET /api/reporting`                   | `functions/api/reporting.js`               | GET     | admin session |
 | `POST /api/admin-create-member`        | `functions/api/admin-create-member.js`     | POST    | admin session |
+| `POST /api/admin-member-approve`       | `functions/api/admin-member-approve.js`    | POST    | admin session |
+| `POST /api/account-delete`             | `functions/api/account-delete.js`          | POST    | session; hard-deletes the caller's account after an emailed code confirms |
+| `POST /auth/enroll`                    | `functions/auth/enroll.js`                 | POST    | signup code from `enroll_otps` (self-enroll only) |
+| `POST /auth/google`                    | `functions/auth/google.js`                 | POST    | Google ID token (inert unless `GOOGLE_CLIENT_ID` set) |
+| `GET /auth/config`                     | `functions/auth/config.js`                 | GET     | none — public flags/keys for the login UI |
 | `POST /api/admin-member-disable`       | `functions/api/admin-member-disable.js`    | POST    | admin session |
 | `POST /api/admin-vibe-fill`            | `functions/api/admin-vibe-fill.js`         | POST    | admin session or `CRON_SECRET` header |
 | `POST /api/admin-url-cleanup`          | `functions/api/admin-url-cleanup.js`       | POST    | admin session |
@@ -219,6 +224,10 @@ Admin endpoints are gated by `_shared/admin.js#isAdmin()` — a valid session wh
 Rate limits on `POST /auth/login`: 5 failed attempts per IP **and** 10 failed attempts per member account per 15 minutes → 429 with `Retry-After`. The per-member cap stops a distributed guesser who knows a member's email/phone from brute-forcing a 6-digit code across many IPs.
 
 Scheduled-job endpoints accept an `X-Cron-Secret` header compared in constant time (`_shared/secrets.js#cronAuthorized`).
+
+### Self-enrollment (migration 031, behind the `SELF_ENROLL` secret)
+
+With `SELF_ENROLL` set, unknown identities can create accounts: `/auth/request-code` sends a signup code (`enroll_otps`) for unknown emails, `/auth/login` answers `{needs_name:true}` for a valid signup code, and `/auth/enroll` completes it; `/auth/apple` and `/auth/google` enroll unrecognized identities directly (asking the client for a name via `{needs_name:true}` when the token doesn't carry one). All channels create the member with `approved = 0` — full personal use, but hidden from the roster, vibe, cross-library search, activity, and trending until approved (`/api/admin-member-approve`, or the Approve button on `/members`). Guards live in `_shared/enroll.js`: global daily circuit breaker (`SELF_ENROLL_MAX_PER_DAY`, default 20), per-IP and per-email caps, optional Turnstile (`TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY`, fail-open when unset), a reserved-slug blocklist (`admin-create-member.js#RESERVED_SLUGS`), an audit row in `signup_requests` (status `self_enrolled`), and an operator email per signup (capped 10/hour). The Apple demo fallback is inert while `SELF_ENROLL` is on. Members self-delete via `/api/account-delete` (fresh emailed code, `channel='delete'` in `login_otps`, hard delete + PII scrub of the audit row).
 
 ### Demo account
 

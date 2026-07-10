@@ -16,7 +16,6 @@ struct ShowDetailView: View {
     @State private var myCopy: Show?
     @State private var cast: [Actor] = []
     @State private var showingEdit = false
-    @State private var showingShare = false
     @State private var posterExpanded = false
     @State private var addingToMine = false
     @State private var addAlert: AddAlert?
@@ -147,17 +146,6 @@ struct ShowDetailView: View {
                 }
             }
 
-            // Send the whole show (rating, network link, cast, flags) to another
-            // member's Up Next. Available on any real member's show when logged in.
-            if auth.isLoggedIn, let s = show, s.memberSlug != nil {
-                Section {
-                    Button {
-                        showingShare = true
-                    } label: {
-                        Label("Send to a member", systemImage: "paperplane.fill")
-                    }
-                }
-            }
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
@@ -186,12 +174,6 @@ struct ShowDetailView: View {
         .sheet(isPresented: $showingEdit) {
             if let m = myCopy {
                 AddEditShowView(memberSlug: m.memberSlug ?? (auth.memberSlug ?? ""), existing: m) { await load() }
-            }
-        }
-        .sheet(isPresented: $showingShare) {
-            if let s = show, let owner = s.memberSlug {
-                ShareShowView(showId: s.id, showTitle: s.title, sourceMember: owner)
-                    .environmentObject(auth)
             }
         }
         .alert(addAlert?.title ?? "",

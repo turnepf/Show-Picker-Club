@@ -39,6 +39,7 @@ struct IPadHomeView: View {
     // member once auth resolves; tapping a member row moves focus to them.
     @State private var focusedSlug: String?
     @State private var showingLogin = false
+    @State private var showingDeleteAccount = false
     @State private var showingSearch = false
 
     private let memberRowHeight: CGFloat = 38
@@ -87,6 +88,7 @@ struct IPadHomeView: View {
         }
         .task { if loading { await load() } }
         .sheet(isPresented: $showingLogin) { LoginView().environmentObject(auth) }
+        .sheet(isPresented: $showingDeleteAccount) { DeleteAccountView().environmentObject(auth) }
         .sheet(isPresented: $showingSearch) { SearchView().environmentObject(auth) }
         // Auth may resolve after the member list loads; land on your Watching
         // list once it does (unless the user has already picked something).
@@ -278,6 +280,11 @@ struct IPadHomeView: View {
                         Task { await auth.logout() }
                     } label: {
                         Label("Log out", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                    Button(role: .destructive) {
+                        showingDeleteAccount = true
+                    } label: {
+                        Label("Delete Account…", systemImage: "trash")
                     }
                 } label: {
                     Image(systemName: "person.crop.circle")

@@ -11,7 +11,9 @@ export async function onRequestGet(context) {
   // from the best available row for the title regardless of when it was added —
   // otherwise a show trending on brand-new (un-enriched) rows shows no poster
   // even though an older copy on someone's list already has the art.
-  const { results } = await env.DB.prepare(
+  // Held (not-yet-approved) self-enrolled members don't feed the public
+  // trending list — approved filter with a column-less retry (migration 031).
+  const popularQuery = (withApproved) => env.DB.prepare(
     `SELECT LOWER(s.title) as ltitle, s.title, s.movie,
        MIN(s.id) as id,
        COUNT(DISTINCT s.member_slug) as member_count,
@@ -27,6 +29,7 @@ export async function onRequestGet(context) {
      FROM shows s
      WHERE s.archived = 0
        AND s.member_slug NOT IN (${EXCLUDED_SQL})
+       ${withApproved ? 'AND s.member_slug IN (SELECT slug FROM members WHERE COALESCE(approved, 1) = 1)' : ''}
        -- Seeded rows are the operator's auto-pick, not a member endorsement.
        -- A row "counts" only once a member has actually touched it
        -- (added themselves, or had a list manually loaded by the operator).
@@ -36,7 +39,9 @@ export async function onRequestGet(context) {
      GROUP BY LOWER(s.title)
      ORDER BY member_count DESC, CAST(rating AS REAL) DESC
      LIMIT 10`
-  ).all();
+  );
+  const { results } = await popularQuery(true).all()
+    .catch(() => popularQuery(false).all());
 
   // Pull actors for each (one query per show; n=10 max). Include imdb_id so
   // the front end can render clickable IMDB links — matching the {name, imdb_id}

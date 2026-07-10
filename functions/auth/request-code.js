@@ -1,5 +1,6 @@
-import { sendEmail, loginCodeEmail } from '../_shared/email.js';
+import { sendEmail, loginCodeEmail, signupCodeEmail } from '../_shared/email.js';
 import { sendVerification, normalizePhone } from '../_shared/twilio-verify.js';
+import { selfEnrollEnabled, turnstileOk, enrollmentThrottled } from '../_shared/enroll.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -80,6 +81,13 @@ export async function onRequestPost(context) {
       'SELECT member_slug FROM member_emails WHERE LOWER(email) = ? LIMIT 1'
     ).bind(emailInput).first();
     if (!row) {
+      // Unknown email. With self-enroll on, this is a signup: send a signup
+      // code instead. Either way the response is the same { success: true },
+      // so callers can't probe which emails belong to members.
+      if (selfEnrollEnabled(env)) {
+        const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+        await maybeSendSignupCode(context, emailInput, ip, body.turnstile_token);
+      }
       return json({ success: true });
     }
     memberSlug = row.member_slug;
@@ -111,6 +119,30 @@ export async function onRequestPost(context) {
     return json({ error: 'send_failed' }, 502);
   }
   return json({ success: true });
+}
+
+// Signup-code path for unknown emails (self-enroll only). All failures are
+// silent — the caller already returned { success: true } shape regardless,
+// and every guard here (Turnstile, global circuit breaker, per-IP and
+// per-email caps) exists to stop abuse, not to inform the abuser.
+async function maybeSendSignupCode(context, email, ip, turnstileToken) {
+  const { env } = context;
+  if (!(await turnstileOk(env, turnstileToken, ip))) return;
+  if (await enrollmentThrottled(env, ip)) return;
+  // Per-email cap: 3 signup codes per hour.
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { cnt } = (await env.DB.prepare(
+    'SELECT COUNT(*) AS cnt FROM enroll_otps WHERE email = ? AND created_at > ?'
+  ).bind(email, hourAgo).first().catch(() => ({ cnt: 99 }))) || { cnt: 99 };
+  if (cnt >= 3) return;
+
+  const code = makeCode();
+  const expiresAt = new Date(Date.now() + TTL_MIN * 60 * 1000).toISOString();
+  await env.DB.prepare(
+    'INSERT INTO enroll_otps (email, code, ip, expires_at) VALUES (?, ?, ?, ?)'
+  ).bind(email, code, ip, expiresAt).run();
+  const { subject, text, html } = signupCodeEmail(code);
+  await sendEmail(env, { to: [email], subject, text, html });
 }
 
 async function overRateLimit(env, memberSlug) {

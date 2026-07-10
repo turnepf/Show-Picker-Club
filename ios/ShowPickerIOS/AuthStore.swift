@@ -25,14 +25,19 @@ final class AuthStore: ObservableObject {
         }
     }
 
+    // How a login attempt resolved: a session was issued, or (self-enroll)
+    // the server wants a name before creating the account.
+    enum LoginResult { case success, needsName }
+
     @MainActor
-    func loginWithEmail(email: String, code: String) async throws {
+    func loginWithEmail(email: String, code: String) async throws -> LoginResult {
         let r = try await API.loginWithEmail(email: email, code: code)
+        if r.needsName == true { return .needsName }
         if r.success == true {
             await refresh()
-        } else {
-            throw API.APIError.badResponse(401)
+            return .success
         }
+        throw API.APIError.badResponse(401)
     }
 
     @MainActor
@@ -46,8 +51,21 @@ final class AuthStore: ObservableObject {
     }
 
     @MainActor
-    func loginWithApple(identityToken: String) async throws {
-        let r = try await API.loginWithApple(identityToken: identityToken)
+    func loginWithApple(identityToken: String, fullName: String? = nil) async throws -> LoginResult {
+        let r = try await API.loginWithApple(identityToken: identityToken, fullName: fullName)
+        if r.needsName == true { return .needsName }
+        if r.success == true {
+            await refresh()
+            return .success
+        }
+        throw API.APIError.badResponse(401)
+    }
+
+    // Finish an email self-enrollment (the /auth/login step answered
+    // needsName). Creates the account and signs it in.
+    @MainActor
+    func enroll(email: String, code: String, fullName: String) async throws {
+        let r = try await API.enroll(email: email, code: code, fullName: fullName)
         if r.success == true {
             await refresh()
         } else {
@@ -58,6 +76,14 @@ final class AuthStore: ObservableObject {
     @MainActor
     func logout() async {
         await API.logout()
+        clearLocalSession()
+    }
+
+    // Reset local state without hitting /auth/logout — used after account
+    // deletion, where the server has already destroyed the session and
+    // cleared the cookie in its response.
+    @MainActor
+    func clearLocalSession() {
         memberSlug = nil
         email = nil
         isAdmin = false

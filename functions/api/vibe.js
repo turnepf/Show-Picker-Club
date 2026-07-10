@@ -27,18 +27,23 @@ function disambiguatedNames(rows) {
 }
 
 async function listEligibleMembers(env) {
-  const { results } = await env.DB.prepare(
+  // Held (not-yet-approved) members are excluded from vibe pages — approved
+  // filter with a column-less retry (migration 031).
+  const eligibleQuery = (withApproved) => env.DB.prepare(
     `SELECT m.slug, m.name, m.first_name, m.last_initial,
        (SELECT COUNT(*) FROM shows s WHERE s.member_slug = m.slug AND s.archived = 0) AS active_count
      FROM members m
      WHERE m.slug NOT IN (${EXCLUDED_SQL})
+       ${withApproved ? 'AND COALESCE(m.approved, 1) = 1' : ''}
        AND EXISTS (
          SELECT 1 FROM shows s
          WHERE s.member_slug = m.slug
            AND (COALESCE(s.added_by, '') != 'seed' OR s.archived = 1 OR s.updated_at IS NOT NULL)
        )
      ORDER BY m.first_name COLLATE NOCASE`
-  ).all();
+  );
+  const { results } = await eligibleQuery(true).all()
+    .catch(() => eligibleQuery(false).all());
   const named = disambiguatedNames(results);
   return named.map(m => ({ slug: m.slug, name: m.display, active_count: m.active_count }));
 }
