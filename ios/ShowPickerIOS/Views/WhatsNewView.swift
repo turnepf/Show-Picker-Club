@@ -13,15 +13,15 @@ struct WhatsNewView: View {
     }
 
     private let entries: [Entry] = [
-        .init(date: "7/4", title: "Subscription Audit.", body: "Paying for streaming you don't watch? Open the Subscription audit from your member page to see which services to keep, pause, or cancel based on what's actually on your lists."),
+        .init(date: "7/4", title: "Subscription Audit.", body: "Paying for streaming you don't watch? Open the Subscription audit from your member page to see which services to keep, pause, or cancel based on what's actually on your lists. Thanks Roger!"),
         .init(date: "7/2", title: "Pick the right show as you type.", body: "Start typing a title in Add or Suggest and matching shows appear with their posters \u{2014} tap one to lock in the exact match. Its artwork, rating, cast, and season dates come along automatically, and it knows whether it's a show or a movie, so nothing needs fixing later."),
         .init(date: "7/2", title: "See the full poster.", body: "Tap a show's artwork on its detail page to view it full screen."),
         .init(date: "6/29", title: "Shake to pick.", body: "Give your phone a shake to pull a random show from your Up Next list \u{2014} an instant answer to \u{201C}what should we watch?\u{201D}"),
         .init(date: "6/29", title: "Share a show.", body: "Send any show to a friend through the standard share sheet \u{2014} Messages, Mail, AirDrop, anything. Tap the share button on a show's detail screen."),
-        .init(date: "6/29", title: "Seasons released.", body: "Show rows now tell you how many seasons have dropped, right next to the Next up date (e.g. \u{201C}Next up: 6/1 \u{00B7} 3 seasons\u{201D})."),
+        .init(date: "6/29", title: "Seasons released.", body: "Show rows now tell you how many seasons have dropped, right next to the Next up date (e.g. \u{201C}Next up: 6/1 \u{00B7} 3 seasons\u{201D}). Thanks Paula!"),
         .init(date: "6/29", title: "Straight to your shows.", body: "Open the app while you're logged in and you land right on your own list, instead of the home screen."),
         .init(date: "5/21", title: "Calendar feed.", body: "Each member page now has a 📅 Calendar feed link at the bottom. Subscribe in Apple Calendar, Google Calendar, or Fantastical to get upcoming season premieres and finales from that member's Watching and Waiting lists, updated daily."),
-        .init(date: "5/9", title: "Vibe.", body: "See a personality fingerprint based on each member's taste: cluster name, top trait signals, balance read, and shows aligned with the vibe. Open Vibe from any member's page."),
+        .init(date: "5/9", title: "Vibe.", body: "See a personality fingerprint based on each member's taste: cluster name, top trait signals, balance read, and shows aligned with the vibe. Open Vibe from any member's page. Thanks Matt!"),
         .init(date: "4/28", title: "One-tap Add.", body: "The + Add button appears on your member page as soon as you're logged in. No need to enter edit mode first."),
         .init(date: "4/26", title: "Cleaner show rows.", body: "Each show is one tidy line: title, network, rating. Tap the title to expand and see genre, cast, who recommended it, next season dates, who you're watching with, and notes; only the lines with data show up."),
         .init(date: "4/21", title: "My Shows link.", body: "When logged in, a quick \u{201C}My Shows\u{201D} link appears on the home page just below the title."),
@@ -34,9 +34,8 @@ struct WhatsNewView: View {
         .init(date: "4/15", title: "Sort your lists.", body: "Sort any list by Rating (default), A\u{2013}Z, Date Added, or Next up."),
         .init(date: "4/15", title: "Watching With field.", body: "Track who you're watching a show with."),
         .init(date: "4/14", title: "Series Complete icon.", body: "Shows that have ended get a 🎬 badge."),
-        .init(date: "4/13", title: "Suggest a Show.", body: "Logged-in members can suggest shows to any other member."),
         .init(date: "4/13", title: "Season dates.", body: "See when the next season starts (and when it ends) pulled automatically from TMDB."),
-        .init(date: "4/13", title: "Multi-member support.", body: "One app, multiple members, each with their own lists and login codes."),
+        .init(date: "4/13", title: "Multi-member support.", body: "One app, multiple members, each with their own lists and login codes. Thanks Sherry!"),
         .init(date: "4/12", title: "Initial launch.", body: "Add, edit, move, and archive shows across four lists: Watching, Waiting, Recommending, and Up Next. Auto-enriched with IMDb ratings, actors, and network links."),
     ]
 
