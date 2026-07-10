@@ -21,7 +21,7 @@ struct WhatsNewView: View {
         .init(date: "6/29", title: "Seasons released.", body: "Show rows now tell you how many seasons have dropped, right next to the Next up date (e.g. \u{201C}Next up: 6/1 \u{00B7} 3 seasons\u{201D}). Thanks Paula!"),
         .init(date: "6/29", title: "Straight to your shows.", body: "Open the app while you're logged in and you land right on your own list, instead of the home screen."),
         .init(date: "5/21", title: "Calendar feed.", body: "Each member page now has a 📅 Calendar feed link at the bottom. Subscribe in Apple Calendar, Google Calendar, or Fantastical to get upcoming season premieres and finales from that member's Watching and Waiting lists, updated daily."),
-        .init(date: "5/9", title: "Vibe.", body: "See a personality fingerprint based on each member's taste: cluster name, top trait signals, balance read, and shows aligned with the vibe. Open Vibe from any member's page."),
+        .init(date: "5/9", title: "Vibe.", body: "See a personality fingerprint based on each member's taste: cluster name, top trait signals, balance read, and shows aligned with the vibe. Open Vibe from any member's page. Thanks Matt!"),
         .init(date: "4/28", title: "One-tap Add.", body: "The + Add button appears on your member page as soon as you're logged in. No need to enter edit mode first."),
         .init(date: "4/26", title: "Cleaner show rows.", body: "Each show is one tidy line: title, network, rating. Tap the title to expand and see genre, cast, who recommended it, next season dates, who you're watching with, and notes; only the lines with data show up."),
         .init(date: "4/21", title: "My Shows link.", body: "When logged in, a quick \u{201C}My Shows\u{201D} link appears on the home page just below the title."),
@@ -34,9 +34,8 @@ struct WhatsNewView: View {
         .init(date: "4/15", title: "Sort your lists.", body: "Sort any list by Rating (default), A\u{2013}Z, Date Added, or Next up."),
         .init(date: "4/15", title: "Watching With field.", body: "Track who you're watching a show with."),
         .init(date: "4/14", title: "Series Complete icon.", body: "Shows that have ended get a 🎬 badge."),
-        .init(date: "4/13", title: "Suggest a Show.", body: "Logged-in members can suggest shows to any other member."),
         .init(date: "4/13", title: "Season dates.", body: "See when the next season starts (and when it ends) pulled automatically from TMDB."),
-        .init(date: "4/13", title: "Multi-member support.", body: "One app, multiple members, each with their own lists and login codes."),
+        .init(date: "4/13", title: "Multi-member support.", body: "One app, multiple members, each with their own lists and login codes. Thanks Sherry!"),
         .init(date: "4/12", title: "Initial launch.", body: "Add, edit, move, and archive shows across four lists: Watching, Waiting, Recommending, and Up Next. Auto-enriched with IMDb ratings, actors, and network links."),
     ]
 
