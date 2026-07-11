@@ -3,10 +3,12 @@ import SwiftUI
 // Cross-library search over every member's active shows (one card per title).
 // Reuses the poster ShowCard; tapping a result opens the show detail.
 struct SearchView: View {
+    @EnvironmentObject private var auth: AuthStore
     @Binding var path: NavigationPath
     @State private var all: [Show] = []
     @State private var query = ""
     @State private var loaded = false
+    @State private var showingAdd = false
 
     private let columns = Array(repeating: GridItem(.fixed(220), spacing: 40), count: 5)
 
@@ -38,7 +40,24 @@ struct SearchView: View {
                 if query.trimmingCharacters(in: .whitespaces).isEmpty {
                     hint("Search the club's shows by title, network, or genre.")
                 } else if results.isEmpty {
-                    hint(loaded ? "No matches for “\(query)”." : "Searching…")
+                    if loaded {
+                        VStack(spacing: 28) {
+                            hint("No matches for “\(query)” in the club.")
+                            // Not in anyone's library yet — offer the TMDB
+                            // type-ahead add (signed-in members only; the
+                            // endpoints are session-gated).
+                            if auth.isLoggedIn {
+                                Button {
+                                    showingAdd = true
+                                } label: {
+                                    Label("Add “\(query)” as a new show", systemImage: "plus")
+                                        .font(.system(size: 24, weight: .semibold))
+                                }
+                            }
+                        }
+                    } else {
+                        hint("Searching…")
+                    }
                 } else {
                     LazyVGrid(columns: columns, alignment: .leading, spacing: 50) {
                         ForEach(results) { show in
@@ -58,6 +77,12 @@ struct SearchView: View {
             .navigationTitle("Search")
             .searchable(text: $query, prompt: "Shows, networks, genres")
             .showDestinations()
+            // Reload after adding so the new show turns up in club search.
+            .fullScreenCover(isPresented: $showingAdd, onDismiss: {
+                Task { await load() }
+            }) {
+                AddShowView(initialQuery: query)
+            }
         }
         .task { await load() }
     }

@@ -137,10 +137,14 @@ enum API {
 
     // Add a show to the logged-in member's list. The server scopes the insert
     // to the session's member, so we don't pass a slug — this always lands on
-    // *my* list. Used to copy a popular / another member's show onto your own.
+    // *my* list. Used to copy a popular / another member's show onto your own,
+    // and (with a tmdbId/tmdbType pick from title search) to add a brand-new
+    // show — the server enriches that exact TMDB entry instead of re-guessing
+    // from the title.
     @discardableResult
     static func addShow(title: String, network: String?, networkUrl: String?,
-                        list: String, movie: Bool, fullSeries: Bool) async throws -> Show {
+                        list: String, movie: Bool, fullSeries: Bool,
+                        tmdbId: Int? = nil, tmdbType: String? = nil) async throws -> Show {
         var body: [String: Any] = [
             "title": title,
             "list": list,
@@ -149,8 +153,23 @@ enum API {
         ]
         if let network, !network.isEmpty { body["network"] = network }
         if let networkUrl, !networkUrl.isEmpty { body["network_url"] = networkUrl }
+        if let tmdbId { body["tmdb_id"] = tmdbId }
+        if let tmdbType { body["tmdb_type"] = tmdbType }
         let r: ShowResponse = try await sendJSON("/api/shows", method: "POST", body: body)
         return r.show
+    }
+
+    // Type-ahead title search while adding a show. Session-gated TMDB proxy;
+    // an empty result list means "let them type freely".
+    static func titleSearch(_ q: String) async throws -> [TitleHit] {
+        // URLComponents escapes &/=/# in the value (.urlQueryAllowed wouldn't,
+        // truncating titles like "Law & Order"); "+" needs one extra step so
+        // URLSearchParams server-side doesn't read it as a space.
+        var comps = URLComponents()
+        comps.queryItems = [URLQueryItem(name: "q", value: q)]
+        let query = (comps.percentEncodedQuery ?? "").replacingOccurrences(of: "+", with: "%2B")
+        let r: TitleSearchResponse = try await get("/api/title-search?\(query)")
+        return r.results
     }
 
     // Move one of my own shows to another list.

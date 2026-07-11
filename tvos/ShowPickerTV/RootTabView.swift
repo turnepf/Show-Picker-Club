@@ -71,7 +71,7 @@ struct MyShowsView: View {
         NavigationStack(path: $path) {
             Group {
                 if let me {
-                    MemberView(member: me)
+                    MemberView(member: me, canAdd: true)
                 } else if loading {
                     ZStack { Theme.background.ignoresSafeArea(); ProgressView() }
                 } else {

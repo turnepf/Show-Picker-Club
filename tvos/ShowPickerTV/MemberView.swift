@@ -2,18 +2,31 @@ import SwiftUI
 
 struct MemberView: View {
     let member: Member
+    // True on the signed-in member's own view (My Shows): shows the
+    // "Add a show" entry point.
+    var canAdd: Bool = false
     @State private var shows: [Show] = []
     @State private var loading = true
     @State private var didInitialLoad = false
     @State private var errorText: String?
+    @State private var showingAdd = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 50) {
-                Text("\(member.label)'s Shows")
-                    .font(.system(size: 48, weight: .bold))
-                    .foregroundColor(Theme.text)
-                    .padding(.top, 20)
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(member.label)'s Shows")
+                        .font(.system(size: 48, weight: .bold))
+                        .foregroundColor(Theme.text)
+                    if canAdd {
+                        Spacer()
+                        Button { showingAdd = true } label: {
+                            Label("Add a show", systemImage: "plus")
+                                .font(.system(size: 24, weight: .semibold))
+                        }
+                    }
+                }
+                .padding(.top, 20)
 
                 if loading {
                     ProgressView().padding(.top, 80)
@@ -33,11 +46,13 @@ struct MemberView: View {
                         // visible content to land on, otherwise the screen looks
                         // hung when every list is empty.
                         VStack(spacing: 24) {
-                            Text("\(member.label) hasn't added any shows yet.")
+                            Text(canAdd ? "You haven't added any shows yet."
+                                        : "\(member.label) hasn't added any shows yet.")
                                 .font(.system(size: 32))
                                 .foregroundColor(Theme.muted)
                                 .multilineTextAlignment(.center)
-                            Text("Check back later, or pick another member from the home page.")
+                            Text(canAdd ? "Use “Add a show” above to start your first list."
+                                        : "Check back later, or pick another member from the home page.")
                                 .font(.system(size: 24))
                                 .foregroundColor(Theme.muted)
                                 .multilineTextAlignment(.center)
@@ -61,6 +76,14 @@ struct MemberView: View {
             Task {
                 if let s = try? await API.shows(member: member.slug) { shows = s }
             }
+        }
+        // Quiet refresh after adding, same as returning from a detail screen.
+        .fullScreenCover(isPresented: $showingAdd, onDismiss: {
+            Task {
+                if let s = try? await API.shows(member: member.slug) { shows = s }
+            }
+        }) {
+            AddShowView()
         }
     }
 

@@ -74,6 +74,31 @@ struct AccountDeleteResponse: Codable {
     let error: String?
 }
 
+// /api/title-search result — the type-ahead pick while adding a show.
+// Picking one pins the exact TMDB entry so enrichment can't mismatch.
+struct TitleHit: Codable, Identifiable, Hashable {
+    let tmdbId: Int
+    let mediaType: String
+    let title: String
+    let year: String?
+    let posterUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case title, year
+        case tmdbId = "tmdb_id"
+        case mediaType = "media_type"
+        case posterUrl = "poster_url"
+    }
+
+    var id: String { "\(mediaType)-\(tmdbId)" }
+    var isMovie: Bool { mediaType == "movie" }
+    var metaText: String {
+        [year, isMovie ? "Movie" : "TV series"].compactMap { $0 }.joined(separator: " · ")
+    }
+}
+
+struct TitleSearchResponse: Codable { let results: [TitleHit] }
+
 struct PopularShow: Codable, Identifiable, Hashable {
     let id: Int
     let title: String
