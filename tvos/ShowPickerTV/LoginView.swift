@@ -26,8 +26,20 @@ struct LoginView: View {
     @State private var sending = false
     @State private var submitting = false
     @State private var errorText: String?
+    @State private var appleCoordinator = AppleSignInCoordinator()
 
     var body: some View {
+        // Menu (the remote's back gesture) steps back through the flow instead
+        // of falling through to the tab bar and out of the app. Attached only
+        // on sub-steps so Menu still leaves normally from the chooser.
+        if step == .choose {
+            content
+        } else {
+            content.onExitCommand { goBack() }
+        }
+    }
+
+    private var content: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
 
@@ -109,13 +121,16 @@ struct LoginView: View {
 
     private var chooseStep: some View {
         VStack(spacing: 24) {
-            SignInWithAppleButton(.continue) { request in
-                request.requestedScopes = [.email, .fullName]
-            } onCompletion: { result in
-                Task { await handleApple(result) }
+            // A plain focusable button driving ASAuthorizationController —
+            // SwiftUI's SignInWithAppleButton doesn't respond to the Siri
+            // Remote's select on tvOS.
+            Button {
+                Task { await startAppleSignIn() }
+            } label: {
+                Label("Continue with Apple", systemImage: "applelogo")
+                    .font(.system(size: 26, weight: .semibold))
+                    .frame(width: 500)
             }
-            .signInWithAppleButtonStyle(.white)
-            .frame(width: 560, height: 64)
             .disabled(submitting)
 
             Button {
@@ -225,6 +240,15 @@ struct LoginView: View {
     }
 
     // MARK: Actions
+
+    private func startAppleSignIn() async {
+        do {
+            let authorization = try await appleCoordinator.signIn()
+            await handleApple(.success(authorization))
+        } catch {
+            await handleApple(.failure(error))
+        }
+    }
 
     private func handleApple(_ result: Result<ASAuthorization, Error>) async {
         errorText = nil
@@ -344,5 +368,43 @@ struct LoginView: View {
         } catch {
             errorText = "Couldn't create your account. Try again."
         }
+    }
+}
+
+// Drives the system Sign in with Apple sheet on tvOS from a plain button.
+// Bridges ASAuthorizationController's delegate callbacks into async/await.
+@MainActor
+final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate,
+                                    ASAuthorizationControllerPresentationContextProviding {
+    private var continuation: CheckedContinuation<ASAuthorization, Error>?
+
+    func signIn() async throws -> ASAuthorization {
+        try await withCheckedThrowingContinuation { cont in
+            continuation = cont
+            let request = ASAuthorizationAppleIDProvider().createRequest()
+            request.requestedScopes = [.email, .fullName]
+            let controller = ASAuthorizationController(authorizationRequests: [request])
+            controller.delegate = self
+            controller.presentationContextProvider = self
+            controller.performRequests()
+        }
+    }
+
+    func authorizationController(controller: ASAuthorizationController,
+                                 didCompleteWithAuthorization authorization: ASAuthorization) {
+        continuation?.resume(returning: authorization)
+        continuation = nil
+    }
+
+    func authorizationController(controller: ASAuthorizationController,
+                                 didCompleteWithError error: Error) {
+        continuation?.resume(throwing: error)
+        continuation = nil
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+            .first ?? ASPresentationAnchor()
     }
 }
