@@ -24,10 +24,15 @@ struct HomeView: View {
                             .padding(.top, 80)
                             .frame(maxWidth: .infinity)
                     } else if let errorText {
-                        Text(errorText)
-                            .font(.system(size: 28))
-                            .foregroundColor(Theme.muted)
-                            .padding(.top, 40)
+                        VStack(spacing: 24) {
+                            Text(errorText)
+                                .font(.system(size: 28))
+                                .foregroundColor(Theme.muted)
+                            Button("Try again") { Task { await load() } }
+                                .font(.system(size: 24, weight: .semibold))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
                     } else {
                         popularShelf
                         membersSection
@@ -46,7 +51,10 @@ struct HomeView: View {
             .background(Theme.background.ignoresSafeArea())
             .showDestinations()
         }
-        .task { if loading { await load() } }
+        // Re-runs on every visit to the tab: keep retrying until content
+        // lands, so one failed launch-time load (cold Wi-Fi, network blip)
+        // doesn't brick Home for the whole session.
+        .task { if members.isEmpty { await load() } }
     }
 
     @ViewBuilder private var popularShelf: some View {
