@@ -403,8 +403,16 @@ final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate,
     }
 
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        UIApplication.shared.connectedScenes
-            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
-            .first ?? ASPresentationAnchor()
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        if let window = scenes.compactMap(\.keyWindow).first ?? scenes.flatMap(\.windows).first {
+            return window
+        }
+        // Unreachable in practice — the sign-in button that triggers this is
+        // itself in an on-screen window. Satisfies the non-optional return
+        // without the bare UIWindow() initializer (deprecated in tvOS 26).
+        guard let scene = scenes.first else {
+            preconditionFailure("Sign in with Apple requested with no connected window scene")
+        }
+        return UIWindow(windowScene: scene)
     }
 }
