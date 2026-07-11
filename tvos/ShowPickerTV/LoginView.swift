@@ -86,6 +86,24 @@ struct LoginView: View {
             .padding(.horizontal, 120)
             .overlay { if submitting { ProgressView().controlSize(.large) } }
         }
+        // Signed in (any path: code, Apple, enroll) — clear the flow so a
+        // later sign-out lands back on the chooser, not a stale "enter your
+        // code" screen. The tab keeps this view's state alive across the
+        // whole signed-in session.
+        .onChange(of: auth.memberSlug) { _, slug in
+            if slug != nil { resetFlow() }
+        }
+    }
+
+    private func resetFlow() {
+        step = .choose
+        channel = .email
+        phone = ""
+        email = ""
+        code = ""
+        fullName = ""
+        appleToken = nil
+        errorText = nil
     }
 
     // MARK: Step copy
