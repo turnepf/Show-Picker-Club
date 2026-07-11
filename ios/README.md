@@ -19,7 +19,6 @@ ios/ShowPickerIOS/
     ├── MemberView.swift        Member's four lists with swipe-to-archive / edit
     ├── ShowDetailView.swift    Read-only detail + Edit + Watch
     ├── AddEditShowView.swift   Sheet for add / edit
-    ├── SuggestShowView.swift   Sheet for suggesting to another member
     └── LoginView.swift         Sign in with Apple + one-time code entry
 ```
 
@@ -209,8 +208,8 @@ Offline/
 | Edit show | ✅ |
 | Archive show (swipe action) | ✅ |
 | Quick-list promotions (leading swipe + detail "Move" section) | ✅ (Watched it / Season done / Watching / Start) |
-| Suggest a show to another member | ✅ |
-| Send an existing show to another member's Up Next | ✅ (carries over rating, network link, cast) |
+| Suggest a show to another member | ❌ Retired 2026-07 (all cross-member writes) |
+| Send an existing show to another member's Up Next | ❌ Retired 2026-07 (all cross-member writes) |
 | Cross-library search (title + actor, across all members) | ✅ (home-screen 🔍, add results to your lists) |
 | Watch on streaming service (deep link) | ✅ for services that support it |
 | Share from Netflix / Apple TV / etc. → Up Next | ✅ (Share Extension) |
@@ -218,7 +217,7 @@ Offline/
 | Recommendations / "Picks for you" | ❌ Removed from the client (see note) |
 | Offline browsing + offline edits | ✅ (cached reads, queued add/edit/move/archive, auto-sync on reconnect) |
 | Field toggle pills (hide ratings/networks/etc.) | ❌ Not planned for iOS |
-| Vibe profile | ❌ Not planned for iOS |
+| Vibe profile | ✅ (`VibeView`, linked from a member's list) |
 
 > **Picks for You was removed.** The feature is gone from all clients (web, iOS, tvOS); iOS no longer renders a picks section. The backend endpoint (`functions/api/recommendations.js`, `GET /api/recommendations`) is retained for backwards compatibility but is no longer called.
 

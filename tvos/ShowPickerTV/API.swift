@@ -49,6 +49,20 @@ enum API {
         try await sendJSON(path, method: "POST", body: body)
     }
 
+    // POST and decode the reply regardless of HTTP status, for endpoints that
+    // speak through an error field ({ error: "rate_limited" }) instead of
+    // bare status codes.
+    private static func postDecoding<T: Decodable>(_ path: String, body: [String: Any]) async throws -> T {
+        guard let url = URL(string: baseString + path) else { throw APIError.badURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(platform, forHTTPHeaderField: "X-Client-Platform")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, _) = try await URLSession.shared.data(for: req)
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
     // MARK: Auth
 
     static func checkAuth() async -> AuthCheckResponse {
@@ -94,6 +108,22 @@ enum API {
     static func requestEmailCode(email: String) async throws -> Bool {
         let r: Ack = try await postJSON("/auth/request-code", body: ["email": email, "channel": "email"])
         return r.success == true
+    }
+
+    // Self-service account deletion (App Store 5.1.1(v)) — two-step hard
+    // delete, decoded regardless of HTTP status so the UI can speak to the
+    // server's error (no_email / admin_must_demote_first / invalid /
+    // rate_limited) instead of a bare status code.
+
+    // Step 1: email a deletion code to the member's primary address.
+    static func requestAccountDeleteCode() async throws -> AccountDeleteResponse {
+        try await postDecoding("/api/account-delete", body: [:])
+    }
+
+    // Step 2: verify the code and hard-delete the account. On { deleted: true }
+    // the server has already cleared the session cookie.
+    static func confirmAccountDelete(code: String) async throws -> AccountDeleteResponse {
+        try await postDecoding("/api/account-delete", body: ["code": code])
     }
 
     static func logout() async {

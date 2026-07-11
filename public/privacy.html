@@ -28,13 +28,15 @@
 </head>
 <body>
   <h1>Show Picker Club — Privacy Policy</h1>
-  <p class="updated">Last updated: May 23, 2026</p>
+  <p class="updated">Last updated: July 11, 2026</p>
 
-  <p>Show Picker Club ("the app") is a private, invitation-only TV-show tracker operated by Patrick Turner. This policy describes what information is collected, how it is used, and your choices.</p>
+  <p>Show Picker Club ("the app") is a small members-only TV-show tracker operated by Patrick Turner. This policy describes what information is collected, how it is used, and your choices.</p>
 
   <h2>What we collect</h2>
   <ul>
-    <li><strong>Name and phone number</strong>, provided when an operator adds you as a member.</li>
+    <li><strong>Name</strong>, provided when an operator adds you as a member or when you sign up yourself.</li>
+    <li><strong>Email address and/or phone number</strong>, used to send you one-time login codes and to match your sign-in to your membership.</li>
+    <li><strong>Sign in with Apple / Google identifiers</strong>: if you sign in with Apple or (on the web) Google, we receive the stable account identifier and the email address the provider shares (for Apple this may be a private-relay address). We use them only to link your sign-in to your membership.</li>
     <li><strong>Show data you enter</strong>: titles, lists, notes, ratings, recommendations, and similar list-related fields.</li>
     <li><strong>Session activity</strong>: timestamps of logins and page loads, used only for activity metrics within the app.</li>
     <li><strong>Standard server logs</strong>: IP address and request timestamps, kept briefly for security and abuse prevention.</li>
@@ -42,10 +44,8 @@
 
   <h2>How we use it</h2>
   <ul>
-    <li>To authenticate you when you log in (via SMS code).</li>
-    <li>To send you notifications when another member recommends or shares a show with you.</li>
-    <li>To display members and their lists to other invited members within the club.</li>
-    <li>To improve the app (recommendation matching, "what members are watching", etc.).</li>
+    <li>To authenticate you when you log in (via a one-time code sent by email or SMS, or via Sign in with Apple / Google).</li>
+    <li>To display members and their lists to other members within the club.</li>
   </ul>
 
   <h2>SMS messaging</h2>
@@ -57,11 +57,13 @@
   <ul>
     <li><strong>Cloudflare</strong> (hosting and database).</li>
     <li><strong>Twilio</strong> (SMS delivery; phone numbers are sent to Twilio for the purpose of delivering messages).</li>
-    <li><strong>OMDB, TMDB</strong> (show metadata enrichment; these calls do not include your phone number or other personal data).</li>
+    <li><strong>Resend</strong> (email delivery; email addresses are sent to Resend for the purpose of delivering login and confirmation codes).</li>
+    <li><strong>Apple and Google</strong> (sign-in only, if you choose those options; they verify your identity and share the identifiers described above).</li>
+    <li><strong>OMDB, TMDB, Watchmode</strong> (show metadata enrichment; these calls do not include your email, phone number, or other personal data).</li>
   </ul>
 
   <h2>Retention and deletion</h2>
-  <p>Your account and data are retained as long as you remain a member. To delete your account, contact the operator at the email below and your records (member, phone number, sessions, and show entries) will be removed from the database.</p>
+  <p>Your account and data are retained as long as you remain a member. You can delete your account yourself at any time from the app or website (Account → Delete account): after confirming with a code emailed to your address on file, your records (member, email addresses, phone number, Apple/Google sign-in link, sessions, and show entries) are removed from the database immediately. You can also contact the operator at the email below to have your account removed.</p>
 
   <h2>Children</h2>
   <p>This app is not directed to children under 13 and is not intended for their use.</p>

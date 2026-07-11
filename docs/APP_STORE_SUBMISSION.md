@@ -5,6 +5,10 @@ because the app is invite-only with no public sign-up, which trips up App Review
 in two predictable ways — a login wall and a privacy-label mismatch. Both are
 covered below.
 
+The listing is **universal**: one bundle id covers iPhone + Apple TV (the watch
+app rides along with the iOS build), so one submission reviews both surfaces —
+work the checklist for **both iPhone/iPad and Apple TV**.
+
 Work top to bottom before you hit **Submit for Review**.
 
 ---
@@ -28,10 +32,20 @@ in with Sign in with Apple"). Open the demo door before submitting.
       - `DEMO_APPLE_FALLBACK=1` → **Sign in with Apple** by an unrecognized Apple
         ID lands in that same demo member (`functions/auth/apple.js`). This is
         the piece that fixes the 2.1(a) rejection.
+      - **Exception — self-enroll live:** with the `SELF_ENROLL` secret set,
+        the Apple handler enrolls an unrecognized Apple ID as a brand-new
+        member and `DEMO_APPLE_FALLBACK` is inert (`functions/auth/apple.js`).
+        That also satisfies 2.1(a) — the reviewer signs up like anyone else.
+        In that mode skip `DEMO_APPLE_FALLBACK`, keep the demo email/code for
+        the Review notes, and expect Apple sign-in to create a fresh account
+        in the verification below.
 - [ ] Redeploy so the secrets take effect, then **verify both paths yourself**:
       - Tap *Sign in with Apple* with a personal Apple ID that is not a member →
-        you land in the demo member's account.
-      - Enter the demo email + code on the login screen → same result.
+        you land in the demo member's account (or a fresh self-enrolled one,
+        if `SELF_ENROLL` is on).
+      - Enter the demo email + code on the login screen → the demo account.
+- [ ] Repeat the email + code sign-in **on an Apple TV** (on-screen keyboard) —
+      the reviewer exercises the tvOS half of the universal app the same way.
 - [ ] Fill in **App Store Connect → App Review Information → Sign-In required**
       with the demo email + code (see Review Notes below).
 
@@ -55,17 +69,37 @@ Requires the **Account Holder or Admin** role (that's you).
 - [ ] App Store Connect → your app → **App Privacy**.
 - [ ] Under **Tracking**, make sure **nothing** is marked "Used to Track You" —
       in particular **Name** must not be. Set tracking to **none**.
-- [ ] Data you *do* collect (Name, phone, user content) can stay listed under
-      "Data Linked to You" / "Data Not Linked to You" as appropriate — that is
-      fine. The violation is only the **tracking** flag.
+- [ ] Data you *do* collect — **Name, email address, phone number, user
+      content** (show lists/notes) — is listed under "Data Linked to You",
+      purpose App Functionality. This must match `public/privacy.html` and the
+      `PrivacyInfo.xcprivacy` manifests in each target, which declare the same
+      set. The violation is only the **tracking** flag.
 - [ ] Confirm no build adds the `NSUserTrackingUsageDescription` key or calls
       `ATTrackingManager` (it shouldn't — there is no such code).
+- [ ] `PrivacyInfo.xcprivacy` present in every target (iOS app, share
+      extension, watch app, watch complication, tvOS app) — they declare
+      UserDefaults required-reason use and "no tracking". Without them uploads
+      draw an `ITMS-91053 Missing API declaration` warning.
 
-## 3. Reply to the open rejection (if resubmitting the same version)
+## 3. Account deletion (Guideline 5.1.1(v))
+
+Apps that create accounts must offer **in-app** account deletion. All three
+account-creating clients have it — verify each before submitting:
+
+- [ ] iOS: account menu → **Delete Account…** (`DeleteAccountView`).
+- [ ] tvOS: Account tab → **Delete account…** (`DeleteAccountView`).
+- [ ] Web: account panel → Delete account (`public/index.html`).
+
+All ride the same two-step `/api/account-delete` (emailed code → immediate
+hard delete). If review asks: deletion is self-service, immediate, and removes
+the member row, emails, phones, Apple/Google links, sessions, and show data.
+
+## 4. Reply to the open rejection (historical — only if resubmitting that version)
 
 If you are responding to submission `2333ecb7-98e5-4b27-9df5-67321971226b`
 rather than shipping a fresh build, reply to Apple's message in App Store
-Connect so the reviewer knows what changed. Draft:
+Connect so the reviewer knows what changed. (For a fresh 1.0.1+ submission,
+skip this section.) Draft:
 
 > Thank you for the review.
 >
@@ -80,7 +114,7 @@ Connect so the reviewer knows what changed. Draft:
 > Privacy information so that no data is marked as used to track. No
 > AppTrackingTransparency prompt is required because the app does not track.
 
-## 4. Review Notes to paste into App Store Connect
+## 5. Review Notes to paste into App Store Connect
 
 ```
 This is an invitation-only TV-show club (no public sign-up).
@@ -97,12 +131,21 @@ tracking, so no App Tracking Transparency prompt is presented.
 ```
 (Fill in the real demo email/code — keep them out of git.)
 
-## 5. Standard build hygiene
+## 6. Standard build hygiene
 
 - [ ] Build/version number bumped and archived from a clean release build.
+      `MARKETING_VERSION` must match across the iOS and tvOS targets (one
+      universal listing).
 - [ ] Launch on an **iPad** (Review used an iPad Air 11-inch / M3) — 2.1(a) was
       caught on iPad, so exercise the full flow there, not just iPhone.
-- [ ] Screenshots and metadata current.
+- [ ] Launch on an **Apple TV** (device or simulator): sign in with the demo
+      email + code, confirm Sign in with Apple presents (entitlement is set on
+      both Debug and Release configs), and confirm Delete account is reachable.
+- [ ] Export compliance: `ITSAppUsesNonExemptEncryption = NO` is set in both
+      the iOS and tvOS build settings, so uploads shouldn't stall on the
+      compliance prompt.
+- [ ] Screenshots and metadata current — including the **Apple TV** screenshot
+      set on the same listing.
 
 ---
 

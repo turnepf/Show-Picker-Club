@@ -67,6 +67,13 @@ struct LoginResponse: Codable {
 // /auth/request-code reply.
 struct Ack: Codable { let success: Bool? }
 
+// /api/account-delete reply (both steps).
+struct AccountDeleteResponse: Codable {
+    let sent: Bool?
+    let deleted: Bool?
+    let error: String?
+}
+
 struct PopularShow: Codable, Identifiable, Hashable {
     let id: Int
     let title: String

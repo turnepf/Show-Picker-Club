@@ -75,4 +75,12 @@ final class AuthStore: ObservableObject {
         email = nil
         isAdmin = false
     }
+
+    // Drop local state after the server already destroyed the session
+    // (account deletion) — no logout round-trip needed.
+    func clearLocalSession() {
+        memberSlug = nil
+        email = nil
+        isAdmin = false
+    }
 }
