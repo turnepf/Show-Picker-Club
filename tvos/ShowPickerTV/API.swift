@@ -63,6 +63,25 @@ enum API {
         try await postJSON("/auth/login", body: ["code": code, "phone": phone])
     }
 
+    // Sign in with Apple: hand the verified identity token to the server, which
+    // maps it to an existing member and sets the session cookie. With
+    // self-enroll on, an unrecognized identity gets { needs_name: true } —
+    // re-post the same token with fullName to create the account (Apple only
+    // gives the name to the client, and only on first authorization).
+    static func loginWithApple(identityToken: String, fullName: String? = nil) async throws -> LoginResponse {
+        var body: [String: Any] = ["identity_token": identityToken]
+        if let fullName, !fullName.isEmpty { body["full_name"] = fullName }
+        return try await postJSON("/auth/apple", body: body)
+    }
+
+    // Complete an email self-enrollment: /auth/login answered { needs_name }
+    // for this email+code, and now we have the person's name. Creates the
+    // member and sets the session cookie. Throws badResponse(401) invalid
+    // code, (409) already a member, (403) signups closed, (429) paused.
+    static func enroll(email: String, code: String, fullName: String) async throws -> LoginResponse {
+        try await postJSON("/auth/enroll", body: ["email": email, "code": code, "full_name": fullName])
+    }
+
     // Server replies 200 even for unknown numbers/addresses (account-enumeration
     // hardening), so success only means the request was accepted.
     @discardableResult

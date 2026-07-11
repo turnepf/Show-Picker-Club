@@ -1,20 +1,29 @@
 import SwiftUI
+import AuthenticationServices
 
-// tvOS sign-in: enter a phone or email, get a 6-digit code by text/email, type
-// it in, log in. Mirrors the iOS phone/email OTP flow (Sign in with Apple is
-// iPhone-only). Presented over the open home screen; on success the session
-// cookie is set, this screen dismisses, and Home jumps to the member's list.
+// tvOS sign-in, identifier-first like iOS and the web: step 1 picks a channel
+// (Apple / email / phone), step 2 takes the identifier, step 3 the 6-digit
+// code (auto-submitting), and step 4 — new signups only, when the server
+// answers needs_name — asks for a name before creating the account. Lives in
+// the Account tab; on success RootTabView flips over to My Shows.
+//
+// Sign in with Apple on tvOS authorizes with an Apple ID already signed into
+// the box, so on a shared TV the code flows stay the way for everyone else in
+// the room to sign in as themselves.
 struct LoginView: View {
-    @EnvironmentObject private var auth: AuthStore
-    @Environment(\.dismiss) private var dismiss
+    private enum Step { case choose, email, phone, code, name }
+    private enum Channel { case email, phone, apple }
 
+    @EnvironmentObject private var auth: AuthStore
+
+    @State private var step: Step = .choose
+    @State private var channel: Channel = .email
     @State private var phone = ""
     @State private var email = ""
     @State private var code = ""
-    @State private var sendingPhone = false
-    @State private var sendingEmail = false
-    @State private var phoneCodeSent = false
-    @State private var emailCodeSent = false
+    @State private var fullName = ""
+    @State private var appleToken: String?
+    @State private var sending = false
     @State private var submitting = false
     @State private var errorText: String?
 
@@ -27,133 +36,313 @@ struct LoginView: View {
                     .font(.system(size: 56, weight: .bold))
                     .foregroundColor(Theme.text)
 
-                Text("Sign in to see the club's lists")
+                Text(subtitle)
                     .font(.system(size: 26))
                     .foregroundColor(Theme.muted)
 
-                VStack(spacing: 24) {
-                    HStack(spacing: 20) {
-                        TextField("Phone", text: $phone)
-                            .textContentType(.telephoneNumber)
-                            .keyboardType(.phonePad)
-                        sendButton(title: "Text me a code", sent: phoneCodeSent,
-                                   sending: sendingPhone, disabled: phone.isEmpty) {
-                            await sendPhoneCode()
-                        }
+                Group {
+                    switch step {
+                    case .choose: chooseStep
+                    case .email: emailStep
+                    case .phone: phoneStep
+                    case .code: codeStep
+                    case .name: nameStep
                     }
-
-                    HStack(spacing: 20) {
-                        TextField("Email", text: $email)
-                            .textContentType(.emailAddress)
-                            .keyboardType(.emailAddress)
-                        sendButton(title: "Email me a code", sent: emailCodeSent,
-                                   sending: sendingEmail, disabled: email.isEmpty) {
-                            await sendEmailCode()
-                        }
-                    }
-
-                    TextField("6-digit code", text: $code)
-                        .textContentType(.oneTimeCode)
-                        .keyboardType(.numberPad)
-                        .font(.system(size: 30, weight: .semibold).monospacedDigit())
-                        .multilineTextAlignment(.center)
-                        .onChange(of: code) { _, newValue in
-                            // Auto-submit once a full 6-digit code is entered.
-                            if newValue.filter(\.isNumber).count == 6 && !submitting {
-                                Task { await submit() }
-                            }
-                        }
                 }
-                .frame(maxWidth: 760)
+                .frame(maxWidth: 720)
 
-                HStack(spacing: 24) {
-                    Button("Not now") { dismiss() }
+                if step != .choose {
+                    Button("Back") { goBack() }
                         .font(.system(size: 24))
-
-                    Button(action: { Task { await submit() } }) {
-                        Text(submitting ? "Logging in…" : "Log in")
-                            .font(.system(size: 26, weight: .semibold))
-                            .frame(maxWidth: 360)
-                    }
-                    .disabled(code.filter(\.isNumber).count < 4 || submitting)
+                        .disabled(submitting)
                 }
 
                 if let errorText {
                     Text(errorText)
                         .font(.system(size: 22))
                         .foregroundColor(.red)
-                } else {
-                    Text("The code logs you in automatically.")
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 900)
+                } else if let hint = footerHint {
+                    Text(hint)
                         .font(.system(size: 20))
                         .foregroundColor(Theme.muted)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 900)
                 }
             }
             .padding(.horizontal, 120)
+            .overlay { if submitting { ProgressView().controlSize(.large) } }
+        }
+    }
+
+    // MARK: Step copy
+
+    private var subtitle: String {
+        switch step {
+        case .choose: return "Sign in to see the club's lists"
+        case .email: return "What's your email?"
+        case .phone: return "What's your phone number?"
+        case .code: return "Enter your code"
+        case .name: return "What's your name?"
+        }
+    }
+
+    private var footerHint: String? {
+        switch step {
+        case .choose:
+            return "By continuing, you agree to the Terms and Privacy Policy at showpicker.club/terms and showpicker.club/privacy."
+        case .email:
+            return "We'll email you a 6-digit code."
+        case .phone:
+            return "Phone login is for members with a number on file. New here? Go back and use Apple or email."
+        case .code:
+            return channel == .phone
+                ? "We texted a code to \(phone). It logs you in automatically."
+                : "We sent a code to \(email). It logs you in automatically."
+        case .name:
+            return "Other members see your first name (plus a last initial if two members share it)."
+        }
+    }
+
+    // MARK: Steps
+
+    private var chooseStep: some View {
+        VStack(spacing: 24) {
+            SignInWithAppleButton(.continue) { request in
+                request.requestedScopes = [.email, .fullName]
+            } onCompletion: { result in
+                Task { await handleApple(result) }
+            }
+            .signInWithAppleButtonStyle(.white)
+            .frame(width: 560, height: 64)
+            .disabled(submitting)
+
+            Button {
+                show(.email, channel: .email)
+            } label: {
+                Label("Continue with email", systemImage: "envelope")
+                    .font(.system(size: 26, weight: .semibold))
+                    .frame(width: 500)
+            }
+            .disabled(submitting)
+
+            Button {
+                show(.phone, channel: .phone)
+            } label: {
+                Label("Continue with phone", systemImage: "message")
+                    .font(.system(size: 26, weight: .semibold))
+                    .frame(width: 500)
+            }
+            .disabled(submitting)
+        }
+    }
+
+    private var emailStep: some View {
+        VStack(spacing: 24) {
+            TextField("you@example.com", text: $email)
+                .textContentType(.emailAddress)
+                .keyboardType(.emailAddress)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            continueButton(title: "Continue",
+                           disabled: email.trimmingCharacters(in: .whitespaces).isEmpty) {
+                await sendEmailCode()
+            }
+        }
+    }
+
+    private var phoneStep: some View {
+        VStack(spacing: 24) {
+            TextField("(336) 555-1234", text: $phone)
+                .textContentType(.telephoneNumber)
+                .keyboardType(.phonePad)
+            continueButton(title: "Text me a code",
+                           disabled: phone.trimmingCharacters(in: .whitespaces).isEmpty) {
+                await sendPhoneCode()
+            }
+        }
+    }
+
+    private var codeStep: some View {
+        TextField("6-digit code", text: $code)
+            .textContentType(.oneTimeCode)
+            .keyboardType(.numberPad)
+            .font(.system(size: 30, weight: .semibold).monospacedDigit())
+            .multilineTextAlignment(.center)
+            .onChange(of: code) { _, newValue in
+                // Auto-submit once a full 6-digit code is entered.
+                if newValue.filter(\.isNumber).count == 6 && !submitting {
+                    Task { await submitCode() }
+                }
+            }
+    }
+
+    private var nameStep: some View {
+        VStack(spacing: 24) {
+            TextField("First and last name", text: $fullName)
+                .textContentType(.name)
+            continueButton(title: "Create my account",
+                           disabled: fullName.trimmingCharacters(in: .whitespaces).count < 2) {
+                await submitName()
+            }
         }
     }
 
     @ViewBuilder
-    private func sendButton(title: String, sent: Bool, sending: Bool,
-                            disabled: Bool, action: @escaping () async -> Void) -> some View {
-        Button { Task { await action() } } label: {
+    private func continueButton(title: String, disabled: Bool,
+                                action: @escaping () async -> Void) -> some View {
+        Button {
+            Task { await action() }
+        } label: {
             if sending {
                 ProgressView()
-            } else if sent {
-                Label("Sent", systemImage: "checkmark.circle.fill")
             } else {
                 Text(title)
+                    .font(.system(size: 26, weight: .semibold))
+                    .frame(maxWidth: 360)
             }
         }
-        .disabled(disabled || sending)
+        .disabled(disabled || sending || submitting)
+    }
+
+    private func show(_ next: Step, channel newChannel: Channel? = nil) {
+        errorText = nil
+        if let c = newChannel { channel = c }
+        step = next
+    }
+
+    private func goBack() {
+        // From the code screen, back to whichever identifier screen sent it;
+        // from anywhere else, back to the channel chooser.
+        errorText = nil
+        code = ""
+        switch step {
+        case .code where channel == .email: step = .email
+        case .code where channel == .phone: step = .phone
+        default: step = .choose
+        }
+    }
+
+    // MARK: Actions
+
+    private func handleApple(_ result: Result<ASAuthorization, Error>) async {
+        errorText = nil
+        switch result {
+        case .success(let authorization):
+            guard let cred = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let tokenData = cred.identityToken,
+                  let token = String(data: tokenData, encoding: .utf8) else {
+                errorText = "Apple didn't return a sign-in token. Try again."
+                return
+            }
+            // Apple shares the name only on the very FIRST authorization —
+            // pass it through so new signups usually skip the name screen.
+            let name = [cred.fullName?.givenName, cred.fullName?.familyName]
+                .compactMap { $0 }.joined(separator: " ")
+            appleToken = token
+            channel = .apple
+            submitting = true
+            defer { submitting = false }
+            do {
+                switch try await auth.loginWithApple(identityToken: token,
+                                                     fullName: name.isEmpty ? nil : name) {
+                case .success: break   // RootTabView jumps to My Shows
+                case .needsName: show(.name)
+                }
+            } catch API.APIError.badResponse(401) {
+                errorText = "That Apple ID isn't linked to a member yet. Pick \"Share My Email\" with the address the owner has on file, or continue with email."
+            } catch API.APIError.badResponse(429) {
+                errorText = "Signups are paused right now. Try again tomorrow."
+            } catch {
+                // 404/403/5xx or no network — distinct from an unrecognized member.
+                errorText = "Couldn't reach sign-in. Check your connection, or continue with email."
+            }
+        case .failure(let error):
+            // Silently ignore a user-initiated cancel; surface anything else.
+            if (error as? ASAuthorizationError)?.code != .canceled {
+                errorText = "Apple sign-in failed. Try again."
+            }
+        }
     }
 
     private func sendPhoneCode() async {
-        sendingPhone = true
+        sending = true
         errorText = nil
-        defer { sendingPhone = false }
+        defer { sending = false }
         do {
             _ = try await API.requestSmsCode(phone: phone.trimmingCharacters(in: .whitespaces))
-            phoneCodeSent = true
+            show(.code)
         } catch {
             errorText = "Couldn't send. Check the number and try again."
         }
     }
 
     private func sendEmailCode() async {
-        sendingEmail = true
+        let trimmed = email.trimmingCharacters(in: .whitespaces)
+        guard trimmed.contains("@") else {
+            errorText = "Enter a valid email first."
+            return
+        }
+        sending = true
         errorText = nil
-        defer { sendingEmail = false }
+        defer { sending = false }
         do {
-            _ = try await API.requestEmailCode(email: email.trimmingCharacters(in: .whitespaces))
-            emailCodeSent = true
+            _ = try await API.requestEmailCode(email: trimmed)
+            show(.code)
         } catch {
             errorText = "Couldn't send. Check the address and try again."
         }
     }
 
-    private func submit() async {
+    private func submitCode() async {
         let trimmedCode = code.trimmingCharacters(in: .whitespaces)
-        let trimmedPhone = phone.trimmingCharacters(in: .whitespaces)
-        let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
-        guard !trimmedPhone.isEmpty || !trimmedEmail.isEmpty else {
-            errorText = "Enter your phone or email above first, then the code."
-            return
-        }
         submitting = true
-        errorText = nil
         defer { submitting = false }
         do {
-            // Phone wins if both are filled — it's the more recent intent.
-            if !trimmedPhone.isEmpty {
-                try await auth.loginWithPhone(phone: trimmedPhone, code: trimmedCode)
+            if channel == .phone {
+                try await auth.loginWithPhone(phone: phone.trimmingCharacters(in: .whitespaces),
+                                              code: trimmedCode)
             } else {
-                try await auth.loginWithEmail(email: trimmedEmail, code: trimmedCode)
+                switch try await auth.loginWithEmail(email: email.trimmingCharacters(in: .whitespaces),
+                                                     code: trimmedCode) {
+                case .success: break
+                case .needsName: show(.name)   // valid signup code, no account yet
+                }
             }
-            // Close the sheet; Home reacts to the new session and opens the list.
-            dismiss()
+        } catch API.APIError.badResponse(429) {
+            errorText = "Too many attempts. Try again in 15 minutes."
+            code = ""
         } catch {
             errorText = "Invalid or expired code. Try again."
             code = ""
+        }
+    }
+
+    private func submitName() async {
+        let name = fullName.trimmingCharacters(in: .whitespaces)
+        guard name.count >= 2 else { return }
+        submitting = true
+        defer { submitting = false }
+        do {
+            if channel == .apple, let token = appleToken {
+                switch try await auth.loginWithApple(identityToken: token, fullName: name) {
+                case .success: break
+                case .needsName: errorText = "Something went wrong — try Apple sign-in again."
+                }
+            } else {
+                try await auth.enroll(email: email.trimmingCharacters(in: .whitespaces),
+                                      code: code.trimmingCharacters(in: .whitespaces),
+                                      fullName: name)
+            }
+        } catch API.APIError.badResponse(409) {
+            errorText = "That email already belongs to a member — go back and log in."
+        } catch API.APIError.badResponse(429) {
+            errorText = "Signups are paused right now. Try again tomorrow."
+        } catch API.APIError.badResponse(403) {
+            errorText = "Signups are closed right now."
+        } catch {
+            errorText = "Couldn't create your account. Try again."
         }
     }
 }

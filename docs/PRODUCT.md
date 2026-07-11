@@ -42,7 +42,7 @@ The network dropdown lists only the modern streaming-service brand (HBO Max, Par
 
 ## Authentication
 
-A member logs in with a one-time code sent to their phone (SMS via Twilio Verify) or email (via Resend, validated against `login_otps`), or with Sign in with Apple (iOS app). All paths resolve to an existing member and set a 30-day HttpOnly session cookie. There are no static per-member passwords.
+A member logs in with a one-time code sent to their phone (SMS via Twilio Verify) or email (via Resend, validated against `login_otps`), or with Sign in with Apple (web, iOS, and tvOS). All paths resolve to an existing member and set a 30-day HttpOnly session cookie. There are no static per-member passwords.
 
 Failed logins are rate-limited: 5 attempts per IP in any 15-minute window returns a 429 with `Retry-After`. Failed-login rows are pruned daily.
 

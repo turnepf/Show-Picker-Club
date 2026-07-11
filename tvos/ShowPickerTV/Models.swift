@@ -55,7 +55,13 @@ struct AuthCheckResponse: Codable {
 struct LoginResponse: Codable {
     let success: Bool?
     let slug: String?
+    let needsName: Bool?
     let error: String?
+
+    enum CodingKeys: String, CodingKey {
+        case success, slug, error
+        case needsName = "needs_name"
+    }
 }
 
 // /auth/request-code reply.
