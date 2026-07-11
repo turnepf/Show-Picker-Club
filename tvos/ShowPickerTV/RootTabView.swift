@@ -55,7 +55,12 @@ struct RootTabView: View {
         .task { await auth.refresh() }
         // Land on My Shows right after signing in; fall back to Home on logout.
         .onChange(of: auth.memberSlug) { _, slug in
-            selection = slug != nil ? .mine : .home
+            guard slug != nil else { selection = .home; return }
+            // Signing in also INSERTS the My Shows tab. Selecting it in the
+            // same update as the insertion can leave the fresh tab rendering
+            // empty on tvOS — let the TabView commit the new tab first, then
+            // switch to it.
+            Task { @MainActor in selection = .mine }
         }
     }
 }
