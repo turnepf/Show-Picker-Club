@@ -1,11 +1,11 @@
 import SwiftUI
 
-// Add a brand-new show from the TV: type a few characters, pick the exact
-// title from TMDB type-ahead results (poster tiles), then choose a list.
-// The pick pins the TMDB entry so server-side enrichment (genres, cast,
-// dates, network URL) can't mismatch — which is what makes remote-keyboard
-// entry workable: 3-4 characters and a click, not a full typed title.
-// Notes / recommender stay phone-and-web things; they can be edited later.
+// Add a brand-new show from the TV: results appear live while typing (the
+// tvOS .searchable layout keeps the keyboard and grid on screen together —
+// a plain TextField's full-screen keyboard would hide them). Picking a
+// result pushes the list choice; the pick pins the TMDB entry so
+// server-side enrichment (genres, cast, dates, network URL) can't
+// mismatch. Notes / recommender stay phone-and-web edits.
 struct AddShowView: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -22,59 +22,23 @@ struct AddShowView: View {
     private let columns = Array(repeating: GridItem(.fixed(220), spacing: 40), count: 5)
 
     var body: some View {
-        ZStack {
-            Theme.background.ignoresSafeArea()
-
-            VStack(spacing: 36) {
-                Text("Add a show")
-                    .font(.system(size: 48, weight: .bold))
-                    .foregroundColor(Theme.text)
-                    .padding(.top, 40)
-
-                if let picked {
-                    pickedStep(picked)
+        NavigationStack {
+            ScrollView {
+                if hits.isEmpty {
+                    Text(query.trimmingCharacters(in: .whitespaces).count >= 2
+                         ? "No matches yet — keep typing."
+                         : "Type a show or movie title — results appear as you type.")
+                        .font(.system(size: 26))
+                        .foregroundColor(Theme.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 120)
                 } else {
-                    searchStep
-                }
-
-                if let errorText {
-                    Text(errorText)
-                        .font(.system(size: 22))
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                }
-
-                Button("Cancel") { dismiss() }
-                    .font(.system(size: 24))
-                    .disabled(working)
-                    .padding(.bottom, 40)
-            }
-            .padding(.horizontal, 60)
-        }
-        // Debounced TMDB lookup: .task(id:) cancels the in-flight search on
-        // every keystroke, so only the pause-after-typing one hits the network.
-        .task(id: query) { await search() }
-    }
-
-    // MARK: Steps
-
-    private var searchStep: some View {
-        VStack(spacing: 28) {
-            TextField("Start typing a title…", text: $query)
-                .font(.system(size: 30))
-                .frame(maxWidth: 900)
-
-            if hits.isEmpty {
-                Text(query.trimmingCharacters(in: .whitespaces).count >= 2
-                     ? "No matches yet — keep typing."
-                     : "Type a couple of characters and pick the show from the results.")
-                    .font(.system(size: 24))
-                    .foregroundColor(Theme.muted)
-            } else {
-                ScrollView {
                     LazyVGrid(columns: columns, alignment: .leading, spacing: 50) {
                         ForEach(hits) { hit in
-                            Button { picked = hit } label: {
+                            Button {
+                                errorText = nil
+                                picked = hit
+                            } label: {
                                 ShowCard(title: hit.title,
                                          subtitle: hit.metaText,
                                          posterUrl: hit.posterUrl)
@@ -82,35 +46,53 @@ struct AddShowView: View {
                             .buttonStyle(PushButtonStyle())
                         }
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 30)
+                    .padding(.horizontal, 60)
+                    .padding(.vertical, 40)
                 }
-                .focusSection()
+            }
+            .background(Theme.background.ignoresSafeArea())
+            .navigationTitle("Add a show")
+            .searchable(text: $query, prompt: "Show or movie title")
+            .navigationDestination(item: $picked) { hit in
+                confirmStep(hit)
             }
         }
+        // Debounced TMDB lookup: .task(id:) cancels the in-flight search on
+        // every keystroke, so only the pause-after-typing one hits the network.
+        .task(id: query) { await search() }
     }
 
-    private func pickedStep(_ hit: TitleHit) -> some View {
-        VStack(spacing: 28) {
-            ShowCard(title: hit.title,
-                     subtitle: hit.metaText,
-                     posterUrl: hit.posterUrl)
-                .frame(width: 220, height: 330)
+    // Which list gets the picked show. Menu pops back to the results.
+    private func confirmStep(_ hit: TitleHit) -> some View {
+        ZStack {
+            Theme.background.ignoresSafeArea()
 
-            Text("Add “\(hit.title)” to…")
-                .font(.system(size: 28, weight: .semibold))
-                .foregroundColor(Theme.text)
+            VStack(spacing: 28) {
+                ShowCard(title: hit.title,
+                         subtitle: hit.metaText,
+                         posterUrl: hit.posterUrl)
+                    .frame(width: 220, height: 330)
 
-            HStack(spacing: 24) {
-                ForEach(ShowList.allCases) { l in
-                    Button(l.title) { Task { await add(to: l) } }
-                        .disabled(working)
+                Text("Add “\(hit.title)” to…")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundColor(Theme.text)
+
+                HStack(spacing: 24) {
+                    ForEach(ShowList.allCases) { l in
+                        Button(l.title) { Task { await add(to: l) } }
+                            .disabled(working)
+                    }
+                }
+
+                if let errorText {
+                    Text(errorText)
+                        .font(.system(size: 22))
+                        .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 900)
                 }
             }
-
-            Button("Not this one — back to results") { picked = nil; errorText = nil }
-                .font(.system(size: 22))
-                .disabled(working)
+            .padding(.horizontal, 60)
         }
     }
 
@@ -118,7 +100,6 @@ struct AddShowView: View {
 
     private func search() async {
         let q = query.trimmingCharacters(in: .whitespaces)
-        guard picked == nil else { return }
         guard q.count >= 2 else { hits = []; return }
         try? await Task.sleep(nanoseconds: 300_000_000)
         if Task.isCancelled { return }
