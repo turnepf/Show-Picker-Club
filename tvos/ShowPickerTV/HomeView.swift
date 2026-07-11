@@ -35,7 +35,13 @@ struct HomeView: View {
                         .padding(.top, 40)
                     } else {
                         popularShelf
-                        membersSection
+                        // The roster endpoint is public (the web landing page
+                        // renders it), but member show lists 401 without a
+                        // session — tapping a member while logged out is a
+                        // guaranteed dead end, so Members waits for sign-in.
+                        if auth.isLoggedIn {
+                            membersSection
+                        }
 
                         // Attribution required by the TMDB API terms; OMDb
                         // credited alongside since IMDb ratings come through it.
