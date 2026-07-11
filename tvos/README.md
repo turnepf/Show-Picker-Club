@@ -51,4 +51,4 @@ the same way for both TestFlight and a public App Store release.
 
 - **No poster art yet.** The backend stores text + URLs, not images, so shows render as colored title tiles. To make it look like a "real" TV app, add a `poster_url` to the `shows` table and populate it from TMDB/Watchmode (both already in the pipeline). The `ShowCard` view is built to drop in a poster image without changing callers.
 - **Deep links are best-effort.** "Watch on …" opens the streaming service's universal link; whether it lands inside that service's tvOS app vs. prompting depends on the app being installed and the service honoring universal links. The `play.hbomax.com` / `watch.amazon.com` URLs the web cleanup produced are what power this.
-- **View-only by design.** No login, no editing. If editing on TV is ever wanted, the right pattern is phone-pairing, not a remote keyboard.
+- **Sign in with Apple uses the box's Apple ID.** tvOS authorizes with an Apple ID already signed into the Apple TV — there's no way to type a different one. On a shared TV, everyone else signs in with the email/phone code flows.

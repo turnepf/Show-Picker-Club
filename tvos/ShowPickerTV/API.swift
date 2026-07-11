@@ -49,6 +49,20 @@ enum API {
         try await sendJSON(path, method: "POST", body: body)
     }
 
+    // POST and decode the reply regardless of HTTP status, for endpoints that
+    // speak through an error field ({ error: "rate_limited" }) instead of
+    // bare status codes.
+    private static func postDecoding<T: Decodable>(_ path: String, body: [String: Any]) async throws -> T {
+        guard let url = URL(string: baseString + path) else { throw APIError.badURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(platform, forHTTPHeaderField: "X-Client-Platform")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, _) = try await URLSession.shared.data(for: req)
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
     // MARK: Auth
 
     static func checkAuth() async -> AuthCheckResponse {
@@ -61,6 +75,25 @@ enum API {
 
     static func loginWithPhone(phone: String, code: String) async throws -> LoginResponse {
         try await postJSON("/auth/login", body: ["code": code, "phone": phone])
+    }
+
+    // Sign in with Apple: hand the verified identity token to the server, which
+    // maps it to an existing member and sets the session cookie. With
+    // self-enroll on, an unrecognized identity gets { needs_name: true } —
+    // re-post the same token with fullName to create the account (Apple only
+    // gives the name to the client, and only on first authorization).
+    static func loginWithApple(identityToken: String, fullName: String? = nil) async throws -> LoginResponse {
+        var body: [String: Any] = ["identity_token": identityToken]
+        if let fullName, !fullName.isEmpty { body["full_name"] = fullName }
+        return try await postJSON("/auth/apple", body: body)
+    }
+
+    // Complete an email self-enrollment: /auth/login answered { needs_name }
+    // for this email+code, and now we have the person's name. Creates the
+    // member and sets the session cookie. Throws badResponse(401) invalid
+    // code, (409) already a member, (403) signups closed, (429) paused.
+    static func enroll(email: String, code: String, fullName: String) async throws -> LoginResponse {
+        try await postJSON("/auth/enroll", body: ["email": email, "code": code, "full_name": fullName])
     }
 
     // Server replies 200 even for unknown numbers/addresses (account-enumeration
@@ -77,6 +110,22 @@ enum API {
         return r.success == true
     }
 
+    // Self-service account deletion (App Store 5.1.1(v)) — two-step hard
+    // delete, decoded regardless of HTTP status so the UI can speak to the
+    // server's error (no_email / admin_must_demote_first / invalid /
+    // rate_limited) instead of a bare status code.
+
+    // Step 1: email a deletion code to the member's primary address.
+    static func requestAccountDeleteCode() async throws -> AccountDeleteResponse {
+        try await postDecoding("/api/account-delete", body: [:])
+    }
+
+    // Step 2: verify the code and hard-delete the account. On { deleted: true }
+    // the server has already cleared the session cookie.
+    static func confirmAccountDelete(code: String) async throws -> AccountDeleteResponse {
+        try await postDecoding("/api/account-delete", body: ["code": code])
+    }
+
     static func logout() async {
         guard let url = URL(string: baseString + "/auth/logout") else { return }
         var req = URLRequest(url: url)
@@ -88,10 +137,14 @@ enum API {
 
     // Add a show to the logged-in member's list. The server scopes the insert
     // to the session's member, so we don't pass a slug — this always lands on
-    // *my* list. Used to copy a popular / another member's show onto your own.
+    // *my* list. Used to copy a popular / another member's show onto your own,
+    // and (with a tmdbId/tmdbType pick from title search) to add a brand-new
+    // show — the server enriches that exact TMDB entry instead of re-guessing
+    // from the title.
     @discardableResult
     static func addShow(title: String, network: String?, networkUrl: String?,
-                        list: String, movie: Bool, fullSeries: Bool) async throws -> Show {
+                        list: String, movie: Bool, fullSeries: Bool,
+                        tmdbId: Int? = nil, tmdbType: String? = nil) async throws -> Show {
         var body: [String: Any] = [
             "title": title,
             "list": list,
@@ -100,8 +153,23 @@ enum API {
         ]
         if let network, !network.isEmpty { body["network"] = network }
         if let networkUrl, !networkUrl.isEmpty { body["network_url"] = networkUrl }
+        if let tmdbId { body["tmdb_id"] = tmdbId }
+        if let tmdbType { body["tmdb_type"] = tmdbType }
         let r: ShowResponse = try await sendJSON("/api/shows", method: "POST", body: body)
         return r.show
+    }
+
+    // Type-ahead title search while adding a show. Session-gated TMDB proxy;
+    // an empty result list means "let them type freely".
+    static func titleSearch(_ q: String) async throws -> [TitleHit] {
+        // URLComponents escapes &/=/# in the value (.urlQueryAllowed wouldn't,
+        // truncating titles like "Law & Order"); "+" needs one extra step so
+        // URLSearchParams server-side doesn't read it as a space.
+        var comps = URLComponents()
+        comps.queryItems = [URLQueryItem(name: "q", value: q)]
+        let query = (comps.percentEncodedQuery ?? "").replacingOccurrences(of: "+", with: "%2B")
+        let r: TitleSearchResponse = try await get("/api/title-search?\(query)")
+        return r.results
     }
 
     // Move one of my own shows to another list.

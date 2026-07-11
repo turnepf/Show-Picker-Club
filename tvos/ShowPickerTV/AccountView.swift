@@ -4,6 +4,7 @@ import SwiftUI
 // signed in. Signing in flips RootTabView over to the My Shows tab.
 struct AccountView: View {
     @EnvironmentObject private var auth: AuthStore
+    @State private var showingDelete = false
 
     var body: some View {
         if auth.isLoggedIn {
@@ -24,7 +25,12 @@ struct AccountView: View {
                     Button("Log out") { Task { await auth.logout() } }
                         .font(.system(size: 26, weight: .semibold))
                         .padding(.top, 12)
+                    Button("Delete account…", role: .destructive) { showingDelete = true }
+                        .font(.system(size: 22))
                 }
+            }
+            .fullScreenCover(isPresented: $showingDelete) {
+                DeleteAccountView()
             }
         } else {
             LoginView()

@@ -24,13 +24,19 @@ final class AuthStore: ObservableObject {
         checked = true
     }
 
-    func loginWithEmail(email: String, code: String) async throws {
+    // How a login attempt resolved: a session was issued, or (self-enroll)
+    // the server wants a name before creating the account.
+    enum LoginResult { case success, needsName }
+
+    @discardableResult
+    func loginWithEmail(email: String, code: String) async throws -> LoginResult {
         let r = try await API.loginWithEmail(email: email, code: code)
+        if r.needsName == true { return .needsName }
         if r.success == true {
             await refresh()
-        } else {
-            throw API.APIError.badResponse(401)
+            return .success
         }
+        throw API.APIError.badResponse(401)
     }
 
     func loginWithPhone(phone: String, code: String) async throws {
@@ -42,8 +48,37 @@ final class AuthStore: ObservableObject {
         }
     }
 
+    func loginWithApple(identityToken: String, fullName: String? = nil) async throws -> LoginResult {
+        let r = try await API.loginWithApple(identityToken: identityToken, fullName: fullName)
+        if r.needsName == true { return .needsName }
+        if r.success == true {
+            await refresh()
+            return .success
+        }
+        throw API.APIError.badResponse(401)
+    }
+
+    // Finish an email self-enrollment (the /auth/login step answered
+    // needsName). Creates the account and signs it in.
+    func enroll(email: String, code: String, fullName: String) async throws {
+        let r = try await API.enroll(email: email, code: code, fullName: fullName)
+        if r.success == true {
+            await refresh()
+        } else {
+            throw API.APIError.badResponse(401)
+        }
+    }
+
     func logout() async {
         await API.logout()
+        memberSlug = nil
+        email = nil
+        isAdmin = false
+    }
+
+    // Drop local state after the server already destroyed the session
+    // (account deletion) — no logout round-trip needed.
+    func clearLocalSession() {
         memberSlug = nil
         email = nil
         isAdmin = false

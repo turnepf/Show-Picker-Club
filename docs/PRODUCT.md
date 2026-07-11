@@ -42,11 +42,11 @@ The network dropdown lists only the modern streaming-service brand (HBO Max, Par
 
 ## Authentication
 
-A member logs in with a one-time code sent to their phone (SMS via Twilio Verify) or email (via Resend, validated against `login_otps`), or with Sign in with Apple (iOS app). All paths resolve to an existing member and set a 30-day HttpOnly session cookie. There are no static per-member passwords.
+A member logs in with a one-time code sent to their phone (SMS via Twilio Verify) or email (via Resend, validated against `login_otps`), or with Sign in with Apple (web, iOS, and tvOS). All paths resolve to an existing member and set a 30-day HttpOnly session cookie. There are no static per-member passwords.
 
 Failed logins are rate-limited: 5 attempts per IP in any 15-minute window returns a 429 with `Retry-After`. Failed-login rows are pruned daily.
 
-Anyone can browse any member's lists without logging in. Only the logged-in member can edit their own list. Suggesting a show to another member also requires a session.
+The member roster and Trending are public, but browsing a member's lists requires a session (the server 401s member reads without one). Only the logged-in member can edit their own list.
 
 ## Home page
 
@@ -81,7 +81,7 @@ Logged in as yourself, every row gets Edit and Archive buttons inline. Editing r
 
 ## Native apps
 
-Alongside the web app / PWA there are native iOS, tvOS, and watchOS clients. The watchOS app (paired to the iPhone) shows the four lists → shows → detail; its session is handed off from the phone, and reads are public.
+Alongside the web app / PWA there are native iOS, tvOS, and watchOS clients. The watchOS app (paired to the iPhone) shows the four lists → shows → detail; its session is handed off from the phone, and member reads depend on that handed-off session (they are not public).
 
 ## Sort and toggle controls
 
