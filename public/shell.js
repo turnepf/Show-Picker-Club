@@ -105,8 +105,8 @@
   var LISTS = [
     { list: 'watching', label: 'Watching', icon: 'play-circle' },
     { list: 'waiting', label: 'Awaiting', icon: 'hourglass' },
-    { list: 'recommending', label: 'Recommending', icon: 'thumbsup' },
-    { list: 'next', label: 'Up Next', icon: 'text-plus' },
+    { list: 'recommending', label: 'Loved', icon: 'thumbsup' },
+    { list: 'next', label: 'Next Up', icon: 'text-plus' },
   ];
 
   // Operator pages, in the same order as the old top pill nav (Reporting

@@ -134,7 +134,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
 
     // Premiere of the next season ("6/1"); nil without a premiere date.
     // Used on the Watching/Awaiting list rows. Deliberately just the one
-    // date — the finale date stays off "Next up" everywhere.
+    // date — the finale date stays off "Next episode" everywhere.
     public var nextUpRange: String? {
         monthDay(nextSeasonDate)
     }

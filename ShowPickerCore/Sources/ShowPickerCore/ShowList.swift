@@ -11,8 +11,8 @@ public enum ShowList: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .watching: return "Watching"
         case .waiting: return "Awaiting"
-        case .recommending: return "Recommending"
-        case .next: return "Up Next"
+        case .recommending: return "Loved"
+        case .next: return "Next Up"
         }
     }
 }

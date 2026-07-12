@@ -11,7 +11,7 @@ const VALID_STATUS = new Set(['subscribed', 'paused', 'cancelled']);
 //   keep      — actively watching something here now
 //   pause     — nothing watching, but a waiting show has a known future season
 //   pause_tba — waiting shows, but no announced next-season date yet
-//   start     — only "up next" shows: start one or skip the service
+//   start     — only "next up" shows: start one or skip the service
 //   cancel    — only finished/recommending shows; nothing pulls you back
 function computeVerdict(s) {
   if (s.watching > 0) {

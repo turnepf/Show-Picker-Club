@@ -2,10 +2,10 @@ import SwiftUI
 
 // One-tap list promotions, mirroring the web's quick-action buttons that keep
 // the four lists honest:
-//   Watching      → "Watched" (Recommending) / "Season Done" (Waiting)
+//   Watching      → "Watched" (Loved) / "Season Done" (Waiting)
 //   Waiting       → "Watching"
-//   Recommending  → "Watching"
-//   Up Next       → "Start watching"
+//   Loved         → "Watching"
+//   Next Up       → "Start watching"
 // Used by MemberView (leading swipe actions) and ShowDetailView (a Move
 // section), so the same moves work with or without the gesture.
 struct ListPromotion: Identifiable {
@@ -21,7 +21,7 @@ func listPromotions(for list: ShowList) -> [ListPromotion] {
     switch list {
     case .watching:
         return [
-            ListPromotion(label: "Watched", detailLabel: "Watched it → Recommending",
+            ListPromotion(label: "Watched", detailLabel: "Watched it → Loved",
                           systemImage: "checkmark.circle.fill", target: .recommending, tint: .purple),
             ListPromotion(label: "Season Done", detailLabel: "Season done → Awaiting",
                           systemImage: "hourglass", target: .waiting, tint: .blue),

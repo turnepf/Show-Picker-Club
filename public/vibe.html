@@ -161,10 +161,10 @@
       </div>
       <label for="addList">Which list?</label>
       <select id="addList">
-        <option value="next">Up Next</option>
+        <option value="next">Next Up</option>
         <option value="watching">Watching</option>
         <option value="waiting">Waiting</option>
-        <option value="recommending">Recommending</option>
+        <option value="recommending">Loved</option>
       </select>
       <label for="addNotes">Notes (optional)</label>
       <textarea id="addNotes" rows="2" placeholder="e.g. Started season 2 already"></textarea>
@@ -227,7 +227,7 @@
         ? `<a href="${escapeHtml(safeUrl(p.network_url))}" target="_blank" rel="noopener">${escapeHtml(p.network || fmtUrl(p.network_url))}</a>`
         : escapeHtml(p.network || '');
       const rating = p.rating ? ` &middot; <span class="pick-rating">&#9733;${escapeHtml(p.rating)}</span>` : '';
-      const listTag = p.list ? ` <span class="pick-list-tag">(${escapeHtml(p.list === 'next' ? 'Up Next' : p.list)})</span>` : '';
+      const listTag = p.list ? ` <span class="pick-list-tag">(${escapeHtml(p.list === 'next' ? 'Next Up' : p.list)})</span>` : '';
 
       const detailLines = [];
       if (p.genres) detailLines.push(`<div class="pick-detail-line"><span class="pick-detail-key">Genre:</span><span>${escapeHtml(p.genres)}</span></div>`);

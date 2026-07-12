@@ -18,8 +18,8 @@ Every member has exactly four lists. They are intentionally narrow and force a c
 |----------------|------------------------------------------------------------|--------|
 | **Watching**   | Currently watching a season or movie.                      | Green  |
 | **Awaiting**   | Finished the current season; waiting on the next.          | Blue   |
-| **Recommending** | Watched and would recommend; happy to talk about it.    | Purple |
-| **Up Next**    | Heard about it, want to watch — not committed yet.         | Orange |
+| **Loved**      | Watched and loved it; happy to talk about it.              | Purple |
+| **Next Up**    | Heard about it, want to watch — not committed yet.         | Orange |
 
 Shows can also be **Archived** (hidden from lists, kept in DB for de-dupe and history).
 
@@ -27,10 +27,10 @@ Shows can also be **Archived** (hidden from lists, kept in DB for de-dupe and hi
 
 The Watching list has one-tap promotions to keep the lists honest:
 
-- **Watched it →** moves to Recommending.
+- **Watched it →** moves to Loved.
 - **Season done →** moves to Awaiting.
 
-Awaiting and Recommending each have a **back to Watching** button. Up Next has **Start watching**.
+Awaiting and Loved each have a **back to Watching** button. Next Up has **Start watching**.
 
 ## Show data
 
@@ -64,16 +64,16 @@ Tabs across the top for the four lists. Each show row collapses to one line (tit
 
 Two pieces of metadata are **always visible** under the row (not collapsed):
 
-- **Awaiting list:** "Next up: 5/9" — the next premiere date only (the finale date is never shown here). The label is "Next up" rather than "Next season" because midseason episode dates can also appear here.
-- **Up Next list:** "Recommended by Dorothy" — surfaces attribution without an expand.
+- **Awaiting list:** "Next episode: 5/9" — the next premiere date only (the finale date is never shown here). The label is "Next episode" rather than "Next season" because midseason episode dates can also appear here.
+- **Next Up list:** "Recommended by Dorothy" — surfaces attribution without an expand.
 
 ### Suggest a show
 
-Any logged-in member can suggest a show to any other member via the **Suggest a Show for ...** button at the bottom of any list. The suggestion lands on that member's Up Next list with the recommender attribution pre-filled and "Suggested · &lt;your notes&gt;" prepended to the notes.
+Any logged-in member can suggest a show to any other member via the **Suggest a Show for ...** button at the bottom of any list. The suggestion lands on that member's Next Up list with the recommender attribution pre-filled and "Suggested · &lt;your notes&gt;" prepended to the notes.
 
 ### Share to another list / member
 
-The **+** button on any show row opens a share modal. The original member can copy the show to their own other list (rare) or to any other member's Up Next. The whole show — including rating, network link, cast, and notes — carries over.
+The **+** button on any show row opens a share modal. The original member can copy the show to their own other list (rare) or to any other member's Next Up. The whole show — including rating, network link, cast, and notes — carries over.
 
 ### Edit, archive
 
@@ -140,7 +140,7 @@ A taste-profile view. Pick any member from the dropdown to see:
 - **Top and bottom trait signals** — the dimensions where they index highest and lowest vs the club mean, with little bars.
 - **Cluster blend** — top three clusters they pattern-match against, with similarity scores.
 - **Balance reads** — warmth vs darkness, cynicism vs optimism, etc.
-- **Aligned shows** — picks from their own library that score highest on their dominant traits, grouped by list. One-tap add to your own Up Next.
+- **Aligned shows** — picks from their own library that score highest on their dominant traits, grouped by list. One-tap add to your own Next Up.
 
 The cluster algorithm and trait list are detailed in [`ARCHITECTURE.md`](ARCHITECTURE.md#vibe-system).
 

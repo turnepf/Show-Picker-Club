@@ -34,7 +34,7 @@ struct Member: Codable, Identifiable, Hashable {
 
     var label: String { displayName ?? firstName ?? name }
 
-    // "Most active" = engaged lists: Watching + Up Next + Recommending.
+    // "Most active" = engaged lists: Watching + Next Up + Loved.
     var activeCount: Int {
         (watchingCount ?? 0) + (nextCount ?? 0) + (recommendingCount ?? 0)
     }
