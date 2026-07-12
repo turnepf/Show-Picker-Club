@@ -12,7 +12,7 @@ public enum ShowList: String, CaseIterable, Identifiable, Sendable {
         case .watching: return "Watching"
         case .waiting: return "Awaiting"
         case .recommending: return "Loved"
-        case .next: return "Up Next"
+        case .next: return "Next Up"
         }
     }
 }

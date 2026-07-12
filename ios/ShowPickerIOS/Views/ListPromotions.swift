@@ -5,7 +5,7 @@ import SwiftUI
 //   Watching      → "Watched" (Loved) / "Season Done" (Waiting)
 //   Waiting       → "Watching"
 //   Loved         → "Watching"
-//   Up Next       → "Start watching"
+//   Next Up       → "Start watching"
 // Used by MemberView (leading swipe actions) and ShowDetailView (a Move
 // section), so the same moves work with or without the gesture.
 struct ListPromotion: Identifiable {

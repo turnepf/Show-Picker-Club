@@ -148,7 +148,7 @@ Four hues, one per product list. Tuned for outline pills and quiet accents at th
 - **Sage / Watching** (`oklch(0.58 0.13 150)`, white-text variant `oklch(0.42 0.13 150)`).
 - **Steel / Waiting** (`oklch(0.60 0.09 230)`, white-text variant `oklch(0.40 0.09 230)`).
 - **Clay Rose / Loved** (`oklch(0.55 0.13 340)`, white-text variant `oklch(0.40 0.13 340)`). Also carries the italic "Suggested via" attribution.
-- **Up Next** uses the Brand Orange; its white-text tab variant is `oklch(0.45 0.16 50)`.
+- **Next Up** uses the Brand Orange; its white-text tab variant is `oklch(0.45 0.16 50)`.
 
 ### Tertiary — Semantic
 - **Info Blue** (`oklch(0.55 0.11 230)`): network deep-links.
@@ -255,7 +255,7 @@ reuses that same iPad layout) must present the *same* chrome: a persistent
 left sidebar broken into the same inset-grouped sections, in the same order —
 
 1. **My Shows** (the focused member's four lists: Watching, Awaiting,
-   Loved, Up Next),
+   Loved, Next Up),
 2. an unlabeled **discovery + account group** (Trending, What's New,
    Subscription audit, Admin), and
 3. **Members** (the roster, most-recently-active first),

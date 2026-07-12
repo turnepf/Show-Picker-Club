@@ -1183,7 +1183,7 @@
           </a>
           <a class="ios-item hidden home-list-row" data-list="next" href="#">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-text-plus"/></svg></span>
-            <span class="ios-item-label">Up Next</span>
+            <span class="ios-item-label">Next Up</span>
           </a>
           <button id="homeLoginRow" class="ios-item" onclick="login()">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-person-plus"/></svg></span>
@@ -1286,7 +1286,7 @@
         </button>
         <button class="ios-item side-list-row" data-list="next" onclick="switchTab('next')">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-text-plus"/></svg></span>
-          <span class="ios-item-label">Up Next</span>
+          <span class="ios-item-label">Next Up</span>
         </button>
       </nav>
       <!-- Discovery + account group, kept separate from the lists above:
@@ -1335,7 +1335,7 @@
           <div class="tab active" data-list="watching" onclick="switchTab('watching')">Watching</div>
           <div class="tab" data-list="waiting" onclick="switchTab('waiting')">Awaiting</div>
           <div class="tab" data-list="recommending" onclick="switchTab('recommending')">Loved</div>
-          <div class="tab" data-list="next" onclick="switchTab('next')">Up Next</div>
+          <div class="tab" data-list="next" onclick="switchTab('next')">Next Up</div>
         </div>
         <div class="section-desc" id="sectionDesc"></div>
       </header>
@@ -1436,7 +1436,7 @@
         <div class="list-chip selected" data-value="watching" style="--chip-color: var(--list-watching);" onclick="selectListChip(this)">Watching</div>
         <div class="list-chip" data-value="waiting" style="--chip-color: var(--list-waiting);" onclick="selectListChip(this)">Awaiting</div>
         <div class="list-chip" data-value="recommending" style="--chip-color: var(--list-recommending);" onclick="selectListChip(this)">Loved</div>
-        <div class="list-chip" data-value="next" style="--chip-color: var(--accent);" onclick="selectListChip(this)">Up Next</div>
+        <div class="list-chip" data-value="next" style="--chip-color: var(--accent);" onclick="selectListChip(this)">Next Up</div>
       </div>
 
       <div class="modal-actions">
@@ -1459,7 +1459,7 @@
         <option value="watching">Watching</option>
         <option value="waiting">Awaiting Next Season</option>
         <option value="recommending">Loved</option>
-        <option value="next">Up Next</option>
+        <option value="next">Next Up</option>
       </select>
 
       <label for="addMyNotes">Notes</label>
@@ -1686,7 +1686,7 @@
       return dismiss;
     }
 
-    const LIST_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved', next: 'Up Next' };
+    const LIST_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved', next: 'Next Up' };
 
     // Empty-state copy. own.* is shown when the viewer owns this page; guest.*
     // is shown to anyone else (no CTA, just acknowledges the list is empty).
@@ -1706,7 +1706,7 @@
           help: "Once you've watched something you loved, move it here so the rest of the club sees it.",
         },
         next: {
-          headline: "Your Up Next is empty.",
+          headline: "Your Next Up is empty.",
           help: "Add shows you want to watch later, or wait for picks and suggestions from other members.",
           cta: { label: 'Add a show', action: 'openAddModal()' },
         },
@@ -1715,7 +1715,7 @@
         watching:   (name) => `${name} isn't watching anything right now.`,
         waiting:    (name) => `${name} isn't awaiting any seasons.`,
         recommending: (name) => `${name} hasn't loved anything yet.`,
-        next:       (name) => `${name}'s Up Next is empty.`,
+        next:       (name) => `${name}'s Next Up is empty.`,
       },
     };
 
@@ -1868,7 +1868,7 @@
 
     // ── iOS-style Home rendering ──────────────────────────────────────
     function memberActiveCount(m) {
-      // "Active" matches the iOS Home rows: Watching + Up Next + Loved.
+      // "Active" matches the iOS Home rows: Watching + Next Up + Loved.
       return (m.watching_count || 0) + (m.recommending_count || 0) + (m.next_count || 0);
     }
 
@@ -1939,7 +1939,7 @@
       try {
         const res = await fetch('/api/members');
         const data = await res.json();
-        // Most active first (Watching + Up Next + Loved), then most
+        // Most active first (Watching + Next Up + Loved), then most
         // recent activity — the same order as the iPhone home screen.
         allHomeMembers = (data.members || []).slice().sort((a, b) => {
           const aa = memberActiveCount(a), ba = memberActiveCount(b);
@@ -2138,7 +2138,7 @@
 
     // Keyboard shortcuts (member page only):
     //   /    focus search
-    //   1-4  switch tabs in order (Watching, Waiting, Loved, Up Next)
+    //   1-4  switch tabs in order (Watching, Waiting, Loved, Next Up)
     //   n    open Add Show modal (own page, logged in)
     //   Esc  close any open modal
     document.addEventListener('keydown', (e) => {
@@ -2734,7 +2734,7 @@
     }
 
 
-    const TAB_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved', next: 'Up Next' };
+    const TAB_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved', next: 'Next Up' };
 
     function updateDesc() {
       const count = shows.filter(s => s.list === currentTab).length;
@@ -2824,7 +2824,7 @@
             dateLine = `<div class="show-sub">${seasons}</div>`;
           }
         } else if (seasons) {
-          // Loved / Up Next have no premiere date, but the total
+          // Loved / Next Up have no premiere date, but the total
           // seasons count is still worth surfacing — mirrors the iOS rows,
           // which show it on every list regardless of next-up date.
           dateLine = `<div class="show-sub">${seasons}</div>`;
@@ -3245,7 +3245,7 @@
         return;
       }
 
-      const labelFor = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved', next: 'Up Next' };
+      const labelFor = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved', next: 'Next Up' };
 
       const meta = `<div class="search-meta">${matches.length} match${matches.length === 1 ? '' : 'es'}</div>`;
       container.innerHTML = meta + matches.map(show => {

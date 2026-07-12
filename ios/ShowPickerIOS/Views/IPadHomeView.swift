@@ -3,7 +3,7 @@ import SwiftUI
 // Purpose-built iPad layout: a compact persistent sidebar beside a detail
 // column that reuses the same MemberView and ShowDetailView screens the iPhone
 // uses. The sidebar leads with the four show lists (Watching, Awaiting,
-// Loved, Up Next) for whichever member is in focus — you by default —
+// Loved, Next Up) for whichever member is in focus — you by default —
 // so the segmented list picker isn't needed on iPad. Members live in a short
 // scrolling window (top five by recent activity visible); tapping one refocuses
 // the lists on them.

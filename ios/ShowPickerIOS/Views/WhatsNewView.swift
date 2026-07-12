@@ -13,7 +13,7 @@ struct WhatsNewView: View {
     }
 
     private let entries: [Entry] = [
-        .init(date: "7/12", title: "Recommending is now Loved.", body: "Same list, better name: shows you've watched and loved. Everything on your Recommending list is already there."),
+        .init(date: "7/12", title: "New list names.", body: "Recommending is now Loved (shows you've watched and loved) and Up Next is now Next Up. Same lists, better names \u{2014} everything on them came along."),
         .init(date: "7/4", title: "Subscription Audit.", body: "Paying for streaming you don't watch? Open the Subscription audit from your member page to see which services to keep, pause, or cancel based on what's actually on your lists. Thanks Roger!"),
         .init(date: "7/2", title: "Pick the right show as you type.", body: "Start typing a title in Add or Suggest and matching shows appear with their posters \u{2014} tap one to lock in the exact match. Its artwork, rating, cast, and season dates come along automatically, and it knows whether it's a show or a movie, so nothing needs fixing later."),
         .init(date: "7/2", title: "See the full poster.", body: "Tap a show's artwork on its detail page to view it full screen."),

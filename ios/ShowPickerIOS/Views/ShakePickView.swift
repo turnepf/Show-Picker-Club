@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Easter egg: shake the phone and we pull a random title from your own Up Next
+// Easter egg: shake the phone and we pull a random title from your own Next Up
 // and tell you to watch it next, with its full detail card below the banner.
 struct ShakePickView: View {
     let show: Show
@@ -16,7 +16,7 @@ struct ShakePickView: View {
                     VStack(spacing: 2) {
                         Text("🎬 Watch this show next")
                             .font(.headline)
-                        Text("Shaken from your Up Next list.")
+                        Text("Shaken from your Next Up list.")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
