@@ -78,7 +78,7 @@ struct ShowDetailView: View {
                         LabeledContent("Watching with", value: w)
                     }
                     if let dates = s.seasonDatesText {
-                        LabeledContent("Next up", value: dates)
+                        LabeledContent("Next episode", value: dates)
                     }
                     if let seasons = s.seasonsText {
                         LabeledContent("Seasons", value: seasons)

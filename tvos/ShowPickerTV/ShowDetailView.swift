@@ -335,11 +335,11 @@ struct ShowDetailView: View {
         .font(.system(size: 24))
     }
 
-    // "Next up: 6/29 · 3 seasons" — the same M/D formatting and seasons
+    // "Next episode: 6/29 · 3 seasons" — the same M/D formatting and seasons
     // count the iOS rows use, instead of raw ISO dates.
     private func seasonLine(_ s: Show) -> String? {
         var parts: [String] = []
-        if let r = s.nextUpRange { parts.append("Next up: \(r)") }
+        if let r = s.nextUpRange { parts.append("Next episode: \(r)") }
         if let seasons = s.seasonsText { parts.append(seasons) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }

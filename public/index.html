@@ -138,7 +138,7 @@
       gap: 8px;
     }
 
-    /* Each show's title row, meta line ("Next up: 6/1") and the
+    /* Each show's title row, meta line ("Next episode: 6/1") and the
        expandable details all live inside a single .show wrapper so the
        divider sits between shows, not between title and meta. */
     .show {
@@ -292,7 +292,7 @@
     .show-actors.visible { display: block; }
     /* Negative margin compensates for the actor-tag's own 8px horizontal
        padding so the first name visually aligns with the other detail
-       lines above ("Western, Drama", "Next up: ...") instead of looking
+       lines above ("Western, Drama", "Next episode: ...") instead of looking
        indented. */
     .actor-list { display: flex; flex-wrap: wrap; gap: 4px; margin-left: -8px; }
     .actor-tag { background: var(--surface); border: 1px solid transparent; padding: 2px 8px; border-radius: 10px; font-size: 12px; text-decoration: none; color: var(--ink-muted); }
@@ -1742,7 +1742,7 @@
         if (show.recommended_by && !opts.skipRecommender) lines.push(`Recommended by ${escapeHtml(show.recommended_by)}`);
         if (show.next_season_date && !opts.skipNextSeason) {
           const seasons = seasonsText(show);
-          lines.push(`Next up: ${formatSeasonRange(show)}${seasons ? ` · ${seasons}` : ''}`);
+          lines.push(`Next episode: ${formatSeasonRange(show)}${seasons ? ` · ${seasons}` : ''}`);
         } else if (!opts.skipNextSeason && seasonsText(show)) {
           // No upcoming date but we know the total — still worth showing.
           lines.push(seasonsText(show));
@@ -1753,7 +1753,7 @@
       return lines.map(l => `<div class="show-detail-line">${l}</div>`).join('');
     }
 
-    // Just the premiere date — the finale date stays off "Next up" everywhere.
+    // Just the premiere date — the finale date stays off "Next episode" everywhere.
     function formatSeasonRange(show) {
       return formatDate(show.next_season_date);
     }
@@ -1791,7 +1791,7 @@
     }
 
     function changeSort(value) {
-      // Per-list so each tab keeps its own sort (Waiting -> Next up, etc.).
+      // Per-list so each tab keeps its own sort (Waiting -> Next episode, etc.).
       localStorage.setItem('sort_order_' + currentTab, value);
       renderShows();
     }
@@ -2771,7 +2771,7 @@
       loading.classList.add('hidden');
 
       // Each list remembers its own sort. Watching and Waiting default to the
-      // "Next up" premiere date (soonest first); the others default to rating.
+      // "Next episode" premiere date (soonest first); the others default to rating.
       const savedSort = localStorage.getItem('sort_order_' + currentTab);
       const dateDefaultTab = currentTab === 'waiting' || currentTab === 'watching';
       const sortOrder = savedSort || (dateDefaultTab ? 'nextup' : 'rating');
@@ -2819,7 +2819,7 @@
         const seasons = seasonsText(show);
         if (currentTab === 'waiting' || currentTab === 'watching') {
           if (show.next_season_date) {
-            dateLine = `<div class="show-sub">📅 Next up: ${formatSeasonRange(show)}${seasons ? ` · ${seasons}` : ''}</div>`;
+            dateLine = `<div class="show-sub">📅 Next episode: ${formatSeasonRange(show)}${seasons ? ` · ${seasons}` : ''}</div>`;
           } else if (seasons) {
             dateLine = `<div class="show-sub">${seasons}</div>`;
           }
@@ -2867,7 +2867,7 @@
       if (countsHtml) container.innerHTML += `<div class="network-counts">${countsHtml}</div>`;
 
       const nextUpOption = dateDefaultTab
-        ? `<option value="nextup"${sortOrder === 'nextup' ? ' selected' : ''}>Sort by Next up</option>`
+        ? `<option value="nextup"${sortOrder === 'nextup' ? ' selected' : ''}>Sort by Next episode</option>`
         : '';
       const sortHtml = `<select class="sort-select" onchange="changeSort(this.value)" aria-label="Sort shows">
         ${nextUpOption}
@@ -3513,7 +3513,7 @@
       // opened this screen. Hidden if I don't have this title.
       if (detailMyCopy && detailMyCopy.recommended_by) rows.push(detailRow('Recommended by', escapeHtml(detailMyCopy.recommended_by)));
       if (detailMyCopy && detailMyCopy.watching_with) rows.push(detailRow('Watching with', escapeHtml(detailMyCopy.watching_with)));
-      if (show.next_season_date) rows.push(detailRow('Next up', escapeHtml(formatSeasonRange(show))));
+      if (show.next_season_date) rows.push(detailRow('Next episode', escapeHtml(formatSeasonRange(show))));
       if (seasonsText(show)) rows.push(detailRow('Seasons', escapeHtml(seasonsText(show))));
 
       let html = '';

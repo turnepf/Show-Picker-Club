@@ -1,12 +1,12 @@
 import SwiftUI
 
-// Mirrors the web sort dropdown: "Next up" (premiere date, Watching/Waiting
+// Mirrors the web sort dropdown: "Next episode" (premiere date, Watching/Waiting
 // only), Rating, A–Z, Date Added. Each list remembers its own choice.
 private enum SortOption: String, CaseIterable {
     case nextup, rating, alpha, added
     var menuLabel: String {
         switch self {
-        case .nextup: return "Sort by Next up"
+        case .nextup: return "Sort by Next episode"
         case .rating: return "Sort by Rating"
         case .alpha:  return "Sort A–Z"
         case .added:  return "Sort by Date Added"
@@ -176,7 +176,7 @@ struct MemberView: View {
     private var sortMenu: some View {
         Menu {
             Picker("Sort", selection: sortSelection) {
-                // "Next up" is only meaningful where premiere dates apply.
+                // "Next episode" is only meaningful where premiere dates apply.
                 if currentList == .watching || currentList == .waiting {
                     Text(SortOption.nextup.menuLabel).tag(SortOption.nextup)
                 }
@@ -227,7 +227,7 @@ struct MemberView: View {
     }
 
     // Same ordering rules as the web: undated shows sink to the bottom on
-    // "Next up", and "Date Added" is newest-first with seed (null-date) rows last.
+    // "Next episode", and "Date Added" is newest-first with seed (null-date) rows last.
     private func sortedItems() -> [Show] {
         let base = shows.filter { $0.list == currentList.rawValue && !$0.isArchived }
         switch currentSort {
@@ -247,10 +247,10 @@ struct MemberView: View {
         }
     }
 
-    // "Next up: 6/1 · 3 seasons" — premiere range plus the seasons count when
+    // "Next episode: 6/1 · 3 seasons" — premiere range plus the seasons count when
     // both are known; either part alone otherwise. nil if neither exists.
     private func nextUpLine(_ s: Show) -> String? {
-        let parts = [s.nextUpRange.map { "Next up: \($0)" }, s.seasonsText].compactMap { $0 }
+        let parts = [s.nextUpRange.map { "Next episode: \($0)" }, s.seasonsText].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 

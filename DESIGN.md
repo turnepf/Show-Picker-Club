@@ -232,7 +232,7 @@ The four-list switcher in the dark header is the system's signature element.
 ### Show Row
 - **Shape:** flex, baseline-aligned, `border-soft` bottom hairline, 7px vertical padding.
 - **Title:** weight 600; when expandable, a dotted underline plus a 16px chevron that rotates 180° and turns accent on expand (0.18s ease-out).
-- **Metadata:** "Next up" dates and "Recommended by" stay always-visible; genre, cast, and notes collapse into the expand. Progressive disclosure, not a modal.
+- **Metadata:** "Next episode" dates and "Recommended by" stay always-visible; genre, cast, and notes collapse into the expand. Progressive disclosure, not a modal.
 
 ### Inputs / Fields
 - **Style:** white fill, 1px `border`, 6px radius, `padding: 10px 12px`. Serif-free; label is a 13px `ink-muted` sans line above.

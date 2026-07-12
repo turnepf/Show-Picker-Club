@@ -200,7 +200,7 @@ Offline/
 | Feature | Status |
 |---|---|
 | Browse popular + members | ✅ |
-| Member's four lists with sort (Next up / Rating / A–Z / Date added) | ✅ |
+| Member's four lists with sort (Next episode / Rating / A–Z / Date added) | ✅ |
 | Show detail (title, network, rating, genres, recommender, notes, cast, dates) | ✅ |
 | Log in with one-time code (text or email) | ✅ (auto-submits on the 6th digit) |
 | Sign in with Apple | ✅ (maps the Apple ID email → existing member; see note) |

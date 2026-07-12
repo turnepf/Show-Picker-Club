@@ -35,7 +35,7 @@ struct WatchDetailView: View {
                 if let n = s.network, !n.isEmpty { row("Network", n) }
                 if let r = s.rating, !r.isEmpty { row("Rating", "★ \(r)") }
                 if let l = ShowList(rawValue: s.list) { row("List", l.title) }
-                if let up = s.nextUpRange { row("Next up", up) }
+                if let up = s.nextUpRange { row("Next episode", up) }
                 if let seasons = s.seasonsText { row("Seasons", seasons) }
                 if s.isMovie { row("Type", "Movie") }
                 if !s.genreList.isEmpty { row("Genres", s.genreList.joined(separator: ", ")) }
