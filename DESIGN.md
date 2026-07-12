@@ -147,7 +147,7 @@ A warm-neutral foundation (hue 50 throughout the neutrals) with a single orange 
 Four hues, one per product list. Tuned for outline pills and quiet accents at the `list-*` lightness; deepened to the `tab-*` variants whenever white text sits on top.
 - **Sage / Watching** (`oklch(0.58 0.13 150)`, white-text variant `oklch(0.42 0.13 150)`).
 - **Steel / Waiting** (`oklch(0.60 0.09 230)`, white-text variant `oklch(0.40 0.09 230)`).
-- **Clay Rose / Recommending** (`oklch(0.55 0.13 340)`, white-text variant `oklch(0.40 0.13 340)`). Also carries the italic "Suggested via" attribution.
+- **Clay Rose / Loved** (`oklch(0.55 0.13 340)`, white-text variant `oklch(0.40 0.13 340)`). Also carries the italic "Suggested via" attribution.
 - **Up Next** uses the Brand Orange; its white-text tab variant is `oklch(0.45 0.16 50)`.
 
 ### Tertiary — Semantic
@@ -245,7 +245,7 @@ The four-list switcher in the dark header is the system's signature element.
 
 ### Empty State
 - **Style:** centered, serif `title` headline + `ink-muted` help line (max 360px) + a pill accent CTA.
-- **Voice:** teaches the list's purpose in the moment ("Once you've watched something worth recommending, move it here"), never a blank "nothing here." Different copy for own page vs. guest view.
+- **Voice:** teaches the list's purpose in the moment ("Once you've watched something you loved, move it here"), never a blank "nothing here." Different copy for own page vs. guest view.
 
 ## 6. Platform Parity (Large Screens)
 
@@ -255,7 +255,7 @@ reuses that same iPad layout) must present the *same* chrome: a persistent
 left sidebar broken into the same inset-grouped sections, in the same order —
 
 1. **My Shows** (the focused member's four lists: Watching, Awaiting,
-   Recommending, Up Next),
+   Loved, Up Next),
 2. an unlabeled **discovery + account group** (Trending, What's New,
    Subscription audit, Admin), and
 3. **Members** (the roster, most-recently-active first),

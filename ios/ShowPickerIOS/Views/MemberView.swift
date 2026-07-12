@@ -194,7 +194,7 @@ struct MemberView: View {
         switch list {
         case .watching:     return "Shows you're actively watching."
         case .waiting:      return "Between seasons — premiere dates show on the calendar feed."
-        case .recommending: return "Shows worth recommending to the club."
+        case .recommending: return "Shows you've watched and loved."
         case .next:         return "Saved to watch later, plus suggestions from others."
         }
     }

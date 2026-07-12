@@ -8,7 +8,7 @@ private enum ShareList: String, CaseIterable, Identifiable {
         switch self {
         case .watching:     return "Watching"
         case .waiting:      return "Awaiting"
-        case .recommending: return "Recommending"
+        case .recommending: return "Loved"
         case .next:         return "Up Next"
         }
     }

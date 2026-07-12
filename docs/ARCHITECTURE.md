@@ -248,7 +248,7 @@ The demo member's data auto-resets (`_shared/demo.js`): each demo sign-in snapsh
 Single-page app. Detects whether `window.location.pathname` is empty (landing) or a slug (member page) and renders accordingly. Major UI surfaces:
 
 - **Landing:** `My Shows` link (logged in), Trending shows shelf, featured Members row + "Browse all members" disclosure, `Search all libraries` button, What's New changelog.
-- **Member page:** title + tabs (Watching, Awaiting, Recommending, Up Next), search button, `+ Add` button (when logged in), per-tab list of show rows with always-visible meta (Next up on Awaiting, Recommended by on Up Next), sort + toggle pills at the bottom, footer with `Curious?` / `Vibe` / `📅 Calendar feed` links.
+- **Member page:** title + tabs (Watching, Awaiting, Loved, Up Next), search button, `+ Add` button (when logged in), per-tab list of show rows with always-visible meta (Next up on Awaiting, Recommended by on Up Next), sort + toggle pills at the bottom, footer with `Curious?` / `Vibe` / `📅 Calendar feed` links.
 - **Modals:** Add/Edit Show, Add to My List (used from Popular and from cross-library search), Search. (Share-to-member and Suggest-a-Show were retired 2026-07.)
 
 State lives in a handful of top-level `let` vars (`shows`, `currentTab`, `isEditor`, `memberSlug`, `authMember`, `searchMode`, etc.). No framework. All API I/O is `fetch()` to relative paths.

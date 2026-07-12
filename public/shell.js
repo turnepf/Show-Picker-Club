@@ -105,7 +105,7 @@
   var LISTS = [
     { list: 'watching', label: 'Watching', icon: 'play-circle' },
     { list: 'waiting', label: 'Awaiting', icon: 'hourglass' },
-    { list: 'recommending', label: 'Recommending', icon: 'thumbsup' },
+    { list: 'recommending', label: 'Loved', icon: 'thumbsup' },
     { list: 'next', label: 'Up Next', icon: 'text-plus' },
   ];
 

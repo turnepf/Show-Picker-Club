@@ -87,7 +87,7 @@ struct SubscriptionAuditView: View {
         if c.watching > 0 { parts.append("\(c.watching) watching") }
         if c.waiting > 0 { parts.append("\(c.waiting) waiting") }
         if c.next > 0 { parts.append("\(c.next) up next") }
-        if c.recommending > 0 { parts.append("\(c.recommending) rec'd") }
+        if c.recommending > 0 { parts.append("\(c.recommending) loved") }
         return parts.joined(separator: " · ")
     }
 

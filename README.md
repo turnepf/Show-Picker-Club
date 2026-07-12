@@ -1,6 +1,6 @@
 # Show Picker Club
 
-A shared TV-show and movie tracker for a small club. Each member maintains four ranked lists (Watching, Awaiting, Recommending, Up Next); the home page surfaces what everyone is watching and exposes a per-member iCalendar feed for upcoming premiere dates.
+A shared TV-show and movie tracker for a small club. Each member maintains four ranked lists (Watching, Awaiting, Loved, Up Next); the home page surfaces what everyone is watching and exposes a per-member iCalendar feed for upcoming premiere dates.
 
 Live at [showpicker.club](https://showpicker.club).
 

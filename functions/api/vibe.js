@@ -5,7 +5,7 @@ import { getSession } from '../_shared/auth.js';
 
 const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
 
-// Per-list weights for the fingerprint. Recommending = strongest endorsement;
+// Per-list weights for the fingerprint. Loved = strongest endorsement;
 // Up Next = weakest (curiosity, not commitment). Archived rows are ignored.
 const LIST_WEIGHT = { recommending: 1.0, watching: 0.8, waiting: 0.6, next: 0.3 };
 

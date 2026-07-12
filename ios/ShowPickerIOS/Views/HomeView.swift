@@ -254,7 +254,7 @@ struct HomeView: View {
         async let p = try? await API.popular()
         let mr = (await m) ?? []
         let pr = (await p) ?? []
-        // Most active first — Watching + Up Next + Recommending — then most
+        // Most active first — Watching + Up Next + Loved — then most
         // recent activity as a tiebreaker so the preview surfaces live members.
         members = mr.sorted {
             if $0.activeCount != $1.activeCount { return $0.activeCount > $1.activeCount }

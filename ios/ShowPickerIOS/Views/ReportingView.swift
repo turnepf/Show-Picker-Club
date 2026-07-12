@@ -52,7 +52,7 @@ struct ReportingView: View {
                     metric("Archived shows", r.totals.archivedShows)
                     metric("Watching", r.totals.watching)
                     metric("Awaiting", r.totals.waiting)
-                    metric("Recommending", r.totals.recommending)
+                    metric("Loved", r.totals.recommending)
                     metric("Up Next", r.totals.next)
                 }
                 if !r.topNetworks.isEmpty {

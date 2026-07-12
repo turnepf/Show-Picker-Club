@@ -18,7 +18,7 @@ Every member has exactly four lists. They are intentionally narrow and force a c
 |----------------|------------------------------------------------------------|--------|
 | **Watching**   | Currently watching a season or movie.                      | Green  |
 | **Awaiting**   | Finished the current season; waiting on the next.          | Blue   |
-| **Recommending** | Watched and would recommend; happy to talk about it.    | Purple |
+| **Loved**      | Watched and loved it; happy to talk about it.              | Purple |
 | **Up Next**    | Heard about it, want to watch — not committed yet.         | Orange |
 
 Shows can also be **Archived** (hidden from lists, kept in DB for de-dupe and history).
@@ -27,10 +27,10 @@ Shows can also be **Archived** (hidden from lists, kept in DB for de-dupe and hi
 
 The Watching list has one-tap promotions to keep the lists honest:
 
-- **Watched it →** moves to Recommending.
+- **Watched it →** moves to Loved.
 - **Season done →** moves to Awaiting.
 
-Awaiting and Recommending each have a **back to Watching** button. Up Next has **Start watching**.
+Awaiting and Loved each have a **back to Watching** button. Up Next has **Start watching**.
 
 ## Show data
 
