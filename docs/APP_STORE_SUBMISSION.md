@@ -133,6 +133,50 @@ tracking, so no App Tracking Transparency prompt is presented.
 ```
 (Fill in the real demo email/code — keep them out of git.)
 
+**Self-enroll variant** — with `SELF_ENROLL` on, Apple sign-in creates a
+fresh account instead of landing in the demo, so use this wording:
+
+```
+This is an invitation-only TV-show club. New members can also self-enroll.
+
+To sign in, either:
+  • Tap "Sign in with Apple" — you'll be asked for a name and a new
+    account is created for you.
+  • Or use the demo login on the same screen (a pre-populated account):
+      Email: <DEMO_LOGIN_EMAIL>
+      Code:  <DEMO_LOGIN_CODE>
+
+The demo code is entered in the app's own login screen (it is a fixed
+code, not sent by email).
+
+The app does not track users: no advertising, data brokers, or cross-app
+tracking, so no App Tracking Transparency prompt is presented.
+```
+
+## 5a. App Store Connect gotchas (hit during the July 2026 resubmission)
+
+- [ ] **Demo secrets have no trailing newline** — set them with `printf`,
+      never `echo`. `login.js` compares the code exactly, so a newline in
+      `DEMO_LOGIN_CODE` makes every login fail. Secrets only take effect on
+      the **next deployment** — redeploy after setting them
+      (`wrangler pages deploy public --project-name=shows --branch=main
+      --commit-dirty=true`, or re-run the deploy workflow).
+- [ ] **App Privacy label**: every collected data type (Name, Email, Phone,
+      Other User Content) reads *App Functionality* + *Linked to the user's
+      identity*, nothing under tracking — identical to the
+      `PrivacyInfo.xcprivacy` manifests. Edits sit as drafts: hit
+      **Publish** or they don't count.
+- [ ] **Apple TV privacy policy is pasted TEXT, not a URL** (tvOS has no
+      browser). App Privacy → Privacy Policy → the Apple TV field wants the
+      plain-text rendering of `public/privacy.html`. Blocks Add for Review
+      if empty.
+- [ ] **Version Number field on each platform's version page** matches
+      `MARKETING_VERSION` — a page created as 1.0 keeps saying 1.0 until
+      edited, even with a 1.0.1 build attached.
+- [ ] **Age-rating questionnaire updates** (e.g. the 2026 social-media
+      questions) answered — for this app: no chat/messaging, no public UGC;
+      lists and notes are visible only inside the private club.
+
 ## 6. Standard build hygiene
 
 - [ ] Build/version number bumped and archived from a clean release build.
