@@ -5,9 +5,11 @@ because the app is invite-only with no public sign-up, which trips up App Review
 in two predictable ways — a login wall and a privacy-label mismatch. Both are
 covered below.
 
-The listing is **universal**: one bundle id covers iPhone + Apple TV (the watch
-app rides along with the iOS build), so one submission reviews both surfaces —
-work the checklist for **both iPhone/iPad and Apple TV**.
+The listing is **universal**: one bundle id covers iPhone + Mac (Catalyst) +
+Apple TV (the watch app rides along with the iOS build), so one submission
+reviews every surface — work the checklist for **iPhone/iPad, Mac, and Apple
+TV**. That means **three archives** per submission: iOS, macOS (Mac Catalyst),
+and tvOS.
 
 Work top to bottom before you hit **Submit for Review**.
 
@@ -135,7 +137,9 @@ tracking, so no App Tracking Transparency prompt is presented.
 
 - [ ] Build/version number bumped and archived from a clean release build.
       `MARKETING_VERSION` must match across the iOS and tvOS targets (one
-      universal listing).
+      universal listing). Three archives: iOS (Any iOS Device), macOS
+      (Any Mac — Mac Catalyst, built from the iOS project so it shares the
+      same version/build), and tvOS (Any tvOS Device).
 - [ ] Launch on an **iPad** (Review used an iPad Air 11-inch / M3) — 2.1(a) was
       caught on iPad, so exercise the full flow there, not just iPhone.
 - [ ] Launch on an **Apple TV** (device or simulator): sign in with the demo
@@ -144,8 +148,10 @@ tracking, so no App Tracking Transparency prompt is presented.
 - [ ] Export compliance: `ITSAppUsesNonExemptEncryption = NO` is set in both
       the iOS and tvOS build settings, so uploads shouldn't stall on the
       compliance prompt.
-- [ ] Screenshots and metadata current — including the **Apple TV** screenshot
-      set on the same listing.
+- [ ] Screenshots and metadata current — including the **Mac** and **Apple
+      TV** screenshot sets on the same listing.
+- [ ] Verify the demo sign-in once on the **Mac** build too — Review opens
+      every platform on the listing.
 
 ---
 
