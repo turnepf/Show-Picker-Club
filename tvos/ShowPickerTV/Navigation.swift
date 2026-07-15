@@ -16,6 +16,20 @@ extension View {
     // member and show-detail screens.
     func showDestinations() -> some View {
         navigationDestination(for: Route.self) { route in
+            RouteScreen(route: route)
+        }
+    }
+}
+
+// Wraps every pushed screen so the remote's Menu/Back button pops it. By
+// default, Menu from a pushed view inside a TabView reveals the tab bar
+// without popping, which strands the user on the detail with no back path.
+private struct RouteScreen: View {
+    let route: Route
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        Group {
             switch route {
             case .member(let m):
                 MemberView(member: m)
@@ -26,5 +40,6 @@ extension View {
                                initialRating: rating, initialPoster: posterUrl, initialNetworkUrl: networkUrl)
             }
         }
+        .onExitCommand { dismiss() }
     }
 }
