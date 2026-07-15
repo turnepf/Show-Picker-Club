@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import Combine
 
 // Standard tvOS top tab-bar navigation. The roster and Trending are open;
 // member show lists are members-only (the server 401s them without a
@@ -9,8 +8,8 @@ import Combine
 struct RootTabView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var selection = Tab.home
-    // Each tab owns its navigation stack here so tab selection (and the
-    // tab bar gaining focus — see below) can reset it to the section root.
+    // Each tab owns its navigation stack here so tab selection (and clicking
+    // a tab-bar item — see below) can reset it to the section root.
     // Without this, a show detail you opened stays pushed when you jump to
     // the tab bar, and there's no way back to the section's full list.
     @State private var minePath = NavigationPath()
@@ -23,7 +22,7 @@ struct RootTabView: View {
     // always land on the section's full grid of cards. Note this only covers
     // *changes*: clicking the tab you're already on never calls the setter
     // (SwiftUI only writes new values), so the same-tab case is handled by
-    // the tab-bar focus observer on the TabView below.
+    // TabBarClickCatcher below.
     private var tabSelection: Binding<Tab> {
         Binding(
             get: { selection },
@@ -57,24 +56,21 @@ struct RootTabView: View {
                 .tag(Tab.account)
         }
         .task { await auth.refresh() }
-        // Pop every tab to its section root the moment the tab bar takes
-        // focus. tvOS tab bars select on focus, not on click, so clicking the
-        // already-selected tab from a pushed show card produces no event at
-        // all — the selection binding never fires and the card stays put.
-        // Instead, treat "user brought up the tab bar" as the intent to
-        // navigate at section level: reset the stacks right away so clicking
-        // Home / My Shows (or just swiping back down) lands on the grid.
-        .onReceive(NotificationCenter.default.publisher(for: UIFocusSystem.didUpdateNotification)) { note in
-            guard let context = note.userInfo?[UIFocusSystem.focusUpdateContextUserInfoKey] as? UIFocusUpdateContext,
-                  Self.focusIsInTabBar(context.nextFocusedItem)
-            else { return }
-            // Only touch non-empty paths: writing a fresh NavigationPath is
-            // never equatable-skipped, so gratuitous writes rebuild every
-            // tab's stack (and restart all their image loads) on each match.
+        // Pop every tab to its section root when a tab-bar item is CLICKED.
+        // tvOS tab bars select on focus, so clicking the already-selected tab
+        // from a pushed show card produces no selection change at all — the
+        // selection binding never fires and the card stays put. And popping
+        // merely when the bar takes focus is too eager (bringing up the bar
+        // to glance at it would lose your place). A select-press recognizer
+        // installed on the underlying UITabBar catches the actual click.
+        .background(TabBarClickCatcher {
+            // Focusing a *different* tab already switched sections and reset
+            // its path via the selection binding, so by click time the
+            // clicked tab is always the selected one: just pop the stacks.
             if !minePath.isEmpty { minePath = NavigationPath() }
             if !homePath.isEmpty { homePath = NavigationPath() }
             if !searchPath.isEmpty { searchPath = NavigationPath() }
-        }
+        })
         // Land on My Shows right after signing in; fall back to Home on logout.
         .onChange(of: auth.memberSlug) { _, slug in
             // Signing in INSERTS the My Shows tab and signing out REMOVES it.
@@ -85,19 +81,61 @@ struct RootTabView: View {
         }
     }
 
-    // True only when the newly focused item is a view sitting inside a real
-    // UITabBar. Deliberately a strict superview walk: the focus-ENVIRONMENT
-    // chain must not be used here, because on tvOS it climbs from any
-    // focused content view up into the UITabBarController that hosts every
-    // tab — so a name match like "TabBar" fires for the whole app, popping
-    // a show card the instant focus lands inside it.
-    private static func focusIsInTabBar(_ item: (any UIFocusItem)?) -> Bool {
-        var view = item as? UIView
-        while let current = view {
-            if current is UITabBar { return true }
-            view = current.superview
+}
+
+// Invisible helper that finds the window's UITabBar (SwiftUI's tvOS TabView
+// is backed by UITabBarController) and attaches a Siri-remote select-press
+// recognizer to it. The recognizer only sees presses while focus is inside
+// the bar — content presses never reach it — so firing means "the user
+// clicked a tab item", which SwiftUI otherwise surfaces no event for when
+// the clicked tab is already selected.
+private struct TabBarClickCatcher: UIViewRepresentable {
+    let onClick: () -> Void
+
+    func makeUIView(context: Context) -> CatcherView { CatcherView() }
+
+    func updateUIView(_ uiView: CatcherView, context: Context) {
+        uiView.onClick = onClick
+    }
+
+    final class CatcherView: UIView {
+        var onClick: (() -> Void)?
+        private weak var installedOn: UITabBar?
+        private var attemptsLeft = 20
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            installIfNeeded()
         }
-        return false
+
+        private func installIfNeeded() {
+            guard installedOn == nil else { return }
+            guard let window else { return }
+            if let bar = Self.findTabBar(in: window) {
+                let press = UITapGestureRecognizer(target: self, action: #selector(barClicked))
+                press.allowedPressTypes = [NSNumber(value: UIPress.PressType.select.rawValue)]
+                press.cancelsTouchesInView = false
+                bar.addGestureRecognizer(press)
+                installedOn = bar
+            } else if attemptsLeft > 0 {
+                // The tab bar may not be in the window yet on first layout;
+                // retry briefly rather than assuming it never appears.
+                attemptsLeft -= 1
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                    self?.installIfNeeded()
+                }
+            }
+        }
+
+        @objc private func barClicked() { onClick?() }
+
+        private static func findTabBar(in view: UIView) -> UITabBar? {
+            if let bar = view as? UITabBar { return bar }
+            for sub in view.subviews {
+                if let bar = findTabBar(in: sub) { return bar }
+            }
+            return nil
+        }
     }
 }
 
