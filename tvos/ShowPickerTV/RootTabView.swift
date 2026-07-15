@@ -65,13 +65,15 @@ struct RootTabView: View {
         // navigate at section level: reset the stacks right away so clicking
         // Home / My Shows (or just swiping back down) lands on the grid.
         .onReceive(NotificationCenter.default.publisher(for: UIFocusSystem.didUpdateNotification)) { note in
-            guard minePath.isEmpty == false || homePath.isEmpty == false || searchPath.isEmpty == false,
-                  let context = note.userInfo?[UIFocusSystem.focusUpdateContextUserInfoKey] as? UIFocusUpdateContext,
+            guard let context = note.userInfo?[UIFocusSystem.focusUpdateContextUserInfoKey] as? UIFocusUpdateContext,
                   Self.focusIsInTabBar(context.nextFocusedItem)
             else { return }
-            minePath = NavigationPath()
-            homePath = NavigationPath()
-            searchPath = NavigationPath()
+            // Only touch non-empty paths: writing a fresh NavigationPath is
+            // never equatable-skipped, so gratuitous writes rebuild every
+            // tab's stack (and restart all their image loads) on each match.
+            if !minePath.isEmpty { minePath = NavigationPath() }
+            if !homePath.isEmpty { homePath = NavigationPath() }
+            if !searchPath.isEmpty { searchPath = NavigationPath() }
         }
         // Land on My Shows right after signing in; fall back to Home on logout.
         .onChange(of: auth.memberSlug) { _, slug in
@@ -83,16 +85,17 @@ struct RootTabView: View {
         }
     }
 
-    // True when the newly focused item lives inside the tab bar. Walks the
-    // focus-environment chain rather than the view hierarchy, so it works
-    // whether SwiftUI backs the bar with a real UITabBar or one of its own
-    // private tab-bar views (matched by class name).
+    // True only when the newly focused item is a view sitting inside a real
+    // UITabBar. Deliberately a strict superview walk: the focus-ENVIRONMENT
+    // chain must not be used here, because on tvOS it climbs from any
+    // focused content view up into the UITabBarController that hosts every
+    // tab — so a name match like "TabBar" fires for the whole app, popping
+    // a show card the instant focus lands inside it.
     private static func focusIsInTabBar(_ item: (any UIFocusItem)?) -> Bool {
-        var env: (any UIFocusEnvironment)? = item
-        while let current = env {
+        var view = item as? UIView
+        while let current = view {
             if current is UITabBar { return true }
-            if String(describing: type(of: current)).contains("TabBar") { return true }
-            env = current.parentFocusEnvironment
+            view = current.superview
         }
         return false
     }
