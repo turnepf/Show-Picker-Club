@@ -1,4 +1,6 @@
 import SwiftUI
+import UIKit
+import Combine
 
 // Standard tvOS top tab-bar navigation. The roster and Trending are open;
 // member show lists are members-only (the server 401s them without a
@@ -7,19 +9,21 @@ import SwiftUI
 struct RootTabView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var selection = Tab.home
-    // Each tab owns its navigation stack here so selecting a tab can reset it
-    // to the section root. tvOS's Menu button jumps focus to the tab bar
-    // instead of popping the stack, so without this a show detail you opened
-    // stays pushed and there's no way back to the section's full list.
+    // Each tab owns its navigation stack here so tab selection (and the
+    // tab bar gaining focus — see below) can reset it to the section root.
+    // Without this, a show detail you opened stays pushed when you jump to
+    // the tab bar, and there's no way back to the section's full list.
     @State private var minePath = NavigationPath()
     @State private var homePath = NavigationPath()
     @State private var searchPath = NavigationPath()
 
     enum Tab: Hashable { case mine, home, search, account }
 
-    // Selecting any tab (whether switching to it or re-tapping the current one)
-    // pops any show detail open in it, so you always land on the section's
-    // full grid of cards.
+    // Switching tabs pops any show detail open in the target tab, so you
+    // always land on the section's full grid of cards. Note this only covers
+    // *changes*: clicking the tab you're already on never calls the setter
+    // (SwiftUI only writes new values), so the same-tab case is handled by
+    // the tab-bar focus observer on the TabView below.
     private var tabSelection: Binding<Tab> {
         Binding(
             get: { selection },
@@ -53,6 +57,22 @@ struct RootTabView: View {
                 .tag(Tab.account)
         }
         .task { await auth.refresh() }
+        // Pop every tab to its section root the moment the tab bar takes
+        // focus. tvOS tab bars select on focus, not on click, so clicking the
+        // already-selected tab from a pushed show card produces no event at
+        // all — the selection binding never fires and the card stays put.
+        // Instead, treat "user brought up the tab bar" as the intent to
+        // navigate at section level: reset the stacks right away so clicking
+        // Home / My Shows (or just swiping back down) lands on the grid.
+        .onReceive(NotificationCenter.default.publisher(for: UIFocusSystem.didUpdateNotification)) { note in
+            guard minePath.isEmpty == false || homePath.isEmpty == false || searchPath.isEmpty == false,
+                  let context = note.userInfo?[UIFocusSystem.focusUpdateContextUserInfoKey] as? UIFocusUpdateContext,
+                  Self.focusIsInTabBar(context.nextFocusedItem)
+            else { return }
+            minePath = NavigationPath()
+            homePath = NavigationPath()
+            searchPath = NavigationPath()
+        }
         // Land on My Shows right after signing in; fall back to Home on logout.
         .onChange(of: auth.memberSlug) { _, slug in
             // Signing in INSERTS the My Shows tab and signing out REMOVES it.
@@ -61,6 +81,20 @@ struct RootTabView: View {
             // TabView commit the change first, then switch.
             Task { @MainActor in selection = slug != nil ? .mine : .home }
         }
+    }
+
+    // True when the newly focused item lives inside the tab bar. Walks the
+    // focus-environment chain rather than the view hierarchy, so it works
+    // whether SwiftUI backs the bar with a real UITabBar or one of its own
+    // private tab-bar views (matched by class name).
+    private static func focusIsInTabBar(_ item: (any UIFocusItem)?) -> Bool {
+        var env: (any UIFocusEnvironment)? = item
+        while let current = env {
+            if current is UITabBar { return true }
+            if String(describing: type(of: current)).contains("TabBar") { return true }
+            env = current.parentFocusEnvironment
+        }
+        return false
     }
 }
 
