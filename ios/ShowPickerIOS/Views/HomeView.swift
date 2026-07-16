@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject private var auth: AuthStore
+    @Environment(\.openURL) private var openURL
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
     @State private var loading = true
@@ -64,10 +65,33 @@ struct HomeView: View {
                         }
                     }
                     // Discovery + account group, separated from My Shows above:
-                    // What's New, Subscription audit (personal), then Admin.
-                    // Trending is its own content section further down.
+                    // What's New, Vibe, Calendar + Subscription audit
+                    // (personal), then Admin. Trending is its own content
+                    // section further down.
                     Section {
                         whatsNewRow
+                        // Vibe is personal: logged-in members only, opening
+                        // their own vibe.
+                        if let me = myMember {
+                            NavigationLink {
+                                VibeView(initialSlug: me.slug)
+                            } label: {
+                                Label("Vibe", systemImage: "sparkles")
+                            }
+                        }
+                        // Your own premiere/finale feed. webcal:// makes iOS
+                        // offer to add it as a subscription calendar; the token
+                        // only comes back for the logged-in member's own row.
+                        if let me = myMember, let token = me.calendarToken {
+                            Button {
+                                let enc = me.slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? me.slug
+                                if let url = URL(string: "webcal://showpicker.club/calendar/\(enc).ics?key=\(token)") {
+                                    openURL(url)
+                                }
+                            } label: {
+                                Label("Calendar", systemImage: "calendar.badge.plus")
+                            }
+                        }
                         if myMember != nil {
                             NavigationLink {
                                 SubscriptionAuditView()

@@ -66,7 +66,7 @@ struct UrlCleanupView: View {
             }
 
         }
-        .navigationTitle("URL Cleanup")
+        .navigationTitle("Show Cleanup")
         .navigationBarTitleDisplayMode(.inline)
         .overlay { if loading && items.isEmpty { ProgressView() } }
         .task { await load() }

@@ -20,7 +20,6 @@ struct MemberView: View {
     // each list as its own entry) and the segmented picker is hidden.
     let fixedList: ShowList?
     @EnvironmentObject private var auth: AuthStore
-    @Environment(\.openURL) private var openURL
     @State private var shows: [Show] = []
     @State private var currentList: ShowList
     @State private var loading = true
@@ -95,39 +94,15 @@ struct MemberView: View {
                     }
                 }
 
-                // Insights for this member. Vibe is viewable for anyone; the
-                // subscription audit is personal, so own-page only.
-                Section {
-                    NavigationLink {
-                        VibeView(initialSlug: member.slug)
-                    } label: {
-                        Label("Vibe", systemImage: "sparkles")
-                    }
-                    if isMine {
+                // Subscription audit is personal, so own-page only. (Vibe and
+                // Calendar moved to the home list / iPad sidebar.)
+                if isMine {
+                    Section {
                         NavigationLink {
                             SubscriptionAuditView()
                         } label: {
                             Label("Subscription audit", systemImage: "creditcard")
                         }
-                    }
-                }
-
-                // Subscribe to this member's premiere/finale feed. webcal:// makes
-                // iOS offer to add it as a subscription calendar. The feed
-                // authenticates with the member's calendar token (only returned
-                // to logged-in sessions), so the row hides without one.
-                if let token = member.calendarToken {
-                    Section {
-                        Button {
-                            let enc = member.slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? member.slug
-                            if let url = URL(string: "webcal://showpicker.club/calendar/\(enc).ics?key=\(token)") {
-                                openURL(url)
-                            }
-                        } label: {
-                            Label("Subscribe in Calendar", systemImage: "calendar.badge.plus")
-                        }
-                    } footer: {
-                        Text("Adds \(member.label)'s upcoming season premieres and finales to your calendar app.")
                     }
                 }
             }

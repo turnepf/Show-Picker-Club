@@ -17,6 +17,7 @@ enum SidebarItem: Hashable {
     case list(ShowList)
     case trending
     case whatsNew
+    case vibe
     case subscriptionAudit
     // Admin sub-tools. The sidebar's Admin row is a disclosure accordion
     // whose entries mirror the iPhone AdminView's options, each opening its
@@ -31,6 +32,7 @@ enum SidebarItem: Hashable {
 
 struct IPadHomeView: View {
     @EnvironmentObject private var auth: AuthStore
+    @Environment(\.openURL) private var openURL
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
     @State private var loading = true
@@ -156,6 +158,24 @@ struct IPadHomeView: View {
                         .tag(SidebarItem.trending)
                 }
                 whatsNewRow
+                // Vibe is personal: logged-in members only, opening their own.
+                if myMember != nil {
+                    Label("Vibe", systemImage: "sparkles")
+                        .tag(SidebarItem.vibe)
+                }
+                // Your own premiere/finale calendar feed — the token only comes
+                // back for the logged-in member's own row, so the row hides
+                // without one.
+                if let me = myMember, let token = me.calendarToken {
+                    Button {
+                        let enc = me.slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? me.slug
+                        if let url = URL(string: "webcal://showpicker.club/calendar/\(enc).ics?key=\(token)") {
+                            openURL(url)
+                        }
+                    } label: {
+                        Label("Calendar", systemImage: "calendar.badge.plus")
+                    }
+                }
                 // Subscription audit is personal, so it only appears once you're
                 // signed in — matching the web sidebar and your own MemberView.
                 if myMember != nil {
@@ -172,7 +192,7 @@ struct IPadHomeView: View {
                             .tag(SidebarItem.adminManageMembers)
                         Label("New members", systemImage: "tray.and.arrow.down")
                             .tag(SidebarItem.adminNewMembers)
-                        Label("URL cleanup & titles", systemImage: "link.badge.plus")
+                        Label("Show Cleanup", systemImage: "link.badge.plus")
                             .tag(SidebarItem.adminUrlCleanup)
                         Label("Vibe trait scoring", systemImage: "sparkles")
                             .tag(SidebarItem.adminVibe)
@@ -312,6 +332,12 @@ struct IPadHomeView: View {
                 TrendingListView(shows: popular)
             case .whatsNew:
                 WhatsNewView()
+            case .vibe:
+                if let slug = auth.memberSlug {
+                    VibeView(initialSlug: slug)
+                } else {
+                    placeholder("Log in to see your vibe.", "sparkles")
+                }
             case .subscriptionAudit:
                 SubscriptionAuditView()
             case .adminReporting:

@@ -59,7 +59,7 @@ struct AdminView: View {
                 NavigationLink {
                     UrlCleanupView()
                 } label: {
-                    Label("URL cleanup & titles", systemImage: "link.badge.plus")
+                    Label("Show Cleanup", systemImage: "link.badge.plus")
                 }
                 NavigationLink {
                     VibeAdminView()

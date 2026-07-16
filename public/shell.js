@@ -114,7 +114,7 @@
   var ADMIN_PAGES = [
     { href: '/admin', label: 'New members' },
     { href: '/members', label: 'Members' },
-    { href: '/url-cleanup', label: 'URL cleanup' },
+    { href: '/url-cleanup', label: 'Show Cleanup' },
     { href: '/vibe-admin', label: 'Vibe admin' },
     { href: '/reporting', label: 'Reporting' },
   ];
