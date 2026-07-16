@@ -172,7 +172,7 @@ struct IPadHomeView: View {
                             .tag(SidebarItem.adminManageMembers)
                         Label("New members", systemImage: "tray.and.arrow.down")
                             .tag(SidebarItem.adminNewMembers)
-                        Label("URL cleanup & titles", systemImage: "link.badge.plus")
+                        Label("Show Cleanup", systemImage: "link.badge.plus")
                             .tag(SidebarItem.adminUrlCleanup)
                         Label("Vibe trait scoring", systemImage: "sparkles")
                             .tag(SidebarItem.adminVibe)
