@@ -1108,7 +1108,8 @@
         flex: none; padding: 0;
       }
       /* Subscription audit lives in the sidebar on the split view, so the
-         duplicate under-list row hides (Vibe + Calendar stay). */
+         duplicate under-list row hides (Vibe + Calendar live in the nav on
+         every layout now). */
       #showPage .member-extras #subscriptionsLink { display: none; }
       /* Pushed show detail covers the detail column, not the sidebar —
          offset by the letterbox margin plus the sidebar width. */
@@ -1206,6 +1207,15 @@
             <span class="ios-item-label">What's New</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
+          <a class="ios-item" href="/vibe">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
+            <span class="ios-item-label">Vibe</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden calendar-feed-row" href="#" title="Subscribe in Calendar to keep upcoming season dates on your phone">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-calendar-plus"/></svg></span>
+            <span class="ios-item-label">Calendar</span>
+          </a>
           <a class="ios-item hidden home-subs-row" href="/subscriptions">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
             <span class="ios-item-label">Subscription audit</span>
@@ -1233,7 +1243,6 @@
 
         <footer class="ios-footnote" style="margin-top: 26px;">
           &copy; 2025 Patrick Turner.
-          <a href="/vibe" style="margin-left: 8px;">Vibe</a>
         </footer>
       </aside>
 
@@ -1297,6 +1306,14 @@
           <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
           <span class="ios-item-label">What's New</span>
         </a>
+        <a class="ios-item" href="/vibe">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
+          <span class="ios-item-label">Vibe</span>
+        </a>
+        <a class="ios-item hidden calendar-feed-row" href="#" title="Subscribe in Calendar to keep upcoming season dates on your phone">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-calendar-plus"/></svg></span>
+          <span class="ios-item-label">Calendar</span>
+        </a>
         <a class="ios-item hidden member-subs-row" href="/subscriptions">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
           <span class="ios-item-label">Subscription audit</span>
@@ -1343,28 +1360,16 @@
         <div class="empty hidden" id="empty">No shows in this list yet.</div>
       </main>
 
-      <!-- Insights + calendar — the same grouped sections (and icons)
-           the iOS MemberView puts under the list. -->
+      <!-- Subscription audit under the list on the iPhone layout. (Vibe and
+           Calendar moved to the home nav / split-view sidebar.) -->
       <div class="member-extras">
         <nav class="ios-group">
-          <a class="ios-item" href="/vibe">
-            <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
-            <span class="ios-item-label">Vibe</span>
-            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
-          </a>
           <a class="ios-item hidden" id="subscriptionsLink" href="/subscriptions" title="See which streaming subscriptions you actually need right now">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
             <span class="ios-item-label">Subscription audit</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
         </nav>
-        <nav class="ios-group hidden" id="calendarGroup" style="margin-bottom: 10px;">
-          <a class="ios-item" id="calendarFeedLink" href="#" title="Subscribe in Calendar to keep upcoming season dates on your phone">
-            <span class="ios-item-icon"><svg class="ic"><use href="#i-calendar-plus"/></svg></span>
-            <span class="ios-item-label">Subscribe in Calendar</span>
-          </a>
-        </nav>
-        <p class="ios-footnote" id="calendarFootnote" style="margin: 0 0 22px;"></p>
       </div>
 
       <footer style="text-align: center; padding: 24px 16px 32px; font-size: 12px; color: var(--ink-quiet);">
@@ -1927,6 +1932,20 @@
       renderHomeMembers();
     }
 
+    // Nav rows for YOUR calendar feed (home nav + member-page sidebar).
+    // Feeds authenticate with a per-member token and the API only returns
+    // your own, so whichever row has one is yours; logged out, none do and
+    // the rows stay hidden.
+    function setupCalendarLinks(members) {
+      const mine = (members || []).find(m => m.calendar_token);
+      if (!mine) return;
+      const href = `webcal://showpicker.club/calendar/${encodeURIComponent(mine.slug)}.ics?key=${encodeURIComponent(mine.calendar_token)}`;
+      document.querySelectorAll('.calendar-feed-row').forEach(a => {
+        a.href = href;
+        a.classList.remove('hidden');
+      });
+    }
+
     async function showLanding() {
       document.getElementById('landingPage').classList.remove('hidden');
       document.title = 'Show Picker Club';
@@ -1941,6 +1960,7 @@
           return (b.last_activity_at || '').localeCompare(a.last_activity_at || '');
         });
         renderHomeMembers();
+        setupCalendarLinks(data.members);
       } catch (e) {}
 
       // Trending renders twice: inline for the iPhone layout, and into the
@@ -1974,14 +1994,7 @@
         const res = await fetch('/api/members');
         const data = await res.json();
         const h = data.members.find(h => h.slug === slug);
-        // Calendar feeds authenticate with a per-member token; the API only
-        // returns your OWN token, so the calendar link renders only on your
-        // own member page.
-        const calLink = document.getElementById('calendarFeedLink');
-        if (calLink && h && h.calendar_token) {
-          calLink.href = `webcal://showpicker.club/calendar/${encodeURIComponent(slug)}.ics?key=${encodeURIComponent(h.calendar_token)}`;
-          document.getElementById('calendarGroup').classList.remove('hidden');
-        }
+        setupCalendarLinks(data.members);
         if (h) {
           owners = h.first_name || h.name.split(' ')[0];
           memberLabel = h.display_name || owners;
@@ -1998,10 +2011,6 @@
 
       document.title = memberName;
       document.getElementById('appTitle').textContent = memberName;
-      const calNote = document.getElementById('calendarFootnote');
-      if (calNote && memberLabel) {
-        calNote.textContent = `Adds ${memberLabel}'s upcoming season premieres and finales to your calendar app.`;
-      }
       updateSideListsHeader();
 
       // Check hash for tab
