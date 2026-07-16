@@ -535,15 +535,30 @@ struct AdminMember: Codable, Identifiable {
     let phones: [String]
     let lastLogin: String?
     let activity30d: MemberActivity?
+    // Status flags (optional so decoding survives an older server).
+    let isAdmin: Bool?
+    let disabled: Bool?
+    let approved: Bool?
+    let enrolledVia: String?
     var id: String { slug }
 
     enum CodingKeys: String, CodingKey {
-        case slug, name, emails, phones
+        case slug, name, emails, phones, disabled, approved
         case firstName = "first_name"
         case lastInitial = "last_initial"
         case lastName = "last_name"
         case lastLogin = "last_login"
         case activity30d = "activity_30d"
+        case isAdmin = "is_admin"
+        case enrolledVia = "enrolled_via"
+    }
+
+    // The person's actual name, from the clean first_name/last_name columns.
+    // members.name is the legacy "…'s Shows" display blob — hand-entered and
+    // inconsistent, so it's only a last-resort fallback here.
+    var personName: String {
+        let full = [firstName, lastName].compactMap { $0 }.joined(separator: " ")
+        return full.trimmingCharacters(in: .whitespaces).isEmpty ? (name ?? slug) : full
     }
 }
 

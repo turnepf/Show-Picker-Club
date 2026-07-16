@@ -109,7 +109,8 @@
     </a>
     <div class="admin-sub">
       Emails and phones are comma-separated; the first in each list is the
-      primary. Saving replaces the existing set for that member. Updating a
+      primary. Saving replaces the existing set for that member, and saves
+      any name change (renames keep the member's slug and URL). Updating a
       member's phone also resyncs their legacy 4-digit code to the new
       last-4 (legacy codes stop working after June 7th).
     </div>
@@ -239,10 +240,14 @@
         if (m.disabled) card.style.opacity = '0.6';
         card.innerHTML = `
           <div class="top">
-            <div class="name"><a href="/${escapeHtml(m.slug)}" target="_blank">${escapeHtml(displayName)}</a> <span class="meta">${escapeHtml(m.slug)}</span>${m.enrolled_via ? ` <span class="meta">via ${escapeHtml(m.enrolled_via)}</span>` : ''}${m.disabled ? ' <span class="meta" style="color:#C0392B;font-weight:600;">DISABLED</span>' : ''}${m.approved === false ? ' <span class="meta" style="color:#E67E22;font-weight:600;">PENDING</span>' : ''}</div>
+            <div class="name"><a href="/${escapeHtml(m.slug)}" target="_blank">${escapeHtml(displayName)}</a> <span class="meta">${escapeHtml(m.slug)}</span>${m.enrolled_via ? ` <span class="meta">via ${escapeHtml(m.enrolled_via)}</span>` : ''}${m.is_admin ? ' <span class="meta" style="color:#2980B9;font-weight:600;">ADMIN</span>' : ''}${m.disabled ? ' <span class="meta" style="color:#C0392B;font-weight:600;">DISABLED</span>' : ''}${m.approved === false ? ' <span class="meta" style="color:#E67E22;font-weight:600;">PENDING</span>' : ''}</div>
             <div class="meta">${formatLastLogin(m.last_login)}</div>
           </div>
           ${activityRow}
+          <div class="field">
+            <label>Name</label>
+            <input class="fullname" type="text" value="${escapeHtml([m.first_name, m.last_name].filter(Boolean).join(' '))}" placeholder="Alice Baker">
+          </div>
           <div class="field">
             <label>Emails</label>
             <input class="emails" type="text" value="${escapeHtml(m.emails.join(', '))}" placeholder="alice@example.com, alice.b@gmail.com">
@@ -258,10 +263,14 @@
           </button>
           ${m.approved === false ? `<button class="save toggle-approve" data-slug="${escapeHtml(m.slug)}"
             style="margin-left:8px;background:#E67E22;">Approve</button>` : ''}
+          <button class="save toggle-admin" data-slug="${escapeHtml(m.slug)}" data-admin="${m.is_admin ? 1 : 0}"
+            style="margin-left:8px;background:#2980B9;">
+            ${m.is_admin ? 'Remove admin' : 'Make admin'}
+          </button>
         `;
         list.appendChild(card);
       }
-      list.querySelectorAll('button.save:not(.toggle-disable):not(.toggle-approve)').forEach(btn => {
+      list.querySelectorAll('button.save:not(.toggle-disable):not(.toggle-approve):not(.toggle-admin)').forEach(btn => {
         btn.addEventListener('click', () => save(btn));
       });
       list.querySelectorAll('button.toggle-disable').forEach(btn => {
@@ -270,6 +279,49 @@
       list.querySelectorAll('button.toggle-approve').forEach(btn => {
         btn.addEventListener('click', () => approve(btn));
       });
+      list.querySelectorAll('button.toggle-admin').forEach(btn => {
+        btn.addEventListener('click', () => toggleAdmin(btn));
+      });
+    }
+
+    // Server error codes → operator-readable explanations. Anything not
+    // listed falls through to the raw code so new errors aren't hidden.
+    function friendlyError(code) {
+      return {
+        cannot_disable_self: "You can't disable yourself.",
+        cannot_disable_admin: 'Remove their admin role first, then disable.',
+        cannot_promote_disabled: 'Enable the member before making them an admin.',
+        last_admin: "They're the only admin — make someone else an admin first.",
+      }[code] || code;
+    }
+
+    // Promote/demote an admin. Full hand-off = promote the other member,
+    // then remove admin from yourself; the server keeps at least one admin.
+    async function toggleAdmin(btn) {
+      const slug = btn.dataset.slug;
+      const promoting = btn.dataset.admin !== '1';
+      const msg = promoting
+        ? `Make ${slug} an admin? They get member management and every admin tool.`
+        : `Remove admin from ${slug}?`;
+      if (!confirm(msg)) return;
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/admin-member-role', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug, action: promoting ? 'promote' : 'demote' }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(friendlyError(data.error) || `Failed (${res.status})`);
+          return;
+        }
+        load();
+      } catch (e) {
+        alert('Network error: ' + e.message);
+      } finally {
+        btn.disabled = false;
+      }
     }
 
     // Approve a held self-enrolled member: makes them visible on the home
@@ -286,7 +338,7 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          alert(data.error || `Failed (${res.status})`);
+          alert(friendlyError(data.error) || `Failed (${res.status})`);
           return;
         }
         load();
@@ -312,7 +364,7 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          alert(data.error || `Failed (${res.status})`);
+          alert(friendlyError(data.error) || `Failed (${res.status})`);
           return;
         }
         load();
@@ -326,6 +378,7 @@
     async function save(btn) {
       const slug = btn.dataset.slug;
       const card = btn.parentElement;
+      const name = card.querySelector('input.fullname').value;
       const emails = card.querySelector('input.emails').value;
       const phones = card.querySelector('input.phones').value;
       btn.disabled = true;
@@ -335,16 +388,20 @@
         const res = await fetch('/api/admin-member-emails', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slug, emails, phones }),
+          body: JSON.stringify({ slug, name, emails, phones }),
         });
         const data = await res.json();
         if (!res.ok) {
           btn.textContent = 'Error';
-          alert(data.error || `Failed (${res.status})`);
+          alert(friendlyError(data.error) || `Failed (${res.status})`);
           return;
         }
         card.querySelector('input.emails').value = (data.emails || []).join(', ');
         card.querySelector('input.phones').value = (data.phones || []).join(', ');
+        if (data.first_name) {
+          card.querySelector('.name a').textContent =
+            [data.first_name, data.last_name].filter(Boolean).join(' ');
+        }
         btn.textContent = 'Saved';
         btn.classList.add('saved');
         setTimeout(() => { btn.textContent = 'Save'; btn.classList.remove('saved'); }, 1500);

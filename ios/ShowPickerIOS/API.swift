@@ -241,14 +241,36 @@ enum API {
         return r.members
     }
 
-    // Replace a member's email and/or phone set. Pass a comma/space-separated
-    // string; an empty string clears that side. Decodes the body either way so
-    // the caller can show validation errors.
-    static func updateMemberContacts(slug: String, emails: String?, phones: String?) async throws -> AdminActionResult {
+    // Replace a member's email and/or phone set, and/or rename them (renames
+    // keep the slug/URL). Pass a comma/space-separated string; an empty string
+    // clears that side. Decodes the body either way so the caller can show
+    // validation errors.
+    static func updateMemberContacts(slug: String, name: String? = nil, emails: String?, phones: String?) async throws -> AdminActionResult {
         var body: [String: Any] = ["slug": slug]
+        if let n = name { body["name"] = n }
         if let e = emails { body["emails"] = e }
         if let p = phones { body["phones"] = p }
         return try await postDecoding("/api/admin-member-emails", body: body)
+    }
+
+    // Ban hammer: flips members.disabled; disabling also kills every session
+    // the member holds, so the lockout is immediate.
+    static func setMemberDisabled(slug: String, disabled: Bool) async throws -> AdminActionResult {
+        try await postDecoding("/api/admin-member-disable",
+                               body: ["slug": slug, "action": disabled ? "disable" : "enable"])
+    }
+
+    // Approve a held self-enrolled member onto the roster (members.approved).
+    static func approveMember(slug: String) async throws -> AdminActionResult {
+        try await postDecoding("/api/admin-member-approve",
+                               body: ["slug": slug, "action": "approve"])
+    }
+
+    // Admin hand-off: promote or demote members.is_admin. The server refuses
+    // to demote the last remaining admin.
+    static func setMemberAdmin(slug: String, admin: Bool) async throws -> AdminActionResult {
+        try await postDecoding("/api/admin-member-role",
+                               body: ["slug": slug, "action": admin ? "promote" : "demote"])
     }
 
     // MARK: Admin: vibe trait scoring
