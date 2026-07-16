@@ -158,8 +158,11 @@ struct IPadHomeView: View {
                         .tag(SidebarItem.trending)
                 }
                 whatsNewRow
-                Label("Vibe", systemImage: "sparkles")
-                    .tag(SidebarItem.vibe)
+                // Vibe is personal: logged-in members only, opening their own.
+                if myMember != nil {
+                    Label("Vibe", systemImage: "sparkles")
+                        .tag(SidebarItem.vibe)
+                }
                 // Your own premiere/finale calendar feed — the token only comes
                 // back for the logged-in member's own row, so the row hides
                 // without one.
@@ -330,10 +333,10 @@ struct IPadHomeView: View {
             case .whatsNew:
                 WhatsNewView()
             case .vibe:
-                if let slug = auth.memberSlug ?? members.first?.slug {
+                if let slug = auth.memberSlug {
                     VibeView(initialSlug: slug)
                 } else {
-                    placeholder("No members yet.", "sparkles")
+                    placeholder("Log in to see your vibe.", "sparkles")
                 }
             case .subscriptionAudit:
                 SubscriptionAuditView()

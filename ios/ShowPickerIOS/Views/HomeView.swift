@@ -70,9 +70,11 @@ struct HomeView: View {
                     // section further down.
                     Section {
                         whatsNewRow
-                        if let anySlug = auth.memberSlug ?? members.first?.slug {
+                        // Vibe is personal: logged-in members only, opening
+                        // their own vibe.
+                        if let me = myMember {
                             NavigationLink {
-                                VibeView(initialSlug: anySlug)
+                                VibeView(initialSlug: me.slug)
                             } label: {
                                 Label("Vibe", systemImage: "sparkles")
                             }
