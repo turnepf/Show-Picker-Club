@@ -13,15 +13,12 @@ struct WhatsNewView: View {
     }
 
     // Shipped in code but not yet in a released build — teased at the top
-    // until the matching build reaches TestFlight, then moved into `entries`
-    // with a date. No date, so Entry.id falls back to the (unique) title.
-    private let comingSoon: [Entry] = [
-        .init(date: "", title: "Show Picker on your wrist.", body: "A companion Apple Watch app that mirrors your lists from your iPhone \u{2014} glance at what you're watching without reaching for your phone."),
-        .init(date: "", title: "Your next premiere, at a glance.", body: "A watch-face complication showing the soonest upcoming season premiere from your lists, right on your watch face."),
-        .init(date: "", title: "Show Picker on your Mac.", body: "The iPhone app running natively on your Mac \u{2014} same lists, same everything, on the big screen."),
-    ]
+    // until the matching build ships, then moved into `entries` with a date.
+    // No date, so Entry.id falls back to the (unique) title.
+    private let comingSoon: [Entry] = []
 
     private let entries: [Entry] = [
+        .init(date: "7/16", title: "Show Picker is on the App Store.", body: "Native apps for iPhone, iPad, Mac, Apple TV, and Apple Watch \u{2014} same lists, same login, everywhere."),
         .init(date: "7/12", title: "New list names.", body: "Recommending is now Loved (shows you've watched and loved) and Up Next is now Next Up. Same lists, better names \u{2014} everything on them came along. The premiere-date line on show rows now reads \u{201C}Next episode:\u{201D} so it doesn't collide with the Next Up list."),
         .init(date: "7/4", title: "Subscription Audit.", body: "Paying for streaming you don't watch? Open the Subscription audit from your member page to see which services to keep, pause, or cancel based on what's actually on your lists. Thanks Roger!"),
         .init(date: "7/2", title: "Pick the right show as you type.", body: "Start typing a title in Add or Suggest and matching shows appear with their posters \u{2014} tap one to lock in the exact match. Its artwork, rating, cast, and season dates come along automatically, and it knows whether it's a show or a movie, so nothing needs fixing later."),
@@ -49,21 +46,32 @@ struct WhatsNewView: View {
         .init(date: "4/12", title: "Initial launch.", body: "Add, edit, move, and archive shows across four lists: Watching, Waiting, Recommending, and Up Next. Auto-enriched with IMDb ratings, actors, and network links."),
     ]
 
+    // e.g. "Version 1.0.2 (15)" — read from the bundle so it always matches
+    // the running binary; this is what to ask a member for when debugging.
+    private var versionLine: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "Version \(version) (\(build))"
+    }
+
     var body: some View {
         List {
-            Section {
-                ForEach(comingSoon) { e in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(e.title).fontWeight(.semibold).foregroundColor(.primary)
-                            .font(.subheadline)
-                        Text(e.body)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+            if !comingSoon.isEmpty {
+                Section {
+                    ForEach(comingSoon) { e in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(e.title).fontWeight(.semibold).foregroundColor(.primary)
+                                .font(.subheadline)
+                            Text(e.body)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 2)
                     }
-                    .padding(.vertical, 2)
+                } header: {
+                    Text("Coming soon")
                 }
-            } header: {
-                Text("Coming soon")
             }
 
             Section {
@@ -79,6 +87,14 @@ struct WhatsNewView: View {
                     }
                     .padding(.vertical, 2)
                 }
+            }
+
+            Section {
+            } footer: {
+                Text(versionLine)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 4)
             }
         }
         .listStyle(.plain)
