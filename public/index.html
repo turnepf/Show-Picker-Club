@@ -1233,10 +1233,7 @@
 
         <footer class="ios-footnote" style="margin-top: 26px;">
           &copy; 2025 Patrick Turner.
-          <a href="/reporting">Curious?</a>
           <a href="/vibe" style="margin-left: 8px;">Vibe</a>
-          <a id="adminLink" href="/admin" style="display:none; margin-left: 8px;">Admin</a>
-          <a id="joinLink" href="/join" style="display:none; margin-left: 8px;">Join link</a>
         </footer>
       </aside>
 
@@ -1372,9 +1369,6 @@
 
       <footer style="text-align: center; padding: 24px 16px 32px; font-size: 12px; color: var(--ink-quiet);">
         &copy; 2025 Patrick Turner.
-        <a href="/reporting" style="color: inherit; margin-left: 6px;">Curious?</a>
-        <a class="admin-link" href="/admin" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Admin</a>
-        <a class="admin-link" href="/join" style="display:none; margin-left: 10px; color: var(--ink-quiet);">Join link</a>
       </footer>
     </div>
   </div>
@@ -2205,16 +2199,10 @@
         if (data.authenticated) {
           editorName = data.email || '';
           authMember = data.member;
-          // Surface Admin link in footers only when this session belongs to
-          // the operator. /auth/check sets is_admin server-side, so we don't
-          // have to hardcode the slug here.
+          // Surface the Admin rows (wrench) in the Home list and sidebar only
+          // when this session belongs to the operator. /auth/check sets
+          // is_admin server-side, so we don't have to hardcode the slug here.
           if (data.is_admin) {
-            const adminLink = document.getElementById('adminLink');
-            if (adminLink) adminLink.style.display = '';
-            const joinLink = document.getElementById('joinLink');
-            if (joinLink) joinLink.style.display = '';
-            document.querySelectorAll('.admin-link').forEach(a => a.style.display = '');
-            // Admin group in the Home list and the sidebar (wrench row).
             document.querySelectorAll('.side-admin').forEach(el => el.classList.remove('hidden'));
           }
           // Home: swap the login row for My Shows — a single row on small
