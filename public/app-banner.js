@@ -52,9 +52,10 @@
     '.spc-ab-sub { font-size: 12px; color: var(--ink-quiet, #777); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }' +
     '.spc-ab-view { flex: 0 0 auto; padding: 6px 10px; font-size: 15px; font-weight: 600; color: var(--tint, #6D63EB); text-decoration: none; }' +
     '@media (min-width: 1024px) {' +
-    /* shell.js pages: body is the split-view grid — give the banner its own
-       full-width top row and let the sidebar/detail row absorb the rest. */
-    '  .spc-app-banner { grid-column: 1 / -1; }' +
+    /* Match the letterboxed app shell's width instead of the viewport. On
+       shell.js pages the banner is a grid item inside the 1180px body
+       already; on index.html it's a body child, so cap and center it. */
+    '  .spc-app-banner { grid-column: 1 / -1; box-sizing: border-box; width: 100%; max-width: var(--shell-max, 1180px); margin: 0 auto; }' +
     '  body.spc-has-app-banner { grid-template-rows: auto minmax(0, 1fr); }' +
     /* index.html letterboxes its own 100dvh grids — shrink them by the
        banner height so their bottom edge stays on screen. */

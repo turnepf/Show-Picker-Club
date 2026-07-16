@@ -189,19 +189,31 @@ A few intentional omissions:
 
 ## Backlog
 
-- **Pending What's New entries — convert "Coming soon" to dated entries when
-  the builds ship.** These features shipped in code but not yet in a released
-  build, so they're teased in a **"Coming soon"** section at the top of
-  What's New (both `public/whats-new.html` and
-  `ios/ShowPickerIOS/Views/WhatsNewView.swift`). When the matching build
-  reaches TestFlight, move each from the coming-soon block into the dated
-  changelog:
-  - **Show Picker on your wrist** — companion Apple Watch app, lists synced
-    from iPhone (7/1).
-  - **Your next premiere, at a glance** — watch-face complication showing the
-    soonest upcoming season premiere from your lists (7/1).
-  - **Show Picker on your Mac** — the iPhone app running natively on macOS
-    via Catalyst (7/7).
+- **iOS What's New still teases the shipped apps.** The web What's New
+  replaced its "Coming soon" card (watch app, complication, Mac app) with a
+  single dated 7/16 App Store launch entry when the universal app went live
+  (July 2026). `ios/ShowPickerIOS/Views/WhatsNewView.swift` still carries the
+  coming-soon block — make the same swap there in the next build.
+
+- **Member star ratings.** (Amy, Susan — 7/2026.) Members can rate shows
+  they've watched, and those ratings show up alongside the IMDB number —
+  friends' stars answer "Patrick liked it, so I'll like it too." Susan asked
+  for exactly this from the other side: she wants to rate shows herself.
+
+- **Bracket competition.** (Amy — 7/2026.) A bracket-style tournament built
+  from the group's shows, where members who have watched a show vote for
+  their favorites round by round.
+
+- **Find something to watch.** (Amy — 7/2026.) A picker that weighs which
+  streaming services you actually have (the subscription-audit data already
+  knows), how much time you have tonight, and what your ratings say about
+  your taste — the vibe trait vectors could drive that last part.
+
+- **Group watch / episode chat.** (Amy — 7/2026.) Chat about specific
+  episodes with other members who are watching the same show. Note this
+  cuts against the current "no comments or threads" stance above — needs a
+  deliberate call on scope (per-episode threads? spoiler-safety by episode
+  progress?) before building.
 
 ## Shipped (formerly backlog)
 
