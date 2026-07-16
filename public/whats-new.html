@@ -63,11 +63,6 @@
     .cl-date { font-weight: 600; color: var(--ink); margin-right: 6px; }
     .cl-title { font-weight: 600; color: var(--ink); margin-right: 4px; }
     .changelog a { color: var(--accent); }
-    /* Teaser for features shipped in code but not yet in a released build. */
-    .coming-soon { margin-bottom: 22px; }
-    .cs-head { font-family: var(--font-sans); font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tint); padding: 14px 0 2px; }
-    .coming-soon p { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--border-soft); font-size: var(--text-sm); line-height: 1.6; color: var(--ink-muted); }
-    .coming-soon p:last-child { border-bottom: none; }
     footer {
       padding: 24px 0 20px;
       font-size: var(--text-xs);
@@ -79,7 +74,6 @@
   <style id="ios-skin">
     body { background: var(--surface-2); }
     .changelog { background: var(--surface); border-radius: 14px; box-shadow: var(--shadow-card); padding: 2px 16px; }
-    .coming-soon { background: var(--surface); border-radius: 14px; box-shadow: var(--shadow-card); padding: 2px 16px; }
   </style>
   <script src="/shell.js?v=2" defer></script>
   <script src="/app-banner.js?v=1" defer></script>
@@ -93,14 +87,8 @@
   </header>
 
   <main>
-    <div class="coming-soon">
-      <div class="cs-head">Coming soon</div>
-      <p><span class="cl-title">Show Picker on your wrist.</span> A companion Apple Watch app that mirrors your lists from your iPhone &mdash; glance at what you're watching without reaching for your phone.</p>
-      <p><span class="cl-title">Your next premiere, at a glance.</span> A watch-face complication showing the soonest upcoming season premiere from your lists, right on your watch face.</p>
-      <p><span class="cl-title">Show Picker on your Mac.</span> The iPhone app running natively on your Mac &mdash; same lists, same everything, on the big screen.</p>
-    </div>
-
     <div class="changelog">
+      <p><span class="cl-date">7/16</span><span class="cl-title">Show Picker is on the App Store.</span> Native apps for <strong>iPhone, iPad, Mac, Apple TV, and Apple Watch</strong> &mdash; same lists, same login, everywhere. The watch app puts your next premiere right on your watch face. One download covers them all: <a href="https://apps.apple.com/app/id6780282764">get Show Picker Club on the App Store</a>.</p>
       <p><span class="cl-date">7/12</span><span class="cl-title">New list names.</span> Recommending is now <strong>Loved</strong> (shows you've watched and loved) and Up Next is now <strong>Next Up</strong>. Same lists, better names &mdash; everything on them came along. The premiere-date line on show rows now reads "Next episode:" so it doesn't collide with the Next Up list.</p>
       <p><span class="cl-date">7/4</span><span class="cl-title">Subscription Audit.</span> Paying for streaming you don't watch? Visit <a href="/subscriptions">the Subscription Audit</a> to see which services to keep, pause, or cancel based on what's actually on your lists. Thanks Roger!</p>
       <p><span class="cl-date">7/2</span><span class="cl-title">Pick the right show as you type.</span> Start typing a title in Add or Suggest and matching shows appear with their posters &mdash; tap one to lock in the exact match. Its artwork, rating, cast, and season dates come along automatically, and it knows whether it's a show or a movie, so nothing needs fixing later.</p>
