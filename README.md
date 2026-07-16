@@ -41,6 +41,7 @@ Only `public/` (static assets) and `functions/` (Pages Functions) are deployed. 
 │   ├── setup.html              Admin: create new member (secret-gated)
 │   ├── url-cleanup.html        Admin: fix missing network URLs (secret-gated)
 │   ├── vibe-admin.html         Admin: batch-score trait vectors (secret-gated)
+│   ├── app-banner.js           Dismissible "get the app" App Store banner (Apple devices)
 │   ├── manifest.json           PWA manifest
 │   ├── sw.js                   Service worker
 │   ├── _headers                Security headers (CSP, HSTS, etc.)
