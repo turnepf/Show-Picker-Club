@@ -13,7 +13,7 @@ struct ManageMembersView: View {
                     MemberContactEditView(member: m) { await load() }
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(displayName(m)).font(.body)
+                        Text(m.personName).font(.body)
                         Text(contactSummary(m)).font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -24,11 +24,6 @@ struct ManageMembersView: View {
         .overlay { if loading && members.isEmpty { ProgressView() } }
         .task { await load() }
         .refreshable { await load() }
-    }
-
-    private func displayName(_ m: AdminMember) -> String {
-        m.name ?? [m.firstName, m.lastName].compactMap { $0 }.joined(separator: " ")
-            .ifEmpty(m.slug)
     }
 
     private func contactSummary(_ m: AdminMember) -> String {
@@ -91,7 +86,7 @@ private struct MemberContactEditView: View {
                 Section { Text(b).foregroundStyle(b.hasPrefix("✓") ? .green : .red) }
             }
         }
-        .navigationTitle(member.name ?? member.slug)
+        .navigationTitle(member.personName)
         .navigationBarTitleDisplayMode(.inline)
         .overlay { if working { ProgressView().controlSize(.large) } }
     }
@@ -113,6 +108,17 @@ private struct MemberContactEditView: View {
                 dismiss()
             }
         } catch { banner = "Network error. Try again." }
+    }
+}
+
+private extension AdminMember {
+    // The person's actual name, from the clean first_name/last_name columns.
+    // members.name is the legacy "…'s Shows" display blob — hand-entered and
+    // inconsistent ("Chuck Brownlee's Shows" vs "Kathleen Shows"), so it's
+    // only a last-resort fallback here.
+    var personName: String {
+        [firstName, lastName].compactMap { $0 }.joined(separator: " ")
+            .ifEmpty(name ?? slug)
     }
 }
 
