@@ -173,7 +173,14 @@ struct IPadHomeView: View {
                             openURL(url)
                         }
                     } label: {
-                        Label("Calendar", systemImage: "calendar.badge.plus")
+                        // Buttons tint their whole label with the accent color;
+                        // keep the title primary so the row matches the rows
+                        // around it.
+                        Label {
+                            Text("Calendar").foregroundStyle(.primary)
+                        } icon: {
+                            Image(systemName: "calendar.badge.plus")
+                        }
                     }
                 }
                 // Subscription audit is personal, so it only appears once you're

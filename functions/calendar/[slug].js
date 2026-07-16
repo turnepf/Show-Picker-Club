@@ -19,7 +19,7 @@ export async function onRequestGet(context) {
   // .catch: pre-migration database (no calendar_token column) → 404, same
   // as a missing member.
   const member = await env.DB.prepare(
-    `SELECT slug, name, first_name, calendar_token FROM members WHERE slug = ?`
+    `SELECT slug, calendar_token FROM members WHERE slug = ?`
   ).bind(slug).first().catch(() => null);
   if (!member) return new Response('Not found', { status: 404 });
 
@@ -51,7 +51,6 @@ export async function onRequestGet(context) {
     resubs = r.results || [];
   } catch (e) {}
 
-  const calName = `${member.first_name || member.name}'s Shows`;
   const dtstamp = formatDtStamp(new Date());
 
   const lines = [
@@ -60,7 +59,7 @@ export async function onRequestGet(context) {
     'PRODID:-//Showpicker//Shows Calendar//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    `X-WR-CALNAME:${escapeIcs(calName)}`,
+    'X-WR-CALNAME:Show Picker Club',
     'X-WR-TIMEZONE:UTC',
     'REFRESH-INTERVAL;VALUE=DURATION:PT24H',
     'X-PUBLISHED-TTL:PT24H',
