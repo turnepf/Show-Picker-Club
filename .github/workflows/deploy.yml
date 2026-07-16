@@ -65,7 +65,6 @@ jobs:
           done
           # Auth gates must return 401.
           for probe in \
-            "POST /api/shows/share" \
             "GET  /api/vibe" \
             "POST /api/enrich" \
             "POST /api/sync-urls" \
@@ -82,6 +81,18 @@ jobs:
               "https://showpicker.club${path}?nocache=$RANDOM")
             if [ "$code" != "401" ]; then
               echo "::error::$method $path returned $code, expected 401"
+              fail=1
+            fi
+          done
+          # Retired endpoints are kept as 410 stubs (share-to-member and
+          # suggest-a-show, both removed before self-enroll). They reject every
+          # caller regardless of session, so they're checked here, not above.
+          for path in "/api/shows/share" "/api/suggestions"; do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" -X POST \
+              -H "Content-Type: application/json" -d '{}' \
+              "https://showpicker.club${path}?nocache=$RANDOM")
+            if [ "$code" != "410" ]; then
+              echo "::error::POST $path returned $code, expected 410 (retired stub)"
               fail=1
             fi
           done
