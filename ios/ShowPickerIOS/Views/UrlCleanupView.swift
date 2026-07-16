@@ -7,7 +7,6 @@ struct UrlCleanupView: View {
     @State private var networks: [String] = []
     @State private var conflicts: [UrlConflict] = []
     @State private var mismatches: [UrlMismatch] = []
-    @State private var badTitles: [UrlQueueItem] = []
     @State private var loading = true
 
     var body: some View {
@@ -66,25 +65,6 @@ struct UrlCleanupView: View {
                 }
             }
 
-            if !badTitles.isEmpty {
-                Section {
-                    ForEach(badTitles) { item in
-                        NavigationLink {
-                            BadTitleItemView(item: item) { await load() }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.title).font(.body)
-                                Text("\(item.network ?? "no network") · \(item.members ?? "")")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                } header: {
-                    Text("Wrong titles (no poster match)")
-                } footer: {
-                    Text("The link works, but no poster ever matched the stored name — so no rating or cast either. Loading this list already tried recovering each name from the show's own link; these need a human. Fix the name to re-enrich every copy, or mark it as right if the name isn't the problem.")
-                }
-            }
         }
         .navigationTitle("URL Cleanup")
         .navigationBarTitleDisplayMode(.inline)
@@ -101,104 +81,7 @@ struct UrlCleanupView: View {
             networks = r.networks
             conflicts = r.conflicts ?? []
             mismatches = r.mismatches ?? []
-            badTitles = r.badTitles ?? []
         }
-    }
-}
-
-// Fix a show whose title didn't match anything — the URL is usually fine, so
-// no link controls here. Reuses the fix_title action: renames every member's
-// copy, then re-pulls title/rating/cast/poster. The network can be corrected
-// in the same save; wrong-service URLs are cleared for the next fill pass.
-private struct BadTitleItemView: View {
-    let item: UrlQueueItem
-    let onChange: () async -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var newTitle: String
-    @State private var network: String
-    @State private var working = false
-    @State private var banner: String?
-
-    init(item: UrlQueueItem, onChange: @escaping () async -> Void) {
-        self.item = item
-        self.onChange = onChange
-        _newTitle = State(initialValue: item.title)
-        _network = State(initialValue: item.network ?? "")
-    }
-
-    private var trimmedTitle: String { newTitle.trimmingCharacters(in: .whitespaces) }
-    private var titleChanged: Bool { trimmedTitle != item.title }
-    private var networkChanged: Bool { network != (item.network ?? "") }
-
-    var body: some View {
-        Form {
-            Section("Show") {
-                LabeledContent("Title", value: item.title)
-                if let n = item.network { LabeledContent("Network", value: n) }
-                if let m = item.members, !m.isEmpty { LabeledContent("On", value: m) }
-            }
-            Section {
-                TextField("Correct title", text: $newTitle)
-                    .textInputAutocapitalization(.words)
-                Picker("Network", selection: $network) {
-                    Text("Keep current").tag(item.network ?? "")
-                    ForEach(CANONICAL_NETWORKS.filter { $0 != item.network }, id: \.self) { Text($0).tag($0) }
-                }
-                Button("Save & re-enrich") { Task { await save() } }
-                    .disabled(trimmedTitle.isEmpty || (!titleChanged && !networkChanged) || working)
-            } header: {
-                Text("Fix the title / network")
-            } footer: {
-                Text("Updates every member's copy and re-pulls the canonical title, rating, cast, and poster. Changing the network clears links that pointed at the old service.")
-            }
-            Section {
-                Button("Title is right — stop flagging it") { Task { await dismissTitle() } }
-                    .disabled(working)
-            } footer: {
-                Text("Keeps the show exactly as stored and removes it from this queue for good — for real titles the poster databases simply don't carry.")
-            }
-            if let b = banner {
-                Section { Text(b).foregroundStyle(b.hasPrefix("✓") ? .green : .red) }
-            }
-        }
-        .navigationTitle("Wrong title")
-        .navigationBarTitleDisplayMode(.inline)
-        .overlay { if working { ProgressView().controlSize(.large) } }
-    }
-
-    private func save() async {
-        working = true
-        defer { working = false }
-        banner = nil
-        do {
-            let r = try await API.fixShowTitle(id: item.id,
-                                               newTitle: trimmedTitle,
-                                               network: networkChanged ? network : nil)
-            if let e = r.error { banner = e }
-            else {
-                banner = "✓ Saved as \(r.newTitle ?? trimmedTitle)"
-                await onChange()
-                try? await Task.sleep(nanoseconds: 700_000_000)
-                dismiss()
-            }
-        } catch { banner = "Network error. Try again." }
-    }
-
-    private func dismissTitle() async {
-        working = true
-        defer { working = false }
-        banner = nil
-        do {
-            let r = try await API.dismissBadTitle(id: item.id)
-            if let e = r.error { banner = e }
-            else {
-                banner = "✓ Kept as-is — won't be flagged again"
-                await onChange()
-                try? await Task.sleep(nanoseconds: 700_000_000)
-                dismiss()
-            }
-        } catch { banner = "Network error. Try again." }
     }
 }
 

@@ -200,47 +200,37 @@ A few intentional omissions:
   - **Show Picker on your Mac** — the iPhone app running natively on macOS
     via Catalyst (7/7).
 
-- **Retire the after-the-fact title-healing bandaids.** Since July 2026,
-  adding or suggesting a show searches TMDB as you type and the member
-  picks the exact entry (`/api/title-search` + `tmdb_id`/`tmdb_type`
-  pins through `POST /api/shows`, `PUT /api/shows/:id`, and
-  `POST /api/suggestions`) — so new rows arrive with the canonical
-  title, correct movie flag, poster, rating, and cast, and the guessing
-  machinery only serves legacy rows and free-text stragglers. Once the
-  queues have drained (give it a few weeks of enrich rotations), strip
-  in roughly this order: the bad-titles queue + its auto-fix pass and
-  the `title_ok` dismiss control (`admin-url-cleanup.js`, web
-  `url-cleanup.html`, iOS `UrlCleanupView`); `titleFromUrl` og:title
-  recovery (`_shared/title-fix.js` callers in `enrich.js` and the
-  cleanup endpoint); the title-variant spelling retries and cross-type
-  flip searches in `enrich.js`'s poster passes; and the OMDB
-  title-guessing fallbacks in `_shared/enrichment.js` /
-  `suggestions.js`. Keep `fetchEnrichmentById`, the artwork
-  sync/propagation passes, and the URL queue (links still rot
-  independently of titles). Check each queue is actually empty before
-  deleting the tool that drains it.
+## Shipped (formerly backlog)
 
-- **Social login — Google.** ~~Sign in with Apple~~ shipped in the iOS app
-  (`/auth/apple`, mapping the Apple ID email back to an existing member's
-  `member_emails` row, then remembering the Apple `sub` in
-  `member_apple_ids`). Google would layer on the same way: an additional
-  sign-in path that maps the SSO email to a seeded member, keeping seeding
-  operator-controlled (no public sign-up).
+- **Title-healing bandaids retired (July 2026).** Since TMDB type-ahead
+  pinning made new rows arrive with canonical title, movie flag, poster,
+  rating, and cast, the after-the-fact guessing machinery only served a
+  legacy backlog that has now fully drained (the bad-titles and `title_ok`
+  queues were verified empty in production before removal). Removed: the
+  bad-titles queue + its auto-fix pass and the `title_ok` dismiss control
+  (`admin-url-cleanup.js`, `url-cleanup.html`, iOS `UrlCleanupView`);
+  `titleFromUrl` og:title recovery (`_shared/title-fix.js` and its callers
+  in `enrich.js` and the cleanup endpoint); the title-variant spelling
+  retries and cross-type flip searches in `enrich.js`'s poster passes; and
+  the OMDB title-guessing fallback in `_shared/enrichment.js`
+  (`suggestions.js` was already a retired 410 stub). Kept:
+  `fetchEnrichmentById`, the artwork sync/propagation passes, the URL queue
+  and its conflict/mismatch tools, and the operator's manual `fix_title`
+  rename (still shared by the URL queue). The `title_ok` column stays on
+  `shows` as an inert, always-zero remnant — harmless to leave, and dropping
+  it would need a migration for no benefit.
 
-- **Open signup ("request access" flow).** Anyone can submit name +
-  email on a `/signup` page. Submission lands in a `pending_signups`
-  table and notifies the operator. Operator approves from `/members`
-  with one click, which runs the existing create-member flow and emails
-  the new member a welcome with their first login code. Keeps the
-  trust model identical to today (operator vets every member) but
-  removes the operator as the bottleneck for inbound interest. No
-  CAPTCHA / Turnstile needed at this scale since the human approval
-  gate already kills automated abuse.
+- **Social login — Google.** Shipped alongside Sign in with Apple:
+  `/auth/google` verifies a Google ID token, maps the `sub` via
+  `member_google_ids` (migration 031) then falls back to verified email,
+  and self-enrolls. Gated on `GOOGLE_CLIENT_ID` (returns 501 until set).
 
-- **SMS login codes via Twilio A2P 10DLC.** Shelved June 2026 after
-  two rejections (consent-required, then person-to-person). Email-OTP
-  is doing the job. Revisit only if a member can't use email, if
-  Twilio's small-sender lane improves, or if we switch to a provider
-  with friendlier verification (Vonage, Sinch). Server-side already
-  accepts `channel: 'sms'` on `/auth/request-code`; just the
-  `sendSms()` half is stubbed.
+- **Open signup — shipped as the `/join` flow.** Public `/join` form →
+  `signup_requests` table → operator approves from `/admin` (the `/members`
+  page surfaces a pending-count banner linking there). Approval runs the
+  create-member flow and hands the operator intro text to send manually
+  (no automated welcome email). Naming differs from the original spec
+  (`/join` not `/signup`, `signup_requests` not `pending_signups`).
+
+- **SMS login codes.** Resolved by reworking the Twilio setup, which cleared
+  the A2P 10DLC verification problem that had shelved it in June 2026.

@@ -1,5 +1,8 @@
-// Shared enrichment: TMDB (search + cast + actor IMDB IDs) + OMDB (IMDB rating by ID).
-// TMDB is primary. OMDB is fallback for both lookup and rating.
+// Shared enrichment: TMDB (search + cast + actor IMDB IDs) + OMDB (IMDB rating
+// by exact IMDB id). TMDB is the sole title-lookup path; OMDB is used only to
+// attach an IMDB rating once TMDB has resolved the show's IMDB id. (The OMDB
+// title-guessing fallback was retired once TMDB type-ahead pinning made new
+// rows arrive canonical — see docs/PRODUCT.md.)
 
 async function tmdbFetch(path, token) {
   const res = await fetch(`https://api.themoviedb.org/3${path}`, {
@@ -20,46 +23,6 @@ async function omdbById(imdbId, apiKey) {
     }
   } catch (_) {}
   return { rating: null, canonicalTitle: null };
-}
-
-async function omdbByTitle(title, apiKey, type) {
-  async function tryTitle(t) {
-    try {
-      let url = `https://www.omdbapi.com/?t=${encodeURIComponent(t)}&apikey=${apiKey}`;
-      if (type) url += `&type=${type}`;
-      const res = await fetch(url);
-      const d = await res.json();
-      if (d.Response === 'True') return d;
-    } catch (_) {}
-    return null;
-  }
-
-  let d = await tryTitle(title);
-  if (!d) d = await tryTitle('The ' + title);
-  if (!d && title.toLowerCase().startsWith('the ')) d = await tryTitle(title.slice(4));
-
-  if (!d) {
-    try {
-      let url = `https://www.omdbapi.com/?s=${encodeURIComponent(title)}&apikey=${apiKey}`;
-      if (type) url += `&type=${type}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.Response === 'True' && data.Search?.length) {
-        const dr = await fetch(`https://www.omdbapi.com/?i=${data.Search[0].imdbID}&apikey=${apiKey}`);
-        const dd = await dr.json();
-        if (dd.Response === 'True') d = dd;
-      }
-    } catch (_) {}
-  }
-
-  if (!d) return null;
-  return {
-    imdbId: d.imdbID || null,
-    rating: d.imdbRating !== 'N/A' ? d.imdbRating : null,
-    canonicalTitle: d.Title || null,
-    actors: d.Actors && d.Actors !== 'N/A' ? d.Actors.split(', ') : [],
-    posterUrl: d.Poster && d.Poster !== 'N/A' ? d.Poster : null,
-  };
 }
 
 // TMDB poster paths are relative; w500 is a good size for tvOS cards.
@@ -124,7 +87,6 @@ export async function fetchEnrichmentById(tmdbId, mediaType, env) {
 
 export async function fetchEnrichment(title, env, isMovie) {
   const token = env.TMDB_TOKEN;
-  const omdbKey = env.OMDB_API_KEY;
   // Try the stored media type first, then the other one. Documentaries and
   // stand-up specials often live under TMDB's *movie* index even when a
   // member added them as a show (and vice versa) — without the flip, a
@@ -161,24 +123,7 @@ export async function fetchEnrichment(title, env, isMovie) {
         return { ...result, canonicalTitle: result.canonicalTitle || title };
       }
     } catch (_) {
-      // fall through to OMDB
-    }
-  }
-
-  // ── OMDB fallback ──────────────────────────────────────────────────────────
-  if (omdbKey) {
-    // Same cross-type retry as TMDB: OMDB files docs/specials under the
-    // other type too, so a typed miss gets one untyped-flip attempt.
-    const result = await omdbByTitle(title, omdbKey, isMovie ? 'movie' : 'series')
-      || await omdbByTitle(title, omdbKey, isMovie ? 'series' : 'movie');
-    if (result) {
-      return {
-        canonicalTitle: result.canonicalTitle,
-        rating: result.rating,
-        actors: result.actors.map(name => ({ name, imdb_id: null })),
-        posterUrl: result.posterUrl || null,
-        networkLogoUrl: null,
-      };
+      // TMDB errored — nothing to fall back to; return the empty shape.
     }
   }
 
