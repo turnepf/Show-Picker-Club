@@ -1,7 +1,6 @@
 import { getSession } from '../_shared/auth.js';
 import { cronAuthorized } from '../_shared/secrets.js';
 import { fetchEnrichment } from '../_shared/enrichment.js';
-import { titleFromUrl, renameShowCopies } from '../_shared/title-fix.js';
 
 // TMDB GET that works with either credential the worker has configured:
 // the v4 Bearer token (TMDB_TOKEN, what the shared enrichment path uses) is
@@ -21,21 +20,7 @@ async function tmdbGet(path, env) {
   return res.json();
 }
 
-// A few title spellings to try against TMDB, since an exact-title search misses
-// shows stored with a year suffix, a "Title: Subtitle", or a leading "The".
-// Kept to 3 so an unmatched title costs at most 3 searches (stays well under
-// Cloudflare's 50-subrequest budget even at batch size).
-function titleVariants(raw) {
-  const out = [];
-  const push = (t) => { const s = (t || '').replace(/\s+/g, ' ').trim(); if (s && !out.includes(s)) out.push(s); };
-  push(raw);
-  push(raw.replace(/\s*\(\d{4}\)\s*$/, '').replace(/\s+\d{4}$/, '').split(':')[0]);
-  if (/^the\s+/i.test(raw)) push(raw.replace(/^the\s+/i, ''));
-  else push('The ' + raw);
-  return out.slice(0, 3);
-}
-
-// Best TMDB result across the title variants (or null). type is 'tv' | 'movie'.
+// Best TMDB result for the title (or null). type is 'tv' | 'movie'.
 //
 // TMDB sorts search results by popularity, not title match, so a popular
 // spin-off outranks the exact-title original it was named after — a search for
@@ -47,49 +32,15 @@ function tmdbResultTitle(r, type) {
   return ((type === 'movie' ? r.title : r.name) || '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
 async function tmdbSearchFirst(title, type, env) {
-  let fallback = null;
-  for (const q of titleVariants(title)) {
-    try {
-      const data = await tmdbGet(`/search/${type}?query=${encodeURIComponent(q)}`, env);
-      const results = (data && data.results) || [];
-      if (!results.length) continue;
-      const want = q.toLowerCase();
-      const exact = results.find((r) => tmdbResultTitle(r, type) === want);
-      if (exact) return exact;
-      if (!fallback) fallback = results[0];
-    } catch (e) {}
-  }
-  return fallback;
-}
-
-// Single raw-title search against the *other* media type. Documentaries and
-// stand-up specials often live under TMDB's movie index even when a member
-// added them as a show (and vice versa), so a typed miss gets exactly one
-// flipped attempt — raw title only, to keep the subrequest cost at 1.
-async function tmdbSearchFlipped(title, type, env) {
-  const flipped = type === 'movie' ? 'tv' : 'movie';
   try {
-    const data = await tmdbGet(`/search/${flipped}?query=${encodeURIComponent(title)}`, env);
-    if (data && data.results && data.results.length) return data.results[0];
-  } catch (e) {}
-  return null;
-}
-
-// Last resort when no title spelling matches TMDB: the stored name is likely
-// made up ("Juul Documentary"), but the row's own deep link points at the
-// streaming service's title page, whose og:title carries the real name.
-// Recover it, re-search, and rename every copy to the matched title so the
-// bad name heals for good. Returns the TMDB result or null. Costs 1 page
-// fetch + up to 3 searches, and only fires for shows whose title search
-// already failed — rare after the first healing pass.
-async function recoverTitleFromUrl(show, type, env) {
-  const guess = await titleFromUrl(show.network_url);
-  if (!guess || guess.toLowerCase() === show.title.toLowerCase()) return null;
-  const first = await tmdbSearchFirst(guess, type, env);
-  if (!first) return null;
-  const realTitle = (type === 'movie' ? first.title : first.name) || guess;
-  await renameShowCopies(env, show.title, realTitle);
-  return first;
+    const data = await tmdbGet(`/search/${type}?query=${encodeURIComponent(title)}`, env);
+    const results = (data && data.results) || [];
+    if (!results.length) return null;
+    const want = title.replace(/\s+/g, ' ').trim().toLowerCase();
+    return results.find((r) => tmdbResultTitle(r, type) === want) || results[0];
+  } catch (e) {
+    return null;
+  }
 }
 
 // Fill missing artwork from sibling copies of the same title — a poster
@@ -364,18 +315,9 @@ export async function onRequestPost(context) {
 
     for (const show of tmdbShows) {
       try {
-        // Search TMDB for the show (trying a few title spellings), falling
-        // back to recovering the real title from the row's own deep link.
-        const first = await tmdbSearchFirst(show.title, 'tv', env)
-          || await recoverTitleFromUrl(show, 'tv', env);
+        // Search TMDB for the show by its stored title.
+        const first = await tmdbSearchFirst(show.title, 'tv', env);
         if (!first) {
-          // Before writing the title off, check TMDB's movie index — docs and
-          // stand-up specials members add as shows usually live there. A hit
-          // only yields artwork (no seasons/dates apply), which is enough to
-          // keep a correctly-named title out of the bad-titles queue.
-          const flipped = await tmdbSearchFlipped(show.title, 'tv', env);
-          const flippedPoster = flipped && flipped.poster_path
-            ? `https://image.tmdb.org/t/p/w500${flipped.poster_path}` : null;
           // Stamp enriched_at so a title TMDB can't match rotates to the back
           // of the oldest-first queue instead of blocking it every round. (A DB
           // write, not a fetch — it doesn't count against the subrequest cap.)
@@ -383,12 +325,10 @@ export async function onRequestPost(context) {
           // groups by title and sorts by the group's oldest stamp, so one
           // unstamped sibling would pin a hopeless title to the front forever.
           await env.DB.prepare(
-            `UPDATE shows SET poster_url = COALESCE(?, poster_url),
-                              enriched_at = datetime('now')
+            `UPDATE shows SET enriched_at = datetime('now')
               WHERE archived = 0
                 AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
-          ).bind(flippedPoster, show.id).run();
-          if (flippedPoster) tmdbUpdated++;
+          ).bind(show.id).run();
           continue;
         }
 
@@ -440,10 +380,8 @@ export async function onRequestPost(context) {
         ).bind(newDate, endDate, isComplete, genres, seasonsReleased, posterUrl, networkLogoUrl, show.id).run();
         // Artwork is per-row; push it to every member's copy of this title so
         // one lookup fills all lists instead of each copy waiting its own turn
-        // in the rotation. Fill-only (COALESCE keeps existing artwork). Keyed
-        // on the row's current title — it may just have been renamed by
-        // recoverTitleFromUrl. A DB write, not a fetch, so it doesn't count
-        // against the subrequest budget.
+        // in the rotation. Fill-only (COALESCE keeps existing artwork). A DB
+        // write, not a fetch, so it doesn't count against the subrequest budget.
         if (posterUrl || networkLogoUrl) {
           await env.DB.prepare(
             `UPDATE shows SET poster_url = COALESCE(poster_url, ?),
@@ -477,11 +415,7 @@ export async function onRequestPost(context) {
 
     for (const show of movieShows) {
       try {
-        const first = await tmdbSearchFirst(show.title, 'movie', env)
-          || await recoverTitleFromUrl(show, 'movie', env)
-          // Cross-type rescue, mirroring the TV pass: a "movie" that's
-          // really filed as a TV title still gets its artwork.
-          || await tmdbSearchFlipped(show.title, 'movie', env);
+        const first = await tmdbSearchFirst(show.title, 'movie', env);
         const posterPath = first && first.poster_path;
         const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
         // Title-scoped: fills every member's copy in one go, and stamps
