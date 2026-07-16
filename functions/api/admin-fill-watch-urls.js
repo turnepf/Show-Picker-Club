@@ -123,8 +123,11 @@ export async function onRequestPost(context) {
       -- best we can do. Don't re-queue them every cleanup pass.
       -- Two shapes accepted: the auto-generated /search? URL and the
       -- operator-pasted /search/result? URL.
-      AND network_url NOT LIKE 'https://play.hbomax.com/search?%'
-      AND network_url NOT LIKE 'https://play.hbomax.com/search/result?%'
+      -- NULL-safe: NULL NOT LIKE ... is NULL in SQLite, so a bare NOT
+      -- LIKE here silently skipped every missing-URL row.
+      AND (network_url IS NULL OR (
+            network_url NOT LIKE 'https://play.hbomax.com/search?%'
+        AND network_url NOT LIKE 'https://play.hbomax.com/search/result?%'))
     -- Dedup by title — one lookup per show, push the result to every
     -- member's same-titled row via the UPDATE below.
     GROUP BY LOWER(title)
