@@ -179,6 +179,31 @@ There is no admin role in the session model — admin actions are gated purely b
 - **Engages** by editing notes, moving shows between lists, adding new shows, archiving, or sharing. Any of these flips the member out of "seed-only" status and they begin showing in popular, recommendations, and vibe.
 - **Goes dormant** when 60 days pass without a session ping; the member card disappears from the home page picker until they come back. They're still reachable by direct URL.
 
+## Admin platform policy
+
+Admin tooling lives on exactly two surfaces, kept at feature parity
+(July 2026):
+
+- **Web** (`/admin`, `/members`, plus Show Cleanup / Vibe admin / Reporting).
+- **The universal iOS app** (Admin tab) — which covers iPhone, iPad, and the
+  Mac Catalyst build in one codebase.
+
+**tvOS and watchOS are view-only by design** — no admin screens, ever; the
+TV's account screen shows a cosmetic "Operator" label and nothing more.
+That's a deliberate scope call (a 10-foot UI is the wrong place for a ban
+button), not a gap to fill.
+
+Member management on both admin surfaces covers: roster with status badges
+(ADMIN / DISABLED / PENDING), last login and 30-day activity, rename (slug
+and URL never change), email/phone editing, create member, disable/enable
+(kills sessions), approving held self-enrolled members, admin
+promote/demote (`/api/admin-member-role`; the server refuses to demote the
+last admin, and a full hand-off is promote-then-demote-yourself — this is
+the path the `admin_must_demote_first` account-deletion error points at),
+and a single "New members" queue holding both `/join` requests and held
+self-enrolled members. When adding a member-management capability, add it
+to both surfaces in the same change or note the follow-up in the Backlog.
+
 ## Future / not built
 
 A few intentional omissions:
@@ -186,6 +211,8 @@ A few intentional omissions:
 - No notifications (calendar feed substitutes for premiere alerts).
 - No comments or threads — discussion happens off-app.
 - No public sign-up or invitation tokens.
+- No hard delete of other members from admin UIs — disable (ban) plus
+  self-service account deletion covers it.
 
 ## Backlog
 

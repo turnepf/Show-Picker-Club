@@ -1,35 +1,115 @@
 import SwiftUI
 
-// Operator tool: edit members' login emails and phone numbers.
-// GET/POST /api/admin-member-emails. Reached from AdminView → Members.
+// Operator tool: the full member roster — rename, edit login emails/phones,
+// disable/enable, approve held members, and hand off the admin role. Mirrors
+// the web /members page capability-for-capability (GET/POST
+// /api/admin-member-emails, /api/admin-member-disable,
+// /api/admin-member-approve, /api/admin-member-role). Reached from
+// AdminView → Manage members.
 struct ManageMembersView: View {
     @State private var members: [AdminMember] = []
     @State private var loading = true
+    @AppStorage("membersSortBy") private var sortBy = "last_login_desc"
 
     var body: some View {
         List {
-            ForEach(members) { m in
+            ForEach(sortedMembers) { m in
                 NavigationLink {
-                    MemberContactEditView(member: m) { await load() }
+                    MemberDetailAdminView(member: m) { await load() }
                 } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(m.personName).font(.body)
-                        Text(contactSummary(m)).font(.caption).foregroundStyle(.secondary)
-                    }
+                    memberRow(m)
                 }
             }
         }
         .navigationTitle("Members")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Picker("Sort", selection: $sortBy) {
+                        Text("Most recent login").tag("last_login_desc")
+                        Text("Oldest / never logged in").tag("last_login_asc")
+                        Text("Name").tag("name")
+                        Text("Slug").tag("slug")
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                }
+            }
+        }
         .overlay { if loading && members.isEmpty { ProgressView() } }
         .task { await load() }
         .refreshable { await load() }
     }
 
+    @ViewBuilder private func memberRow(_ m: AdminMember) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Text(m.personName).font(.body)
+                if m.isAdmin == true { statusTag("ADMIN", .blue) }
+                if m.disabled == true { statusTag("DISABLED", .red) }
+                if m.approved == false { statusTag("PENDING", .orange) }
+            }
+            Text(contactSummary(m)).font(.caption).foregroundStyle(.secondary)
+            Text(contextLine(m)).font(.caption).foregroundStyle(.secondary)
+        }
+        .opacity(m.disabled == true ? 0.6 : 1)
+    }
+
+    private func statusTag(_ text: String, _ color: Color) -> some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(color)
+    }
+
     private func contactSummary(_ m: AdminMember) -> String {
         let e = m.emails.count
         let p = m.phones.count
-        return "\(e) email\(e == 1 ? "" : "s") · \(p) phone\(p == 1 ? "" : "s")"
+        var parts = ["\(e) email\(e == 1 ? "" : "s") · \(p) phone\(p == 1 ? "" : "s")"]
+        if let via = m.enrolledVia, !via.isEmpty { parts.append("via \(via)") }
+        return parts.joined(separator: " · ")
+    }
+
+    // Last login + 30-day list activity, matching the web roster's context row.
+    private func contextLine(_ m: AdminMember) -> String {
+        var parts = [lastLoginText(m.lastLogin)]
+        if let a = m.activity30d {
+            let total = a.watching + a.waiting + a.recommending + a.next
+            parts.append(total == 0 ? "no list activity in 30 days" : "\(total) list adds in 30 days")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private var sortedMembers: [AdminMember] {
+        let byName: (AdminMember, AdminMember) -> Bool = {
+            $0.personName.localizedCaseInsensitiveCompare($1.personName) == .orderedAscending
+        }
+        switch sortBy {
+        case "slug":
+            return members.sorted { $0.slug < $1.slug }
+        case "last_login_asc":
+            // Never-logged-in members rise to the top so they're easy to spot.
+            return members.sorted {
+                switch ($0.lastLogin, $1.lastLogin) {
+                case (nil, nil): return byName($0, $1)
+                case (nil, _): return true
+                case (_, nil): return false
+                case let (a?, b?): return a < b
+                }
+            }
+        case "name":
+            return members.sorted(by: byName)
+        default:
+            // Most recent first; never-logged-in members sink to the bottom.
+            return members.sorted {
+                switch ($0.lastLogin, $1.lastLogin) {
+                case (nil, nil): return byName($0, $1)
+                case (nil, _): return false
+                case (_, nil): return true
+                case let (a?, b?): return a > b
+                }
+            }
+        }
     }
 
     private func load() async {
@@ -39,25 +119,83 @@ struct ManageMembersView: View {
     }
 }
 
-private struct MemberContactEditView: View {
+// Server error codes → operator-readable explanations, matching the web page.
+// Unknown codes fall through raw so new errors aren't hidden.
+func friendlyAdminError(_ code: String) -> String {
+    switch code {
+    case "cannot_disable_self": return "You can't disable yourself."
+    case "cannot_disable_admin": return "Remove their admin role first, then disable."
+    case "cannot_promote_disabled": return "Enable the member before making them an admin."
+    case "last_admin": return "They're the only admin — make someone else an admin first."
+    default: return code
+    }
+}
+
+// sessions.created_at arrives as SQLite "yyyy-MM-dd HH:mm:ss" (UTC); newer
+// fields may be ISO 8601. Accept both.
+private let sqliteDateFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    f.timeZone = TimeZone(identifier: "UTC")
+    f.locale = Locale(identifier: "en_US_POSIX")
+    return f
+}()
+
+func lastLoginText(_ iso: String?) -> String {
+    guard let iso,
+          let d = ISO8601DateFormatter().date(from: iso) ?? sqliteDateFormatter.date(from: iso)
+    else { return "never logged in" }
+    let days = Int(Date().timeIntervalSince(d) / 86_400)
+    let when: String
+    switch days {
+    case ..<1: when = "today"
+    case 1: when = "yesterday"
+    case ..<30: when = "\(days)d ago"
+    case ..<365: when = "\(days / 30)mo ago"
+    default: when = "\(days / 365)y ago"
+    }
+    return "last login \(when)"
+}
+
+private struct MemberDetailAdminView: View {
     let member: AdminMember
     let onChange: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @State private var name: String
     @State private var emails: String
     @State private var phones: String
+    @State private var isDisabled: Bool
+    @State private var isApproved: Bool
+    @State private var isAdmin: Bool
     @State private var working = false
     @State private var banner: String?
+    @State private var confirmDisable = false
+    @State private var confirmAdmin = false
 
     init(member: AdminMember, onChange: @escaping () async -> Void) {
         self.member = member
         self.onChange = onChange
+        _name = State(initialValue: [member.firstName, member.lastName].compactMap { $0 }.joined(separator: " "))
         _emails = State(initialValue: member.emails.joined(separator: ", "))
         _phones = State(initialValue: member.phones.joined(separator: ", "))
+        _isDisabled = State(initialValue: member.disabled ?? false)
+        _isApproved = State(initialValue: member.approved ?? true)
+        _isAdmin = State(initialValue: member.isAdmin ?? false)
     }
 
     var body: some View {
         Form {
+            Section {
+                TextField("Alice Baker", text: $name)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+            } header: {
+                Text("Name")
+            } footer: {
+                Text("Renames keep the member's slug and URL (@\(member.slug)).")
+            }
+
             Section {
                 TextField("name@example.com, …", text: $emails, axis: .vertical)
                     .keyboardType(.emailAddress)
@@ -82,6 +220,50 @@ private struct MemberContactEditView: View {
                 Button("Save") { Task { await save() } }.disabled(working)
             }
 
+            Section {
+                if !isApproved {
+                    Button {
+                        Task { await approve() }
+                    } label: {
+                        Label("Approve member", systemImage: "checkmark.circle.fill")
+                    }
+                    .tint(.orange)
+                }
+
+                Button {
+                    confirmAdmin = true
+                } label: {
+                    Label(isAdmin ? "Remove admin" : "Make admin",
+                          systemImage: isAdmin ? "person.badge.minus" : "person.badge.shield.checkmark")
+                }
+                .tint(.blue)
+                .confirmationDialog(
+                    isAdmin ? "Remove admin from \(member.personName)?"
+                            : "Make \(member.personName) an admin? They get member management and every admin tool.",
+                    isPresented: $confirmAdmin, titleVisibility: .visible
+                ) {
+                    Button(isAdmin ? "Remove admin" : "Make admin") { Task { await toggleAdmin() } }
+                }
+
+                Button(role: isDisabled ? nil : ButtonRole.destructive) {
+                    if isDisabled { Task { await toggleDisabled() } } else { confirmDisable = true }
+                } label: {
+                    Label(isDisabled ? "Enable member" : "Disable member",
+                          systemImage: isDisabled ? "person.fill.checkmark" : "person.slash")
+                }
+                .confirmationDialog(
+                    "Disable \(member.personName)? They'll be logged out everywhere and can't log back in until re-enabled.",
+                    isPresented: $confirmDisable, titleVisibility: .visible
+                ) {
+                    Button("Disable", role: .destructive) { Task { await toggleDisabled() } }
+                }
+            } header: {
+                Text("Status")
+            } footer: {
+                Text(statusFooter)
+            }
+            .disabled(working)
+
             if let b = banner {
                 Section { Text(b).foregroundStyle(b.hasPrefix("✓") ? .green : .red) }
             }
@@ -91,6 +273,14 @@ private struct MemberContactEditView: View {
         .overlay { if working { ProgressView().controlSize(.large) } }
     }
 
+    private var statusFooter: String {
+        var bits: [String] = []
+        if isAdmin { bits.append("Admin.") }
+        if isDisabled { bits.append("Disabled — can't log in.") }
+        if !isApproved { bits.append("Held — hidden from the roster until approved.") }
+        return bits.isEmpty ? "Active member." : bits.joined(separator: " ")
+    }
+
     private func save() async {
         working = true
         defer { working = false }
@@ -98,9 +288,10 @@ private struct MemberContactEditView: View {
         do {
             let r = try await API.updateMemberContacts(
                 slug: member.slug,
+                name: name.trimmingCharacters(in: .whitespacesAndNewlines),
                 emails: emails.trimmingCharacters(in: .whitespacesAndNewlines),
                 phones: phones.trimmingCharacters(in: .whitespacesAndNewlines))
-            if let e = r.error { banner = e }
+            if let e = r.error { banner = friendlyAdminError(e) }
             else {
                 banner = "✓ Saved"
                 await onChange()
@@ -109,21 +300,33 @@ private struct MemberContactEditView: View {
             }
         } catch { banner = "Network error. Try again." }
     }
-}
 
-private extension AdminMember {
-    // The person's actual name, from the clean first_name/last_name columns.
-    // members.name is the legacy "…'s Shows" display blob — hand-entered and
-    // inconsistent ("Chuck Brownlee's Shows" vs "Kathleen Shows"), so it's
-    // only a last-resort fallback here.
-    var personName: String {
-        [firstName, lastName].compactMap { $0 }.joined(separator: " ")
-            .ifEmpty(name ?? slug)
+    private func approve() async {
+        await run { try await API.approveMember(slug: member.slug) } onOK: { isApproved = true }
     }
-}
 
-private extension String {
-    func ifEmpty(_ fallback: String) -> String {
-        trimmingCharacters(in: .whitespaces).isEmpty ? fallback : self
+    private func toggleAdmin() async {
+        let target = !isAdmin
+        await run { try await API.setMemberAdmin(slug: member.slug, admin: target) } onOK: { isAdmin = target }
+    }
+
+    private func toggleDisabled() async {
+        let target = !isDisabled
+        await run { try await API.setMemberDisabled(slug: member.slug, disabled: target) } onOK: { isDisabled = target }
+    }
+
+    private func run(_ call: () async throws -> AdminActionResult, onOK: () -> Void) async {
+        working = true
+        defer { working = false }
+        banner = nil
+        do {
+            let r = try await call()
+            if let e = r.error { banner = friendlyAdminError(e) }
+            else {
+                onOK()
+                banner = "✓ Done"
+                await onChange()
+            }
+        } catch { banner = "Network error. Try again." }
     }
 }

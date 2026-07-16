@@ -39,7 +39,7 @@ export async function onRequestGet(context) {
   // column-less retries so the page keeps working mid-rollout.
   const memberQuery = (extras) => env.DB.prepare(`
     SELECT m.slug, m.name, m.first_name, m.last_initial, m.last_name,
-           ${extras >= 1 ? 'm.disabled,' : '0 AS disabled,'}
+           ${extras >= 1 ? 'm.is_admin, m.disabled,' : '0 AS is_admin, 0 AS disabled,'}
            ${extras >= 2 ? 'm.approved, m.enrolled_via,' : '1 AS approved, NULL AS enrolled_via,'}
            (SELECT GROUP_CONCAT(email, ',')
               FROM (SELECT email FROM member_emails
@@ -76,6 +76,7 @@ export async function onRequestGet(context) {
   const members = (results || []).map(r => ({
     slug: r.slug,
     name: r.name,
+    is_admin: !!r.is_admin,
     disabled: !!r.disabled,
     approved: !!r.approved,
     enrolled_via: r.enrolled_via || null,
@@ -95,10 +96,13 @@ export async function onRequestGet(context) {
   return json({ members });
 }
 
-// POST: replace the email and/or phone set for one member. Body:
-// { slug, emails?: string|string[], phones?: string|string[] }.
-// Sending an empty array clears the corresponding set; omitting the key
-// leaves that side alone.
+// POST: replace the email and/or phone set for one member, and/or rename
+// them. Body: { slug, emails?: string|string[], phones?: string|string[],
+// name?: string }. Sending an empty array clears the corresponding set;
+// omitting a key leaves that side alone. A rename re-derives first/last
+// name and last initial from the full name (same split as create-member)
+// but never touches the slug — URLs, shows.member_slug, and contact rows
+// all key on it (see migration 026 for the precedent).
 export async function onRequestPost(context) {
   const { request, env } = context;
   if (!(await isAdmin(request, env))) {
@@ -111,6 +115,28 @@ export async function onRequestPost(context) {
 
   const exists = await env.DB.prepare('SELECT slug FROM members WHERE slug = ?').bind(slug).first();
   if (!exists) return json({ error: 'unknown_member' }, 404);
+
+  // ---- Rename ----
+  let renamed = null;
+  if (body.name !== undefined) {
+    const fullName = String(body.name || '').trim();
+    const tokens = fullName.split(/\s+/).filter(Boolean);
+    if (!tokens.length) return json({ error: 'name_required' }, 400);
+    const firstName = tokens[0];
+    const lastName = tokens.length > 1 ? tokens[tokens.length - 1] : null;
+    const lastInitial = lastName
+      ? lastName.toLowerCase().replace(/[^a-z0-9]/g, '').charAt(0).toUpperCase() || null
+      : null;
+    renamed = {
+      name: `${firstName}'s Shows`,
+      first_name: firstName,
+      last_name: lastName,
+      last_initial: lastInitial,
+    };
+    await env.DB.prepare(
+      'UPDATE members SET name = ?, first_name = ?, last_name = ?, last_initial = ? WHERE slug = ?'
+    ).bind(renamed.name, renamed.first_name, renamed.last_name, renamed.last_initial, slug).run();
+  }
 
   // ---- Emails ----
   let emails = null;
@@ -168,5 +194,5 @@ export async function onRequestPost(context) {
     }
   }
 
-  return json({ ok: true, slug, emails, phones });
+  return json({ ok: true, slug, emails, phones, ...(renamed || {}) });
 }

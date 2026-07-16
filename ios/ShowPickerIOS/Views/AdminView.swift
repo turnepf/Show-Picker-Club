@@ -6,6 +6,10 @@ import SwiftUI
 struct AdminView: View {
     @EnvironmentObject private var auth: AuthStore
 
+    // Everyone waiting to get in: pending /join requests + held self-enrolled
+    // members. Shown as a badge on the New members row, like the web banner.
+    @State private var waitingCount = 0
+
     // Public sign-up form. Submissions land in the Signup requests queue.
     private let joinURL = URL(string: "https://showpicker.club/join")!
 
@@ -34,6 +38,7 @@ struct AdminView: View {
                 } label: {
                     Label("New members", systemImage: "tray.and.arrow.down")
                 }
+                .badge(waitingCount)
             }
             Section {
                 HStack {
@@ -70,5 +75,12 @@ struct AdminView: View {
         }
         .navigationTitle("Admin")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await loadWaitingCount() }
+    }
+
+    private func loadWaitingCount() async {
+        let pending = ((try? await API.signupRequests()) ?? []).filter { $0.status == "pending" }.count
+        let held = ((try? await API.adminMembers()) ?? []).filter { $0.approved == false }.count
+        waitingCount = pending + held
     }
 }

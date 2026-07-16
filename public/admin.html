@@ -160,10 +160,12 @@
     </nav>
     <h1 class="admin-title">New members</h1>
     <div class="admin-sub">
-      Anyone who submits the <a href="/join">/join</a> form lands here as a pending
-      request. Approve to run the create-member flow and get the intro text to send.
-      Reject marks the row for the record; nothing is sent to the requester automatically.
-      Use "Add a member manually" below to seed someone yourself.
+      Everyone waiting to get in lands here: <a href="/join">/join</a> form
+      submissions arrive as pending requests (Approve runs the create-member
+      flow and hands you the intro text; Reject just marks the row), and
+      members who self-enrolled via Sign in with Apple/Google show up as held
+      members until approved onto the roster. Use "Add a member manually"
+      below to seed someone yourself.
     </div>
     <div id="authWarn" class="err" style="display:none;">
       Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a>, then reload.
@@ -198,6 +200,7 @@
 
   <script>
     let allRequests = [];
+    let heldMembers = [];
 
     async function load() {
       const res = await fetch('/api/admin-signup-requests');
@@ -207,6 +210,14 @@
       }
       const data = await res.json();
       allRequests = data.requests || [];
+      // Self-enrolled members held off the roster (members.approved = 0)
+      // wait in the same queue as /join requests, so approvals live in one
+      // place on every platform.
+      try {
+        const mres = await fetch('/api/admin-member-emails');
+        const mdata = mres.ok ? await mres.json() : {};
+        heldMembers = (mdata.members || []).filter(m => m.approved === false);
+      } catch { heldMembers = []; }
       render();
     }
 
@@ -218,9 +229,67 @@
       const approved = allRequests.filter(r => r.status === 'approved');
       const rejected = allRequests.filter(r => r.status === 'rejected');
 
+      if (heldMembers.length) root.appendChild(heldSection(heldMembers));
       root.appendChild(section('Pending', pending, true));
       if (approved.length) root.appendChild(section('Approved', approved, false));
       if (rejected.length) root.appendChild(section('Rejected', rejected, false));
+    }
+
+    // Held self-enrolled members: already have an account and full personal
+    // use, but stay hidden from the roster/search/trending until approved.
+    function heldSection(members) {
+      const wrap = document.createElement('div');
+      const h = document.createElement('div');
+      h.className = 'section-title';
+      h.textContent = `Held members (${members.length})`;
+      wrap.appendChild(h);
+      for (const m of members) {
+        const c = document.createElement('div');
+        c.className = 'card pending';
+        const displayName = [m.first_name, m.last_name].filter(Boolean).join(' ') || m.slug;
+        c.innerHTML = `
+          <div class="top">
+            <div class="name"><a href="/${escapeHtml(m.slug)}" target="_blank" style="color:inherit;">${escapeHtml(displayName)}</a></div>
+            <div class="when">${escapeHtml(m.slug)}${m.enrolled_via ? ' · via ' + escapeHtml(m.enrolled_via) : ''}</div>
+          </div>
+          <div class="contact">
+            ${m.emails && m.emails.length ? `<span><a href="mailto:${escapeHtml(m.emails[0])}">${escapeHtml(m.emails[0])}</a></span>` : ''}
+            ${m.phones && m.phones.length ? `<span><a href="tel:${escapeHtml(m.phones[0])}">${escapeHtml(m.phones[0])}</a></span>` : ''}
+          </div>
+        `;
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+        const approveBtn = document.createElement('button');
+        approveBtn.className = 'btn-approve';
+        approveBtn.textContent = 'Approve';
+        approveBtn.onclick = () => approveHeld(c, m.slug);
+        actions.appendChild(approveBtn);
+        c.appendChild(actions);
+        wrap.appendChild(c);
+      }
+      return wrap;
+    }
+
+    async function approveHeld(card, slug) {
+      const buttons = card.querySelectorAll('button');
+      buttons.forEach(b => b.disabled = true);
+      try {
+        const res = await fetch('/api/admin-member-approve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug, action: 'approve' }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || `Failed (${res.status})`);
+          buttons.forEach(b => b.disabled = false);
+          return;
+        }
+        load();
+      } catch (e) {
+        alert('Network error: ' + e.message);
+        buttons.forEach(b => b.disabled = false);
+      }
     }
 
     function section(title, items, isPending) {

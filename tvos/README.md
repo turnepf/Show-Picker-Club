@@ -4,6 +4,8 @@ A native, **view-only** tvOS client for [showpicker.club](https://showpicker.clu
 
 Built with SwiftUI. Talks to the same public `/api/*` endpoints as the web app; no auth, no backend changes.
 
+**No admin tooling, by design.** Admin surfaces are the web and the universal iOS app only (see `docs/PRODUCT.md` → Admin platform policy); the TV shows admins a cosmetic "Operator" label and nothing more.
+
 This tvOS app ships **bundled with the iOS app as a single universal App Store listing** — they share one bundle id (`net.patrickturner.showpickerios`, iPhone + Apple TV), not two separate apps. It depends on the shared **`ShowPickerCore`** Swift package (at the repo root; models + response wrappers, also used by iOS and watchOS) and is opened together with iOS via **`ShowPickerClub.xcworkspace`**.
 
 ## What's here

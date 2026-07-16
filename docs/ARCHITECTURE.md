@@ -179,6 +179,7 @@ The complete map:
 | `POST /auth/google`                    | `functions/auth/google.js`                 | POST    | Google ID token (inert unless `GOOGLE_CLIENT_ID` set) |
 | `GET /auth/config`                     | `functions/auth/config.js`                 | GET     | none — public flags/keys for the login UI |
 | `POST /api/admin-member-disable`       | `functions/api/admin-member-disable.js`    | POST    | admin session |
+| `POST /api/admin-member-role`          | `functions/api/admin-member-role.js`       | POST    | admin session — promote/demote `members.is_admin`; refuses to demote the last admin |
 | `POST /api/admin-vibe-fill`            | `functions/api/admin-vibe-fill.js`         | POST    | admin session or `CRON_SECRET` header |
 | `POST /api/admin-url-cleanup`          | `functions/api/admin-url-cleanup.js`       | POST    | admin session |
 | `POST /api/admin-sms-test`             | `functions/api/admin-sms-test.js`          | POST    | admin session |
