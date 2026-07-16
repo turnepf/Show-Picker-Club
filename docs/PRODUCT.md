@@ -189,10 +189,13 @@ A few intentional omissions:
 
 ## Backlog
 
-- **Pending What's New entries — publish with the app builds.** These
-  features shipped in code but their changelog entries are held until the
-  matching build reaches TestFlight (add to both `public/whats-new.html`
-  and `ios/ShowPickerIOS/Views/WhatsNewView.swift`):
+- **Pending What's New entries — convert "Coming soon" to dated entries when
+  the builds ship.** These features shipped in code but not yet in a released
+  build, so they're teased in a **"Coming soon"** section at the top of
+  What's New (both `public/whats-new.html` and
+  `ios/ShowPickerIOS/Views/WhatsNewView.swift`). When the matching build
+  reaches TestFlight, move each from the coming-soon block into the dated
+  changelog:
   - **Show Picker on your wrist** — companion Apple Watch app, lists synced
     from iPhone (7/1).
   - **Your next premiere, at a glance** — watch-face complication showing the

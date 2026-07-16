@@ -12,6 +12,15 @@ struct WhatsNewView: View {
         var id: String { date + title }
     }
 
+    // Shipped in code but not yet in a released build — teased at the top
+    // until the matching build reaches TestFlight, then moved into `entries`
+    // with a date. No date, so Entry.id falls back to the (unique) title.
+    private let comingSoon: [Entry] = [
+        .init(date: "", title: "Show Picker on your wrist.", body: "A companion Apple Watch app that mirrors your lists from your iPhone \u{2014} glance at what you're watching without reaching for your phone."),
+        .init(date: "", title: "Your next premiere, at a glance.", body: "A watch-face complication showing the soonest upcoming season premiere from your lists, right on your watch face."),
+        .init(date: "", title: "Show Picker on your Mac.", body: "The iPhone app running natively on your Mac \u{2014} same lists, same everything, on the big screen."),
+    ]
+
     private let entries: [Entry] = [
         .init(date: "7/12", title: "New list names.", body: "Recommending is now Loved (shows you've watched and loved) and Up Next is now Next Up. Same lists, better names \u{2014} everything on them came along. The premiere-date line on show rows now reads \u{201C}Next episode:\u{201D} so it doesn't collide with the Next Up list."),
         .init(date: "7/4", title: "Subscription Audit.", body: "Paying for streaming you don't watch? Open the Subscription audit from your member page to see which services to keep, pause, or cancel based on what's actually on your lists. Thanks Roger!"),
@@ -41,17 +50,36 @@ struct WhatsNewView: View {
     ]
 
     var body: some View {
-        List(entries) { e in
-            VStack(alignment: .leading, spacing: 4) {
-                (Text(e.date).fontWeight(.semibold).foregroundColor(.primary)
-                 + Text("  ")
-                 + Text(e.title).fontWeight(.semibold).foregroundColor(.primary))
-                    .font(.subheadline)
-                Text(e.body)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+        List {
+            Section {
+                ForEach(comingSoon) { e in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(e.title).fontWeight(.semibold).foregroundColor(.primary)
+                            .font(.subheadline)
+                        Text(e.body)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
+                }
+            } header: {
+                Text("Coming soon")
             }
-            .padding(.vertical, 2)
+
+            Section {
+                ForEach(entries) { e in
+                    VStack(alignment: .leading, spacing: 4) {
+                        (Text(e.date).fontWeight(.semibold).foregroundColor(.primary)
+                         + Text("  ")
+                         + Text(e.title).fontWeight(.semibold).foregroundColor(.primary))
+                            .font(.subheadline)
+                        Text(e.body)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
         }
         .listStyle(.plain)
         .navigationTitle("What's New")
