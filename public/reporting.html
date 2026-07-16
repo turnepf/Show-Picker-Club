@@ -80,7 +80,8 @@
     .card, .section { border: none; border-radius: 14px; box-shadow: var(--shadow-card); }
     .topbar {
       position: sticky; top: 0; z-index: 10;
-      margin: -24px -16px 16px; padding: 12px 16px;
+      /* No negative top bleed — the admin nav sits above the sticky bar now. */
+      margin: 0 -16px 16px; padding: 12px 16px;
       background: color-mix(in srgb, var(--surface-2) 86%, transparent);
       backdrop-filter: saturate(180%) blur(12px);
       -webkit-backdrop-filter: saturate(180%) blur(12px);
@@ -91,8 +92,15 @@
 </head>
 <body>
   <div class="wrap">
+    <nav class="admin-nav">
+      <a href="/" class="back" aria-label="Back to Show Picker Club">&#9664;</a>
+      <a href="/admin">New members</a>
+      <a href="/members">Members</a>
+      <a href="/url-cleanup">URL cleanup</a>
+      <a href="/vibe-admin">Vibe admin</a>
+      <a href="/reporting" class="current">Reporting</a>
+    </nav>
     <div class="topbar">
-      <a class="back" href="/" title="Home">&#8249; Home</a>
       <h1>Reporting</h1>
     </div>
     <div class="subtitle" id="generated">Loading…</div>
