@@ -197,6 +197,19 @@ tracking, so no App Tracking Transparency prompt is presented.
 - [ ] Verify the demo sign-in once on the **Mac** build too — Review opens
       every platform on the listing.
 
+## 7. The web app's "get the app" banner
+
+The web app shows a dismissible App Store banner on Apple devices, keyed to
+the listing's numeric Apple ID: `APP_STORE_ID` at the top of
+`public/app-banner.js` (currently `6780282764`, the July 2026 listing). One
+universal listing covers iPhone / iPad / Mac / Apple TV, so that single ID is
+all the banner needs — it tailors the copy per device itself.
+
+- [ ] If the listing is ever re-created under a new Apple ID (App Store
+      Connect → the app → App Information → "Apple ID"), update
+      `APP_STORE_ID` to match. Setting it to the empty string turns the
+      banner off entirely.
+
 ---
 
 ### Why these two keep coming up
