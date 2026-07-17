@@ -268,6 +268,10 @@ Auth-gated dashboard for the operator. Calls `/api/reporting`; displays metric c
 
 Admin tools. Each requires the operator to be logged in as `patrick` (session cookie); they show a "log in first" hint otherwise. Not linked from the navigation.
 
+## Universal links
+
+`public/.well-known/apple-app-site-association` (served as `application/json` via a `_headers` rule — it has no extension) claims showpicker.club URLs for the iOS app (`NQ6AJVVBBJ.net.patrickturner.showpickerios`): member pages, `/`, and `/whats-new` open in-app when tapped from another app; API/auth/calendar/admin paths and web-only pages (`/vibe`, `/subscriptions`, legal pages) are excluded and stay in the browser. The app side is the `applinks:showpicker.club` Associated Domains entitlement (iOS + Catalyst) plus `route(url:)` handlers in `HomeView` (iPhone: pushes the member or What's New) and `IPadHomeView` (focuses the member in the sidebar, honoring the `#list` fragment web URLs carry). Cold-launch links park in `pendingLink` until the roster loads; the `dorothy` → `whitt` slug redirect is mirrored. Apple's CDN caches the AASA file (~hours), so entitlement/AASA changes take a re-install or a day to propagate to devices.
+
 ## Native clients
 
 Native SwiftUI apps for iOS, tvOS, and watchOS call the same public `/api/*` endpoints as the web. They share a `ShowPickerCore` Swift package (at the repo root) that holds the `Show` / `Actor` / `ShowList` models and their response wrappers, and are opened together via `ShowPickerClub.xcworkspace`. iOS and tvOS share one bundle id (`net.patrickturner.showpickerios`) and ship as a single universal App Store app (iPhone + Apple TV). The watchOS app (`watch/ShowPickerWatch`) is paired to the iPhone and receives its session via WatchConnectivity; its reads are public. Platform usage tracking now includes a `watchos` platform value.

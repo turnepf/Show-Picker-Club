@@ -40,6 +40,8 @@ struct IPadHomeView: View {
     // Whose lists the sidebar's list entries show. Defaults to the logged-in
     // member once auth resolves; tapping a member row moves focus to them.
     @State private var focusedSlug: String?
+    // Universal link that arrived before the roster loaded; replayed by load().
+    @State private var pendingLink: URL?
     @State private var showingLogin = false
     @State private var showingDeleteAccount = false
     @State private var showingSearch = false
@@ -95,6 +97,13 @@ struct IPadHomeView: View {
         // Auth may resolve after the member list loads; land on your Watching
         // list once it does (unless the user has already picked something).
         .onChange(of: auth.memberSlug) { _, _ in applyInitialSelection() }
+        // Universal links: focus the linked member in the sidebar. The web
+        // keeps the open tab in the URL fragment (#recommending etc.), so a
+        // shared link can land on the exact list.
+        .onOpenURL { route(url: $0) }
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+            if let url = activity.webpageURL { route(url: url) }
+        }
         // Keep the Admin accordion open whenever one of its tools is selected.
         .onChange(of: selection) { _, sel in
             if sel.map(isAdminItem) == true { adminExpanded = true }
@@ -419,7 +428,29 @@ struct IPadHomeView: View {
             return $0.activeCount > $1.activeCount
         }
         popular = pr
-        applyInitialSelection()
+        if let link = pendingLink {
+            pendingLink = nil
+            route(url: link)
+        } else {
+            applyInitialSelection()
+        }
+    }
+
+    // Route a showpicker.club URL: /<slug> focuses that member (honoring the
+    // #list fragment the web puts in shared URLs), /whats-new opens the
+    // changelog. Cold-launch links wait for the roster via pendingLink.
+    @MainActor
+    private func route(url: URL) {
+        guard let first = url.path.split(separator: "/").first.map({ String($0).lowercased() }) else { return }
+        if first == "whats-new" { selection = .whatsNew; return }
+        let slug = first == "dorothy" ? "whitt" : first // mirror the web's 301
+        if members.contains(where: { $0.slug == slug }) {
+            focusedSlug = slug
+            let frag = (url.fragment ?? "").lowercased()
+            selection = .list(ShowList(rawValue: frag) ?? .watching)
+        } else if members.isEmpty {
+            pendingLink = url
+        }
     }
 }
 
