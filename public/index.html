@@ -3501,8 +3501,10 @@
 
       const rows = [detailRow('Title', escapeHtml(show.title))];
       if (show.network) {
+        // Spell the affordance out — a bare network name reads as a label,
+        // not a link, so nobody realized it opened the show on the service.
         rows.push(detailRow('Network', realUrl
-          ? `<a href="${safeUrl(show.network_url)}" target="_blank" rel="noopener">${escapeHtml(show.network)}</a>`
+          ? `<a href="${safeUrl(show.network_url)}" target="_blank" rel="noopener">Go to show on ${escapeHtml(show.network)}</a>`
           : escapeHtml(show.network)));
       }
       if (show.rating) rows.push(detailRow('Rating', `★ ${escapeHtml(show.rating)}`));
