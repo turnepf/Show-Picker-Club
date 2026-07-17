@@ -67,6 +67,7 @@ Login is by one-time code or Sign in with Apple — there are no stored password
 | `added_by`          | TEXT | `'seed'` for seeded shows, otherwise editor email or `'Anonymous'` for public suggestions. |
 | `enriched_at`       | TEXT | Bumped by OMDB/TMDB enrichment so enrichment can prioritize stale rows. |
 | `genres`            | TEXT | Comma-separated, from TMDB. |
+| `sort_order`        | INTEGER | Position for the member's "My Order" manual sort (migration 033). NULL = never manually placed. Written only by `POST /api/shows/reorder`, which deliberately does **not** bump `updated_at`. |
 
 ### `actors`
 Join table for per-show cast.
@@ -166,6 +167,7 @@ The complete map:
 | `PUT /api/shows/[id]`                  | `functions/api/shows/[id].js`              | PUT     | session |
 | `DELETE /api/shows/[id]`               | `functions/api/shows/[id].js`              | DELETE  | session |
 | `PUT /api/shows/[id]/move`             | `functions/api/shows/[id]/move.js`         | PUT     | session |
+| `POST /api/shows/reorder`              | `functions/api/shows/reorder.js`           | POST    | session (own rows only) |
 | `PUT /api/shows/[id]/archive`          | `functions/api/shows/[id]/archive.js`      | PUT     | session |
 | `GET /api/shows/[id]/actors`           | `functions/api/shows/[id]/actors.js`       | GET     | none |
 | `POST /api/suggestions`                | `functions/api/suggestions.js`             | POST    | retired 2026-07 — returns 410 Gone |
@@ -437,6 +439,8 @@ Body: `{secret, count}`. Runs the vibe trait-backfill loop described above. The 
 
 ### `POST /api/admin-url-cleanup`
 Body: `{secret}`. Before listing, runs `propagateGoodUrls` to push every known good URL out to any sibling row still on a placeholder (so the queue never surfaces a title that someone has already fixed). Then returns the residual queue: titles where *no* copy has a good URL yet. The companion `url-cleanup.html` UI lets the operator paste a real deep link, then push it to every member's copy of that title in one go.
+
+The page's tools row also has a "Run enrichment passes" button — it loops `POST /api/enrich` (full mode: OMDB ratings/cast, TMDB posters/dates, actor-IMDB-id backfill) up to five times with the operator's session, stopping early once a pass returns all zeroes.
 
 The `inherit_networks` action (the "Adopt networks from club copies" button on the page) rescues rows that have no `network` at all — URL propagation can't reach them because it is scoped to `(title, network)`. Any active row whose title has exactly one distinct network across the rest of the club adopts that network, then a propagation pass fills its URL from the siblings. Titles whose copies disagree on the service are deliberately skipped; those belong to the conflict queue. Returns `{networks_set, urls_filled}`.
 

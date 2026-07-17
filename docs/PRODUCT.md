@@ -87,7 +87,7 @@ Alongside the web app / PWA there are native iOS, tvOS, and watchOS clients. The
 
 Footer of each list:
 
-- **Sort:** by Rating (default), A–Z, or Date Added.
+- **Sort:** by Rating (default), A–Z, Date Added, or — on your own lists — **My Order (drag to sort)**. Picking My Order puts the list in reorder mode: every row grows a ☰ grab handle (with a how-to hint above the list) and dragging saves the order immediately. The order is stored per list on the server (`sort_order`), so it follows the member across web and iOS; which sort mode is active stays a per-device choice. Shows added after the last drag sink to the bottom of My Order until placed.
 - **Toggle pills:** Ratings, Networks, Recommended By, Dates, Notes, Genres — each can be hidden globally.
 
 ## Search

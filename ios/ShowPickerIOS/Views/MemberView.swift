@@ -1,15 +1,17 @@
 import SwiftUI
 
 // Mirrors the web sort dropdown: "Next episode" (premiere date, Watching/Waiting
-// only), Rating, A–Z, Date Added. Each list remembers its own choice.
+// only), Rating, A–Z, Date Added, plus "My Order" (drag to sort, own lists
+// only). Each list remembers its own choice.
 private enum SortOption: String, CaseIterable {
-    case nextup, rating, alpha, added
+    case nextup, rating, alpha, added, manual
     var menuLabel: String {
         switch self {
         case .nextup: return "Sort by Next episode"
         case .rating: return "Sort by Rating"
         case .alpha:  return "Sort A–Z"
         case .added:  return "Sort by Date Added"
+        case .manual: return "My Order (drag to sort)"
         }
     }
 }
@@ -49,9 +51,13 @@ struct MemberView: View {
                 .padding(.top, 8)
             }
 
-            Text(listHelp(currentList))
+            // In reorder mode the help line becomes the how-to, so the grab
+            // handles never appear unexplained.
+            Text(isReordering
+                 ? "My Order: press the ≡ handle and drag a show up or down. Your order is saved."
+                 : listHelp(currentList))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(isReordering ? Color.accentColor : Color.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
                 .padding(.vertical, 6)
@@ -92,6 +98,7 @@ struct MemberView: View {
                             }
                         }
                     }
+                    .onMove(perform: isReordering ? moveItems : nil)
                 }
 
                 // Footer: 🎬 legend + per-network counts, mirroring the web
@@ -126,6 +133,11 @@ struct MemberView: View {
                     }
                 }
             }
+            // Edit mode is what puts the standard ≡ reorder handles on every
+            // row (and it pauses row navigation while dragging, which is the
+            // stock reorder behavior). Driven by the sort choice, so picking
+            // any other sort drops straight back to normal browsing.
+            .environment(\.editMode, .constant(isReordering ? .active : .inactive))
         }
         .navigationTitle(fixedList.map { list in
             isMine ? list.title : "\(member.label) · \(list.title)"
@@ -178,6 +190,10 @@ struct MemberView: View {
                 Text(SortOption.rating.menuLabel).tag(SortOption.rating)
                 Text(SortOption.alpha.menuLabel).tag(SortOption.alpha)
                 Text(SortOption.added.menuLabel).tag(SortOption.added)
+                // Dragging rearranges MY rows, so guests don't get the option.
+                if isMine {
+                    Text(SortOption.manual.menuLabel).tag(SortOption.manual)
+                }
             }
         } label: {
             Image(systemName: "line.3.horizontal.decrease.circle")
@@ -199,8 +215,16 @@ struct MemberView: View {
     }
 
     private var currentSort: SortOption {
-        sortByList[currentList.rawValue] ?? defaultSort(currentList)
+        let saved = sortByList[currentList.rawValue] ?? defaultSort(currentList)
+        // Manual sort is meaningless on someone else's page (their order,
+        // my saved preference) — fall back to the list's default there.
+        if saved == .manual && !isMine { return defaultSort(currentList) }
+        return saved
     }
+
+    // Drag-reorder mode: my page, "My Order" selected. Puts the List in edit
+    // mode so every row grows the standard ≡ grab handle.
+    private var isReordering: Bool { isMine && currentSort == .manual }
 
     private var sortSelection: Binding<SortOption> {
         Binding(
@@ -239,7 +263,30 @@ struct MemberView: View {
             }
         case .rating:
             return base.sorted { (Double($0.rating ?? "0") ?? 0) > (Double($1.rating ?? "0") ?? 0) }
+        case .manual:
+            // My saved drag order; never-placed rows (nil sort_order — e.g.
+            // added after the last drag) sink to the bottom, rating-sorted.
+            return base.sorted { a, b in
+                let pa = a.sortOrder ?? Int.max
+                let pb = b.sortOrder ?? Int.max
+                if pa != pb { return pa < pb }
+                return (Double(a.rating ?? "0") ?? 0) > (Double(b.rating ?? "0") ?? 0)
+            }
         }
+    }
+
+    // Drag handler for "My Order": restamp positions locally so the list
+    // re-renders in the new order instantly, then persist the whole order.
+    private func moveItems(from source: IndexSet, to destination: Int) {
+        var items = sortedItems()
+        items.move(fromOffsets: source, toOffset: destination)
+        let orderedIds = items.map(\.id)
+        for (pos, id) in orderedIds.enumerated() {
+            if let idx = shows.firstIndex(where: { $0.id == id }) {
+                shows[idx].sortOrder = pos
+            }
+        }
+        Task { try? await API.reorderShows(list: currentList.rawValue, ids: orderedIds) }
     }
 
     // "Next episode: 6/1 · 3 seasons" — premiere range plus the seasons count when
