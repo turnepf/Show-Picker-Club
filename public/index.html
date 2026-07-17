@@ -2941,9 +2941,20 @@
     // the row's synthetic click, so taps elsewhere still open the detail.
     function attachDragHandles(container) {
       container.querySelectorAll('.drag-handle').forEach(h => {
+        // For a real mouse (Safari on Mac especially), canceling pointerdown
+        // does NOT cancel the native mousedown — mouse events aren't
+        // "compatibility" events the way they are for touch — so the
+        // browser's text-selection drag still starts and swallows the
+        // gesture. Cancel the mouse-side events directly.
+        h.addEventListener('mousedown', e => e.preventDefault());
+        h.addEventListener('dragstart', e => e.preventDefault());
         h.addEventListener('pointerdown', e => startRowDrag(e, container));
       });
     }
+
+    // Swallow the single click that a mouse fires after pointerup — without
+    // this, dropping a row on desktop also opens that row's detail screen.
+    function squelchClick(ev) { ev.stopPropagation(); ev.preventDefault(); }
 
     function startRowDrag(e, container) {
       e.preventDefault();
@@ -2955,6 +2966,8 @@
       // mid-drag (the symptom when this goes wrong is selecting titles
       // instead of moving the row).
       document.body.classList.add('no-select');
+      const sel = window.getSelection();
+      if (sel) sel.removeAllRanges();
       const move = ev => {
         ev.preventDefault();
         const el = document.elementFromPoint(ev.clientX, ev.clientY);
@@ -2974,6 +2987,11 @@
         window.removeEventListener('pointercancel', finish);
         row.classList.remove('dragging');
         document.body.classList.remove('no-select');
+        // The mouse's post-pointerup click would open the dropped row's
+        // detail; swallow it. The timeout clears the guard on gestures
+        // that end without a click (touch, pointercancel).
+        window.addEventListener('click', squelchClick, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener('click', squelchClick, { capture: true }), 250);
         saveManualOrder(container);
       };
       window.addEventListener('pointermove', move);
