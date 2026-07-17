@@ -323,6 +323,25 @@
 
     .network-counts { text-align: center; font-size: 12px; color: var(--ink-quiet); padding: 12px 0 4px; }
 
+    /* "My Order" drag-to-reorder */
+    .drag-hint {
+      text-align: center; font-size: 12px; color: var(--accent);
+      padding: 2px 0 10px;
+    }
+    .drag-handle {
+      font-size: 20px; line-height: 1; color: var(--ink-faint);
+      padding: 10px 2px 10px 12px;
+      cursor: grab;
+      touch-action: none;           /* the handle drags; it never scrolls */
+      user-select: none; -webkit-user-select: none;
+    }
+    .ios-row.dragging {
+      opacity: 0.85;
+      box-shadow: var(--shadow-card);
+      transform: scale(1.01);
+      position: relative; z-index: 5;
+    }
+
     /* Sort + future filter controls above the list. Right-aligned utility row. */
     .list-controls {
       display: flex;
@@ -2781,9 +2800,22 @@
       // "Next episode" premiere date (soonest first); the others default to rating.
       const savedSort = localStorage.getItem('sort_order_' + currentTab);
       const dateDefaultTab = currentTab === 'waiting' || currentTab === 'watching';
-      const sortOrder = savedSort || (dateDefaultTab ? 'nextup' : 'rating');
+      // "My Order" (manual drag) only makes sense on my own page — the saved
+      // preference falls back to the default when browsing someone else's.
+      const isOwnPage = !!authMember && authMember === memberSlug;
+      let sortOrder = savedSort || (dateDefaultTab ? 'nextup' : 'rating');
+      if (sortOrder === 'manual' && !isOwnPage) sortOrder = dateDefaultTab ? 'nextup' : 'rating';
+      const manualMode = sortOrder === 'manual';
       const filtered = shows.filter(s => s.list === currentTab)
         .sort((a, b) => {
+          if (sortOrder === 'manual') {
+            // My saved drag order; never-placed rows (added since the last
+            // drag) sink to the bottom, rating-sorted.
+            const pa = a.sort_order == null ? Infinity : a.sort_order;
+            const pb = b.sort_order == null ? Infinity : b.sort_order;
+            if (pa !== pb) return pa - pb;
+            return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
+          }
           if (sortOrder === 'alpha') return (a.title || '').localeCompare(b.title || '');
           if (sortOrder === 'added') return new Date(b.created_at || 0) - new Date(a.created_at || 0);
           if (sortOrder === 'nextup') {
@@ -2851,10 +2883,21 @@
                 ${dateLine}
               </div>
               ${rating}
-              <span class="ios-row-chevron">&#8250;</span>
+              ${manualMode
+                ? `<span class="drag-handle" title="Drag to reorder">&#x2630;</span>`
+                : `<span class="ios-row-chevron">&#8250;</span>`}
             </div>
           </div>`;
       }).join('');
+
+      // In "My Order" the how-to sits right above the rows, so the ☰ handles
+      // never appear unexplained, and each row grows a grab handle.
+      if (manualMode) {
+        container.innerHTML =
+          `<div class="drag-hint">My Order — press the ☰ handle and drag a show up or down. Your order is saved.</div>`
+          + container.innerHTML;
+        attachDragHandles(container);
+      }
 
       // Footer: legend + network counts
       const hasFullSeries = filtered.some(s => s.full_series);
@@ -2881,11 +2924,75 @@
         <option value="rating"${sortOrder === 'rating' ? ' selected' : ''}>Sort by Rating</option>
         <option value="alpha"${sortOrder === 'alpha' ? ' selected' : ''}>Sort A–Z</option>
         <option value="added"${sortOrder === 'added' ? ' selected' : ''}>Sort by Date Added</option>
+        ${isOwnPage ? `<option value="manual"${sortOrder === 'manual' ? ' selected' : ''}>My Order (drag to sort)</option>` : ''}
       </select>`;
       const listControls = document.getElementById('listControls');
       if (listControls) {
         listControls.innerHTML = sortHtml;
         listControls.classList.remove('hidden');
+      }
+    }
+
+    // ── "My Order" drag-to-reorder ────────────────────────────────────────
+    // Pointer events (not HTML5 DnD) so the same code works for mouse and
+    // touch. Only the ☰ handle starts a drag — preventDefault there kills
+    // the row's synthetic click, so taps elsewhere still open the detail.
+    function attachDragHandles(container) {
+      container.querySelectorAll('.drag-handle').forEach(h => {
+        h.addEventListener('pointerdown', e => startRowDrag(e, container));
+      });
+    }
+
+    function startRowDrag(e, container) {
+      e.preventDefault();
+      e.stopPropagation();
+      const row = e.target.closest('.ios-row');
+      if (!row) return;
+      row.classList.add('dragging');
+      const move = ev => {
+        ev.preventDefault();
+        const el = document.elementFromPoint(ev.clientX, ev.clientY);
+        const over = el && el.closest ? el.closest('.ios-row') : null;
+        if (over && over !== row && over.parentElement === row.parentElement) {
+          const r = over.getBoundingClientRect();
+          const before = ev.clientY < r.top + r.height / 2;
+          row.parentElement.insertBefore(row, before ? over : over.nextSibling);
+        }
+        // Keep long lists draggable: creep the page when the pointer rides
+        // the top or bottom edge.
+        if (ev.clientY < 70) window.scrollBy(0, -12);
+        else if (ev.clientY > window.innerHeight - 70) window.scrollBy(0, 12);
+      };
+      const finish = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointercancel', finish);
+        row.classList.remove('dragging');
+        saveManualOrder(container);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', finish, { once: true });
+      window.addEventListener('pointercancel', finish, { once: true });
+    }
+
+    async function saveManualOrder(container) {
+      const ids = [...container.querySelectorAll('.ios-row')]
+        .map(r => parseInt((r.id || '').replace('row-', ''), 10))
+        .filter(Number.isInteger);
+      if (!ids.length) return;
+      // Restamp local copies so any re-render keeps this order immediately.
+      ids.forEach((id, pos) => {
+        const s = shows.find(x => x.id === id);
+        if (s) s.sort_order = pos;
+      });
+      try {
+        const res = await fetch('/api/shows/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ list: currentTab, ids }),
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+      } catch (e) {
+        showToast('Couldn’t save your order — check your connection', { tone: 'error' });
       }
     }
 

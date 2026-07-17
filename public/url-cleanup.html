@@ -10,14 +10,15 @@
     .remaining { font-size: var(--text-sm); color: var(--ink-muted); margin-bottom: 20px; }
 
     .tools {
-      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      display: flex; flex-direction: column; gap: 12px;
       background: var(--surface);
       border: 1px solid var(--border-soft);
       border-radius: 8px;
       padding: 12px 16px;
       margin-bottom: 16px;
     }
-    .tools .btn-update { flex-shrink: 0; }
+    .tool-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .tool-row .btn-update { flex-shrink: 0; min-width: 240px; }
     .tools-msg { font-size: 12px; color: var(--ink-muted); line-height: 1.5; flex: 1; min-width: 200px; }
 
     .login {
@@ -167,8 +168,14 @@
 
     <div id="bannerErr"></div>
     <div class="tools" id="tools" style="display:none;">
-      <button class="btn-update" id="inheritBtn" type="button">Adopt networks from club copies</button>
-      <span class="tools-msg" id="inheritMsg">Shows with no service set adopt the network the rest of the club uses for that title, then pick up their siblings' URLs. Titles where members disagree are skipped — resolve those below.</span>
+      <div class="tool-row">
+        <button class="btn-update" id="inheritBtn" type="button">Adopt networks from club copies</button>
+        <span class="tools-msg" id="inheritMsg">Shows with no service set adopt the network the rest of the club uses for that title, then pick up their siblings' URLs. Titles where members disagree are skipped — resolve those below.</span>
+      </div>
+      <div class="tool-row">
+        <button class="btn-update" id="enrichBtn" type="button">Run enrichment passes</button>
+        <span class="tools-msg" id="enrichMsg">Fill missing ratings, posters, dates, and actor IMDB links across the whole club — runs up to 5 passes and stops when there's nothing left to do.</span>
+      </div>
     </div>
     <div id="conflicts"></div>
     <div id="mismatches"></div>
@@ -218,6 +225,49 @@
       }
       inheritBtn.disabled = false;
       inheritBtn.textContent = oldText;
+    });
+
+    // Full enrichment from the page: same /api/enrich the member pages fire,
+    // but looped so one click drains a chunk of the backlog. Each pass does
+    // ~10 OMDB fills + a TMDB posters/dates batch + 8 actor-IMDB backfills;
+    // stops early once a pass comes back all zeroes.
+    const enrichBtn = el('enrichBtn');
+    const enrichMsg = el('enrichMsg');
+    enrichBtn.addEventListener('click', async () => {
+      enrichBtn.disabled = true;
+      const oldText = enrichBtn.textContent;
+      const totals = { omdb: 0, tmdb: 0, actors: 0 };
+      const totalsText = () =>
+        `ratings/cast ${totals.omdb} · posters/dates ${totals.tmdb} · actor IMDB links ${totals.actors}`;
+      try {
+        for (let pass = 1; pass <= 5; pass++) {
+          enrichBtn.textContent = `Enriching… (pass ${pass}/5)`;
+          const res = await fetch('/api/enrich', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            enrichMsg.textContent = data.error || `Error (${res.status})`;
+            break;
+          }
+          totals.omdb += data.enriched || 0;
+          totals.tmdb += data.tmdbUpdated || 0;
+          totals.actors += data.actorImdbFilled || 0;
+          if (!(data.enriched || data.tmdbUpdated || data.actorImdbFilled)) {
+            enrichMsg.textContent = `All caught up — ${totalsText()}.`;
+            break;
+          }
+          enrichMsg.textContent = pass === 5
+            ? `Done for now — ${totalsText()}. Click again to keep draining the backlog.`
+            : `Pass ${pass} done — ${totalsText()} so far…`;
+        }
+      } catch (e) {
+        enrichMsg.textContent = 'Network error: ' + e.message;
+      }
+      enrichBtn.disabled = false;
+      enrichBtn.textContent = oldText;
     });
 
     function escapeHtml(s) {

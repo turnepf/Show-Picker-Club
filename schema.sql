@@ -54,6 +54,9 @@ CREATE TABLE IF NOT EXISTS shows (
   -- Operator marker: the title/network are right as stored even though no
   -- poster ever matched — keeps the row out of the bad-titles cleanup queue.
   title_ok INTEGER DEFAULT 0,
+  -- Position within the member's list for the "My order" manual sort
+  -- (migration 033). NULL = never manually placed.
+  sort_order INTEGER,
   archived INTEGER DEFAULT 0,
   member_slug TEXT REFERENCES members(slug),
   created_at TEXT DEFAULT (datetime('now')),

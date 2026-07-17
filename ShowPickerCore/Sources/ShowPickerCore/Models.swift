@@ -40,6 +40,10 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
     public let networkLogoUrl: String?
     public let createdAt: String?
     public let archived: Int?
+    // Position within the member's list for the "My order" manual sort.
+    // `var` so the apps can restamp positions locally after a drag without
+    // waiting for a refetch. NULL/nil = never manually placed.
+    public var sortOrder: Int?
     // The API returns actors as a JSON-encoded string (from SQLite's
     // json_group_array). Decoded lazily via `castMembers`.
     public let actors: String?
@@ -70,7 +74,8 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         memberSlug: String? = nil,
         createdAt: String? = nil,
         posterUrl: String? = nil,
-        networkLogoUrl: String? = nil
+        networkLogoUrl: String? = nil,
+        sortOrder: Int? = nil
     ) {
         self.id = id
         self.title = title
@@ -93,6 +98,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         self.createdAt = createdAt
         self.archived = archived
         self.actors = actors
+        self.sortOrder = sortOrder
     }
 
     enum CodingKeys: String, CodingKey {
@@ -108,6 +114,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         case posterUrl = "poster_url"
         case networkLogoUrl = "network_logo_url"
         case createdAt = "created_at"
+        case sortOrder = "sort_order"
     }
 
     public var isMovie: Bool { (movie ?? 0) == 1 }

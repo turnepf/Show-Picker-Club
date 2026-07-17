@@ -496,6 +496,15 @@ enum API {
         let _: Ack = try await putJSON("/api/shows/\(id)/move", body: ["list": list])
     }
 
+    // Persist the "My order" drag order for one of my lists — ids in the
+    // desired top-to-bottom order. No offline queueing: the local sortOrder
+    // restamp keeps the UI right, and the next successful reorder resends
+    // the full order anyway.
+    static func reorderShows(list: String, ids: [Int]) async throws {
+        struct Ack: Decodable {}
+        let _: Ack = try await postJSON("/api/shows/reorder", body: ["list": list, "ids": ids])
+    }
+
     static func archiveShow(id: Int) async throws {
         do {
             try await archiveShowRemote(id: id)
