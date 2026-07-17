@@ -94,6 +94,15 @@ struct MemberView: View {
                 Text(list.title)
                     .font(.system(size: 32, weight: .semibold))
                     .foregroundColor(Theme.text)
+                // Per-network counts, mirroring the web list footer. Lives in
+                // the shelf header because the shelves scroll horizontally —
+                // there is no per-list bottom edge to hang a footer on.
+                if let counts = NetworkTally.line(for: items) {
+                    Text(counts)
+                        .font(.system(size: 20))
+                        .foregroundColor(Theme.muted)
+                        .padding(.leading, 8)
+                }
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(alignment: .top, spacing: 40) {

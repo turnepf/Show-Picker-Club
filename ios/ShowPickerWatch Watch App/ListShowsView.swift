@@ -8,16 +8,27 @@ struct ListShowsView: View {
     let shows: [Show]
 
     var body: some View {
-        List(sorted) { show in
-            NavigationLink {
-                WatchDetailView(show: show)
-            } label: {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(show.title).font(.headline).lineLimit(2)
-                    if let n = show.network, !n.isEmpty {
-                        Text(n).font(.caption2).foregroundStyle(.secondary)
+        List {
+            ForEach(sorted) { show in
+                NavigationLink {
+                    WatchDetailView(show: show)
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(show.title).font(.headline).lineLimit(2)
+                        if let n = show.network, !n.isEmpty {
+                            Text(n).font(.caption2).foregroundStyle(.secondary)
+                        }
                     }
                 }
+            }
+            // Per-network counts, mirroring the web list footer.
+            if let counts = NetworkTally.line(for: shows) {
+                Text(counts)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .listRowBackground(Color.clear)
             }
         }
         .navigationTitle(list.title)
