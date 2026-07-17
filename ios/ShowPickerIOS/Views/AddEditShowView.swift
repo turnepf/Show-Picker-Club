@@ -23,6 +23,10 @@ struct AddEditShowView: View {
     // exact pick (pinned through save so enrichment can't mismatch).
     @State private var titleHits: [TitleHit] = []
     @State private var picked: TitleHit?
+    // Pre-save dedupe (add only): an archived copy of the typed title offers
+    // a restore instead of creating a duplicate row.
+    @State private var restoreId: Int?
+    @State private var showingRestorePrompt = false
 
     var body: some View {
         NavigationStack {
@@ -84,6 +88,12 @@ struct AddEditShowView: View {
             .interactiveDismissDisabled(saving)
             .onAppear(perform: prefill)
             .overlay { if saving { ProgressView().controlSize(.large) } }
+            .alert("Already in your archive", isPresented: $showingRestorePrompt) {
+                Button("Add back to \(list.title)") { Task { await restoreArchived() } }
+                Button("Cancel", role: .cancel) { restoreId = nil }
+            } message: {
+                Text("“\(title.trimmingCharacters(in: .whitespaces))” is in your archive. Restore it to \(list.title) instead of adding a duplicate?")
+            }
         }
     }
 
@@ -142,6 +152,19 @@ struct AddEditShowView: View {
                                              memberSlug: memberSlug,
                                              tmdbId: pin?.tmdbId, tmdbType: pin?.mediaType)
             } else {
+                // Mirror the web's pre-save dedupe: an active copy blocks with
+                // a pointer to its list, an archived copy offers a restore.
+                // Offline (check unreachable) falls through to the queued add.
+                if let dup = try? await API.checkShow(title: t, member: memberSlug), dup.exists {
+                    if dup.archived == true, let id = dup.id {
+                        restoreId = id
+                        showingRestorePrompt = true
+                        return
+                    }
+                    let listName = dup.list.flatMap { ShowList(rawValue: $0)?.title } ?? "one of your lists"
+                    errorText = "“\(t)” is already on \(listName == "one of your lists" ? listName : "your \(listName) list")."
+                    return
+                }
                 _ = try await API.addShow(memberSlug: memberSlug, title: t, network: net, list: list.rawValue,
                                           notes: n, recommendedBy: rec, movie: movie,
                                           fullSeries: fullSeries, watchingWith: ww,
@@ -151,6 +174,19 @@ struct AddEditShowView: View {
             dismiss()
         } catch {
             errorText = "Couldn't save. Are you logged in?"
+        }
+    }
+
+    private func restoreArchived() async {
+        guard let id = restoreId else { return }
+        saving = true
+        defer { saving = false }
+        do {
+            try await API.restoreShow(id: id, to: list.rawValue)
+            await onSave()
+            dismiss()
+        } catch {
+            errorText = "Couldn't restore. Are you logged in?"
         }
     }
 }

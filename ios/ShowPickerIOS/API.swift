@@ -496,6 +496,22 @@ enum API {
         let _: Ack = try await putJSON("/api/shows/\(id)/move", body: ["list": list])
     }
 
+    // Pre-save dedupe: whether the member already has this title, and where.
+    struct ShowCheck: Decodable {
+        let exists: Bool
+        let id: Int?
+        let list: String?
+        let archived: Bool?
+    }
+
+    static func checkShow(title: String, member: String) async throws -> ShowCheck {
+        var comps = URLComponents()
+        comps.queryItems = [URLQueryItem(name: "title", value: title),
+                            URLQueryItem(name: "member", value: member)]
+        let query = comps.percentEncodedQuery ?? ""
+        return try await get("/api/shows/check?\(query)")
+    }
+
     // Persist the "My order" drag order for one of my lists — ids in the
     // desired top-to-bottom order. No offline queueing: the local sortOrder
     // restamp keeps the UI right, and the next successful reorder resends

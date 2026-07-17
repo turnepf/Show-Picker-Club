@@ -65,6 +65,7 @@ Tabs across the top for the four lists. Each show row collapses to one line (tit
 Two pieces of metadata are **always visible** under the row (not collapsed):
 
 - **Awaiting list:** "Next episode: 5/9" — the next premiere date only (the finale date is never shown here). The label is "Next episode" rather than "Next season" because midseason episode dates can also appear here.
+- **Every list shows the premiere date when one exists** (since 2026-07): Loved and Next Up rows carry the same "📅 Next episode" line — a show you thought was done can drop a surprise season, and the date is the nudge to move it back to Watching.
 - **Next Up list:** "Recommended by Dorothy" — surfaces attribution without an expand.
 
 ### Suggest a show

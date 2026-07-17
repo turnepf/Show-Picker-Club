@@ -20,7 +20,8 @@ struct SearchView: View {
         guard q.count >= 1 else { return [] }
         var best: [String: Show] = [:]
         for s in all {
-            let hay = "\(s.title) \(s.network ?? "") \(s.genres ?? "")".lowercased()
+            let cast = s.castMembers.map(\.name).joined(separator: " ")
+            let hay = "\(s.title) \(s.network ?? "") \(s.genres ?? "") \(cast)".lowercased()
             guard hay.contains(q) else { continue }
             let key = s.title.lowercased()
             if let existing = best[key] {
@@ -38,7 +39,7 @@ struct SearchView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 if query.trimmingCharacters(in: .whitespaces).isEmpty {
-                    hint("Search the club's shows by title, network, or genre.")
+                    hint("Search the club's shows by title, actor, network, or genre.")
                 } else if results.isEmpty {
                     if loaded {
                         VStack(spacing: 28) {
