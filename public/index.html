@@ -2801,12 +2801,13 @@
       // "Next episode" premiere date (soonest first); the others default to rating.
       const savedSort = localStorage.getItem('sort_order_' + currentTab);
       const dateDefaultTab = currentTab === 'waiting' || currentTab === 'watching';
-      // "My Order" (manual drag) only makes sense on my own page — the saved
-      // preference falls back to the default when browsing someone else's.
+      // "My Order" works on any page: on your own it's drag-to-sort; on
+      // someone else's it sorts by THEIR saved arrangement, read-only.
       const isOwnPage = !!authMember && authMember === memberSlug;
-      let sortOrder = savedSort || (dateDefaultTab ? 'nextup' : 'rating');
-      if (sortOrder === 'manual' && !isOwnPage) sortOrder = dateDefaultTab ? 'nextup' : 'rating';
+      const sortOrder = savedSort || (dateDefaultTab ? 'nextup' : 'rating');
       const manualMode = sortOrder === 'manual';
+      // Drag handles (and saving) only on your own rows.
+      const canDrag = manualMode && isOwnPage;
       const filtered = shows.filter(s => s.list === currentTab)
         .sort((a, b) => {
           if (sortOrder === 'manual') {
@@ -2880,7 +2881,7 @@
                 ${dateLine}
               </div>
               ${rating}
-              ${manualMode
+              ${canDrag
                 ? `<span class="drag-handle" title="Drag to reorder">&#x2630;</span>`
                 : `<span class="ios-row-chevron">&#8250;</span>`}
             </div>
@@ -2892,9 +2893,13 @@
       // the END of renderShows — the footer appends below use innerHTML +=,
       // which re-parses the container and would silently drop any listeners
       // attached here.
-      if (manualMode) {
+      if (canDrag) {
         container.innerHTML =
           `<div class="drag-hint">My Order — press the ☰ handle and drag a show up or down. Your order is saved.</div>`
+          + container.innerHTML;
+      } else if (manualMode) {
+        container.innerHTML =
+          `<div class="drag-hint">Shown in ${escapeHtml(owners)}'s own order.</div>`
           + container.innerHTML;
       }
 
@@ -2916,7 +2921,7 @@
       if (countsHtml) container.innerHTML += `<div class="network-counts">${countsHtml}</div>`;
 
       // Last DOM write is done — now it's safe to wire the ☰ drag handles.
-      if (manualMode) attachDragHandles(container);
+      if (canDrag) attachDragHandles(container);
 
       const nextUpOption = dateDefaultTab
         ? `<option value="nextup"${sortOrder === 'nextup' ? ' selected' : ''}>Sort by Next episode</option>`
@@ -2926,7 +2931,7 @@
         <option value="rating"${sortOrder === 'rating' ? ' selected' : ''}>Sort by Rating</option>
         <option value="alpha"${sortOrder === 'alpha' ? ' selected' : ''}>Sort A–Z</option>
         <option value="added"${sortOrder === 'added' ? ' selected' : ''}>Sort by Date Added</option>
-        ${isOwnPage ? `<option value="manual"${sortOrder === 'manual' ? ' selected' : ''}>My Order (drag to sort)</option>` : ''}
+        <option value="manual"${sortOrder === 'manual' ? ' selected' : ''}>${isOwnPage ? 'My Order (drag to sort)' : `${escapeHtml(owners)}'s Order`}</option>
       </select>`;
       const listControls = document.getElementById('listControls');
       if (listControls) {
