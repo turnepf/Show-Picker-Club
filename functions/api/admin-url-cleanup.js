@@ -68,6 +68,29 @@ const QUEUE_FILTER = `
   ))
 `;
 
+// Rows with no network at all can't be rescued by URL propagation — it's
+// scoped to (title, network). But when every other active copy of the title
+// agrees on a service, the answer is unambiguous: adopt it. Titles whose
+// copies disagree are left alone; picking a winner there is the conflict
+// queue's job. Runs on demand from the Show Cleanup page's "Adopt networks"
+// button, followed by a propagation pass so the newly-scoped rows pick up
+// their siblings' URLs in the same click.
+async function inheritNetworks(env) {
+  const result = await env.DB.prepare(`
+    UPDATE shows
+       SET network = (SELECT s.network FROM shows s
+                       WHERE LOWER(s.title) = LOWER(shows.title) AND s.archived = 0
+                         AND s.network IS NOT NULL AND s.network != ''),
+           enriched_at = datetime('now')
+     WHERE archived = 0
+       AND (network IS NULL OR network = '')
+       AND (SELECT COUNT(DISTINCT s.network) FROM shows s
+             WHERE LOWER(s.title) = LOWER(shows.title) AND s.archived = 0
+               AND s.network IS NOT NULL AND s.network != '') = 1
+  `).run();
+  return result.meta.changes;
+}
+
 async function propagateGoodUrls(env) {
   // Before listing, push every known good URL out to any sibling row that's
   // still on a placeholder. Scoped to (title, network) because the same
@@ -90,8 +113,9 @@ async function propagateGoodUrls(env) {
        AND network_url != 'https://www.amazon.com/s/'
      GROUP BY LOWER(title), network`
   ).all();
+  let filled = 0;
   for (const src of sources) {
-    await env.DB.prepare(
+    const result = await env.DB.prepare(
       `UPDATE shows
          SET network_url = ?,
              enriched_at = datetime('now')
@@ -108,7 +132,9 @@ async function propagateGoodUrls(env) {
               OR network_url = 'https://www.amazon.com/s'
               OR network_url = 'https://www.amazon.com/s/')`
     ).bind(src.network_url, src.ltitle, src.network).run();
+    filled += result.meta.changes;
   }
+  return filled;
 }
 
 async function fetchQueue(env) {
@@ -310,6 +336,12 @@ export async function onRequestPost(context) {
     ).bind(network, url, titleRow.title, network).run();
 
     return json({ ok: true, updated: result.meta.changes });
+  }
+
+  if (action === 'inherit_networks') {
+    const networksSet = await inheritNetworks(env);
+    const urlsFilled = await propagateGoodUrls(env);
+    return json({ ok: true, networks_set: networksSet, urls_filled: urlsFilled });
   }
 
   if (action === 'resolve_conflict') {
