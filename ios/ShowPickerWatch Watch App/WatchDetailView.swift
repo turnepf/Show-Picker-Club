@@ -32,7 +32,18 @@ struct WatchDetailView: View {
 
                 Text(s.title).font(.headline)
 
-                if let n = s.network, !n.isEmpty { row("Network", n) }
+                if let n = s.network, !n.isEmpty {
+                    // Spell the affordance out — a bare network name reads as
+                    // a label, so nobody realized it led to the show.
+                    if s.hasRealUrl, let u = s.networkUrl, let url = URL(string: u) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Network").font(.caption2).foregroundStyle(.secondary)
+                            Link("Go to show on \(n)", destination: url).font(.footnote)
+                        }
+                    } else {
+                        row("Network", n)
+                    }
+                }
                 if let r = s.rating, !r.isEmpty { row("Rating", "★ \(r)") }
                 if let l = ShowList(rawValue: s.list) { row("List", l.title) }
                 if let up = s.nextUpRange { row("Next episode", up) }
@@ -41,7 +52,23 @@ struct WatchDetailView: View {
                 if !s.genreList.isEmpty { row("Genres", s.genreList.joined(separator: ", ")) }
                 if let by = s.recommendedBy, !by.isEmpty { row("From", by) }
                 if let w = s.watchingWith, !w.isEmpty { row("With", w) }
-                if !cast.isEmpty { row("Cast", cast.prefix(6).map { $0.name }.joined(separator: ", ")) }
+                if !cast.isEmpty {
+                    // One line per actor so each can be its own IMDB link
+                    // (inline links inside a joined Text aren't tappable on
+                    // watchOS). Unlinked names are legacy rows the enrich
+                    // backfill hasn't reached yet.
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Cast").font(.caption2).foregroundStyle(.secondary)
+                        ForEach(Array(cast.prefix(6).enumerated()), id: \.offset) { item in
+                            if let imdb = item.element.imdbId, !imdb.isEmpty,
+                               let url = URL(string: "https://www.imdb.com/name/\(imdb)/") {
+                                Link(item.element.name, destination: url).font(.footnote)
+                            } else {
+                                Text(item.element.name).font(.footnote)
+                            }
+                        }
+                    }
+                }
                 if let notes = s.notes, !notes.isEmpty {
                     Text(notes).font(.caption2).foregroundStyle(.secondary).italic()
                 }

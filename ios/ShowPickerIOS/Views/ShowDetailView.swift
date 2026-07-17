@@ -51,7 +51,18 @@ struct ShowDetailView: View {
             // Everything factual in one compact card so a show fits on one screen.
             Section {
                 LabeledContent("Title", value: title)
-                if let n = network, !n.isEmpty { LabeledContent("Network", value: n) }
+                if let n = network, !n.isEmpty {
+                    // Spell the affordance out — a bare network name reads as
+                    // a label, so nobody realized it was the way to the show.
+                    if let urlStr = show?.networkUrl ?? initialNetworkUrl,
+                       isRealUrl(urlStr), let url = URL(string: urlStr) {
+                        LabeledContent("Network") {
+                            Link("Go to show on \(n)", destination: url)
+                        }
+                    } else {
+                        LabeledContent("Network", value: n)
+                    }
+                }
                 if let r = rating, !r.isEmpty {
                     LabeledContent("Rating") {
                         Text("\(Image(systemName: "star.fill")) \(r)").foregroundStyle(.orange)
@@ -95,7 +106,7 @@ struct ShowDetailView: View {
 
             if !cast.isEmpty {
                 Section("Cast") {
-                    Text(cast.prefix(8).map { $0.name }.joined(separator: ", "))
+                    Text(castLine)
                         .font(.callout).foregroundStyle(.secondary)
                 }
             }
@@ -198,6 +209,24 @@ struct ShowDetailView: View {
     private var shareText: String {
         let place = (network.map { " on \($0)" }) ?? ""
         return "Check out \(title)\(place) — from Show Picker Club"
+    }
+
+    // Inline comma list with tappable IMDB links — matches the web's cast
+    // card. Actors without an IMDB id (legacy rows the enrich backfill
+    // hasn't reached yet) stay plain text.
+    private var castLine: AttributedString {
+        var line = AttributedString()
+        for (i, actor) in cast.prefix(8).enumerated() {
+            if i > 0 { line += AttributedString(", ") }
+            var name = AttributedString(actor.name)
+            if let imdb = actor.imdbId, !imdb.isEmpty,
+               let url = URL(string: "https://www.imdb.com/name/\(imdb)/") {
+                name.link = url
+                name.underlineStyle = .single
+            }
+            line += name
+        }
+        return line
     }
 
     private func isRealUrl(_ u: String) -> Bool {

@@ -94,6 +94,26 @@ struct MemberView: View {
                     }
                 }
 
+                // Footer: 🎬 legend + per-network counts, mirroring the web
+                // member page's list footer.
+                if !items.isEmpty, NetworkTally.line(for: items) != nil || NetworkTally.hasFullSeries(items) {
+                    Section {
+                        VStack(spacing: 2) {
+                            if NetworkTally.hasFullSeries(items) {
+                                Text("🎬 Series Complete")
+                            }
+                            if let counts = NetworkTally.line(for: items) {
+                                Text(counts)
+                            }
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .listRowBackground(Color.clear)
+                    }
+                }
+
                 // Subscription audit is personal, so own-page only. (Vibe and
                 // Calendar moved to the home list / iPad sidebar.)
                 if isMine {
