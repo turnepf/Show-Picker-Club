@@ -97,6 +97,15 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 
 ## Working preferences
 
+- **Every feature request is a cross-platform conversation.** The product
+  ships on web, iOS/iPad, tvOS, and watchOS. When a new feature or change is
+  requested, always enumerate all platforms and state explicitly which get
+  the feature and which don't (and why — e.g. tvOS is view-only, watch is
+  read-only). Never silently implement for one platform; parity gaps that
+  slip through are expensive to rediscover. What's New content is centralized
+  in `public/whats-new.json` — update it (with platform tags) when shipping
+  member-visible features.
+
 - **Never put `#` comments in terminal commands meant for the user to paste.**
   Pasted into their zsh, comment lines execute as garbage commands and break
   the sequence. Give bare commands in separate code blocks and explain them

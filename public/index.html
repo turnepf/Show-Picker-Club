@@ -341,6 +341,7 @@
       transform: scale(1.01);
       position: relative; z-index: 5;
     }
+    body.no-select { user-select: none; -webkit-user-select: none; }
 
     /* Sort + future filter controls above the list. Right-aligned utility row. */
     .list-controls {
@@ -2856,16 +2857,12 @@
 
         let dateLine = '';
         const seasons = seasonsText(show);
-        if (currentTab === 'waiting' || currentTab === 'watching') {
-          if (show.next_season_date) {
-            dateLine = `<div class="show-sub">📅 Next episode: ${formatSeasonRange(show)}${seasons ? ` · ${seasons}` : ''}</div>`;
-          } else if (seasons) {
-            dateLine = `<div class="show-sub">${seasons}</div>`;
-          }
+        // A premiere date shows on EVERY list, not just Watching/Awaiting —
+        // a show you Loved can drop a surprise new season, and that date is
+        // exactly the nudge to move it back to Watching.
+        if (show.next_season_date) {
+          dateLine = `<div class="show-sub">📅 Next episode: ${formatSeasonRange(show)}${seasons ? ` · ${seasons}` : ''}</div>`;
         } else if (seasons) {
-          // Loved / Next Up have no premiere date, but the total
-          // seasons count is still worth surfacing — mirrors the iOS rows,
-          // which show it on every list regardless of next-up date.
           dateLine = `<div class="show-sub">${seasons}</div>`;
         }
 
@@ -2891,12 +2888,14 @@
       }).join('');
 
       // In "My Order" the how-to sits right above the rows, so the ☰ handles
-      // never appear unexplained, and each row grows a grab handle.
+      // never appear unexplained. NOTE: the drag listeners are attached at
+      // the END of renderShows — the footer appends below use innerHTML +=,
+      // which re-parses the container and would silently drop any listeners
+      // attached here.
       if (manualMode) {
         container.innerHTML =
           `<div class="drag-hint">My Order — press the ☰ handle and drag a show up or down. Your order is saved.</div>`
           + container.innerHTML;
-        attachDragHandles(container);
       }
 
       // Footer: legend + network counts
@@ -2915,6 +2914,9 @@
       const legend = legendParts.join(' | ');
       if (legend) container.innerHTML += `<div class="network-counts">${legend}</div>`;
       if (countsHtml) container.innerHTML += `<div class="network-counts">${countsHtml}</div>`;
+
+      // Last DOM write is done — now it's safe to wire the ☰ drag handles.
+      if (manualMode) attachDragHandles(container);
 
       const nextUpOption = dateDefaultTab
         ? `<option value="nextup"${sortOrder === 'nextup' ? ' selected' : ''}>Sort by Next episode</option>`
@@ -2949,6 +2951,10 @@
       const row = e.target.closest('.ios-row');
       if (!row) return;
       row.classList.add('dragging');
+      // Belt and braces against the browser starting a text selection
+      // mid-drag (the symptom when this goes wrong is selecting titles
+      // instead of moving the row).
+      document.body.classList.add('no-select');
       const move = ev => {
         ev.preventDefault();
         const el = document.elementFromPoint(ev.clientX, ev.clientY);
@@ -2967,6 +2973,7 @@
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointercancel', finish);
         row.classList.remove('dragging');
+        document.body.classList.remove('no-select');
         saveManualOrder(container);
       };
       window.addEventListener('pointermove', move);
@@ -3647,8 +3654,13 @@
       if (realUrl) actions.push(`<a class="detail-action" href="${safeUrl(show.network_url)}" target="_blank" rel="noopener">▶ Watch on ${escapeHtml(show.network || 'streaming')}</a>`);
       const mine = detailMyCopy;
       if (mine && !mine.archived) {
-        // On one of my lists → move it to any other list, edit, or archive.
-        ALL_LISTS.filter(l => l !== mine.list).forEach(l =>
+        // On one of my lists → friendly promotion labels for the moves each
+        // list is designed around (mirroring the iOS swipe labels), then
+        // plain "Move to X" for the rest, then edit/archive.
+        const promos = detailPromotions(mine.list);
+        promos.forEach(p =>
+          actions.push(`<button class="detail-action" onclick="detailMoveMine(${mine.id}, '${p.target}')">${escapeHtml(p.label)}</button>`));
+        ALL_LISTS.filter(l => l !== mine.list && !promos.some(p => p.target === l)).forEach(l =>
           actions.push(`<button class="detail-action" onclick="detailMoveMine(${mine.id}, '${l}')">Move to ${escapeHtml(LIST_LABELS[l] || l)}</button>`));
         actions.push(`<button class="detail-action" onclick="detailEdit(${mine.id})">Edit</button>`);
         actions.push(`<button class="detail-action danger" onclick="detailArchive(${mine.id})">Archive</button>`);

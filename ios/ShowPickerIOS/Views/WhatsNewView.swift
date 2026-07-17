@@ -1,50 +1,26 @@
 import SwiftUI
 
-// Changelog, ported from public/whats-new.html. There's no API for this, so
-// the entries live here; keep roughly in sync with the web page when it
-// changes. Reachable from under My Shows on the iPhone home screen and from
-// the iPad sidebar.
+// Changelog, rendered from the shared /whats-new.json — the same single
+// source of truth the web page uses, so the platforms can't drift. The last
+// successful fetch is cached in UserDefaults for offline viewing. Reachable
+// from under My Shows on the iPhone home screen and from the iPad sidebar.
 struct WhatsNewView: View {
-    private struct Entry: Identifiable {
-        let date: String
+    private struct Entry: Decodable, Identifiable {
+        let date: String?
         let title: String
         let body: String
-        var id: String { date + title }
+        var id: String { (date ?? "") + title }
+    }
+    private struct Feed: Decodable {
+        let coming_soon: [Entry]?
+        let entries: [Entry]?
     }
 
-    // Shipped in code but not yet in a released build — teased at the top
-    // until the matching build ships, then moved into `entries` with a date.
-    // No date, so Entry.id falls back to the (unique) title.
-    private let comingSoon: [Entry] = []
+    private static let cacheKey = "whats_new_cache"
 
-    private let entries: [Entry] = [
-        .init(date: "7/16", title: "Show Picker is on the App Store.", body: "Native apps for iPhone, iPad, Mac, Apple TV, and Apple Watch \u{2014} same lists, same login, everywhere."),
-        .init(date: "7/12", title: "New list names.", body: "Recommending is now Loved (shows you've watched and loved) and Up Next is now Next Up. Same lists, better names \u{2014} everything on them came along. The premiere-date line on show rows now reads \u{201C}Next episode:\u{201D} so it doesn't collide with the Next Up list."),
-        .init(date: "7/4", title: "Subscription Audit.", body: "Paying for streaming you don't watch? Open the Subscription audit from your member page to see which services to keep, pause, or cancel based on what's actually on your lists. Thanks Roger!"),
-        .init(date: "7/2", title: "Pick the right show as you type.", body: "Start typing a title in Add or Suggest and matching shows appear with their posters \u{2014} tap one to lock in the exact match. Its artwork, rating, cast, and season dates come along automatically, and it knows whether it's a show or a movie, so nothing needs fixing later."),
-        .init(date: "7/2", title: "See the full poster.", body: "Tap a show's artwork on its detail page to view it full screen."),
-        .init(date: "6/29", title: "Shake to pick.", body: "Give your phone a shake to pull a random show from your Up Next list \u{2014} an instant answer to \u{201C}what should we watch?\u{201D}"),
-        .init(date: "6/29", title: "Share a show.", body: "Send any show to a friend through the standard share sheet \u{2014} Messages, Mail, AirDrop, anything. Tap the share button on a show's detail screen."),
-        .init(date: "6/29", title: "Seasons released.", body: "Show rows now tell you how many seasons have dropped, right next to the Next up date (e.g. \u{201C}Next up: 6/1 \u{00B7} 3 seasons\u{201D}). Thanks Paula!"),
-        .init(date: "6/29", title: "Straight to your shows.", body: "Open the app while you're logged in and you land right on your own list, instead of the home screen."),
-        .init(date: "5/21", title: "Calendar feed.", body: "Each member page now has a 📅 Calendar feed link at the bottom. Subscribe in Apple Calendar, Google Calendar, or Fantastical to get upcoming season premieres and finales from that member's Watching and Waiting lists, updated daily."),
-        .init(date: "5/9", title: "Vibe.", body: "See a personality fingerprint based on each member's taste: cluster name, top trait signals, balance read, and shows aligned with the vibe. Open Vibe from any member's page. Thanks Matt!"),
-        .init(date: "4/28", title: "One-tap Add.", body: "The + Add button appears on your member page as soon as you're logged in. No need to enter edit mode first."),
-        .init(date: "4/26", title: "Cleaner show rows.", body: "Each show is one tidy line: title, network, rating. Tap the title to expand and see genre, cast, who recommended it, next season dates, who you're watching with, and notes; only the lines with data show up."),
-        .init(date: "4/21", title: "My Shows link.", body: "When logged in, a quick \u{201C}My Shows\u{201D} link appears on the home page just below the title."),
-        .init(date: "4/17", title: "Quick actions.", body: "On the Watching list, \u{201C}Watched it\u{201D} moves a show to Recommending and \u{201C}Season done\u{201D} moves it to Waiting. No dropdown needed."),
-        .init(date: "4/17", title: "Genre tags.", body: "Shows display genre info (Drama, Comedy, Thriller, etc.) pulled from TMDB."),
-        .init(date: "4/17", title: "Share this list.", body: "Share a member's list with friends via text, email, or clipboard."),
-        .init(date: "4/16", title: "What Members Are Watching.", body: "The home screen shows the most popular shows across all members. Tap a show to add it to your own list."),
-        .init(date: "4/15", title: "New domain!", body: "Show Picker Club is now at showpicker.club. The old link still works too."),
-        .init(date: "4/15", title: "Share shows to other members.", body: "See a show on someone else's list that you want to add to yours? Send it to another member's Up Next. It carries over the rating, network link, actors, and all the details."),
-        .init(date: "4/15", title: "Sort your lists.", body: "Sort any list by Rating (default), A\u{2013}Z, Date Added, or Next up."),
-        .init(date: "4/15", title: "Watching With field.", body: "Track who you're watching a show with."),
-        .init(date: "4/14", title: "Series Complete icon.", body: "Shows that have ended get a 🎬 badge."),
-        .init(date: "4/13", title: "Season dates.", body: "See when the next season starts (and when it ends) pulled automatically from TMDB."),
-        .init(date: "4/13", title: "Multi-member support.", body: "One app, multiple members, each with their own lists and login codes. Thanks Sherry!"),
-        .init(date: "4/12", title: "Initial launch.", body: "Add, edit, move, and archive shows across four lists: Watching, Waiting, Recommending, and Up Next. Auto-enriched with IMDb ratings, actors, and network links."),
-    ]
+    @State private var comingSoon: [Entry] = []
+    @State private var entries: [Entry] = []
+    @State private var failed = false
 
     // e.g. "Version 1.0.2 (15)" — read from the bundle so it always matches
     // the running binary; this is what to ask a member for when debugging.
@@ -57,6 +33,13 @@ struct WhatsNewView: View {
 
     var body: some View {
         List {
+            if failed && entries.isEmpty {
+                Section {
+                    Text("Couldn't load What's New. Check your connection and come back.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             if !comingSoon.isEmpty {
                 Section {
                     ForEach(comingSoon) { e in
@@ -74,18 +57,20 @@ struct WhatsNewView: View {
                 }
             }
 
-            Section {
-                ForEach(entries) { e in
-                    VStack(alignment: .leading, spacing: 4) {
-                        (Text(e.date).fontWeight(.semibold).foregroundColor(.primary)
-                         + Text("  ")
-                         + Text(e.title).fontWeight(.semibold).foregroundColor(.primary))
-                            .font(.subheadline)
-                        Text(e.body)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+            if !entries.isEmpty {
+                Section {
+                    ForEach(entries) { e in
+                        VStack(alignment: .leading, spacing: 4) {
+                            (Text(e.date ?? "").fontWeight(.semibold).foregroundColor(.primary)
+                             + Text("  ")
+                             + Text(e.title).fontWeight(.semibold).foregroundColor(.primary))
+                                .font(.subheadline)
+                            Text(e.body)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 2)
                     }
-                    .padding(.vertical, 2)
                 }
             }
 
@@ -100,5 +85,30 @@ struct WhatsNewView: View {
         .listStyle(.plain)
         .navigationTitle("What's New")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+    }
+
+    private func apply(_ data: Data) -> Bool {
+        guard let feed = try? JSONDecoder().decode(Feed.self, from: data) else { return false }
+        comingSoon = feed.coming_soon ?? []
+        entries = feed.entries ?? []
+        return true
+    }
+
+    private func load() async {
+        // Cached copy first so the screen is never blank offline.
+        if let cached = UserDefaults.standard.data(forKey: Self.cacheKey) {
+            _ = apply(cached)
+        }
+        guard let url = URL(string: API.baseString + "/whats-new.json") else { return }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if apply(data) {
+                UserDefaults.standard.set(data, forKey: Self.cacheKey)
+                failed = false
+            }
+        } catch {
+            failed = entries.isEmpty
+        }
     }
 }

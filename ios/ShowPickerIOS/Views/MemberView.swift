@@ -27,8 +27,13 @@ struct MemberView: View {
     @State private var loading = true
     @State private var showingLogin = false
     @State private var showingAdd = false
+    @State private var showingSearch = false
     @State private var editingShow: Show?
     @State private var sortByList: [String: SortOption] = [:]
+    // Archive Undo: the just-archived show, shown in a 6-second bottom
+    // banner (mirrors the web's undo toast).
+    @State private var undoShow: Show?
+    @State private var undoDismiss: Task<Void, Never>?
 
     init(member: Member, fixedList: ShowList? = nil) {
         self.member = member
@@ -65,8 +70,7 @@ struct MemberView: View {
             List {
                 let items = sortedItems()
                 if items.isEmpty {
-                    Text("No shows on this list.")
-                        .foregroundStyle(.secondary)
+                    emptyState
                         .frame(maxWidth: .infinity, alignment: .center)
                         .listRowBackground(Color.clear)
                 } else {
@@ -77,7 +81,7 @@ struct MemberView: View {
                         .swipeActions(edge: .trailing) {
                             if isMine {
                                 Button(role: .destructive) {
-                                    Task { try? await API.archiveShow(id: show.id); await load() }
+                                    Task { await archiveWithUndo(show) }
                                 } label: { Label("Archive", systemImage: "archivebox") }
                                 Button {
                                     editingShow = show
@@ -144,6 +148,10 @@ struct MemberView: View {
         } ?? "\(member.label)'s Shows")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                // Member-scoped search (includes archived — the restore path).
+                Button { showingSearch = true } label: { Image(systemName: "magnifyingglass") }
+            }
             ToolbarItem(placement: .topBarTrailing) { sortMenu }
             ToolbarItem(placement: .topBarTrailing) {
                 if isMine {
@@ -153,6 +161,22 @@ struct MemberView: View {
                 } else {
                     Button("Log in") { showingLogin = true }
                 }
+            }
+        }
+        // Archive Undo banner, mirroring the web's 6-second undo toast.
+        .overlay(alignment: .bottom) {
+            if let s = undoShow {
+                HStack(spacing: 12) {
+                    Text("Archived “\(s.title)”").lineLimit(1)
+                    Spacer()
+                    Button("Undo") { undoArchive() }.fontWeight(.bold)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .onAppear {
@@ -169,6 +193,11 @@ struct MemberView: View {
         .overlay { if loading && shows.isEmpty { ProgressView() } }
         .sheet(isPresented: $showingLogin) {
             LoginView().environmentObject(auth)
+        }
+        // Reload on dismiss: a restore from the search sheet's detail screen
+        // should show up in the list immediately.
+        .sheet(isPresented: $showingSearch, onDismiss: { Task { await load() } }) {
+            MemberSearchView(member: member).environmentObject(auth)
         }
         .sheet(isPresented: $showingAdd) {
             if isMine {
@@ -313,8 +342,9 @@ struct MemberView: View {
                     }
                 }
                 .font(.caption)
-                if (currentList == .watching || currentList == .waiting),
-                   let line = nextUpLine(s) {
+                // A premiere date shows on EVERY list — a Loved show that
+                // drops a surprise season is exactly what to surface.
+                if s.nextUpRange != nil, let line = nextUpLine(s) {
                     Label(line, systemImage: "calendar")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -339,5 +369,77 @@ struct MemberView: View {
         loading = true
         defer { loading = false }
         shows = (try? await API.shows(member: member.slug)) ?? []
+    }
+
+    // ── Empty states (mirrors the web's EMPTY_COPY: owner gets guidance and
+    // an Add CTA on the lists you fill yourself; guests get a neutral line).
+    @ViewBuilder private var emptyState: some View {
+        VStack(spacing: 8) {
+            Text(emptyHeadline)
+                .fontWeight(.semibold)
+                .multilineTextAlignment(.center)
+            if isMine, let help = emptyHelp {
+                Text(help)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            if isMine && (currentList == .watching || currentList == .next) {
+                Button("Add a show") { showingAdd = true }
+                    .buttonStyle(.borderedProminent)
+                    .padding(.top, 4)
+            }
+        }
+        .padding(.vertical, 24)
+    }
+
+    private var emptyHeadline: String {
+        if isMine {
+            switch currentList {
+            case .watching:     return "You're not watching anything yet."
+            case .waiting:      return "Nothing awaiting a next season."
+            case .recommending: return "Nothing loved yet."
+            case .next:         return "Your Next Up is empty."
+            }
+        }
+        switch currentList {
+        case .watching:     return "\(member.label) isn't watching anything right now."
+        case .waiting:      return "\(member.label) isn't awaiting any seasons."
+        case .recommending: return "\(member.label) hasn't loved anything yet."
+        case .next:         return "\(member.label)'s Next Up is empty."
+        }
+    }
+
+    private var emptyHelp: String? {
+        switch currentList {
+        case .watching:     return "Add a show you're actively watching so the club knows what you're into."
+        case .waiting:      return "When you finish a season but want to come back, move the show here. Premiere dates show on your calendar feed."
+        case .recommending: return "Once you've watched something you loved, move it here so the rest of the club sees it."
+        case .next:         return "Add shows you want to watch later, plus picks from other members."
+        }
+    }
+
+    // ── Archive with Undo ────────────────────────────────────────────────
+    private func archiveWithUndo(_ show: Show) async {
+        try? await API.archiveShow(id: show.id)
+        await load()
+        undoDismiss?.cancel()
+        withAnimation { undoShow = show }
+        undoDismiss = Task {
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            if !Task.isCancelled {
+                withAnimation { undoShow = nil }
+            }
+        }
+    }
+
+    private func undoArchive() {
+        guard let s = undoShow else { return }
+        undoDismiss?.cancel()
+        withAnimation { undoShow = nil }
+        Task {
+            try? await API.restoreShow(id: s.id, to: s.list)
+            await load()
+        }
     }
 }

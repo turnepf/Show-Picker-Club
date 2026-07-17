@@ -1,0 +1,159 @@
+{
+  "_comment": "Single source of truth for What's New on every platform. The web page (whats-new.html) and the iOS app (WhatsNewView) both render this file. Keep bodies plain text; put a hyperlink in `link` (web renders it, apps ignore it). Entries whose features need a new app build wait in `coming_soon` until the build ships, then move into `entries` with a date. Dates are M/D.",
+  "coming_soon": [
+    {
+      "title": "Next app update — parity pass.",
+      "body": "Coming to iPhone, iPad, Apple TV, and Apple Watch: My Order drag sorting, search that finds your archived shows (iPhone), a six-second Undo after archiving (iPhone), duplicate detection when adding (iPhone), actor search on Apple TV, per-network counts under every list, tappable IMDb cast links, premiere dates on every list, and clearer “Go to show on …” watch links."
+    }
+  ],
+  "entries": [
+    {
+      "date": "7/17",
+      "title": "Put your lists in your order.",
+      "body": "Every list's sort menu now has My Order (drag to sort) on your own page. Pick it and each row grows a ☰ handle — drag shows up or down and the order saves instantly, per list. Apple TV and Apple Watch will show your saved order automatically once the next app build ships."
+    },
+    {
+      "date": "7/17",
+      "title": "Premiere dates on every list.",
+      "body": "The “📅 Next episode” line now shows on Loved and Next Up too, not just Watching and Awaiting — sometimes a show you thought was done drops a surprise season, and that date is your nudge to move it back to Watching."
+    },
+    {
+      "date": "7/17",
+      "title": "Clearer watch links.",
+      "body": "Show detail pages now say “Go to show on Netflix” instead of just the network name, so it's obvious the link opens the show on that service."
+    },
+    {
+      "date": "7/16",
+      "title": "Show Picker is on the Apple App Store.",
+      "body": "Native apps for iPhone, iPad, Mac, Apple TV, and Apple Watch — same lists, same login, everywhere.",
+      "link": { "label": "Get Show Picker Club on the App Store", "url": "https://apps.apple.com/app/id6780282764" }
+    },
+    {
+      "date": "7/12",
+      "title": "New list names.",
+      "body": "Recommending is now Loved (shows you've watched and loved) and Up Next is now Next Up. Same lists, better names — everything on them came along. The premiere-date line on show rows now reads “Next episode:” so it doesn't collide with the Next Up list."
+    },
+    {
+      "date": "7/4",
+      "title": "Subscription Audit.",
+      "body": "Paying for streaming you don't watch? The Subscription Audit shows which services to keep, pause, or cancel based on what's actually on your lists. Thanks Roger!",
+      "link": { "label": "Open the Subscription Audit", "url": "/subscriptions" }
+    },
+    {
+      "date": "7/2",
+      "title": "Pick the right show as you type.",
+      "body": "Start typing a title in Add and matching shows appear with their posters — tap one to lock in the exact match. Its artwork, rating, cast, and season dates come along automatically, and it knows whether it's a show or a movie, so nothing needs fixing later."
+    },
+    {
+      "date": "7/2",
+      "title": "See the full poster.",
+      "body": "Tap a show's artwork on its detail page to view it full screen, on any platform."
+    },
+    {
+      "date": "6/29",
+      "title": "Shake to pick.",
+      "body": "On iPhone, give your phone a shake to pull a random show from your Next Up list — an instant answer to “what should we watch?”"
+    },
+    {
+      "date": "6/29",
+      "title": "Share a show.",
+      "body": "Send any show to a friend through the standard share sheet — text, email, or any app — from a show's detail screen in the iOS app."
+    },
+    {
+      "date": "6/29",
+      "title": "Seasons released.",
+      "body": "Show rows now tell you how many seasons have dropped, right next to the premiere date (e.g. “Next episode: 6/1 · 3 seasons”). Thanks Paula!"
+    },
+    {
+      "date": "6/29",
+      "title": "Straight to your shows.",
+      "body": "Open the app or the site while you're logged in and you land right on your own list, instead of the home page."
+    },
+    {
+      "date": "5/21",
+      "title": "Calendar feed.",
+      "body": "Each member page has a 📅 Calendar feed link. Subscribe in Apple Calendar, Google Calendar, or Fantastical to get upcoming season premieres and finales from that member's Watching and Awaiting lists, updated daily."
+    },
+    {
+      "date": "5/9",
+      "title": "Vibe.",
+      "body": "See a personality fingerprint based on each member's taste: cluster name, top trait signals, balance read, and shows aligned with the vibe. Pick any member from the dropdown. Thanks Matt!",
+      "link": { "label": "showpicker.club/vibe", "url": "/vibe" }
+    },
+    {
+      "date": "4/28",
+      "title": "One-tap Add.",
+      "body": "The + Add button appears on your member page as soon as you're logged in. No need to click Edit first."
+    },
+    {
+      "date": "4/26",
+      "title": "Cleaner show rows.",
+      "body": "Each show is one tidy line: title, network, rating. The detail screen carries genre, cast, who recommended it, next season dates, who you're watching with, and notes; only the lines with data show up."
+    },
+    {
+      "date": "4/21",
+      "title": "My Shows link.",
+      "body": "When logged in, a quick “My Shows” link appears on the home page just below the title."
+    },
+    {
+      "date": "4/17",
+      "title": "Quick actions.",
+      "body": "On the Watching list, “Watched it” moves a show to Loved and “Season done” moves it to Awaiting. No dropdown needed."
+    },
+    {
+      "date": "4/17",
+      "title": "Genre tags.",
+      "body": "Shows display genre info (Drama, Comedy, Thriller, etc.) pulled from TMDB."
+    },
+    {
+      "date": "4/17",
+      "title": "Share this list.",
+      "body": "Share a member's list with friends via text, email, or clipboard."
+    },
+    {
+      "date": "4/16",
+      "title": "What Members Are Watching.",
+      "body": "The home page shows the most popular shows across all members. Tap + to add any of them to your own list."
+    },
+    {
+      "date": "4/15",
+      "title": "New domain!",
+      "body": "Show Picker Club is now at showpicker.club. The old link still works too."
+    },
+    {
+      "date": "4/15",
+      "title": "Share shows to other members.",
+      "body": "See a show on someone else's list that you want to add to yours? Send it to another member's Up Next list, carrying over the rating, network link, actors, and all the details. (Retired 7/2026 — copy shows onto your own list from search or a show's detail screen instead.)"
+    },
+    {
+      "date": "4/15",
+      "title": "Sort your lists.",
+      "body": "Use the sort dropdown at the bottom of any list to sort by Rating (default), A–Z, or Date Added."
+    },
+    {
+      "date": "4/15",
+      "title": "Watching With field.",
+      "body": "Track who you're watching a show with."
+    },
+    {
+      "date": "4/14",
+      "title": "Series Complete icon.",
+      "body": "Shows that have ended get a 🎬 badge."
+    },
+    {
+      "date": "4/13",
+      "title": "Season dates.",
+      "body": "See when the next season starts (and when it ends) pulled automatically from TMDB."
+    },
+    {
+      "date": "4/13",
+      "title": "Multi-member support.",
+      "body": "One app, multiple members, each with their own lists and login codes. Thanks Sherry!"
+    },
+    {
+      "date": "4/12",
+      "title": "Initial launch.",
+      "body": "Add, edit, move, and archive shows across four lists. Auto-enriched with IMDb ratings, actors, and network links."
+    }
+  ]
+}
