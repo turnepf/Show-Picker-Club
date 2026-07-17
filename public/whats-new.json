@@ -3,14 +3,14 @@
   "coming_soon": [
     {
       "title": "Next app update — parity pass.",
-      "body": "Coming to iPhone, iPad, Apple TV, and Apple Watch: My Order drag sorting, search that finds your archived shows (iPhone), a six-second Undo after archiving (iPhone), duplicate detection when adding (iPhone), actor search on Apple TV, per-network counts under every list, tappable IMDb cast links, premiere dates on every list, and clearer “Go to show on …” watch links."
+      "body": "Coming to iPhone, iPad, Apple TV, and Apple Watch: My Order drag sorting, search that finds your archived shows (iPhone), a six-second Undo after archiving (iPhone), duplicate detection when adding (iPhone), actor search on Apple TV, per-network counts under every list, tappable IMDb cast links, premiere dates on every list, clearer “Go to show on …” watch links, and universal links — a shared showpicker.club link tapped in Messages or Mail opens right in the app."
     }
   ],
   "entries": [
     {
       "date": "7/17",
       "title": "Put your lists in your order.",
-      "body": "Every list's sort menu now has My Order (drag to sort) on your own page. Pick it and each row grows a ☰ handle — drag shows up or down and the order saves instantly, per list. Apple TV and Apple Watch will show your saved order automatically once the next app build ships."
+      "body": "Every list's sort menu now has My Order (drag to sort) on your own page. Pick it and each row grows a ☰ handle — drag shows up or down and the order saves instantly, per list. On another member's page the same menu offers “their Order” so you can browse a list the way its owner arranged it (viewing only — you can't change their order). Apple TV and Apple Watch will show saved orders automatically once the next app build ships."
     },
     {
       "date": "7/17",

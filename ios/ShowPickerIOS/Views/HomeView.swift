@@ -15,6 +15,9 @@ struct HomeView: View {
     // Auto-open the logged-in member's own list once per launch. Tracked so
     // tapping Back to Home doesn't immediately bounce them forward again.
     @State private var didAutoOpen = false
+    // Universal link that arrived before the roster loaded (cold launch);
+    // replayed by load().
+    @State private var pendingLink: URL?
 
     private let memberPreviewCount = 6
 
@@ -184,6 +187,30 @@ struct HomeView: View {
             // Auth may resolve after the member list loads (they refresh
             // concurrently at launch), so react to whichever lands last.
             .onChange(of: auth.memberSlug) { _, _ in maybeAutoOpen() }
+            // Universal links (a shared showpicker.club/<member> URL tapped in
+            // Messages, Mail, etc.) arrive one of two ways depending on launch
+            // state, so handle both.
+            .onOpenURL { route(url: $0) }
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                if let url = activity.webpageURL { route(url: url) }
+            }
+        }
+    }
+
+    // Route a showpicker.club URL to the matching screen: /<slug> opens that
+    // member's lists, /whats-new opens the changelog, anything else stays on
+    // Home. On a cold launch the roster may not be loaded yet — park the URL
+    // and replay it when load() lands.
+    @MainActor
+    private func route(url: URL) {
+        guard let first = url.path.split(separator: "/").first.map({ String($0).lowercased() }) else { return }
+        didAutoOpen = true // the tapped link outranks the open-my-own-list nicety
+        if first == "whats-new" { path = [.whatsNew]; return }
+        let slug = first == "dorothy" ? "whitt" : first // mirror the web's 301
+        if let m = members.first(where: { $0.slug == slug }) {
+            path = [.member(m)]
+        } else if members.isEmpty {
+            pendingLink = url
         }
     }
 
@@ -292,7 +319,12 @@ struct HomeView: View {
             return ($0.lastActivityAt ?? "") > ($1.lastActivityAt ?? "")
         }
         popular = pr
-        maybeAutoOpen()
+        if let link = pendingLink {
+            pendingLink = nil
+            route(url: link)
+        } else {
+            maybeAutoOpen()
+        }
     }
 }
 

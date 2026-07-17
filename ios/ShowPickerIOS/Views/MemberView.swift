@@ -57,10 +57,13 @@ struct MemberView: View {
             }
 
             // In reorder mode the help line becomes the how-to, so the grab
-            // handles never appear unexplained.
+            // handles never appear unexplained. Viewing someone else's
+            // arrangement gets a read-only caption instead.
             Text(isReordering
                  ? "My Order: press the ≡ handle and drag a show up or down. Your order is saved."
-                 : listHelp(currentList))
+                 : (currentSort == .manual && !isMine
+                    ? "Shown in \(member.label)'s own order."
+                    : listHelp(currentList)))
                 .font(.caption)
                 .foregroundStyle(isReordering ? Color.accentColor : Color.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -219,9 +222,12 @@ struct MemberView: View {
                 Text(SortOption.rating.menuLabel).tag(SortOption.rating)
                 Text(SortOption.alpha.menuLabel).tag(SortOption.alpha)
                 Text(SortOption.added.menuLabel).tag(SortOption.added)
-                // Dragging rearranges MY rows, so guests don't get the option.
+                // On my page this is drag-to-sort; on someone else's it
+                // sorts by THEIR saved arrangement, read-only.
                 if isMine {
                     Text(SortOption.manual.menuLabel).tag(SortOption.manual)
+                } else {
+                    Text("\(member.label)'s Order").tag(SortOption.manual)
                 }
             }
         } label: {
@@ -244,11 +250,7 @@ struct MemberView: View {
     }
 
     private var currentSort: SortOption {
-        let saved = sortByList[currentList.rawValue] ?? defaultSort(currentList)
-        // Manual sort is meaningless on someone else's page (their order,
-        // my saved preference) — fall back to the list's default there.
-        if saved == .manual && !isMine { return defaultSort(currentList) }
-        return saved
+        sortByList[currentList.rawValue] ?? defaultSort(currentList)
     }
 
     // Drag-reorder mode: my page, "My Order" selected. Puts the List in edit

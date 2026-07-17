@@ -1,0 +1,32 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["NQ6AJVVBBJ.net.patrickturner.showpickerios"],
+        "components": [
+          { "/": "/api/*", "exclude": true },
+          { "/": "/auth/*", "exclude": true },
+          { "/": "/calendar/*", "exclude": true },
+          { "/": "/.well-known/*", "exclude": true },
+          { "/": "/admin*", "exclude": true },
+          { "/": "/members*", "exclude": true },
+          { "/": "/reporting*", "exclude": true },
+          { "/": "/url-cleanup*", "exclude": true },
+          { "/": "/vibe-admin*", "exclude": true },
+          { "/": "/vibe*", "exclude": true },
+          { "/": "/subscriptions*", "exclude": true },
+          { "/": "/sms*", "exclude": true },
+          { "/": "/join*", "exclude": true },
+          { "/": "/setup*", "exclude": true },
+          { "/": "/privacy*", "exclude": true },
+          { "/": "/terms*", "exclude": true },
+          { "/": "/requests*", "exclude": true },
+          { "/": "/*" }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["NQ6AJVVBBJ.net.patrickturner.showpickerios"]
+  }
+}
