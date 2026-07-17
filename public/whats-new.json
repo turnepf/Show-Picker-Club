@@ -14,6 +14,11 @@
     },
     {
       "date": "7/17",
+      "title": "Friendlier move buttons.",
+      "body": "A show's detail screen now leads with the moves each list is designed around — “Watched it → Loved”, “Season done → Awaiting”, “Start watching” — matching the app's swipe actions, with plain “Move to” for the rest."
+    },
+    {
+      "date": "7/17",
       "title": "Premiere dates on every list.",
       "body": "The “📅 Next episode” line now shows on Loved and Next Up too, not just Watching and Awaiting — sometimes a show you thought was done drops a surprise season, and that date is your nudge to move it back to Watching."
     },
