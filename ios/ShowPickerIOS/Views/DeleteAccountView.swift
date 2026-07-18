@@ -88,7 +88,7 @@ struct DeleteAccountView: View {
         do {
             let r = try await API.confirmAccountDelete(code: code.trimmingCharacters(in: .whitespaces))
             if r.deleted == true {
-                await auth.clearLocalSession()
+                auth.clearLocalSession()
                 dismiss()
             } else if r.error == "rate_limited" {
                 errorText = "Too many attempts. Try again later."
