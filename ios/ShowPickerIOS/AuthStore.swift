@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import WidgetKit
 
 // Observable session state. URLSession.shared handles the cookie itself —
 // we just track who's logged in and which member they are so views can
@@ -23,6 +24,9 @@ final class AuthStore: ObservableObject {
             SharedSession.sync(memberSlug: slug)
             WatchBridge.shared.send(memberSlug: slug, cookie: WatchBridge.currentCookieHeader())
         }
+        // The Upcoming widget reads the App Group session we just wrote (or
+        // cleared) — have it redraw against the new state.
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     // How a login attempt resolved: a session was issued, or (self-enroll)
@@ -93,6 +97,7 @@ final class AuthStore: ObservableObject {
         // sign in on this device starts clean.
         OfflineQueue.shared.reset()
         OfflineCache.clearAll()
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     func isMe(_ slug: String) -> Bool { memberSlug == slug }

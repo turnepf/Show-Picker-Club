@@ -19,6 +19,11 @@
 		CDD1EA862FF5BE6300F095DE /* ShowPickerWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = CDD1EA7C2FF5BE6200F095DE /* ShowPickerWatch Watch App.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CDD1EA982FF5C17700F095DE /* ShowPickerCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDD1EA972FF5C17700F095DE /* ShowPickerCore */; };
 		CDE59A2E2FF5B30D00CBD097 /* ShowPickerCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDE59A2D2FF5B30D00CBD097 /* ShowPickerCore */; };
+		CDA1B000000000000000000D /* ShowPickerWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CDA1B0000000000000000001 /* ShowPickerWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CDA1B000000000000000000E /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CD0077132FF5CADE00DCCF4D /* WidgetKit.framework */; };
+		CDA1B000000000000000000F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CD0077152FF5CADE00DCCF4D /* SwiftUI.framework */; };
+		CDA1B0000000000000000011 /* ShowPickerCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDA1B0000000000000000010 /* ShowPickerCore */; };
+		CDA1B0000000000000000012 /* Shared/SharedSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* Shared/SharedSession.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,6 +48,13 @@
 			remoteGlobalIDString = CDD1EA7B2FF5BE6200F095DE;
 			remoteInfo = "ShowPickerWatch Watch App";
 		};
+		CDA1B000000000000000000B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A100000000000000000000A1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CDA1B0000000000000000002;
+			remoteInfo = ShowPickerWidgetsExtension;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -53,6 +65,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				A1000000000000000000010D /* ShowPickerShareExtension.appex in Embed Foundation Extensions */,
+				CDA1B000000000000000000D /* ShowPickerWidgetsExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -91,6 +104,7 @@
 		CD0077132FF5CADE00DCCF4D /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		CD0077152FF5CADE00DCCF4D /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		CDD1EA7C2FF5BE6200F095DE /* ShowPickerWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "ShowPickerWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CDA1B0000000000000000001 /* ShowPickerWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShowPickerWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -107,6 +121,13 @@
 				Info.plist,
 			);
 			target = CD0077112FF5CADE00DCCF4D /* ShowPickerWatchComplicationExtension */;
+		};
+		CDA1B0000000000000000007 /* Exceptions for "ShowPickerWidgets" folder in "ShowPickerWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = CDA1B0000000000000000002 /* ShowPickerWidgetsExtension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -140,6 +161,14 @@
 		CDD1EA7D2FF5BE6200F095DE /* ShowPickerWatch Watch App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "ShowPickerWatch Watch App";
+			sourceTree = "<group>";
+		};
+		CDA1B0000000000000000006 /* ShowPickerWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CDA1B0000000000000000007 /* Exceptions for "ShowPickerWidgets" folder in "ShowPickerWidgetsExtension" target */,
+			);
+			path = ShowPickerWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -185,6 +214,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CDA1B0000000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CDA1B0000000000000000011 /* ShowPickerCore in Frameworks */,
+				CDA1B000000000000000000F /* SwiftUI.framework in Frameworks */,
+				CDA1B000000000000000000E /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -198,6 +237,7 @@
 				A100000000000000000000E5 /* Shared/ShareTitleParser.swift */,
 				CDD1EA7D2FF5BE6200F095DE /* ShowPickerWatch Watch App */,
 				CD0077172FF5CADE00DCCF4D /* ShowPickerWatchComplication */,
+				CDA1B0000000000000000006 /* ShowPickerWidgets */,
 				CDE59A2C2FF5B30D00CBD097 /* Frameworks */,
 				A100000000000000000000D2 /* Products */,
 			);
@@ -211,6 +251,7 @@
 				A100000000000000000000C3 /* ShowPickerShareExtensionTests.xctest */,
 				CDD1EA7C2FF5BE6200F095DE /* ShowPickerWatch Watch App.app */,
 				CD0077122FF5CADE00DCCF4D /* ShowPickerWatchComplicationExtension.appex */,
+				CDA1B0000000000000000001 /* ShowPickerWidgetsExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -242,6 +283,7 @@
 			dependencies = (
 				A1000000000000000000010E /* PBXTargetDependency */,
 				CDD1EA852FF5BE6300F095DE /* PBXTargetDependency */,
+				CDA1B000000000000000000C /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A100000000000000000000D3 /* ShowPickerIOS */,
@@ -345,6 +387,29 @@
 			productReference = CDD1EA7C2FF5BE6200F095DE /* ShowPickerWatch Watch App.app */;
 			productType = "com.apple.product-type.application";
 		};
+		CDA1B0000000000000000002 /* ShowPickerWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CDA1B0000000000000000008 /* Build configuration list for PBXNativeTarget "ShowPickerWidgetsExtension" */;
+			buildPhases = (
+				CDA1B0000000000000000003 /* Sources */,
+				CDA1B0000000000000000004 /* Frameworks */,
+				CDA1B0000000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				CDA1B0000000000000000006 /* ShowPickerWidgets */,
+			);
+			name = ShowPickerWidgetsExtension;
+			packageProductDependencies = (
+				CDA1B0000000000000000010 /* ShowPickerCore */,
+			);
+			productName = ShowPickerWidgetsExtension;
+			productReference = CDA1B0000000000000000001 /* ShowPickerWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -395,6 +460,7 @@
 				A100000000000000000000B3 /* ShowPickerShareExtensionTests */,
 				CDD1EA7B2FF5BE6200F095DE /* ShowPickerWatch Watch App */,
 				CD0077112FF5CADE00DCCF4D /* ShowPickerWatchComplicationExtension */,
+				CDA1B0000000000000000002 /* ShowPickerWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -422,6 +488,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		CDD1EA7A2FF5BE6200F095DE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CDA1B0000000000000000005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -470,6 +543,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CDA1B0000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CDA1B0000000000000000012 /* Shared/SharedSession.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -489,6 +570,11 @@
 			platformFilter = ios;
 			target = CDD1EA7B2FF5BE6200F095DE /* ShowPickerWatch Watch App */;
 			targetProxy = CDD1EA842FF5BE6300F095DE /* PBXContainerItemProxy */;
+		};
+		CDA1B000000000000000000C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CDA1B0000000000000000002 /* ShowPickerWidgetsExtension */;
+			targetProxy = CDA1B000000000000000000B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -915,6 +1001,70 @@
 			};
 			name = Release;
 		};
+		CDA1B0000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = ShowPickerWidgets/ShowPickerWidgets.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "ShowPickerWidgets/ShowPickerWidgets-Catalyst.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 16;
+				DEVELOPMENT_TEAM = NQ6AJVVBBJ;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ShowPickerWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Show Picker Club";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.3;
+				PRODUCT_BUNDLE_IDENTIFIER = net.patrickturner.showpickerios.ShowPickerWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CDA1B000000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = ShowPickerWidgets/ShowPickerWidgets.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "ShowPickerWidgets/ShowPickerWidgets-Catalyst.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 16;
+				DEVELOPMENT_TEAM = NQ6AJVVBBJ;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ShowPickerWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Show Picker Club";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.3;
+				PRODUCT_BUNDLE_IDENTIFIER = net.patrickturner.showpickerios.ShowPickerWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -972,6 +1122,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		CDA1B0000000000000000008 /* Build configuration list for PBXNativeTarget "ShowPickerWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CDA1B0000000000000000009 /* Debug */,
+				CDA1B000000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -993,6 +1152,10 @@
 		CDE59A2D2FF5B30D00CBD097 /* ShowPickerCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = CDE59A2B2FF5B08200CBD097 /* XCLocalSwiftPackageReference "../ShowPickerCore" */;
+			productName = ShowPickerCore;
+		};
+		CDA1B0000000000000000010 /* ShowPickerCore */ = {
+			isa = XCSwiftPackageProductDependency;
 			productName = ShowPickerCore;
 		};
 /* End XCSwiftPackageProductDependency section */

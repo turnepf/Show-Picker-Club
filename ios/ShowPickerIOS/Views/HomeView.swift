@@ -197,14 +197,16 @@ struct HomeView: View {
         }
     }
 
-    // Route a showpicker.club URL to the matching screen: /<slug> opens that
-    // member's lists, /whats-new opens the changelog, anything else stays on
-    // Home. On a cold launch the roster may not be loaded yet — park the URL
-    // and replay it when load() lands.
+    // Route a showpicker.club URL to the matching screen: /show/<id> (widget
+    // taps) opens that show's card, /<slug> opens that member's lists,
+    // /whats-new opens the changelog, anything else stays on Home. On a cold
+    // launch the roster may not be loaded yet — park member URLs and replay
+    // them when load() lands (show links need no roster at all).
     @MainActor
     private func route(url: URL) {
         guard let first = url.path.split(separator: "/").first.map({ String($0).lowercased() }) else { return }
         didAutoOpen = true // the tapped link outranks the open-my-own-list nicety
+        if let show = Route.showLink(url) { path = [show]; return }
         if first == "whats-new" { path = [.whatsNew]; return }
         let slug = first == "dorothy" ? "whitt" : first // mirror the web's 301
         if let m = members.first(where: { $0.slug == slug }) {
@@ -330,6 +332,17 @@ struct HomeView: View {
 
 // Nav routes. Hashable for NavigationStack value links.
 enum Route: Hashable {
+    // showpicker.club/show/<id>?title=… — the home-screen widgets' tap-through
+    // link — parsed to the detail route it opens. nil for any other URL. The
+    // title just gives the card something to draw before its own fetch lands.
+    static func showLink(_ url: URL) -> Route? {
+        let parts = url.path.split(separator: "/").map(String.init)
+        guard parts.count >= 2, parts[0].lowercased() == "show", let id = Int(parts[1]) else { return nil }
+        let title = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "title" })?.value ?? ""
+        return .detail(id: id, title: title, network: nil, rating: nil)
+    }
+
     case member(Member)
     case detail(id: Int, title: String, network: String?, rating: String?)
     // A recommendation ("Picks for you") has no backing show row yet — open the
