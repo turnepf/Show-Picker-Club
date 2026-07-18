@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 @main
 struct ShowPickerIOSApp: App {
@@ -21,6 +22,9 @@ struct ShowPickerIOSApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     // Returning to the foreground is a good moment to retry.
                     if phase == .active { Task { await OfflineQueue.shared.flush() } }
+                    // Leaving is when list edits made this session should reach
+                    // the home-screen widgets (Upcoming reads the member's lists).
+                    if phase == .background { WidgetCenter.shared.reloadAllTimelines() }
                 }
         }
     }

@@ -24,12 +24,12 @@ ios/ShowPickerIOS/
 
 ## Build it on your Mac
 
-The Xcode project is committed at `ios/ShowPickerIOS.xcodeproj` with **two targets already wired up** — the `ShowPickerIOS` app and the `ShowPickerShareExtension` (the share-sheet integration). You don't create anything by hand; just open and run.
+The Xcode project is committed at `ios/ShowPickerIOS.xcodeproj` with **every target already wired up** — the `ShowPickerIOS` app, the `ShowPickerShareExtension` (share-sheet integration), the `ShowPickerWidgetsExtension` (iPhone/iPad/Mac home-screen widgets), the paired watch app, and its complication. You don't create anything by hand; just open and run.
 
 1. **Open `ShowPickerClub.xcworkspace`** (at the repo root) in Xcode — it contains the iOS and tvOS apps plus the shared `ShowPickerCore` package. (Opening `ios/ShowPickerIOS.xcodeproj` on its own still works, but the workspace is the intended entry point.)
 2. **Signing & Capabilities** → for *both* the `ShowPickerIOS` and `ShowPickerShareExtension` targets, select your Team. The project ships with `DEVELOPMENT_TEAM = NQ6AJVVBBJ` (the same team as the tvOS app); if that's not your team, change it on both targets.
    - The bundle IDs are `net.patrickturner.showpickerios` (app) and `net.patrickturner.showpickerios.ShareExtension` (extension). Change the prefix on both if you need a different one — keep the extension ID as a child of the app ID.
-   - The **App Group** `group.net.patrickturner.showpickerios` is already declared in both targets' entitlements. Xcode's automatic signing will register it for you; if you change the group ID, update both `.entitlements` files **and** `ios/Shared/SharedSession.swift` (the `appGroupID` constant).
+   - The **App Group** `group.net.patrickturner.showpickerios` is declared in the entitlements of every target that shares session state: the app, the share extension, the watch app, and the watch complication (the complication runs in its own process and reads the member slug + cookie from the group — without the entitlement it silently renders its empty state). Xcode's automatic signing will register it for you; if you change the group ID, update all `.entitlements` files **and** the constants in `ios/Shared/SharedSession.swift` (`appGroupID`) and `ShowPickerCore/Sources/ShowPickerCore/WatchShared.swift` (`appGroup`).
 3. Pick the iPhone simulator and **Cmd+R** (scheme: `ShowPickerIOS`). You should see the home screen load against the live API.
 4. To run on your actual iPhone, plug it in (or pair via Wi-Fi: Window → Devices and Simulators), pick it from the device dropdown, then Cmd+R.
 
@@ -62,15 +62,45 @@ The project uses Xcode's file-system-synchronized groups (same as the tvOS proje
 ios/
 ├── ShowPickerIOS.xcodeproj         ← open this
 ├── Shared/
-│   └── SharedSession.swift         ← compiled into BOTH targets (App Group cookie bridge)
+│   └── SharedSession.swift         ← compiled into app + share extension + widgets (App Group cookie bridge)
 ├── ShowPickerIOS/                  ← app target folder (auto-synced)
 │   ├── ShowPickerIOS.entitlements
 │   └── … app sources
-└── ShowPickerShareExtension/       ← extension target folder (auto-synced)
-    ├── Info.plist                  ← NSExtension config
-    ├── ShareExtension.entitlements
-    └── … extension sources
+├── ShowPickerShareExtension/       ← share extension target folder (auto-synced)
+│   ├── Info.plist                  ← NSExtension config
+│   ├── ShareExtension.entitlements
+│   └── … extension sources
+├── ShowPickerWidgets/              ← home-screen widget extension (auto-synced; see below)
+├── ShowPickerWatch Watch App/      ← paired watchOS app (session arrives over WatchConnectivity)
+└── ShowPickerWatchComplication/    ← watch-face complication (Next Premiere)
 ```
+
+## Home-screen widgets (iPhone, iPad, Mac)
+
+The `ShowPickerWidgetsExtension` target ships two WidgetKit widgets:
+
+- **Trending** — what the club is picking up right now (`/api/popular`, public,
+  so it works signed out). Small (top show as a poster card), medium (top 3),
+  large (top 5), and extra-large on iPad/Mac (top 8).
+- **Upcoming Premieres** — your next premieres from Watching + Awaiting sorted
+  by date, same rules as the watch complication. Small/medium/large plus the
+  iPhone Lock Screen (`accessoryRectangular`/`accessoryInline`) families. Needs
+  the session the app parks in the App Group — signed out it shows a sign-in
+  nudge.
+
+Mechanics, for reference:
+
+- The target builds for iOS **and Mac Catalyst** (`SUPPORTS_MACCATALYST`), so
+  the same widgets appear in the macOS widget gallery via the Mac build of the
+  app. Its Catalyst entitlements add the sandbox + network-client keys the Mac
+  requires (`ShowPickerWidgets-Catalyst.entitlements`).
+- Poster art is fetched inside the timeline provider and stored in each entry —
+  widget views render from a static snapshot and can't load images themselves.
+- Every show links to `https://showpicker.club/show/<id>?title=…`; the app's
+  universal-link routing (`Route.showLink` in `HomeView.swift`, plus the iPad
+  split view's `detailPath`) opens that show's card from it.
+- The app nudges `WidgetCenter` on auth changes (`AuthStore`) and when it goes
+  to background (`ShowPickerIOSApp`) so widgets track logins and list edits.
 
 ## Share Extension (iOS share sheet → Next Up)
 

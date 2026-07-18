@@ -42,6 +42,10 @@ struct IPadHomeView: View {
     @State private var focusedSlug: String?
     // Universal link that arrived before the roster loaded; replayed by load().
     @State private var pendingLink: URL?
+    // Pushes on the detail column's stack. Owned here (not by the
+    // NavigationStack) so widget deep links can push a show card directly;
+    // cleared whenever detailKey resets the stack, matching the old behavior.
+    @State private var detailPath: [Route] = []
     @State private var showingLogin = false
     @State private var showingDeleteAccount = false
     @State private var showingSearch = false
@@ -82,7 +86,7 @@ struct IPadHomeView: View {
             // The detail column is its own stack so MemberView's NavigationLinks
             // (to show detail, Vibe, etc.) push here. The id resets it to the
             // section root whenever the sidebar choice or focused member changes.
-            NavigationStack {
+            NavigationStack(path: $detailPath) {
                 detailRoot
                     .navigationDestination(for: Route.self) { route in
                         destination(route)
@@ -91,6 +95,7 @@ struct IPadHomeView: View {
             .id(detailKey)
         }
         .task { if loading { await load() } }
+        .onChange(of: detailKey) { _, _ in detailPath = [] }
         .sheet(isPresented: $showingLogin) { LoginView().environmentObject(auth) }
         .sheet(isPresented: $showingDeleteAccount) { DeleteAccountView().environmentObject(auth) }
         .sheet(isPresented: $showingSearch) { SearchView().environmentObject(auth) }
@@ -442,6 +447,9 @@ struct IPadHomeView: View {
     @MainActor
     private func route(url: URL) {
         guard let first = url.path.split(separator: "/").first.map({ String($0).lowercased() }) else { return }
+        // Widget taps: push the show's card onto the detail column. Needs no
+        // roster, and leaves the sidebar selection alone.
+        if let show = Route.showLink(url) { detailPath = [show]; return }
         if first == "whats-new" { selection = .whatsNew; return }
         let slug = first == "dorothy" ? "whitt" : first // mirror the web's 301
         if members.contains(where: { $0.slug == slug }) {
