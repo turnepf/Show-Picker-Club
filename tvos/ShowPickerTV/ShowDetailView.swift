@@ -394,10 +394,10 @@ struct ShowDetailView: View {
 
     private var buttonLabel: String {
         let n = network ?? "Streaming"
-        // "Go to show on X" everywhere the detail names the network — people
-        // didn't realize the network name was the way to the show. When we
-        // can't deep-link (just opening the service app), stay honest.
-        let verb = canDeepLink ? "Go to show on" : "Open"
+        // "Watch on X" matches the wording on web/iOS/watch — people didn't
+        // realize the network name was the way to the show. When we can't
+        // deep-link (just opening the service app), stay honest.
+        let verb = canDeepLink ? "Watch on" : "Open"
         return "\(verb) \(n)"
     }
 

@@ -19,7 +19,6 @@ struct ShowDetailView: View {
     @State private var posterExpanded = false
     @State private var addingToMine = false
     @State private var addAlert: AddAlert?
-    @Environment(\.openURL) private var openURL
 
     private var title: String { show?.title ?? initialTitle }
     private var network: String? { show?.network ?? initialNetwork }
@@ -57,7 +56,7 @@ struct ShowDetailView: View {
                     if let urlStr = show?.networkUrl ?? initialNetworkUrl,
                        isRealUrl(urlStr), let url = URL(string: urlStr) {
                         LabeledContent("Network") {
-                            Link("Go to show on \(n)", destination: url)
+                            Link("Watch on \(n)", destination: url)
                         }
                     } else {
                         LabeledContent("Network", value: n)
@@ -111,17 +110,8 @@ struct ShowDetailView: View {
                 }
             }
 
-            if let urlStr = show?.networkUrl,
-               let url = URL(string: urlStr),
-               isRealUrl(urlStr) {
-                Section {
-                    Button {
-                        openURL(url)
-                    } label: {
-                        Label("Watch on \(network ?? "Streaming")", systemImage: "play.fill")
-                    }
-                }
-            }
+            // No separate "Watch on …" button — the Network row above is the
+            // watch link, and it renders whenever the same real URL exists.
 
             if let m = mineActive, let cur = ShowList(rawValue: m.list) {
                 // On one of my lists → move it to any list, or archive it.
