@@ -110,9 +110,9 @@
   ];
 
   // Operator pages, in the same order as the old top pill nav (Reporting
-  // added; it lives under Admin on iOS).
+  // added; it lives under Admin on iOS). The new-members queue lives at the
+  // top of Members now — /admin just redirects there.
   var ADMIN_PAGES = [
-    { href: '/admin', label: 'New members' },
     { href: '/members', label: 'Members' },
     { href: '/url-cleanup', label: 'Show Cleanup' },
     { href: '/vibe-admin', label: 'Vibe admin' },

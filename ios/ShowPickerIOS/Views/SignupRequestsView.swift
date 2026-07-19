@@ -117,6 +117,8 @@ struct SignupRequestsView: View {
         .padding(.vertical, 2)
     }
 
+    // Reviewed rows carry a Hide: dismisses the request for good (the
+    // server stops returning it), so the queue empties once processed.
     @ViewBuilder private func reviewedRow(_ r: SignupRequest) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(r.fullName).font(.body)
@@ -124,6 +126,14 @@ struct SignupRequestsView: View {
                 Text(r.status.capitalized)
                     .foregroundStyle(r.status == "approved" ? .green : .secondary)
                 if let s = r.createdMemberSlug { Text("· @\(s)") }
+                Spacer()
+                if working == r.id {
+                    ProgressView()
+                } else {
+                    Button("Hide") { Task { await act(r, action: "hide") } }
+                        .buttonStyle(.borderless)
+                        .disabled(working != nil)
+                }
             }
             .font(.caption)
         }
@@ -143,7 +153,7 @@ struct SignupRequestsView: View {
                 banner = "Couldn't \(action): \(e)"
             } else if action == "approve" {
                 banner = "Approved \(r.fullName)" + (res.created?.slug.map { " → @\($0)" } ?? "")
-            } else {
+            } else if action == "reject" {
                 banner = "Rejected \(r.fullName)"
             }
             await load()

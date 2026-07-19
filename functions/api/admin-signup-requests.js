@@ -9,26 +9,32 @@ function json(data, status = 200) {
 }
 
 // GET — list every request grouped by status. Pending first because that's
-// the queue the operator is actually working from.
+// the queue the operator is actually working from. Hidden rows (operator
+// dismissed a processed request, migration 035) never leave the server, so
+// every client's queue empties out without its own filtering. Column-less
+// retry keeps the page working mid-rollout.
 export async function onRequestGet(context) {
   const { request, env } = context;
   if (!(await isAdmin(request, env))) return json({ error: 'forbidden' }, 403);
 
-  const { results } = await env.DB.prepare(`
+  const query = (withHidden) => env.DB.prepare(`
     SELECT id, full_name, email, phone, source, status,
            created_at, reviewed_at, reviewed_by, notes,
            created_member_slug
       FROM signup_requests
+     ${withHidden ? 'WHERE hidden_at IS NULL' : ''}
      ORDER BY
        CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
        created_at DESC
   `).all();
+  const { results } = await query(true).catch(() => query(false));
   return json({ requests: results || [] });
 }
 
 // POST — actions on a request:
 //   { id, action: 'approve' }              → run create-member, mark approved
 //   { id, action: 'reject', notes: '...' } → mark rejected
+//   { id, action: 'hide' }                 → dismiss a processed row from the queue
 export async function onRequestPost(context) {
   const { request, env } = context;
   // reviewed_by stamps the acting admin's slug, so we need the session, not
@@ -87,6 +93,18 @@ export async function onRequestPost(context) {
         WHERE id = ?`
     ).bind(adminSession.member_slug, notes, id).run();
     return json({ ok: true, action: 'reject' });
+  }
+
+  if (body.action === 'hide') {
+    // Only processed rows can be dismissed — a pending request still needs
+    // a decision, so hiding it would silently lose someone's signup.
+    if (row.status === 'pending') {
+      return json({ error: 'Decide on it first — approve or reject, then hide' }, 409);
+    }
+    await env.DB.prepare(
+      "UPDATE signup_requests SET hidden_at = datetime('now') WHERE id = ?"
+    ).bind(id).run();
+    return json({ ok: true, action: 'hide' });
   }
 
   return json({ error: 'unknown_action' }, 400);

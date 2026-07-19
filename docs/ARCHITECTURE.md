@@ -269,9 +269,11 @@ Member taste profile UI. Calls `/api/vibe?member=<slug>` and renders the cluster
 
 Auth-gated dashboard for the operator. Calls `/api/reporting`; displays metric cards and a few tables.
 
-### `setup.html`, `url-cleanup.html`, `vibe-admin.html`
+### `members.html`, `url-cleanup.html`, `vibe-admin.html`
 
-Admin tools. Each requires the operator to be logged in as `patrick` (session cookie); they show a "log in first" hint otherwise. Not linked from the navigation.
+Admin tools. Each requires an admin session; they show a "log in first" hint otherwise. Not linked from the navigation.
+
+`members.html` is the member-administration hub. The new-members queue sits at the top — held self-enrolled members, pending `/join` requests (from `signup_requests`), and processed requests awaiting dismissal — and the whole section disappears when there's nothing left to handle. Processed rows carry a **Hide** action: `POST /api/admin-signup-requests {action:'hide'}` stamps `signup_requests.hidden_at` (migration 035) and the GET stops returning the row, so every client's queue empties out; pending rows can't be hidden. Below the queue: the manual-add form and the roster. The old standalone `/admin` page was folded in here; `/admin`, `/setup`, and `/requests` all 301 to `/members` (`public/_redirects`).
 
 ## Universal links
 
