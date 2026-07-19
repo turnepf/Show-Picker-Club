@@ -38,7 +38,7 @@ struct WatchDetailView: View {
                     if s.hasRealUrl, let u = s.networkUrl, let url = URL(string: u) {
                         VStack(alignment: .leading, spacing: 1) {
                             Text("Network").font(.caption2).foregroundStyle(.secondary)
-                            Link("Go to show on \(n)", destination: url).font(.footnote)
+                            Link("Watch on \(n)", destination: url).font(.footnote)
                         }
                     } else {
                         row("Network", n)
