@@ -9,7 +9,6 @@ import SwiftUI
 struct ManageMembersView: View {
     @State private var members: [AdminMember] = []
     @State private var loading = true
-    @AppStorage("membersSortBy") private var sortBy = "last_login_desc"
 
     var body: some View {
         List {
@@ -23,20 +22,6 @@ struct ManageMembersView: View {
         }
         .navigationTitle("Members")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Picker("Sort", selection: $sortBy) {
-                        Text("Most recent login").tag("last_login_desc")
-                        Text("Oldest / never logged in").tag("last_login_asc")
-                        Text("Name").tag("name")
-                        Text("Slug").tag("slug")
-                    }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                }
-            }
-        }
         .overlay { if loading && members.isEmpty { ProgressView() } }
         .task { await load() }
         .refreshable { await load() }
@@ -80,34 +65,20 @@ struct ManageMembersView: View {
         return parts.joined(separator: " · ")
     }
 
+    // Always most-recent-activity first (last_activity_at, the member's
+    // latest library touch); members with no recorded activity sink to the
+    // bottom, alphabetically. The server normalises the timestamp format,
+    // so plain string comparison orders correctly.
     private var sortedMembers: [AdminMember] {
         let byName: (AdminMember, AdminMember) -> Bool = {
             $0.personName.localizedCaseInsensitiveCompare($1.personName) == .orderedAscending
         }
-        switch sortBy {
-        case "slug":
-            return members.sorted { $0.slug < $1.slug }
-        case "last_login_asc":
-            // Never-logged-in members rise to the top so they're easy to spot.
-            return members.sorted {
-                switch ($0.lastLogin, $1.lastLogin) {
-                case (nil, nil): return byName($0, $1)
-                case (nil, _): return true
-                case (_, nil): return false
-                case let (a?, b?): return a < b
-                }
-            }
-        case "name":
-            return members.sorted(by: byName)
-        default:
-            // Most recent first; never-logged-in members sink to the bottom.
-            return members.sorted {
-                switch ($0.lastLogin, $1.lastLogin) {
-                case (nil, nil): return byName($0, $1)
-                case (nil, _): return false
-                case (_, nil): return true
-                case let (a?, b?): return a > b
-                }
+        return members.sorted {
+            switch ($0.lastActivityAt, $1.lastActivityAt) {
+            case (nil, nil): return byName($0, $1)
+            case (nil, _): return false
+            case (_, nil): return true
+            case let (a?, b?): return a == b ? byName($0, $1) : a > b
             }
         }
     }
