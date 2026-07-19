@@ -384,10 +384,13 @@
         .join(' ');
     }
 
-    function formatLastLogin(iso) {
-      if (!iso) return '<span class="never">never logged in</span>';
+    // Last activity (the member's latest library touch) matters more than
+    // last login for an engagement read, so it's what the card shows —
+    // and it matches the list's fixed sort order.
+    function formatLastActivity(iso) {
+      if (!iso) return '<span class="never">no activity yet</span>';
       const d = new Date(iso);
-      if (isNaN(d)) return 'last login: ' + escapeHtml(iso);
+      if (isNaN(d)) return 'last activity: ' + escapeHtml(iso);
       const now = new Date();
       const days = Math.floor((now - d) / 86400000);
       let when;
@@ -396,7 +399,7 @@
       else if (days < 30) when = `${days}d ago`;
       else if (days < 365) when = `${Math.floor(days/30)}mo ago`;
       else when = `${Math.floor(days/365)}y ago`;
-      return `last login: ${when} (${d.toLocaleDateString()})`;
+      return `last activity: ${when} (${d.toLocaleDateString()})`;
     }
 
     function render(members) {
@@ -415,7 +418,7 @@
         card.innerHTML = `
           <div class="top">
             <div class="name"><a href="/${escapeHtml(m.slug)}" target="_blank">${escapeHtml(displayName)}</a> <span class="meta">${escapeHtml(m.slug)}</span>${m.enrolled_via ? ` <span class="meta">via ${escapeHtml(m.enrolled_via)}</span>` : ''}${m.is_admin ? ' <span class="meta" style="color:#2980B9;font-weight:600;">ADMIN</span>' : ''}${m.disabled ? ' <span class="meta" style="color:#C0392B;font-weight:600;">DISABLED</span>' : ''}${m.approved === false ? ' <span class="meta" style="color:#E67E22;font-weight:600;">PENDING</span>' : ''}</div>
-            <div class="meta">${formatLastLogin(m.last_login)}</div>
+            <div class="meta">${formatLastActivity(m.last_activity_at)}</div>
           </div>
           ${activityRow}
           <div class="field">
