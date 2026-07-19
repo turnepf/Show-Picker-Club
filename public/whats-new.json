@@ -1,16 +1,17 @@
 {
   "_comment": "Single source of truth for What's New on every platform. The web page (whats-new.html) and the iOS app (WhatsNewView) both render this file. Keep bodies plain text; put a hyperlink in `link` (web renders it, apps ignore it). Entries whose features need a new app build wait in `coming_soon` until the build ships, then move into `entries` with a date. Dates are M/D.",
-  "coming_soon": [
+  "coming_soon": [],
+  "entries": [
     {
+      "date": "7/19",
       "title": "Home-screen widgets on iPhone, iPad, and Mac.",
-      "body": "Two widgets in the next app build: Trending (what the club is picking up right now) and Upcoming Premieres (your next premieres from Watching and Awaiting, by date), in small, medium, and large sizes — plus an iPhone Lock Screen version of Upcoming. Tap any show to jump straight to its card in the app."
+      "body": "App version 1.0.3 brings two widgets: Trending (what the club is picking up right now) and Upcoming Premieres (your next premieres from Watching and Awaiting, by date), in small, medium, and large sizes — plus an iPhone Lock Screen version of Upcoming. Tap any show to jump straight to its card in the app."
     },
     {
-      "title": "Next app update — parity pass.",
-      "body": "Coming to iPhone, iPad, Apple TV, and Apple Watch: My Order drag sorting, search that finds your archived shows (iPhone), a six-second Undo after archiving (iPhone), duplicate detection when adding (iPhone), actor search on Apple TV, per-network counts under every list, tappable IMDb cast links, premiere dates on every list, clearer “Watch on …” links, and universal links — a shared showpicker.club link tapped in Messages or Mail opens right in the app."
-    }
-  ],
-  "entries": [
+      "date": "7/19",
+      "title": "App update 1.0.3 — parity pass.",
+      "body": "Now on iPhone, iPad, Apple TV, and Apple Watch: My Order drag sorting, search that finds your archived shows (iPhone), a six-second Undo after archiving (iPhone), duplicate detection when adding (iPhone), actor search on Apple TV, per-network counts under every list, tappable IMDb cast links, premiere dates on every list, clearer “Watch on …” links, and universal links — a shared showpicker.club link tapped in Messages or Mail opens right in the app."
+    },
     {
       "date": "7/19",
       "title": "Members list now sorts by recent activity.",
