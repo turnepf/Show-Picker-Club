@@ -209,9 +209,11 @@ promote/demote (`/api/admin-member-role`; the server refuses to demote the
 last admin, and a full hand-off is promote-then-demote-yourself — this is
 the path the `admin_must_demote_first` account-deletion error points at),
 and a single "New members" queue holding both `/join` requests and held
-self-enrolled members. On web the queue sits at the top of `/members` and
-the whole section disappears once empty; on iOS it stays its own screen in
-the Admin tab. Processed (approved/rejected) requests carry a **Hide**
+self-enrolled members. The queue sits at the top of the members list on
+both surfaces (web `/members`; iOS Manage members, whose Admin-row badge
+counts everyone waiting) and the whole section disappears once empty —
+there is no separate "New members" page or link anywhere anymore.
+Processed (approved/rejected) requests carry a **Hide**
 action on both surfaces — hiding dismisses the row for good (server-side
 `hidden_at`, so every client's queue empties out), while pending requests
 can't be hidden. When adding a member-management capability, add it

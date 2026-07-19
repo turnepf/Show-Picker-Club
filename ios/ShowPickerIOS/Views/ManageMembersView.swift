@@ -1,22 +1,57 @@
 import SwiftUI
 
-// Operator tool: the full member roster — rename, edit login emails/phones,
-// disable/enable, approve held members, and hand off the admin role. Mirrors
-// the web /members page capability-for-capability (GET/POST
-// /api/admin-member-emails, /api/admin-member-disable,
-// /api/admin-member-approve, /api/admin-member-role). Reached from
-// AdminView → Manage members.
+// Operator tool: the single member-administration hub, mirroring the web
+// /members page capability-for-capability. The new-members queue (pending
+// /join requests via /api/admin-signup-requests + held self-enrolled
+// members via /api/admin-member-approve) sits at the top and disappears
+// once everything is processed and hidden; below it, the full roster —
+// rename, edit login emails/phones, disable/enable, approve held members,
+// and hand off the admin role (GET/POST /api/admin-member-emails,
+// /api/admin-member-disable, /api/admin-member-approve,
+// /api/admin-member-role). Reached from AdminView → Manage members.
 struct ManageMembersView: View {
     @State private var members: [AdminMember] = []
+    @State private var requests: [SignupRequest] = []
     @State private var loading = true
+    @State private var working: Int?
+    @State private var workingSlug: String?
+    @State private var banner: String?
+
+    private var held: [AdminMember] { members.filter { $0.approved == false } }
+    private var pendingRequests: [SignupRequest] { requests.filter { $0.status == "pending" } }
+    private var reviewed: [SignupRequest] { requests.filter { $0.status != "pending" } }
 
     var body: some View {
         List {
-            ForEach(sortedMembers) { m in
-                NavigationLink {
-                    MemberDetailAdminView(member: m) { await load() }
-                } label: {
-                    memberRow(m)
+            if let b = banner {
+                Section { Text(b).font(.callout) }
+            }
+            if !held.isEmpty {
+                Section {
+                    ForEach(held) { heldRow($0) }
+                } header: {
+                    Text("Held members (\(held.count))")
+                } footer: {
+                    Text("Self-enrolled via Apple/Google — they can already use their own lists, but stay off the roster until approved.")
+                }
+            }
+            if !pendingRequests.isEmpty {
+                Section("Pending requests (\(pendingRequests.count))") {
+                    ForEach(pendingRequests) { pendingRow($0) }
+                }
+            }
+            if !reviewed.isEmpty {
+                Section("Processed — hide when done") {
+                    ForEach(reviewed) { reviewedRow($0) }
+                }
+            }
+            Section("Members") {
+                ForEach(sortedMembers) { m in
+                    NavigationLink {
+                        MemberDetailAdminView(member: m) { await load() }
+                    } label: {
+                        memberRow(m)
+                    }
                 }
             }
         }
@@ -26,6 +61,122 @@ struct ManageMembersView: View {
         .task { await load() }
         .refreshable { await load() }
     }
+
+    // ---- New-members queue (moved here from the retired New members screen) ----
+
+    @ViewBuilder private func heldRow(_ m: AdminMember) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(m.personName).font(.body)
+            Text(heldContact(m)).font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 12) {
+                Button {
+                    Task { await approveHeld(m) }
+                } label: {
+                    Label("Approve", systemImage: "checkmark.circle.fill")
+                }
+                .buttonStyle(.borderless)
+                .tint(.green)
+                Spacer()
+                if workingSlug == m.slug { ProgressView() }
+            }
+            .disabled(workingSlug != nil)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func heldContact(_ m: AdminMember) -> String {
+        var parts: [String] = ["@\(m.slug)"]
+        if let via = m.enrolledVia, !via.isEmpty { parts.append("via \(via)") }
+        if let email = m.emails.first { parts.append(email) }
+        return parts.joined(separator: " · ")
+    }
+
+    private func approveHeld(_ m: AdminMember) async {
+        workingSlug = m.slug
+        defer { workingSlug = nil }
+        banner = nil
+        do {
+            let res = try await API.approveMember(slug: m.slug)
+            if let e = res.error { banner = "Couldn't approve: \(e)" }
+            else { banner = "Approved \(m.personName)" }
+            await load()
+        } catch {
+            banner = "Network error. Try again."
+        }
+    }
+
+    @ViewBuilder private func pendingRow(_ r: SignupRequest) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(r.fullName).font(.body)
+            Text(requestContact(r)).font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 12) {
+                Button {
+                    Task { await act(r, action: "approve") }
+                } label: {
+                    Label("Approve", systemImage: "checkmark.circle.fill")
+                }
+                .buttonStyle(.borderless)
+                .tint(.green)
+                Button(role: .destructive) {
+                    Task { await act(r, action: "reject") }
+                } label: {
+                    Label("Reject", systemImage: "xmark.circle")
+                }
+                .buttonStyle(.borderless)
+                Spacer()
+                if working == r.id { ProgressView() }
+            }
+            .disabled(working != nil)
+        }
+        .padding(.vertical, 2)
+    }
+
+    // Processed rows carry a Hide: dismisses the request for good (the
+    // server stops returning it), so the queue empties once handled.
+    @ViewBuilder private func reviewedRow(_ r: SignupRequest) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(r.fullName).font(.body)
+            HStack(spacing: 6) {
+                Text(r.status.capitalized)
+                    .foregroundStyle(r.status == "approved" ? .green : .secondary)
+                if let s = r.createdMemberSlug { Text("· @\(s)") }
+                Spacer()
+                if working == r.id {
+                    ProgressView()
+                } else {
+                    Button("Hide") { Task { await act(r, action: "hide") } }
+                        .buttonStyle(.borderless)
+                        .disabled(working != nil)
+                }
+            }
+            .font(.caption)
+        }
+    }
+
+    private func requestContact(_ r: SignupRequest) -> String {
+        [r.email, r.phone].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    private func act(_ r: SignupRequest, action: String) async {
+        working = r.id
+        defer { working = nil }
+        banner = nil
+        do {
+            let res = try await API.actOnSignupRequest(id: r.id, action: action)
+            if let e = res.error {
+                banner = "Couldn't \(action): \(e)"
+            } else if action == "approve" {
+                banner = "Approved \(r.fullName)" + (res.created?.slug.map { " → @\($0)" } ?? "")
+            } else if action == "reject" {
+                banner = "Rejected \(r.fullName)"
+            }
+            await load()
+        } catch {
+            banner = "Network error. Try again."
+        }
+    }
+
+    // ---- Roster ----
 
     @ViewBuilder private func memberRow(_ m: AdminMember) -> some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -89,6 +240,7 @@ struct ManageMembersView: View {
         loading = true
         defer { loading = false }
         members = (try? await API.adminMembers()) ?? []
+        requests = (try? await API.signupRequests()) ?? []
     }
 }
 

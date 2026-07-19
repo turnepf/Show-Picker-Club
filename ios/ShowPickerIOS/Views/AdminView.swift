@@ -7,7 +7,8 @@ struct AdminView: View {
     @EnvironmentObject private var auth: AuthStore
 
     // Everyone waiting to get in: pending /join requests + held self-enrolled
-    // members. Shown as a badge on the New members row, like the web banner.
+    // members. Shown as a badge on the Manage members row — the queue lives
+    // at the top of that screen, matching the web /members page.
     @State private var waitingCount = 0
 
     // Public sign-up form. Submissions land in the Signup requests queue.
@@ -33,11 +34,6 @@ struct AdminView: View {
                 } label: {
                     Label("Manage members", systemImage: "person.2.badge.gearshape")
                 }
-                NavigationLink {
-                    SignupRequestsView()
-                } label: {
-                    Label("New members", systemImage: "tray.and.arrow.down")
-                }
                 .badge(waitingCount)
             }
             Section {
@@ -58,7 +54,7 @@ struct AdminView: View {
             } header: {
                 Text("Invite")
             } footer: {
-                Text("Send this to someone you want in the club — they fill out the form and land in New members.")
+                Text("Send this to someone you want in the club — they fill out the form and land at the top of Manage members.")
             }
             Section("Content") {
                 NavigationLink {
