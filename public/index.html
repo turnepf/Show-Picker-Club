@@ -1973,12 +1973,13 @@
       try {
         const res = await fetch('/api/members');
         const data = await res.json();
-        // Most active first (Watching + Next Up + Loved), then most
-        // recent activity — the same order as the iPhone home screen.
+        // Most recently active first, then most active (Watching + Next Up +
+        // Loved) as the tiebreaker — the same order as the member-page
+        // sidebar, so the roster reads the same everywhere.
         allHomeMembers = (data.members || []).slice().sort((a, b) => {
-          const aa = memberActiveCount(a), ba = memberActiveCount(b);
-          if (aa !== ba) return ba - aa;
-          return (b.last_activity_at || '').localeCompare(a.last_activity_at || '');
+          const la = a.last_activity_at || '', lb = b.last_activity_at || '';
+          if (la !== lb) return lb.localeCompare(la);
+          return memberActiveCount(b) - memberActiveCount(a);
         });
         renderHomeMembers();
         setupCalendarLinks(data.members);

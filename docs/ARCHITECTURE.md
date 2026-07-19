@@ -208,9 +208,9 @@ The `[slug]` param matches the full final segment (including `.ics`); the handle
   - `show_count`: total active shows across all lists.
   - `watching_count`: active shows on the Watching list.
   - `waiting_count`: active shows on the list now labeled "Awaiting" in the UI (the stored value is still `waiting`, so the field name is unchanged).
-  - `last_activity_at`: `MAX(COALESCE(updated_at, created_at))` over the member's shows where `added_by != 'seed'`. Editing or archiving a seeded row doesn't count — only self-added, suggested-in, or shared-in shows register. NULL `added_by` predates the column and is treated as engaged since seeds always carry `added_by='seed'`. Kept for reference and possible future filtering even though the home page no longer uses it.
+  - `last_activity_at`: `MAX(COALESCE(updated_at, created_at))` over the member's shows where `added_by != 'seed'`. Editing or archiving a seeded row doesn't count — only self-added, suggested-in, or shared-in shows register. NULL `added_by` predates the column and is treated as engaged since seeds always carry `added_by='seed'`. This is the primary roster sort key on every client.
 
-  Rows are ordered by `last_activity_at DESC NULLS LAST, name`. The home page re-sorts the response client-side by `watching_count DESC, waiting_count DESC` and features the top 6; the rest go behind a "Browse all members" disclosure.
+  Rows are ordered by `last_activity_at DESC NULLS LAST, name`. Every client roster (web home + member-page sidebar, iPhone/iPad home, Apple TV home) keeps that order — most recent activity first, with the active-show count (Watching + Next Up + Loved) only as a tiebreaker. The web home features the top 6; the rest go behind a "Show all members" disclosure.
 - `GET /api/shows?member=<slug>&include_archived=1` — `include_archived=1` is set by the per-member search modal so archived rows can be found.
 
 ## Authentication
