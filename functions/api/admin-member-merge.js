@@ -168,6 +168,12 @@ export async function onRequestPost(context) {
     await env.DB.batch(statements);
   }
 
+  // Best-effort: drop any dismissed-duplicate matches that referenced the
+  // now-deleted account (table may not exist yet — see admin-dupe-ignores).
+  await env.DB.prepare(
+    'DELETE FROM dupe_ignores WHERE slug_a = ?1 OR slug_b = ?1'
+  ).bind(source).run().catch(() => {});
+
   return json({
     ok: true,
     source,

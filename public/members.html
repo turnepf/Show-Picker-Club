@@ -111,6 +111,15 @@
       cursor: pointer;
     }
     button.merge:disabled { background: var(--ink-faint); cursor: not-allowed; }
+    button.ghost {
+      padding: 6px 14px; background: transparent; color: var(--ink-muted);
+      border: 1px solid var(--border); border-radius: 6px; font-size: 13px;
+      font-weight: 600; cursor: pointer;
+    }
+    button.ghost:hover { color: var(--ink); border-color: var(--ink-muted); }
+    .ignored-list { margin-top: 10px; font-size: 13px; color: var(--ink-muted); }
+    .ignored-list summary { cursor: pointer; }
+    .ignored-list .dupe-row { justify-content: flex-start; }
     .err {
       background: var(--danger-soft);
       color: var(--danger-deep);
@@ -161,15 +170,24 @@
 
   <script>
     let allMembers = [];
+    let ignoredRows = [];
+    let ignoredPairs = new Set();
 
     async function load() {
-      const res = await fetch('/api/admin-member-emails');
+      const [res, igRes] = await Promise.all([
+        fetch('/api/admin-member-emails'),
+        fetch('/api/admin-dupe-ignores'),
+      ]);
       if (res.status === 403) {
         document.getElementById('authWarn').style.display = '';
         return;
       }
       const data = await res.json();
       allMembers = data.members || [];
+      try {
+        ignoredRows = (await igRes.json()).ignores || [];
+      } catch { ignoredRows = []; }
+      ignoredPairs = new Set(ignoredRows.map(r => pairKey(r.slug_a, r.slug_b)));
       renderSorted();
       renderDupes();
       loadPendingRequests();
@@ -188,6 +206,13 @@
       return !!m.enrolled_via && m.phones.length === 0;
     }
 
+    function pairKey(a, b) {
+      return [a, b].sort().join('|');
+    }
+    function pairIgnored(a, b) {
+      return ignoredPairs.has(pairKey(a, b));
+    }
+
     function dupeGroups() {
       const byFirst = new Map();
       for (const m of allMembers) {
@@ -195,9 +220,15 @@
         if (!byFirst.has(key)) byFirst.set(key, []);
         byFirst.get(key).push(m);
       }
-      const groups = [...byFirst.values()].filter(g => g.length > 1);
+      // Drop members whose every pairing within the group has been ignored;
+      // a group that shrinks below two is no longer a match.
+      const groups = [...byFirst.values()]
+        .map(g => g.filter(m => g.some(o => o.slug !== m.slug && !pairIgnored(m.slug, o.slug))))
+        .filter(g => g.length > 1);
       const grouped = new Set(groups.flat().map(m => m.slug));
-      const loneRelays = allMembers.filter(m => isRelayOnly(m) && !grouped.has(m.slug));
+      // A self-pair ignore silences the "hidden email only" flag.
+      const loneRelays = allMembers.filter(m =>
+        isRelayOnly(m) && !grouped.has(m.slug) && !pairIgnored(m.slug, m.slug));
       return { groups, loneRelays };
     }
 
@@ -233,20 +264,29 @@
     function renderDupes() {
       const panel = document.getElementById('dupes');
       const { groups, loneRelays } = dupeGroups();
-      if (!groups.length && !loneRelays.length) { panel.style.display = 'none'; return; }
+      // Only list ignores whose members still exist (merges and deletions
+      // can leave stale rows behind; they're harmless but confusing to show).
+      const slugs = new Set(allMembers.map(m => m.slug));
+      const shownIgnores = ignoredRows.filter(r => slugs.has(r.slug_a) && slugs.has(r.slug_b));
+      if (!groups.length && !loneRelays.length && !shownIgnores.length) {
+        panel.style.display = 'none';
+        return;
+      }
       panel.className = 'dupes';
       panel.style.display = '';
       let html = `<h2>Possible duplicates</h2>
         <p class="hint">Merging moves the duplicate's shows, emails, phones, and
         Apple/Google sign-in to the kept account (untouched starter shows and
         exact duplicate titles are dropped), switches their signed-in devices
-        over, and deletes the duplicate. It cannot be undone.</p>`;
+        over, and deletes the duplicate. It cannot be undone. Ignoring a match
+        hides it from this panel permanently (until un-ignored below).</p>`;
       groups.forEach((g, i) => {
         const keep = defaultKeep(g);
         html += `<div class="dupe-group" data-group="${i}">
           ${g.map(m => dupeRowHtml(m, i, keep)).join('')}
           <div class="merge-controls">
             <button class="merge merge-group" data-group="${i}">Merge the other${g.length > 2 ? 's' : ''} into the kept account</button>
+            <button class="ghost ignore-group" data-group="${i}">Not duplicates — ignore this match</button>
           </div>
         </div>`;
       });
@@ -268,6 +308,7 @@
             <label>Merge into</label>
             <select class="lone-target"><option value="">choose member…</option>${options}</select>
             <button class="merge merge-lone" data-source="${escapeHtml(m.slug)}">Merge</button>
+            <button class="ghost ignore-lone" data-source="${escapeHtml(m.slug)}">Not a duplicate — ignore</button>
           </div>
         </div>`;
       }
@@ -282,6 +323,18 @@
         <select id="manualTarget"><option value="">kept account…</option>${all}</select>
         <button class="merge" id="manualMerge">Merge</button>
       </div>`;
+      if (shownIgnores.length) {
+        const label = (r) => r.slug_a === r.slug_b
+          ? `${escapeHtml(r.slug_a)} (hidden-email flag)`
+          : `${escapeHtml(r.slug_a)} &harr; ${escapeHtml(r.slug_b)}`;
+        html += `<details class="ignored-list">
+          <summary>${shownIgnores.length} ignored match${shownIgnores.length === 1 ? '' : 'es'}</summary>
+          ${shownIgnores.map(r => `<div class="dupe-row">
+            <span>${label(r)}</span>
+            <button class="ghost unignore" data-a="${escapeHtml(r.slug_a)}" data-b="${escapeHtml(r.slug_b)}">Un-ignore</button>
+          </div>`).join('')}
+        </details>`;
+      }
       panel.innerHTML = html;
 
       panel.querySelectorAll('button.merge-group').forEach(btn => {
@@ -307,6 +360,50 @@
         if (!source || !target) return alert('Pick both accounts first.');
         mergeAll(panel.querySelector('#manualMerge'), [source], target);
       });
+      panel.querySelectorAll('button.ignore-group').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const { groups } = dupeGroups();
+          const g = groups[btn.dataset.group].map(m => m.slug);
+          // Every pairing in the group, so it stays hidden even if a third
+          // same-named member appears in a different combination later.
+          const pairs = [];
+          for (let a = 0; a < g.length; a++)
+            for (let b = a + 1; b < g.length; b++) pairs.push([g[a], g[b]]);
+          setIgnored(btn, pairs, true,
+            `Ignore the match between ${g.join(' and ')}? They won't be flagged as possible duplicates of each other again.`);
+        });
+      });
+      panel.querySelectorAll('button.ignore-lone').forEach(btn => {
+        const s = btn.dataset.source;
+        btn.addEventListener('click', () => setIgnored(btn, [[s, s]], true,
+          `Stop flagging ${s} as a hidden-email-only account?`));
+      });
+      panel.querySelectorAll('button.unignore').forEach(btn => {
+        btn.addEventListener('click', () =>
+          setIgnored(btn, [[btn.dataset.a, btn.dataset.b]], false, null));
+      });
+    }
+
+    async function setIgnored(btn, pairs, ignoring, confirmMsg) {
+      if (confirmMsg && !confirm(confirmMsg)) return;
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/admin-dupe-ignores', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: ignoring ? 'ignore' : 'unignore', pairs }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(friendlyError(data.error) || `Failed (${res.status})`);
+          return;
+        }
+        load();
+      } catch (e) {
+        alert('Network error: ' + e.message);
+      } finally {
+        btn.disabled = false;
+      }
     }
 
     async function mergeAll(btn, sources, target) {
@@ -384,6 +481,17 @@
         .join(' ');
     }
 
+    function relTime(d) {
+      const days = Math.floor((new Date() - d) / 86400000);
+      let when;
+      if (days === 0) when = 'today';
+      else if (days === 1) when = 'yesterday';
+      else if (days < 30) when = `${days}d ago`;
+      else if (days < 365) when = `${Math.floor(days/30)}mo ago`;
+      else when = `${Math.floor(days/365)}y ago`;
+      return `${when} (${d.toLocaleDateString()})`;
+    }
+
     // Last activity (the member's latest library touch) matters more than
     // last login for an engagement read, so it's what the card shows —
     // and it matches the list's fixed sort order.
@@ -391,15 +499,17 @@
       if (!iso) return '<span class="never">no activity yet</span>';
       const d = new Date(iso);
       if (isNaN(d)) return 'last activity: ' + escapeHtml(iso);
-      const now = new Date();
-      const days = Math.floor((now - d) / 86400000);
-      let when;
-      if (days === 0) when = 'today';
-      else if (days === 1) when = 'yesterday';
-      else if (days < 30) when = `${days}d ago`;
-      else if (days < 365) when = `${Math.floor(days/30)}mo ago`;
-      else when = `${Math.floor(days/365)}y ago`;
-      return `last activity: ${when} (${d.toLocaleDateString()})`;
+      return `last activity: ${relTime(d)}`;
+    }
+
+    // The duplicates panel shows last login instead: a hidden-email
+    // duplicate that logged in yesterday next to a real account with a
+    // stale login is exactly how the operator tells which is which.
+    function formatLastLogin(iso) {
+      if (!iso) return '<span class="never">never logged in</span>';
+      const d = new Date(iso);
+      if (isNaN(d)) return 'last login: ' + escapeHtml(iso);
+      return `last login: ${relTime(d)}`;
     }
 
     function render(members) {
