@@ -131,8 +131,11 @@ func friendlyAdminError(_ code: String) -> String {
     }
 }
 
-// sessions.created_at arrives as SQLite "yyyy-MM-dd HH:mm:ss" (UTC); newer
-// fields may be ISO 8601. Accept both.
+// last_login has arrived in three shapes over time: SQLite
+// "yyyy-MM-dd HH:mm:ss" (UTC), ISO 8601 with milliseconds (JS
+// toISOString — a bare ISO8601DateFormatter rejects fractional seconds,
+// which once made every member read "never logged in"), and the current
+// fraction-less ISO. Accept all three.
 private let sqliteDateFormatter: DateFormatter = {
     let f = DateFormatter()
     f.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -141,9 +144,17 @@ private let sqliteDateFormatter: DateFormatter = {
     return f
 }()
 
+private let isoFractionalFormatter: ISO8601DateFormatter = {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return f
+}()
+
 func lastLoginText(_ iso: String?) -> String {
     guard let iso,
-          let d = ISO8601DateFormatter().date(from: iso) ?? sqliteDateFormatter.date(from: iso)
+          let d = ISO8601DateFormatter().date(from: iso)
+              ?? isoFractionalFormatter.date(from: iso)
+              ?? sqliteDateFormatter.date(from: iso)
     else { return "never logged in" }
     let days = Int(Date().timeIntervalSince(d) / 86_400)
     let when: String

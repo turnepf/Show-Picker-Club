@@ -34,6 +34,16 @@ export async function onRequestGet(context) {
   // Activity rollup: per (member, list) count of shows added or touched
   // in the last 30 days. Excludes seeded rows (they're the operator's
   // auto-pick, not member activity) and archived rows.
+  //
+  // last_login comes from the durable members.last_login_at (migration 013,
+  // stamped on every session issue), NOT from MAX(sessions.created_at):
+  // logout, disable, and account deletion all delete session rows, so the
+  // sessions table under-reports logins ("never logged in" for members who
+  // log out). The sessions subquery remains only as a fallback for rows
+  // where the best-effort last_login_at bump failed. strftime normalises
+  // both storage formats (SQLite datetime('now') vs JS toISOString with
+  // milliseconds) to fraction-less UTC ISO — the only shape the shipped
+  // iOS admin screen's ISO8601DateFormatter can parse.
   const since = "datetime('now', '-30 days')";
   // disabled (migration 030) / approved + enrolled_via (migration 031) with
   // column-less retries so the page keeps working mid-rollout.
@@ -49,8 +59,10 @@ export async function onRequestGet(context) {
               FROM (SELECT phone FROM member_phones
                      WHERE member_slug = m.slug
                      ORDER BY is_primary DESC, id)) AS phones,
-           (SELECT MAX(created_at) FROM sessions
-             WHERE member_slug = m.slug) AS last_login,
+           strftime('%Y-%m-%dT%H:%M:%SZ',
+             COALESCE(m.last_login_at,
+                      (SELECT MAX(created_at) FROM sessions
+                        WHERE member_slug = m.slug))) AS last_login,
            (SELECT COUNT(*) FROM shows
              WHERE member_slug = m.slug AND archived = 0 AND list = 'watching'
                AND COALESCE(added_by,'') != 'seed'
