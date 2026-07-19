@@ -12,6 +12,11 @@
   ],
   "entries": [
     {
+      "date": "7/19",
+      "title": "Members list now sorts by recent activity.",
+      "body": "The Members roster everywhere now puts the most recently active member first instead of whoever has the most shows — so the list surfaces who's actually around. Live on the web now (home and sidebar); iPhone and Apple TV pick it up in the next app build, and iPad already sorted this way."
+    },
+    {
       "date": "7/17",
       "title": "Put your lists in your order.",
       "body": "Every list's sort menu now has My Order (drag to sort) on your own page. Pick it and each row grows a ☰ handle — drag shows up or down and the order saves instantly, per list. On another member's page the same menu offers “their Order” so you can browse a list the way its owner arranged it (viewing only — you can't change their order). Apple TV and Apple Watch will show saved orders automatically once the next app build ships. Thanks Joe P!"

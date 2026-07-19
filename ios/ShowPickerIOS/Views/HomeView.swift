@@ -314,11 +314,12 @@ struct HomeView: View {
         async let p = try? await API.popular()
         let mr = (await m) ?? []
         let pr = (await p) ?? []
-        // Most active first — Watching + Next Up + Loved — then most
-        // recent activity as a tiebreaker so the preview surfaces live members.
+        // Most recently active first, then most active (Watching + Next Up +
+        // Loved) as the tiebreaker — the same roster order as the iPad and web.
         members = mr.sorted {
-            if $0.activeCount != $1.activeCount { return $0.activeCount > $1.activeCount }
-            return ($0.lastActivityAt ?? "") > ($1.lastActivityAt ?? "")
+            let la = $0.lastActivityAt ?? "", lb = $1.lastActivityAt ?? ""
+            if la != lb { return la > lb }
+            return $0.activeCount > $1.activeCount
         }
         popular = pr
         if let link = pendingLink {
