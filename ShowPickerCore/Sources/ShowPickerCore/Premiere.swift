@@ -1,7 +1,8 @@
 import Foundation
 
-// Shared "next premiere" logic used by the complication (and available to the
-// apps). A premiere is the start of a show's next season, taken from the
+// Shared "next premiere" logic used by the iPhone/iPad/Mac Upcoming widget
+// (and available to the apps). A premiere is the start of a show's next
+// season, taken from the
 // `next_season_date` the API already supplies. We only consider the lists you
 // actively track upcoming episodes on — Watching and Awaiting — and skip
 // archived rows.

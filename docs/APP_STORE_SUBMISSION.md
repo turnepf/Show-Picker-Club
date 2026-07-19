@@ -79,8 +79,7 @@ Requires the **Account Holder or Admin** role (that's you).
 - [ ] Confirm no build adds the `NSUserTrackingUsageDescription` key or calls
       `ATTrackingManager` (it shouldn't — there is no such code).
 - [ ] `PrivacyInfo.xcprivacy` present in every target (iOS app, share
-      extension, widget extension, watch app, watch complication, tvOS app) —
-      they declare
+      extension, widget extension, watch app, tvOS app) — they declare
       UserDefaults required-reason use and "no tracking". Without them uploads
       draw an `ITMS-91053 Missing API declaration` warning.
 

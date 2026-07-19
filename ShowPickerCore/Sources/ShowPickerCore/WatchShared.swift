@@ -1,16 +1,10 @@
 import Foundation
 
-// A tiny shared store the watch app and its complication both read.
-//
-// The complication runs in a *separate* process (the widget extension), so it
-// can't see the watch app's in-memory session. An App Group gives them a common
-// UserDefaults suite: the watch app writes the handed-off member slug (+ cookie)
-// here, and the complication's timeline provider reads it to fetch your shows.
-//
-// Requires the App Group `WatchShared.appGroup` to be enabled on BOTH the watch
-// app target and the complication target (Signing & Capabilities → App Groups).
-// If it isn't wired up yet, `defaults` falls back to `.standard` so the watch
-// app still works — only the complication would come up empty.
+// The watch app's persisted session: the member slug (+ cookie) handed off
+// from the iPhone, kept so the watch works at cold launch before the phone
+// re-sends. Stored in the App Group suite (the watch app target declares the
+// `WatchShared.appGroup` entitlement); `defaults` falls back to `.standard`
+// if the suite is unavailable, so the cache still works either way.
 public enum WatchShared {
     public static let appGroup = "group.net.patrickturner.showpickerios"
     public static let slugKey = "memberSlug"

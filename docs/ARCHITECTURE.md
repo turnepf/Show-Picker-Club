@@ -183,6 +183,8 @@ The complete map:
 | `GET /auth/config`                     | `functions/auth/config.js`                 | GET     | none — public flags/keys for the login UI |
 | `POST /api/admin-member-disable`       | `functions/api/admin-member-disable.js`    | POST    | admin session |
 | `POST /api/admin-member-role`          | `functions/api/admin-member-role.js`       | POST    | admin session — promote/demote `members.is_admin`; refuses to demote the last admin |
+| `POST /api/admin-member-merge`         | `functions/api/admin-member-merge.js`      | POST    | admin session — merge a duplicate member account into the kept one, then delete the duplicate |
+| `GET/POST /api/admin-dupe-ignores`     | `functions/api/admin-dupe-ignores.js`      | GET, POST | admin session — list / dismiss / restore Possible-duplicates matches |
 | `POST /api/admin-vibe-fill`            | `functions/api/admin-vibe-fill.js`         | POST    | admin session or `CRON_SECRET` header |
 | `POST /api/admin-url-cleanup`          | `functions/api/admin-url-cleanup.js`       | POST    | admin session |
 | `POST /api/admin-sms-test`             | `functions/api/admin-sms-test.js`          | POST    | admin session |
@@ -271,7 +273,7 @@ Auth-gated dashboard for the operator. Calls `/api/reporting`; displays metric c
 
 Admin tools. Each requires an admin session; they show a "log in first" hint otherwise. Not linked from the navigation.
 
-`members.html` is the member-administration hub. The new-members queue sits at the top — held self-enrolled members, pending `/join` requests (from `signup_requests`), and processed requests awaiting dismissal — and the whole section disappears when there's nothing left to handle. Processed rows carry a **Hide** action: `POST /api/admin-signup-requests {action:'hide'}` stamps `signup_requests.hidden_at` (migration 034) and the GET stops returning the row, so every client's queue empties out; pending rows can't be hidden. Below the queue: the manual-add form and the roster. The old standalone `/admin` page was folded in here; `/admin`, `/setup`, and `/requests` all 301 to `/members` (`public/_redirects`).
+`members.html` is the member-administration hub. The new-members queue sits at the top — held self-enrolled members, pending `/join` requests (from `signup_requests`), and processed requests awaiting dismissal — and the whole section disappears when there's nothing left to handle. Processed rows carry a **Hide** action: `POST /api/admin-signup-requests {action:'hide'}` stamps `signup_requests.hidden_at` (migration 035) and the GET stops returning the row, so every client's queue empties out; pending rows can't be hidden. Below the queue: the manual-add form and the roster. The old standalone `/admin` page was folded in here; `/admin`, `/setup`, and `/requests` all 301 to `/members` (`public/_redirects`).
 
 ## Universal links
 
@@ -442,6 +444,16 @@ All require an admin session via `isAdmin()` (`members.is_admin = 1`). No separa
 
 ### `POST /api/admin-create-member`
 Body: `{secret, full_name, phone, emails}`. Generates a slug from `full_name`, inserts into `members` plus `member_phones`/`member_emails` (the contacts the member's login codes are sent to), then picks 8 seed shows (2 per list) drawn from the existing club's highly-rated picks with cast and a real network URL. Shows are inserted with `added_by='seed'`, `created_at=NULL`, `updated_at=NULL` so the seed-only check (which looks for exactly that signature) recognizes them.
+
+### `POST /api/admin-member-merge`
+Body: `{source, target}` (slugs). Merges a duplicate account into the member's real one, in a single all-or-nothing `DB.batch`. Exists because Sign in with Apple + "Hide My Email" mints a private-relay address that doesn't match `member_emails`, so self-enrollment creates a second account for an existing member (and links their `apple_sub` to it).
+
+What happens: the source's shows move to the target (actors follow via `show_id`), except untouched seed rows (`added_by='seed' AND updated_at IS NULL` — dropped) and active rows whose title the target already carries actively (case-insensitive — the kept copy wins, the source's is dropped). Emails and phones are deduped against the target's set and moved as non-primary alternates, so the relay address still works for email-code login. `member_apple_ids` / `member_google_ids` are repointed — this is what makes the *next* relay sign-in resolve to the right member. `member_subscriptions` move (deduped on network), live `sessions` are repointed rather than killed (the member's phone stays signed in, now to the kept account), `signup_requests.created_member_slug` follows, the target's `last_login_at` takes the max of the two, and the source's `login_otps` and member row are deleted.
+
+Refuses to merge an admin source (`cannot_merge_admin` — demote first), the demo member on either side (`cannot_merge_demo`), or an account into itself. The `/members` page surfaces candidates (private-relay-only accounts, shared first names) in a "Possible duplicates" panel with a manual picker for anything the heuristics miss.
+
+### `GET/POST /api/admin-dupe-ignores`
+Backs the "Ignore this match" buttons on that panel — the heuristics false-positive (e.g. the demo account sharing a first name with a real member, which the merge guard rightly refuses), so dismissals must persist. Rows live in `dupe_ignores` (migration 034) as sorted slug pairs; a self-pair means "stop flagging this account as hidden-email-only". GET lists them; POST takes `{action: 'ignore'|'unignore', pairs: [[a,b], ...]}`. The POST creates the table on demand (identical `CREATE TABLE IF NOT EXISTS` as the migration) so deploy order doesn't matter, and rejects ignores naming unknown members. A successful merge deletes any ignore rows referencing the merged-away slug; the panel hides (but keeps) rows whose members have otherwise disappeared. Dismissed matches reappear via the panel's "ignored matches" disclosure → Un-ignore.
 
 ### `POST /api/admin-vibe-fill`
 Body: `{secret, count}`. Runs the vibe trait-backfill loop described above. The `vibe-admin.html` UI calls it in a loop until the operator stops or every show is scored.

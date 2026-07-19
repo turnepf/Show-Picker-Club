@@ -129,7 +129,7 @@ enum WidgetData {
         return data
     }
 
-    // MARK: Date labels (mirrors the watch complication's formatting)
+    // MARK: Date labels
 
     // "Jul 24" — month + day, no year.
     static func dayLabel(_ date: Date) -> String {
