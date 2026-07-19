@@ -82,9 +82,9 @@ Logged in as yourself, every row gets Edit and Archive buttons inline. Editing r
 
 ## Native apps
 
-Alongside the web app / PWA there are native iOS, tvOS, and watchOS clients. The watchOS app (paired to the iPhone) shows the four lists → shows → detail; its session is handed off from the phone, and member reads depend on that handed-off session (they are not public). The watch face gets a **Next Premiere complication** (soonest upcoming premiere from Watching + Awaiting).
+Alongside the web app / PWA there are native iOS, tvOS, and watchOS clients. The watchOS app (paired to the iPhone) shows the four lists → shows → detail; its session is handed off from the phone, and member reads depend on that handed-off session (they are not public). There is deliberately no watch-face complication (one shipped briefly in 2026-07 and was retired — it rendered unreliably on device).
 
-The iOS app ships **home-screen widgets** on iPhone, iPad, and Mac (the Mac Catalyst build): **Trending** (public, the club's rolling top adds; small/medium/large + extra-large on iPad/Mac) and **Upcoming Premieres** (the signed-in member's next premieres by date; small/medium/large + iPhone Lock Screen). Tapping a show opens its card in the app via `showpicker.club/show/<id>` universal links. tvOS has no widget surface; the watch's equivalent is the complication.
+The iOS app ships **home-screen widgets** on iPhone, iPad, and Mac (the Mac Catalyst build): **Trending** (public, the club's rolling top adds; small/medium/large + extra-large on iPad/Mac) and **Upcoming Premieres** (the signed-in member's next premieres by date; small/medium/large + iPhone Lock Screen). Tapping a show opens its card in the app via `showpicker.club/show/<id>` universal links. tvOS and watchOS have no widget equivalent.
 
 ## Sort and toggle controls
 

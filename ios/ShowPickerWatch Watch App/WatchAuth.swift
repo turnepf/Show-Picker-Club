@@ -1,7 +1,6 @@
 import Foundation
 import Combine
 import WatchConnectivity
-import WidgetKit
 import ShowPickerCore
 
 
@@ -14,9 +13,8 @@ final class WatchAuth: NSObject, ObservableObject, WCSessionDelegate {
 
     override init() {
         super.init()
-        // Cached from a previous hand-off (in the shared App Group, which the
-        // complication also reads), so the watch works at launch before the
-        // phone re-sends.
+        // Cached from a previous hand-off, so the watch works at launch
+        // before the phone re-sends.
         memberSlug = WatchShared.memberSlug
         cookieHeader = WatchShared.cookieHeader
         if WCSession.isSupported() {
@@ -33,11 +31,9 @@ final class WatchAuth: NSObject, ObservableObject, WCSessionDelegate {
         DispatchQueue.main.async {
             self.memberSlug = (slug?.isEmpty == false) ? slug : nil
             self.cookieHeader = (cookie?.isEmpty == false) ? cookie : nil
-            // Persist to the shared App Group so the complication's timeline
-            // provider can fetch your shows, then nudge it to refresh.
+            // Persist for the next cold launch.
             WatchShared.memberSlug = self.memberSlug
             WatchShared.cookieHeader = self.cookieHeader
-            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 
