@@ -64,6 +64,9 @@ export async function onRequestGet(context) {
                       (SELECT MAX(created_at) FROM sessions
                         WHERE member_slug = m.slug))) AS last_login,
            (SELECT COUNT(*) FROM shows
+             WHERE member_slug = m.slug AND archived = 0
+               AND COALESCE(added_by,'') != 'seed') AS show_count,
+           (SELECT COUNT(*) FROM shows
              WHERE member_slug = m.slug AND archived = 0 AND list = 'watching'
                AND COALESCE(added_by,'') != 'seed'
                AND COALESCE(updated_at, created_at) >= ${since}) AS act_watching,
@@ -98,6 +101,7 @@ export async function onRequestGet(context) {
     emails: r.emails ? r.emails.split(',').filter(Boolean) : [],
     phones: r.phones ? r.phones.split(',').filter(Boolean) : [],
     last_login: r.last_login || null,
+    show_count: r.show_count || 0,
     activity_30d: {
       watching: r.act_watching || 0,
       waiting: r.act_waiting || 0,
