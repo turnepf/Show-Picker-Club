@@ -14,6 +14,7 @@
       border: 1px solid var(--border-soft);
       margin-bottom: 10px;
     }
+    .card.pending { border-color: color-mix(in oklch, var(--accent) 40%, transparent); }
     .top {
       display: flex;
       align-items: baseline;
@@ -78,6 +79,132 @@
       font-size: 13px;
     }
     .err a { color: inherit; }
+
+    /* ---- New-members queue (moved from the old /admin page) ---- */
+    .section-title {
+      font-size: 13px; color: var(--ink-muted);
+      text-transform: uppercase; letter-spacing: 0.6px;
+      margin: 20px 0 10px;
+    }
+    #queue { margin-bottom: 26px; }
+    .when { color: var(--ink-muted); font-size: 12px; }
+    .contact {
+      display: flex; flex-wrap: wrap; gap: 14px;
+      margin-top: 8px; font-size: 13px; color: var(--ink-muted);
+    }
+    .contact a { color: var(--accent); text-decoration: none; }
+    .contact a:hover { text-decoration: underline; }
+    .source {
+      margin-top: 10px; padding: 10px 12px;
+      background: color-mix(in oklch, var(--surface-2) 65%, transparent);
+      border-radius: 6px; font-size: 13px;
+      color: var(--ink); line-height: 1.5;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .source.empty { color: var(--ink-muted); font-style: italic; }
+    .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .actions button, .copy-row button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px; font-weight: 600;
+      border: none; cursor: pointer; font-family: inherit;
+    }
+    .actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-approve { background: var(--accent); color: #fff; }
+    .btn-approve:hover { background: var(--accent-hover); }
+    .btn-reject { background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); }
+    .btn-reject:hover { background: color-mix(in oklch, var(--danger) 10%, var(--surface-2)); border-color: color-mix(in oklch, var(--danger) 30%, transparent); }
+    .btn-hide { background: var(--surface-2); color: var(--ink-muted); border: 1px solid var(--border); }
+    .btn-hide:hover { background: var(--surface); color: var(--ink); }
+    .status-badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 999px;
+      text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600;
+    }
+    .status-badge.approved { background: color-mix(in oklch, var(--list-watching) 18%, var(--surface)); color: var(--ink); }
+    .status-badge.rejected { background: var(--danger-soft); color: var(--danger-deep); }
+    .reviewed-note { font-size: 12px; color: var(--ink-muted); margin-top: 8px; }
+    .approved-intro {
+      margin-top: 14px;
+      background: color-mix(in oklch, var(--list-watching) 8%, var(--surface));
+      border-radius: 6px;
+      border: 1px solid color-mix(in oklch, var(--list-watching) 30%, transparent);
+      font-size: 13px;
+    }
+    .approved-intro > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 8px 12px;
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      font-weight: 600; color: var(--ink);
+    }
+    .approved-intro > summary::-webkit-details-marker { display: none; }
+    .approved-intro > summary::after {
+      content: '+'; color: var(--ink-muted); font-size: 18px;
+    }
+    .approved-intro[open] > summary::after { content: '−'; }
+    .approved-intro .intro-url {
+      font-weight: 400; color: var(--ink-muted); font-size: 12px;
+      font-family: ui-monospace, monospace;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      min-width: 0;
+    }
+    .approved-intro .intro-body { padding: 0 12px 12px; }
+    .copy-row { display: flex; gap: 8px; margin-top: 4px; }
+    .copy-row button { background: var(--ink); color: #fff; }
+    .copy-row button:hover { background: oklch(0.18 0.025 50); }
+
+    /* Manual-add form, collapsed by default. */
+    details.add-manual {
+      background: var(--surface);
+      border: 1px solid var(--border-soft);
+      border-radius: 10px;
+      padding: 0;
+      margin-bottom: 18px;
+    }
+    details.add-manual > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 14px 18px;
+      font-weight: 600;
+      color: var(--ink);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    details.add-manual > summary::-webkit-details-marker { display: none; }
+    details.add-manual > summary::after {
+      content: '+'; font-size: 18px; color: var(--ink-muted);
+      transition: transform 0.15s;
+    }
+    details.add-manual[open] > summary::after { content: '−'; }
+    details.add-manual > summary:hover { background: color-mix(in oklch, var(--surface-2) 60%, transparent); border-top-left-radius: 10px; border-top-right-radius: 10px; }
+    .add-form { padding: 4px 18px 18px; }
+    .add-form label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; margin-top: 14px; color: var(--ink-muted); }
+    .add-form label:first-of-type { margin-top: 6px; }
+    .add-form input {
+      width: 100%; padding: 10px 12px;
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: 15px; font-family: inherit;
+    }
+    .add-form input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 18%, transparent); }
+    .hint { font-size: 12px; color: var(--ink-muted); margin-top: 4px; }
+    .add-form button[type=submit] {
+      width: 100%; margin-top: 22px; padding: 12px;
+      background: var(--accent); color: #fff;
+      border: none; border-radius: 6px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+    }
+    .add-form button[type=submit]:hover { background: var(--accent-hover); }
+    .add-form button[type=submit]:disabled { opacity: 0.5; cursor: not-allowed; }
+    .preview { font-size: 12px; color: var(--ink-muted); margin-top: 4px; }
+    .add-msg {
+      margin-top: 16px; padding: 12px 14px;
+      border-radius: 6px; font-size: 13px; line-height: 1.5;
+    }
+    .add-msg.err {
+      background: var(--danger-soft); color: var(--danger-deep);
+      border: 1px solid color-mix(in oklch, var(--danger) 30%, transparent);
+    }
+
     @media (max-width: 560px) {
       .top { flex-direction: column; align-items: flex-start; }
       .field label { width: 50px; }
@@ -89,16 +216,42 @@
   <div class="admin-wrap">
     <nav class="admin-nav">
       <a href="/" class="back" aria-label="Back to Show Picker Club">&#9664;</a>
-      <a href="/admin">New members</a>
       <a href="/members" class="current">Members</a>
       <a href="/url-cleanup">Show Cleanup</a>
       <a href="/vibe-admin">Vibe admin</a>
       <a href="/reporting">Reporting</a>
     </nav>
     <h1 class="admin-title">Members</h1>
-    <a id="pendingLink" href="/admin" style="display:none; align-items:center; gap:6px; margin: -2px 0 12px; padding: 6px 12px; background: color-mix(in oklch, var(--accent) 14%, var(--surface)); border: 1px solid color-mix(in oklch, var(--accent) 35%, transparent); border-radius: 999px; font-size: 13px; color: var(--ink); text-decoration: none; width: fit-content;">
-      <span id="pendingCount">0</span> pending membership request<span id="pendingPlural">s</span>
-    </a>
+    <div id="authWarn" class="err" style="display:none;">
+      Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a>, then reload.
+    </div>
+
+    <!-- New-members queue: /join requests and held self-enrolled members.
+         The whole section disappears once everything is processed and
+         hidden, so a clean queue means a clean page. -->
+    <div id="queue" style="display:none;"></div>
+
+    <details class="add-manual">
+      <summary>Add a member manually</summary>
+      <form class="add-form" id="addForm">
+        <label for="full_name">Full name</label>
+        <input type="text" id="full_name" autocomplete="off" required>
+        <div class="preview" id="preview"></div>
+
+        <label for="phone">Phone number</label>
+        <input type="tel" id="phone" autocomplete="off" placeholder="(336) 555-1234">
+        <div class="hint">Optional. +1 assumed for US numbers; prefix with + and country code for non-US. Used as the SMS Verify destination.</div>
+
+        <label for="emails">Email address(es)</label>
+        <input type="text" id="emails" autocomplete="off" placeholder="alice@example.com, alice.b@gmail.com">
+        <div class="hint">Optional. Comma-separated for multiple. Any of them can be used to request an email code.</div>
+
+        <button type="submit" id="addBtn">Create member + seed 8 shows</button>
+        <div id="addMsg"></div>
+        <div id="addIntro"></div>
+      </form>
+    </details>
+
     <div class="admin-sub">
       Emails and phones are comma-separated; the first in each list is the
       primary. Saving replaces the existing set for that member, and saves
@@ -106,14 +259,12 @@
       member's phone also resyncs their legacy 4-digit code to the new
       last-4 (legacy codes stop working after June 7th).
     </div>
-    <div id="authWarn" class="err" style="display:none;">
-      Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a>, then reload.
-    </div>
     <div id="list"></div>
   </div>
 
   <script>
     let allMembers = [];
+    let allRequests = [];
 
     async function load() {
       const res = await fetch('/api/admin-member-emails');
@@ -124,21 +275,292 @@
       const data = await res.json();
       allMembers = data.members || [];
       renderSorted();
-      loadPendingRequests();
+      await loadQueue();
     }
 
-    async function loadPendingRequests() {
+    // ---- New-members queue (moved here from the old /admin page) ----
+
+    async function loadQueue() {
       try {
         const res = await fetch('/api/admin-signup-requests');
         if (!res.ok) return;
         const data = await res.json();
-        const pending = (data.requests || []).filter(r => r.status === 'pending');
-        if (pending.length === 0) return;
-        document.getElementById('pendingCount').textContent = pending.length;
-        document.getElementById('pendingPlural').style.display = pending.length === 1 ? 'none' : '';
-        document.getElementById('pendingLink').style.display = 'inline-flex';
+        allRequests = data.requests || [];
+      } catch { allRequests = []; }
+      renderQueue();
+    }
+
+    function renderQueue() {
+      const root = document.getElementById('queue');
+      root.innerHTML = '';
+      // Held self-enrolled members (members.approved = 0) wait in the same
+      // queue as /join requests, so approvals live in one place.
+      const held = allMembers.filter(m => m.approved === false);
+      const pending = allRequests.filter(r => r.status === 'pending');
+      // The server already drops hidden rows, so anything non-pending here
+      // is processed-but-not-yet-hidden.
+      const processed = allRequests.filter(r => r.status !== 'pending');
+
+      if (!held.length && !pending.length && !processed.length) {
+        root.style.display = 'none';
+        return;
+      }
+      root.style.display = '';
+
+      if (held.length) {
+        root.appendChild(sectionTitle(`Held members (${held.length})`));
+        for (const m of held) root.appendChild(heldCard(m));
+      }
+      if (pending.length) {
+        root.appendChild(sectionTitle(`Pending requests (${pending.length})`));
+        for (const r of pending) root.appendChild(requestCard(r));
+      }
+      if (processed.length) {
+        root.appendChild(sectionTitle('Processed — hide when done'));
+        for (const r of processed) root.appendChild(requestCard(r));
+      }
+    }
+
+    function sectionTitle(text) {
+      const h = document.createElement('div');
+      h.className = 'section-title';
+      h.textContent = text;
+      return h;
+    }
+
+    // Held self-enrolled members: already have an account and full personal
+    // use, but stay hidden from the roster/search/trending until approved.
+    function heldCard(m) {
+      const c = document.createElement('div');
+      c.className = 'card pending';
+      const displayName = [m.first_name, m.last_name].filter(Boolean).join(' ') || m.slug;
+      c.innerHTML = `
+        <div class="top">
+          <div class="name"><a href="/${escapeHtml(m.slug)}" target="_blank">${escapeHtml(displayName)}</a></div>
+          <div class="when">${escapeHtml(m.slug)}${m.enrolled_via ? ' · via ' + escapeHtml(m.enrolled_via) : ''}</div>
+        </div>
+        <div class="contact">
+          ${m.emails && m.emails.length ? `<span><a href="mailto:${escapeHtml(m.emails[0])}">${escapeHtml(m.emails[0])}</a></span>` : ''}
+          ${m.phones && m.phones.length ? `<span><a href="tel:${escapeHtml(m.phones[0])}">${escapeHtml(m.phones[0])}</a></span>` : ''}
+        </div>
+      `;
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      const approveBtn = document.createElement('button');
+      approveBtn.className = 'btn-approve';
+      approveBtn.textContent = 'Approve';
+      approveBtn.onclick = () => approveHeld(c, m.slug);
+      actions.appendChild(approveBtn);
+      c.appendChild(actions);
+      return c;
+    }
+
+    async function approveHeld(card, slug) {
+      const buttons = card.querySelectorAll('button');
+      buttons.forEach(b => b.disabled = true);
+      try {
+        const res = await fetch('/api/admin-member-approve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug, action: 'approve' }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || `Failed (${res.status})`);
+          buttons.forEach(b => b.disabled = false);
+          return;
+        }
+        load();
+      } catch (e) {
+        alert('Network error: ' + e.message);
+        buttons.forEach(b => b.disabled = false);
+      }
+    }
+
+    function requestCard(req) {
+      const c = document.createElement('div');
+      c.className = `card ${req.status}`;
+      c.dataset.id = req.id;
+      const when = formatWhen(req.created_at);
+      const reviewedLine = req.reviewed_at
+        ? `<div class="reviewed-note">${escapeHtml(req.status === 'approved' ? 'Approved' : 'Rejected')} ${formatWhen(req.reviewed_at)}${req.reviewed_by ? ' by ' + escapeHtml(req.reviewed_by) : ''}${req.notes ? ' · ' + escapeHtml(req.notes) : ''}</div>`
+        : '';
+      const statusBadge = req.status === 'pending'
+        ? ''
+        : `<span class="status-badge ${escapeHtml(req.status)}">${escapeHtml(req.status)}</span>`;
+      c.innerHTML = `
+        <div class="top">
+          <div class="name">${escapeHtml(req.full_name)}</div>
+          <div class="when">${escapeHtml(when)} ${statusBadge}</div>
+        </div>
+        <div class="contact">
+          <span><a href="mailto:${escapeHtml(req.email)}">${escapeHtml(req.email)}</a></span>
+          <span><a href="tel:${escapeHtml(req.phone)}">${escapeHtml(req.phone)}</a></span>
+        </div>
+        <div class="source ${req.source ? '' : 'empty'}">${req.source ? escapeHtml(req.source) : '(no answer)'}</div>
+        ${reviewedLine}
+      `;
+
+      if (req.status === 'approved' && req.created_member_slug) {
+        c.appendChild(buildIntroPanel({
+          slug: req.created_member_slug,
+          name: req.full_name,
+          phone: req.phone,
+        }));
+      }
+
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+
+      if (req.status === 'pending' || req.status === 'rejected') {
+        const approve = document.createElement('button');
+        approve.className = 'btn-approve';
+        approve.textContent = req.status === 'rejected' ? 'Approve anyway' : 'Approve';
+        approve.onclick = () => doAction(c, req.id, 'approve');
+        actions.appendChild(approve);
+      }
+      if (req.status === 'pending') {
+        const reject = document.createElement('button');
+        reject.className = 'btn-reject';
+        reject.textContent = 'Reject';
+        reject.onclick = () => doReject(c, req.id);
+        actions.appendChild(reject);
+      }
+      // Processed rows get a Hide: dismisses the card for good (the server
+      // stops returning it), which is how the queue empties itself out.
+      if (req.status !== 'pending') {
+        const hide = document.createElement('button');
+        hide.className = 'btn-hide';
+        hide.textContent = 'Hide';
+        hide.onclick = () => doAction(c, req.id, 'hide');
+        actions.appendChild(hide);
+      }
+
+      if (actions.children.length) c.appendChild(actions);
+      return c;
+    }
+
+    async function doAction(card, id, action, notes) {
+      const buttons = card.querySelectorAll('button');
+      buttons.forEach(b => b.disabled = true);
+      try {
+        const res = await fetch('/api/admin-signup-requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, action, notes }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || `Failed (${res.status})`);
+          buttons.forEach(b => b.disabled = false);
+          return;
+        }
+        if (action === 'reject' || action === 'hide') {
+          load();
+          return;
+        }
+        // Fresh approve: swap the card to its processed state in place so the
+        // intro panel is right there, then refresh the roster underneath.
+        const actionsRow = card.querySelector('.actions');
+        if (actionsRow) actionsRow.remove();
+        const when = card.querySelector('.when');
+        if (when && !when.querySelector('.status-badge')) {
+          when.insertAdjacentHTML('beforeend', ' <span class="status-badge approved">approved</span>');
+        }
+        if (data.created) {
+          card.appendChild(buildIntroPanel({
+            slug: data.created.slug,
+            phone: data.created.phone,
+            displayName: data.created.editor_name,
+            defaultOpen: true,
+          }));
+        }
+        refreshRoster();
+      } catch (e) {
+        alert('Network error: ' + e.message);
+        buttons.forEach(b => b.disabled = false);
+      }
+    }
+
+    function doReject(card, id) {
+      const notes = prompt('Optional rejection note (kept for your records, not sent to the requester):');
+      if (notes === null) return;
+      doAction(card, id, 'reject', notes);
+    }
+
+    // Refresh the roster below without rebuilding the queue (so an
+    // in-place approved card keeps its open intro panel).
+    async function refreshRoster() {
+      try {
+        const res = await fetch('/api/admin-member-emails');
+        if (!res.ok) return;
+        allMembers = (await res.json()).members || [];
+        renderSorted();
       } catch {}
     }
+
+    function buildIntroPanel({ slug, name, phone, displayName, defaultOpen }) {
+      const url = `https://showpicker.club/${slug}`;
+      const editor = displayName || (name || '').trim().split(/\s+/)[0] || slug;
+      const intro = `Hey ${editor}! I set you up on Show Picker Club. It's a shared show tracker where we all keep track of what we're watching, what's next, and what we'd recommend. I seeded yours with some popular shows to get you started; if any don't interest you, just tap Edit, then Archive to remove them.
+
+Your list:
+${url}
+
+To edit your list, tap Log in and we'll send a login code by text or email.
+
+You can also browse everyone else's lists from the home page:
+https://showpicker.club
+
+If you see something you like on someone else's list, tap the **+** to add it to yours!
+
+- Patrick`;
+
+      // Collapsible so approved cards stay short by default. Operator
+      // expands when they actually want to send the intro. After a fresh
+      // approve we pass defaultOpen=true so the textarea is right there.
+      const wrap = document.createElement('details');
+      wrap.className = 'approved-intro';
+      if (defaultOpen) wrap.open = true;
+      wrap.innerHTML = `
+        <summary>Welcome intro <span class="intro-url">${escapeHtml(url.replace(/^https?:\/\//, ''))}</span></summary>
+        <div class="intro-body">
+          <div class="copy-row">
+            <button class="copy">Copy intro</button>
+            ${phone ? '<button class="text">Text intro</button>' : ''}
+          </div>
+        </div>
+      `;
+
+      wrap.querySelector('.copy').addEventListener('click', async (e) => {
+        e.preventDefault();
+        try { await navigator.clipboard.writeText(intro); } catch {}
+        e.target.textContent = 'Copied!';
+        setTimeout(() => { e.target.textContent = 'Copy intro'; }, 1500);
+      });
+      const textBtn = wrap.querySelector('.text');
+      if (textBtn) {
+        textBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const href = `sms:${phone}?&body=${encodeURIComponent(intro)}`;
+          window.location.href = href;
+        });
+      }
+      return wrap;
+    }
+
+    function formatWhen(iso) {
+      if (!iso) return '';
+      const d = new Date(iso.replace(' ', 'T') + 'Z');
+      if (isNaN(d)) return iso;
+      const days = Math.floor((Date.now() - d) / 86400000);
+      if (days === 0) return 'today';
+      if (days === 1) return 'yesterday';
+      if (days < 30) return `${days}d ago`;
+      return d.toLocaleDateString();
+    }
+
+    // ---- Roster ----
 
     // Always most-recent-activity first (the member's latest library touch,
     // last_activity_at from the server); members with no recorded activity
@@ -378,8 +800,72 @@
     }
 
     function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     }
+
+    // ---- Manual add ----
+    const addForm = document.getElementById('addForm');
+    const addBtn = document.getElementById('addBtn');
+    const addMsg = document.getElementById('addMsg');
+    const addIntro = document.getElementById('addIntro');
+    const nameInput = document.getElementById('full_name');
+    const previewEl = document.getElementById('preview');
+
+    nameInput.addEventListener('input', () => {
+      const v = nameInput.value.trim();
+      if (!v) { previewEl.textContent = ''; return; }
+      const first = v.split(/\s+/)[0];
+      const slugGuess = first.toLowerCase().replace(/[^a-z0-9]/g, '');
+      previewEl.innerHTML = `URL: <code>showpicker.club/${escapeHtml(slugGuess)}</code> (suffix added on collision) &middot; Display: <code>${escapeHtml(first)}'s Shows</code>`;
+    });
+
+    addForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      addMsg.className = '';
+      addMsg.textContent = '';
+      addIntro.innerHTML = '';
+      addBtn.disabled = true;
+      addBtn.textContent = 'Working…';
+
+      const body = {
+        full_name: nameInput.value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        emails: document.getElementById('emails').value.trim(),
+      };
+
+      try {
+        const res = await fetch('/api/admin-create-member', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          if (res.status === 403) document.getElementById('authWarn').style.display = '';
+          addMsg.className = 'add-msg err';
+          addMsg.textContent = data.error || `Error (${res.status})`;
+        } else {
+          addMsg.className = 'add-msg';
+          addMsg.style.color = 'var(--ink-muted)';
+          addMsg.textContent = `Created ${data.name} · seeded ${data.seeded.length} shows.`;
+          addIntro.appendChild(buildIntroPanel({
+            slug: data.slug,
+            phone: data.phone,
+            displayName: data.editor_name,
+            defaultOpen: true,
+          }));
+          addForm.reset();
+          previewEl.textContent = '';
+          refreshRoster();
+        }
+      } catch (err) {
+        addMsg.className = 'add-msg err';
+        addMsg.textContent = 'Network error: ' + err.message;
+      } finally {
+        addBtn.disabled = false;
+        addBtn.textContent = 'Create member + seed 8 shows';
+      }
+    });
 
     load();
   </script>

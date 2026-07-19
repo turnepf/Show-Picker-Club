@@ -187,7 +187,8 @@ There is no admin role in the session model — admin actions are gated purely b
 Admin tooling lives on exactly two surfaces, kept at feature parity
 (July 2026):
 
-- **Web** (`/admin`, `/members`, plus Show Cleanup / Vibe admin / Reporting).
+- **Web** (`/members` — the single member-administration hub — plus Show
+  Cleanup / Vibe admin / Reporting; `/admin` now 301s to `/members`).
 - **The universal iOS app** (Admin tab) — which covers iPhone, iPad, and the
   Mac Catalyst build in one codebase.
 
@@ -208,7 +209,12 @@ promote/demote (`/api/admin-member-role`; the server refuses to demote the
 last admin, and a full hand-off is promote-then-demote-yourself — this is
 the path the `admin_must_demote_first` account-deletion error points at),
 and a single "New members" queue holding both `/join` requests and held
-self-enrolled members. When adding a member-management capability, add it
+self-enrolled members. On web the queue sits at the top of `/members` and
+the whole section disappears once empty; on iOS it stays its own screen in
+the Admin tab. Processed (approved/rejected) requests carry a **Hide**
+action on both surfaces — hiding dismisses the row for good (server-side
+`hidden_at`, so every client's queue empties out), while pending requests
+can't be hidden. When adding a member-management capability, add it
 to both surfaces in the same change or note the follow-up in the Backlog.
 
 ## Future / not built
@@ -275,8 +281,8 @@ A few intentional omissions:
   and self-enrolls. Gated on `GOOGLE_CLIENT_ID` (returns 501 until set).
 
 - **Open signup — shipped as the `/join` flow.** Public `/join` form →
-  `signup_requests` table → operator approves from `/admin` (the `/members`
-  page surfaces a pending-count banner linking there). Approval runs the
+  `signup_requests` table → operator approves from the queue at the top
+  of `/members`. Approval runs the
   create-member flow and hands the operator intro text to send manually
   (no automated welcome email). Naming differs from the original spec
   (`/join` not `/signup`, `signup_requests` not `pending_signups`).

@@ -1,3 +1,4 @@
-/setup    /admin  301
-/requests /admin  301
+/setup    /members  301
+/requests /members  301
+/admin    /members  301
 /*  /index.html  200
