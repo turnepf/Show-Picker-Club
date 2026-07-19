@@ -55,9 +55,11 @@ struct ManageMembersView: View {
         return parts.joined(separator: " · ")
     }
 
-    // Last login + 30-day list activity, matching the web roster's context row.
+    // Last activity + 30-day list activity, matching the web roster's context
+    // row. Last activity (the member's latest library touch) reads better for
+    // engagement than last login, and it matches the list's fixed sort order.
     private func contextLine(_ m: AdminMember) -> String {
-        var parts = [lastLoginText(m.lastLogin)]
+        var parts = [lastActivityText(m.lastActivityAt)]
         if let a = m.activity30d {
             let total = a.watching + a.waiting + a.recommending + a.next
             parts.append(total == 0 ? "no list activity in 30 days" : "\(total) list adds in 30 days")
@@ -102,7 +104,7 @@ func friendlyAdminError(_ code: String) -> String {
     }
 }
 
-// last_login has arrived in three shapes over time: SQLite
+// Server timestamps have arrived in three shapes over time: SQLite
 // "yyyy-MM-dd HH:mm:ss" (UTC), ISO 8601 with milliseconds (JS
 // toISOString — a bare ISO8601DateFormatter rejects fractional seconds,
 // which once made every member read "never logged in"), and the current
@@ -121,12 +123,12 @@ private let isoFractionalFormatter: ISO8601DateFormatter = {
     return f
 }()
 
-func lastLoginText(_ iso: String?) -> String {
+func lastActivityText(_ iso: String?) -> String {
     guard let iso,
           let d = ISO8601DateFormatter().date(from: iso)
               ?? isoFractionalFormatter.date(from: iso)
               ?? sqliteDateFormatter.date(from: iso)
-    else { return "never logged in" }
+    else { return "no activity yet" }
     let days = Int(Date().timeIntervalSince(d) / 86_400)
     let when: String
     switch days {
@@ -136,7 +138,7 @@ func lastLoginText(_ iso: String?) -> String {
     case ..<365: when = "\(days / 30)mo ago"
     default: when = "\(days / 365)y ago"
     }
-    return "last login \(when)"
+    return "last activity \(when)"
 }
 
 private struct MemberDetailAdminView: View {

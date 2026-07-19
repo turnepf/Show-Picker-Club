@@ -199,7 +199,9 @@ button), not a gap to fill.
 Member management on both admin surfaces covers: roster with status badges
 (ADMIN / DISABLED / PENDING), always ordered by most recent library
 activity (`last_activity_at` — no sort picker; members with no recorded
-activity sink to the bottom), last login and 30-day activity, rename (slug
+activity sink to the bottom), last activity timestamp and 30-day counts
+(last login is no longer shown — activity is the engagement signal that
+matters), rename (slug
 and URL never change), email/phone editing, create member, disable/enable
 (kills sessions), approving held self-enrolled members, admin
 promote/demote (`/api/admin-member-role`; the server refuses to demote the
