@@ -183,6 +183,7 @@ The complete map:
 | `GET /auth/config`                     | `functions/auth/config.js`                 | GET     | none — public flags/keys for the login UI |
 | `POST /api/admin-member-disable`       | `functions/api/admin-member-disable.js`    | POST    | admin session |
 | `POST /api/admin-member-role`          | `functions/api/admin-member-role.js`       | POST    | admin session — promote/demote `members.is_admin`; refuses to demote the last admin |
+| `POST /api/admin-member-merge`         | `functions/api/admin-member-merge.js`      | POST    | admin session — merge a duplicate member account into the kept one, then delete the duplicate |
 | `POST /api/admin-vibe-fill`            | `functions/api/admin-vibe-fill.js`         | POST    | admin session or `CRON_SECRET` header |
 | `POST /api/admin-url-cleanup`          | `functions/api/admin-url-cleanup.js`       | POST    | admin session |
 | `POST /api/admin-sms-test`             | `functions/api/admin-sms-test.js`          | POST    | admin session |
@@ -440,6 +441,13 @@ All require an admin session via `isAdmin()` (`members.is_admin = 1`). No separa
 
 ### `POST /api/admin-create-member`
 Body: `{secret, full_name, phone, emails}`. Generates a slug from `full_name`, inserts into `members` plus `member_phones`/`member_emails` (the contacts the member's login codes are sent to), then picks 8 seed shows (2 per list) drawn from the existing club's highly-rated picks with cast and a real network URL. Shows are inserted with `added_by='seed'`, `created_at=NULL`, `updated_at=NULL` so the seed-only check (which looks for exactly that signature) recognizes them.
+
+### `POST /api/admin-member-merge`
+Body: `{source, target}` (slugs). Merges a duplicate account into the member's real one, in a single all-or-nothing `DB.batch`. Exists because Sign in with Apple + "Hide My Email" mints a private-relay address that doesn't match `member_emails`, so self-enrollment creates a second account for an existing member (and links their `apple_sub` to it).
+
+What happens: the source's shows move to the target (actors follow via `show_id`), except untouched seed rows (`added_by='seed' AND updated_at IS NULL` — dropped) and active rows whose title the target already carries actively (case-insensitive — the kept copy wins, the source's is dropped). Emails and phones are deduped against the target's set and moved as non-primary alternates, so the relay address still works for email-code login. `member_apple_ids` / `member_google_ids` are repointed — this is what makes the *next* relay sign-in resolve to the right member. `member_subscriptions` move (deduped on network), live `sessions` are repointed rather than killed (the member's phone stays signed in, now to the kept account), `signup_requests.created_member_slug` follows, the target's `last_login_at` takes the max of the two, and the source's `login_otps` and member row are deleted.
+
+Refuses to merge an admin source (`cannot_merge_admin` — demote first), the demo member on either side (`cannot_merge_demo`), or an account into itself. The `/members` page surfaces candidates (private-relay-only accounts, shared first names) in a "Possible duplicates" panel with a manual picker for anything the heuristics miss.
 
 ### `POST /api/admin-vibe-fill`
 Body: `{secret, count}`. Runs the vibe trait-backfill loop described above. The `vibe-admin.html` UI calls it in a loop until the operator stops or every show is scored.
