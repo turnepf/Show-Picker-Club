@@ -44,6 +44,13 @@ export async function onRequestGet(context) {
   // both storage formats (SQLite datetime('now') vs JS toISOString with
   // milliseconds) to fraction-less UTC ISO — the only shape the shipped
   // iOS admin screen's ISO8601DateFormatter can parse.
+  //
+  // last_activity_at is the member's most recent member-initiated library
+  // touch and is what both admin member lists sort by. Broader than the
+  // 30-day count columns: a seeded row with updated_at set counts too,
+  // because updated_at only ever moves on member intent (same engagement
+  // test as the dormant digest). Normalised inside MAX so the mixed
+  // storage formats (datetime('now') vs JS toISOString) compare correctly.
   const since = "datetime('now', '-30 days')";
   // disabled (migration 030) / approved + enrolled_via (migration 031) with
   // column-less retries so the page keeps working mid-rollout.
@@ -63,6 +70,10 @@ export async function onRequestGet(context) {
              COALESCE(m.last_login_at,
                       (SELECT MAX(created_at) FROM sessions
                         WHERE member_slug = m.slug))) AS last_login,
+           (SELECT MAX(strftime('%Y-%m-%dT%H:%M:%SZ', COALESCE(updated_at, created_at)))
+              FROM shows
+             WHERE member_slug = m.slug
+               AND (COALESCE(added_by,'') != 'seed' OR updated_at IS NOT NULL)) AS last_activity_at,
            (SELECT COUNT(*) FROM shows
              WHERE member_slug = m.slug AND archived = 0 AND list = 'watching'
                AND COALESCE(added_by,'') != 'seed'
@@ -98,6 +109,7 @@ export async function onRequestGet(context) {
     emails: r.emails ? r.emails.split(',').filter(Boolean) : [],
     phones: r.phones ? r.phones.split(',').filter(Boolean) : [],
     last_login: r.last_login || null,
+    last_activity_at: r.last_activity_at || null,
     activity_30d: {
       watching: r.act_watching || 0,
       waiting: r.act_waiting || 0,
