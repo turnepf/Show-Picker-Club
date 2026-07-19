@@ -1,5 +1,4 @@
 import SwiftUI
-import WidgetKit
 import ShowPickerCore
 
 // Screen 1: the four lists, each with a count. Tapping one drills into its
@@ -78,8 +77,6 @@ struct ListsView: View {
             do {
                 shows = try await WatchAPI.shows(member: slug, cookie: auth.cookieHeader)
                 errorText = nil
-                // Fresh list data — refresh the complication's next-premiere entry.
-                WidgetCenter.shared.reloadAllTimelines()
                 return
             } catch {
                 // .task(id:) restarts cancel the in-flight load — bail without

@@ -57,7 +57,7 @@ struct UpcomingProvider: TimelineProvider {
 
             // One entry per local midnight so "Today" / "in N days" stays true
             // without a network trip, then a twice-a-day refetch for new adds
-            // and date changes (same shape as the watch complication).
+            // and date changes.
             var entries = [UpcomingEntry(date: now, shows: shows, signedIn: signedIn)]
             let cal = Calendar.current
             var day = cal.startOfDay(for: now)
