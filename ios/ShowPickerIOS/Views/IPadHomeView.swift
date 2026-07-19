@@ -25,7 +25,6 @@ enum SidebarItem: Hashable {
     case adminReporting
     case adminCreateMember
     case adminManageMembers
-    case adminNewMembers
     case adminUrlCleanup
     case adminVibe
 }
@@ -118,7 +117,7 @@ struct IPadHomeView: View {
     private func isAdminItem(_ item: SidebarItem) -> Bool {
         switch item {
         case .adminReporting, .adminCreateMember, .adminManageMembers,
-             .adminNewMembers, .adminUrlCleanup, .adminVibe:
+             .adminUrlCleanup, .adminVibe:
             return true
         default:
             return false
@@ -211,8 +210,6 @@ struct IPadHomeView: View {
                             .tag(SidebarItem.adminCreateMember)
                         Label("Manage members", systemImage: "person.2.badge.gearshape")
                             .tag(SidebarItem.adminManageMembers)
-                        Label("New members", systemImage: "tray.and.arrow.down")
-                            .tag(SidebarItem.adminNewMembers)
                         Label("Show Cleanup", systemImage: "link.badge.plus")
                             .tag(SidebarItem.adminUrlCleanup)
                         Label("Vibe trait scoring", systemImage: "sparkles")
@@ -367,8 +364,6 @@ struct IPadHomeView: View {
                 CreateMemberView().environmentObject(auth)
             case .adminManageMembers:
                 ManageMembersView().environmentObject(auth)
-            case .adminNewMembers:
-                SignupRequestsView().environmentObject(auth)
             case .adminUrlCleanup:
                 UrlCleanupView().environmentObject(auth)
             case .adminVibe:
