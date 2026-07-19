@@ -36,6 +36,7 @@ database_id = "..."
 | `first_name`   | TEXT             | Override for display name (rare collisions).|
 | `last_initial` | TEXT             | Suffix used to disambiguate two first-name collisions. |
 | `created_at`   | TEXT             | Default `datetime('now')`.                  |
+| `last_login_at`| TEXT             | Migration 013. Stamped on every session issue and never cleared, so it survives logout/disable (which delete `sessions` rows). Any "last login" / "never logged in" display must read this, not `MAX(sessions.created_at)`. |
 
 ### Login identity tables
 Login is by one-time code or Sign in with Apple — there are no stored passwords. The relevant tables (added by migrations, not in the base `schema.sql`):
@@ -243,6 +244,8 @@ The demo member's data auto-resets (`_shared/demo.js`): each demo sign-in snapsh
 `/auth/check` is hit on every page load by the SPA. It bumps `sessions.last_seen_at`, but throttled — the `UPDATE` clause only fires when `last_seen_at IS NULL OR last_seen_at < datetime('now', '-1 hour')`. This means at most one write per session per hour, with no read-then-write.
 
 `last_seen_at` feeds **Reporting** only: DAU / WAU / MAU = `COUNT(DISTINCT member_slug) FROM sessions WHERE last_seen_at >= ...`. The home-page member ordering is library-based (`last_activity_at` on `/api/members`), not session-based.
+
+Durable login tracking is separate: `members.last_login_at` (stamped by `_shared/session.js#issueSession` on every login). The `sessions` table cannot answer "when did this member last log in" — logout, admin disable, and account deletion all delete session rows — so the admin member list (`/api/admin-member-emails`) and the engagement script read `last_login_at`, falling back to sessions only when the column is NULL. The endpoint normalises the value to fraction-less UTC ISO (`2026-07-19T08:30:00Z`) because the shipped iOS admin screen's `ISO8601DateFormatter` rejects fractional seconds.
 
 ## Frontend pages
 
