@@ -68,14 +68,6 @@
     button.save:hover { background: var(--accent-hover); }
     button.save:disabled { background: var(--ink-faint); cursor: not-allowed; }
     button.save.saved { background: var(--list-watching); }
-    .sort-bar {
-      display: flex; align-items: center; gap: 8px;
-      margin-bottom: 14px; font-size: 13px; color: var(--ink-muted);
-    }
-    .sort-bar select {
-      padding: 6px 10px; font-size: 13px; font-family: inherit;
-      border: 1px solid var(--border); border-radius: 6px; background: var(--surface);
-    }
     .dupes {
       background: color-mix(in oklch, var(--accent) 8%, var(--surface));
       border: 1px solid color-mix(in oklch, var(--accent) 30%, transparent);
@@ -164,15 +156,6 @@
       Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a>, then reload.
     </div>
     <div id="dupes" style="display:none;"></div>
-    <div class="sort-bar">
-      <label for="sortBy">Sort:</label>
-      <select id="sortBy">
-        <option value="last_login_desc">Most recent login</option>
-        <option value="last_login_asc">Oldest / never logged in</option>
-        <option value="name">Name</option>
-        <option value="slug">Slug</option>
-      </select>
-    </div>
     <div id="list"></div>
   </div>
 
@@ -187,10 +170,6 @@
       }
       const data = await res.json();
       allMembers = data.members || [];
-      // Restore last-used sort preference per browser/operator so the page
-      // opens the same way each visit.
-      const saved = localStorage.getItem('membersSortBy');
-      if (saved) document.getElementById('sortBy').value = saved;
       renderSorted();
       renderDupes();
       loadPendingRequests();
@@ -374,39 +353,21 @@
       } catch {}
     }
 
+    // Always most-recent-activity first (the member's latest library touch,
+    // last_activity_at from the server); members with no recorded activity
+    // sink to the bottom, alphabetically.
     function renderSorted() {
-      const mode = document.getElementById('sortBy').value;
-      localStorage.setItem('membersSortBy', mode);
       const sorted = [...allMembers];
       const cmpName = (a, b) =>
         (a.first_name || a.slug).localeCompare(b.first_name || b.slug, undefined, { sensitivity: 'base' });
-      if (mode === 'slug') {
-        sorted.sort((a, b) => a.slug.localeCompare(b.slug));
-      } else if (mode === 'last_login_desc') {
-        // Most recent first; never-logged-in members sink to the bottom.
-        sorted.sort((a, b) => {
-          if (!a.last_login && !b.last_login) return cmpName(a, b);
-          if (!a.last_login) return 1;
-          if (!b.last_login) return -1;
-          return b.last_login.localeCompare(a.last_login);
-        });
-      } else if (mode === 'last_login_asc') {
-        // Never-logged-in members rise to the top so they're easy to spot.
-        sorted.sort((a, b) => {
-          if (!a.last_login && !b.last_login) return cmpName(a, b);
-          if (!a.last_login) return -1;
-          if (!b.last_login) return 1;
-          return a.last_login.localeCompare(b.last_login);
-        });
-      } else {
-        sorted.sort(cmpName);
-      }
+      sorted.sort((a, b) => {
+        if (!a.last_activity_at && !b.last_activity_at) return cmpName(a, b);
+        if (!a.last_activity_at) return 1;
+        if (!b.last_activity_at) return -1;
+        return b.last_activity_at.localeCompare(a.last_activity_at) || cmpName(a, b);
+      });
       render(sorted);
     }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('sortBy').addEventListener('change', renderSorted);
-    });
 
     function activityPills(act) {
       const order = [

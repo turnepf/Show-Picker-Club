@@ -534,6 +534,7 @@ struct AdminMember: Codable, Identifiable {
     let emails: [String]
     let phones: [String]
     let lastLogin: String?
+    let lastActivityAt: String?
     let activity30d: MemberActivity?
     // Status flags (optional so decoding survives an older server).
     let isAdmin: Bool?
@@ -548,6 +549,7 @@ struct AdminMember: Codable, Identifiable {
         case lastInitial = "last_initial"
         case lastName = "last_name"
         case lastLogin = "last_login"
+        case lastActivityAt = "last_activity_at"
         case activity30d = "activity_30d"
         case isAdmin = "is_admin"
         case enrolledVia = "enrolled_via"
