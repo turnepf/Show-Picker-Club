@@ -3526,12 +3526,15 @@
       }[c]));
     }
 
-    // Allow only http(s) URLs into href/data attributes. Blocks javascript:,
-    // data:, and other script-bearing schemes from member-supplied network_url.
+    // Allow only http(s) URLs into href/src attributes. Blocks javascript:,
+    // data:, and other script-bearing schemes from member-supplied
+    // network_url. Output is HTML-escaped because every call site
+    // interpolates it into an attribute value — a stored quote must not
+    // close the attribute and start an inline event handler.
     function safeUrl(url) {
       if (!url || typeof url !== 'string') return '#';
       const t = url.trim();
-      return /^https?:\/\//i.test(t) ? t : '#';
+      return /^https?:\/\//i.test(t) ? escapeHtml(t) : '#';
     }
 
     // Click the detail poster to view it full screen; click anywhere (or hit
