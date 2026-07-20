@@ -6,7 +6,10 @@ function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
 }
 
-export async function issueSession(env, memberSlug) {
+// `extra` is spread into the success JSON — enrollment paths pass
+// { enrolled: true } so the web client can fire its signup conversion event;
+// plain logins omit it. Native clients ignore unknown keys.
+export async function issueSession(env, memberSlug, extra = {}) {
   // disabled = banned (migration 030): refuse to mint a session. Falls back
   // to the column-less select mid-rollout.
   const m = await env.DB.prepare(
@@ -30,7 +33,7 @@ export async function issueSession(env, memberSlug) {
   await env.DB.prepare("UPDATE members SET last_login_at = datetime('now') WHERE slug = ?")
     .bind(memberSlug).run().catch(() => {});
 
-  return new Response(JSON.stringify({ success: true, slug: memberSlug }), {
+  return new Response(JSON.stringify({ success: true, slug: memberSlug, ...extra }), {
     status: 200,
     headers: {
       ...corsHeaders(),

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Show Picker Club</title>
+  <meta name="description" content="Track the TV shows and movies you watch with friends. Four simple lists, automatic show info, and premiere dates — free on the web, iPhone, and Apple TV.">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-CP9N26NG19"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-CP9N26NG19');</script>
   <link rel="manifest" href="/manifest.json">
@@ -586,6 +587,22 @@
       max-height: 88vh;
       overflow-y: auto;
     }
+
+    /* Join pitch card shown to logged-out landing visitors while
+       self-enrollment is open. */
+    .join-cta {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 18px;
+    }
+    .join-cta-pitch {
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--ink);
+      margin: 0 0 12px;
+    }
+    .join-cta-btn { width: 100%; }
 
     /* Log in / sign up chooser: a narrow centered column of pill buttons.
        Google's GIS button is an iframe capped at 400px that can't inherit our
@@ -1182,6 +1199,14 @@
           <h1 class="home-title">Show Picker Club</h1>
           <button class="icon-btn" title="Search all libraries" aria-label="Search all libraries" onclick="openLandingSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
           <button class="icon-btn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
+        </div>
+
+        <!-- Join pitch for logged-out visitors, but only when self-enrollment
+             is actually open (/auth/config → self_enroll) — invite-only
+             deployments never show it. Toggled by maybeShowJoinCta(). -->
+        <div class="join-cta hidden" id="joinCta">
+          <p class="join-cta-pitch">Track the shows and movies you're watching, see when seasons come back, and share picks with friends.</p>
+          <button class="btn btn-save join-cta-btn" onclick="login()">Create your free account</button>
         </div>
 
         <!-- iPhone home shows a single "My Shows" row; the desktop split
@@ -2007,7 +2032,7 @@
       } catch (e) {
         detailStatus.textContent = 'Failed to load trending shows.';
       }
-      checkAuth();
+      checkAuth().then(maybeShowJoinCta);
     }
 
     async function showMember(slug) {
@@ -2213,6 +2238,21 @@
     // Header login button: visible only when logged out. Once logged in, the
     // Log out button takes over; per-row actions show inline on your own page
     // (no edit-mode toggle needed).
+    // Landing join pitch: only for logged-out visitors, and only when
+    // self-enrollment is open (/auth/config, cached by loadAuthConfig).
+    // Invite-only deployments (SELF_ENROLL unset) never see it.
+    async function maybeShowJoinCta() {
+      const cta = document.getElementById('joinCta');
+      if (!cta) return;
+      if (authMember) { cta.classList.add('hidden'); return; }
+      const cfg = await loadAuthConfig();
+      cta.classList.toggle('hidden', !cfg.self_enroll);
+      if (cfg.self_enroll) {
+        const loginRowLabel = document.querySelector('#homeLoginRow .ios-item-label');
+        if (loginRowLabel) loginRowLabel.textContent = 'Log in or sign up';
+      }
+    }
+
     function updateLoginBtnLabel() {
       const btn = document.getElementById('loginBtn');
       if (!btn) return;
@@ -2329,6 +2369,7 @@
       updateLoginBtnLabel();
       updateSideListsHeader();
       updateHeaderTitle();
+      maybeShowJoinCta();
       if (typeof renderShows === 'function' && typeof shows !== 'undefined') renderShows();
     }
 
@@ -2347,6 +2388,15 @@
         authConfig = await res.json();
       } catch { authConfig = { self_enroll: false, google_client_id: null, turnstile_site_key: null }; }
       return authConfig;
+    }
+
+    // GA4 sign_up conversion, fired only when the server says the login
+    // actually created an account (enrolled: true). Beacon transport so the
+    // hit survives finishLogin's immediate navigation to the member page.
+    function trackSignup(method) {
+      try {
+        if (typeof gtag === 'function') gtag('event', 'sign_up', { method, transport_type: 'beacon' });
+      } catch {}
     }
 
     function loginShowStep(step) {
@@ -2442,7 +2492,11 @@
           body: JSON.stringify({ credential: resp.credential }),
         });
         const data = await res.json().catch(() => ({}));
-        if (res.ok && data.success) { await finishLogin(); return; }
+        if (res.ok && data.success) {
+          if (data.enrolled) trackSignup('google');
+          await finishLogin();
+          return;
+        }
         if (res.ok && data.needs_name) { loginShowStep('name'); return; }
         if (res.status === 401) {
           showLoginError("That Google account isn't linked to a member. Use the email the group owner has on file, or ask them to add you.");
@@ -2577,7 +2631,11 @@
           body: JSON.stringify(body),
         });
         const data = await res.json().catch(() => ({}));
-        if (res.ok && data.success) { await finishLogin(); return; }
+        if (res.ok && data.success) {
+          if (data.enrolled) trackSignup(loginState.channel || 'email');
+          await finishLogin();
+          return;
+        }
         if (res.status === 429) { showLoginError('Signups are paused right now. Try again tomorrow.'); return; }
         showLoginError(data.error === 'already_member'
           ? 'That email already belongs to a member — go back and log in.'
@@ -2716,6 +2774,7 @@
         });
         const payload = await res.json().catch(() => ({}));
         if (res.ok && payload.success) {
+          if (payload.enrolled) trackSignup('apple');
           await finishLogin();
         } else if (res.ok && payload.needs_name) {
           loginShowStep('name');
