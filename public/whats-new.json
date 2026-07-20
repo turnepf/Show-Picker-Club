@@ -1,6 +1,11 @@
 {
   "_comment": "Single source of truth for What's New on every platform. The web page (whats-new.html) and the iOS app (WhatsNewView) both render this file. Keep bodies plain text; put a hyperlink in `link` (web renders it, apps ignore it). Entries whose features need a new app build wait in `coming_soon` until the build ships, then move into `entries` with a date. Dates are M/D.",
-  "coming_soon": [],
+  "coming_soon": [
+    {
+      "title": "Tap a show while sorting.",
+      "body": "On iPhone and iPad, tapping a show in My Order drag-to-sort mode now opens its card — matching the web — while the ≡ handle keeps handling the dragging."
+    }
+  ],
   "entries": [
     {
       "date": "7/19",
