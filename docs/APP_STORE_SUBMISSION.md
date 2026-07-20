@@ -199,16 +199,27 @@ tracking, so no App Tracking Transparency prompt is presented.
 
 ## 7. The web app's "get the app" banner
 
-The web app shows a dismissible App Store banner on Apple devices, keyed to
-the listing's numeric Apple ID: `APP_STORE_ID` at the top of
-`public/app-banner.js` (currently `6780282764`, the July 2026 listing). One
-universal listing covers iPhone / iPad / Mac / Apple TV, so that single ID is
-all the banner needs — it tailors the copy per device itself.
+The web app promotes the App Store listing two ways, split by browser so no
+one ever sees more than one prompt:
+
+- **iPhone/iPad Safari** gets Apple's native Smart App Banner via
+  `<meta name="apple-itunes-app">` in the head of `index.html`, `vibe.html`,
+  `subscriptions.html`, and `whats-new.html`. Safari renders OPEN when the
+  app is installed and GET when it isn't, and this never stacks with the
+  universal-link "Open in app" bar. `app-banner.js` detects iOS Safari and
+  skips itself there.
+- **Everything else on Apple hardware** (Chrome/Firefox on iOS, Safari on
+  the Mac) gets the custom dismissible bar from `public/app-banner.js`,
+  keyed to `APP_STORE_ID` at the top of that file. One universal listing
+  covers iPhone / iPad / Mac / Apple TV, so a single ID is all it needs —
+  it tailors the copy per device itself.
 
 - [ ] If the listing is ever re-created under a new Apple ID (App Store
       Connect → the app → App Information → "Apple ID"), update
-      `APP_STORE_ID` to match. Setting it to the empty string turns the
-      banner off entirely.
+      `APP_STORE_ID` in `app-banner.js` **and** the `apple-itunes-app` meta
+      tag on the four pages above (currently `6780282764`, the July 2026
+      listing). Setting `APP_STORE_ID` to the empty string turns the custom
+      bar off entirely; removing the meta tags turns off the native one.
 
 ---
 
