@@ -235,7 +235,7 @@ Scheduled-job endpoints accept an `X-Cron-Secret` header compared in constant ti
 
 With `SELF_ENROLL` set, unknown identities can create accounts: `/auth/request-code` sends a signup code (`enroll_otps`) for unknown emails, `/auth/login` answers `{needs_name:true}` for a valid signup code, and `/auth/enroll` completes it; `/auth/apple` and `/auth/google` enroll unrecognized identities directly (asking the client for a name via `{needs_name:true}` when the token doesn't carry one). All channels create the member with `approved = 0` — full personal use, but hidden from the roster, vibe, cross-library search, activity, and trending until approved (`/api/admin-member-approve`, or the Approve button on `/members`). Guards live in `_shared/enroll.js`: global daily circuit breaker (`SELF_ENROLL_MAX_PER_DAY`, default 20), per-IP and per-email caps, optional Turnstile (`TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY`, fail-open when unset), a reserved-slug blocklist (`admin-create-member.js#RESERVED_SLUGS`), an audit row in `signup_requests` (status `self_enrolled`), and an operator email per signup (capped 10/hour). The Apple demo fallback is inert while `SELF_ENROLL` is on. Members self-delete via `/api/account-delete` (fresh emailed code, `channel='delete'` in `login_otps`, hard delete + PII scrub of the audit row).
 
-Enrollment responses include `enrolled: true` alongside the usual `{success, slug}` session payload (`issueSession`'s `extra` param); plain logins omit it. The web frontend uses the flag to fire a GA4 `sign_up` event (with `method: email|apple|google`, beacon transport) — mark that event as a conversion in GA4/Google Ads to optimize ad campaigns toward signups. Native clients ignore the extra key. The landing page also shows a join-pitch card (`#joinCta`) to logged-out visitors — and relabels the home login row "Log in or sign up" — only while `/auth/config` reports `self_enroll: true`.
+Enrollment responses include `enrolled: true` alongside the usual `{success, slug}` session payload (`issueSession`'s `extra` param); plain logins omit it. The web frontend uses the flag to fire a GA4 `sign_up` event (with `method: email|apple|google`, beacon transport) — mark that event as a conversion in GA4/Google Ads to optimize ad campaigns toward signups. Native clients ignore the extra key. The landing page also shows a join-pitch card (`#joinCta`) to logged-out visitors — and relabels the home login row "Log in or sign up" — only while `/auth/config` reports `self_enroll: true`. Fresh web signups land on `/welcome` (`welcome.html`), a stable confirmation URL registered with Google Ads' page-based conversion tracking — keep that URL stable, and keep the Google tag on the page. It forwards to the new member's page; sessionless visits bounce to `/`.
 
 ### Demo account
 
@@ -270,6 +270,10 @@ Member taste profile UI. Calls `/api/vibe?member=<slug>` and renders the cluster
 ### `reporting.html`
 
 Auth-gated dashboard for the operator. Calls `/api/reporting`; displays metric cards and a few tables.
+
+### `welcome.html`
+
+Post-signup confirmation at `/welcome`. Every fresh enrollment is routed here by `finishLogin(enrolled)`; the page carries the Google tag so Google Ads' page-visit conversion tracking can count it (see [Self-enrollment](#self-enrollment-migration-031-behind-the-self_enroll-secret)). Logged-in members get a "Go to my shows" button pointed at their slug; anyone without a session is redirected to `/`.
 
 ### `members.html`, `url-cleanup.html`, `vibe-admin.html`
 

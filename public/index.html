@@ -2494,7 +2494,7 @@
         const data = await res.json().catch(() => ({}));
         if (res.ok && data.success) {
           if (data.enrolled) trackSignup('google');
-          await finishLogin();
+          await finishLogin(!!data.enrolled);
           return;
         }
         if (res.ok && data.needs_name) { loginShowStep('name'); return; }
@@ -2633,7 +2633,7 @@
         const data = await res.json().catch(() => ({}));
         if (res.ok && data.success) {
           if (data.enrolled) trackSignup(loginState.channel || 'email');
-          await finishLogin();
+          await finishLogin(!!data.enrolled);
           return;
         }
         if (res.status === 429) { showLoginError('Signups are paused right now. Try again tomorrow.'); return; }
@@ -2718,9 +2718,16 @@
       finally { btn.disabled = false; btn.textContent = 'Permanently delete my account'; }
     }
 
-    async function finishLogin() {
+    async function finishLogin(enrolled = false) {
       closeLoginModal();
       await checkAuth();
+      // Fresh signups land on /welcome — a stable confirmation URL that
+      // Google Ads' page-based conversion tracking watches (member pages are
+      // per-slug, so they can't serve that role). It forwards to their page.
+      if (enrolled) {
+        window.location.href = '/welcome';
+        return;
+      }
       // From the landing page (memberSlug is null until we navigate to a
       // member route), drop the user on their own page so the login feels
       // like "go to my shows" rather than just "you're now authenticated".
@@ -2775,7 +2782,7 @@
         const payload = await res.json().catch(() => ({}));
         if (res.ok && payload.success) {
           if (payload.enrolled) trackSignup('apple');
-          await finishLogin();
+          await finishLogin(!!payload.enrolled);
         } else if (res.ok && payload.needs_name) {
           loginShowStep('name');
         } else if (res.status === 401) {
