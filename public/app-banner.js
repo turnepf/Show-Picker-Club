@@ -8,6 +8,13 @@
  * Non-Apple devices, installed-PWA windows, and anyone who has dismissed
  * the banner (localStorage) never see it.
  *
+ * iPhone/iPad **Safari** never sees it either: those pages carry the native
+ * <meta name="apple-itunes-app"> Smart App Banner, and Safari also shows its
+ * own "Open in app" bar for our universal-link domain when the app is
+ * installed — rendering this bar there stacked a second, redundant prompt on
+ * top of Apple's. This bar only covers browsers with no native banner:
+ * Chrome/Firefox/etc. on iOS, and Safari on the Mac.
+ *
  * Include with <script src="/app-banner.js" defer></script> — on pages that
  * load shell.js it must come AFTER shell.js so the banner slots into the
  * restructured split-view layout.
@@ -41,6 +48,15 @@
     /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'iPad' :
     /Macintosh/.test(ua) ? 'Mac' : null;
   if (!device) return;
+
+  // iPhone/iPad Safari gets Apple's native Smart App Banner (the
+  // apple-itunes-app meta tag) plus Safari's own universal-link "Open in
+  // app" bar — showing ours too means two or three prompts at once. Every
+  // third-party iOS browser brands its UA (CriOS, FxiOS, EdgiOS, …); plain
+  // "Safari/" with none of those is the real thing, so bow out there.
+  var isIosSafari = device !== 'Mac' && /Safari\//.test(ua) &&
+    !/CriOS|FxiOS|EdgiOS|OPiOS|OPT\/|GSA\/|DuckDuckGo|Brave/.test(ua);
+  if (isIosSafari) return;
 
   var CSS =
     '.spc-app-banner { position: relative; z-index: 200; display: flex; align-items: center; gap: 11px; padding: 10px 12px; background: var(--surface, #fff); border-bottom: 1px solid var(--border-soft, #ddd); font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, sans-serif); }' +

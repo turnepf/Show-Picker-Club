@@ -30,7 +30,7 @@ struct CreateMemberView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
             } footer: {
-                Text("Provide a phone, at least one email, or both — that's where login codes go.")
+                Text(footerText)
             }
 
             Section {
@@ -58,11 +58,31 @@ struct CreateMemberView: View {
                             ForEach(seeded, id: \.self) { Text($0).font(.callout) }
                         }
                     }
+                    // Same welcome message the web /members page offers after
+                    // a create — copy it or fire it straight off as a text.
+                    if let s = r.slug {
+                        WelcomeIntroPanel(
+                            slug: s,
+                            displayName: r.editorName ?? s,
+                            phone: r.phone,
+                            defaultOpen: true)
+                    }
                 }
             }
         }
         .navigationTitle("Create Member")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    // Live preview of the slug/URL the server will mint (first name,
+    // lowercased, alphanumerics only; a suffix is added on collision) —
+    // mirrors the web form's preview line.
+    private var footerText: String {
+        let base = "Provide a phone, at least one email, or both — that's where login codes go."
+        let first = fullName.trimmingCharacters(in: .whitespaces).split(separator: " ").first.map(String.init) ?? ""
+        let slug = first.lowercased().filter { $0.isLetter || $0.isNumber }
+        guard !slug.isEmpty else { return base }
+        return "URL: showpicker.club/\(slug) (suffix added on collision) · Display: \(first)'s Shows\n\(base)"
     }
 
     private func labeled(_ label: String, _ value: String) -> some View {

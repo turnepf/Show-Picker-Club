@@ -262,14 +262,23 @@ struct SharedTitle: Codable, Identifiable {
     var id: String { title }
 }
 
-// /api/admin-create-member result (success or {error}).
+// /api/admin-create-member result (success or {error}). editor_name is the
+// greeting name for the welcome intro; phone is the normalized E.164 number
+// the Text-intro button sends to.
 struct CreateMemberResult: Codable {
     let ok: Bool?
     let slug: String?
     let name: String?
+    let editorName: String?
     let url: String?
+    let phone: String?
     let seeded: [String]?
     let error: String?
+
+    enum CodingKeys: String, CodingKey {
+        case ok, slug, name, url, phone, seeded, error
+        case editorName = "editor_name"
+    }
 }
 
 // /api/admin-signup-requests — pending /join requests for the operator.
@@ -536,6 +545,9 @@ struct AdminMember: Codable, Identifiable {
     let lastLogin: String?
     let lastActivityAt: String?
     let activity30d: MemberActivity?
+    // Non-seed active shows — the duplicates panel ranks the default keeper
+    // by library size.
+    let showCount: Int?
     // Status flags (optional so decoding survives an older server).
     let isAdmin: Bool?
     let disabled: Bool?
@@ -551,6 +563,7 @@ struct AdminMember: Codable, Identifiable {
         case lastLogin = "last_login"
         case lastActivityAt = "last_activity_at"
         case activity30d = "activity_30d"
+        case showCount = "show_count"
         case isAdmin = "is_admin"
         case enrolledVia = "enrolled_via"
     }
@@ -569,6 +582,36 @@ struct MemberActivity: Codable {
     let waiting: Int
     let recommending: Int
     let next: Int
+}
+
+// /api/admin-dupe-ignores — operator-dismissed duplicate matches. Pairs are
+// stored sorted (slug_a <= slug_b); a self-pair silences the hidden-email-
+// only flag for that account.
+struct DupeIgnore: Codable, Identifiable {
+    let slugA: String
+    let slugB: String
+    var id: String { "\(slugA)|\(slugB)" }
+
+    enum CodingKeys: String, CodingKey {
+        case slugA = "slug_a"
+        case slugB = "slug_b"
+    }
+}
+
+struct DupeIgnoresResponse: Codable { let ignores: [DupeIgnore] }
+
+// /api/admin-member-merge result (success or {error}).
+struct MergeResult: Codable {
+    let ok: Bool?
+    let showsMoved: Int?
+    let duplicateShowsDropped: Int?
+    let error: String?
+
+    enum CodingKeys: String, CodingKey {
+        case ok, error
+        case showsMoved = "shows_moved"
+        case duplicateShowsDropped = "duplicate_shows_dropped"
+    }
 }
 
 // MARK: - Admin: vibe trait scoring (/api/admin-vibe-fill)

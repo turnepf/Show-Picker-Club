@@ -29,6 +29,9 @@ struct MemberView: View {
     @State private var showingAdd = false
     @State private var showingSearch = false
     @State private var editingShow: Show?
+    // Programmatic push for taps while reordering: edit mode swallows
+    // NavigationLink taps, so the row's tap gesture lands here instead.
+    @State private var reorderDetail: Show?
     @State private var sortByList: [String: SortOption] = [:]
     // Archive Undo: the just-archived show, shown in a 6-second bottom
     // banner (mirrors the web's undo toast).
@@ -60,7 +63,7 @@ struct MemberView: View {
             // handles never appear unexplained. Viewing someone else's
             // arrangement gets a read-only caption instead.
             Text(isReordering
-                 ? "My Order: press the ≡ handle and drag a show up or down. Your order is saved."
+                 ? "My Order: drag the ≡ handle to sort — tap a show to open it. Your order is saved."
                  : (currentSort == .manual && !isMine
                     ? "Shown in \(member.label)'s own order."
                     : listHelp(currentList)))
@@ -81,6 +84,14 @@ struct MemberView: View {
                         NavigationLink(value: Route.detail(id: show.id, title: show.title, network: show.network, rating: show.rating)) {
                             row(show)
                         }
+                        // Edit mode disables the NavigationLink tap, but the web
+                        // still opens the card in manual sort — so while
+                        // reordering, a tap on the row (not the ≡ handle) pushes
+                        // the detail programmatically. Simultaneous so it never
+                        // steals the link's tap in normal browsing.
+                        .simultaneousGesture(TapGesture().onEnded {
+                            if isReordering { reorderDetail = show }
+                        })
                         .swipeActions(edge: .trailing) {
                             if isMine {
                                 Button(role: .destructive) {
@@ -145,6 +156,12 @@ struct MemberView: View {
             // stock reorder behavior). Driven by the sort choice, so picking
             // any other sort drops straight back to normal browsing.
             .environment(\.editMode, .constant(isReordering ? .active : .inactive))
+            // Destination for taps made while reordering (see the row's tap
+            // gesture). Pushes the same card as the NavigationLink route.
+            .navigationDestination(item: $reorderDetail) { show in
+                ShowDetailView(id: show.id, initialTitle: show.title,
+                               initialNetwork: show.network, initialRating: show.rating)
+            }
         }
         .navigationTitle(fixedList.map { list in
             isMine ? list.title : "\(member.label) · \(list.title)"
