@@ -9,7 +9,7 @@
 //   Exported 2026-07-20
 //
 //   Watching
-//   Severance on Apple TV+ at https://tv.apple.com/...
+//   Severance on Apple TV+
 //   The Bear on Hulu
 //
 //   Awaiting
@@ -19,7 +19,6 @@
 // web button and the iOS share sheet both consume this same endpoint.
 
 import { getSession } from '../_shared/auth.js';
-import { safeNetworkUrl } from '../_shared/url-utils.js';
 
 // Display order + labels, matching the app's list tabs (public/shell.js).
 const LISTS = [
@@ -29,25 +28,10 @@ const LISTS = [
   ['next', 'Next Up'],
 ];
 
-// A stored network_url is only a real deep link when it isn't one of the
-// search-page placeholders the rest of the codebase ignores (see
-// functions/api/shows.js). Anything unsafe or placeholder-shaped is treated
-// as "no link" so the export never points at a bare search page.
-function deepLink(url) {
-  const s = safeNetworkUrl(url);
-  if (!s) return null;
-  if (s.includes('/search') || s.includes('/s?') || s.includes('?q=') || s.includes('?query=')) {
-    return null;
-  }
-  return s;
-}
-
 function showLine(row) {
   let line = (row.title || '').trim();
   if (!line) return null;
   if (row.network) line += ` on ${row.network}`;
-  const url = deepLink(row.network_url);
-  if (url) line += ` at ${url}`;
   return line;
 }
 
@@ -64,7 +48,7 @@ export async function onRequestGet(context) {
   const name = (member && member.name) ? member.name : slug;
 
   const { results } = await env.DB.prepare(
-    `SELECT title, network, network_url, list
+    `SELECT title, network, list
        FROM shows
       WHERE member_slug = ? AND archived = 0
       ORDER BY title COLLATE NOCASE`
