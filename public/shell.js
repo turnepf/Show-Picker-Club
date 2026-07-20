@@ -34,6 +34,7 @@
     '<symbol id="s-text-plus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6.5h9M3.5 12h13M3.5 17.5h13"/><path d="M18.5 3.9v5M16 6.4h5"/></g></symbol>' +
     '<symbol id="s-chevron-right" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M9 5.5 15.7 12 9 18.5"/></symbol>' +
     '<symbol id="s-logout" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5H7.8A1.8 1.8 0 0 0 6 6.3v11.4a1.8 1.8 0 0 0 1.8 1.8h5.7M10.5 12h10M17 8.5 20.5 12 17 15.5"/></symbol>' +
+    '<symbol id="s-export" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 15V3.5M8.5 7 12 3.5 15.5 7M5 13v5.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V13"/></symbol>' +
     '<symbol id="s-creditcard" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.8" y="5.5" width="18.4" height="13" rx="2.2"/><path d="M2.8 9.8h18.4" stroke-width="2.2"/></g></symbol>' +
     '</svg>';
 
@@ -150,6 +151,23 @@
     if (menuEl) { closeMenu(); return; }
     var menu = document.createElement('div');
     menu.className = 'shell-menu';
+    var exportItem = document.createElement('button');
+    exportItem.type = 'button';
+    exportItem.innerHTML = 'Export my lists <svg class="ic"><use href="#s-export"/></svg>';
+    exportItem.addEventListener('click', function () {
+      closeMenu();
+      // The endpoint responds with Content-Disposition: attachment, so a
+      // plain anchor click downloads the .txt file rather than navigating
+      // the SPA to it.
+      var a = document.createElement('a');
+      a.href = '/api/export';
+      a.download = '';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+    menu.appendChild(exportItem);
+
     var item = document.createElement('button');
     item.type = 'button';
     item.innerHTML = 'Log out <svg class="ic"><use href="#s-logout"/></svg>';

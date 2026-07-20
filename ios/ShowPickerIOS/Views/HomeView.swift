@@ -11,6 +11,7 @@ struct HomeView: View {
     @State private var loadFailed = false
     @State private var showingLogin = false
     @State private var showingDeleteAccount = false
+    @State private var showingExport = false
     @State private var showingSearch = false
     @State private var showAllMembers = false
     @State private var shakePick: Show?
@@ -181,6 +182,9 @@ struct HomeView: View {
             .sheet(isPresented: $showingDeleteAccount) {
                 DeleteAccountView().environmentObject(auth)
             }
+            .sheet(isPresented: $showingExport) {
+                ExportListsView().environmentObject(auth)
+            }
             .sheet(isPresented: $showingLogin) {
                 LoginView().environmentObject(auth)
             }
@@ -262,6 +266,11 @@ struct HomeView: View {
         Group {
             if auth.isLoggedIn {
                 Menu {
+                    Button {
+                        showingExport = true
+                    } label: {
+                        Label("Export My Lists…", systemImage: "square.and.arrow.up")
+                    }
                     Button(role: .destructive) {
                         Task { await auth.logout() }
                     } label: {

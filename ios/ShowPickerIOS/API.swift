@@ -92,6 +92,21 @@ enum API {
 
     // MARK: Reads
 
+    // Plain-text export of the signed-in member's own lists (/api/export).
+    // Returns the raw text body; the caller writes it to a file and hands it
+    // to the system share sheet. Session cookie authenticates, same as every
+    // other authed call.
+    static func exportText() async throws -> String {
+        guard let url = URL(string: baseString + "/api/export") else { throw APIError.badURL }
+        var req = URLRequest(url: url)
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        req.setValue("ios", forHTTPHeaderField: "X-Client-Platform")
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse else { throw APIError.badResponse(-1) }
+        guard (200..<300).contains(http.statusCode) else { throw APIError.badResponse(http.statusCode) }
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+
     static func members() async throws -> [Member] {
         let r: MembersResponse = try await getCached("/api/members", cacheKey: "members")
         return r.members

@@ -160,6 +160,7 @@ The complete map:
 | `GET /api/recommendations`             | `functions/api/recommendations.js`         | GET     | session (legacy — no longer called by any client) |
 | `GET /api/vibe`                        | `functions/api/vibe.js`                    | GET     | session |
 | `GET /api/shows`                       | `functions/api/shows.js`                   | GET     | session |
+| `GET /api/export`                      | `functions/api/export.js`                  | GET     | session (exports the caller's OWN lists only; plain-text download) |
 | `POST /api/shows`                      | `functions/api/shows.js`                   | POST    | session |
 | `GET /api/shows/all`                   | `functions/api/shows/all.js`               | GET     | session |
 | `GET /api/shows/check`                 | `functions/api/shows/check.js`             | GET     | session |
