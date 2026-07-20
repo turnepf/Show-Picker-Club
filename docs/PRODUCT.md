@@ -119,7 +119,7 @@ A "📅 Calendar feed" link in each member-page footer opens the `webcal://` URL
 
 ## Export your lists
 
-So members never feel locked in, the account menu has an **Export my lists** action (logged-in members only) backed by `GET /api/export`. It returns a plain-text file of the caller's **own** lists — a section per list (`Watching`, `Awaiting`, `Loved`, `Next Up`), each show rendered as `Title on Network at URL` (network and link dropped when absent; search-page placeholder URLs are treated as no link), shows sorted alphabetically within each list. Private notes are not included.
+So members never feel locked in, the account menu has an **Export my lists** action (logged-in members only) backed by `GET /api/export`. It returns a plain-text file of the caller's **own** lists — a section per list (`Watching`, `Awaiting`, `Loved`, `Next Up`), each show rendered as `Title on Network` (network dropped when absent), shows sorted alphabetically within each list. Private notes are not included.
 
 - **Web:** downloads a `showpicker-<slug>.txt` file (served with `Content-Disposition: attachment`).
 - **iPhone / iPad:** opens the standard share sheet so the file can go to Notes, Messages, Mail, Files, etc.
