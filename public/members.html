@@ -286,8 +286,10 @@
     <details class="add-manual">
       <summary>Add a member manually</summary>
       <form class="add-form" id="addForm">
-        <label for="full_name">Full name</label>
-        <input type="text" id="full_name" autocomplete="off" required>
+        <label for="first_name">First name(s)</label>
+        <input type="text" id="first_name" autocomplete="off" required placeholder="Alice — or Paula &amp; Brad for a shared list">
+        <label for="last_name">Last name</label>
+        <input type="text" id="last_name" autocomplete="off" placeholder="Baker">
         <div class="preview" id="preview"></div>
 
         <label for="phone">Phone number</label>
@@ -957,8 +959,12 @@ If you see something you like on someone else's list, tap the **+** to add it to
           </div>
           ${activityRow}
           <div class="field">
-            <label>Name</label>
-            <input class="fullname" type="text" value="${escapeHtml([m.first_name, m.last_name].filter(Boolean).join(' '))}" placeholder="Alice Baker">
+            <label>First name(s)</label>
+            <input class="firstname" type="text" value="${escapeHtml(m.first_name || '')}" placeholder="Alice — or Paula &amp; Brad for a shared list">
+          </div>
+          <div class="field">
+            <label>Last name</label>
+            <input class="lastname" type="text" value="${escapeHtml(m.last_name || '')}" placeholder="Baker">
           </div>
           <div class="field">
             <label>Emails</label>
@@ -1094,7 +1100,8 @@ If you see something you like on someone else's list, tap the **+** to add it to
     async function save(btn) {
       const slug = btn.dataset.slug;
       const card = btn.parentElement;
-      const name = card.querySelector('input.fullname').value;
+      const first_name = card.querySelector('input.firstname').value.trim();
+      const last_name = card.querySelector('input.lastname').value.trim();
       const emails = card.querySelector('input.emails').value;
       const phones = card.querySelector('input.phones').value;
       btn.disabled = true;
@@ -1104,7 +1111,7 @@ If you see something you like on someone else's list, tap the **+** to add it to
         const res = await fetch('/api/admin-member-emails', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slug, name, emails, phones }),
+          body: JSON.stringify({ slug, first_name, last_name, emails, phones }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -1138,13 +1145,15 @@ If you see something you like on someone else's list, tap the **+** to add it to
     const addBtn = document.getElementById('addBtn');
     const addMsg = document.getElementById('addMsg');
     const addIntro = document.getElementById('addIntro');
-    const nameInput = document.getElementById('full_name');
+    const firstInput = document.getElementById('first_name');
+    const lastInput = document.getElementById('last_name');
     const previewEl = document.getElementById('preview');
 
-    nameInput.addEventListener('input', () => {
-      const v = nameInput.value.trim();
-      if (!v) { previewEl.textContent = ''; return; }
-      const first = v.split(/\s+/)[0];
+    firstInput.addEventListener('input', () => {
+      // The whole first-name field drives the slug and display name, so a
+      // shared "Paula & Brad" previews as paulabrad / Paula & Brad's Shows.
+      const first = firstInput.value.trim();
+      if (!first) { previewEl.textContent = ''; return; }
       const slugGuess = first.toLowerCase().replace(/[^a-z0-9]/g, '');
       previewEl.innerHTML = `URL: <code>showpicker.club/${escapeHtml(slugGuess)}</code> (suffix added on collision) &middot; Display: <code>${escapeHtml(first)}'s Shows</code>`;
     });
@@ -1158,7 +1167,8 @@ If you see something you like on someone else's list, tap the **+** to add it to
       addBtn.textContent = 'Working…';
 
       const body = {
-        full_name: nameInput.value.trim(),
+        first_name: firstInput.value.trim(),
+        last_name: lastInput.value.trim(),
         phone: document.getElementById('phone').value.trim(),
         emails: document.getElementById('emails').value.trim(),
       };

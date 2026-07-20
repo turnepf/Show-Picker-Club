@@ -73,8 +73,8 @@ export const RESERVED_SLUGS = new Set([
 // (_shared/enroll.js — which passes allowNoContact for Apple/Google-only
 // identities, approved: 0 for the roster hold, and enrolledVia).
 // Returns either { ok: true, ...details } or { ok: false, status, error }.
-export async function createMember(env, { full_name, phone, emails, allowNoContact = false, approved = 1, enrolledVia = null }) {
-  if (!full_name) {
+export async function createMember(env, { full_name, first_name, last_name, phone, emails, allowNoContact = false, approved = 1, enrolledVia = null }) {
+  if (!full_name && !first_name) {
     return { ok: false, status: 400, error: 'Full name required' };
   }
   if (!phone && !emails && !allowNoContact) {
@@ -105,10 +105,19 @@ export async function createMember(env, { full_name, phone, emails, allowNoConta
     }
   }
 
-  const tokens = full_name.trim().split(/\s+/);
-  const firstName = tokens[0];
+  // Explicit first_name/last_name wins — it lets a shared list carry a
+  // multi-word first name ("Paula & Brad"), which the token split below
+  // would mangle. full_name splitting stays for self-enroll and old callers.
+  let firstName, lastName;
+  if (first_name) {
+    firstName = String(first_name).trim();
+    lastName = String(last_name || '').trim() || null;
+  } else {
+    const tokens = full_name.trim().split(/\s+/);
+    firstName = tokens[0];
+    lastName = tokens.length > 1 ? tokens[tokens.length - 1] : null;
+  }
   const firstSlug = firstName.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const lastName = tokens.length > 1 ? tokens[tokens.length - 1] : null;
   const lastInitial = lastName
     ? lastName.toLowerCase().replace(/[^a-z0-9]/g, '').charAt(0)
     : '';

@@ -145,13 +145,24 @@ export async function onRequestPost(context) {
   if (!exists) return json({ error: 'unknown_member' }, 404);
 
   // ---- Rename ----
+  // Preferred: explicit first_name/last_name fields, so a shared list can
+  // carry a multi-word first name ("Paula & Brad"). Legacy: a single `name`
+  // string, split first-token/last-token (which would mangle "&"-names).
   let renamed = null;
-  if (body.name !== undefined) {
+  let firstName = null;
+  let lastName = null;
+  if (body.first_name !== undefined) {
+    firstName = String(body.first_name || '').trim();
+    if (!firstName) return json({ error: 'name_required' }, 400);
+    lastName = String(body.last_name || '').trim() || null;
+  } else if (body.name !== undefined) {
     const fullName = String(body.name || '').trim();
     const tokens = fullName.split(/\s+/).filter(Boolean);
     if (!tokens.length) return json({ error: 'name_required' }, 400);
-    const firstName = tokens[0];
-    const lastName = tokens.length > 1 ? tokens[tokens.length - 1] : null;
+    firstName = tokens[0];
+    lastName = tokens.length > 1 ? tokens[tokens.length - 1] : null;
+  }
+  if (firstName !== null) {
     const lastInitial = lastName
       ? lastName.toLowerCase().replace(/[^a-z0-9]/g, '').charAt(0).toUpperCase() || null
       : null;
