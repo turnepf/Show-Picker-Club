@@ -33,6 +33,19 @@ enum API {
         let title: String?   // canonical title the server deduped against
     }
 
+    // Short, honest failure line for a member-visible error: names an expired
+    // session or being offline when that's the cause, and stays generic
+    // otherwise instead of inventing one.
+    static func failureLine(_ error: Error, action: String) -> String {
+        if let e = error as? APIError, e.status == 401 {
+            return "You're logged out — sign in again from Home."
+        }
+        if isOffline(error) {
+            return "You're offline — couldn't \(action)."
+        }
+        return "Couldn't \(action). Try again."
+    }
+
     // True for the URLError codes that mean "no usable network" rather than a
     // real server rejection. We queue writes / serve cache for these, and
     // propagate everything else (4xx/5xx, decode failures) as before.

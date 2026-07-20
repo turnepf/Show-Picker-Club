@@ -10,6 +10,9 @@ struct VibeView: View {
     @State private var data: VibeResponse?
     @State private var selected: String
     @State private var loading = true
+    // The vibe fetch threw — "No vibe available" must not show over a
+    // failed load.
+    @State private var loadFailed = false
 
     init(initialSlug: String) {
         self.initialSlug = initialSlug
@@ -31,12 +34,18 @@ struct VibeView: View {
             if let m = data?.member {
                 content(for: m)
             } else if !loading {
-                Section { Text("No vibe available.").foregroundStyle(.secondary) }
+                Section {
+                    Text(loadFailed
+                         ? "Couldn't load the vibe — pull down to try again."
+                         : "No vibe available.")
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .navigationTitle("Vibe")
         .navigationBarTitleDisplayMode(.inline)
         .overlay { if loading && data == nil { ProgressView() } }
+        .refreshable { await load() }
         .task { await load() }
         .onChange(of: selected) { _, _ in Task { await load() } }
     }
@@ -128,7 +137,12 @@ struct VibeView: View {
     private func load() async {
         loading = true
         defer { loading = false }
-        data = try? await API.vibe(member: selected)
+        do {
+            data = try await API.vibe(member: selected)
+            loadFailed = false
+        } catch {
+            loadFailed = true
+        }
     }
 }
 

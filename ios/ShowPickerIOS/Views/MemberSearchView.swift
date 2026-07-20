@@ -10,6 +10,8 @@ struct MemberSearchView: View {
 
     @State private var shows: [Show] = []
     @State private var loading = true
+    // The library fetch threw — "No matches" must not show over a failed load.
+    @State private var loadFailed = false
     @State private var titleQuery = ""
     @State private var actorQuery = ""
 
@@ -40,6 +42,12 @@ struct MemberSearchView: View {
                 }
                 if loading {
                     Section { HStack { Spacer(); ProgressView(); Spacer() } }
+                } else if loadFailed {
+                    Section {
+                        Text("Couldn't load \(member.label)'s shows.")
+                            .foregroundStyle(.secondary)
+                        Button("Try again") { Task { await load() } }
+                    }
                 } else if !hasQuery {
                     Section {
                         Text("Search \(member.label)'s shows — archived ones too.")
@@ -96,6 +104,11 @@ struct MemberSearchView: View {
     private func load() async {
         loading = true
         defer { loading = false }
-        shows = (try? await API.shows(member: member.slug, includeArchived: true)) ?? []
+        do {
+            shows = try await API.shows(member: member.slug, includeArchived: true)
+            loadFailed = false
+        } catch {
+            loadFailed = true
+        }
     }
 }

@@ -9,6 +9,8 @@ struct SearchView: View {
 
     @State private var all: [AllShow] = []
     @State private var loading = true
+    // The library fetch threw — "No matches" must not show over a failed load.
+    @State private var loadFailed = false
     @State private var titleQuery = ""
     @State private var actorQuery = ""
     @State private var addingId: Int?
@@ -41,6 +43,12 @@ struct SearchView: View {
                 }
                 if loading {
                     Section { HStack { Spacer(); ProgressView(); Spacer() } }
+                } else if loadFailed {
+                    Section {
+                        Text("Couldn't load the club libraries.")
+                            .foregroundStyle(.secondary)
+                        Button("Try again") { Task { await load() } }
+                    }
                 } else if !hasQuery {
                     Section {
                         Text("Type to search across every member's library.")
@@ -124,7 +132,12 @@ struct SearchView: View {
     private func load() async {
         loading = true
         defer { loading = false }
-        all = (try? await API.allShows()) ?? []
+        do {
+            all = try await API.allShows()
+            loadFailed = false
+        } catch {
+            loadFailed = true
+        }
     }
 
     // Copy a search result onto one of my lists. Session-scoped POST, so it

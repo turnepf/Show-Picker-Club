@@ -119,28 +119,33 @@
     
 
     <footer>
-      <div id="platformLine">Web app &mdash; always the current release.</div>
-      <div>The iPhone, iPad, and Mac app shows its version, build, and platform at the bottom of this page.</div>
+      <div id="platformLine">Web app</div>
       <div>&copy; 2025 Patrick Turner.</div>
     </footer>
     <script>
-      // "Web app on iPhone, in the browser" — settles "which app am I in?"
-      // when a member sends a screenshot. iPadOS Safari masquerades as a
-      // Mac; the touch-points check tells them apart.
+      // "Web app on Safari on the Mac" — settles "which app am I in?" when a
+      // member sends a screenshot. iPadOS Safari masquerades as a Mac; the
+      // touch-points check tells them apart. Order matters for the browser:
+      // Chrome/Edge UAs also contain "Safari".
       (() => {
         const ua = navigator.userAgent;
         const iPad = /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
         const device =
-          /iPhone/.test(ua) ? 'iPhone' :
-          iPad ? 'iPad' :
+          /iPhone/.test(ua) ? 'the iPhone' :
+          iPad ? 'the iPad' :
           /Android/.test(ua) ? 'Android' :
-          /Macintosh/.test(ua) ? 'Mac' :
+          /Macintosh/.test(ua) ? 'the Mac' :
           /Windows/.test(ua) ? 'Windows' : '';
+        const browser =
+          /Edg/.test(ua) ? 'Edge' :
+          /CriOS|Chrome/.test(ua) ? 'Chrome' :
+          /FxiOS|Firefox/.test(ua) ? 'Firefox' :
+          /Safari/.test(ua) ? 'Safari' : '';
         const installed = navigator.standalone === true ||
           matchMedia('(display-mode: standalone)').matches;
         document.getElementById('platformLine').textContent =
-          `Web app${device ? ' on ' + device : ''}, ` +
-          `${installed ? 'installed to the Home Screen' : 'in the browser'} — always the current release.`;
+          'Web app' + (installed ? ' installed' : (browser ? ' on ' + browser : '')) +
+          (device ? ' on ' + device : '');
       })();
     </script>
   </main>
