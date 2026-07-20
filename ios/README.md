@@ -39,7 +39,7 @@ The app is **already in TestFlight**, so shipping a new build is just *archive +
 
 **The build number is a fixed value shared by every target.** All targets
 (app, share extension, widget extension, watch app) carry the same
-`CURRENT_PROJECT_VERSION` (currently 15), set at the project level, so Apple's
+`CURRENT_PROJECT_VERSION` (currently 17), set at the project level, so Apple's
 parent/extension version-match rule always passes. Bump that one value before
 archiving a new build for App Store Connect. (Earlier date-based auto-stamping
 scripts were removed — they conflicted with the Xcode build graph once the
