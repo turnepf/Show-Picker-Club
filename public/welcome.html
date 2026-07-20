@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- Post-signup confirmation page. Every fresh enrollment lands here (see
+       finishLogin in index.html), which gives Google Ads' page-based
+       conversion tracking a single stable URL to watch — member pages are
+       per-slug and can't serve that role. Keep the URL stable: it's
+       registered in the Smart campaign's conversion settings. -->
+  <meta name="robots" content="noindex, nofollow">
+  <title>Welcome — Show Picker Club</title>
+  <!-- Same Google tag as index.html: Ads counts the conversion by seeing
+       this page load, so the tag must be here too. -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CP9N26NG19"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-CP9N26NG19');</script>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/favicon.svg">
+  <meta name="theme-color" content="#2C3E50">
+  <link rel="stylesheet" href="/styles.css?v=5">
+  <style>
+    body { padding: 40px 20px 80px; }
+    .wrap {
+      max-width: 480px;
+      margin: 0 auto;
+      background: var(--surface);
+      padding: 28px;
+      border-radius: 12px;
+      box-shadow: 0 1px 2px oklch(0.18 0.03 50 / 0.06), 0 8px 28px oklch(0.18 0.03 50 / 0.06);
+      text-align: center;
+    }
+    .party { font-size: 44px; margin-bottom: 10px; }
+    h1 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--ink); margin-bottom: 8px; }
+    .lede { color: var(--ink-muted); font-size: var(--text-sm); margin-bottom: 24px; line-height: 1.6; text-align: left; }
+    .lede + .lede { margin-top: -12px; }
+    a.go {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 6px;
+      font-size: var(--text-base);
+      font-weight: 600;
+      text-decoration: none;
+    }
+    a.go:hover { background: var(--accent-hover); }
+  </style>
+  <style id="ios-skin">
+    body { background: var(--surface-2); }
+    .wrap { border-radius: 16px; }
+    a.go { border-radius: 10px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="party">🎉</div>
+    <h1>You're in!</h1>
+    <p class="lede">Your account is ready. Add the shows and movies you're watching — titles get artwork, ratings, and next-season dates filled in automatically.</p>
+    <p class="lede">Four lists keep it honest: <strong>Watching</strong>, <strong>Awaiting</strong> (between seasons), <strong>Loved</strong>, and <strong>Next&nbsp;Up</strong>.</p>
+    <a class="go" id="go" href="/">Go to my shows</a>
+  </div>
+
+  <script>
+    // Point the button at the new member's own page; anyone who lands here
+    // without a session (bookmark, bot) is bounced to the landing page so
+    // stray visits don't linger on the conversion URL.
+    fetch('/auth/check')
+      .then(r => r.json())
+      .then(d => {
+        if (d.authenticated && d.member) {
+          document.getElementById('go').href = '/' + d.member;
+        } else {
+          window.location.replace('/');
+        }
+      })
+      .catch(() => {});
+  </script>
+</body>
+</html>

@@ -80,7 +80,7 @@ export async function onRequestPost(context) {
   await env.DB.prepare('UPDATE enroll_otps SET used_at = ? WHERE id = ?')
     .bind(nowISO, otp.id).run();
 
-  return await issueSession(env, created.slug);
+  return await issueSession(env, created.slug, { enrolled: true });
 }
 
 export async function onRequestOptions() {

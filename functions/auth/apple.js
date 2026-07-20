@@ -207,7 +207,7 @@ export async function onRequestPost(context) {
     if (!created.ok) {
       return new Response(JSON.stringify({ error: created.error }), { status: created.status || 400, headers: corsHeaders() });
     }
-    return await issueSession(env, created.slug);
+    return await issueSession(env, created.slug, { enrolled: true });
   }
 
   // 4) Demo / public trial fallback: no real member matched, but the demo

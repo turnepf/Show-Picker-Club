@@ -235,6 +235,8 @@ Scheduled-job endpoints accept an `X-Cron-Secret` header compared in constant ti
 
 With `SELF_ENROLL` set, unknown identities can create accounts: `/auth/request-code` sends a signup code (`enroll_otps`) for unknown emails, `/auth/login` answers `{needs_name:true}` for a valid signup code, and `/auth/enroll` completes it; `/auth/apple` and `/auth/google` enroll unrecognized identities directly (asking the client for a name via `{needs_name:true}` when the token doesn't carry one). All channels create the member with `approved = 0` — full personal use, but hidden from the roster, vibe, cross-library search, activity, and trending until approved (`/api/admin-member-approve`, or the Approve button on `/members`). Guards live in `_shared/enroll.js`: global daily circuit breaker (`SELF_ENROLL_MAX_PER_DAY`, default 20), per-IP and per-email caps, optional Turnstile (`TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY`, fail-open when unset), a reserved-slug blocklist (`admin-create-member.js#RESERVED_SLUGS`), an audit row in `signup_requests` (status `self_enrolled`), and an operator email per signup (capped 10/hour). The Apple demo fallback is inert while `SELF_ENROLL` is on. Members self-delete via `/api/account-delete` (fresh emailed code, `channel='delete'` in `login_otps`, hard delete + PII scrub of the audit row).
 
+Enrollment responses include `enrolled: true` alongside the usual `{success, slug}` session payload (`issueSession`'s `extra` param); plain logins omit it. The web frontend uses the flag to fire a GA4 `sign_up` event (with `method: email|apple|google`, beacon transport) — mark that event as a conversion in GA4/Google Ads to optimize ad campaigns toward signups. Native clients ignore the extra key. The landing page also shows a join-pitch card (`#joinCta`) to logged-out visitors — and relabels the home login row "Log in or sign up" — only while `/auth/config` reports `self_enroll: true`. Fresh web signups land on `/welcome` (`welcome.html`), a stable confirmation URL registered with Google Ads' page-based conversion tracking — keep that URL stable, and keep the Google tag on the page. It forwards to the new member's page; sessionless visits bounce to `/`.
+
 ### Demo account
 
 `DEMO_LOGIN_EMAIL` + `DEMO_LOGIN_CODE` (Cloudflare secrets) enable a reviewer/demo login: that one email signs in with a fixed code. `DEMO_APPLE_FALLBACK=true` additionally routes unrecognized Apple IDs into the same demo member. With the secrets unset, all of it is inert.
@@ -255,7 +257,7 @@ Durable login tracking is separate: `members.last_login_at` (stamped by `_shared
 
 Single-page app. Detects whether `window.location.pathname` is empty (landing) or a slug (member page) and renders accordingly. Major UI surfaces:
 
-- **Landing:** `My Shows` link (logged in), Trending shows shelf, featured Members row + "Browse all members" disclosure, `Search all libraries` button, What's New changelog.
+- **Landing:** `My Shows` link (logged in), Trending shows shelf, featured Members row + "Browse all members" disclosure, `Search all libraries` button, What's New changelog. Logged-out visitors get a join-pitch card with a "Create your free account" button when self-enrollment is open (see [Self-enrollment](#self-enrollment-migration-031-behind-the-self_enroll-secret)).
 - **Member page:** title + tabs (Watching, Awaiting, Loved, Next Up), search button, `+ Add` button (when logged in), per-tab list of show rows with always-visible meta (Next episode on every list when a premiere date exists, Recommended by on Next Up), sort + toggle pills at the bottom, footer with `Curious?` / `Vibe` / `📅 Calendar feed` links.
 - **Modals:** Add/Edit Show, Add to My List (used from Popular and from cross-library search), Search. (Share-to-member and Suggest-a-Show were retired 2026-07.)
 
@@ -268,6 +270,10 @@ Member taste profile UI. Calls `/api/vibe?member=<slug>` and renders the cluster
 ### `reporting.html`
 
 Auth-gated dashboard for the operator. Calls `/api/reporting`; displays metric cards and a few tables.
+
+### `welcome.html`
+
+Post-signup confirmation at `/welcome`. Every fresh enrollment is routed here by `finishLogin(enrolled)`; the page carries the Google tag so Google Ads' page-visit conversion tracking can count it (see [Self-enrollment](#self-enrollment-migration-031-behind-the-self_enroll-secret)). Logged-in members get a "Go to my shows" button pointed at their slug; anyone without a session is redirected to `/`.
 
 ### `members.html`, `url-cleanup.html`, `vibe-admin.html`
 
