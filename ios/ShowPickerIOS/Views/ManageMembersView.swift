@@ -445,24 +445,16 @@ struct ManageMembersView: View {
                 }
                 Text(dupeDetail(m)).font(.caption).foregroundStyle(.secondary)
             }
-            HStack(spacing: 10) {
-                Picker("Merge into", selection: Binding(
-                    get: { loneTarget[m.slug] ?? "" },
-                    set: { loneTarget[m.slug] = $0 }
-                )) {
-                    Text("choose member…").tag("")
-                    ForEach(members.filter { $0.slug != m.slug }) {
-                        Text("\($0.personName) (@\($0.slug))").tag($0.slug)
-                    }
-                }
-                .labelsHidden()
+            memberPickerRow("Merge into", selection: Binding(
+                get: { loneTarget[m.slug] ?? "" },
+                set: { loneTarget[m.slug] = $0 }
+            ), excluding: m.slug)
+            HStack(spacing: 14) {
                 Button("Merge", role: .destructive) {
-                    guard let target = loneTarget[m.slug], !target.isEmpty else {
-                        banner = "Pick the member to merge into first."
-                        return
-                    }
+                    guard let target = loneTarget[m.slug], !target.isEmpty else { return }
                     mergePlan = MergePlan(sources: [m.slug], target: target)
                 }
+                .disabled((loneTarget[m.slug] ?? "").isEmpty)
                 Button("Not a duplicate") {
                     ignorePlan = IgnorePlan(
                         pairs: [[m.slug, m.slug]],
@@ -475,34 +467,41 @@ struct ManageMembersView: View {
         .padding(.vertical, 4)
     }
 
-    // Manual fallback for pairs the heuristics don't spot.
+    // Manual fallback for pairs the heuristics don't spot. Each picker gets a
+    // full-width labeled row — a single horizontal row truncates the pickers
+    // to a few characters on iPhone widths.
     @ViewBuilder private var manualMergeRow: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Manual merge").font(.caption).foregroundStyle(.secondary)
-            HStack(spacing: 8) {
-                Picker("Duplicate", selection: $manualSource) {
-                    Text("duplicate…").tag("")
-                    ForEach(members) { Text("@\($0.slug)").tag($0.slug) }
-                }
-                .labelsHidden()
-                Text("into").font(.caption).foregroundStyle(.secondary)
-                Picker("Kept account", selection: $manualTarget) {
-                    Text("kept…").tag("")
-                    ForEach(members) { Text("@\($0.slug)").tag($0.slug) }
-                }
-                .labelsHidden()
-                Button("Merge", role: .destructive) {
-                    guard !manualSource.isEmpty, !manualTarget.isEmpty else {
-                        banner = "Pick both accounts first."
-                        return
-                    }
-                    mergePlan = MergePlan(sources: [manualSource], target: manualTarget)
-                }
-                .font(.callout.weight(.semibold))
-                .buttonStyle(.borderless)
+            memberPickerRow("Duplicate", selection: $manualSource)
+            memberPickerRow("Merge into", selection: $manualTarget)
+            Button("Merge duplicate into kept account", role: .destructive) {
+                mergePlan = MergePlan(sources: [manualSource], target: manualTarget)
             }
+            .font(.callout.weight(.semibold))
+            .buttonStyle(.borderless)
+            .disabled(manualSource.isEmpty || manualTarget.isEmpty || manualSource == manualTarget)
         }
         .padding(.vertical, 2)
+    }
+
+    // A labeled, full-width picker row listing every member by name + slug.
+    // The menu keeps the trailing value readable because it owns the whole
+    // row width instead of sharing one line with buttons and other pickers.
+    @ViewBuilder private func memberPickerRow(
+        _ label: String, selection: Binding<String>, excluding: String? = nil
+    ) -> some View {
+        HStack {
+            Text(label).font(.callout)
+            Spacer()
+            Picker(label, selection: selection) {
+                Text("choose member…").tag("")
+                ForEach(members.filter { $0.slug != excluding }) {
+                    Text("\($0.personName) (@\($0.slug))").tag($0.slug)
+                }
+            }
+            .labelsHidden()
+        }
     }
 
     @ViewBuilder private var ignoredBlock: some View {
