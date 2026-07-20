@@ -298,7 +298,7 @@ struct ShowDetailView: View {
             addAlert = AddAlert(title: "Added",
                                 message: "“\(addTitle)” was added to your \(list.title) list.")
             await refreshMyCopy()
-        } catch API.APIError.badResponse(409) {
+        } catch let e as API.APIError where e.status == 409 {
             // Already have it (maybe archived) — reconcile so the right
             // controls appear.
             await refreshMyCopy()

@@ -148,7 +148,7 @@ struct SearchView: View {
             )
             addAlert = SearchAlert(title: "Added",
                                    message: "“\(s.title)” was added to your \(list.title) list.")
-        } catch API.APIError.badResponse(409) {
+        } catch let e as API.APIError where e.status == 409 {
             addAlert = SearchAlert(title: "Already on a list",
                                    message: "“\(s.title)” is already on one of your lists.")
         } catch {

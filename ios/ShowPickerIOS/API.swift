@@ -8,7 +8,30 @@ import Foundation
 enum API {
     static let baseString = "https://showpicker.club"
 
-    enum APIError: Error { case badURL, badResponse(Int), badBody }
+    enum APIError: Error {
+        case badURL, badResponse(Int), badBody
+        // Non-2xx whose JSON body decoded: the server's actual rejection
+        // (exists_active, exists_archived, rate_limited, Unauthorized, …),
+        // so views can explain the real reason instead of guessing from
+        // the status code.
+        case rejected(ServerRejection)
+
+        var status: Int? {
+            switch self {
+            case .badResponse(let s): return s
+            case .rejected(let r): return r.status
+            default: return nil
+            }
+        }
+    }
+
+    struct ServerRejection {
+        let status: Int
+        let code: String     // the body's "error" string
+        let id: Int?         // exists_archived: the archived row to restore
+        let list: String?    // exists_active: which list already has it
+        let title: String?   // canonical title the server deduped against
+    }
 
     // True for the URLError codes that mean "no usable network" rather than a
     // real server rejection. We queue writes / serve cache for these, and
@@ -599,7 +622,12 @@ enum API {
         req.httpBody = try JSONSerialization.data(withJSONObject: compact)
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw APIError.badResponse((resp as? HTTPURLResponse)?.statusCode ?? -1)
+            let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
+            struct ErrBody: Decodable { let error: String?; let id: Int?; let list: String?; let title: String? }
+            if let b = try? JSONDecoder().decode(ErrBody.self, from: data), let code = b.error {
+                throw APIError.rejected(ServerRejection(status: status, code: code, id: b.id, list: b.list, title: b.title))
+            }
+            throw APIError.badResponse(status)
         }
         // Some endpoints return {} on success; tolerate empty decoding.
         if data.isEmpty || data == Data("{}".utf8) {
