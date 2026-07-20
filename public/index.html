@@ -1183,6 +1183,7 @@
     <symbol id="i-chevron-down" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5.5 9 12 15.7 18.5 9"/></symbol>
     <symbol id="i-chevron-up" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5.5 15 12 8.3 18.5 15"/></symbol>
     <symbol id="i-logout" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5H7.8A1.8 1.8 0 0 0 6 6.3v11.4a1.8 1.8 0 0 0 1.8 1.8h5.7M10.5 12h10M17 8.5 20.5 12 17 15.5"/></symbol>
+    <symbol id="i-export" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 15V3.5M8.5 7 12 3.5 15.5 7M5 13v5.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V13"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5.2v13.6M5.2 12h13.6"/></symbol>
     <symbol id="i-creditcard" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.8" y="5.5" width="18.4" height="13" rx="2.2"/><path d="M2.8 9.8h18.4" stroke-width="2.2"/></g></symbol>
     <symbol id="i-calendar-plus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.4"/><path d="M3.5 9.7h17M8 2.8v4M16 2.8v4M12 12.3v5.4M9.3 15h5.4"/></g></symbol>
@@ -2169,6 +2170,21 @@
       if (accountMenuEl) { closeAccountMenu(); return; }
       const menu = document.createElement('div');
       menu.className = 'account-menu';
+      const exp = document.createElement('button');
+      exp.type = 'button';
+      exp.innerHTML = 'Export my lists <svg class="ic"><use href="#i-export"/></svg>';
+      // /api/export responds with Content-Disposition: attachment, so a plain
+      // anchor click downloads the .txt file instead of navigating the SPA.
+      exp.addEventListener('click', () => {
+        closeAccountMenu();
+        const a = document.createElement('a');
+        a.href = '/api/export';
+        a.download = '';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
+      menu.appendChild(exp);
       const item = document.createElement('button');
       item.type = 'button';
       item.innerHTML = 'Log out <svg class="ic"><use href="#i-logout"/></svg>';
