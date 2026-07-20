@@ -438,12 +438,15 @@
           }),
         });
         if (!res.ok) {
-          let msg = `Error (${res.status})`;
+          // Translate server codes; never show a raw one like "rate_limited".
+          let msg = res.status === 401
+            ? 'You’re logged out — refresh the page and log in again.'
+            : `Error (${res.status})`;
           try {
             const data = await res.json();
             if (data.error === 'exists_archived') msg = 'You archived this once already. Unarchive from your list.';
             else if (data.error === 'exists_active') msg = `Already on your ${data.list} list.`;
-            else if (data.error) msg = data.error;
+            else if (data.error === 'rate_limited') msg = 'Daily add limit reached. Try again tomorrow.';
           } catch {}
           errBox.textContent = msg;
           btn.disabled = false;

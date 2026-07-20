@@ -119,6 +119,8 @@ struct AddShowView: View {
             dismiss()
         } catch API.APIError.badResponse(409) {
             errorText = "“\(hit.title)” is already on one of your lists (maybe archived)."
+        } catch API.APIError.badResponse(401) {
+            errorText = "You're logged out — sign in again from the Account tab."
         } catch {
             errorText = "Couldn't add it. Please try again."
         }

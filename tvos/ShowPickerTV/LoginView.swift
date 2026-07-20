@@ -315,8 +315,14 @@ struct LoginView: View {
         do {
             _ = try await API.requestSmsCode(phone: phone.trimmingCharacters(in: .whitespaces))
             show(.code)
+        } catch API.APIError.badResponse(400) {
+            // The only failure the number itself can cause (invalid_phone).
+            // Unknown-but-valid numbers return success on purpose.
+            errorText = "That doesn't look like a valid phone number. Check it and try again."
+        } catch API.APIError.badResponse(429) {
+            errorText = "Too many codes requested. Try again in an hour."
         } catch {
-            errorText = "Couldn't send. Check the number and try again."
+            errorText = "Couldn't send the code. Check the connection and try again."
         }
     }
 
@@ -332,8 +338,12 @@ struct LoginView: View {
         do {
             _ = try await API.requestEmailCode(email: trimmed)
             show(.code)
+        } catch API.APIError.badResponse(429) {
+            errorText = "Too many codes requested. Try again in an hour."
         } catch {
-            errorText = "Couldn't send. Check the address and try again."
+            // Unknown addresses return success on purpose, so a failure here
+            // is delivery or connectivity — never the address.
+            errorText = "Couldn't send the code. Check the connection and try again."
         }
     }
 
@@ -355,9 +365,12 @@ struct LoginView: View {
         } catch API.APIError.badResponse(429) {
             errorText = "Too many attempts. Try again in 15 minutes."
             code = ""
-        } catch {
+        } catch API.APIError.badResponse(401) {
             errorText = "Invalid or expired code. Try again."
             code = ""
+        } catch {
+            // Connectivity/server trouble — the code may still be good, keep it.
+            errorText = "Couldn't reach sign-in. Check the connection and try again."
         }
     }
 

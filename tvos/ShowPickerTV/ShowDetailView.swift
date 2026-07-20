@@ -209,6 +209,8 @@ struct ShowDetailView: View {
             actionMessage = mineArchived != nil
                 ? "“\(addTitle)” is archived — use “add back to” below."
                 : "“\(addTitle)” is already on one of your lists."
+        } catch API.APIError.badResponse(401) {
+            actionMessage = "You're logged out — sign in again from the Account tab."
         } catch {
             actionMessage = "Couldn't add it. Please try again."
         }
@@ -221,6 +223,8 @@ struct ShowDetailView: View {
             try await API.moveShow(id: id, to: list.rawValue)
             actionMessage = "Moved to \(list.title)."
             await refreshMyCopy()
+        } catch API.APIError.badResponse(401) {
+            actionMessage = "You're logged out — sign in again from the Account tab."
         } catch {
             actionMessage = "Couldn't move it. Please try again."
         }
@@ -233,6 +237,8 @@ struct ShowDetailView: View {
             try await API.archiveShow(id: id)
             actionMessage = "Archived."
             await refreshMyCopy()
+        } catch API.APIError.badResponse(401) {
+            actionMessage = "You're logged out — sign in again from the Account tab."
         } catch {
             actionMessage = "Couldn't archive it. Please try again."
         }
@@ -245,6 +251,8 @@ struct ShowDetailView: View {
             try await API.restoreShow(id: id, to: list.rawValue)
             actionMessage = "Added back to \(list.title)."
             await refreshMyCopy()
+        } catch API.APIError.badResponse(401) {
+            actionMessage = "You're logged out — sign in again from the Account tab."
         } catch {
             actionMessage = "Couldn't restore it. Please try again."
         }

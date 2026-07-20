@@ -160,6 +160,8 @@ struct MemberView: View {
         defer { loading = false }
         do {
             shows = try await API.shows(member: member.slug)
+        } catch API.APIError.badResponse(401) {
+            errorText = "You're logged out — sign in again from the Account tab."
         } catch {
             errorText = "Couldn't load \(member.label)'s shows."
         }

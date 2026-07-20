@@ -151,6 +151,9 @@ struct SearchView: View {
         } catch let e as API.APIError where e.status == 409 {
             addAlert = SearchAlert(title: "Already on a list",
                                    message: "“\(s.title)” is already on one of your lists.")
+        } catch let e as API.APIError where e.status == 401 {
+            addAlert = SearchAlert(title: "Logged out",
+                                   message: "Your session expired — sign in again from Home.")
         } catch {
             addAlert = SearchAlert(title: "Couldn’t add",
                                    message: "Something went wrong. Please try again.")
