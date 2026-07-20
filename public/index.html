@@ -3686,6 +3686,14 @@
       return `<div class="detail-row"><span class="k">${k}</span><span class="v">${v}</span></div>`;
     }
 
+    // Minutes → "1h 52m" / "45m".
+    function runtimeText(min) {
+      const n = parseInt(min, 10);
+      if (!n) return '';
+      const h = Math.floor(n / 60), m = n % 60;
+      return h ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+    }
+
     function detailPromotions(list) {
       if (list === 'watching') return [{ label: 'Watched it → Loved', target: 'recommending' }, { label: 'Season done → Awaiting', target: 'waiting' }];
       if (list === 'waiting') return [{ label: "It's back → Watching", target: 'watching' }];
@@ -3746,9 +3754,12 @@
         // not a link, so nobody realized it opened the show on the service.
         rows.push(detailRow('Network', realUrl
           ? `<a href="${safeUrl(show.network_url)}" target="_blank" rel="noopener">Watch on ${escapeHtml(show.network)}</a>`
-          : escapeHtml(show.network)));
+          : (show.watch_link
+              ? `${escapeHtml(show.network)} · <a href="${safeUrl(show.watch_link)}" target="_blank" rel="noopener">Where to watch</a>`
+              : escapeHtml(show.network))));
       }
       if (show.rating) rows.push(detailRow('Rating', `★ ${escapeHtml(show.rating)}`));
+      if (show.tmdb_rating) rows.push(detailRow('TMDB', `★ ${escapeHtml(show.tmdb_rating)}`));
       // Reflect MY status, not the copy that opened this screen.
       if (detailMyCopy && !detailMyCopy.archived) {
         rows.push(detailRow('List', LIST_LABELS[detailMyCopy.list] || detailMyCopy.list));
@@ -3765,10 +3776,17 @@
       if (detailMyCopy && detailMyCopy.watching_with) rows.push(detailRow('Watching with', escapeHtml(detailMyCopy.watching_with)));
       if (show.next_season_date) rows.push(detailRow('Next episode', escapeHtml(formatSeasonRange(show))));
       if (seasonsText(show)) rows.push(detailRow('Seasons', escapeHtml(seasonsText(show))));
+      if (show.content_rating) rows.push(detailRow('Rated', escapeHtml(show.content_rating)));
+      if (show.release_year) rows.push(detailRow('Year', escapeHtml(String(show.release_year))));
+      if (show.runtime) rows.push(detailRow('Runtime', escapeHtml(runtimeText(show.runtime))));
+      if (show.director) rows.push(detailRow(show.movie ? 'Director' : 'Creator', escapeHtml(show.director)));
+      if (show.trailer_key) rows.push(detailRow('Trailer', `<a href="https://www.youtube.com/watch?v=${encodeURIComponent(show.trailer_key)}" target="_blank" rel="noopener">▶ Watch trailer</a>`));
 
       let html = '';
+      if (show.backdrop_url) html += `<div class="detail-backdrop" style="width:100%;margin-bottom:12px;"><img src="${safeUrl(show.backdrop_url)}" alt="" loading="lazy" style="width:100%;border-radius:10px;display:block;"></div>`;
       if (show.poster_url) html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy" onclick="togglePosterLightbox(this)"></div>`;
       html += `<div class="detail-card">${rows.join('')}</div>`;
+      if (show.overview) html += `<div class="detail-card"><div class="detail-card-title">Overview</div><div class="detail-prose">${escapeHtml(show.overview)}</div></div>`;
       if (detailMyCopy && detailMyCopy.notes) html += `<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-prose">${escapeHtml(detailMyCopy.notes)}</div></div>`;
       if (actors.length) {
         const cast = actors.map(a => a.imdb_id

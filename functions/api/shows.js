@@ -161,15 +161,19 @@ export async function onRequestPost(context) {
   const finalNetwork =
     networkFromUrl(userUrl) ||
     networkFromUrl(goodCopyUrl) ||
-    (rawNetwork ? canonicalNetwork(rawNetwork) : null);
+    (rawNetwork ? canonicalNetwork(rawNetwork) : null) ||
+    omdb.providerNetwork || null;
   const finalUrl =
     userUrl ||
     goodCopyUrl ||
     generateNetworkUrl(finalNetwork, finalTitle);
 
   const result = await env.DB.prepare(
-    'INSERT INTO shows (title, network, network_url, recommended_by, rating, list, notes, movie, full_series, watching_with, poster_url, network_logo_url, member_slug, added_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).bind(finalTitle, finalNetwork, finalUrl, recommended_by || null, omdb.rating, list, notes || null, movie || 0, full_series || 0, watching_with || null, omdb.posterUrl || null, omdb.networkLogoUrl || null, session.member_slug, session.email).run();
+    `INSERT INTO shows (title, network, network_url, recommended_by, rating, list, notes, movie, full_series, watching_with, poster_url, network_logo_url, member_slug, added_by,
+       overview, backdrop_url, tmdb_rating, content_rating, trailer_key, director, runtime, release_year, watch_link)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(finalTitle, finalNetwork, finalUrl, recommended_by || null, omdb.rating, list, notes || null, movie || 0, full_series || 0, watching_with || null, omdb.posterUrl || null, omdb.networkLogoUrl || null, session.member_slug, session.email,
+    omdb.overview || null, omdb.backdropUrl || null, omdb.tmdbRating || null, omdb.contentRating || null, omdb.trailerKey || null, omdb.director || null, omdb.runtime || null, omdb.releaseYear || null, omdb.watchLink || null).run();
 
   const showId = result.meta.last_row_id;
   if (omdb.actors.length > 0) {

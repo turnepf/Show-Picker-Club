@@ -192,9 +192,17 @@ async function commitTitleFix(env, oldTitle, rawNew, enriched) {
     `UPDATE shows
         SET rating = COALESCE(?, rating),
             poster_url = COALESCE(?, poster_url),
-            network_logo_url = COALESCE(?, network_logo_url)
+            network_logo_url = COALESCE(?, network_logo_url),
+            overview = COALESCE(?, overview), backdrop_url = COALESCE(?, backdrop_url),
+            tmdb_rating = COALESCE(?, tmdb_rating), content_rating = COALESCE(?, content_rating),
+            trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director),
+            runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
+            network = COALESCE(network, ?), watch_link = COALESCE(?, watch_link)
       WHERE LOWER(title) = LOWER(?) AND archived = 0`
-  ).bind(enriched.rating, enriched.posterUrl, enriched.networkLogoUrl, finalTitle).run();
+  ).bind(enriched.rating, enriched.posterUrl, enriched.networkLogoUrl,
+    enriched.overview, enriched.backdropUrl, enriched.tmdbRating, enriched.contentRating,
+    enriched.trailerKey, enriched.director, enriched.runtime, enriched.releaseYear,
+    enriched.providerNetwork, enriched.watchLink, finalTitle).run();
 
   if (enriched.actors.length > 0) {
     const { results: copies } = await env.DB.prepare(
@@ -478,15 +486,23 @@ export async function onRequestPost(context) {
     if (!row) return json({ error: 'Show not found' }, 404);
 
     const enriched = await fetchEnrichment(row.title, env, !!row.movie);
-    if (enriched.posterUrl || enriched.networkLogoUrl || enriched.rating) {
+    if (enriched.posterUrl || enriched.networkLogoUrl || enriched.rating || enriched.overview) {
       await env.DB.prepare(
         `UPDATE shows
             SET poster_url = COALESCE(?, poster_url),
                 network_logo_url = COALESCE(?, network_logo_url),
                 rating = COALESCE(?, rating),
+                overview = COALESCE(?, overview), backdrop_url = COALESCE(?, backdrop_url),
+                tmdb_rating = COALESCE(?, tmdb_rating), content_rating = COALESCE(?, content_rating),
+                trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director),
+                runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
+                network = COALESCE(network, ?), watch_link = COALESCE(?, watch_link),
                 enriched_at = datetime('now')
           WHERE LOWER(title) = LOWER(?) AND archived = 0`
-      ).bind(enriched.posterUrl, enriched.networkLogoUrl, enriched.rating, row.title).run();
+      ).bind(enriched.posterUrl, enriched.networkLogoUrl, enriched.rating,
+        enriched.overview, enriched.backdropUrl, enriched.tmdbRating, enriched.contentRating,
+        enriched.trailerKey, enriched.director, enriched.runtime, enriched.releaseYear,
+        enriched.providerNetwork, enriched.watchLink, row.title).run();
     } else {
       // Nothing found — stamp so the title rotates to the back of the
       // oldest-first background pass instead of blocking it every round.

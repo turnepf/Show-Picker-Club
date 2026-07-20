@@ -17,6 +17,10 @@ const PUBLIC_SHOW_FIELDS = [
   'id', 'title', 'network', 'network_url', 'rating', 'movie', 'full_series',
   'genres', 'poster_url', 'network_logo_url', 'seasons_released',
   'next_season_date', 'season_end_date',
+  // Catalog-level detail fields — facts about the show itself, safe for the
+  // logged-out Trending detail screen.
+  'overview', 'backdrop_url', 'tmdb_rating', 'content_rating', 'trailer_key',
+  'director', 'runtime', 'release_year', 'watch_link',
 ];
 
 export async function onRequestGet(context) {
@@ -65,7 +69,7 @@ export async function onRequestPut(context) {
   // stored network is Netflix regardless of what the dropdown said. Falls
   // through to alias-folding the dropdown pick when the URL doesn't tell
   // us anything.
-  const network = networkFromUrl(network_url) || canonicalNetwork(val('network'));
+  const network = networkFromUrl(network_url) || canonicalNetwork(val('network')) || null;
   const recommended_by = val('recommended_by');
   const list = val('list');
   const notes = val('notes');
@@ -86,9 +90,21 @@ export async function onRequestPut(context) {
   if (!enriched) enriched = await fetchEnrichment(title, env, !!movie);
   const rating = enriched.rating || existing.rating;
 
+  const finalNetwork = network || enriched.providerNetwork || null;
   await env.DB.prepare(
-    "UPDATE shows SET title = ?, network = ?, network_url = ?, recommended_by = ?, list = ?, notes = ?, movie = ?, full_series = ?, watching_with = ?, rating = ?, archived = ?, poster_url = COALESCE(?, poster_url), network_logo_url = COALESCE(?, network_logo_url), updated_at = datetime('now') WHERE id = ?"
-  ).bind(title, network, network_url, recommended_by, list, notes, movie, full_series, watching_with, rating, archived, enriched.posterUrl || null, enriched.networkLogoUrl || null, params.id).run();
+    `UPDATE shows SET title = ?, network = ?, network_url = ?, recommended_by = ?, list = ?, notes = ?, movie = ?, full_series = ?, watching_with = ?, rating = ?, archived = ?,
+        poster_url = COALESCE(?, poster_url), network_logo_url = COALESCE(?, network_logo_url),
+        overview = COALESCE(?, overview), backdrop_url = COALESCE(?, backdrop_url),
+        tmdb_rating = COALESCE(?, tmdb_rating), content_rating = COALESCE(?, content_rating),
+        trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director),
+        runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
+        watch_link = COALESCE(?, watch_link),
+        updated_at = datetime('now') WHERE id = ?`
+  ).bind(title, finalNetwork, network_url, recommended_by, list, notes, movie, full_series, watching_with, rating, archived,
+    enriched.posterUrl || null, enriched.networkLogoUrl || null,
+    enriched.overview || null, enriched.backdropUrl || null, enriched.tmdbRating || null, enriched.contentRating || null,
+    enriched.trailerKey || null, enriched.director || null, enriched.runtime || null, enriched.releaseYear || null,
+    enriched.watchLink || null, params.id).run();
 
   if (enriched.actors.length > 0) {
     await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(params.id).run();
@@ -99,13 +115,13 @@ export async function onRequestPut(context) {
   // If the network changed (or we landed on a placeholder URL), kick off
   // a Watchmode lookup in the background to keep the row on a real
   // deep link. Propagates to all members' same-titled active rows.
-  const networkChanged = (network || null) !== (existing.network || null);
+  const networkChanged = (finalNetwork || null) !== (existing.network || null);
   const onPlaceholder = !network_url ||
     network_url.includes('/search') || network_url.includes('/s?') ||
     network_url.includes('?q=') || network_url.includes('?query=');
-  if (network && (networkChanged || onPlaceholder)) {
+  if (finalNetwork && (networkChanged || onPlaceholder)) {
     context.waitUntil((async () => {
-      const realUrl = await lookupWatchmodeUrl(env, title, network, !!movie);
+      const realUrl = await lookupWatchmodeUrl(env, title, finalNetwork, !!movie);
       if (realUrl) {
         await env.DB.prepare(
           "UPDATE shows SET network_url = ?, enriched_at = datetime('now') WHERE LOWER(title) = LOWER(?) AND archived = 0"

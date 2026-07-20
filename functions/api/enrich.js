@@ -1,6 +1,6 @@
 import { getSession } from '../_shared/auth.js';
 import { cronAuthorized } from '../_shared/secrets.js';
-import { fetchEnrichment } from '../_shared/enrichment.js';
+import { fetchEnrichment, extractTmdbDetailFields } from '../_shared/enrichment.js';
 
 // TMDB GET that works with either credential the worker has configured:
 // the v4 Bearer token (TMDB_TOKEN, what the shared enrichment path uses) is
@@ -333,7 +333,11 @@ export async function onRequestPost(context) {
         }
 
         const tmdbId = first.id;
-        const detail = await tmdbGet(`/tv/${tmdbId}`, env);
+        // append_to_response folds videos/providers/content-ratings into the
+        // one detail call we already make — no extra subrequest budget.
+        const detail = await tmdbGet(
+          `/tv/${tmdbId}?append_to_response=videos,watch/providers,content_ratings`, env);
+        const df = extractTmdbDetailFields(detail, 'tv');
 
         // Check if series is complete
         const status = detail.status;
@@ -376,20 +380,34 @@ export async function onRequestPost(context) {
         }
 
         await env.DB.prepare(
-          "UPDATE shows SET next_season_date = ?, season_end_date = ?, full_series = ?, genres = COALESCE(?, genres), seasons_released = COALESCE(?, seasons_released), poster_url = COALESCE(?, poster_url), network_logo_url = COALESCE(?, network_logo_url), enriched_at = datetime('now') WHERE id = ?"
-        ).bind(newDate, endDate, isComplete, genres, seasonsReleased, posterUrl, networkLogoUrl, show.id).run();
-        // Artwork is per-row; push it to every member's copy of this title so
-        // one lookup fills all lists instead of each copy waiting its own turn
-        // in the rotation. Fill-only (COALESCE keeps existing artwork). A DB
-        // write, not a fetch, so it doesn't count against the subrequest budget.
-        if (posterUrl || networkLogoUrl) {
-          await env.DB.prepare(
-            `UPDATE shows SET poster_url = COALESCE(poster_url, ?),
-                              network_logo_url = COALESCE(network_logo_url, ?)
-              WHERE archived = 0
-                AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
-          ).bind(posterUrl, networkLogoUrl, show.id).run();
-        }
+          `UPDATE shows SET next_season_date = ?, season_end_date = ?, full_series = ?,
+              genres = COALESCE(?, genres), seasons_released = COALESCE(?, seasons_released),
+              poster_url = COALESCE(?, poster_url), network_logo_url = COALESCE(?, network_logo_url),
+              overview = COALESCE(?, overview), backdrop_url = COALESCE(?, backdrop_url),
+              tmdb_rating = COALESCE(?, tmdb_rating), content_rating = COALESCE(?, content_rating),
+              trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director),
+              runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
+              network = COALESCE(network, ?), watch_link = COALESCE(?, watch_link),
+              enriched_at = datetime('now') WHERE id = ?`
+        ).bind(newDate, endDate, isComplete, genres, seasonsReleased, posterUrl, networkLogoUrl,
+          df.overview, df.backdropUrl, df.tmdbRating, df.contentRating, df.trailerKey, df.director,
+          df.runtime, df.releaseYear, df.providerNetwork, df.watchLink, show.id).run();
+        // Catalog fields (artwork + the new detail fields) are the same for
+        // every member's copy of a title, so push them to all copies in one
+        // go rather than making each copy wait its own turn in the rotation.
+        // Fill-only (COALESCE keeps anything already set). A DB write, not a
+        // fetch, so it doesn't count against the subrequest budget.
+        await env.DB.prepare(
+          `UPDATE shows SET poster_url = COALESCE(poster_url, ?), network_logo_url = COALESCE(network_logo_url, ?),
+              overview = COALESCE(overview, ?), backdrop_url = COALESCE(backdrop_url, ?),
+              tmdb_rating = COALESCE(tmdb_rating, ?), content_rating = COALESCE(content_rating, ?),
+              trailer_key = COALESCE(trailer_key, ?), director = COALESCE(director, ?),
+              runtime = COALESCE(runtime, ?), release_year = COALESCE(release_year, ?),
+              genres = COALESCE(genres, ?), watch_link = COALESCE(watch_link, ?)
+            WHERE archived = 0
+              AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
+        ).bind(posterUrl, networkLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.contentRating,
+          df.trailerKey, df.director, df.runtime, df.releaseYear, genres, df.watchLink, show.id).run();
         tmdbUpdated++;
       } catch (e) {}
     }
@@ -416,16 +434,38 @@ export async function onRequestPost(context) {
     for (const show of movieShows) {
       try {
         const first = await tmdbSearchFirst(show.title, 'movie', env);
-        const posterPath = first && first.poster_path;
+        if (!first) {
+          // No match — stamp so the title rotates to the back instead of
+          // pinning the front of the grouped-by-title queue.
+          await env.DB.prepare(
+            `UPDATE shows SET enriched_at = datetime('now')
+              WHERE archived = 0 AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
+          ).bind(show.id).run();
+          continue;
+        }
+        // One detail call (append folds in videos/providers/release_dates/credits)
+        // gets the poster AND the rich fields — same subrequest budget as before
+        // plus this single GET per matched movie.
+        const detail = await tmdbGet(
+          `/movie/${first.id}?append_to_response=videos,watch/providers,release_dates,credits`, env);
+        const df = extractTmdbDetailFields(detail, 'movie');
+        const posterPath = detail.poster_path || first.poster_path;
         const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
-        // Title-scoped: fills every member's copy in one go, and stamps
-        // enriched_at on all of them so a title TMDB can't match rotates to
-        // the back of the grouped-by-title queue instead of pinning it.
+        const genres = (detail.genres || []).map(g => g.name).join(', ') || null;
+        // Title-scoped: fills every member's copy in one go (fill-only COALESCE),
+        // and stamps enriched_at on all of them so the title rotates evenly.
         await env.DB.prepare(
-          `UPDATE shows SET poster_url = COALESCE(?, poster_url), enriched_at = datetime('now')
+          `UPDATE shows SET poster_url = COALESCE(?, poster_url),
+              overview = COALESCE(overview, ?), backdrop_url = COALESCE(backdrop_url, ?),
+              tmdb_rating = COALESCE(tmdb_rating, ?), content_rating = COALESCE(content_rating, ?),
+              trailer_key = COALESCE(trailer_key, ?), director = COALESCE(director, ?),
+              runtime = COALESCE(runtime, ?), release_year = COALESCE(release_year, ?),
+              genres = COALESCE(genres, ?), network = COALESCE(network, ?),
+              watch_link = COALESCE(watch_link, ?), enriched_at = datetime('now')
             WHERE archived = 0
               AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
-        ).bind(posterUrl, show.id).run();
+        ).bind(posterUrl, df.overview, df.backdropUrl, df.tmdbRating, df.contentRating, df.trailerKey,
+          df.director, df.runtime, df.releaseYear, genres, df.providerNetwork, df.watchLink, show.id).run();
         if (posterUrl) tmdbUpdated++;
       } catch (e) {}
     }

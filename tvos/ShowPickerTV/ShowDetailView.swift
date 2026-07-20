@@ -50,6 +50,18 @@ struct ShowDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 40) {
+                if let b = show?.backdropUrl, !b.isEmpty, let url = URL(string: b) {
+                    AsyncImage(url: url) { phase in
+                        if let img = phase.image {
+                            img.resizable().scaledToFill()
+                        } else {
+                            Rectangle().fill(Theme.background)
+                        }
+                    }
+                    .frame(height: 320)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
                 HStack(alignment: .top, spacing: 50) {
                     // Click the poster to view it full screen (click again to
                     // come back). The no-poster gradient tile stays inert.
@@ -106,6 +118,7 @@ struct ShowDetailView: View {
                         if let s = show { metaRows(s) }
 
                         watchButton
+                        trailerButton
                     }
                     Spacer()
                 }
@@ -336,11 +349,30 @@ struct ShowDetailView: View {
             if let w = s.watchingWith, !w.isEmpty {
                 Text("Watching with \(w)").foregroundColor(Theme.text.opacity(0.7))
             }
+            if let extra = extraMetaLine(s) {
+                Text(extra).foregroundColor(Theme.text.opacity(0.7))
+            }
+            if let d = s.director, !d.isEmpty {
+                Text("\(s.directorLabel): \(d)").foregroundColor(Theme.text.opacity(0.7))
+            }
             if let notes = s.notes, !notes.isEmpty {
                 Text(notes).italic().foregroundColor(Theme.muted)
             }
+            if let ov = s.overview, !ov.isEmpty {
+                Text(ov).foregroundColor(Theme.muted).lineLimit(8)
+            }
         }
         .font(.system(size: 24))
+    }
+
+    // "2026 · 1h 52m · TV-MA · ★ 7.2 TMDB" — the catalog facts on one line.
+    private func extraMetaLine(_ s: Show) -> String? {
+        var parts: [String] = []
+        if let y = s.releaseYear { parts.append(String(y)) }
+        if let rt = s.runtimeText { parts.append(rt) }
+        if let cr = s.contentRating, !cr.isEmpty { parts.append(cr) }
+        if let tr = s.tmdbRating, !tr.isEmpty { parts.append("★ \(tr) TMDB") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     // "Next episode: 6/29 · 3 seasons" — the same M/D formatting and seasons
@@ -378,11 +410,30 @@ struct ShowDetailView: View {
                     .font(.system(size: 20))
                     .foregroundColor(Theme.muted)
             }
+        } else if let s = show, let wl = s.whereToWatchURL {
+            // No deep link — the TMDB/JustWatch "where to watch" page lists the
+            // services carrying it.
+            Button { openURL(wl) } label: {
+                Label("Where to watch", systemImage: "magnifyingglass")
+                    .font(.system(size: 26, weight: .semibold))
+                    .padding(.vertical, 8)
+            }
+            .padding(.top, 12)
         } else if show != nil {
             Text("No direct link yet")
                 .font(.system(size: 22))
                 .foregroundColor(Theme.muted)
                 .padding(.top, 12)
+        }
+    }
+
+    @ViewBuilder private var trailerButton: some View {
+        if let url = show?.trailerURL {
+            Button { openURL(url) } label: {
+                Label("Trailer", systemImage: "play.rectangle.fill")
+                    .font(.system(size: 26, weight: .semibold))
+                    .padding(.vertical, 8)
+            }
         }
     }
 

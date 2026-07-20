@@ -40,15 +40,28 @@ struct WatchDetailView: View {
                             Text("Network").font(.caption2).foregroundStyle(.secondary)
                             Link("Watch on \(n)", destination: url).font(.footnote)
                         }
+                    } else if let wl = s.whereToWatchURL {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(n).font(.caption2).foregroundStyle(.secondary)
+                            Link("Where to watch", destination: wl).font(.footnote)
+                        }
                     } else {
                         row("Network", n)
                     }
                 }
                 if let r = s.rating, !r.isEmpty { row("Rating", "★ \(r)") }
+                if let tr = s.tmdbRating, !tr.isEmpty { row("TMDB", "★ \(tr)") }
                 if let l = ShowList(rawValue: s.list) { row("List", l.title) }
                 if let up = s.nextUpRange { row("Next episode", up) }
                 if let seasons = s.seasonsText { row("Seasons", seasons) }
                 if s.isMovie { row("Type", "Movie") }
+                if let cr = s.contentRating, !cr.isEmpty { row("Rated", cr) }
+                if let y = s.releaseYear { row("Year", String(y)) }
+                if let rt = s.runtimeText { row("Runtime", rt) }
+                if let d = s.director, !d.isEmpty { row(s.directorLabel, d) }
+                if let turl = s.trailerURL {
+                    Link("▶ Trailer", destination: turl).font(.footnote)
+                }
                 if !s.genreList.isEmpty { row("Genres", s.genreList.joined(separator: ", ")) }
                 if let by = s.recommendedBy, !by.isEmpty { row("From", by) }
                 if let w = s.watchingWith, !w.isEmpty { row("With", w) }
@@ -71,6 +84,12 @@ struct WatchDetailView: View {
                 }
                 if let notes = s.notes, !notes.isEmpty {
                     Text(notes).font(.caption2).foregroundStyle(.secondary).italic()
+                }
+                if let ov = s.overview, !ov.isEmpty {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Overview").font(.caption2).foregroundStyle(.secondary)
+                        Text(ov).font(.caption2)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
