@@ -716,7 +716,8 @@ private struct MemberDetailAdminView: View {
     let onChange: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var name: String
+    @State private var firstName: String
+    @State private var lastName: String
     @State private var emails: String
     @State private var phones: String
     @State private var isDisabled: Bool
@@ -730,7 +731,8 @@ private struct MemberDetailAdminView: View {
     init(member: AdminMember, onChange: @escaping () async -> Void) {
         self.member = member
         self.onChange = onChange
-        _name = State(initialValue: [member.firstName, member.lastName].compactMap { $0 }.joined(separator: " "))
+        _firstName = State(initialValue: member.firstName ?? "")
+        _lastName = State(initialValue: member.lastName ?? "")
         _emails = State(initialValue: member.emails.joined(separator: ", "))
         _phones = State(initialValue: member.phones.joined(separator: ", "))
         _isDisabled = State(initialValue: member.disabled ?? false)
@@ -741,13 +743,16 @@ private struct MemberDetailAdminView: View {
     var body: some View {
         Form {
             Section {
-                TextField("Alice Baker", text: $name)
+                TextField("Alice — or Paula & Brad for a shared list", text: $firstName)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                TextField("Last name", text: $lastName)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
             } header: {
                 Text("Name")
             } footer: {
-                Text("Renames keep the member's slug and URL (@\(member.slug)).")
+                Text("First name(s) is what the club sees — a shared list can use \"Paula & Brad\". Renames keep the member's slug and URL (@\(member.slug)).")
             }
 
             Section {
@@ -842,7 +847,8 @@ private struct MemberDetailAdminView: View {
         do {
             let r = try await API.updateMemberContacts(
                 slug: member.slug,
-                name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+                firstName: firstName.trimmingCharacters(in: .whitespacesAndNewlines),
+                lastName: lastName.trimmingCharacters(in: .whitespacesAndNewlines),
                 emails: emails.trimmingCharacters(in: .whitespacesAndNewlines),
                 phones: phones.trimmingCharacters(in: .whitespacesAndNewlines))
             if let e = r.error { banner = friendlyAdminError(e) }

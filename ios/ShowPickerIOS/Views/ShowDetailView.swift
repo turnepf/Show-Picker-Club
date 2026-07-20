@@ -246,6 +246,9 @@ struct ShowDetailView: View {
         do {
             try await API.moveShow(id: id, to: list.rawValue)
             await refreshMyCopy()
+        } catch let e as API.APIError where e.status == 401 {
+            addAlert = AddAlert(title: "Logged out",
+                                message: "Your session expired — sign in again from Home.")
         } catch {
             addAlert = AddAlert(title: "Couldn’t move",
                                 message: "Something went wrong. Please try again.")
@@ -256,6 +259,9 @@ struct ShowDetailView: View {
         do {
             try await API.archiveShow(id: id)
             await refreshMyCopy()
+        } catch let e as API.APIError where e.status == 401 {
+            addAlert = AddAlert(title: "Logged out",
+                                message: "Your session expired — sign in again from Home.")
         } catch {
             addAlert = AddAlert(title: "Couldn’t archive",
                                 message: "Something went wrong. Please try again.")
@@ -306,6 +312,9 @@ struct ShowDetailView: View {
                                 message: mineArchived != nil
                                     ? "“\(addTitle)” is archived — use “add back to” below."
                                     : "“\(addTitle)” is already on one of your lists.")
+        } catch let e as API.APIError where e.status == 401 {
+            addAlert = AddAlert(title: "Logged out",
+                                message: "Your session expired — sign in again from Home.")
         } catch {
             addAlert = AddAlert(title: "Couldn’t add",
                                 message: "Something went wrong. Please try again.")

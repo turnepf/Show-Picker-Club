@@ -35,6 +35,9 @@ struct IPadHomeView: View {
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
     @State private var loading = true
+    // Roster fetch threw — shown only when there's nothing to display, so an
+    // empty roster reads as a load failure, not an empty club.
+    @State private var loadFailed = false
     @State private var selection: SidebarItem?
     // Whose lists the sidebar's list entries show. Defaults to the logged-in
     // member once auth resolves; tapping a member row moves focus to them.
@@ -274,6 +277,12 @@ struct IPadHomeView: View {
     private var membersWindow: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
+                if members.isEmpty && loadFailed {
+                    Text("Couldn't load the club — check the connection and relaunch.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 8)
+                }
                 ForEach(members) { m in memberRow(m) }
             }
         }
@@ -418,16 +427,18 @@ struct IPadHomeView: View {
         defer { loading = false }
         async let m = try? await API.members()
         async let p = try? await API.popular()
-        let mr = (await m) ?? []
-        let pr = (await p) ?? []
+        let mr = await m
+        let pr = await p
+        loadFailed = (mr == nil)
         // Most recently active first (the window shows the top five), then most
-        // shows as the tiebreaker.
-        members = mr.sorted {
+        // shows as the tiebreaker. On failure keep the previous roster —
+        // stale beats blank.
+        members = (mr ?? members).sorted {
             let la = $0.lastActivityAt ?? "", lb = $1.lastActivityAt ?? ""
             if la != lb { return la > lb }
             return $0.activeCount > $1.activeCount
         }
-        popular = pr
+        popular = pr ?? popular
         if let link = pendingLink {
             pendingLink = nil
             route(url: link)

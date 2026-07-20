@@ -93,7 +93,7 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 - **`schema.sql` is not the real schema.** Production D1 has columns and tables added by `migrations/`; `docs/ARCHITECTURE.md#database` is the authoritative description.
 - **Secrets are set with `printf`, never `echo`** (trailing newlines break runtime API calls).
 - **Slug `dorothy` 301s to `whitt`** and the member displays as Dorothy; don't "fix" either side.
-- **Delete feature branches once merged and live** — local and remote. In the Claude-Code-on-the-web environment the git proxy rejects remote branch deletion (403), so hand the user the GitHub deletion link instead (see Working preferences).
+- **Delete feature branches once merged and live** — local and remote. In the Claude-Code-on-the-web environment the git proxy rejects remote branch deletion (403); the user deletes merged branches themselves from GitHub's post-merge screen.
 
 ## Working preferences
 
@@ -119,9 +119,7 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
   pending on the user (merges, migrations, secrets, verifications), whether
   branches are cleaned up, and whether the session is safe to archive. If
   something is not done, say what and why instead of going quiet.
-- **"Safe to archive" always comes with the branch-deletion link.** Remote
-  branch deletes are often blocked from the session (403), so whenever a
-  close-out says the session is safe to archive, include the GitHub link to
-  delete the session's merged branch, in the filtered form
-  `https://github.com/turnepf/Show-Picker-Club/branches/all?query=<branch-name>`
-  (shows just that branch with its trash-can delete button).
+- **No branch-deletion links in close-outs.** GitHub's post-merge screen
+  already offers the branch delete, so don't paste `branches/all?query=…`
+  links or remind about deleting merged branches — just say whether the
+  branch is merged yet.

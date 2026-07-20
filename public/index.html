@@ -1696,6 +1696,15 @@
     //   showToast("Moved to Loved")
     //   showToast("Archived \"Foo\"", { action: { label: "Undo", onClick: fn } })
     //   showToast("Network error", { tone: "error" })
+    // Error toast for a failed write. A 401 is by far the most common real
+    // cause (a session cookie that finally expired), and "Failed to X" sends
+    // members chasing the wrong problem — so it gets named explicitly.
+    function failToast(res, fallback) {
+      showToast(res.status === 401
+        ? 'You’re logged out — refresh the page and log in again.'
+        : fallback, { tone: 'error' });
+    }
+
     function showToast(message, opts = {}) {
       let stack = document.getElementById('toastStack');
       if (!stack) {
@@ -2575,6 +2584,7 @@
           body: JSON.stringify({ phone, channel: 'sms' }),
         });
         if (res.status === 429) { showLoginError('Too many requests. Try again in an hour.'); return; }
+        if (res.status === 400) { showLoginError('That doesn’t look like a valid phone number. Check it and try again.'); return; }
         if (!res.ok) { showLoginError('Could not send. Try again, or contact the group owner.'); return; }
         document.getElementById('loginCodeSent').textContent = 'We texted a code to ' + phone + '.';
         loginShowStep('code');
@@ -3090,7 +3100,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ list: currentTab, ids }),
         });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
+        if (!res.ok) { failToast(res, 'Couldn’t save your order. Try again.'); return; }
       } catch (e) {
         showToast('Couldn’t save your order — check your connection', { tone: 'error' });
       }
@@ -3291,13 +3301,16 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...body, title: err.title, archived: 0 }),
               });
-              if (!res.ok) { showToast('Failed to restore', { tone: 'error' }); return; }
+              if (!res.ok) { failToast(res, 'Failed to restore'); return; }
             } else { return; }
           } else if (err.error === 'exists_active') {
             showToast(`IMDB knows this as "${err.title}". Already on the ${LIST_LABELS[err.list] || err.list} list.`, { tone: 'error' });
             return;
           } else {
-            showToast(err.error || 'Failed to save', { tone: 'error' });
+            // Translate server codes; never show a raw one like "rate_limited".
+            failToast(res, err.error === 'rate_limited'
+              ? 'Daily add limit reached. Try again tomorrow.'
+              : 'Failed to save. Try again.');
             return;
           }
         }
@@ -3336,7 +3349,7 @@
             });
           }
         } else {
-          showToast('Failed to move show', { tone: 'error' });
+          failToast(res, 'Failed to move show');
         }
       } catch (e) {
         showToast('Network error. Try again.', { tone: 'error' });
@@ -3356,7 +3369,7 @@
             action: { label: 'Undo', onClick: () => unarchiveShow(showId, savedShow) },
           });
         } else {
-          showToast('Failed to archive show', { tone: 'error' });
+          failToast(res, 'Failed to archive show');
         }
       } catch (e) {
         showToast('Network error. Try again.', { tone: 'error' });
@@ -3375,7 +3388,7 @@
           renderShows();
           showToast(`Restored "${savedShow.title}"`);
         } else {
-          showToast('Failed to restore show', { tone: 'error' });
+          failToast(res, 'Failed to restore show');
         }
       } catch (e) {
         showToast('Network error. Try again.', { tone: 'error' });
@@ -3561,7 +3574,9 @@
           closeAddMyList();
           showToast(`Added to your ${LIST_LABELS[list] || list} list`);
         } else {
-          showToast(data.error || 'Failed to add', { tone: 'error' });
+          failToast(res, data.error === 'rate_limited'
+            ? 'Daily add limit reached. Try again tomorrow.'
+            : 'Failed to add. Try again.');
         }
       } catch (e) {
         showToast('Network error. Try again.', { tone: 'error' });
@@ -3798,7 +3813,7 @@
           method: 'PUT', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ list }),
         });
-        if (!res.ok) { showToast("Couldn’t move", { tone: 'error' }); return; }
+        if (!res.ok) { failToast(res, 'Couldn’t move'); return; }
         showToast(`Moved to ${LIST_LABELS[list] || list}`);
         if (typeof loadShows === 'function') loadShows();
         await reRenderDetail();
@@ -3810,7 +3825,7 @@
         const res = await fetch(`/api/shows/${id}/archive`, {
           method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{}',
         });
-        if (!res.ok) { showToast("Couldn’t archive", { tone: 'error' }); return; }
+        if (!res.ok) { failToast(res, 'Couldn’t archive'); return; }
         showToast('Archived');
         if (typeof loadShows === 'function') loadShows();
         await reRenderDetail();
@@ -3823,7 +3838,7 @@
           method: 'PUT', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ archived: 0, list }),
         });
-        if (!res.ok) { showToast("Couldn’t restore", { tone: 'error' }); return; }
+        if (!res.ok) { failToast(res, 'Couldn’t restore'); return; }
         showToast(`Added back to ${LIST_LABELS[list] || list}`);
         if (typeof loadShows === 'function') loadShows();
         await reRenderDetail();
@@ -3845,7 +3860,7 @@
             ? 'It’s archived — use “Add back to” below' : 'Already on one of your lists');
           return;
         }
-        if (!res.ok) { showToast("Couldn’t add", { tone: 'error' }); return; }
+        if (!res.ok) { failToast(res, 'Couldn’t add'); return; }
         showToast(`Added to ${LIST_LABELS[list] || list}`);
         if (typeof loadShows === 'function') loadShows();
         await reRenderDetail();

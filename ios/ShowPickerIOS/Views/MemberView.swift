@@ -37,6 +37,12 @@ struct MemberView: View {
     // banner (mirrors the web's undo toast).
     @State private var undoShow: Show?
     @State private var undoDismiss: Task<Void, Never>?
+    // A load that threw (vs. a genuinely empty library) — the empty state
+    // must not claim "you're not watching anything" when the server failed.
+    @State private var loadFailed = false
+    // Failed-write banner, same bottom slot as the undo banner.
+    @State private var errorBanner: String?
+    @State private var errorDismiss: Task<Void, Never>?
 
     init(member: Member, fixedList: ShowList? = nil) {
         self.member = member
@@ -76,7 +82,7 @@ struct MemberView: View {
             List {
                 let items = sortedItems()
                 if items.isEmpty {
-                    emptyState
+                    Group { if loadFailed && shows.isEmpty { loadFailedState } else { emptyState } }
                         .frame(maxWidth: .infinity, alignment: .center)
                         .listRowBackground(Color.clear)
                 } else {
@@ -109,7 +115,7 @@ struct MemberView: View {
                             if isMine {
                                 ForEach(listPromotions(for: currentList)) { p in
                                     Button {
-                                        Task { try? await API.moveShow(id: show.id, to: p.target.rawValue); await load() }
+                                        Task { await move(show, to: p.target) }
                                     } label: { Label(p.label, systemImage: p.systemImage) }
                                         .tint(p.tint)
                                 }
@@ -183,21 +189,34 @@ struct MemberView: View {
                 }
             }
         }
-        // Archive Undo banner, mirroring the web's 6-second undo toast.
+        // Bottom banners: failed-write errors and the archive Undo toast
+        // (mirroring the web's 6-second undo toast).
         .overlay(alignment: .bottom) {
-            if let s = undoShow {
-                HStack(spacing: 12) {
-                    Text("Archived “\(s.title)”").lineLimit(1)
-                    Spacer()
-                    Button("Undo") { undoArchive() }.fontWeight(.bold)
+            VStack(spacing: 8) {
+                if let msg = errorBanner {
+                    Text(msg)
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal)
-                .padding(.bottom, 8)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                if let s = undoShow {
+                    HStack(spacing: 12) {
+                        Text("Archived “\(s.title)”").lineLimit(1)
+                        Spacer()
+                        Button("Undo") { undoArchive() }.fontWeight(.bold)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
+            .padding(.horizontal)
+            .padding(.bottom, 8)
         }
         .onAppear {
             loadSavedSorts()
@@ -334,7 +353,10 @@ struct MemberView: View {
                 shows[idx].sortOrder = pos
             }
         }
-        Task { try? await API.reorderShows(list: currentList.rawValue, ids: orderedIds) }
+        Task {
+            do { try await API.reorderShows(list: currentList.rawValue, ids: orderedIds) }
+            catch { showError(error, action: "save your order") }
+        }
     }
 
     // "Next episode: 6/1 · 3 seasons" — premiere range plus the seasons count when
@@ -387,7 +409,46 @@ struct MemberView: View {
     private func load() async {
         loading = true
         defer { loading = false }
-        shows = (try? await API.shows(member: member.slug)) ?? []
+        do {
+            shows = try await API.shows(member: member.slug)
+            loadFailed = false
+        } catch {
+            // Keep whatever's already on screen — stale beats blank — and
+            // let the empty state say "couldn't load", not "empty library".
+            loadFailed = true
+        }
+    }
+
+    // One-tap swipe promotion to another list. Offline moves are queued by
+    // the API layer; a real server rejection surfaces in the error banner.
+    private func move(_ show: Show, to target: ShowList) async {
+        do { try await API.moveShow(id: show.id, to: target.rawValue) }
+        catch { showError(error, action: "move “\(show.title)”") }
+        await load()
+    }
+
+    // Failed-write banner in the undo-toast slot, auto-dismissed after 6s.
+    private func showError(_ error: Error, action: String) {
+        errorDismiss?.cancel()
+        withAnimation { errorBanner = API.failureLine(error, action: action) }
+        errorDismiss = Task {
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            if !Task.isCancelled {
+                withAnimation { errorBanner = nil }
+            }
+        }
+    }
+
+    @ViewBuilder private var loadFailedState: some View {
+        VStack(spacing: 8) {
+            Text("Couldn't load \(isMine ? "your" : "\(member.label)'s") shows.")
+                .fontWeight(.semibold)
+            Text("This is a loading problem, not an empty list — pull down to try again.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .multilineTextAlignment(.center)
+        .padding(.vertical, 24)
     }
 
     // ── Empty states (mirrors the web's EMPTY_COPY: owner gets guidance and
@@ -440,7 +501,12 @@ struct MemberView: View {
 
     // ── Archive with Undo ────────────────────────────────────────────────
     private func archiveWithUndo(_ show: Show) async {
-        try? await API.archiveShow(id: show.id)
+        do { try await API.archiveShow(id: show.id) }
+        catch {
+            // No undo banner for an archive that didn't happen.
+            showError(error, action: "archive “\(show.title)”")
+            return
+        }
         await load()
         undoDismiss?.cancel()
         withAnimation { undoShow = show }
@@ -457,7 +523,8 @@ struct MemberView: View {
         undoDismiss?.cancel()
         withAnimation { undoShow = nil }
         Task {
-            try? await API.restoreShow(id: s.id, to: s.list)
+            do { try await API.restoreShow(id: s.id, to: s.list) }
+            catch { showError(error, action: "restore “\(s.title)”") }
             await load()
         }
     }

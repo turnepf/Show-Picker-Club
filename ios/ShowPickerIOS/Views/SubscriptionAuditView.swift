@@ -9,9 +9,13 @@ struct SubscriptionAuditView: View {
     @State private var loading = true
     @State private var addingService = false
     @State private var newServiceName = ""
+    @State private var errorText: String?
 
     var body: some View {
         List {
+            if let err = errorText {
+                Section { Text(err).foregroundStyle(.red) }
+            }
             if let a = audit {
                 Section {
                     LabeledContent("Services", value: "\(a.totals.serviceCount)")
@@ -44,6 +48,11 @@ struct SubscriptionAuditView: View {
                     }
                 } footer: {
                     Text("Track a service you pay for that isn't tied to any show on your lists.")
+                }
+            } else if !loading {
+                Section {
+                    Text("Couldn't load your subscriptions — pull down to try again.")
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -101,7 +110,12 @@ struct SubscriptionAuditView: View {
         let name = newServiceName.trimmingCharacters(in: .whitespaces)
         newServiceName = ""
         guard !name.isEmpty else { return }
-        try? await API.updateSubscription(network: name, status: "subscribed", isManual: true)
+        do {
+            try await API.updateSubscription(network: name, status: "subscribed", isManual: true)
+            errorText = nil
+        } catch {
+            errorText = API.failureLine(error, action: "add \(name)")
+        }
         await load()
     }
 }
@@ -147,6 +161,7 @@ private struct SubscriptionServiceEditView: View {
     @State private var setResubscribe: Bool
     @State private var resubscribeDate: Date
     @State private var working = false
+    @State private var errorText: String?
 
     init(service: SubscriptionService, onChange: @escaping () async -> Void) {
         self.service = service
@@ -204,6 +219,10 @@ private struct SubscriptionServiceEditView: View {
                 }
             }
 
+            if let err = errorText {
+                Section { Text(err).foregroundStyle(.red) }
+            }
+
             Section {
                 Button("Save") { Task { await save() } }.disabled(working)
                 if service.isManual {
@@ -235,9 +254,15 @@ private struct SubscriptionServiceEditView: View {
         let resub: String?? = setResubscribe
             ? .some(SubscriptionServiceEditView.formatDate(resubscribeDate))
             : .some(nil)
-        try? await API.updateSubscription(
-            network: service.network, status: status, monthlyPriceCents: cents,
-            resubscribeDate: resub, isManual: service.isManual ? true : nil)
+        do {
+            try await API.updateSubscription(
+                network: service.network, status: status, monthlyPriceCents: cents,
+                resubscribeDate: resub, isManual: service.isManual ? true : nil)
+        } catch {
+            // Stay on the sheet so nothing looks saved when it wasn't.
+            errorText = API.failureLine(error, action: "save")
+            return
+        }
         await onChange()
         dismiss()
     }
@@ -245,7 +270,12 @@ private struct SubscriptionServiceEditView: View {
     private func remove() async {
         working = true
         defer { working = false }
-        try? await API.updateSubscription(network: service.network, remove: true)
+        do {
+            try await API.updateSubscription(network: service.network, remove: true)
+        } catch {
+            errorText = API.failureLine(error, action: "remove \(service.network)")
+            return
+        }
         await onChange()
         dismiss()
     }

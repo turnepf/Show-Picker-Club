@@ -6,6 +6,9 @@ struct HomeView: View {
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
     @State private var loading = true
+    // Roster fetch threw — shown only when there's nothing to display, so an
+    // empty Members section reads as a load failure, not an empty club.
+    @State private var loadFailed = false
     @State private var showingLogin = false
     @State private var showingDeleteAccount = false
     @State private var showingSearch = false
@@ -127,6 +130,10 @@ struct HomeView: View {
                         }
                     }
                     Section("Members") {
+                        if members.isEmpty && loadFailed {
+                            Text("Couldn't load the club — pull down to try again.")
+                                .foregroundStyle(.secondary)
+                        }
                         let visible = showAllMembers ? members : Array(members.prefix(memberPreviewCount))
                         ForEach(visible) { m in
                             NavigationLink(value: Route.member(m)) {
@@ -312,16 +319,18 @@ struct HomeView: View {
         defer { loading = false }
         async let m = try? await API.members()
         async let p = try? await API.popular()
-        let mr = (await m) ?? []
-        let pr = (await p) ?? []
+        let mr = await m
+        let pr = await p
+        loadFailed = (mr == nil)
         // Most recently active first, then most active (Watching + Next Up +
         // Loved) as the tiebreaker — the same roster order as the iPad and web.
-        members = mr.sorted {
+        // On failure keep the previous roster — stale beats blank.
+        members = (mr ?? members).sorted {
             let la = $0.lastActivityAt ?? "", lb = $1.lastActivityAt ?? ""
             if la != lb { return la > lb }
             return $0.activeCount > $1.activeCount
         }
-        popular = pr
+        popular = pr ?? popular
         if let link = pendingLink {
             pendingLink = nil
             route(url: link)

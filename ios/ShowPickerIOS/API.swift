@@ -33,6 +33,19 @@ enum API {
         let title: String?   // canonical title the server deduped against
     }
 
+    // Short, honest failure line for a member-visible error: names an expired
+    // session or being offline when that's the cause, and stays generic
+    // otherwise instead of inventing one.
+    static func failureLine(_ error: Error, action: String) -> String {
+        if let e = error as? APIError, e.status == 401 {
+            return "You're logged out — sign in again from Home."
+        }
+        if isOffline(error) {
+            return "You're offline — couldn't \(action)."
+        }
+        return "Couldn't \(action). Try again."
+    }
+
     // True for the URLError codes that mean "no usable network" rather than a
     // real server rejection. We queue writes / serve cache for these, and
     // propagate everything else (4xx/5xx, decode failures) as before.
@@ -194,14 +207,17 @@ enum API {
         return try JSONDecoder().decode(T.self, from: data)
     }
 
-    // Create a new member (operator only). Decodes the body on success or
-    // failure so the caller can surface the server's error message.
-    static func createMember(fullName: String, phone: String?, emails: String?) async throws -> CreateMemberResult {
+    // Create a new member (operator only). First/last name travel separately
+    // so a shared list can carry a multi-word first name ("Paula & Brad").
+    // Decodes the body on success or failure so the caller can surface the
+    // server's error message.
+    static func createMember(firstName: String, lastName: String?, phone: String?, emails: String?) async throws -> CreateMemberResult {
         guard let url = URL(string: baseString + "/api/admin-create-member") else { throw APIError.badURL }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        var body: [String: Any] = ["full_name": fullName]
+        var body: [String: Any] = ["first_name": firstName]
+        if let l = lastName, !l.isEmpty { body["last_name"] = l }
         if let p = phone, !p.isEmpty { body["phone"] = p }
         if let e = emails, !e.isEmpty { body["emails"] = e }
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -265,12 +281,16 @@ enum API {
     }
 
     // Replace a member's email and/or phone set, and/or rename them (renames
-    // keep the slug/URL). Pass a comma/space-separated string; an empty string
-    // clears that side. Decodes the body either way so the caller can show
-    // validation errors.
-    static func updateMemberContacts(slug: String, name: String? = nil, emails: String?, phones: String?) async throws -> AdminActionResult {
+    // keep the slug/URL). First/last name travel separately so a shared list
+    // can carry a multi-word first name ("Paula & Brad") — a combined string
+    // would get token-split server-side and lose the middle. Pass
+    // comma/space-separated strings; an empty string clears that side.
+    // Decodes the body either way so the caller can show validation errors.
+    static func updateMemberContacts(slug: String, firstName: String? = nil, lastName: String? = nil,
+                                     emails: String?, phones: String?) async throws -> AdminActionResult {
         var body: [String: Any] = ["slug": slug]
-        if let n = name { body["name"] = n }
+        if let f = firstName { body["first_name"] = f }
+        if let l = lastName { body["last_name"] = l }
         if let e = emails { body["emails"] = e }
         if let p = phones { body["phones"] = p }
         return try await postDecoding("/api/admin-member-emails", body: body)

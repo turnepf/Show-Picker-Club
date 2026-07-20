@@ -4,7 +4,8 @@ import SwiftUI
 // the web /setup flow — name plus a phone and/or emails; the server generates
 // the slug and seeds 8 shows.
 struct CreateMemberView: View {
-    @State private var fullName = ""
+    @State private var firstName = ""
+    @State private var lastName = ""
     @State private var phone = ""
     @State private var emails = ""
     @State private var submitting = false
@@ -12,7 +13,7 @@ struct CreateMemberView: View {
     @State private var result: CreateMemberResult?
 
     private var canSubmit: Bool {
-        !fullName.trimmingCharacters(in: .whitespaces).isEmpty
+        !firstName.trimmingCharacters(in: .whitespaces).isEmpty
             && (!phone.trimmingCharacters(in: .whitespaces).isEmpty
                 || !emails.trimmingCharacters(in: .whitespaces).isEmpty)
             && !submitting
@@ -21,7 +22,9 @@ struct CreateMemberView: View {
     var body: some View {
         Form {
             Section {
-                TextField("Full name", text: $fullName)
+                TextField("First name(s) — e.g. Alice, or Paula & Brad", text: $firstName)
+                    .textInputAutocapitalization(.words)
+                TextField("Last name (optional)", text: $lastName)
                     .textInputAutocapitalization(.words)
                 TextField("Phone (optional)", text: $phone)
                     .keyboardType(.phonePad)
@@ -74,12 +77,12 @@ struct CreateMemberView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    // Live preview of the slug/URL the server will mint (first name,
-    // lowercased, alphanumerics only; a suffix is added on collision) —
-    // mirrors the web form's preview line.
+    // Live preview of the slug/URL the server will mint (the whole first-name
+    // field, lowercased, alphanumerics only; a suffix is added on collision) —
+    // mirrors the web form's preview line. "Paula & Brad" → paulabrad.
     private var footerText: String {
         let base = "Provide a phone, at least one email, or both — that's where login codes go."
-        let first = fullName.trimmingCharacters(in: .whitespaces).split(separator: " ").first.map(String.init) ?? ""
+        let first = firstName.trimmingCharacters(in: .whitespaces)
         let slug = first.lowercased().filter { $0.isLetter || $0.isNumber }
         guard !slug.isEmpty else { return base }
         return "URL: showpicker.club/\(slug) (suffix added on collision) · Display: \(first)'s Shows\n\(base)"
@@ -96,7 +99,8 @@ struct CreateMemberView: View {
         result = nil
         do {
             let r = try await API.createMember(
-                fullName: fullName.trimmingCharacters(in: .whitespaces),
+                firstName: firstName.trimmingCharacters(in: .whitespaces),
+                lastName: lastName.trimmingCharacters(in: .whitespaces),
                 phone: phone.trimmingCharacters(in: .whitespaces),
                 emails: emails.trimmingCharacters(in: .whitespaces)
             )
@@ -105,7 +109,7 @@ struct CreateMemberView: View {
             } else {
                 result = r
                 // Clear the form so it's ready for the next one.
-                fullName = ""; phone = ""; emails = ""
+                firstName = ""; lastName = ""; phone = ""; emails = ""
             }
         } catch {
             errorText = "Couldn't reach the server. Try again."
