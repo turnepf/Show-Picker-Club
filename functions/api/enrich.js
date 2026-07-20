@@ -318,33 +318,12 @@ export async function onRequestPost(context) {
         // Search TMDB for the show by its stored title.
         const first = await tmdbSearchFirst(show.title, 'tv', env);
         if (!first) {
-          // Not on TMDB's TV index. A row filed as a show can actually be a
-          // film — a movie mis-flagged as a show, or a stand-up special /
-          // documentary TMDB only indexes under movies. The add-time enricher
-          // (enrichment.js) flips media types for exactly this; the background
-          // passes were siloed (TV-only here, movie-only below), so such a row
-          // never matched either pass and never got a poster. Mirror the flip:
-          // try the movie index for a poster before giving up. Poster only —
-          // seasons, air dates, and network logos don't apply to films.
-          const movieHit = await tmdbSearchFirst(show.title, 'movie', env);
-          const moviePoster = movieHit && movieHit.poster_path
-            ? `https://image.tmdb.org/t/p/w500${movieHit.poster_path}` : null;
-          if (moviePoster) {
-            await env.DB.prepare(
-              `UPDATE shows SET poster_url = COALESCE(poster_url, ?), enriched_at = datetime('now')
-                WHERE archived = 0
-                  AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
-            ).bind(moviePoster, show.id).run();
-            tmdbUpdated++;
-            continue;
-          }
-          // Truly unmatched on either index — stamp enriched_at so a title TMDB
-          // can't match rotates to the back of the oldest-first queue instead of
-          // blocking it every round. (A DB write, not a fetch — it doesn't count
-          // against the subrequest cap.) Every copy of the title, not just this
-          // row: the posters-mode batch groups by title and sorts by the group's
-          // oldest stamp, so one unstamped sibling would pin a hopeless title to
-          // the front forever.
+          // Stamp enriched_at so a title TMDB can't match rotates to the back
+          // of the oldest-first queue instead of blocking it every round. (A DB
+          // write, not a fetch — it doesn't count against the subrequest cap.)
+          // Every copy of the title, not just this row: the posters-mode batch
+          // groups by title and sorts by the group's oldest stamp, so one
+          // unstamped sibling would pin a hopeless title to the front forever.
           await env.DB.prepare(
             `UPDATE shows SET enriched_at = datetime('now')
               WHERE archived = 0
@@ -436,15 +415,8 @@ export async function onRequestPost(context) {
 
     for (const show of movieShows) {
       try {
-        let first = await tmdbSearchFirst(show.title, 'movie', env);
-        let posterPath = first && first.poster_path;
-        if (!posterPath) {
-          // Mirror the TV pass's fallback: a row flagged as a movie can
-          // actually be a series (mis-flag, or TMDB only carries the TV entry).
-          // Try the TV index for a poster before giving up.
-          const tvHit = await tmdbSearchFirst(show.title, 'tv', env);
-          posterPath = tvHit && tvHit.poster_path;
-        }
+        const first = await tmdbSearchFirst(show.title, 'movie', env);
+        const posterPath = first && first.poster_path;
         const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
         // Title-scoped: fills every member's copy in one go, and stamps
         // enriched_at on all of them so a title TMDB can't match rotates to

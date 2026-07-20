@@ -210,6 +210,43 @@ async function commitTitleFix(env, oldTitle, rawNew, enriched) {
   return { finalTitle, updated: renamed };
 }
 
+// Titles where no active copy has a poster. Grouped by title (one card per
+// title, with every member label) because artwork is per-title — a poster
+// fetched for one copy covers all. These are the rows a stored title TMDB
+// can't match on its own: a typo that stuck ("Marshalls"), a descriptive
+// member-entered name, or a title only indexed under the opposite media type.
+// The operator fixes them from the Missing-posters section: Re-enrich (a fresh
+// TMDB lookup, media-type-flipping) or, when the title itself is wrong, Rename.
+async function fetchNeedsPoster(env) {
+  const { results } = await env.DB.prepare(`
+    SELECT
+      MIN(s.id) AS id,
+      MIN(s.title) AS title,
+      MAX(s.movie) AS movie,
+      COUNT(*) AS member_count,
+      GROUP_CONCAT(
+        COALESCE(
+          CASE WHEN m.first_name IS NOT NULL AND m.last_initial IS NOT NULL
+               THEN m.first_name || ' ' || m.last_initial
+               ELSE m.first_name END,
+          s.member_slug),
+        ', ') AS members
+    FROM shows s
+    LEFT JOIN members m ON m.slug = s.member_slug
+    WHERE s.archived = 0
+    GROUP BY LOWER(s.title)
+    HAVING MAX(CASE WHEN s.poster_url IS NOT NULL AND s.poster_url != '' THEN 1 ELSE 0 END) = 0
+    ORDER BY LOWER(s.title)
+  `).all();
+  return (results || []).map(r => ({
+    id: r.id,
+    title: r.title,
+    movie: r.movie,
+    member_count: r.member_count,
+    members: r.members,
+  }));
+}
+
 // Titles where two or more members carry the show on different networks.
 // Often a typo (member picked the wrong service) but sometimes legitimate
 // (a title that lives on multiple services). Surface so the operator can
@@ -428,10 +465,57 @@ export async function onRequestPost(context) {
     return json({ ok: true, old_title: oldTitle, new_title: finalTitle, network, updated });
   }
 
+  if (action === 're_enrich') {
+    // Force a fresh TMDB lookup for a poster-less title without renaming it —
+    // for titles that are spelled right but never matched (added before TMDB
+    // had the entry, or only indexed under the opposite media type, which
+    // fetchEnrichment flips for). Writes any artwork/rating found onto every
+    // active copy; fills cast only where a copy has none. When nothing turns
+    // up, stamps enriched_at so the title rotates to the back of the queue.
+    const id = parseInt(body.id, 10);
+    if (!Number.isInteger(id)) return json({ error: 'id required' }, 400);
+    const row = await env.DB.prepare('SELECT title, movie FROM shows WHERE id = ?').bind(id).first();
+    if (!row) return json({ error: 'Show not found' }, 404);
+
+    const enriched = await fetchEnrichment(row.title, env, !!row.movie);
+    if (enriched.posterUrl || enriched.networkLogoUrl || enriched.rating) {
+      await env.DB.prepare(
+        `UPDATE shows
+            SET poster_url = COALESCE(?, poster_url),
+                network_logo_url = COALESCE(?, network_logo_url),
+                rating = COALESCE(?, rating),
+                enriched_at = datetime('now')
+          WHERE LOWER(title) = LOWER(?) AND archived = 0`
+      ).bind(enriched.posterUrl, enriched.networkLogoUrl, enriched.rating, row.title).run();
+    } else {
+      // Nothing found — stamp so the title rotates to the back of the
+      // oldest-first background pass instead of blocking it every round.
+      await env.DB.prepare(
+        `UPDATE shows SET enriched_at = datetime('now') WHERE LOWER(title) = LOWER(?) AND archived = 0`
+      ).bind(row.title).run();
+    }
+
+    // Fill cast on any copy that has none (TMDB actors only — the fallback
+    // can't supply IMDB ids, so there's nothing to gain from OMDB-only rows).
+    if ((enriched.actors || []).some(a => a.imdb_id)) {
+      const { results: copies } = await env.DB.prepare(
+        'SELECT id FROM shows WHERE LOWER(title) = LOWER(?) AND archived = 0'
+      ).bind(row.title).all();
+      const ins = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id) VALUES (?, ?, ?)');
+      for (const c of copies) {
+        const have = await env.DB.prepare('SELECT COUNT(*) AS c FROM actors WHERE show_id = ?').bind(c.id).first();
+        if (have.c === 0) await env.DB.batch(enriched.actors.map(a => ins.bind(c.id, a.name, a.imdb_id || null)));
+      }
+    }
+
+    return json({ ok: true, poster: !!enriched.posterUrl, title: enriched.canonicalTitle || row.title });
+  }
+
   await propagateGoodUrls(env);
   const shows = await fetchQueue(env);
   const networks = await fetchNetworks(env);
   const conflicts = await fetchConflicts(env);
   const mismatches = await fetchMismatches(env);
-  return json({ shows, networks, conflicts, mismatches });
+  const needsPoster = await fetchNeedsPoster(env);
+  return json({ shows, networks, conflicts, mismatches, needsPoster });
 }

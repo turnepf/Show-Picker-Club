@@ -55,8 +55,11 @@
       gap: 8px;
     }
     .row.mismatch .row-form { grid-template-columns: 1fr 1fr; }
+    .row.needs-poster { border-color: color-mix(in oklch, var(--accent) 22%, transparent); }
+    .row.needs-poster .row-form { grid-template-columns: 1fr auto auto; }
     @media (max-width: 560px) {
       .row.mismatch .row-form { grid-template-columns: 1fr; }
+      .row.needs-poster .row-form { grid-template-columns: 1fr; }
     }
 
     .row {
@@ -176,6 +179,7 @@
         <span class="tools-msg" id="enrichMsg">Fill missing ratings, posters, dates, and actor IMDB links across the whole club — runs up to 5 passes and stops when there's nothing left to do.</span>
       </div>
     </div>
+    <div id="needsPoster"></div>
     <div id="conflicts"></div>
     <div id="mismatches"></div>
     <div id="list"></div>
@@ -434,6 +438,119 @@
       }
     }
 
+    // Titles where no copy has a poster. Two fixes per card: "Re-enrich" runs a
+    // fresh TMDB lookup for the title as-is (for titles spelled right that just
+    // never matched — added before TMDB had them, or only under the opposite
+    // media type); "Rename" corrects a wrong/typo'd title and re-enriches. Both
+    // reuse the same actions the URL queue does.
+    function renderNeedsPoster(items) {
+      const root = document.getElementById('needsPoster');
+      if (!items.length) { root.innerHTML = ''; return; }
+      root.innerHTML = `
+        <div class="section-head">Missing posters</div>
+        <div class="section-blurb">No copy of these titles has a poster — usually the stored title doesn't match TMDB. Re-enrich to try a fresh lookup as-is, or fix the title if it's wrong (typo, or a descriptive name). A poster fetched here covers every member's copy.</div>
+        ${items.map(p => `
+          <div class="row needs-poster" data-id="${p.id}">
+            <div class="row-head">
+              <a class="show-link" target="_blank" rel="noopener noreferrer"
+                 href="${googleSearchUrl(p.title, null)}">${escapeHtml(p.title)}</a>
+              <span class="show-meta">${p.member_count > 1 ? p.member_count + ' lists &middot; ' : ''}${escapeHtml(p.members)}${p.movie ? ' &middot; movie' : ''}</span>
+            </div>
+            <div class="row-form">
+              <input type="text" class="title-input" placeholder="Fix title" value="${escapeAttr(p.title)}" autocomplete="off">
+              <button class="btn-rename" type="button">Rename &amp; re-enrich</button>
+              <button class="btn-update btn-reenrich" type="button">Re-enrich</button>
+              <div class="row-err"></div>
+            </div>
+          </div>
+        `).join('')}
+      `;
+      root.querySelectorAll('.row.needs-poster').forEach(attachPosterHandlers);
+    }
+
+    function attachPosterHandlers(rowEl) {
+      const errBox = rowEl.querySelector('.row-err');
+      const titleInput = rowEl.querySelector('.title-input');
+      const renameBtn = rowEl.querySelector('.btn-rename');
+      const reenrichBtn = rowEl.querySelector('.btn-reenrich');
+
+      const removeRow = () => {
+        rowEl.classList.add('removing');
+        setTimeout(() => { rowEl.remove(); refreshPosterCount(); }, 250);
+      };
+
+      reenrichBtn.addEventListener('click', async () => {
+        errBox.textContent = '';
+        reenrichBtn.disabled = true;
+        const old = reenrichBtn.textContent;
+        reenrichBtn.textContent = 'Re-enriching…';
+        try {
+          const res = await fetch('/api/admin-url-cleanup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 're_enrich', id: parseInt(rowEl.dataset.id, 10) }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            errBox.textContent = data.error || `Error (${res.status})`;
+          } else if (data.poster) {
+            removeRow();
+            return;
+          } else {
+            errBox.textContent = 'Still no match — try fixing the title.';
+          }
+        } catch (e) {
+          errBox.textContent = 'Network error: ' + e.message;
+        }
+        reenrichBtn.disabled = false;
+        reenrichBtn.textContent = old;
+      });
+
+      titleInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); renameBtn.click(); }
+      });
+      renameBtn.addEventListener('click', async () => {
+        errBox.textContent = '';
+        const newTitle = titleInput.value.trim();
+        if (!newTitle) { errBox.textContent = 'Enter a title.'; return; }
+        renameBtn.disabled = true;
+        const old = renameBtn.textContent;
+        renameBtn.textContent = '…';
+        try {
+          const res = await fetch('/api/admin-url-cleanup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'fix_title', id: parseInt(rowEl.dataset.id, 10), new_title: newTitle }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            errBox.textContent = data.error || `Error (${res.status})`;
+            renameBtn.disabled = false;
+            renameBtn.textContent = old;
+          } else {
+            // fix_title re-enriches under the new name; the poster miss is
+            // resolved whether or not TMDB had artwork, so clear the card.
+            removeRow();
+          }
+        } catch (e) {
+          errBox.textContent = 'Network error: ' + e.message;
+          renameBtn.disabled = false;
+          renameBtn.textContent = old;
+        }
+      });
+    }
+
+    function refreshPosterCount() {
+      const root = document.getElementById('needsPoster');
+      const n = root.querySelectorAll('.row.needs-poster').length;
+      if (n === 0) {
+        root.innerHTML = '';
+      } else {
+        const head = root.querySelector('.section-head');
+        if (head) head.textContent = 'Missing posters';
+      }
+    }
+
     function renderConflicts(conflicts) {
       const root = document.getElementById('conflicts');
       if (!conflicts.length) { root.innerHTML = ''; return; }
@@ -543,10 +660,13 @@
         const shows = data.shows || [];
         const conflicts = data.conflicts || [];
         const mismatches = data.mismatches || [];
+        const needsPoster = data.needsPoster || [];
+        renderNeedsPoster(needsPoster);
         renderConflicts(conflicts);
         renderMismatches(mismatches);
         const queueSummary = `${shows.length} show${shows.length === 1 ? '' : 's'} remaining`;
         const extras = [];
+        if (needsPoster.length) extras.push(`${needsPoster.length} missing poster${needsPoster.length === 1 ? '' : 's'}`);
         if (conflicts.length) extras.push(`${conflicts.length} cross-network conflict${conflicts.length === 1 ? '' : 's'}`);
         if (mismatches.length) extras.push(`${mismatches.length} URL/network mismatch${mismatches.length === 1 ? 'es' : 'es'}`);
         remaining.textContent = extras.length ? `${queueSummary} · ${extras.join(' · ')}` : queueSummary;
