@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // Changelog, rendered from the shared /whats-new.json — the same single
 // source of truth the web page uses, so the platforms can't drift. The last
@@ -22,13 +23,25 @@ struct WhatsNewView: View {
     @State private var entries: [Entry] = []
     @State private var failed = false
 
-    // e.g. "Version 1.0.2 (15)" — read from the bundle so it always matches
-    // the running binary; this is what to ask a member for when debugging.
+    // e.g. "Version 1.0.2 (15) · iPhone" — read from the bundle so it always
+    // matches the running binary; this is what to ask a member for when
+    // debugging, and the platform settles "which app are you in?" up front.
     private var versionLine: String {
         let info = Bundle.main.infoDictionary
         let version = info?["CFBundleShortVersionString"] as? String ?? "?"
         let build = info?["CFBundleVersion"] as? String ?? "?"
-        return "Version \(version) (\(build))"
+        return "Version \(version) (\(build)) · \(platformName)"
+    }
+
+    private var platformName: String {
+        // The iPad build on an Apple silicon Mac still reports the .pad idiom.
+        if ProcessInfo.processInfo.isiOSAppOnMac { return "Mac" }
+        switch UIDevice.current.userInterfaceIdiom {
+        case .mac: return "Mac"
+        case .pad: return "iPad"
+        case .phone: return "iPhone"
+        default: return "iOS"
+        }
     }
 
     var body: some View {
