@@ -7,6 +7,10 @@ enum ShareAPI {
 
     enum APIError: Error {
         case notLoggedIn, encodingFailed, badResponse(Int)
+        // 409 from POST /api/shows — already on a list, or archived (server
+        // dedupes against the canonical title, so this fires even when the
+        // typed title is a near-match).
+        case duplicate(list: String?, archived: Bool)
     }
 
     static func addShow(
@@ -31,9 +35,16 @@ enum ShareAPI {
 
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (_, resp) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw APIError.badResponse((resp as? HTTPURLResponse)?.statusCode ?? -1)
+            let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
+            if status == 401 { throw APIError.notLoggedIn }
+            if status == 409 {
+                struct ErrBody: Decodable { let error: String?; let list: String? }
+                let b = try? JSONDecoder().decode(ErrBody.self, from: data)
+                throw APIError.duplicate(list: b?.list, archived: b?.error == "exists_archived")
+            }
+            throw APIError.badResponse(status)
         }
     }
 }

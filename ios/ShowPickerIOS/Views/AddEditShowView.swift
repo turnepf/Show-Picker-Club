@@ -135,6 +135,7 @@ struct AddEditShowView: View {
 
     private func save() async {
         saving = true
+        errorText = nil
         defer { saving = false }
         let t = title.trimmingCharacters(in: .whitespaces)
         let net = network.isEmpty ? nil : network
@@ -172,8 +173,30 @@ struct AddEditShowView: View {
             }
             await onSave()
             dismiss()
+        } catch let API.APIError.rejected(rej) {
+            // The server dedupes against the canonical (TMDB) title, which can
+            // differ from what was typed — so a duplicate can slip past the
+            // pre-save check above and come back as a 409 here.
+            switch rej.code {
+            case "exists_archived" where rej.id != nil:
+                if let canon = rej.title { title = canon }
+                restoreId = rej.id
+                showingRestorePrompt = true
+            case "exists_active":
+                let canon = rej.title ?? t
+                let listName = rej.list.flatMap { ShowList(rawValue: $0)?.title }
+                errorText = "“\(canon)” is already on \(listName.map { "your \($0) list" } ?? "one of your lists")."
+            case "rate_limited":
+                errorText = "Daily add limit reached. Try again tomorrow."
+            default:
+                errorText = rej.status == 401
+                    ? "Couldn't save — you're logged out. Sign in again from Home."
+                    : "Couldn't save. Try again."
+            }
+        } catch let e as API.APIError where e.status == 401 {
+            errorText = "Couldn't save — you're logged out. Sign in again from Home."
         } catch {
-            errorText = "Couldn't save. Are you logged in?"
+            errorText = "Couldn't save. Check your connection and try again."
         }
     }
 
@@ -185,8 +208,10 @@ struct AddEditShowView: View {
             try await API.restoreShow(id: id, to: list.rawValue)
             await onSave()
             dismiss()
+        } catch let e as API.APIError where e.status == 401 {
+            errorText = "Couldn't restore — you're logged out. Sign in again from Home."
         } catch {
-            errorText = "Couldn't restore. Are you logged in?"
+            errorText = "Couldn't restore. Check your connection and try again."
         }
     }
 }

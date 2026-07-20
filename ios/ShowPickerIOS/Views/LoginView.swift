@@ -208,9 +208,9 @@ struct LoginView: View {
                 case .success: dismiss()
                 case .needsName: show(.name)
                 }
-            } catch API.APIError.badResponse(401) {
+            } catch let e as API.APIError where e.status == 401 {
                 errorText = "That Apple ID isn't linked to a member yet. Pick \"Share My Email\" with the address the owner has on file, or continue with email."
-            } catch API.APIError.badResponse(429) {
+            } catch let e as API.APIError where e.status == 429 {
                 errorText = "Signups are paused right now. Try again tomorrow."
             } catch {
                 // 404/403/5xx or no network — distinct from an unrecognized member.
@@ -269,7 +269,7 @@ struct LoginView: View {
                 case .needsName: show(.name)   // valid signup code, no account yet
                 }
             }
-        } catch API.APIError.badResponse(429) {
+        } catch let e as API.APIError where e.status == 429 {
             errorText = "Too many attempts. Try again in 15 minutes."
             code = ""
         } catch {
@@ -295,11 +295,11 @@ struct LoginView: View {
                                       fullName: name)
                 dismiss()
             }
-        } catch API.APIError.badResponse(409) {
+        } catch let e as API.APIError where e.status == 409 {
             errorText = "That email already belongs to a member — go back and log in."
-        } catch API.APIError.badResponse(429) {
+        } catch let e as API.APIError where e.status == 429 {
             errorText = "Signups are paused right now. Try again tomorrow."
-        } catch API.APIError.badResponse(403) {
+        } catch let e as API.APIError where e.status == 403 {
             errorText = "Signups are closed right now."
         } catch {
             errorText = "Couldn't create your account. Try again."

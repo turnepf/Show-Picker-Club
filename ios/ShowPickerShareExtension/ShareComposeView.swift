@@ -92,6 +92,11 @@ struct ShareComposeView: View {
             onComplete()
         } catch ShareAPI.APIError.notLoggedIn {
             errorText = "Not logged in — open Show Picker Club first."
+        } catch ShareAPI.APIError.duplicate(let dupList, let archived) {
+            let listName = dupList.flatMap { ShareList(rawValue: $0)?.label }
+            errorText = archived
+                ? "“\(t)” is in your archive — restore it from the app."
+                : "“\(t)” is already on \(listName.map { "your \($0) list" } ?? "one of your lists")."
         } catch {
             errorText = "Couldn't save — check your connection."
         }
