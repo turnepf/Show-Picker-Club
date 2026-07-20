@@ -3,6 +3,11 @@
   "coming_soon": [],
   "entries": [
     {
+      "date": "7/20",
+      "title": "Export your lists.",
+      "body": "Take your shows with you anytime — no lock-in. Open the account menu and choose Export my lists to get a plain-text file with every list (Watching, Awaiting, Loved, Next Up) and each show's network and watch link. On the web it downloads a .txt file; on iPhone and iPad it opens the share sheet so you can drop it into Notes, Messages, Files, or anywhere else. Live on the web now; iPhone and iPad get it in the next app build."
+    },
+    {
       "date": "7/19",
       "title": "Home-screen widgets on iPhone, iPad, and Mac.",
       "body": "App version 1.0.3 brings two widgets: Trending (what the club is picking up right now) and Upcoming Premieres (your next premieres from Watching and Awaiting, by date), in small, medium, and large sizes — plus an iPhone Lock Screen version of Upcoming. Tap any show to jump straight to its card in the app."
