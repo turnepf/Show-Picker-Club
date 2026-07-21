@@ -51,14 +51,16 @@ struct ShowDetailView: View {
                     VStack(alignment: .leading, spacing: 24) {
                         heroImage
                             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        // Description under the image, filling the space the tall
-                        // info column would otherwise leave blank on the left.
+                        // Description + cast under the image, filling the space the
+                        // tall info column would otherwise leave blank on the left,
+                        // so the whole screen fits without scrolling.
                         if let ov = show?.overview, !ov.isEmpty {
                             Text(ov)
                                 .font(.system(size: 24))
                                 .foregroundColor(Theme.muted)
                                 .frame(maxWidth: 720, alignment: .leading)
                         }
+                        castSection
                     }
 
                     VStack(alignment: .leading, spacing: 22) {
@@ -106,26 +108,6 @@ struct ShowDetailView: View {
                     }
                     Spacer()
                 }
-
-                // Cast sits below the image/info block, under the description on
-                // the left, with the creator/director grouped under it.
-                if !cast.isEmpty || (show?.director.map { !$0.isEmpty } ?? false) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Cast")
-                            .font(.system(size: 30, weight: .semibold))
-                            .foregroundColor(Theme.text)
-                        if !cast.isEmpty {
-                            Text(cast.prefix(10).map { $0.name }.joined(separator: ", "))
-                                .font(.system(size: 24))
-                                .foregroundColor(Theme.muted)
-                        }
-                        if let s = show, let d = s.director, !d.isEmpty {
-                            Text("\(s.directorLabel): \(d)")
-                                .font(.system(size: 24))
-                                .foregroundColor(Theme.muted)
-                        }
-                    }
-                }
             }
             .padding(60)
         }
@@ -171,13 +153,18 @@ struct ShowDetailView: View {
                     }
                 }
                 // Archive on its own row so the list row isn't crowded and the
-                // focused button has room to scale up.
+                // focused button has room to scale up. Not role:.destructive —
+                // that painted the pill red with red text, unreadable until
+                // focused. A red box icon + white label reads in both states.
                 if let m = mineActive {
-                    Button(role: .destructive) { Task { await archive(m.id) } } label: {
-                        Label("Archive", systemImage: "archivebox")
-                            .font(.system(size: 24, weight: .semibold))
-                            .lineLimit(1)
-                            .fixedSize()
+                    Button { Task { await archive(m.id) } } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "archivebox").foregroundColor(.red)
+                            Text("Archive").foregroundColor(Theme.text)
+                        }
+                        .font(.system(size: 24, weight: .semibold))
+                        .lineLimit(1)
+                        .fixedSize()
                     }
                     .buttonStyle(.bordered)
                     .disabled(working)
@@ -284,6 +271,29 @@ struct ShowDetailView: View {
         let t = (show?.title ?? initialTitle).lowercased()
         let mine = (try? await API.myShows(slug: slug, includeArchived: true)) ?? []
         myCopy = mine.first { $0.title.lowercased() == t }
+    }
+
+    // Cast + creator, sitting under the description on the left so it fills the
+    // space beside the tall info column instead of pushing below the fold.
+    @ViewBuilder private var castSection: some View {
+        if !cast.isEmpty || (show?.director.map { !$0.isEmpty } ?? false) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Cast")
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundColor(Theme.text)
+                if !cast.isEmpty {
+                    Text(cast.prefix(10).map { $0.name }.joined(separator: ", "))
+                        .font(.system(size: 24))
+                        .foregroundColor(Theme.muted)
+                }
+                if let s = show, let d = s.director, !d.isEmpty {
+                    Text("\(s.directorLabel): \(d)")
+                        .font(.system(size: 24))
+                        .foregroundColor(Theme.muted)
+                }
+            }
+            .frame(maxWidth: 720, alignment: .leading)
+        }
     }
 
     // The big left-hand image: the landscape backdrop shown whole (scaledToFit,
