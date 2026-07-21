@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       file:
-        description: "Migration file (path from repo root) to apply to shows-db"
+        description: "Migration file to apply to shows-db (filename or repo-root path; a bare NNN_*.sql is resolved under migrations/)"
         required: true
         default: "migrations/015_seasons_released.sql"
 
@@ -32,4 +32,19 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: wrangler d1 execute shows-db --remote --file="${{ inputs.file }}"
+        run: |
+          FILE="${{ inputs.file }}"
+          # Accept a bare filename (e.g. "043_foo.sql") as well as a full
+          # repo-root path — resolve the bare form under migrations/ so a
+          # missing prefix doesn't fail with "Unable to read SQL text file".
+          case "$FILE" in
+            */*) : ;;
+            *)   FILE="migrations/$FILE" ;;
+          esac
+          if [ ! -f "$FILE" ]; then
+            echo "::error::Migration file not found: $FILE"
+            echo "Available migrations:"; ls migrations/
+            exit 1
+          fi
+          echo "Applying $FILE"
+          wrangler d1 execute shows-db --remote --file="$FILE"
