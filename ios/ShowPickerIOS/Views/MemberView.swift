@@ -389,10 +389,9 @@ struct MemberView: View {
                 // A premiere date shows on EVERY list — a Loved show that
                 // drops a surprise season is exactly what to surface.
                 if s.nextUpRange != nil, let line = nextUpLine(s) {
-                    Label(line, systemImage: "calendar")
+                    Text(line)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .labelStyle(.titleAndIcon)
                 } else if let seasons = s.seasonsText {
                     Text(seasons)
                         .font(.caption)
