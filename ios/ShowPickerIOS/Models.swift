@@ -373,6 +373,21 @@ struct SubscriptionAudit: Codable {
     let today: String
     let services: [SubscriptionService]
     let totals: SubscriptionTotals
+    // Household members pooled into this audit (nil/empty = just me).
+    let household: [HouseholdMember]?
+}
+
+// A club member the audit can pool in (slug + first-name display label).
+struct HouseholdMember: Codable, Identifiable {
+    let slug: String
+    let name: String
+    var id: String { slug }
+}
+
+// Roster + current selection for the household picker (GET /api/household).
+struct HouseholdInfo: Codable {
+    let household: [String]
+    let members: [HouseholdMember]
 }
 
 struct SubscriptionTotals: Codable {

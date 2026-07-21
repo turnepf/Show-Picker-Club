@@ -165,6 +165,20 @@
     </div>
   </div>
 
+  <div class="modal-overlay hidden" id="householdOverlay" onclick="closeHouseholdModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <h2>Your household</h2>
+      <p style="font-size:13px;color:var(--ink-muted);line-height:1.5;margin-bottom:4px;">
+        Check the members you share streaming services with. Your audit pools everyone's shows, so a service someone in the household is watching counts as one to keep.
+      </p>
+      <div id="householdList" style="display:flex;flex-direction:column;gap:2px;margin:10px 0;max-height:50vh;overflow:auto;">Loading&hellip;</div>
+      <div class="modal-actions">
+        <button type="button" class="cancel" onclick="closeHouseholdModal()">Cancel</button>
+        <button type="button" class="submit" onclick="submitHousehold()">Save</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script>
@@ -325,6 +339,16 @@
         ${savingsBlock}
       </div>`;
 
+      // Household: pool other members' shows into the audit.
+      const hh = data.household || [];
+      const hhText = hh.length
+        ? `Including you + ${hh.map(m => escapeHtml(m.name)).join(', ')}`
+        : 'Auditing just your shows';
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--surface,#fff);border:1px solid var(--border-soft,#e5e5e5);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:14px;">
+        <span>&#128106; ${hhText}</span>
+        <button id="householdBtn" type="button" style="background:none;border:1px solid var(--accent,#6b5cff);color:var(--accent,#6b5cff);border-radius:6px;padding:6px 12px;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap;">${hh.length ? 'Edit household' : 'Add household'}</button>
+      </div>`;
+
       let idx = 0;
       for (const b of BUCKETS) {
         const items = data.services.filter(s => b.verdicts.includes(s.verdict));
@@ -371,6 +395,48 @@
       });
       const addBtn = document.getElementById('addBtn');
       if (addBtn) addBtn.addEventListener('click', openAddModal);
+      const hhBtn = document.getElementById('householdBtn');
+      if (hhBtn) hhBtn.addEventListener('click', openHousehold);
+    }
+
+    // Household picker: load the roster + current selection, let the member
+    // check who they share services with, save, and re-run the audit.
+    async function openHousehold() {
+      const list = document.getElementById('householdList');
+      list.innerHTML = 'Loading&hellip;';
+      document.getElementById('householdOverlay').classList.remove('hidden');
+      try {
+        const res = await fetch('/api/household');
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        const selected = new Set(data.household || []);
+        const rows = (data.members || []).map(m => `
+          <label style="display:flex;align-items:center;gap:10px;padding:9px 4px;cursor:pointer;border-bottom:1px solid var(--border-soft,#eee);">
+            <input type="checkbox" value="${escapeHtml(m.slug)}" ${selected.has(m.slug) ? 'checked' : ''} style="width:18px;height:18px;">
+            <span>${escapeHtml(m.name)}</span>
+          </label>`).join('');
+        list.innerHTML = rows || '<div style="color:var(--ink-muted);font-size:13px;padding:8px 0;">No other members to add yet.</div>';
+      } catch {
+        list.innerHTML = '<div style="color:var(--danger-deep,#c0392b);font-size:13px;padding:8px 0;">Couldn\'t load members — try again.</div>';
+      }
+    }
+    function closeHouseholdModal(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('householdOverlay').classList.add('hidden');
+    }
+    async function submitHousehold() {
+      const checked = [...document.querySelectorAll('#householdList input[type=checkbox]:checked')].map(c => c.value);
+      try {
+        const res = await fetch('/api/household', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ members: checked }),
+        });
+        if (!res.ok) { toast('Could not save household'); return; }
+        document.getElementById('householdOverlay').classList.add('hidden');
+        toast('Household saved');
+        await load();
+      } catch { toast('Network error'); }
     }
 
     async function save(network, fields, msg) {
