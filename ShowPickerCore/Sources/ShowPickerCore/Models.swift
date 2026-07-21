@@ -172,6 +172,16 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         return "\(n) season\(n == 1 ? "" : "s")"
     }
 
+    // Combined series line for the detail screen: "4 Seasons, Complete" while
+    // ended, "2 Seasons" while running, or just "Complete" when the count is
+    // unknown. nil when neither a count nor the ended flag is set.
+    public var seriesText: String? {
+        var parts: [String] = []
+        if let n = seasonsReleased, n > 0 { parts.append("\(n) Season\(n == 1 ? "" : "s")") }
+        if isFullSeries { parts.append("Complete") }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
+
     // Format an ISO "YYYY-MM-DD" as "M/D", matching the web's formatDate.
     private func monthDay(_ s: String?) -> String? {
         guard let s, !s.isEmpty else { return nil }

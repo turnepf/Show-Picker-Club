@@ -24,7 +24,6 @@ struct ShowDetailView: View {
     @State private var openFailed = false
     @State private var working = false
     @State private var actionMessage: String?
-    @State private var posterExpanded = false
     @Environment(\.openURL) private var openURL
 
     private var posterUrlString: String? {
@@ -66,20 +65,10 @@ struct ShowDetailView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
                 HStack(alignment: .top, spacing: 50) {
-                    // Click the poster to view it full screen (click again to
-                    // come back). The no-poster gradient tile stays inert.
-                    if posterUrlString != nil {
-                        Button { posterExpanded = true } label: {
-                            detailPoster
-                                .frame(width: 300, height: 450)
-                                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        }
-                        .buttonStyle(PushButtonStyle())
-                    } else {
-                        detailPoster
-                            .frame(width: 300, height: 450)
-                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    }
+                    // Poster is display-only — no tap-to-enlarge.
+                    detailPoster
+                        .frame(width: 300, height: 450)
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 22) {
                         Text(title)
@@ -106,9 +95,6 @@ struct ShowDetailView: View {
                             if let s = show, s.isMovie {
                                 Text("Movie").foregroundColor(Theme.text.opacity(0.5))
                             }
-                            if let s = show, s.isFullSeries {
-                                Text("🎬 Complete")
-                            }
                         }
                         .font(.system(size: 26))
 
@@ -126,15 +112,23 @@ struct ShowDetailView: View {
                     Spacer()
                 }
 
-                // Cast sits directly under the title/info block, above the actions.
-                if !cast.isEmpty {
+                // Cast sits directly under the title/info block, above the
+                // actions, with the creator/director grouped under it.
+                if !cast.isEmpty || (show?.director.map { !$0.isEmpty } ?? false) {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Cast")
                             .font(.system(size: 30, weight: .semibold))
                             .foregroundColor(Theme.text)
-                        Text(cast.prefix(10).map { $0.name }.joined(separator: ", "))
-                            .font(.system(size: 24))
-                            .foregroundColor(Theme.muted)
+                        if !cast.isEmpty {
+                            Text(cast.prefix(10).map { $0.name }.joined(separator: ", "))
+                                .font(.system(size: 24))
+                                .foregroundColor(Theme.muted)
+                        }
+                        if let s = show, let d = s.director, !d.isEmpty {
+                            Text("\(s.directorLabel): \(d)")
+                                .font(.system(size: 24))
+                                .foregroundColor(Theme.muted)
+                        }
                     }
                 }
 
@@ -144,64 +138,63 @@ struct ShowDetailView: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .task { await load() }
-        .fullScreenCover(isPresented: $posterExpanded) {
-            if let p = posterUrlString {
-                FullScreenPosterTV(url: p)
-            }
-        }
     }
 
     // Add-to-my-list (when signed in and it isn't already mine) or move-between-
     // lists (when it's my own show). Mirrors the iOS detail actions; editing,
     // sharing, and the calendar feed stay off the TV.
+    // The four list chips ARE the move/add control: select one to move an
+    // active copy to that list, restore an archived one, or add the show if I
+    // don't have it. A checkmark marks the list it's currently on. Archive
+    // stays as a separate action for a copy I actively have.
     @ViewBuilder private var actionsSection: some View {
         if auth.memberSlug != nil, (show != nil || id == nil) {
+            let cur = mineActive.flatMap { ShowList(rawValue: $0.list) }
             VStack(alignment: .leading, spacing: 14) {
-                if let m = mineActive, let cur = ShowList(rawValue: m.list) {
-                    // On one of my lists → move it around or archive it.
-                    Text("Move to")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundColor(Theme.text)
-                    HStack(spacing: 24) {
-                        ForEach(ShowList.allCases.filter { $0 != cur }) { l in
-                            Button(l.title) { Task { await moveTo(l, id: m.id) } }
-                                .disabled(working)
+                Text("My Lists")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundColor(Theme.text)
+                HStack(spacing: 20) {
+                    ForEach(ShowList.allCases) { l in
+                        Button { Task { await chipTap(l) } } label: {
+                            HStack(spacing: 8) {
+                                if cur == l { Image(systemName: "checkmark.circle.fill") }
+                                Text(l.title)
+                            }
+                            .font(.system(size: 24, weight: .semibold))
                         }
+                        .tint(Theme.listColor(l.rawValue))
+                        .disabled(working)
+                    }
+                    if let m = mineActive {
                         Button(role: .destructive) { Task { await archive(m.id) } } label: {
                             Label("Archive", systemImage: "archivebox")
                         }
                         .disabled(working)
                     }
-                } else if let m = mineArchived {
-                    // Archived → drop it back onto any list.
-                    Text("Archived — add back to")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundColor(Theme.text)
-                    HStack(spacing: 24) {
-                        ForEach(ShowList.allCases) { l in
-                            Button(l.title) { Task { await restore(l, id: m.id) } }
-                                .disabled(working)
-                        }
-                    }
-                } else {
-                    // Not on my lists → add it to any list.
-                    Text("Add to my list")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundColor(Theme.text)
-                    HStack(spacing: 24) {
-                        ForEach(ShowList.allCases) { l in
-                            Button(l.title) { Task { await addToMyList(l) } }
-                                .disabled(working)
-                        }
-                    }
                 }
-
+                if mineArchived != nil {
+                    Text("Archived — pick a list to add it back")
+                        .font(.system(size: 22))
+                        .foregroundColor(Theme.muted)
+                }
                 if let actionMessage {
                     Text(actionMessage)
                         .font(.system(size: 22))
                         .foregroundColor(Theme.muted)
                 }
             }
+        }
+    }
+
+    private func chipTap(_ list: ShowList) async {
+        if let m = mineActive {
+            if m.list == list.rawValue { return }
+            await moveTo(list, id: m.id)
+        } else if let m = mineArchived {
+            await restore(list, id: m.id)
+        } else {
+            await addToMyList(list)
         }
     }
 
@@ -224,7 +217,7 @@ struct ShowDetailView: View {
             // controls appear.
             await refreshMyCopy()
             actionMessage = mineArchived != nil
-                ? "“\(addTitle)” is archived — use “add back to” below."
+                ? "“\(addTitle)” is archived — pick a list to add it back."
                 : "“\(addTitle)” is already on one of your lists."
         } catch API.APIError.badResponse(401) {
             actionMessage = "You're logged out — sign in again from the Account tab."
@@ -284,33 +277,6 @@ struct ShowDetailView: View {
         myCopy = mine.first { $0.title.lowercased() == t }
     }
 
-    // Full-screen poster: the whole screen is one button, so a click on the
-    // remote sends it back to the thumbnail (Menu/back works too).
-    private struct FullScreenPosterTV: View {
-        let url: String
-        @Environment(\.dismiss) private var dismiss
-
-        var body: some View {
-            Button { dismiss() } label: {
-                ZStack {
-                    Color.black
-                    if let u = URL(string: url) {
-                        AsyncImage(url: u) { phase in
-                            if let image = phase.image {
-                                image.resizable().scaledToFit()
-                            } else {
-                                ProgressView()
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .buttonStyle(.plain)
-            .ignoresSafeArea()
-        }
-    }
-
     // Portrait poster when we have one; otherwise a gradient tile with the
     // title so un-enriched shows still read clearly.
     @ViewBuilder private var detailPoster: some View {
@@ -353,11 +319,11 @@ struct ShowDetailView: View {
             if let w = s.watchingWith, !w.isEmpty {
                 Text("Watching with \(w)").foregroundColor(Theme.text.opacity(0.7))
             }
+            if let series = s.seriesText {
+                Text(series).foregroundColor(Theme.text.opacity(0.7))
+            }
             if let extra = extraMetaLine(s) {
                 Text(extra).foregroundColor(Theme.text.opacity(0.7))
-            }
-            if let d = s.director, !d.isEmpty {
-                Text("\(s.directorLabel): \(d)").foregroundColor(Theme.text.opacity(0.7))
             }
             if let notes = s.notes, !notes.isEmpty {
                 Text(notes).italic().foregroundColor(Theme.muted)
@@ -379,13 +345,12 @@ struct ShowDetailView: View {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    // "Next episode: 6/29 · 3 seasons" — the same M/D formatting and seasons
-    // count the iOS rows use, instead of raw ISO dates.
+    // "Next episode: 6/29" — the same M/D formatting the iOS rows use, instead
+    // of raw ISO dates.
     private func seasonLine(_ s: Show) -> String? {
-        var parts: [String] = []
-        if let r = s.nextUpRange { parts.append("Next episode: \(r)") }
-        if let seasons = s.seasonsText { parts.append(seasons) }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+        // Season count now lives in the combined series line (seriesText).
+        guard let r = s.nextUpRange else { return nil }
+        return "Next episode: \(r)"
     }
 
     @ViewBuilder private var watchButton: some View {
