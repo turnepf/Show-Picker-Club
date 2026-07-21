@@ -49,10 +49,11 @@ struct ShowDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 40) {
-                // One image, not two: the poster + info sit side-by-side below,
-                // so the backdrop hero shows only when there's no poster.
-                if posterUrlString == nil,
-                   let b = show?.backdropUrl, !b.isEmpty, let url = URL(string: b) {
+                // Large backdrop hero at the top. On the TV this is the big
+                // "show card" image; the portrait poster sits beside the info
+                // below, so both earn their place (unlike the web/phone, where
+                // they'd stack redundantly).
+                if let b = show?.backdropUrl, !b.isEmpty, let url = URL(string: b) {
                     AsyncImage(url: url) { phase in
                         if let img = phase.image {
                             img.resizable().scaledToFill()
@@ -397,12 +398,32 @@ struct ShowDetailView: View {
     }
 
     @ViewBuilder private var trailerButton: some View {
-        if let url = show?.trailerURL {
-            Button { openURL(url) } label: {
+        if let key = show?.trailerKey, !key.isEmpty {
+            Button { openTrailer(key: key) } label: {
                 Label("Trailer", systemImage: "play.rectangle.fill")
                     .font(.system(size: 26, weight: .semibold))
                     .padding(.vertical, 8)
             }
+        }
+    }
+
+    // tvOS has no web browser, so a trailer can only open in the YouTube app.
+    // Try the app's URL scheme first (lands right on the video), then the https
+    // universal link. Both require YouTube to be installed on the Apple TV — if
+    // it isn't, neither opens (openURL just reports not-accepted and nothing
+    // happens), which is why the button looked dead without it.
+    private func openTrailer(key: String) {
+        let candidates = [
+            "youtube://watch?v=\(key)",
+            "https://www.youtube.com/watch?v=\(key)",
+        ].compactMap { URL(string: $0) }
+        openFirstAvailable(candidates)
+    }
+
+    private func openFirstAvailable(_ urls: [URL]) {
+        guard let first = urls.first else { return }
+        openURL(first) { accepted in
+            if !accepted { openFirstAvailable(Array(urls.dropFirst())) }
         }
     }
 
