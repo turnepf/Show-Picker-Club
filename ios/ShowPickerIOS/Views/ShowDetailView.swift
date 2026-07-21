@@ -41,14 +41,16 @@ struct ShowDetailView: View {
                 Section {
                     AsyncImage(url: url) { phase in
                         if let img = phase.image {
-                            img.resizable().scaledToFill()
+                            img.resizable().scaledToFit()
                         } else {
                             Color(.secondarySystemBackground)
                         }
                     }
+                    // Keep the backdrop's natural 16:9 shape so it fills the
+                    // width without cropping. A fixed short height + scaledToFill
+                    // chopped the image badly on wide iPad / Mac windows.
+                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 180)
-                    .clipped()
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
                 }
