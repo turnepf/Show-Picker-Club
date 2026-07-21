@@ -228,6 +228,11 @@
       background: var(--chip-color);
       color: #fff;
     }
+    /* Read-only four-across list chips on the detail screen (not a picker). */
+    .detail-list-chips { grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 12px 16px; margin-bottom: 0; }
+    .detail-list-chips .list-chip { cursor: pointer; height: 32px; font-size: 11px; }
+    .detail-list-chips .list-chip:hover { background: color-mix(in oklch, var(--chip-color) 14%, transparent); }
+    .detail-list-chips .list-chip.selected:hover { background: var(--chip-color); }
     .show-via { color: var(--list-recommending); font-size: 12px; font-style: italic; white-space: nowrap; }
     .show-on { color: var(--ink-quiet); font-size: 13px; }
     .show-watching-with { color: var(--ink-muted); font-size: 13px; white-space: nowrap; }
@@ -1027,7 +1032,6 @@
     .detail-poster img {
       width: 160px; max-width: 45%; height: auto;
       border-radius: 12px; box-shadow: var(--shadow-card, 0 4px 16px rgba(0,0,0,0.18));
-      cursor: zoom-in;
     }
     /* Click the detail poster to view it full screen; click again to close. */
     .poster-lightbox {
@@ -3766,35 +3770,27 @@
       const rows = [];
       // Single audience score, sourced from TMDB (`rating` carries it now).
       if (show.rating) rows.push(detailRow('TMDB Rating', `★ ${escapeHtml(show.rating)}`));
-      // Reflect MY status, not the copy that opened this screen.
-      if (detailMyCopy && !detailMyCopy.archived) {
-        rows.push(detailRow('List', LIST_LABELS[detailMyCopy.list] || detailMyCopy.list));
-      } else if (detailMyCopy && detailMyCopy.archived) {
-        rows.push(detailRow('List', 'Archived'));
-      }
+      // The list + the member-edited fields (recommender, watching-with, notes)
+      // live in the separate "My Lists" section built below — they're member
+      // specific, not catalog data, so they're not in these rows.
       if (show.movie) rows.push(detailRow('Type', 'Movie'));
       if (show.full_series) rows.push(detailRow('Series', 'Complete'));
       if (show.genres) rows.push(detailRow('Genres', escapeHtml(show.genres)));
-      // Recommended-by / watching-with / notes are per-member, so they reflect
-      // MY copy — not whatever row (a trending pick, or another member's list)
-      // opened this screen. Hidden if I don't have this title.
-      if (detailMyCopy && detailMyCopy.recommended_by) rows.push(detailRow('Recommended by', escapeHtml(detailMyCopy.recommended_by)));
-      if (detailMyCopy && detailMyCopy.watching_with) rows.push(detailRow('Watching with', escapeHtml(detailMyCopy.watching_with)));
       if (show.next_season_date) rows.push(detailRow('Next episode', escapeHtml(formatSeasonRange(show))));
       if (seasonsText(show)) rows.push(detailRow('Seasons', escapeHtml(seasonsText(show))));
       if (show.content_rating) rows.push(detailRow('Rated', escapeHtml(show.content_rating)));
       if (show.release_year) rows.push(detailRow('Year', escapeHtml(String(show.release_year))));
       if (show.runtime) rows.push(detailRow('Runtime', escapeHtml(runtimeText(show.runtime))));
-      // Creator/Director is grouped under the Cast card (built below), not in
-      // the metadata rows. Link a single-person credit to their IMDB page
+      // Creator/Director renders as a standard label/value row grouped in the
+      // Cast card (built below). Link a single-person credit to their IMDB page
       // (mirrors the cast links); a multi-creator credit (comma in the name)
       // stays plain so the whole list doesn't point at just the first person.
-      let creatorLine = '';
+      let creatorRow = '';
       if (show.director) {
         const dirVal = (show.director_imdb_id && !show.director.includes(','))
           ? `<a href="https://www.imdb.com/name/${encodeURIComponent(show.director_imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(show.director)}</a>`
           : escapeHtml(show.director);
-        creatorLine = `<div class="detail-prose" style="margin-top:8px;"><strong>${show.movie ? 'Director' : 'Creator'}:</strong> ${dirVal}</div>`;
+        creatorRow = detailRow(show.movie ? 'Director' : 'Creator', dirVal);
       }
 
       let html = '';
@@ -3803,56 +3799,58 @@
       if (show.backdrop_url) {
         html += `<div class="detail-backdrop" style="width:100%;margin-bottom:12px;"><img src="${safeUrl(show.backdrop_url)}" alt="" loading="lazy" style="width:100%;border-radius:10px;display:block;"></div>`;
       } else if (show.poster_url) {
-        html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy" onclick="togglePosterLightbox(this)"></div>`;
+        // No tap-to-enlarge — the affordance confused people.
+        html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy"></div>`;
       }
       // Overview (plot synopsis) sits right under the title/image.
       if (show.overview) html += `<div class="detail-card"><div class="detail-card-title">Overview</div><div class="detail-prose">${escapeHtml(show.overview)}</div></div>`;
       // Top card: Network, then Trailer.
       if (topRows.length) html += `<div class="detail-card">${topRows.join('')}</div>`;
       // Cast — with the creator/director grouped underneath — directly under
-      // the trailer.
-      if (actors.length || creatorLine) {
+      // the trailer, both as standard label/value rows (names right-aligned).
+      if (actors.length || creatorRow) {
         let castInner = '';
         if (actors.length) {
           const cast = actors.map(a => a.imdb_id
             ? `<a href="https://www.imdb.com/name/${encodeURIComponent(a.imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(a.name)}</a>`
             : escapeHtml(a.name)).join(', ');
-          castInner += `<div class="detail-prose">${cast}</div>`;
+          castInner += detailRow('Cast', cast);
         }
-        castInner += creatorLine;
-        html += `<div class="detail-card"><div class="detail-card-title">Cast</div>${castInner}</div>`;
+        castInner += creatorRow;
+        html += `<div class="detail-card">${castInner}</div>`;
       }
-      // The rest of the metadata (rating, list, genres, dates, creator, …).
+      // My-lists / member section — for logged-in members. The four list chips
+      // ARE the move/add control: tap a chip to put the show on that list (move
+      // an active copy, restore an archived one, or add it if I don't have it).
+      // The member-edited fields (recommender, watching-with, notes) show when
+      // I have the title.
+      if (loggedIn) {
+        const curList = (detailMyCopy && !detailMyCopy.archived) ? detailMyCopy.list : null;
+        const chipColor = { watching: 'var(--list-watching)', waiting: 'var(--list-waiting)', recommending: 'var(--list-recommending)', next: 'var(--accent)' };
+        const chips = ALL_LISTS.map(l =>
+          `<div class="list-chip${l === curList ? ' selected' : ''}" style="--chip-color: ${chipColor[l]};" onclick="detailChip('${l}')">${escapeHtml(LIST_LABELS[l] || l)}</div>`
+        ).join('');
+        let memberInner = `<div class="list-chips detail-list-chips">${chips}</div>`;
+        if (detailMyCopy && detailMyCopy.archived) memberInner += detailRow('Status', 'Archived');
+        if (detailMyCopy && detailMyCopy.recommended_by) memberInner += detailRow('Recommended by', escapeHtml(detailMyCopy.recommended_by));
+        if (detailMyCopy && detailMyCopy.watching_with) memberInner += detailRow('Watching with', escapeHtml(detailMyCopy.watching_with));
+        if (detailMyCopy && detailMyCopy.notes) memberInner += `<div class="detail-prose"><strong>Notes:</strong> ${escapeHtml(detailMyCopy.notes)}</div>`;
+        // Edit / Archive live here in the member section (only for a copy I
+        // actively have) — no separate actions card at the bottom.
+        if (detailMyCopy && !detailMyCopy.archived) {
+          memberInner += `<button class="detail-action" onclick="detailEdit(${detailMyCopy.id})">Edit</button>`;
+          memberInner += `<button class="detail-action danger" onclick="detailArchive(${detailMyCopy.id})">Archive</button>`;
+        }
+        html += `<div class="detail-card"><div class="detail-card-title">My Lists</div>${memberInner}</div>`;
+      }
+      // The remaining catalog data (rating, type, genres, dates, …), grouped in
+      // its own section below.
       if (rows.length) html += `<div class="detail-card">${rows.join('')}</div>`;
-      if (detailMyCopy && detailMyCopy.notes) html += `<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-prose">${escapeHtml(detailMyCopy.notes)}</div></div>`;
 
       // No "Watch on …" action here — the Network row above is the watch
       // link, and it renders whenever the same real URL exists.
-      const actions = [];
-      const mine = detailMyCopy;
-      if (mine && !mine.archived) {
-        // On one of my lists → friendly promotion labels for the moves each
-        // list is designed around (mirroring the iOS swipe labels), then
-        // plain "Move to X" for the rest, then edit/archive.
-        const promos = detailPromotions(mine.list);
-        promos.forEach(p =>
-          actions.push(`<button class="detail-action" onclick="detailMoveMine(${mine.id}, '${p.target}')">${escapeHtml(p.label)}</button>`));
-        ALL_LISTS.filter(l => l !== mine.list && !promos.some(p => p.target === l)).forEach(l =>
-          actions.push(`<button class="detail-action" onclick="detailMoveMine(${mine.id}, '${l}')">Move to ${escapeHtml(LIST_LABELS[l] || l)}</button>`));
-        actions.push(`<button class="detail-action" onclick="detailEdit(${mine.id})">Edit</button>`);
-        actions.push(`<button class="detail-action danger" onclick="detailArchive(${mine.id})">Archive</button>`);
-      } else if (mine && mine.archived) {
-        // Archived → add it back onto any list.
-        ALL_LISTS.forEach(l =>
-          actions.push(`<button class="detail-action" onclick="detailRestore(${mine.id}, '${l}')">Add back to ${escapeHtml(LIST_LABELS[l] || l)}</button>`));
-      } else if (loggedIn) {
-        // Not on my lists → add it to any list.
-        ALL_LISTS.forEach(l =>
-          actions.push(`<button class="detail-action" onclick="detailAdd('${l}')">Add to ${escapeHtml(LIST_LABELS[l] || l)}</button>`));
-      }
-      // No per-show "Share" here — the browser's own share button covers
-      // sharing the page, so a custom one would be redundant on web.
-      html += `<div class="detail-card">${actions.join('')}</div>`;
+      // Edit/Archive now live in the My Lists section above, and the browser's
+      // own share button covers sharing — so there's no actions card here.
 
       document.getElementById('detailBody').innerHTML = html;
     }
@@ -3870,6 +3868,21 @@
     async function reRenderDetail() {
       await resolveMyCopy();
       if (detailShow) renderDetail(detailShow, detailActors);
+    }
+
+    // The list chips on the detail screen double as the move/add control:
+    // move an active copy, restore an archived one, or add the show if I don't
+    // have it yet. Tapping the chip for the list it's already on is a no-op.
+    async function detailChip(list) {
+      const mine = detailMyCopy;
+      if (mine && !mine.archived) {
+        if (mine.list === list) return;
+        await detailMoveMine(mine.id, list);
+      } else if (mine && mine.archived) {
+        await detailRestore(mine.id, list);
+      } else {
+        await detailAdd(list);
+      }
     }
 
     async function detailMoveMine(id, list) {
@@ -3922,7 +3935,7 @@
         if (res.status === 409) {
           await reRenderDetail();
           showToast(detailMyCopy && detailMyCopy.archived
-            ? 'It’s archived — use “Add back to” below' : 'Already on one of your lists');
+            ? 'It’s archived — tap a list above to add it back' : 'Already on one of your lists');
           return;
         }
         if (!res.ok) { failToast(res, 'Couldn’t add'); return; }
