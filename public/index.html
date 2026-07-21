@@ -228,6 +228,9 @@
       background: var(--chip-color);
       color: #fff;
     }
+    /* Read-only four-across list chips on the detail screen (not a picker). */
+    .detail-list-chips { grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 12px 16px; margin-bottom: 0; }
+    .detail-list-chips .list-chip { cursor: default; height: 30px; font-size: 11px; }
     .show-via { color: var(--list-recommending); font-size: 12px; font-style: italic; white-space: nowrap; }
     .show-on { color: var(--ink-quiet); font-size: 13px; }
     .show-watching-with { color: var(--ink-muted); font-size: 13px; white-space: nowrap; }
@@ -3765,20 +3768,12 @@
       const rows = [];
       // Single audience score, sourced from TMDB (`rating` carries it now).
       if (show.rating) rows.push(detailRow('TMDB Rating', `★ ${escapeHtml(show.rating)}`));
-      // Reflect MY status, not the copy that opened this screen.
-      if (detailMyCopy && !detailMyCopy.archived) {
-        rows.push(detailRow('List', LIST_LABELS[detailMyCopy.list] || detailMyCopy.list));
-      } else if (detailMyCopy && detailMyCopy.archived) {
-        rows.push(detailRow('List', 'Archived'));
-      }
+      // The list + the member-edited fields (recommender, watching-with, notes)
+      // live in the separate "My Lists" section built below — they're member
+      // specific, not catalog data, so they're not in these rows.
       if (show.movie) rows.push(detailRow('Type', 'Movie'));
       if (show.full_series) rows.push(detailRow('Series', 'Complete'));
       if (show.genres) rows.push(detailRow('Genres', escapeHtml(show.genres)));
-      // Recommended-by / watching-with / notes are per-member, so they reflect
-      // MY copy — not whatever row (a trending pick, or another member's list)
-      // opened this screen. Hidden if I don't have this title.
-      if (detailMyCopy && detailMyCopy.recommended_by) rows.push(detailRow('Recommended by', escapeHtml(detailMyCopy.recommended_by)));
-      if (detailMyCopy && detailMyCopy.watching_with) rows.push(detailRow('Watching with', escapeHtml(detailMyCopy.watching_with)));
       if (show.next_season_date) rows.push(detailRow('Next episode', escapeHtml(formatSeasonRange(show))));
       if (seasonsText(show)) rows.push(detailRow('Seasons', escapeHtml(seasonsText(show))));
       if (show.content_rating) rows.push(detailRow('Rated', escapeHtml(show.content_rating)));
@@ -3822,9 +3817,25 @@
         castInner += creatorRow;
         html += `<div class="detail-card">${castInner}</div>`;
       }
-      // The rest of the metadata (rating, list, genres, dates, creator, …).
+      // My-lists / member section: the four lists with mine highlighted, plus
+      // the content only I edited (recommender, watching-with, notes). Only
+      // rendered when I actually have this title.
+      if (detailMyCopy) {
+        const curList = detailMyCopy.archived ? null : detailMyCopy.list;
+        const chipColor = { watching: 'var(--list-watching)', waiting: 'var(--list-waiting)', recommending: 'var(--list-recommending)', next: 'var(--accent)' };
+        const chips = ALL_LISTS.map(l =>
+          `<div class="list-chip${l === curList ? ' selected' : ''}" style="--chip-color: ${chipColor[l]};">${escapeHtml(LIST_LABELS[l] || l)}</div>`
+        ).join('');
+        let memberInner = `<div class="list-chips detail-list-chips">${chips}</div>`;
+        if (detailMyCopy.archived) memberInner += detailRow('Status', 'Archived');
+        if (detailMyCopy.recommended_by) memberInner += detailRow('Recommended by', escapeHtml(detailMyCopy.recommended_by));
+        if (detailMyCopy.watching_with) memberInner += detailRow('Watching with', escapeHtml(detailMyCopy.watching_with));
+        if (detailMyCopy.notes) memberInner += `<div class="detail-prose"><strong>Notes:</strong> ${escapeHtml(detailMyCopy.notes)}</div>`;
+        html += `<div class="detail-card"><div class="detail-card-title">My Lists</div>${memberInner}</div>`;
+      }
+      // The remaining catalog data (rating, type, genres, dates, …), grouped in
+      // its own section below.
       if (rows.length) html += `<div class="detail-card">${rows.join('')}</div>`;
-      if (detailMyCopy && detailMyCopy.notes) html += `<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-prose">${escapeHtml(detailMyCopy.notes)}</div></div>`;
 
       // No "Watch on …" action here — the Network row above is the watch
       // link, and it renders whenever the same real URL exists.
