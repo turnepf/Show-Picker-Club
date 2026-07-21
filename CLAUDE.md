@@ -111,6 +111,13 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
   the sequence. Give bare commands in separate code blocks and explain them
   in prose around the blocks instead.
 
+- **Walk operational procedures ONE step at a time.** For any multi-step
+  operator task (secrets, deploys, migrations, dashboard setup, DNS, etc.),
+  give a single step, then stop and wait for the user to confirm it's done
+  before giving the next. Never dump a numbered list of actions for them to
+  track — they don't want to keep up with a checklist. Lead with the most
+  urgent/blocking step first.
+
 - **Never watch PRs, CI, or deployments, and never offer to.** Watching burns
   tokens while polling. When work involves a PR or deploy, just give the link
   and let the user watch it themselves.
