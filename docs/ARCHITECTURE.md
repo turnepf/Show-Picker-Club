@@ -8,7 +8,7 @@ Implementation reference for the Show Picker Club codebase. For the user-facing 
 - **Backend:** Cloudflare Pages Functions. JavaScript modules under `functions/` route by file path.
 - **Database:** Cloudflare D1 (`shows-db`), serverless SQLite at the edge. Single `DB` binding in `wrangler.toml`.
 - **Frontend:** Static HTML/CSS/JS, no build step. Vanilla ES6 in `<script>` tags. Service worker for PWA install + offline shell.
-- **External APIs:** OMDB (ratings + canonical titles), TMDB (cast, season dates, genres), Anthropic Claude (vibe trait scoring, admin-only batch), Twilio (outbound SMS).
+- **External APIs:** TMDB (ratings, canonical titles, cast + actor IMDB ids, creator/director + IMDB id, season dates, genres), Anthropic Claude (vibe trait scoring, admin-only batch), Twilio (outbound SMS). *(OMDB retired 2026-07 — TMDB is the sole enrichment source.)*
 - **Backups:** Daily wrangler `d1 export` → Google Drive via rclone, GitHub Actions workflow.
 
 The `wrangler.toml` is minimal:
@@ -53,7 +53,7 @@ Login is by one-time code or Sign in with Apple — there are no stored password
 | `network`           | TEXT | |
 | `network_url`       | TEXT | Deep link to show on network site (or a search-page placeholder until upgraded). |
 | `recommended_by`    | TEXT | Free-text attribution. |
-| `rating`            | TEXT | IMDB rating string from OMDB. |
+| `rating`            | TEXT | Audience rating string. TMDB's score since 2026-07 (migration 043); was the IMDB score from OMDB before that. Drives Sort-by-Rating, member seeding, and vibe input. |
 | `list`              | TEXT NOT NULL | `watching` / `waiting` / `recommending` / `next`. |
 | `notes`             | TEXT | |
 | `movie`             | INTEGER DEFAULT 0 | Suppresses TMDB season lookups. |
@@ -66,15 +66,16 @@ Login is by one-time code or Sign in with Apple — there are no stored password
 | `created_at`        | TEXT | Default `datetime('now')`. May be NULL for seeded shows. |
 | `updated_at`        | TEXT | Default `datetime('now')`. Bumped by member edits (not enrichment). |
 | `added_by`          | TEXT | `'seed'` for seeded shows, otherwise editor email or `'Anonymous'` for public suggestions. |
-| `enriched_at`       | TEXT | Bumped by OMDB/TMDB enrichment so enrichment can prioritize stale rows. |
+| `enriched_at`       | TEXT | Bumped by TMDB enrichment so enrichment can prioritize stale rows. |
 | `genres`            | TEXT | Comma-separated, from TMDB. |
 | `sort_order`        | INTEGER | Position for the member's "My Order" manual sort (migration 033). NULL = never manually placed. Written only by `POST /api/shows/reorder`, which deliberately does **not** bump `updated_at`. |
 | `overview`          | TEXT | Plot synopsis from TMDB (migration 042). |
 | `backdrop_url`      | TEXT | Wide 16:9 hero image (TMDB `backdrop_path`, w780). Migration 042. |
-| `tmdb_rating`       | TEXT | TMDB audience score "x.y" — distinct from `rating` (the IMDB score from OMDB). Migration 042. |
+| `tmdb_rating`       | TEXT | TMDB audience score "x.y". Since 2026-07 (migration 043) `rating` carries the same TMDB score; `tmdb_rating` is retained because older app builds still read it. Migration 042. |
 | `content_rating`    | TEXT | US maturity certification (TV-MA, R, …). Migration 042. |
 | `trailer_key`       | TEXT | YouTube video key for the trailer. Migration 042. |
 | `director`          | TEXT | Director (movie) or creator(s) (TV). Migration 042. |
+| `director_imdb_id`  | TEXT | IMDB id (nm…) of the creator/director, from TMDB external_ids. The detail screen links the name to the IMDB person page, but only for a single-person credit. Migration 043. |
 | `runtime`           | INTEGER | Minutes. Migration 042. |
 | `release_year`      | INTEGER | First release / first-air year. Migration 042. |
 | `watch_link`        | TEXT | TMDB/JustWatch "where to watch" page. A **fallback only** — the UI prefers the real deep-link `network_url` and shows this aggregator page only when no deep link exists. Migration 042. |
@@ -87,7 +88,7 @@ Join table for per-show cast.
 | `id`       | INTEGER PK | |
 | `show_id`  | INTEGER REFERENCES shows(id) ON DELETE CASCADE | |
 | `name`     | TEXT NOT NULL | |
-| `imdb_id`  | TEXT | NULL for seeded rows and for OMDB-only enrichments. |
+| `imdb_id`  | TEXT | NULL for seeded rows and legacy enrichments that predate TMDB actor ids. |
 
 ### `sessions`
 | Column          | Type | Notes |
@@ -323,18 +324,13 @@ The deploy smoke test verifies these headers are present after each push.
 
 ## External APIs
 
-### OMDB
-- Env: `OMDB_API_KEY`.
-- Used by `_shared/enrichment.js` (`fetchEnrichment`), `enrich.js`, and `suggestions.js`.
-- Returns canonical title, IMDB rating, comma-separated actors. No IMDB IDs for individual actors.
-- Fallback path: tries exact title, "The " prefix, prefix stripped, collapsed-spaces title, then OMDB search endpoint.
-- Free tier is ~1000/day; on-demand enrichment is soft-capped at 50 per call.
+### OMDB (retired 2026-07)
+- Removed entirely. It used to supply the IMDB `rating` and a canonical-title override; the app now consolidates on TMDB's audience score (`rating` carries it — migration 043) and drops the `OMDB_API_KEY` secret. Kept here as a note so old references in commit history make sense.
 
 ### TMDB
 - Env: `TMDB_API_KEY` (legacy v3 key for some calls), `TMDB_TOKEN` (v4 bearer token).
-- Used by `_shared/enrichment.js` and `enrich.js`.
-- Returns canonical title, cast (first 4), per-actor IMDB IDs, genres, next-episode-to-air date, last-episode date, status (`Ended` / `Canceled` → `full_series=1`).
-- Preferred over OMDB for actor IMDB IDs and for season metadata.
+- Used by `_shared/enrichment.js` and `enrich.js`. **Sole enrichment source.**
+- Returns canonical title, audience `rating` (vote_average), cast (first 4) with per-actor IMDB IDs, the creator/director + their IMDB id (`director_imdb_id`, via a `/person/{id}/external_ids` call), genres, next-episode-to-air date, last-episode date, status (`Ended` / `Canceled` → `full_series=1`).
 
 ### Anthropic Claude
 - Env: `ANTHROPIC_API_KEY`.
@@ -355,17 +351,17 @@ The deploy smoke test verifies these headers are present after each push.
 Two surfaces:
 
 ### Synchronous (`_shared/enrichment.js#fetchEnrichment`)
-Called from `POST /api/shows` (and edit / suggestion paths). Returns `{canonicalTitle, rating, actors}` plus the richer detail fields (see below) so the new row inserts with everything already filled in. TMDB is tried first (more accurate cast); OMDB is the fallback.
+Called from `POST /api/shows` (and edit / suggestion paths). Returns `{canonicalTitle, rating, actors, directorImdbId}` plus the richer detail fields (see below) so the new row inserts with everything already filled in. TMDB is the sole source; `rating` is TMDB's `vote_average`.
 
 **Rich detail fields (migration 042).** The one TMDB detail call already made pulls extra data via `append_to_response=credits,external_ids,videos,watch/providers,{content_ratings|release_dates}` — a single HTTP request, no extra subrequest budget. `extractTmdbDetailFields()` (exported from `enrichment.js`, shared by the add-time path and the background passes) pulls `overview`, `backdrop_url`, `tmdb_rating`, `content_rating`, `trailer_key`, `director`/creator, `runtime`, `release_year`, plus a **provider network** and a **watch link** from `watch/providers` (US flatrate). The provider name feeds `network` only when `knownNetwork()` maps it to one of our services (so unaliased variants like "…with Ads" are skipped); the `watch_link` is a JustWatch/TMDB aggregator page stored separately and used by the UI **only as a fallback** when there's no real deep-link `network_url`. Deep links themselves are unchanged — still member paste, sibling inheritance, or the Watchmode lookup (`_shared/watch-providers.js`).
 
 On insert, `POST /api/shows` also looks for any other member's active copy of the same title that already has a deep-link `network_url` (and a `network`). If one exists, the new row inherits both fields instead of falling back to the search-URL placeholder. So a show that someone else has already curated lands in the new member's library with the real URL on day one — never needs to go through `/url-cleanup`.
 
 ### Background (`POST /api/enrich`)
-A logged-in member's page calls this fire-and-forget on load. Two phases:
+A logged-in member's page calls this fire-and-forget on load. TMDB-only since OMDB was retired:
 
-1. **OMDB phase:** picks up to 50 active shows missing `rating`, missing `network_url`, or with no actor rows. Updates whatever it gets back. Title gets canonicalized only if there's no other row with that title (avoids creating duplicates).
-2. **TMDB phase:** a TV pass over active non-movie shows (ordered by `COALESCE(enriched_at, '1970-01-01') ASC` so the stalest refresh first) plus a separate movie pass. Writes `next_season_date`, `season_end_date`, `full_series`, `genres`, poster/logo, and the migration-042 detail fields (all coalesced — never overwrites existing values), then propagates the catalog fields to every member's copy of the title, and bumps `enriched_at`. The movie pass now fetches movie details too (not just a poster) so films get the same rich fields.
+- A TV pass over active non-movie shows (ordered by `COALESCE(enriched_at, '1970-01-01') ASC` so the stalest refresh first) plus a separate movie pass. Writes `next_season_date`, `season_end_date`, `full_series`, `genres`, poster/logo, and the detail fields — `overview`, `tmdb_rating`, `rating` (converges to the fresh TMDB score), `director`/`director_imdb_id`, etc. Most are coalesced (never overwrite an existing value); `rating` is refreshed from TMDB so old OMDB values migrate over time. Then propagates the catalog fields to every member's copy of the title and bumps `enriched_at`. `director_imdb_id` costs one extra `/person/{id}/external_ids` call per matched show.
+- An actor-IMDB-id backfill re-runs TMDB enrichment for any title whose cast rows still lack ids. `mode: 'posters'` (alias `skip_omdb`) runs only the small poster catch-up batch so an artwork backfill fits within the subrequest budget. The response's `enriched` counter is retained but always 0 now (the OMDB ratings/actors pass it counted is gone).
 
 `updated_at` is **not** touched by enrichment — only by member-initiated writes. This is what lets `updated_at != created_at` cleanly distinguish "the member touched it" from "we auto-enriched it."
 
@@ -479,7 +475,7 @@ Body: `{secret, count}`. Runs the vibe trait-backfill loop described above. The 
 ### `POST /api/admin-url-cleanup`
 Body: `{secret}`. Before listing, runs `propagateGoodUrls` to push every known good URL out to any sibling row still on a placeholder (so the queue never surfaces a title that someone has already fixed). Then returns the residual queue: titles where *no* copy has a good URL yet. The companion `url-cleanup.html` UI lets the operator paste a real deep link, then push it to every member's copy of that title in one go.
 
-The page's tools row also has a "Run enrichment passes" button — it loops `POST /api/enrich` (full mode: OMDB ratings/cast, TMDB posters/dates, actor-IMDB-id backfill) up to five times with the operator's session, stopping early once a pass returns all zeroes.
+The page's tools row also has a "Run enrichment passes" button — it loops `POST /api/enrich` (TMDB posters/dates/ratings/detail fields + actor-IMDB-id backfill) up to five times with the operator's session, stopping early once a pass returns all zeroes.
 
 The `inherit_networks` action (the "Adopt networks from club copies" button on the page) rescues rows that have no `network` at all — URL propagation can't reach them because it is scoped to `(title, network)`. Any active row whose title has exactly one distinct network across the rest of the club adopts that network, then a propagation pass fills its URL from the siblings. Titles whose copies disagree on the service are deliberately skipped; those belong to the conflict queue. Returns `{networks_set, urls_filled}`.
 

@@ -14,7 +14,7 @@ There are native iOS, tvOS, and watchOS apps. They share a `ShowPickerCore` Swif
 ## At a glance
 
 - **Multi-tenant.** One deployment, many members. Each member is a slug (`/whitt`, `/patrick`) with their own lists; they sign in with a one-time code (text or email), Sign in with Apple, or Sign in with Google (web). With `SELF_ENROLL` on, anyone can join — new members are held off the roster until the operator approves.
-- **Auto-enriched.** OMDB supplies IMDB ratings and canonical titles; TMDB supplies cast, next-season dates, finale dates, series-ended flags, and genres.
+- **Auto-enriched.** TMDB supplies everything: audience rating, canonical titles, cast (with IMDB links), the creator/director (with an IMDB link), next-season dates, finale dates, series-ended flags, and genres.
 - **Social.** Browse every member's lists and cross-library search; add anything you see to your own lists. (Push-style "suggest to another member" was retired 2026-07 — near-zero usage.)
 - **Vibe.** `/vibe` profiles each member's taste across 27 trait dimensions and assigns one of seven cluster identities.
 - **Calendar feed.** `webcal://showpicker.club/calendar/<slug>.ics?key=<calendar_token>` keeps upcoming premieres and finales in Apple Calendar / Google Calendar / Fantastical. The per-member `key` is required (calendar apps can't log in); you see your own feed link on your own member page.
@@ -25,7 +25,7 @@ There are native iOS, tvOS, and watchOS apps. They share a `ShowPickerCore` Swif
 - **Frontend:** Static HTML + vanilla JS, no build step. Service worker for PWA support.
 - **API:** Cloudflare Pages Functions (file-system-routed JavaScript handlers).
 - **Database:** Cloudflare D1 (SQLite at the edge).
-- **Enrichment:** OMDB API + TMDB API.
+- **Enrichment:** TMDB API (sole source — OMDB retired 2026-07).
 - **Vibe trait scoring:** Claude API (Sonnet 4.6 with prompt caching), admin-triggered batch only.
 - **Auth:** One-time codes (SMS via Twilio Verify, email via Resend) plus Sign in with Apple and Sign in with Google (web); HttpOnly session cookies, 30-day expiry. Optional self-enrollment behind the `SELF_ENROLL` kill switch, with self-service account deletion.
 
@@ -67,7 +67,6 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 - A [Cloudflare](https://cloudflare.com) account
 - [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/)
-- A free [OMDB API key](http://www.omdbapi.com/apikey.aspx)
 - A free [TMDB API key](https://www.themoviedb.org/settings/api)
 - *(Optional, for vibe trait scoring)* an [Anthropic API key](https://console.anthropic.com/)
 
@@ -95,7 +94,6 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 4. **Set API key secrets.** Use `printf` (not `echo`) so trailing newlines don't break runtime calls.
    ```bash
-   printf "your-omdb-key"    | wrangler pages secret put OMDB_API_KEY    --project-name shows
    printf "your-tmdb-key"    | wrangler pages secret put TMDB_API_KEY    --project-name shows
    printf "your-tmdb-token"  | wrangler pages secret put TMDB_TOKEN      --project-name shows
    # Optional — only if you wire up the corresponding features:

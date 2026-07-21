@@ -52,7 +52,10 @@ struct ShowDetailView: View {
                     .listRowBackground(Color.clear)
                 }
             }
-            if let p = (show?.posterUrl ?? initialPoster), !p.isEmpty {
+            // One image, not two: the backdrop above is the hero when present;
+            // the poster shows only when there's no backdrop.
+            let hasBackdrop = !((show?.backdropUrl ?? "").isEmpty)
+            if !hasBackdrop, let p = (show?.posterUrl ?? initialPoster), !p.isEmpty {
                 Section {
                     // Tap to view the poster full screen; tap again to return.
                     Button { posterExpanded = true } label: {
@@ -83,14 +86,10 @@ struct ShowDetailView: View {
                         LabeledContent("Network", value: n)
                     }
                 }
+                // Single audience score, sourced from TMDB (`rating` carries it now).
                 if let r = rating, !r.isEmpty {
                     LabeledContent("Rating") {
                         Text("\(Image(systemName: "star.fill")) \(r)").foregroundStyle(.orange)
-                    }
-                }
-                if let tr = show?.tmdbRating, !tr.isEmpty {
-                    LabeledContent("TMDB") {
-                        Text("\(Image(systemName: "star.fill")) \(tr)").foregroundStyle(.orange)
                     }
                 }
                 if let s = show {
@@ -129,11 +128,24 @@ struct ShowDetailView: View {
                         LabeledContent("Runtime", value: rt)
                     }
                     if let d = s.director, !d.isEmpty {
-                        LabeledContent(s.directorLabel, value: d)
+                        // Link a single-person credit to their IMDB page (like cast).
+                        if let url = s.directorURL {
+                            LabeledContent(s.directorLabel) { Link(d, destination: url) }
+                        } else {
+                            LabeledContent(s.directorLabel, value: d)
+                        }
                     }
                     if let turl = s.trailerURL {
                         LabeledContent("Trailer") { Link("▶ Watch trailer", destination: turl) }
                     }
+                }
+            }
+
+            // Cast sits directly under the main info card, right below the title.
+            if !cast.isEmpty {
+                Section("Cast") {
+                    Text(castLine)
+                        .font(.callout).foregroundStyle(.secondary)
                 }
             }
 
@@ -148,13 +160,6 @@ struct ShowDetailView: View {
             if let notes = myCopy?.notes, !notes.isEmpty {
                 Section("Notes") {
                     Text(notes).font(.callout).foregroundStyle(.secondary)
-                }
-            }
-
-            if !cast.isEmpty {
-                Section("Cast") {
-                    Text(castLine)
-                        .font(.callout).foregroundStyle(.secondary)
                 }
             }
 

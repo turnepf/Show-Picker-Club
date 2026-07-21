@@ -56,10 +56,15 @@
     }
     .row.mismatch .row-form { grid-template-columns: 1fr 1fr; }
     .row.needs-poster { border-color: color-mix(in oklch, var(--accent) 22%, transparent); }
-    .row.needs-poster .row-form { grid-template-columns: 1fr auto auto; }
+    /* Flex (not grid) so the variable set of controls wraps cleanly. */
+    .row.needs-poster .row-form { display: flex; flex-wrap: wrap; align-items: center; }
+    .row.needs-poster .title-input, .row.needs-poster .url-input { flex: 1 1 200px; }
+    .row.needs-poster .net-select, .row.needs-poster .type-select { flex: 0 0 auto; }
+    .row.needs-poster .other-input, .row.needs-poster .row-err { flex: 1 1 100%; }
     @media (max-width: 560px) {
       .row.mismatch .row-form { grid-template-columns: 1fr; }
-      .row.needs-poster .row-form { grid-template-columns: 1fr; }
+      .row.needs-poster .title-input, .row.needs-poster .url-input,
+      .row.needs-poster .net-select, .row.needs-poster .type-select { flex: 1 1 100%; }
     }
 
     .row {
@@ -448,7 +453,7 @@
       if (!items.length) { root.innerHTML = ''; return; }
       root.innerHTML = `
         <div class="section-head">Missing posters</div>
-        <div class="section-blurb">No copy of these titles has a poster — usually the stored title doesn't match TMDB. Re-enrich to try a fresh lookup as-is, or fix the title if it's wrong (typo, or a descriptive name). A poster fetched here covers every member's copy.</div>
+        <div class="section-blurb">No copy of these titles has a poster — usually the stored title doesn't match TMDB. Re-enrich to try a fresh lookup as-is, or fix the title if it's wrong (typo, or a descriptive name). If TMDB only indexes it under the other media type, flip the Show/Movie toggle so the lookup searches the right index. A poster fetched here covers every member's copy. Optionally paste a direct watch URL (with its service) to set it in the same click.</div>
         ${items.map(p => `
           <div class="row needs-poster" data-id="${p.id}">
             <div class="row-head">
@@ -458,8 +463,15 @@
             </div>
             <div class="row-form">
               <input type="text" class="title-input" placeholder="Fix title" value="${escapeAttr(p.title)}" autocomplete="off">
+              <select class="type-select" aria-label="Media type" title="Show or movie — flip this if TMDB indexes it under the other type">
+                <option value="0"${p.movie ? '' : ' selected'}>Show</option>
+                <option value="1"${p.movie ? ' selected' : ''}>Movie</option>
+              </select>
               <button class="btn-rename" type="button">Rename &amp; re-enrich</button>
               <button class="btn-update btn-reenrich" type="button">Re-enrich</button>
+              <select class="net-select">${networkOptionsHtml('')}</select>
+              <input type="text" class="url-input" placeholder="Paste direct URL (optional)" autocomplete="off">
+              <input type="text" class="other-input" placeholder="New network name">
               <div class="row-err"></div>
             </div>
           </div>
@@ -473,6 +485,15 @@
       const titleInput = rowEl.querySelector('.title-input');
       const renameBtn = rowEl.querySelector('.btn-rename');
       const reenrichBtn = rowEl.querySelector('.btn-reenrich');
+      const netSelect = rowEl.querySelector('.net-select');
+      const otherInput = rowEl.querySelector('.other-input');
+      const urlInput = rowEl.querySelector('.url-input');
+      const typeSelect = rowEl.querySelector('.type-select');
+
+      netSelect.addEventListener('change', () => {
+        if (netSelect.value === '__other') { otherInput.classList.add('show'); otherInput.focus(); }
+        else { otherInput.classList.remove('show'); }
+      });
 
       const removeRow = () => {
         rowEl.classList.add('removing');
@@ -488,7 +509,7 @@
           const res = await fetch('/api/admin-url-cleanup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 're_enrich', id: parseInt(rowEl.dataset.id, 10) }),
+            body: JSON.stringify({ action: 're_enrich', id: parseInt(rowEl.dataset.id, 10), movie: parseInt(typeSelect.value, 10) }),
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) {
@@ -513,6 +534,11 @@
         errBox.textContent = '';
         const newTitle = titleInput.value.trim();
         if (!newTitle) { errBox.textContent = 'Enter a title.'; return; }
+        const network = (netSelect.value === '__other' ? otherInput.value : netSelect.value).trim();
+        const newUrl = urlInput.value.trim();
+        // A URL needs a service so we know which app it opens; a network on its
+        // own (no URL) is fine — it just sets the service.
+        if (newUrl && !network) { errBox.textContent = 'Pick a service for that URL.'; return; }
         renameBtn.disabled = true;
         const old = renameBtn.textContent;
         renameBtn.textContent = '…';
@@ -520,7 +546,11 @@
           const res = await fetch('/api/admin-url-cleanup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'fix_title', id: parseInt(rowEl.dataset.id, 10), new_title: newTitle }),
+            body: JSON.stringify({
+              action: 'fix_title', id: parseInt(rowEl.dataset.id, 10), new_title: newTitle,
+              network: network || undefined, network_url: newUrl || undefined,
+              movie: parseInt(typeSelect.value, 10),
+            }),
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) {
@@ -528,6 +558,12 @@
             renameBtn.disabled = false;
             renameBtn.textContent = old;
           } else {
+            // If the operator added a new service name, remember it for the
+            // other cards' dropdowns.
+            if (network && !networks.includes(network)) {
+              networks.push(network);
+              networks.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+            }
             // fix_title re-enriches under the new name; the poster miss is
             // resolved whether or not TMDB had artwork, so clear the card.
             removeRow();

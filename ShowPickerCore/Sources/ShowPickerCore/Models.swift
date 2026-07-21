@@ -50,10 +50,11 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
     // Richer TMDB detail fields (all optional; backfilled by enrichment).
     public let overview: String?
     public let backdropUrl: String?
-    public let tmdbRating: String?      // TMDB audience score "x.y" (distinct from `rating`, the IMDB score)
+    public let tmdbRating: String?      // TMDB audience score "x.y"; mirrors `rating` now (kept for older builds)
     public let contentRating: String?   // US maturity certification (TV-MA, R, …)
     public let trailerKey: String?      // YouTube video key
     public let director: String?        // director (movie) or creator(s) (TV)
+    public let directorImdbId: String?  // IMDB id (nm…) of the creator/director, for the person link
     public let runtime: Int?            // minutes
     public let releaseYear: Int?
     public let watchLink: String?       // fallback "where to watch" page; used only when there's no real deep link
@@ -94,7 +95,8 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         director: String? = nil,
         runtime: Int? = nil,
         releaseYear: Int? = nil,
-        watchLink: String? = nil
+        watchLink: String? = nil,
+        directorImdbId: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -124,6 +126,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         self.contentRating = contentRating
         self.trailerKey = trailerKey
         self.director = director
+        self.directorImdbId = directorImdbId
         self.runtime = runtime
         self.releaseYear = releaseYear
         self.watchLink = watchLink
@@ -149,6 +152,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         case contentRating = "content_rating"
         case trailerKey = "trailer_key"
         case director
+        case directorImdbId = "director_imdb_id"
         case runtime
         case releaseYear = "release_year"
         case watchLink = "watch_link"
@@ -222,6 +226,15 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
 
     // "Director" for a film, "Creator" for a series — matches the field's source.
     public var directorLabel: String { isMovie ? "Director" : "Creator" }
+
+    // IMDB person page for the creator/director — only for a single-person
+    // credit (a comma means multiple names, so the one id wouldn't match the
+    // whole label). nil otherwise, in which case the name renders as plain text.
+    public var directorURL: URL? {
+        guard let id = directorImdbId, !id.isEmpty,
+              let d = director, !d.contains(",") else { return nil }
+        return URL(string: "https://www.imdb.com/name/\(id)/")
+    }
 
     // YouTube trailer URL, when a key is present.
     public var trailerURL: URL? {

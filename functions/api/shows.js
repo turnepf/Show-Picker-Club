@@ -105,7 +105,7 @@ export async function onRequestPost(context) {
   }
 
   // Per-member daily cap. Far above any human pace (the whole club adds a
-  // few shows a day), but each add fans out to OMDB/TMDB/Watchmode calls, so
+  // few shows a day), but each add fans out to TMDB/Watchmode calls, so
   // a scripted session could otherwise spam rows and drain API quotas.
   const { cnt: addsToday } = (await env.DB.prepare(
     "SELECT COUNT(*) AS cnt FROM shows WHERE member_slug = ? AND created_at > datetime('now', '-1 day')"
@@ -129,13 +129,13 @@ export async function onRequestPost(context) {
   // from the title. Falls back to the title search if the lookup fails.
   const tmdbId = parseInt(body.tmdb_id, 10);
   const tmdbType = body.tmdb_type === 'movie' || body.tmdb_type === 'tv' ? body.tmdb_type : null;
-  let omdb = null;
+  let enriched = null;
   if (Number.isInteger(tmdbId) && tmdbType) {
     const byId = await fetchEnrichmentById(tmdbId, tmdbType, env);
-    if (byId.canonicalTitle) omdb = byId;
+    if (byId.canonicalTitle) enriched = byId;
   }
-  if (!omdb) omdb = await fetchEnrichment(title, env, !!movie);
-  const finalTitle = omdb.canonicalTitle || title;
+  if (!enriched) enriched = await fetchEnrichment(title, env, !!movie);
+  const finalTitle = enriched.canonicalTitle || title;
 
   const existing = await env.DB.prepare(
     'SELECT id, list, archived FROM shows WHERE LOWER(title) = LOWER(?) AND member_slug = ?'
@@ -162,7 +162,7 @@ export async function onRequestPost(context) {
     networkFromUrl(userUrl) ||
     networkFromUrl(goodCopyUrl) ||
     (rawNetwork ? canonicalNetwork(rawNetwork) : null) ||
-    omdb.providerNetwork || null;
+    enriched.providerNetwork || null;
   const finalUrl =
     userUrl ||
     goodCopyUrl ||
@@ -170,15 +170,15 @@ export async function onRequestPost(context) {
 
   const result = await env.DB.prepare(
     `INSERT INTO shows (title, network, network_url, recommended_by, rating, list, notes, movie, full_series, watching_with, poster_url, network_logo_url, member_slug, added_by,
-       overview, backdrop_url, tmdb_rating, content_rating, trailer_key, director, runtime, release_year, watch_link)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(finalTitle, finalNetwork, finalUrl, recommended_by || null, omdb.rating, list, notes || null, movie || 0, full_series || 0, watching_with || null, omdb.posterUrl || null, omdb.networkLogoUrl || null, session.member_slug, session.email,
-    omdb.overview || null, omdb.backdropUrl || null, omdb.tmdbRating || null, omdb.contentRating || null, omdb.trailerKey || null, omdb.director || null, omdb.runtime || null, omdb.releaseYear || null, omdb.watchLink || null).run();
+       overview, backdrop_url, tmdb_rating, content_rating, trailer_key, director, director_imdb_id, runtime, release_year, watch_link)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(finalTitle, finalNetwork, finalUrl, recommended_by || null, enriched.rating, list, notes || null, movie || 0, full_series || 0, watching_with || null, enriched.posterUrl || null, enriched.networkLogoUrl || null, session.member_slug, session.email,
+    enriched.overview || null, enriched.backdropUrl || null, enriched.tmdbRating || null, enriched.contentRating || null, enriched.trailerKey || null, enriched.director || null, enriched.directorImdbId || null, enriched.runtime || null, enriched.releaseYear || null, enriched.watchLink || null).run();
 
   const showId = result.meta.last_row_id;
-  if (omdb.actors.length > 0) {
+  if (enriched.actors.length > 0) {
     const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id) VALUES (?, ?, ?)');
-    await env.DB.batch(omdb.actors.map(a => stmt.bind(showId, a.name, a.imdb_id || null)));
+    await env.DB.batch(enriched.actors.map(a => stmt.bind(showId, a.name, a.imdb_id || null)));
   }
 
   // If we ended up on a search-URL placeholder (no user paste, no sibling

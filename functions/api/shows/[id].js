@@ -20,7 +20,7 @@ const PUBLIC_SHOW_FIELDS = [
   // Catalog-level detail fields — facts about the show itself, safe for the
   // logged-out Trending detail screen.
   'overview', 'backdrop_url', 'tmdb_rating', 'content_rating', 'trailer_key',
-  'director', 'runtime', 'release_year', 'watch_link',
+  'director', 'director_imdb_id', 'runtime', 'release_year', 'watch_link',
 ];
 
 export async function onRequestGet(context) {
@@ -97,13 +97,14 @@ export async function onRequestPut(context) {
         overview = COALESCE(?, overview), backdrop_url = COALESCE(?, backdrop_url),
         tmdb_rating = COALESCE(?, tmdb_rating), content_rating = COALESCE(?, content_rating),
         trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director),
+        director_imdb_id = COALESCE(?, director_imdb_id),
         runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
         watch_link = COALESCE(?, watch_link),
         updated_at = datetime('now') WHERE id = ?`
   ).bind(title, finalNetwork, network_url, recommended_by, list, notes, movie, full_series, watching_with, rating, archived,
     enriched.posterUrl || null, enriched.networkLogoUrl || null,
     enriched.overview || null, enriched.backdropUrl || null, enriched.tmdbRating || null, enriched.contentRating || null,
-    enriched.trailerKey || null, enriched.director || null, enriched.runtime || null, enriched.releaseYear || null,
+    enriched.trailerKey || null, enriched.director || null, enriched.directorImdbId || null, enriched.runtime || null, enriched.releaseYear || null,
     enriched.watchLink || null, params.id).run();
 
   if (enriched.actors.length > 0) {

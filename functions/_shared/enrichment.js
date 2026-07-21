@@ -1,8 +1,9 @@
-// Shared enrichment: TMDB (search + cast + actor IMDB IDs) + OMDB (IMDB rating
-// by exact IMDB id). TMDB is the sole title-lookup path; OMDB is used only to
-// attach an IMDB rating once TMDB has resolved the show's IMDB id. (The OMDB
-// title-guessing fallback was retired once TMDB type-ahead pinning made new
-// rows arrive canonical — see docs/PRODUCT.md.)
+// Shared enrichment: TMDB only (search + detail + cast + actor IMDB IDs +
+// creator/director IMDB ID). TMDB is the sole title-lookup path and the sole
+// rating source — `rating` now carries TMDB's audience score. (OMDB was
+// retired once we consolidated on a single TMDB rating; the OMDB title-guessing
+// fallback had already been dropped when TMDB type-ahead pinning made new rows
+// arrive canonical — see docs/PRODUCT.md.)
 
 import { knownNetwork } from './networks.js';
 
@@ -30,14 +31,21 @@ export function extractTmdbDetailFields(detail, mediaType) {
   const releaseDate = mediaType === 'movie' ? detail.release_date : detail.first_air_date;
   const releaseYear = releaseDate ? (parseInt(String(releaseDate).slice(0, 4), 10) || null) : null;
 
-  // Director (movie) or creator(s) (TV).
+  // Director (movie) or creator(s) (TV). directorPersonId is the TMDB person id
+  // of the *first* credited person — the one whose external_ids we resolve to
+  // an IMDB id for the detail-screen person link. (The link is only rendered
+  // client-side when the display name is a single person, so a multi-creator
+  // show's joined names never link to just the first creator.)
   let director = null;
+  let directorPersonId = null;
   if (mediaType === 'movie') {
     const d = (detail.credits?.crew || []).find((c) => c.job === 'Director');
     director = d ? d.name : null;
+    directorPersonId = d ? d.id : null;
   } else {
-    const creators = (detail.created_by || []).map((c) => c.name).filter(Boolean);
-    director = creators.length ? creators.join(', ') : null;
+    const creators = (detail.created_by || []).filter((c) => c && c.name);
+    director = creators.length ? creators.map((c) => c.name).join(', ') : null;
+    directorPersonId = creators.length ? creators[0].id : null;
   }
 
   // US maturity certification.
@@ -76,15 +84,15 @@ export function extractTmdbDetailFields(detail, mediaType) {
 
   return {
     overview, backdropUrl, tmdbRating, contentRating, trailerKey,
-    director, runtime, releaseYear, providerNetwork, watchLink,
+    director, directorPersonId, runtime, releaseYear, providerNetwork, watchLink,
   };
 }
 
 // The null-valued shape of the detail fields, for the empty/failed returns.
 const EMPTY_DETAIL = {
   overview: null, backdropUrl: null, tmdbRating: null, contentRating: null,
-  trailerKey: null, director: null, runtime: null, releaseYear: null,
-  providerNetwork: null, watchLink: null,
+  trailerKey: null, director: null, directorPersonId: null, runtime: null,
+  releaseYear: null, providerNetwork: null, watchLink: null,
 };
 
 async function tmdbFetch(path, token) {
@@ -94,18 +102,16 @@ async function tmdbFetch(path, token) {
   return res.json();
 }
 
-async function omdbById(imdbId, apiKey) {
+// Resolve a TMDB person id to their IMDB id (nm…), for the creator/director
+// person link on the detail screen. Best-effort: null on any miss/error.
+async function personImdbId(personId, token) {
+  if (!personId) return null;
   try {
-    const res = await fetch(`https://www.omdbapi.com/?i=${imdbId}&apikey=${apiKey}`);
-    const d = await res.json();
-    if (d.Response === 'True') {
-      return {
-        rating: d.imdbRating !== 'N/A' ? d.imdbRating : null,
-        canonicalTitle: d.Title || null,
-      };
-    }
-  } catch (_) {}
-  return { rating: null, canonicalTitle: null };
+    const ext = await tmdbFetch(`/person/${personId}/external_ids`, token);
+    return ext.imdb_id || null;
+  } catch (_) {
+    return null;
+  }
 }
 
 // TMDB poster paths are relative; w500 is a good size for tvOS cards.
@@ -114,47 +120,45 @@ function tmdbPosterUrl(posterPath) {
 }
 
 // Full enrichment payload for a known TMDB id: details + credits +
-// external_ids in one call, IMDB rating via OMDB (by exact IMDB id), and
-// actor IMDB ids. Shared by the title-search path below and the exact-pick
-// path (fetchEnrichmentById) used when a member selected the show themselves.
+// external_ids in one call, TMDB rating, actor IMDB ids, and the
+// creator/director's IMDB id. Shared by the title-search path below and the
+// exact-pick path (fetchEnrichmentById) used when a member picked the show.
 async function enrichFromTmdbId(tmdbId, mediaType, env, fallbackPoster = null) {
   const token = env.TMDB_TOKEN;
-  const omdbKey = env.OMDB_API_KEY;
 
   const detail = await tmdbFetch(
     `/${mediaType}/${tmdbId}?append_to_response=${detailAppend(mediaType)}&language=en-US`,
     token
   );
 
-  const imdbShowId = detail.external_ids?.imdb_id || null;
-  let canonicalTitle = (mediaType === 'movie' ? detail.title : detail.name) || null;
-  let rating = null;
-  if (imdbShowId && omdbKey) {
-    const omdb = await omdbById(imdbShowId, omdbKey);
-    rating = omdb.rating;
-    if (omdb.canonicalTitle) canonicalTitle = omdb.canonicalTitle;
-  }
+  const canonicalTitle = (mediaType === 'movie' ? detail.title : detail.name) || null;
+  const detailFields = extractTmdbDetailFields(detail, mediaType);
+  // Single rating, straight from TMDB (OMDB retired).
+  const rating = detailFields.tmdbRating;
 
-  // Actor IMDB IDs in parallel
+  // Actor IMDB IDs + the creator/director's IMDB id, all in parallel.
   const cast = (detail.credits?.cast || []).slice(0, 4);
-  const actors = await Promise.all(
-    cast.map(async (person) => {
-      try {
-        const ext = await tmdbFetch(`/person/${person.id}/external_ids`, token);
-        return { name: person.name, imdb_id: ext.imdb_id || null };
-      } catch (_) {
-        return { name: person.name, imdb_id: null };
-      }
-    })
-  );
+  const [actors, directorImdbId] = await Promise.all([
+    Promise.all(
+      cast.map(async (person) => {
+        try {
+          const ext = await tmdbFetch(`/person/${person.id}/external_ids`, token);
+          return { name: person.name, imdb_id: ext.imdb_id || null };
+        } catch (_) {
+          return { name: person.name, imdb_id: null };
+        }
+      })
+    ),
+    personImdbId(detailFields.directorPersonId, token),
+  ]);
 
   const posterUrl = tmdbPosterUrl(detail.poster_path) || fallbackPoster;
   const netLogoPath = detail.networks && detail.networks[0] && detail.networks[0].logo_path;
   const networkLogoUrl = netLogoPath ? `https://image.tmdb.org/t/p/w154${netLogoPath}` : null;
 
   return {
-    canonicalTitle, rating, actors, posterUrl, networkLogoUrl,
-    ...extractTmdbDetailFields(detail, mediaType),
+    canonicalTitle, rating, actors, posterUrl, networkLogoUrl, directorImdbId,
+    ...detailFields,
   };
 }
 
@@ -162,7 +166,7 @@ async function enrichFromTmdbId(tmdbId, mediaType, env, fallbackPoster = null) {
 // search, so skip title-guessing entirely. Returns the empty shape when the
 // lookup fails (caller falls back to fetchEnrichment's title search).
 export async function fetchEnrichmentById(tmdbId, mediaType, env) {
-  const empty = { canonicalTitle: null, rating: null, actors: [], posterUrl: null, networkLogoUrl: null, ...EMPTY_DETAIL };
+  const empty = { canonicalTitle: null, rating: null, actors: [], posterUrl: null, networkLogoUrl: null, directorImdbId: null, ...EMPTY_DETAIL };
   if (!env.TMDB_TOKEN || !tmdbId) return empty;
   try {
     return await enrichFromTmdbId(tmdbId, mediaType === 'movie' ? 'movie' : 'tv', env);
@@ -213,5 +217,5 @@ export async function fetchEnrichment(title, env, isMovie) {
     }
   }
 
-  return { canonicalTitle: null, rating: null, actors: [], posterUrl: null, networkLogoUrl: null, ...EMPTY_DETAIL };
+  return { canonicalTitle: null, rating: null, actors: [], posterUrl: null, networkLogoUrl: null, directorImdbId: null, ...EMPTY_DETAIL };
 }
