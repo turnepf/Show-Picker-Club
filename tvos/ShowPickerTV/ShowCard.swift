@@ -86,6 +86,12 @@ struct ShowCard: View {
 
     @ViewBuilder private var poster: some View {
         if let posterUrl, let url = URL(string: posterUrl) {
+            // The frame lives ON the AsyncImage (not just the enclosing view) so
+            // it has a definite size and actually fires the load inside the lazy
+            // horizontal shelf — without it the empty-phase gradient has no
+            // intrinsic size, the view collapses, and the image never loads (the
+            // detail screen's hero image works because it frames AsyncImage the
+            // same way). scaledToFill + clipped keeps the poster filling the card.
             AsyncImage(url: url) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFill()
@@ -93,8 +99,11 @@ struct ShowCard: View {
                     gradientFallback
                 }
             }
+            .frame(width: Self.w, height: Self.posterH)
+            .clipped()
         } else {
             gradientFallback
+                .frame(width: Self.w, height: Self.posterH)
         }
     }
 
