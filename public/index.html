@@ -3784,16 +3784,16 @@
       if (show.content_rating) rows.push(detailRow('Rated', escapeHtml(show.content_rating)));
       if (show.release_year) rows.push(detailRow('Year', escapeHtml(String(show.release_year))));
       if (show.runtime) rows.push(detailRow('Runtime', escapeHtml(runtimeText(show.runtime))));
-      // Creator/Director is grouped under the Cast card (built below), not in
-      // the metadata rows. Link a single-person credit to their IMDB page
+      // Creator/Director renders as a standard label/value row grouped in the
+      // Cast card (built below). Link a single-person credit to their IMDB page
       // (mirrors the cast links); a multi-creator credit (comma in the name)
       // stays plain so the whole list doesn't point at just the first person.
-      let creatorLine = '';
+      let creatorRow = '';
       if (show.director) {
         const dirVal = (show.director_imdb_id && !show.director.includes(','))
           ? `<a href="https://www.imdb.com/name/${encodeURIComponent(show.director_imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(show.director)}</a>`
           : escapeHtml(show.director);
-        creatorLine = `<div class="detail-prose" style="margin-top:8px;"><strong>${show.movie ? 'Director' : 'Creator'}:</strong> ${dirVal}</div>`;
+        creatorRow = detailRow(show.movie ? 'Director' : 'Creator', dirVal);
       }
 
       let html = '';
@@ -3810,17 +3810,17 @@
       // Top card: Network, then Trailer.
       if (topRows.length) html += `<div class="detail-card">${topRows.join('')}</div>`;
       // Cast — with the creator/director grouped underneath — directly under
-      // the trailer.
-      if (actors.length || creatorLine) {
+      // the trailer, both as standard label/value rows (names right-aligned).
+      if (actors.length || creatorRow) {
         let castInner = '';
         if (actors.length) {
           const cast = actors.map(a => a.imdb_id
             ? `<a href="https://www.imdb.com/name/${encodeURIComponent(a.imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(a.name)}</a>`
             : escapeHtml(a.name)).join(', ');
-          castInner += `<div class="detail-prose">${cast}</div>`;
+          castInner += detailRow('Cast', cast);
         }
-        castInner += creatorLine;
-        html += `<div class="detail-card"><div class="detail-card-title">Cast</div>${castInner}</div>`;
+        castInner += creatorRow;
+        html += `<div class="detail-card">${castInner}</div>`;
       }
       // The rest of the metadata (rating, list, genres, dates, creator, …).
       if (rows.length) html += `<div class="detail-card">${rows.join('')}</div>`;
