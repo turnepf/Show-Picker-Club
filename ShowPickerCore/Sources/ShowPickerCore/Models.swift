@@ -47,6 +47,16 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
     // The API returns actors as a JSON-encoded string (from SQLite's
     // json_group_array). Decoded lazily via `castMembers`.
     public let actors: String?
+    // Richer TMDB detail fields (all optional; backfilled by enrichment).
+    public let overview: String?
+    public let backdropUrl: String?
+    public let tmdbRating: String?      // TMDB audience score "x.y" (distinct from `rating`, the IMDB score)
+    public let contentRating: String?   // US maturity certification (TV-MA, R, …)
+    public let trailerKey: String?      // YouTube video key
+    public let director: String?        // director (movie) or creator(s) (TV)
+    public let runtime: Int?            // minutes
+    public let releaseYear: Int?
+    public let watchLink: String?       // fallback "where to watch" page; used only when there's no real deep link
 
     // Explicit public init so other modules (the apps, their offline queues)
     // can construct a Show — the synthesized memberwise init is internal.
@@ -75,7 +85,16 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         createdAt: String? = nil,
         posterUrl: String? = nil,
         networkLogoUrl: String? = nil,
-        sortOrder: Int? = nil
+        sortOrder: Int? = nil,
+        overview: String? = nil,
+        backdropUrl: String? = nil,
+        tmdbRating: String? = nil,
+        contentRating: String? = nil,
+        trailerKey: String? = nil,
+        director: String? = nil,
+        runtime: Int? = nil,
+        releaseYear: Int? = nil,
+        watchLink: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -99,6 +118,15 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         self.archived = archived
         self.actors = actors
         self.sortOrder = sortOrder
+        self.overview = overview
+        self.backdropUrl = backdropUrl
+        self.tmdbRating = tmdbRating
+        self.contentRating = contentRating
+        self.trailerKey = trailerKey
+        self.director = director
+        self.runtime = runtime
+        self.releaseYear = releaseYear
+        self.watchLink = watchLink
     }
 
     enum CodingKeys: String, CodingKey {
@@ -115,6 +143,15 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         case networkLogoUrl = "network_logo_url"
         case createdAt = "created_at"
         case sortOrder = "sort_order"
+        case overview
+        case backdropUrl = "backdrop_url"
+        case tmdbRating = "tmdb_rating"
+        case contentRating = "content_rating"
+        case trailerKey = "trailer_key"
+        case director
+        case runtime
+        case releaseYear = "release_year"
+        case watchLink = "watch_link"
     }
 
     public var isMovie: Bool { (movie ?? 0) == 1 }
@@ -173,6 +210,30 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         guard let u = networkUrl?.lowercased() else { return false }
         return u.hasPrefix("https://play.hbomax.com/search?")
             || u.hasPrefix("https://play.hbomax.com/search/result?")
+    }
+
+    // Minutes → "1h 52m" / "45m".
+    public var runtimeText: String? {
+        guard let n = runtime, n > 0 else { return nil }
+        let h = n / 60, m = n % 60
+        if h > 0 { return m > 0 ? "\(h)h \(m)m" : "\(h)h" }
+        return "\(m)m"
+    }
+
+    // "Director" for a film, "Creator" for a series — matches the field's source.
+    public var directorLabel: String { isMovie ? "Director" : "Creator" }
+
+    // YouTube trailer URL, when a key is present.
+    public var trailerURL: URL? {
+        guard let k = trailerKey, !k.isEmpty else { return nil }
+        return URL(string: "https://www.youtube.com/watch?v=\(k)")
+    }
+
+    // Fallback "where to watch" aggregator page — only when there's no real
+    // deep link, mirroring the web's Network-row fallback.
+    public var whereToWatchURL: URL? {
+        guard !hasRealUrl, let l = watchLink, !l.isEmpty else { return nil }
+        return URL(string: l)
     }
 }
 

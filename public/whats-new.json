@@ -4,6 +4,11 @@
   "entries": [
     {
       "date": "7/20",
+      "title": "Richer show details.",
+      "body": "Every show's detail screen now carries a lot more: a plot synopsis, a wide backdrop image, the TMDB audience score alongside the IMDb rating, the maturity rating (TV-MA, R, …), release year, runtime, the director or creator, and a trailer link. And when a show has no direct deep link, you'll now get a “Where to watch” link instead of just the network name. It's all pulled in automatically. Live on the web now; iPhone, iPad, Apple TV, and Apple Watch get it in the next app build."
+    },
+    {
+      "date": "7/20",
       "title": "Export your lists.",
       "body": "Take your shows with you anytime — no lock-in. Open the account menu and choose Export my lists to get a plain-text file with every list (Watching, Awaiting, Loved, Next Up) and each show's network. On the web it downloads a .txt file; on iPhone and iPad it opens the share sheet so you can drop it into Notes, Messages, Files, or anywhere else. Live on the web now; iPhone and iPad get it in the next app build."
     },

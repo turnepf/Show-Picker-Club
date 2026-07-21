@@ -36,6 +36,22 @@ struct ShowDetailView: View {
 
     var body: some View {
         Form {
+            if let b = show?.backdropUrl, !b.isEmpty, let url = URL(string: b) {
+                Section {
+                    AsyncImage(url: url) { phase in
+                        if let img = phase.image {
+                            img.resizable().scaledToFill()
+                        } else {
+                            Color(.secondarySystemBackground)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 180)
+                    .clipped()
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                }
+            }
             if let p = (show?.posterUrl ?? initialPoster), !p.isEmpty {
                 Section {
                     // Tap to view the poster full screen; tap again to return.
@@ -58,6 +74,11 @@ struct ShowDetailView: View {
                         LabeledContent("Network") {
                             Link("Watch on \(n)", destination: url)
                         }
+                    } else if let wl = show?.whereToWatchURL {
+                        // No deep link — offer the aggregator "where to watch" page.
+                        LabeledContent(n) {
+                            Link("Where to watch", destination: wl)
+                        }
                     } else {
                         LabeledContent("Network", value: n)
                     }
@@ -65,6 +86,11 @@ struct ShowDetailView: View {
                 if let r = rating, !r.isEmpty {
                     LabeledContent("Rating") {
                         Text("\(Image(systemName: "star.fill")) \(r)").foregroundStyle(.orange)
+                    }
+                }
+                if let tr = show?.tmdbRating, !tr.isEmpty {
+                    LabeledContent("TMDB") {
+                        Text("\(Image(systemName: "star.fill")) \(tr)").foregroundStyle(.orange)
                     }
                 }
                 if let s = show {
@@ -93,6 +119,28 @@ struct ShowDetailView: View {
                     if let seasons = s.seasonsText {
                         LabeledContent("Seasons", value: seasons)
                     }
+                    if let cr = s.contentRating, !cr.isEmpty {
+                        LabeledContent("Rated", value: cr)
+                    }
+                    if let y = s.releaseYear {
+                        LabeledContent("Year", value: String(y))
+                    }
+                    if let rt = s.runtimeText {
+                        LabeledContent("Runtime", value: rt)
+                    }
+                    if let d = s.director, !d.isEmpty {
+                        LabeledContent(s.directorLabel, value: d)
+                    }
+                    if let turl = s.trailerURL {
+                        LabeledContent("Trailer") { Link("▶ Watch trailer", destination: turl) }
+                    }
+                }
+            }
+
+            // Plot synopsis from TMDB (catalog-level, not per-member).
+            if let ov = show?.overview, !ov.isEmpty {
+                Section("Overview") {
+                    Text(ov).font(.callout).foregroundStyle(.secondary)
                 }
             }
 

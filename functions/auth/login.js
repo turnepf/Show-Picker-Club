@@ -56,8 +56,7 @@ export async function onRequestPost(context) {
   }
 
   // `member` is resolved server-side from the email below — it is never taken
-  // from the request. The old static per-member codes are gone; login is phone
-  // (Twilio Verify) or email (login_otps) only.
+  // from the request. Login is phone (Twilio Verify) or email (login_otps) only.
   let code, member, email, phone;
   try {
     const body = await request.json();

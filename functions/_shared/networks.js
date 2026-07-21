@@ -143,6 +143,16 @@ export function canonicalNetwork(name) {
   return _aliasIndex.get(name.trim().toLowerCase()) || name;
 }
 
+// Like canonicalNetwork, but returns null for names we don't recognize
+// (canonicalNetwork echoes its input). Used to map a TMDB/Watchmode provider
+// string to one of our services only when it's genuinely one of them — so a
+// variant we don't alias (e.g. "Amazon Prime Video with Ads") is skipped
+// rather than stored as a bogus network.
+export function knownNetwork(name) {
+  if (!name) return null;
+  return _aliasIndex.get(name.trim().toLowerCase()) || null;
+}
+
 // Given a URL (deep link or search-page), returns the canonical network
 // based on its domain — or null if the domain isn't one of ours. Used to
 // auto-correct the stored network when a pasted URL disagrees with the

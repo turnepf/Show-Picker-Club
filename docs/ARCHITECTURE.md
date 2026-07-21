@@ -69,6 +69,15 @@ Login is by one-time code or Sign in with Apple — there are no stored password
 | `enriched_at`       | TEXT | Bumped by OMDB/TMDB enrichment so enrichment can prioritize stale rows. |
 | `genres`            | TEXT | Comma-separated, from TMDB. |
 | `sort_order`        | INTEGER | Position for the member's "My Order" manual sort (migration 033). NULL = never manually placed. Written only by `POST /api/shows/reorder`, which deliberately does **not** bump `updated_at`. |
+| `overview`          | TEXT | Plot synopsis from TMDB (migration 042). |
+| `backdrop_url`      | TEXT | Wide 16:9 hero image (TMDB `backdrop_path`, w780). Migration 042. |
+| `tmdb_rating`       | TEXT | TMDB audience score "x.y" — distinct from `rating` (the IMDB score from OMDB). Migration 042. |
+| `content_rating`    | TEXT | US maturity certification (TV-MA, R, …). Migration 042. |
+| `trailer_key`       | TEXT | YouTube video key for the trailer. Migration 042. |
+| `director`          | TEXT | Director (movie) or creator(s) (TV). Migration 042. |
+| `runtime`           | INTEGER | Minutes. Migration 042. |
+| `release_year`      | INTEGER | First release / first-air year. Migration 042. |
+| `watch_link`        | TEXT | TMDB/JustWatch "where to watch" page. A **fallback only** — the UI prefers the real deep-link `network_url` and shows this aggregator page only when no deep link exists. Migration 042. |
 
 ### `actors`
 Join table for per-show cast.
@@ -346,7 +355,9 @@ The deploy smoke test verifies these headers are present after each push.
 Two surfaces:
 
 ### Synchronous (`_shared/enrichment.js#fetchEnrichment`)
-Called from `POST /api/shows` (and edit / suggestion paths). Returns `{canonicalTitle, rating, actors}` so the new row inserts with rating + cast already filled in. TMDB is tried first (more accurate cast); OMDB is the fallback.
+Called from `POST /api/shows` (and edit / suggestion paths). Returns `{canonicalTitle, rating, actors}` plus the richer detail fields (see below) so the new row inserts with everything already filled in. TMDB is tried first (more accurate cast); OMDB is the fallback.
+
+**Rich detail fields (migration 042).** The one TMDB detail call already made pulls extra data via `append_to_response=credits,external_ids,videos,watch/providers,{content_ratings|release_dates}` — a single HTTP request, no extra subrequest budget. `extractTmdbDetailFields()` (exported from `enrichment.js`, shared by the add-time path and the background passes) pulls `overview`, `backdrop_url`, `tmdb_rating`, `content_rating`, `trailer_key`, `director`/creator, `runtime`, `release_year`, plus a **provider network** and a **watch link** from `watch/providers` (US flatrate). The provider name feeds `network` only when `knownNetwork()` maps it to one of our services (so unaliased variants like "…with Ads" are skipped); the `watch_link` is a JustWatch/TMDB aggregator page stored separately and used by the UI **only as a fallback** when there's no real deep-link `network_url`. Deep links themselves are unchanged — still member paste, sibling inheritance, or the Watchmode lookup (`_shared/watch-providers.js`).
 
 On insert, `POST /api/shows` also looks for any other member's active copy of the same title that already has a deep-link `network_url` (and a `network`). If one exists, the new row inherits both fields instead of falling back to the search-URL placeholder. So a show that someone else has already curated lands in the new member's library with the real URL on day one — never needs to go through `/url-cleanup`.
 
@@ -354,7 +365,7 @@ On insert, `POST /api/shows` also looks for any other member's active copy of th
 A logged-in member's page calls this fire-and-forget on load. Two phases:
 
 1. **OMDB phase:** picks up to 50 active shows missing `rating`, missing `network_url`, or with no actor rows. Updates whatever it gets back. Title gets canonicalized only if there's no other row with that title (avoids creating duplicates).
-2. **TMDB phase:** picks up to 50 active non-movie shows, ordered by `COALESCE(enriched_at, '1970-01-01') ASC` so the stalest get refreshed first. Writes `next_season_date`, `season_end_date`, `full_series`, `genres` (coalesced — doesn't overwrite existing genres), and bumps `enriched_at`.
+2. **TMDB phase:** a TV pass over active non-movie shows (ordered by `COALESCE(enriched_at, '1970-01-01') ASC` so the stalest refresh first) plus a separate movie pass. Writes `next_season_date`, `season_end_date`, `full_series`, `genres`, poster/logo, and the migration-042 detail fields (all coalesced — never overwrites existing values), then propagates the catalog fields to every member's copy of the title, and bumps `enriched_at`. The movie pass now fetches movie details too (not just a poster) so films get the same rich fields.
 
 `updated_at` is **not** touched by enrichment — only by member-initiated writes. This is what lets `updated_at != created_at` cleanly distinguish "the member touched it" from "we auto-enriched it."
 
@@ -472,9 +483,9 @@ The page's tools row also has a "Run enrichment passes" button — it loops `POS
 
 The `inherit_networks` action (the "Adopt networks from club copies" button on the page) rescues rows that have no `network` at all — URL propagation can't reach them because it is scoped to `(title, network)`. Any active row whose title has exactly one distinct network across the rest of the club adopts that network, then a propagation pass fills its URL from the siblings. Titles whose copies disagree on the service are deliberately skipped; those belong to the conflict queue. Returns `{networks_set, urls_filled}`.
 
-The list response also carries a `bad_titles` section: titles enrichment has attempted (`enriched_at` set) but never matched to a poster on any copy. A missing poster is the observable symptom of a made-up name (e.g. "Juul Documentary" for *Big Vape: The Rise and Fall of Juul*) — the row's URL may be perfectly good, which is exactly why the URL queue misses it. The `fix_title` action renames every active copy, re-enriches, and now also pulls the new title's poster and network logo (preferring fresh artwork over whatever the old title had).
+The list response also carries a `needsPoster` section (`fetchNeedsPoster`): titles where *no* active copy has a poster, grouped by title. A missing poster is the observable symptom of a title TMDB can't match — a typo that stuck ("Marshalls" for *Marshals*), a descriptive member-entered name, or a title only indexed under the opposite media type. The row's URL may be perfectly good, which is exactly why the URL queue misses these. The companion "Missing posters" section on `url-cleanup.html` offers two fixes per title: **Re-enrich** (the `re_enrich` action — a fresh `fetchEnrichment` lookup for the title as-is, which flips media types, writing any poster/logo/rating/cast onto every copy) and **Rename** (the shared `fix_title` action, for when the stored title itself is wrong).
 
-Bad titles are fixed automatically where possible (`functions/_shared/title-fix.js`): when the row carries a real deep link, the streaming service's title page is a public SEO page whose `og:title` holds the show's actual name. Both the cleanup list action (capped pass before listing, reported as `auto_fixed`) and `/api/enrich`'s TMDB passes (fallback when no title spelling matches) recover the name that way, re-search TMDB, and rename every copy — member-safely: a member who already carries the show under its real name gets their wrong-titled duplicate archived instead of renamed. Only titles the automation can't confidently match (no poster from the recovered name) remain in `bad_titles` for manual cleanup.
+The automatic title-healing that used to back this queue was retired in July 2026 (`b1ecd34`) once TMDB type-ahead pinning made new in-app rows arrive canonical: the old `bad_titles`/`title_ok` queue, `og:title` recovery from deep links (`title-fix.js`), title-variant and cross-media-type retries in `/api/enrich`'s poster passes, and the OMDB title-guessing fallback are all gone. Kept: the manual `fix_title` rename and the artwork sync/propagation passes. Bulk off-platform imports (e.g. migration 032) bypass type-ahead, so hand-typed titles and movie flags can still miss — the `needsPoster` queue and per-title fix migrations are the operator's net for exactly that.
 
 ## Seed-only definition
 
