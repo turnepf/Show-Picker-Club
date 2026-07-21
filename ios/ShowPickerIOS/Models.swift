@@ -34,6 +34,13 @@ struct Member: Codable, Identifiable, Hashable {
 
     var label: String { displayName ?? firstName ?? name }
 
+    // A couple's label ("Jane & Joe", "Patrick and Ali") is a plural subject,
+    // so empty-state copy uses "aren't/haven't" instead of "isn't/hasn't".
+    var labelIsPlural: Bool {
+        let l = label.lowercased()
+        return l.contains(" & ") || l.contains(" and ")
+    }
+
     // "Most active" = engaged lists: Watching + Next Up + Loved.
     var activeCount: Int {
         (watchingCount ?? 0) + (nextCount ?? 0) + (recommendingCount ?? 0)

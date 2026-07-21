@@ -1750,6 +1750,10 @@
 
     const LIST_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved', next: 'Next Up' };
 
+    // A couple's page name ("Jane & Joe", "Patrick and Ali") is a plural
+    // subject, so empty-state verbs agree ("aren't/haven't").
+    const nameIsPlural = (name) => / & | and /i.test(name || '');
+
     // Empty-state copy. own.* is shown when the viewer owns this page; guest.*
     // is shown to anyone else (no CTA, just acknowledges the list is empty).
     const EMPTY_COPY = {
@@ -1774,9 +1778,11 @@
         },
       },
       guest: {
-        watching:   (name) => `${name} isn't watching anything right now.`,
-        waiting:    (name) => `${name} isn't awaiting any seasons.`,
-        recommending: (name) => `${name} hasn't loved anything yet.`,
+        // A couple's name ("Jane & Joe") is a plural subject, so the verb is
+        // "aren't/haven't" instead of "isn't/hasn't".
+        watching:   (name) => `${name} ${nameIsPlural(name) ? "aren't" : "isn't"} watching anything right now.`,
+        waiting:    (name) => `${name} ${nameIsPlural(name) ? "aren't" : "isn't"} awaiting any seasons.`,
+        recommending: (name) => `${name} ${nameIsPlural(name) ? "haven't" : "hasn't"} loved anything yet.`,
         next:       (name) => `${name}'s Next Up is empty.`,
       },
     };
