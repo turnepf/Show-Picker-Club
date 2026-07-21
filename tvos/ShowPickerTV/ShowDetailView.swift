@@ -99,12 +99,16 @@ struct ShowDetailView: View {
 
                         watchButton
                         trailerButton
+
+                        // The list controls live right under the buttons so the
+                        // whole screen fits without scrolling on the TV.
+                        actionsSection
                     }
                     Spacer()
                 }
 
-                // Cast sits directly under the title/info block, above the
-                // actions, with the creator/director grouped under it.
+                // Cast sits below the image/info block, under the description on
+                // the left, with the creator/director grouped under it.
                 if !cast.isEmpty || (show?.director.map { !$0.isEmpty } ?? false) {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Cast")
@@ -122,8 +126,6 @@ struct ShowDetailView: View {
                         }
                     }
                 }
-
-                actionsSection
             }
             .padding(60)
         }
@@ -145,7 +147,7 @@ struct ShowDetailView: View {
                 Text("My Lists")
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundColor(Theme.text)
-                HStack(spacing: 20) {
+                HStack(spacing: 14) {
                     ForEach(ShowList.allCases) { l in
                         // A colored dot + always-white label so the list name is
                         // legible whether or not the chip is focused. The system
