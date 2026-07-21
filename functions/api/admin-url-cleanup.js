@@ -182,7 +182,16 @@ async function fetchQueue(env) {
 // rating, and cast onto the renamed rows. Drives the operator's fix_title
 // action on the URL-cleanup queue.
 async function commitTitleFix(env, oldTitle, rawNew, enriched) {
-  const finalTitle = enriched.canonicalTitle || rawNew;
+  let finalTitle = enriched.canonicalTitle || rawNew;
+  // The operator is deliberately renaming away from oldTitle. When enrichment's
+  // canonical title circles right back to it — TMDB/OMDB matched a same-named
+  // entry (e.g. "Scarpetta" typed against a movie row collides with the 1918
+  // short "Scarpetta e l'americana" in the movie index) — honoring canonical
+  // would silently no-op the rename, which reads to the operator as the old
+  // name stubbornly reappearing. Trust the operator's typed title in that case.
+  if (finalTitle.trim().toLowerCase() === oldTitle.trim().toLowerCase()) {
+    finalTitle = rawNew;
+  }
   const renamed = await renameShowCopies(env, oldTitle, finalTitle);
 
   // Prefer the new title's artwork — the old title either had none (search
@@ -448,8 +457,28 @@ export async function onRequestPost(context) {
     const id = parseInt(body.id, 10);
     const rawNew = String(body.new_title || '').trim();
     const submittedNetwork = String(body.network || '').trim();
+    // Optional direct URL: lets the operator set a watch link straight from the
+    // Missing-posters card (which otherwise has no URL field). Same paste-blob
+    // tolerance as the save action.
+    const rawUrl = extractUrl(body.network_url || '') || (body.network_url || '').trim();
     if (!Number.isInteger(id)) return json({ error: 'id required' }, 400);
     if (!rawNew) return json({ error: 'new title required' }, 400);
+
+    // Validate the URL and resolve its network up front — before we rename —
+    // so a bad paste can't leave a half-applied fix (title renamed, URL rejected).
+    let urlNetwork = null;
+    if (rawUrl) {
+      const lower = rawUrl.toLowerCase();
+      const looksLikeSearch =
+        lower.includes('/search') || lower.includes('/s?') ||
+        lower.includes('?q=') || lower.includes('?query=');
+      if (looksLikeSearch) {
+        return json({ error: 'That still looks like a search URL — paste the direct show URL.' }, 400);
+      }
+      // URL trumps the dropdown pick, same as the save action.
+      urlNetwork = networkFromUrl(rawUrl) || (submittedNetwork ? canonicalNetwork(submittedNetwork) : null);
+      if (!urlNetwork) return json({ error: 'Pick a network for that URL.' }, 400);
+    }
 
     const row = await env.DB.prepare('SELECT title, movie FROM shows WHERE id = ?').bind(id).first();
     if (!row) return json({ error: 'Show not found' }, 404);
@@ -459,7 +488,16 @@ export async function onRequestPost(context) {
     const { finalTitle, updated } = await commitTitleFix(env, oldTitle, rawNew, enriched);
 
     let network = null;
-    if (submittedNetwork) {
+    if (rawUrl) {
+      // Set the operator's direct URL on every copy of the (freshly renamed)
+      // title that shares this network or has none — mirrors the save action's
+      // scoping so a sibling on a different service isn't clobbered.
+      network = urlNetwork;
+      await env.DB.prepare(
+        `UPDATE shows SET network = ?, network_url = ?, enriched_at = datetime('now')
+          WHERE LOWER(title) = LOWER(?) AND archived = 0 AND (network = ? OR network IS NULL)`
+      ).bind(network, rawUrl, finalTitle, network).run();
+    } else if (submittedNetwork) {
       network = canonicalNetwork(submittedNetwork);
       await env.DB.prepare(
         `UPDATE shows
@@ -470,7 +508,7 @@ export async function onRequestPost(context) {
       ).bind(network, network, finalTitle).run();
     }
 
-    return json({ ok: true, old_title: oldTitle, new_title: finalTitle, network, updated });
+    return json({ ok: true, old_title: oldTitle, new_title: finalTitle, network, network_url: rawUrl || null, updated });
   }
 
   if (action === 're_enrich') {
