@@ -42,7 +42,7 @@ database_id = "..."
 Login is by one-time code or Sign in with Apple — there are no stored passwords. The relevant tables (added by migrations, not in the base `schema.sql`):
 
 - `member_emails` / `member_phones` — map an email or phone to a member; the address a login code is sent to and matched against.
-- `login_otps` — short-lived, single-use email codes (`member_slug`, `code`, `channel`, `expires_at`, `used_at`). SMS codes are held by Twilio Verify, not stored here.
+- `login_otps` — short-lived, single-use email codes (`member_slug`, `code`, `channel`, `expires_at`, `used_at`, and `ip`/`user_agent` of the requester — migration 046). SMS codes are held by Twilio Verify, not stored here, but a marker row with `code=''` still records the request (and its IP) for rate-limiting. The IP columns exist so unrequested codes (someone submitting a member's email/phone) can be traced to a source and blocked at the Cloudflare edge.
 - `member_apple_ids` — links an Apple user id (`apple_sub`) to a member, populated on first Apple sign-in by email match so later sign-ins work even behind a private-relay address.
 
 ### `shows`
@@ -233,6 +233,7 @@ The `[slug]` param matches the full final segment (including `.ics`); the handle
 ### Login flow
 
 1. `POST /auth/login` with `{phone, code}` or `{email, code}` (codes are requested first via `POST /auth/request-code`). Sign in with Apple uses `POST /auth/apple` with Apple's identity token instead.
+   - `request-code` caps a member to 5 code sends/hour and logs the requester's IP on every row. On the **web** email form it also requires a Turnstile token (returns `403 {error:'captcha'}` on failure, checked *before* the membership lookup so it can't be used to probe which emails are members). This is gated on a browser `Origin` header so native iOS/tvOS email/phone login — which can't produce a Turnstile token — is never challenged, and is inert unless `TURNSTILE_SECRET_KEY` is set. Sending a code never exposes it to the requester (it only ever goes to the address already on file), and the verify step's per-IP + per-member failure caps make the 6-digit code non-brute-forceable, so unrequested codes are a nuisance, not an account risk.
 2. Throttle check: 5 failed attempts per IP in 15 minutes → 429 with `Retry-After`.
 3. Resolve the member: phone → `member_phones` + Twilio Verify; email → `member_emails` + `login_otps`; Apple → verify the token, then `member_apple_ids` (or first-time email match against `member_emails`).
 4. On success: insert a `sessions` row (UUID id, member's name as `email`, 30-day `expires_at`), set an HttpOnly + Secure + SameSite=Lax `session=` cookie, return the slug.
