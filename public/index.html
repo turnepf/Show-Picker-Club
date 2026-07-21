@@ -2541,12 +2541,16 @@
       } catch { showLoginError('Network error. Try again.'); }
     }
 
-    // ---- Turnstile (email signups; only when TURNSTILE_SITE_KEY is set) ----
+    // ---- Turnstile (email login + signups; only when TURNSTILE_SITE_KEY is
+    // set). Mounts for any email login now, not just self-enroll signups, so
+    // the server can require a challenge on the request-code form and stop
+    // scripted login-code spam. Native apps can't produce a token, so the
+    // server only enforces it for web (Origin-gated). ----
     let turnstileScriptLoading = false;
     function mountTurnstile() {
       const cfg = authConfig || {};
       const wrap = document.getElementById('turnstileWrap');
-      if (!cfg.turnstile_site_key || !cfg.self_enroll || wrap.dataset.rendered) return;
+      if (!cfg.turnstile_site_key || wrap.dataset.rendered) return;
       const render = () => {
         if (!window.turnstile || wrap.dataset.rendered) return;
         turnstileWidget = turnstile.render(wrap, { sitekey: cfg.turnstile_site_key });
@@ -2584,6 +2588,7 @@
           body: JSON.stringify(body),
         });
         if (res.status === 429) { showLoginError('Too many requests. Try again in an hour.'); return; }
+        if (res.status === 403) { showLoginError('Please complete the “I’m human” check and try again.'); return; }
         if (!res.ok) { showLoginError('Could not send. Try again in a minute.'); return; }
         document.getElementById('loginCodeSent').textContent = 'We sent a code to ' + email + '.';
         loginShowStep('code');
