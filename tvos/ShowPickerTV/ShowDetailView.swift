@@ -147,13 +147,12 @@ struct ShowDetailView: View {
                 Text("My Lists")
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundColor(Theme.text)
-                HStack(spacing: 14) {
+                // Four list chips on one row, each sized to its own label so the
+                // name never wraps. A colored dot + always-white label keeps the
+                // name legible without focus; we don't .tint (that painted the
+                // fill the same color as the text, hiding it until focus).
+                HStack(spacing: 16) {
                     ForEach(ShowList.allCases) { l in
-                        // A colored dot + always-white label so the list name is
-                        // legible whether or not the chip is focused. The system
-                        // .bordered style supplies the focusable pill; we don't
-                        // .tint it (that painted the fill the same color as the
-                        // text, hiding it until focus).
                         Button { Task { await chipTap(l) } } label: {
                             HStack(spacing: 10) {
                                 Circle().fill(Theme.listColor(l.rawValue)).frame(width: 16, height: 16)
@@ -164,17 +163,24 @@ struct ShowDetailView: View {
                                 }
                             }
                             .font(.system(size: 24, weight: .semibold))
+                            .lineLimit(1)
+                            .fixedSize()
                         }
                         .buttonStyle(.bordered)
                         .disabled(working)
                     }
-                    if let m = mineActive {
-                        Button(role: .destructive) { Task { await archive(m.id) } } label: {
-                            Label("Archive", systemImage: "archivebox")
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(working)
+                }
+                // Archive on its own row so the list row isn't crowded and the
+                // focused button has room to scale up.
+                if let m = mineActive {
+                    Button(role: .destructive) { Task { await archive(m.id) } } label: {
+                        Label("Archive", systemImage: "archivebox")
+                            .font(.system(size: 24, weight: .semibold))
+                            .lineLimit(1)
+                            .fixedSize()
                     }
+                    .buttonStyle(.bordered)
+                    .disabled(working)
                 }
                 if mineArchived != nil {
                     Text("Archived — pick a list to add it back")
