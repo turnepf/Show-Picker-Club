@@ -8,6 +8,16 @@ import Foundation
 enum API {
     static let baseString = "https://showpicker.club"
 
+    // Error payload the JSON senders decode from a non-2xx body. Declared at
+    // the type level (not inside the generic sendJSON) because Swift forbids
+    // nesting a type in a generic function.
+    private struct ErrBody: Decodable {
+        let error: String?
+        let id: Int?
+        let list: String?
+        let title: String?
+    }
+
     enum APIError: Error {
         case badURL, badResponse(Int), badBody
         // Non-2xx whose JSON body decoded: the server's actual rejection
@@ -658,7 +668,6 @@ enum API {
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
-            struct ErrBody: Decodable { let error: String?; let id: Int?; let list: String?; let title: String? }
             if let b = try? JSONDecoder().decode(ErrBody.self, from: data), let code = b.error {
                 throw APIError.rejected(ServerRejection(status: status, code: code, id: b.id, list: b.list, title: b.title))
             }
