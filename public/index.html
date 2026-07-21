@@ -3774,10 +3774,19 @@
       // live in the separate "My Lists" section built below — they're member
       // specific, not catalog data, so they're not in these rows.
       if (show.movie) rows.push(detailRow('Type', 'Movie'));
-      if (show.full_series) rows.push(detailRow('Series', 'Complete'));
+      // Series row folds in the season count: "4 Seasons, Complete", or just
+      // "2 Seasons" when it's still running (or just "Complete" if the count is
+      // unknown).
+      {
+        const n = show.seasons_released;
+        const seasonsStr = (typeof n === 'number' && n > 0) ? `${n} Season${n === 1 ? '' : 's'}` : null;
+        const seriesParts = [];
+        if (seasonsStr) seriesParts.push(seasonsStr);
+        if (show.full_series) seriesParts.push('Complete');
+        if (seriesParts.length) rows.push(detailRow('Series', escapeHtml(seriesParts.join(', '))));
+      }
       if (show.genres) rows.push(detailRow('Genres', escapeHtml(show.genres)));
       if (show.next_season_date) rows.push(detailRow('Next episode', escapeHtml(formatSeasonRange(show))));
-      if (seasonsText(show)) rows.push(detailRow('Seasons', escapeHtml(seasonsText(show))));
       if (show.content_rating) rows.push(detailRow('Rated', escapeHtml(show.content_rating)));
       if (show.release_year) rows.push(detailRow('Year', escapeHtml(String(show.release_year))));
       if (show.runtime) rows.push(detailRow('Runtime', escapeHtml(runtimeText(show.runtime))));
