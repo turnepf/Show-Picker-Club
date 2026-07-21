@@ -1017,9 +1017,9 @@
     .detail-nav .detail-nav-title {
       position: absolute;
       left: 50%; transform: translateX(-50%);
-      max-width: 60%;
+      max-width: 68%;
       text-align: center;
-      font-weight: 600; font-size: 16px;
+      font-weight: 700; font-size: 20px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .detail-body { max-width: 640px; margin: 16px auto 60px; padding: 0 14px; }
@@ -3748,16 +3748,22 @@
       const loggedIn = !!authMember;
       const realUrl = detailRealUrl(show.network_url);
 
-      const rows = [detailRow('Title', escapeHtml(show.title))];
+      // Title lives in the nav bar above the image (enlarged) — no redundant
+      // "Title" row here. The top card leads with where to watch + the trailer,
+      // then Cast, then the rest of the metadata below.
+      const topRows = [];
       if (show.network) {
         // Spell the affordance out — a bare network name reads as a label,
         // not a link, so nobody realized it opened the show on the service.
-        rows.push(detailRow('Network', realUrl
+        topRows.push(detailRow('Network', realUrl
           ? `<a href="${safeUrl(show.network_url)}" target="_blank" rel="noopener">Watch on ${escapeHtml(show.network)}</a>`
           : (show.watch_link
               ? `${escapeHtml(show.network)} · <a href="${safeUrl(show.watch_link)}" target="_blank" rel="noopener">Where to watch</a>`
               : escapeHtml(show.network))));
       }
+      if (show.trailer_key) topRows.push(detailRow('Trailer', `<a href="https://www.youtube.com/watch?v=${encodeURIComponent(show.trailer_key)}" target="_blank" rel="noopener">▶ Watch trailer</a>`));
+
+      const rows = [];
       // Single audience score, sourced from TMDB (`rating` carries it now).
       if (show.rating) rows.push(detailRow('Rating', `★ ${escapeHtml(show.rating)}`));
       // Reflect MY status, not the copy that opened this screen.
@@ -3788,7 +3794,6 @@
           : escapeHtml(show.director);
         rows.push(detailRow(show.movie ? 'Director' : 'Creator', dirVal));
       }
-      if (show.trailer_key) rows.push(detailRow('Trailer', `<a href="https://www.youtube.com/watch?v=${encodeURIComponent(show.trailer_key)}" target="_blank" rel="noopener">▶ Watch trailer</a>`));
 
       let html = '';
       // One image, not two: the wide backdrop is the hero when we have one;
@@ -3798,14 +3803,17 @@
       } else if (show.poster_url) {
         html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy" onclick="togglePosterLightbox(this)"></div>`;
       }
-      html += `<div class="detail-card">${rows.join('')}</div>`;
-      // Cast sits directly under the main info card, right below the title.
+      // Top card: Network, then Trailer.
+      if (topRows.length) html += `<div class="detail-card">${topRows.join('')}</div>`;
+      // Cast, directly under the trailer.
       if (actors.length) {
         const cast = actors.map(a => a.imdb_id
           ? `<a href="https://www.imdb.com/name/${encodeURIComponent(a.imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(a.name)}</a>`
           : escapeHtml(a.name)).join(', ');
         html += `<div class="detail-card"><div class="detail-card-title">Cast</div><div class="detail-prose">${cast}</div></div>`;
       }
+      // The rest of the metadata (rating, list, genres, dates, creator, …).
+      if (rows.length) html += `<div class="detail-card">${rows.join('')}</div>`;
       if (show.overview) html += `<div class="detail-card"><div class="detail-card-title">Overview</div><div class="detail-prose">${escapeHtml(show.overview)}</div></div>`;
       if (detailMyCopy && detailMyCopy.notes) html += `<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-prose">${escapeHtml(detailMyCopy.notes)}</div></div>`;
 
