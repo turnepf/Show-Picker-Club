@@ -1027,7 +1027,6 @@
     .detail-poster img {
       width: 160px; max-width: 45%; height: auto;
       border-radius: 12px; box-shadow: var(--shadow-card, 0 4px 16px rgba(0,0,0,0.18));
-      cursor: zoom-in;
     }
     /* Click the detail poster to view it full screen; click again to close. */
     .poster-lightbox {
@@ -3803,7 +3802,8 @@
       if (show.backdrop_url) {
         html += `<div class="detail-backdrop" style="width:100%;margin-bottom:12px;"><img src="${safeUrl(show.backdrop_url)}" alt="" loading="lazy" style="width:100%;border-radius:10px;display:block;"></div>`;
       } else if (show.poster_url) {
-        html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy" onclick="togglePosterLightbox(this)"></div>`;
+        // No tap-to-enlarge — the affordance confused people.
+        html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy"></div>`;
       }
       // Overview (plot synopsis) sits right under the title/image.
       if (show.overview) html += `<div class="detail-card"><div class="detail-card-title">Overview</div><div class="detail-prose">${escapeHtml(show.overview)}</div></div>`;
