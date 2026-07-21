@@ -3765,7 +3765,7 @@
 
       const rows = [];
       // Single audience score, sourced from TMDB (`rating` carries it now).
-      if (show.rating) rows.push(detailRow('Rating', `★ ${escapeHtml(show.rating)}`));
+      if (show.rating) rows.push(detailRow('TMDB Rating', `★ ${escapeHtml(show.rating)}`));
       // Reflect MY status, not the copy that opened this screen.
       if (detailMyCopy && !detailMyCopy.archived) {
         rows.push(detailRow('List', LIST_LABELS[detailMyCopy.list] || detailMyCopy.list));
