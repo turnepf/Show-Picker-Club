@@ -93,11 +93,14 @@ struct MemberView: View {
                         // Edit mode disables the NavigationLink tap, but the web
                         // still opens the card in manual sort — so while
                         // reordering, a tap on the row (not the ≡ handle) pushes
-                        // the detail programmatically. Simultaneous so it never
-                        // steals the link's tap in normal browsing.
-                        .simultaneousGesture(TapGesture().onEnded {
-                            if isReordering { reorderDetail = show }
-                        })
+                        // the detail programmatically. Masked to .subviews when
+                        // NOT reordering so it never competes with — and swallows
+                        // — the row's value-based NavigationLink tap (which is
+                        // what stopped member-list cards from opening).
+                        .simultaneousGesture(
+                            TapGesture().onEnded { reorderDetail = show },
+                            including: isReordering ? .all : .subviews
+                        )
                         .swipeActions(edge: .trailing) {
                             if isMine {
                                 Button(role: .destructive) {
