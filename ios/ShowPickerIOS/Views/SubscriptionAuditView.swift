@@ -10,6 +10,7 @@ struct SubscriptionAuditView: View {
     @State private var addingService = false
     @State private var newServiceName = ""
     @State private var errorText: String?
+    @State private var showingHousehold = false
 
     var body: some View {
         List {
@@ -17,6 +18,24 @@ struct SubscriptionAuditView: View {
                 Section { Text(err).foregroundStyle(.red) }
             }
             if let a = audit {
+                Section {
+                    Button {
+                        showingHousehold = true
+                    } label: {
+                        HStack {
+                            Label(householdLabel(a), systemImage: "person.2")
+                                .lineLimit(2)
+                            Spacer()
+                            Text((a.household?.isEmpty ?? true) ? "Add" : "Edit")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Household")
+                } footer: {
+                    Text("Pool another member's shows into this audit — for services you share, so one someone's watching counts as a keep.")
+                }
+
                 Section {
                     LabeledContent("Services", value: "\(a.totals.serviceCount)")
                     LabeledContent("Monthly spend", value: money(a.totals.monthlySpendCents))
@@ -68,6 +87,17 @@ struct SubscriptionAuditView: View {
         } message: {
             Text("Enter the name of a streaming service you pay for.")
         }
+        .sheet(isPresented: $showingHousehold) {
+            NavigationStack {
+                HouseholdPickerView { await load() }
+            }
+        }
+    }
+
+    private func householdLabel(_ a: SubscriptionAudit) -> String {
+        let hh = a.household ?? []
+        if hh.isEmpty { return "Just your shows" }
+        return "You + " + hh.map(\.name).joined(separator: ", ")
     }
 
     private func serviceRow(_ svc: SubscriptionService) -> some View {
@@ -295,6 +325,84 @@ private struct SubscriptionServiceEditView: View {
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
+}
+
+// Pick which club members share your household, so the audit pools everyone's
+// shows. Replaces the whole set on Save.
+private struct HouseholdPickerView: View {
+    let onSaved: () async -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var info: HouseholdInfo?
+    @State private var selected: Set<String> = []
+    @State private var loading = true
+    @State private var saving = false
+    @State private var errorText: String?
+
+    var body: some View {
+        List {
+            if let err = errorText {
+                Section { Text(err).foregroundStyle(.red) }
+            }
+            if let info {
+                if info.members.isEmpty {
+                    Section { Text("No other members to add yet.").foregroundStyle(.secondary) }
+                } else {
+                    Section {
+                        ForEach(info.members) { m in
+                            Button {
+                                if selected.contains(m.slug) { selected.remove(m.slug) }
+                                else { selected.insert(m.slug) }
+                            } label: {
+                                HStack {
+                                    Text(m.name).foregroundStyle(.primary)
+                                    Spacer()
+                                    if selected.contains(m.slug) {
+                                        Image(systemName: "checkmark").foregroundStyle(.tint)
+                                    }
+                                }
+                            }
+                        }
+                    } footer: {
+                        Text("Check the members you share streaming services with. The audit pools everyone's shows.")
+                    }
+                }
+            }
+        }
+        .navigationTitle("Household")
+        .navigationBarTitleDisplayMode(.inline)
+        .overlay { if loading && info == nil { ProgressView() } }
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") { Task { await save() } }.disabled(saving || loading)
+            }
+        }
+        .task { await load() }
+    }
+
+    private func load() async {
+        loading = true
+        defer { loading = false }
+        do {
+            let i = try await API.household()
+            info = i
+            selected = Set(i.household)
+        } catch {
+            errorText = "Couldn't load members — try again."
+        }
+    }
+
+    private func save() async {
+        saving = true
+        defer { saving = false }
+        do {
+            try await API.saveHousehold(Array(selected))
+            await onSaved()
+            dismiss()
+        } catch {
+            errorText = "Couldn't save — try again."
+        }
+    }
 }
 
 // Format cents as a dollar string.

@@ -131,11 +131,15 @@ Per-member subscription decisions for the Subscription Audit (`/subscriptions`).
 | `is_manual` | INTEGER DEFAULT 0 | 1 for a service the member pays for but tracks no shows on (e.g. a sports package). Stays 1 once set (`MAX` on upsert). |
 | `created_at`, `updated_at` | TEXT | |
 
+### `household_members`
+Members a person shares streaming services with, so the audit pools everyone's shows. Added by `migrations/045_household_members.sql`. Directed and per-member: `member_slug`'s household includes `other_slug` (A adding B doesn't change B's own audit). PK `(member_slug, other_slug)`; the PUT endpoint replaces the whole set. Managed via `GET/PUT /api/household` (`functions/api/household.js`).
+
 ## Subscription audit
 
 `GET/PUT /api/subscriptions` (`functions/api/subscriptions.js`), page at `public/subscriptions.html`, linked from the member page nav (own page only). Both verbs require a session and operate on the logged-in member.
 
-- **GET** groups the member's active shows by canonical network and assigns each service a **verdict**:
+- **Household pooling.** Before grouping, the GET reads the member's `household_members` and pools active shows across the member + those members. The same title appearing on more than one household member's list is deduped per network, keeping the most-active list (watching > waiting > next up > loved) so the verdict reflects whoever's furthest along. The response includes `household` (the pooled members' slugs + display names) for the "including …" line. Household is edited via the picker (web: modal on `/subscriptions`; iOS: sheet on `SubscriptionAuditView`) which calls `GET/PUT /api/household`.
+- **GET** groups the (pooled) active shows by canonical network and assigns each service a **verdict**:
   - `keep` — ≥1 show in `watching`.
   - `pause` — nothing watching, but a `waiting` show has a future `next_season_date`; the soonest such date is the suggested resubscribe target.
   - `pause_tba` — `waiting` shows but no announced premiere date.

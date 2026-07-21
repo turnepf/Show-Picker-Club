@@ -294,6 +294,21 @@ enum API {
         let _: Ack = try await putJSON("/api/subscriptions", body: body)
     }
 
+    // MARK: Household
+
+    // The members whose shows are pooled into my subscription audit, plus the
+    // roster to choose from (GET), and a save (PUT replaces the whole set).
+    static func household() async throws -> HouseholdInfo {
+        try await get("/api/household")
+    }
+
+    @discardableResult
+    static func saveHousehold(_ slugs: [String]) async throws -> Bool {
+        struct Ack: Decodable {}
+        let _: Ack = try await putJSON("/api/household", body: ["members": slugs])
+        return true
+    }
+
     // MARK: Vibe
 
     // Taste fingerprint for a member (any member; requires login). Pass nil to
