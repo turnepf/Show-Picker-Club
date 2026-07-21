@@ -52,7 +52,10 @@ struct ShowDetailView: View {
                     .listRowBackground(Color.clear)
                 }
             }
-            if let p = (show?.posterUrl ?? initialPoster), !p.isEmpty {
+            // One image, not two: the backdrop above is the hero when present;
+            // the poster shows only when there's no backdrop.
+            let hasBackdrop = !((show?.backdropUrl ?? "").isEmpty)
+            if !hasBackdrop, let p = (show?.posterUrl ?? initialPoster), !p.isEmpty {
                 Section {
                     // Tap to view the poster full screen; tap again to return.
                     Button { posterExpanded = true } label: {

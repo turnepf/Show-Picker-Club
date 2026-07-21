@@ -1289,7 +1289,7 @@
           <nav class="ios-group" id="membersList"></nav>
         </div>
 
-        <p class="ios-footnote">Ratings and metadata from IMDb (via OMDb) and TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+        <p class="ios-footnote">Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
 
         <footer class="ios-footnote" style="margin-top: 26px;">
           &copy; 2025 Patrick Turner.
@@ -1375,7 +1375,7 @@
       </nav>
       <h3 class="ios-group-header">Members</h3>
       <nav class="ios-group side-members" id="sideMembersList"></nav>
-      <p class="ios-footnote">Ratings and metadata from IMDb (via OMDb) and TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+      <p class="ios-footnote">Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
     </aside>
 
     <div class="split-detail">
@@ -3791,8 +3791,13 @@
       if (show.trailer_key) rows.push(detailRow('Trailer', `<a href="https://www.youtube.com/watch?v=${encodeURIComponent(show.trailer_key)}" target="_blank" rel="noopener">▶ Watch trailer</a>`));
 
       let html = '';
-      if (show.backdrop_url) html += `<div class="detail-backdrop" style="width:100%;margin-bottom:12px;"><img src="${safeUrl(show.backdrop_url)}" alt="" loading="lazy" style="width:100%;border-radius:10px;display:block;"></div>`;
-      if (show.poster_url) html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy" onclick="togglePosterLightbox(this)"></div>`;
+      // One image, not two: the wide backdrop is the hero when we have one;
+      // otherwise fall back to the poster (still tap-to-expand).
+      if (show.backdrop_url) {
+        html += `<div class="detail-backdrop" style="width:100%;margin-bottom:12px;"><img src="${safeUrl(show.backdrop_url)}" alt="" loading="lazy" style="width:100%;border-radius:10px;display:block;"></div>`;
+      } else if (show.poster_url) {
+        html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy" onclick="togglePosterLightbox(this)"></div>`;
+      }
       html += `<div class="detail-card">${rows.join('')}</div>`;
       // Cast sits directly under the main info card, right below the title.
       if (actors.length) {

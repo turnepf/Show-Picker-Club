@@ -484,8 +484,19 @@ export async function onRequestPost(context) {
     if (!row) return json({ error: 'Show not found' }, 404);
     const oldTitle = row.title;
 
-    const enriched = await fetchEnrichment(rawNew, env, !!row.movie);
+    // Optional media-type correction from the card's Show/Movie toggle. Flipping
+    // it makes enrichment search the right TMDB index — the reason a movie row
+    // like "Scarpetta e l'americana" could never resolve to the TV series.
+    const movieOverride = (body.movie === 0 || body.movie === 1) ? body.movie : null;
+    const isMovie = movieOverride !== null ? !!movieOverride : !!row.movie;
+
+    const enriched = await fetchEnrichment(rawNew, env, isMovie);
     const { finalTitle, updated } = await commitTitleFix(env, oldTitle, rawNew, enriched);
+    if (movieOverride !== null) {
+      await env.DB.prepare(
+        `UPDATE shows SET movie = ?, enriched_at = datetime('now') WHERE LOWER(title) = LOWER(?) AND archived = 0`
+      ).bind(movieOverride, finalTitle).run();
+    }
 
     let network = null;
     if (rawUrl) {
@@ -523,7 +534,17 @@ export async function onRequestPost(context) {
     const row = await env.DB.prepare('SELECT title, movie FROM shows WHERE id = ?').bind(id).first();
     if (!row) return json({ error: 'Show not found' }, 404);
 
-    const enriched = await fetchEnrichment(row.title, env, !!row.movie);
+    // Optional media-type correction from the card's Show/Movie toggle, so the
+    // fresh lookup searches the right TMDB index.
+    const movieOverride = (body.movie === 0 || body.movie === 1) ? body.movie : null;
+    if (movieOverride !== null) {
+      await env.DB.prepare(
+        `UPDATE shows SET movie = ? WHERE LOWER(title) = LOWER(?) AND archived = 0`
+      ).bind(movieOverride, row.title).run();
+    }
+    const isMovie = movieOverride !== null ? !!movieOverride : !!row.movie;
+
+    const enriched = await fetchEnrichment(row.title, env, isMovie);
     if (enriched.posterUrl || enriched.networkLogoUrl || enriched.rating || enriched.overview) {
       await env.DB.prepare(
         `UPDATE shows

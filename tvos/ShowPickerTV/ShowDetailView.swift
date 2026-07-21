@@ -50,7 +50,10 @@ struct ShowDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 40) {
-                if let b = show?.backdropUrl, !b.isEmpty, let url = URL(string: b) {
+                // One image, not two: the poster + info sit side-by-side below,
+                // so the backdrop hero shows only when there's no poster.
+                if posterUrlString == nil,
+                   let b = show?.backdropUrl, !b.isEmpty, let url = URL(string: b) {
                     AsyncImage(url: url) { phase in
                         if let img = phase.image {
                             img.resizable().scaledToFill()
