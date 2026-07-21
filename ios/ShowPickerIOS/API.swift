@@ -18,6 +18,15 @@ enum API {
         let title: String?
     }
 
+    // sendJSON drops Swift-nil body values so the JSON omits them, and the
+    // update endpoint keeps a field whose key is absent (only an explicit JSON
+    // null clears it). So a cleared editable field (e.g. an emptied note) would
+    // be dropped, not cleared. Wrap it in NSNull() to send an explicit null.
+    private static func jsonNullable(_ s: String?) -> Any {
+        if let s { return s }
+        return NSNull()
+    }
+
     enum APIError: Error {
         case badURL, badResponse(Int), badBody
         // Non-2xx whose JSON body decoded: the server's actual rejection
@@ -553,15 +562,18 @@ enum API {
                                  watchingWith: String?, archived: Bool,
                                  tmdbId: Int? = nil, tmdbType: String? = nil) async throws -> Show {
         struct Wrapper: Decodable { let show: Show }
+        // Member-editable text fields are sent as explicit JSON null when
+        // cleared (via jsonNullable) so emptying a note/recommender/watching-with
+        // actually clears it instead of being dropped and kept.
         let body: [String: Any?] = [
             "title": title,
             "network": network,
             "list": list,
-            "notes": notes,
-            "recommended_by": recommendedBy,
+            "notes": jsonNullable(notes),
+            "recommended_by": jsonNullable(recommendedBy),
             "movie": movie ? 1 : 0,
             "full_series": fullSeries ? 1 : 0,
-            "watching_with": watchingWith,
+            "watching_with": jsonNullable(watchingWith),
             "archived": archived ? 1 : 0,
             "tmdb_id": tmdbId,
             "tmdb_type": tmdbType,
