@@ -123,8 +123,7 @@ struct ShowDetailView: View {
                     Spacer()
                 }
 
-                actionsSection
-
+                // Cast sits directly under the title/info block, above the actions.
                 if !cast.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Cast")
@@ -135,6 +134,8 @@ struct ShowDetailView: View {
                             .foregroundColor(Theme.muted)
                     }
                 }
+
+                actionsSection
             }
             .padding(60)
         }
@@ -365,13 +366,13 @@ struct ShowDetailView: View {
         .font(.system(size: 24))
     }
 
-    // "2026 · 1h 52m · TV-MA · ★ 7.2 TMDB" — the catalog facts on one line.
+    // "2026 · 1h 52m · TV-MA" — the catalog facts on one line. The audience
+    // score isn't repeated here; the star Label by the title already shows it.
     private func extraMetaLine(_ s: Show) -> String? {
         var parts: [String] = []
         if let y = s.releaseYear { parts.append(String(y)) }
         if let rt = s.runtimeText { parts.append(rt) }
         if let cr = s.contentRating, !cr.isEmpty { parts.append(cr) }
-        if let tr = s.tmdbRating, !tr.isEmpty { parts.append("★ \(tr) TMDB") }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 

@@ -49,8 +49,8 @@ struct WatchDetailView: View {
                         row("Network", n)
                     }
                 }
+                // Single audience score, sourced from TMDB (`rating` carries it now).
                 if let r = s.rating, !r.isEmpty { row("Rating", "★ \(r)") }
-                if let tr = s.tmdbRating, !tr.isEmpty { row("TMDB", "★ \(tr)") }
                 if let l = ShowList(rawValue: s.list) { row("List", l.title) }
                 if let up = s.nextUpRange { row("Next episode", up) }
                 if let seasons = s.seasonsText { row("Seasons", seasons) }
@@ -58,7 +58,17 @@ struct WatchDetailView: View {
                 if let cr = s.contentRating, !cr.isEmpty { row("Rated", cr) }
                 if let y = s.releaseYear { row("Year", String(y)) }
                 if let rt = s.runtimeText { row("Runtime", rt) }
-                if let d = s.director, !d.isEmpty { row(s.directorLabel, d) }
+                if let d = s.director, !d.isEmpty {
+                    // Link a single-person credit to their IMDB page (like cast).
+                    if let url = s.directorURL {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(s.directorLabel).font(.caption2).foregroundStyle(.secondary)
+                            Link(d, destination: url).font(.footnote)
+                        }
+                    } else {
+                        row(s.directorLabel, d)
+                    }
+                }
                 if let turl = s.trailerURL {
                     Link("▶ Trailer", destination: turl).font(.footnote)
                 }

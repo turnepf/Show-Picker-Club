@@ -3758,8 +3758,8 @@
               ? `${escapeHtml(show.network)} · <a href="${safeUrl(show.watch_link)}" target="_blank" rel="noopener">Where to watch</a>`
               : escapeHtml(show.network))));
       }
+      // Single audience score, sourced from TMDB (`rating` carries it now).
       if (show.rating) rows.push(detailRow('Rating', `★ ${escapeHtml(show.rating)}`));
-      if (show.tmdb_rating) rows.push(detailRow('TMDB', `★ ${escapeHtml(show.tmdb_rating)}`));
       // Reflect MY status, not the copy that opened this screen.
       if (detailMyCopy && !detailMyCopy.archived) {
         rows.push(detailRow('List', LIST_LABELS[detailMyCopy.list] || detailMyCopy.list));
@@ -3779,21 +3779,30 @@
       if (show.content_rating) rows.push(detailRow('Rated', escapeHtml(show.content_rating)));
       if (show.release_year) rows.push(detailRow('Year', escapeHtml(String(show.release_year))));
       if (show.runtime) rows.push(detailRow('Runtime', escapeHtml(runtimeText(show.runtime))));
-      if (show.director) rows.push(detailRow(show.movie ? 'Director' : 'Creator', escapeHtml(show.director)));
+      if (show.director) {
+        // Link a single-person credit to their IMDB page (mirrors the cast
+        // links); a multi-creator credit (comma in the name) stays plain so the
+        // whole list doesn't point at just the first person.
+        const dirVal = (show.director_imdb_id && !show.director.includes(','))
+          ? `<a href="https://www.imdb.com/name/${encodeURIComponent(show.director_imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(show.director)}</a>`
+          : escapeHtml(show.director);
+        rows.push(detailRow(show.movie ? 'Director' : 'Creator', dirVal));
+      }
       if (show.trailer_key) rows.push(detailRow('Trailer', `<a href="https://www.youtube.com/watch?v=${encodeURIComponent(show.trailer_key)}" target="_blank" rel="noopener">▶ Watch trailer</a>`));
 
       let html = '';
       if (show.backdrop_url) html += `<div class="detail-backdrop" style="width:100%;margin-bottom:12px;"><img src="${safeUrl(show.backdrop_url)}" alt="" loading="lazy" style="width:100%;border-radius:10px;display:block;"></div>`;
       if (show.poster_url) html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy" onclick="togglePosterLightbox(this)"></div>`;
       html += `<div class="detail-card">${rows.join('')}</div>`;
-      if (show.overview) html += `<div class="detail-card"><div class="detail-card-title">Overview</div><div class="detail-prose">${escapeHtml(show.overview)}</div></div>`;
-      if (detailMyCopy && detailMyCopy.notes) html += `<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-prose">${escapeHtml(detailMyCopy.notes)}</div></div>`;
+      // Cast sits directly under the main info card, right below the title.
       if (actors.length) {
         const cast = actors.map(a => a.imdb_id
           ? `<a href="https://www.imdb.com/name/${encodeURIComponent(a.imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(a.name)}</a>`
           : escapeHtml(a.name)).join(', ');
         html += `<div class="detail-card"><div class="detail-card-title">Cast</div><div class="detail-prose">${cast}</div></div>`;
       }
+      if (show.overview) html += `<div class="detail-card"><div class="detail-card-title">Overview</div><div class="detail-prose">${escapeHtml(show.overview)}</div></div>`;
+      if (detailMyCopy && detailMyCopy.notes) html += `<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-prose">${escapeHtml(detailMyCopy.notes)}</div></div>`;
 
       // No "Watch on …" action here — the Network row above is the watch
       // link, and it renders whenever the same real URL exists.

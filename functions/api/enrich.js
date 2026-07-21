@@ -71,109 +71,16 @@ async function syncArtworkAcrossCopies(env) {
   ).run();
 }
 
-// Networks with `param` pass the show name in the search URL query string.
-// Networks without `param` just link to the search page (no show name).
-const NETWORK_SEARCH = {
-  // These pass the show name in the search query:
-  'HBO': { base: 'https://play.max.com/search', param: 'q' },
-  'Apple TV': { base: 'https://tv.apple.com/search', param: 'term' },
-  'Amazon': { base: 'https://www.amazon.com/s', param: 'k', extra: 'i=instant-video' },
-  'Starz': { base: 'https://www.starz.com/search', param: 'q' },
-  'Showtime': { base: 'https://www.sho.com/search', param: 'q' },
-  // These just link to the search page (no query param support):
-  'Netflix': { base: 'https://www.netflix.com/search' },
-  'Hulu': { base: 'https://www.hulu.com/search' },
-  'Paramount': { base: 'https://www.paramountplus.com/search' },
-  'Peacock': { base: 'https://www.peacocktv.com/watch/search' },
-  'Bravo': { base: 'https://www.peacocktv.com/watch/search' },
-  'Disney+': { base: 'https://www.disneyplus.com/browse/search' },
-  'NBC': { base: 'https://www.nbc.com/search' },
-  'CBS': { base: 'https://www.cbs.com/shows/' },
-  'USA': { base: 'https://www.peacocktv.com/watch/search' },
-  'National Geographic': { base: 'https://www.nationalgeographic.com/tv/shows' },
-  'Food Network': { base: 'https://www.foodnetwork.com/search', param: 'q' },
-  'Fox': { base: 'https://www.fox.com/search' },
-  'BritBox': { base: 'https://www.britbox.com/us/search' },
-};
-
-function generateSearchUrl(network, title) {
-  if (!network) return null;
-  const cfg = NETWORK_SEARCH[network];
-  if (!cfg) return null;
-  if (!cfg.param) return cfg.base;
-  const params = new URLSearchParams();
-  if (cfg.extra) cfg.extra.split('&').forEach(p => { const [k,v] = p.split('='); params.set(k,v); });
-  params.set(cfg.param, title);
-  return cfg.base + '?' + params.toString();
-}
-
-async function tryOMDB(title, apiKey, type) {
+// Resolve a TMDB person id to their IMDB id (nm…), for the creator/director
+// person link on the detail screen. Best-effort: null on any miss/error.
+async function personImdbId(personId, env) {
+  if (!personId) return null;
   try {
-    let url = `https://www.omdbapi.com/?t=${encodeURIComponent(title)}&apikey=${apiKey}`;
-    if (type) url += `&type=${type}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.Response === 'True') {
-      return {
-        canonicalTitle: data.Title,
-        rating: data.imdbRating !== 'N/A' ? data.imdbRating : null,
-        actors: data.Actors && data.Actors !== 'N/A' ? data.Actors.split(', ') : [],
-      };
-    }
-  } catch (e) {}
-  return null;
-}
-
-async function searchOMDB(title, apiKey, type) {
-  try {
-    let url = `https://www.omdbapi.com/?s=${encodeURIComponent(title)}&apikey=${apiKey}`;
-    if (type) url += `&type=${type}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.Response === 'True' && data.Search && data.Search.length > 0) {
-      // Fetch full details for the first result
-      const id = data.Search[0].imdbID;
-      const detailRes = await fetch(`https://www.omdbapi.com/?i=${id}&apikey=${apiKey}`);
-      const detail = await detailRes.json();
-      if (detail.Response === 'True') {
-        return {
-          canonicalTitle: detail.Title,
-          rating: detail.imdbRating !== 'N/A' ? detail.imdbRating : null,
-          actors: detail.Actors && detail.Actors !== 'N/A' ? detail.Actors.split(', ') : [],
-        };
-      }
-    }
-  } catch (e) {}
-  return null;
-}
-
-async function fetchOMDB(title, apiKey, type) {
-  // Try exact title
-  let result = await tryOMDB(title, apiKey, type);
-  if (result) return result;
-
-  // Try with "The " prepended
-  result = await tryOMDB('The ' + title, apiKey, type);
-  if (result) return result;
-
-  // Try without "The " prefix
-  if (title.toLowerCase().startsWith('the ')) {
-    result = await tryOMDB(title.slice(4), apiKey, type);
-    if (result) return result;
+    const ext = await tmdbGet(`/person/${personId}/external_ids`, env);
+    return ext.imdb_id || null;
+  } catch (e) {
+    return null;
   }
-
-  // Try collapsing spaces (e.g. "Land Man" -> "Landman")
-  const collapsed = title.replace(/\s+/g, '');
-  if (collapsed !== title) {
-    result = await tryOMDB(collapsed, apiKey, type);
-    if (result) return result;
-  }
-
-  // Fall back to search endpoint
-  result = await searchOMDB(title, apiKey, type);
-  if (result) return result;
-
-  return { canonicalTitle: null, rating: null, actors: [] };
 }
 
 export async function onRequestPost(context) {
@@ -190,101 +97,29 @@ export async function onRequestPost(context) {
     });
   }
 
-  const apiKey = env.OMDB_API_KEY;
-
   let body = {};
   try { body = await request.json(); } catch (e) {}
   const member = body.member || null;
-  // Cloudflare's free plan caps a single Worker invocation at 50 fetch
-  // subrequests. Running every pass (OMDB + TMDB TV + movie + actors) at a
-  // cap of 50 blows far past that — the OMDB pass alone exhausts the budget,
-  // so the later TMDB poster fetches all throw "Too many subrequests" and get
-  // swallowed. `mode: 'posters'` (or skip_omdb/skip_actors) runs only the
-  // cheap TMDB poster passes so a backfill can populate artwork within budget.
+  // Cloudflare's subrequest ceiling still bounds a single invocation, so the
+  // heavy TMDB detail passes and the cheap poster catch-up stay separable.
+  // `mode: 'posters'` (or skip_omdb/skip_actors) runs only the small poster
+  // batch so an artwork backfill fits comfortably within budget. (`skip_omdb`
+  // is kept as an alias now that OMDB is gone — it still selects posters-only.)
   const skipOmdb = body.skip_omdb === true || body.mode === 'posters';
   const skipActors = body.skip_actors === true || body.mode === 'posters';
   // Optional: restrict the TMDB passes to a specific set of titles (e.g. the
   // Trending shelf), so we can prioritise the most-visible shows first.
   const titles = Array.isArray(body.titles) && body.titles.length
     ? body.titles.map(t => String(t).toLowerCase()) : null;
-  // Soft caps to keep us well clear of OMDB's free-tier 1k/day, TMDB's
-  // per-key budget, and (above all) the 50-subrequest-per-invocation ceiling.
-  // The poster passes now try up to 3 title spellings per show, so the default
-  // batch is smaller to stay under budget when many titles miss.
-  const maxOmdb = parseInt(body.max_omdb ?? '50', 10);
+  // Soft cap on the TMDB batch, kept well clear of the per-invocation
+  // subrequest ceiling. Smaller in posters-only mode since that's just a
+  // top-up sweep.
   const maxTmdb = parseInt(body.max_tmdb ?? (skipOmdb ? '6' : '50'), 10);
 
-  // OMDB pass (ratings, actors, search URLs). Gated on an OMDB key being
-  // configured: a missing key skips this pass but must NOT short-circuit the
-  // TMDB poster/season passes that follow (that early return was why the
-  // backfill reported tmdbUpdated: 0 even with TMDB credentials present).
+  // `enriched` is retained in the response shape for callers/UI that read it;
+  // the OMDB ratings/actors pass it once counted is gone (TMDB now supplies
+  // ratings, cast, and creator links directly in the passes below).
   let enriched = 0;
-  if (apiKey && !skipOmdb) {
-  // Order by most-recent change first so newly-added/edited shows enrich before older backlog.
-  const baseSelect = `SELECT s.id, s.title, s.network, s.network_url, s.movie
-     FROM shows s
-     WHERE s.archived = 0
-       AND (s.rating IS NULL
-         OR s.network_url IS NULL
-         OR NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = s.id))`;
-  const stmt = member
-    ? env.DB.prepare(`${baseSelect} AND s.member_slug = ? ORDER BY COALESCE(s.updated_at, s.created_at) DESC LIMIT ?`).bind(member, maxOmdb)
-    : env.DB.prepare(`${baseSelect} ORDER BY COALESCE(s.updated_at, s.created_at) DESC LIMIT ?`).bind(maxOmdb);
-  const { results: needsRating } = await stmt.all();
-
-  for (const show of needsRating) {
-    const omdb = await fetchOMDB(show.title, apiKey, show.movie ? 'movie' : 'series');
-
-    // Update canonical title if OMDB returned a different one
-    if (omdb.canonicalTitle && omdb.canonicalTitle !== show.title) {
-      // Check if canonical title already exists in DB
-      const dupe = await env.DB.prepare(
-        'SELECT id FROM shows WHERE LOWER(title) = LOWER(?) AND id != ?'
-      ).bind(omdb.canonicalTitle, show.id).first();
-      if (dupe) {
-        // Duplicate — archive this one instead of renaming
-        await env.DB.prepare(
-          "UPDATE shows SET archived = 1, enriched_at = datetime('now') WHERE id = ?"
-        ).bind(show.id).run();
-        enriched++;
-        continue;
-      }
-      await env.DB.prepare(
-        "UPDATE shows SET title = ?, enriched_at = datetime('now') WHERE id = ?"
-      ).bind(omdb.canonicalTitle, show.id).run();
-    }
-
-    // Update rating if missing
-    if (omdb.rating) {
-      await env.DB.prepare(
-        "UPDATE shows SET rating = ?, enriched_at = datetime('now') WHERE id = ? AND rating IS NULL"
-      ).bind(omdb.rating, show.id).run();
-    }
-
-    // Update actors if missing
-    if (omdb.actors.length > 0) {
-      const { results: existing } = await env.DB.prepare(
-        'SELECT COUNT(*) as c FROM actors WHERE show_id = ?'
-      ).bind(show.id).all();
-      if (existing[0].c === 0) {
-        const stmt = env.DB.prepare('INSERT INTO actors (show_id, name) VALUES (?, ?)');
-        await env.DB.batch(omdb.actors.map(actor => stmt.bind(show.id, actor)));
-      }
-    }
-
-    // Generate search URL if no URL at all
-    if (!show.network_url && show.network) {
-      const searchUrl = generateSearchUrl(show.network, show.title);
-      if (searchUrl) {
-        await env.DB.prepare(
-          "UPDATE shows SET network_url = ?, enriched_at = datetime('now') WHERE id = ?"
-        ).bind(searchUrl, show.id).run();
-      }
-    }
-
-    enriched++;
-  }
-  }
 
   // TMDB: check next season dates for Watching and Waiting shows.
   // Cap the same way; oldest/least-recently-enriched first so the budget rotates evenly.
@@ -336,8 +171,9 @@ export async function onRequestPost(context) {
         // append_to_response folds videos/providers/content-ratings into the
         // one detail call we already make — no extra subrequest budget.
         const detail = await tmdbGet(
-          `/tv/${tmdbId}?append_to_response=videos,watch/providers,content_ratings`, env);
+          `/tv/${tmdbId}?append_to_response=videos,watch/providers,content_ratings,credits`, env);
         const df = extractTmdbDetailFields(detail, 'tv');
+        const directorImdbId = await personImdbId(df.directorPersonId, env);
 
         // Check if series is complete
         const status = detail.status;
@@ -384,13 +220,13 @@ export async function onRequestPost(context) {
               genres = COALESCE(?, genres), seasons_released = COALESCE(?, seasons_released),
               poster_url = COALESCE(?, poster_url), network_logo_url = COALESCE(?, network_logo_url),
               overview = COALESCE(?, overview), backdrop_url = COALESCE(?, backdrop_url),
-              tmdb_rating = COALESCE(?, tmdb_rating), content_rating = COALESCE(?, content_rating),
-              trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director),
+              tmdb_rating = COALESCE(?, tmdb_rating), rating = COALESCE(?, rating), content_rating = COALESCE(?, content_rating),
+              trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director), director_imdb_id = COALESCE(?, director_imdb_id),
               runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
               network = COALESCE(network, ?), watch_link = COALESCE(?, watch_link),
               enriched_at = datetime('now') WHERE id = ?`
         ).bind(newDate, endDate, isComplete, genres, seasonsReleased, posterUrl, networkLogoUrl,
-          df.overview, df.backdropUrl, df.tmdbRating, df.contentRating, df.trailerKey, df.director,
+          df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey, df.director, directorImdbId,
           df.runtime, df.releaseYear, df.providerNetwork, df.watchLink, show.id).run();
         // Catalog fields (artwork + the new detail fields) are the same for
         // every member's copy of a title, so push them to all copies in one
@@ -400,14 +236,14 @@ export async function onRequestPost(context) {
         await env.DB.prepare(
           `UPDATE shows SET poster_url = COALESCE(poster_url, ?), network_logo_url = COALESCE(network_logo_url, ?),
               overview = COALESCE(overview, ?), backdrop_url = COALESCE(backdrop_url, ?),
-              tmdb_rating = COALESCE(tmdb_rating, ?), content_rating = COALESCE(content_rating, ?),
-              trailer_key = COALESCE(trailer_key, ?), director = COALESCE(director, ?),
+              tmdb_rating = COALESCE(tmdb_rating, ?), rating = COALESCE(?, rating), content_rating = COALESCE(content_rating, ?),
+              trailer_key = COALESCE(trailer_key, ?), director = COALESCE(director, ?), director_imdb_id = COALESCE(director_imdb_id, ?),
               runtime = COALESCE(runtime, ?), release_year = COALESCE(release_year, ?),
               genres = COALESCE(genres, ?), watch_link = COALESCE(watch_link, ?)
             WHERE archived = 0
               AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
-        ).bind(posterUrl, networkLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.contentRating,
-          df.trailerKey, df.director, df.runtime, df.releaseYear, genres, df.watchLink, show.id).run();
+        ).bind(posterUrl, networkLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating,
+          df.trailerKey, df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.watchLink, show.id).run();
         tmdbUpdated++;
       } catch (e) {}
     }
@@ -449,23 +285,25 @@ export async function onRequestPost(context) {
         const detail = await tmdbGet(
           `/movie/${first.id}?append_to_response=videos,watch/providers,release_dates,credits`, env);
         const df = extractTmdbDetailFields(detail, 'movie');
+        const directorImdbId = await personImdbId(df.directorPersonId, env);
         const posterPath = detail.poster_path || first.poster_path;
         const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
         const genres = (detail.genres || []).map(g => g.name).join(', ') || null;
-        // Title-scoped: fills every member's copy in one go (fill-only COALESCE),
-        // and stamps enriched_at on all of them so the title rotates evenly.
+        // Title-scoped: fills every member's copy in one go (fill-only COALESCE,
+        // except rating which converges to the fresh TMDB score), and stamps
+        // enriched_at on all of them so the title rotates evenly.
         await env.DB.prepare(
           `UPDATE shows SET poster_url = COALESCE(?, poster_url),
               overview = COALESCE(overview, ?), backdrop_url = COALESCE(backdrop_url, ?),
-              tmdb_rating = COALESCE(tmdb_rating, ?), content_rating = COALESCE(content_rating, ?),
-              trailer_key = COALESCE(trailer_key, ?), director = COALESCE(director, ?),
+              tmdb_rating = COALESCE(tmdb_rating, ?), rating = COALESCE(?, rating), content_rating = COALESCE(content_rating, ?),
+              trailer_key = COALESCE(trailer_key, ?), director = COALESCE(director, ?), director_imdb_id = COALESCE(director_imdb_id, ?),
               runtime = COALESCE(runtime, ?), release_year = COALESCE(release_year, ?),
               genres = COALESCE(genres, ?), network = COALESCE(network, ?),
               watch_link = COALESCE(watch_link, ?), enriched_at = datetime('now')
             WHERE archived = 0
               AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
-        ).bind(posterUrl, df.overview, df.backdropUrl, df.tmdbRating, df.contentRating, df.trailerKey,
-          df.director, df.runtime, df.releaseYear, genres, df.providerNetwork, df.watchLink, show.id).run();
+        ).bind(posterUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey,
+          df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.providerNetwork, df.watchLink, show.id).run();
         if (posterUrl) tmdbUpdated++;
       } catch (e) {}
     }
@@ -473,14 +311,12 @@ export async function onRequestPost(context) {
 
   // Actor IMDB-id backfill — self-healing, no admin action required.
   // imdb_id is only ever written by the TMDB enrichment path (at add/edit time).
-  // Shows added before that path existed, or via one that omits it (OMDB
-  // fallback, the OMDB pass above, share, suggestions), keep actor rows with
-  // imdb_id = NULL, so their names render as plain non-clickable tags. Re-run
-  // the same TMDB enrichment for any show that still has null-id actors and
-  // refresh its cast. We propagate by title so a single lookup fixes every
-  // member's copy at once — including the oldest copy the home page surfaces
-  // via /api/popular's MIN(id). Gated on TMDB_TOKEN: the OMDB fallback can't
-  // supply actor ids, so there's nothing to gain (and nothing to wipe) without it.
+  // Shows added before that path existed, or via a legacy path that omitted it
+  // (share, suggestions), keep actor rows with imdb_id = NULL, so their names
+  // render as plain non-clickable tags. Re-run the TMDB enrichment for any show
+  // that still has null-id actors and refresh its cast. We propagate by title
+  // so a single lookup fixes every member's copy at once — including the oldest
+  // copy the home page surfaces via /api/popular's MIN(id). Gated on TMDB_TOKEN.
   let actorImdbFilled = 0;
   if (env.TMDB_TOKEN && !skipActors) {
     const maxActorImdb = parseInt(body.max_actor_imdb ?? '8', 10);
@@ -497,8 +333,8 @@ export async function onRequestPost(context) {
       try {
         const result = await fetchEnrichment(show.title, env, !!show.movie);
         const actors = result.actors || [];
-        // Only act when TMDB actually returned IMDB ids. If it fell back to OMDB
-        // (all ids null) or found nothing, leave the existing cast untouched.
+        // Only act when TMDB actually returned IMDB ids. If it found nothing
+        // (all ids null), leave the existing cast untouched.
         if (!actors.some(a => a.imdb_id)) continue;
 
         const { results: copies } = await env.DB.prepare(
