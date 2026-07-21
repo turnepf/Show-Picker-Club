@@ -16,7 +16,6 @@ struct ShowDetailView: View {
     @State private var myCopy: Show?
     @State private var cast: [Actor] = []
     @State private var showingEdit = false
-    @State private var posterExpanded = false
     @State private var addingToMine = false
     @State private var addAlert: AddAlert?
 
@@ -36,6 +35,8 @@ struct ShowDetailView: View {
 
     var body: some View {
         Form {
+            // One hero image (backdrop preferred, else poster). No tap-to-
+            // enlarge — the affordance confused people.
             if let b = show?.backdropUrl, !b.isEmpty, let url = URL(string: b) {
                 Section {
                     AsyncImage(url: url) { phase in
@@ -51,83 +52,54 @@ struct ShowDetailView: View {
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
                 }
-            }
-            // One image, not two: the backdrop above is the hero when present;
-            // the poster shows only when there's no backdrop.
-            let hasBackdrop = !((show?.backdropUrl ?? "").isEmpty)
-            if !hasBackdrop, let p = (show?.posterUrl ?? initialPoster), !p.isEmpty {
+            } else if let p = (show?.posterUrl ?? initialPoster), !p.isEmpty {
                 Section {
-                    // Tap to view the poster full screen; tap again to return.
-                    Button { posterExpanded = true } label: {
-                        PosterThumb(url: p, width: 130, height: 195)
-                    }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .listRowBackground(Color.clear)
+                    PosterThumb(url: p, width: 130, height: 195)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .listRowBackground(Color.clear)
                 }
             }
-            // Everything factual in one compact card so a show fits on one screen.
-            Section {
-                LabeledContent("Title", value: title)
-                if let n = network, !n.isEmpty {
-                    // Spell the affordance out — a bare network name reads as
-                    // a label, so nobody realized it was the way to the show.
-                    if let urlStr = show?.networkUrl ?? initialNetworkUrl,
-                       isRealUrl(urlStr), let url = URL(string: urlStr) {
-                        LabeledContent("Network") {
-                            Link("Watch on \(n)", destination: url)
+
+            // Overview (plot synopsis) sits right under the title/image, with
+            // no section header.
+            if let ov = show?.overview, !ov.isEmpty {
+                Section {
+                    Text(ov).font(.callout).foregroundStyle(.secondary)
+                }
+            }
+
+            // Where to watch + trailer.
+            if hasWatchRow {
+                Section {
+                    if let n = network, !n.isEmpty {
+                        // Spell the affordance out — a bare network name reads as
+                        // a label, so nobody realized it was the way to the show.
+                        if let urlStr = show?.networkUrl ?? initialNetworkUrl,
+                           isRealUrl(urlStr), let url = URL(string: urlStr) {
+                            LabeledContent("Network") {
+                                Link("Watch on \(n)", destination: url)
+                            }
+                        } else if let wl = show?.whereToWatchURL {
+                            LabeledContent(n) {
+                                Link("Where to watch", destination: wl)
+                            }
+                        } else {
+                            LabeledContent("Network", value: n)
                         }
-                    } else if let wl = show?.whereToWatchURL {
-                        // No deep link — offer the aggregator "where to watch" page.
-                        LabeledContent(n) {
-                            Link("Where to watch", destination: wl)
-                        }
-                    } else {
-                        LabeledContent("Network", value: n)
+                    }
+                    if let turl = show?.trailerURL {
+                        LabeledContent("Trailer") { Link("▶ Watch trailer", destination: turl) }
                     }
                 }
-                // Single audience score, sourced from TMDB (`rating` carries it now).
-                if let r = rating, !r.isEmpty {
-                    LabeledContent("Rating") {
-                        Text("\(Image(systemName: "star.fill")) \(r)").foregroundStyle(.orange)
+            }
+
+            // Cast as its own block, with the creator/director grouped under it.
+            if !cast.isEmpty || hasDirector {
+                Section("Cast") {
+                    if !cast.isEmpty {
+                        Text(castLine).font(.callout).foregroundStyle(.secondary)
                     }
-                }
-                if let s = show {
-                    if let m = mineActive {
-                        LabeledContent("List", value: ShowList(rawValue: m.list)?.title ?? m.list.capitalized)
-                    } else if mineArchived != nil {
-                        LabeledContent("List", value: "Archived")
-                    }
-                    if s.isMovie { LabeledContent("Type", value: "Movie") }
-                    if s.isFullSeries { LabeledContent("Series", value: "Complete") }
-                    if !s.genreList.isEmpty {
-                        LabeledContent("Genres", value: s.genreList.joined(separator: " · "))
-                    }
-                    // Recommended-by / watching-with are per-member, so they
-                    // reflect MY copy — not whatever row (a trending pick, or
-                    // another member's list) happened to open this screen.
-                    if let by = myCopy?.recommendedBy, !by.isEmpty {
-                        LabeledContent("Recommended by", value: by)
-                    }
-                    if let w = myCopy?.watchingWith, !w.isEmpty {
-                        LabeledContent("Watching with", value: w)
-                    }
-                    if let dates = s.seasonDatesText {
-                        LabeledContent("Next episode", value: dates)
-                    }
-                    if let seasons = s.seasonsText {
-                        LabeledContent("Seasons", value: seasons)
-                    }
-                    if let cr = s.contentRating, !cr.isEmpty {
-                        LabeledContent("Rated", value: cr)
-                    }
-                    if let y = s.releaseYear {
-                        LabeledContent("Year", value: String(y))
-                    }
-                    if let rt = s.runtimeText {
-                        LabeledContent("Runtime", value: rt)
-                    }
-                    if let d = s.director, !d.isEmpty {
+                    if let s = show, let d = s.director, !d.isEmpty {
                         // Link a single-person credit to their IMDB page (like cast).
                         if let url = s.directorURL {
                             LabeledContent(s.directorLabel) { Link(d, destination: url) }
@@ -135,74 +107,76 @@ struct ShowDetailView: View {
                             LabeledContent(s.directorLabel, value: d)
                         }
                     }
-                    if let turl = s.trailerURL {
-                        LabeledContent("Trailer") { Link("▶ Watch trailer", destination: turl) }
-                    }
                 }
             }
 
-            // Cast sits directly under the main info card, right below the title.
-            if !cast.isEmpty {
-                Section("Cast") {
-                    Text(castLine)
-                        .font(.callout).foregroundStyle(.secondary)
-                }
-            }
-
-            // Plot synopsis from TMDB (catalog-level, not per-member).
-            if let ov = show?.overview, !ov.isEmpty {
-                Section("Overview") {
-                    Text(ov).font(.callout).foregroundStyle(.secondary)
-                }
-            }
-
-            // Notes are per-member too — show mine, if I have this title.
-            if let notes = myCopy?.notes, !notes.isEmpty {
-                Section("Notes") {
-                    Text(notes).font(.callout).foregroundStyle(.secondary)
-                }
-            }
-
-            // No separate "Watch on …" button — the Network row above is the
-            // watch link, and it renders whenever the same real URL exists.
-
-            if let m = mineActive, let cur = ShowList(rawValue: m.list) {
-                // On one of my lists → move it to any list, or archive it.
-                Section("Move to") {
-                    ForEach(ShowList.allCases.filter { $0 != cur }) { l in
-                        Button(l.title) { Task { await move(to: l, id: m.id) } }
+            // My Lists — the four list chips ARE the move/add control (tap to
+            // move an active copy, restore an archived one, or add it if I don't
+            // have it). The member-edited fields and Edit/Archive live here too.
+            // Logged-in members only.
+            if auth.memberSlug != nil {
+                Section("My Lists") {
+                    listChipsRow()
+                    if mineArchived != nil {
+                        Text("Archived — tap a list to add it back")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
-                }
-                Section {
-                    Button(role: .destructive) { Task { await archive(m.id) } } label: {
-                        Label("Archive", systemImage: "archivebox")
+                    if let by = myCopy?.recommendedBy, !by.isEmpty {
+                        LabeledContent("Recommended by", value: by)
                     }
-                    .disabled(addingToMine)
-                }
-            } else if let m = mineArchived {
-                // Archived → add it back onto any list.
-                Section("Archived — add back to") {
-                    ForEach(ShowList.allCases) { l in
-                        Button(l.title) { Task { await restore(to: l, id: m.id) } }
+                    if let w = myCopy?.watchingWith, !w.isEmpty {
+                        LabeledContent("Watching with", value: w)
                     }
-                }
-            } else if auth.memberSlug != nil {
-                // Not on my lists → add to any list.
-                Section {
-                    Menu {
-                        ForEach(ShowList.allCases) { l in
-                            Button(l.title) { Task { await addToMyList(l) } }
+                    if let notes = myCopy?.notes, !notes.isEmpty {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Notes").font(.caption).foregroundStyle(.secondary)
+                            Text(notes).font(.callout).foregroundStyle(.secondary)
                         }
-                    } label: {
-                        Label("Add to My List", systemImage: "plus.circle.fill")
                     }
-                    .disabled(addingToMine)
+                    if let m = mineActive {
+                        Button("Edit") { showingEdit = true }
+                        Button(role: .destructive) {
+                            Task { await archive(m.id) }
+                        } label: {
+                            Label("Archive", systemImage: "archivebox")
+                        }
+                        .disabled(addingToMine)
+                    }
                 }
             }
 
+            // Catalog facts about the show itself, grouped below.
+            if hasCatalog {
+                Section {
+                    if let r = rating, !r.isEmpty {
+                        LabeledContent("TMDB Rating") {
+                            Text("\(Image(systemName: "star.fill")) \(r)").foregroundStyle(.orange)
+                        }
+                    }
+                    if let s = show {
+                        if s.isMovie { LabeledContent("Type", value: "Movie") }
+                        if let series = s.seriesText { LabeledContent("Series", value: series) }
+                        if !s.genreList.isEmpty {
+                            LabeledContent("Genres", value: s.genreList.joined(separator: " · "))
+                        }
+                        if let dates = s.seasonDatesText {
+                            LabeledContent("Next episode", value: dates)
+                        }
+                        if let cr = s.contentRating, !cr.isEmpty {
+                            LabeledContent("Rated", value: cr)
+                        }
+                        if let y = s.releaseYear {
+                            LabeledContent("Year", value: String(y))
+                        }
+                        if let rt = s.runtimeText {
+                            LabeledContent("Runtime", value: rt)
+                        }
+                    }
+                }
+            }
         }
         .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             // Standard iOS share sheet — text, mail, AirDrop, anything the
             // user has. Shares a watch link (or the club page) plus a blurb.
@@ -213,18 +187,8 @@ struct ShowDetailView: View {
                     Image(systemName: "square.and.arrow.up")
                 }
             }
-            if myCopy != nil {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Edit") { showingEdit = true }
-                }
-            }
         }
         .task { await load() }
-        .fullScreenCover(isPresented: $posterExpanded) {
-            if let p = (show?.posterUrl ?? initialPoster), !p.isEmpty {
-                FullScreenPoster(url: p)
-            }
-        }
         .sheet(isPresented: $showingEdit) {
             if let m = myCopy {
                 AddEditShowView(memberSlug: m.memberSlug ?? (auth.memberSlug ?? ""), existing: m) { await load() }
@@ -235,6 +199,68 @@ struct ShowDetailView: View {
                presenting: addAlert) { _ in
             Button("OK", role: .cancel) { }
         } message: { Text($0.message) }
+    }
+
+    // Whether the "where to watch" section has anything to show.
+    private var hasWatchRow: Bool {
+        (network.map { !$0.isEmpty } ?? false) || show?.trailerURL != nil
+    }
+    private var hasDirector: Bool { (show?.director.map { !$0.isEmpty }) ?? false }
+    private var hasCatalog: Bool {
+        if let r = rating, !r.isEmpty { return true }
+        guard let s = show else { return false }
+        return s.isMovie || s.seriesText != nil || !s.genreList.isEmpty
+            || s.seasonDatesText != nil || (s.contentRating.map { !$0.isEmpty } ?? false)
+            || s.releaseYear != nil || s.runtimeText != nil
+    }
+
+    // The four list chips, current one filled. Tapping a chip moves/adds/
+    // restores the show to that list.
+    @ViewBuilder private func listChipsRow() -> some View {
+        let cur = mineActive.flatMap { ShowList(rawValue: $0.list) }
+        HStack(spacing: 6) {
+            ForEach(ShowList.allCases) { l in
+                Button { Task { await chipTap(l) } } label: {
+                    chipLabel(l, selected: cur == l)
+                }
+                .buttonStyle(.borderless)
+                .disabled(addingToMine)
+            }
+        }
+        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+    }
+
+    private func chipLabel(_ l: ShowList, selected: Bool) -> some View {
+        Text(l.title)
+            .font(.caption).fontWeight(.semibold)
+            .lineLimit(1).minimumScaleFactor(0.7)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 7)
+            .background(selected ? listColor(l) : Color.clear)
+            .foregroundStyle(selected ? Color.white : listColor(l))
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(listColor(l), lineWidth: 1.5))
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+    }
+
+    private func chipTap(_ list: ShowList) async {
+        if let m = mineActive {
+            if m.list == list.rawValue { return }
+            await move(to: list, id: m.id)
+        } else if let m = mineArchived {
+            await restore(to: list, id: m.id)
+        } else {
+            await addToMyList(list)
+        }
+    }
+
+    // Per-list colors, matching the tvOS/web palette.
+    private func listColor(_ l: ShowList) -> Color {
+        switch l {
+        case .watching:    return Color(red: 0.20, green: 0.78, blue: 0.45)
+        case .waiting:     return Color(red: 0.26, green: 0.60, blue: 0.90)
+        case .recommending: return Color(red: 0.66, green: 0.40, blue: 0.85)
+        case .next:        return .orange
+        }
     }
 
     // What the share sheet hands off. Prefer a real deep link so the
@@ -363,7 +389,7 @@ struct ShowDetailView: View {
             await refreshMyCopy()
             addAlert = AddAlert(title: mineArchived != nil ? "Archived" : "Already on a list",
                                 message: mineArchived != nil
-                                    ? "“\(addTitle)” is archived — use “add back to” below."
+                                    ? "“\(addTitle)” is archived — tap a list to add it back."
                                     : "“\(addTitle)” is already on one of your lists.")
         } catch let e as API.APIError where e.status == 401 {
             addAlert = AddAlert(title: "Logged out",

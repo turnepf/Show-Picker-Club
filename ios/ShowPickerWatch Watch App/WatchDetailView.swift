@@ -8,7 +8,6 @@ struct WatchDetailView: View {
     @EnvironmentObject private var auth: WatchAuth
     @State private var full: Show?
     @State private var cast: [Actor] = []
-    @State private var posterExpanded = false
 
     private var s: Show { full ?? show }
 
@@ -26,11 +25,14 @@ struct WatchDetailView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 120)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    // Tap to view full screen; tap again to come back.
-                    .onTapGesture { posterExpanded = true }
                 }
 
                 Text(s.title).font(.headline)
+
+                // Overview (plot synopsis) right under the title, no header.
+                if let ov = s.overview, !ov.isEmpty {
+                    Text(ov).font(.caption2).foregroundStyle(.secondary)
+                }
 
                 if let n = s.network, !n.isEmpty {
                     // Spell the affordance out — a bare network name reads as
@@ -50,10 +52,10 @@ struct WatchDetailView: View {
                     }
                 }
                 // Single audience score, sourced from TMDB (`rating` carries it now).
-                if let r = s.rating, !r.isEmpty { row("Rating", "★ \(r)") }
+                if let r = s.rating, !r.isEmpty { row("TMDB Rating", "★ \(r)") }
                 if let l = ShowList(rawValue: s.list) { row("List", l.title) }
                 if let up = s.nextUpRange { row("Next episode", up) }
-                if let seasons = s.seasonsText { row("Seasons", seasons) }
+                if let series = s.seriesText { row("Series", series) }
                 if s.isMovie { row("Type", "Movie") }
                 if let cr = s.contentRating, !cr.isEmpty { row("Rated", cr) }
                 if let y = s.releaseYear { row("Year", String(y)) }
@@ -95,34 +97,12 @@ struct WatchDetailView: View {
                 if let notes = s.notes, !notes.isEmpty {
                     Text(notes).font(.caption2).foregroundStyle(.secondary).italic()
                 }
-                if let ov = s.overview, !ov.isEmpty {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Overview").font(.caption2).foregroundStyle(.secondary)
-                        Text(ov).font(.caption2)
-                    }
-                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(s.title)
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
-        .sheet(isPresented: $posterExpanded) {
-            if let p = s.posterUrl, let url = URL(string: p) {
-                ZStack {
-                    Color.black.ignoresSafeArea()
-                    AsyncImage(url: url) { phase in
-                        if let image = phase.image {
-                            image.resizable().scaledToFit()
-                        } else {
-                            ProgressView()
-                        }
-                    }
-                }
-                .contentShape(Rectangle())
-                .onTapGesture { posterExpanded = false }
-            }
-        }
     }
 
     private func row(_ label: String, _ value: String) -> some View {
