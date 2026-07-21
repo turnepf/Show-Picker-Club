@@ -48,8 +48,18 @@ struct ShowDetailView: View {
                     // One big image on the left, shown whole (not cropped): the
                     // landscape backdrop when we have one, else the portrait
                     // poster. Display-only — no tap-to-enlarge.
-                    heroImage
-                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    VStack(alignment: .leading, spacing: 24) {
+                        heroImage
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        // Description under the image, filling the space the tall
+                        // info column would otherwise leave blank on the left.
+                        if let ov = show?.overview, !ov.isEmpty {
+                            Text(ov)
+                                .font(.system(size: 24))
+                                .foregroundColor(Theme.muted)
+                                .frame(maxWidth: 720, alignment: .leading)
+                        }
+                    }
 
                     VStack(alignment: .leading, spacing: 22) {
                         Text(title)
@@ -137,20 +147,30 @@ struct ShowDetailView: View {
                     .foregroundColor(Theme.text)
                 HStack(spacing: 20) {
                     ForEach(ShowList.allCases) { l in
+                        // A colored dot + always-white label so the list name is
+                        // legible whether or not the chip is focused. The system
+                        // .bordered style supplies the focusable pill; we don't
+                        // .tint it (that painted the fill the same color as the
+                        // text, hiding it until focus).
                         Button { Task { await chipTap(l) } } label: {
-                            HStack(spacing: 8) {
-                                if cur == l { Image(systemName: "checkmark.circle.fill") }
-                                Text(l.title)
+                            HStack(spacing: 10) {
+                                Circle().fill(Theme.listColor(l.rawValue)).frame(width: 16, height: 16)
+                                Text(l.title).foregroundColor(Theme.text)
+                                if cur == l {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(Theme.listColor(l.rawValue))
+                                }
                             }
                             .font(.system(size: 24, weight: .semibold))
                         }
-                        .tint(Theme.listColor(l.rawValue))
+                        .buttonStyle(.bordered)
                         .disabled(working)
                     }
                     if let m = mineActive {
                         Button(role: .destructive) { Task { await archive(m.id) } } label: {
                             Label("Archive", systemImage: "archivebox")
                         }
+                        .buttonStyle(.bordered)
                         .disabled(working)
                     }
                 }
@@ -327,9 +347,8 @@ struct ShowDetailView: View {
             if let notes = s.notes, !notes.isEmpty {
                 Text(notes).italic().foregroundColor(Theme.muted)
             }
-            if let ov = s.overview, !ov.isEmpty {
-                Text(ov).foregroundColor(Theme.muted).lineLimit(8)
-            }
+            // Overview now lives under the hero image on the left, so it isn't
+            // repeated here.
         }
         .font(.system(size: 24))
     }
