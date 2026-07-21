@@ -3803,6 +3803,8 @@
       } else if (show.poster_url) {
         html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy" onclick="togglePosterLightbox(this)"></div>`;
       }
+      // Overview (plot synopsis) sits right under the title/image.
+      if (show.overview) html += `<div class="detail-card"><div class="detail-card-title">Overview</div><div class="detail-prose">${escapeHtml(show.overview)}</div></div>`;
       // Top card: Network, then Trailer.
       if (topRows.length) html += `<div class="detail-card">${topRows.join('')}</div>`;
       // Cast, directly under the trailer.
@@ -3814,7 +3816,6 @@
       }
       // The rest of the metadata (rating, list, genres, dates, creator, …).
       if (rows.length) html += `<div class="detail-card">${rows.join('')}</div>`;
-      if (show.overview) html += `<div class="detail-card"><div class="detail-card-title">Overview</div><div class="detail-prose">${escapeHtml(show.overview)}</div></div>`;
       if (detailMyCopy && detailMyCopy.notes) html += `<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-prose">${escapeHtml(detailMyCopy.notes)}</div></div>`;
 
       // No "Watch on …" action here — the Network row above is the watch
