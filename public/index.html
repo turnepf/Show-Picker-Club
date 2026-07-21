@@ -3835,6 +3835,12 @@
         if (detailMyCopy && detailMyCopy.recommended_by) memberInner += detailRow('Recommended by', escapeHtml(detailMyCopy.recommended_by));
         if (detailMyCopy && detailMyCopy.watching_with) memberInner += detailRow('Watching with', escapeHtml(detailMyCopy.watching_with));
         if (detailMyCopy && detailMyCopy.notes) memberInner += `<div class="detail-prose"><strong>Notes:</strong> ${escapeHtml(detailMyCopy.notes)}</div>`;
+        // Edit / Archive live here in the member section (only for a copy I
+        // actively have) — no separate actions card at the bottom.
+        if (detailMyCopy && !detailMyCopy.archived) {
+          memberInner += `<button class="detail-action" onclick="detailEdit(${detailMyCopy.id})">Edit</button>`;
+          memberInner += `<button class="detail-action danger" onclick="detailArchive(${detailMyCopy.id})">Archive</button>`;
+        }
         html += `<div class="detail-card"><div class="detail-card-title">My Lists</div>${memberInner}</div>`;
       }
       // The remaining catalog data (rating, type, genres, dates, …), grouped in
@@ -3843,17 +3849,8 @@
 
       // No "Watch on …" action here — the Network row above is the watch
       // link, and it renders whenever the same real URL exists.
-      // The list chips above are the move/add/restore control now, so the only
-      // buttons left are Edit and Archive — and only for a copy I actively have.
-      const actions = [];
-      const mine = detailMyCopy;
-      if (mine && !mine.archived) {
-        actions.push(`<button class="detail-action" onclick="detailEdit(${mine.id})">Edit</button>`);
-        actions.push(`<button class="detail-action danger" onclick="detailArchive(${mine.id})">Archive</button>`);
-      }
-      // No per-show "Share" here — the browser's own share button covers
-      // sharing the page, so a custom one would be redundant on web.
-      if (actions.length) html += `<div class="detail-card">${actions.join('')}</div>`;
+      // Edit/Archive now live in the My Lists section above, and the browser's
+      // own share button covers sharing — so there's no actions card here.
 
       document.getElementById('detailBody').innerHTML = html;
     }
