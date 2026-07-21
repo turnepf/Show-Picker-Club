@@ -484,10 +484,12 @@ struct MemberView: View {
             case .next:         return "Your Next Up is empty."
             }
         }
+        let isNot = member.labelIsPlural ? "aren't" : "isn't"
+        let hasNot = member.labelIsPlural ? "haven't" : "hasn't"
         switch currentList {
-        case .watching:     return "\(member.label) isn't watching anything right now."
-        case .waiting:      return "\(member.label) isn't awaiting any seasons."
-        case .recommending: return "\(member.label) hasn't loved anything yet."
+        case .watching:     return "\(member.label) \(isNot) watching anything right now."
+        case .waiting:      return "\(member.label) \(isNot) awaiting any seasons."
+        case .recommending: return "\(member.label) \(hasNot) loved anything yet."
         case .next:         return "\(member.label)'s Next Up is empty."
         }
     }

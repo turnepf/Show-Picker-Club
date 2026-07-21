@@ -47,7 +47,7 @@ struct MemberView: View {
                         // hung when every list is empty.
                         VStack(spacing: 24) {
                             Text(canAdd ? "You haven't added any shows yet."
-                                        : "\(member.label) hasn't added any shows yet.")
+                                        : "\(member.label) \(member.labelIsPlural ? "haven't" : "hasn't") added any shows yet.")
                                 .font(.system(size: 32))
                                 .foregroundColor(Theme.muted)
                                 .multilineTextAlignment(.center)
