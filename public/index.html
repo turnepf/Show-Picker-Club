@@ -3812,7 +3812,7 @@
         html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy"></div>`;
       }
       // Overview (plot synopsis) sits right under the title/image.
-      if (show.overview) html += `<div class="detail-card"><div class="detail-card-title">Overview</div><div class="detail-prose">${escapeHtml(show.overview)}</div></div>`;
+      if (show.overview) html += `<div class="detail-card"><div class="detail-prose">${escapeHtml(show.overview)}</div></div>`;
       // Top card: Network, then Trailer.
       if (topRows.length) html += `<div class="detail-card">${topRows.join('')}</div>`;
       // Cast — with the creator/director grouped underneath — directly under
