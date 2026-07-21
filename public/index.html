@@ -3765,7 +3765,7 @@
 
       const rows = [];
       // Single audience score, sourced from TMDB (`rating` carries it now).
-      if (show.rating) rows.push(detailRow('Rating', `★ ${escapeHtml(show.rating)}`));
+      if (show.rating) rows.push(detailRow('TMDB Rating', `★ ${escapeHtml(show.rating)}`));
       // Reflect MY status, not the copy that opened this screen.
       if (detailMyCopy && !detailMyCopy.archived) {
         rows.push(detailRow('List', LIST_LABELS[detailMyCopy.list] || detailMyCopy.list));
@@ -3785,14 +3785,16 @@
       if (show.content_rating) rows.push(detailRow('Rated', escapeHtml(show.content_rating)));
       if (show.release_year) rows.push(detailRow('Year', escapeHtml(String(show.release_year))));
       if (show.runtime) rows.push(detailRow('Runtime', escapeHtml(runtimeText(show.runtime))));
+      // Creator/Director is grouped under the Cast card (built below), not in
+      // the metadata rows. Link a single-person credit to their IMDB page
+      // (mirrors the cast links); a multi-creator credit (comma in the name)
+      // stays plain so the whole list doesn't point at just the first person.
+      let creatorLine = '';
       if (show.director) {
-        // Link a single-person credit to their IMDB page (mirrors the cast
-        // links); a multi-creator credit (comma in the name) stays plain so the
-        // whole list doesn't point at just the first person.
         const dirVal = (show.director_imdb_id && !show.director.includes(','))
           ? `<a href="https://www.imdb.com/name/${encodeURIComponent(show.director_imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(show.director)}</a>`
           : escapeHtml(show.director);
-        rows.push(detailRow(show.movie ? 'Director' : 'Creator', dirVal));
+        creatorLine = `<div class="detail-prose" style="margin-top:8px;"><strong>${show.movie ? 'Director' : 'Creator'}:</strong> ${dirVal}</div>`;
       }
 
       let html = '';
@@ -3807,12 +3809,18 @@
       if (show.overview) html += `<div class="detail-card"><div class="detail-card-title">Overview</div><div class="detail-prose">${escapeHtml(show.overview)}</div></div>`;
       // Top card: Network, then Trailer.
       if (topRows.length) html += `<div class="detail-card">${topRows.join('')}</div>`;
-      // Cast, directly under the trailer.
-      if (actors.length) {
-        const cast = actors.map(a => a.imdb_id
-          ? `<a href="https://www.imdb.com/name/${encodeURIComponent(a.imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(a.name)}</a>`
-          : escapeHtml(a.name)).join(', ');
-        html += `<div class="detail-card"><div class="detail-card-title">Cast</div><div class="detail-prose">${cast}</div></div>`;
+      // Cast — with the creator/director grouped underneath — directly under
+      // the trailer.
+      if (actors.length || creatorLine) {
+        let castInner = '';
+        if (actors.length) {
+          const cast = actors.map(a => a.imdb_id
+            ? `<a href="https://www.imdb.com/name/${encodeURIComponent(a.imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(a.name)}</a>`
+            : escapeHtml(a.name)).join(', ');
+          castInner += `<div class="detail-prose">${cast}</div>`;
+        }
+        castInner += creatorLine;
+        html += `<div class="detail-card"><div class="detail-card-title">Cast</div>${castInner}</div>`;
       }
       // The rest of the metadata (rating, list, genres, dates, creator, …).
       if (rows.length) html += `<div class="detail-card">${rows.join('')}</div>`;
