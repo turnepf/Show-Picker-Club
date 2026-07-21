@@ -26,11 +26,6 @@ struct ShowDetailView: View {
     @State private var actionMessage: String?
     @Environment(\.openURL) private var openURL
 
-    private var posterUrlString: String? {
-        let p = show?.posterUrl ?? initialPoster
-        return (p?.isEmpty == false) ? p : nil
-    }
-
     private var title: String { show?.title ?? initialTitle }
     private var network: String? { show?.network ?? initialNetwork }
     private var rating: String? { show?.rating ?? initialRating }
@@ -49,26 +44,11 @@ struct ShowDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 40) {
-                // Large backdrop hero at the top. On the TV this is the big
-                // "show card" image; the portrait poster sits beside the info
-                // below, so both earn their place (unlike the web/phone, where
-                // they'd stack redundantly).
-                if let b = show?.backdropUrl, !b.isEmpty, let url = URL(string: b) {
-                    AsyncImage(url: url) { phase in
-                        if let img = phase.image {
-                            img.resizable().scaledToFill()
-                        } else {
-                            Rectangle().fill(Theme.background)
-                        }
-                    }
-                    .frame(height: 320)
-                    .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                }
                 HStack(alignment: .top, spacing: 50) {
-                    // Poster is display-only — no tap-to-enlarge.
-                    detailPoster
-                        .frame(width: 300, height: 450)
+                    // One big image on the left, shown whole (not cropped): the
+                    // landscape backdrop when we have one, else the portrait
+                    // poster. Display-only — no tap-to-enlarge.
+                    heroImage
                         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 22) {
@@ -276,6 +256,24 @@ struct ShowDetailView: View {
         let t = (show?.title ?? initialTitle).lowercased()
         let mine = (try? await API.myShows(slug: slug, includeArchived: true)) ?? []
         myCopy = mine.first { $0.title.lowercased() == t }
+    }
+
+    // The big left-hand image: the landscape backdrop shown whole (scaledToFit,
+    // never cropped) when we have one, otherwise the portrait poster / tile.
+    @ViewBuilder private var heroImage: some View {
+        if let b = show?.backdropUrl, !b.isEmpty, let url = URL(string: b) {
+            AsyncImage(url: url) { phase in
+                if let img = phase.image {
+                    img.resizable().scaledToFit()
+                } else {
+                    Rectangle().fill(Theme.background)
+                }
+            }
+            .frame(width: 720, height: 405)
+        } else {
+            detailPoster
+                .frame(width: 300, height: 450)
+        }
     }
 
     // Portrait poster when we have one; otherwise a gradient tile with the
