@@ -1,9 +1,14 @@
--- Attribute login-code requests to a source. login_otps records that a code
--- was minted (member, channel, time) but not WHO asked for it, so unrequested
--- codes (someone submitting a member's email/phone to /auth/request-code)
--- couldn't be traced. Store the requester's IP + user agent on every insert so
--- a repeat can be pinned to a source and blocked at the Cloudflare edge.
-ALTER TABLE login_otps ADD COLUMN ip TEXT;
-ALTER TABLE login_otps ADD COLUMN user_agent TEXT;
-
+-- Attribute login-code requests to a source so unrequested codes (someone
+-- submitting a member's email/phone to /auth/request-code) can be traced and
+-- blocked at the Cloudflare edge.
+--
+-- NOTE: production `login_otps` already carries `ip` and `user_agent` columns
+-- (added out-of-band; the live schema had drifted from these files). The first
+-- version of this migration tried to ADD them and failed with "duplicate
+-- column name: ip". SQLite has no "ADD COLUMN IF NOT EXISTS", so this migration
+-- only ensures the lookup index now — the columns are already present in
+-- production and the deployed code writes them. If you ever rebuild a database
+-- from scratch, add the two columns first:
+--   ALTER TABLE login_otps ADD COLUMN ip TEXT;
+--   ALTER TABLE login_otps ADD COLUMN user_agent TEXT;
 CREATE INDEX IF NOT EXISTS idx_login_otps_ip_time ON login_otps(ip, created_at);
