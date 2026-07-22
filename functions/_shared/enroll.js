@@ -62,6 +62,16 @@ export async function enrollmentThrottled(env, ip) {
   return null;
 }
 
+// True when a name has a first *and* last token. Both self-enroll
+// (validFullName below) and /join (signup-request.js) require this before
+// creating anything — createMember()'s token split (admin-create-member.js)
+// otherwise leaves last_name NULL on a single-word name, which is how one
+// member registered without a last name.
+export function hasFirstAndLast(name) {
+  const tokens = String(name || '').trim().split(/\s+/).filter(Boolean);
+  return tokens.length >= 2;
+}
+
 export function validFullName(name) {
   const n = String(name || '').trim();
   if (n.length < 2 || n.length > 60) return null;
@@ -69,6 +79,7 @@ export function validFullName(name) {
   // angle brackets (names render into member-facing HTML and emails).
   if (!/\p{L}/u.test(n)) return null;
   if (/[<>\x00-\x1f]/.test(n)) return null;
+  if (!hasFirstAndLast(n)) return null;
   return n;
 }
 
@@ -77,7 +88,7 @@ export function validFullName(name) {
 // result shape ({ ok: true, slug, ... } | { ok: false, status, error }).
 export async function enrollMember(env, ctx, { full_name, email, via, appleSub, googleSub, ip }) {
   const name = validFullName(full_name);
-  if (!name) return { ok: false, status: 400, error: 'A real name (2–60 characters) is required.' };
+  if (!name) return { ok: false, status: 400, error: 'Enter your first and last name (2–60 characters).' };
 
   const created = await createMember(env, {
     full_name: name,

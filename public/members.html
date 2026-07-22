@@ -231,58 +231,6 @@
     .copy-row button { background: var(--ink); color: #fff; }
     .copy-row button:hover { background: oklch(0.18 0.025 50); }
 
-    /* Manual-add form, collapsed by default. */
-    details.add-manual {
-      background: var(--surface);
-      border: 1px solid var(--border-soft);
-      border-radius: 10px;
-      padding: 0;
-      margin-bottom: 18px;
-    }
-    details.add-manual > summary {
-      list-style: none;
-      cursor: pointer;
-      padding: 14px 18px;
-      font-weight: 600;
-      color: var(--ink);
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    details.add-manual > summary::-webkit-details-marker { display: none; }
-    details.add-manual > summary::after {
-      content: '+'; font-size: 18px; color: var(--ink-muted);
-      transition: transform 0.15s;
-    }
-    details.add-manual[open] > summary::after { content: '−'; }
-    details.add-manual > summary:hover { background: color-mix(in oklch, var(--surface-2) 60%, transparent); border-top-left-radius: 10px; border-top-right-radius: 10px; }
-    .add-form { padding: 4px 18px 18px; }
-    .add-form label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; margin-top: 14px; color: var(--ink-muted); }
-    .add-form label:first-of-type { margin-top: 6px; }
-    .add-form input {
-      width: 100%; padding: 10px 12px;
-      border: 1px solid var(--border); border-radius: 6px;
-      font-size: 15px; font-family: inherit;
-    }
-    .add-form input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 18%, transparent); }
-    .hint { font-size: 12px; color: var(--ink-muted); margin-top: 4px; }
-    .add-form button[type=submit] {
-      width: 100%; margin-top: 22px; padding: 12px;
-      background: var(--accent); color: #fff;
-      border: none; border-radius: 6px;
-      font-size: 13px; font-weight: 600;
-      cursor: pointer; font-family: inherit;
-    }
-    .add-form button[type=submit]:hover { background: var(--accent-hover); }
-    .add-form button[type=submit]:disabled { opacity: 0.5; cursor: not-allowed; }
-    .preview { font-size: 12px; color: var(--ink-muted); margin-top: 4px; }
-    .add-msg {
-      margin-top: 16px; padding: 12px 14px;
-      border-radius: 6px; font-size: 13px; line-height: 1.5;
-    }
-    .add-msg.err {
-      background: var(--danger-soft); color: var(--danger-deep);
-      border: 1px solid color-mix(in oklch, var(--danger) 30%, transparent);
-    }
-
     @media (max-width: 560px) {
       .top { flex-direction: column; align-items: flex-start; }
       .field label { width: 50px; }
@@ -308,29 +256,6 @@
          The whole section disappears once everything is processed and
          hidden, so a clean queue means a clean page. -->
     <div id="queue" style="display:none;"></div>
-
-    <details class="add-manual">
-      <summary>Add a member manually</summary>
-      <form class="add-form" id="addForm">
-        <label for="first_name">First name(s)</label>
-        <input type="text" id="first_name" autocomplete="off" required placeholder="Alice — or Paula &amp; Brad for a shared list">
-        <label for="last_name">Last name</label>
-        <input type="text" id="last_name" autocomplete="off" placeholder="Baker">
-        <div class="preview" id="preview"></div>
-
-        <label for="phone">Phone number</label>
-        <input type="tel" id="phone" autocomplete="off" placeholder="(336) 555-1234">
-        <div class="hint">Optional. +1 assumed for US numbers; prefix with + and country code for non-US. Used as the SMS Verify destination.</div>
-
-        <label for="emails">Email address(es)</label>
-        <input type="text" id="emails" autocomplete="off" placeholder="alice@example.com, alice.b@gmail.com">
-        <div class="hint">Optional. Comma-separated for multiple. Any of them can be used to request an email code.</div>
-
-        <button type="submit" id="addBtn">Create member + seed 8 shows</button>
-        <div id="addMsg"></div>
-        <div id="addIntro"></div>
-      </form>
-    </details>
 
     <div class="admin-sub">
       Emails and phones are comma-separated; the first in each list is the
@@ -1207,73 +1132,6 @@ If you see something you like on someone else's list, tap the **+** to add it to
     function escapeHtml(s) {
       return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     }
-
-    // ---- Manual add ----
-    const addForm = document.getElementById('addForm');
-    const addBtn = document.getElementById('addBtn');
-    const addMsg = document.getElementById('addMsg');
-    const addIntro = document.getElementById('addIntro');
-    const firstInput = document.getElementById('first_name');
-    const lastInput = document.getElementById('last_name');
-    const previewEl = document.getElementById('preview');
-
-    firstInput.addEventListener('input', () => {
-      // The whole first-name field drives the slug and display name, so a
-      // shared "Paula & Brad" previews as paulabrad / Paula & Brad's Shows.
-      const first = firstInput.value.trim();
-      if (!first) { previewEl.textContent = ''; return; }
-      const slugGuess = first.toLowerCase().replace(/[^a-z0-9]/g, '');
-      previewEl.innerHTML = `URL: <code>showpicker.club/${escapeHtml(slugGuess)}</code> (suffix added on collision) &middot; Display: <code>${escapeHtml(first)}'s Shows</code>`;
-    });
-
-    addForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      addMsg.className = '';
-      addMsg.textContent = '';
-      addIntro.innerHTML = '';
-      addBtn.disabled = true;
-      addBtn.textContent = 'Working…';
-
-      const body = {
-        first_name: firstInput.value.trim(),
-        last_name: lastInput.value.trim(),
-        phone: document.getElementById('phone').value.trim(),
-        emails: document.getElementById('emails').value.trim(),
-      };
-
-      try {
-        const res = await fetch('/api/admin-create-member', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          if (res.status === 403) document.getElementById('authWarn').style.display = '';
-          addMsg.className = 'add-msg err';
-          addMsg.textContent = data.error || `Error (${res.status})`;
-        } else {
-          addMsg.className = 'add-msg';
-          addMsg.style.color = 'var(--ink-muted)';
-          addMsg.textContent = `Created ${data.name} · seeded ${data.seeded.length} shows.`;
-          addIntro.appendChild(buildIntroPanel({
-            slug: data.slug,
-            phone: data.phone,
-            displayName: data.editor_name,
-            defaultOpen: true,
-          }));
-          addForm.reset();
-          previewEl.textContent = '';
-          refreshRoster();
-        }
-      } catch (err) {
-        addMsg.className = 'add-msg err';
-        addMsg.textContent = 'Network error: ' + err.message;
-      } finally {
-        addBtn.disabled = false;
-        addBtn.textContent = 'Create member + seed 8 shows';
-      }
-    });
 
     renderPlatformFilter();
     load();

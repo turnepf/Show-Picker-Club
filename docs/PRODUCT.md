@@ -211,7 +211,7 @@ activity (`last_activity_at` — no sort picker; members with no recorded
 activity sink to the bottom), last activity timestamp and 30-day counts
 (last login is no longer shown — activity is the engagement signal that
 matters), rename (slug
-and URL never change), email/phone editing, create member, disable/enable
+and URL never change), email/phone editing, disable/enable
 (kills sessions), approving held self-enrolled members, admin
 promote/demote (`/api/admin-member-role`; the server refuses to demote the
 last admin, and a full hand-off is promote-then-demote-yourself — this is
