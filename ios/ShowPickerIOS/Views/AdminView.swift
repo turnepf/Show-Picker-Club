@@ -11,9 +11,6 @@ struct AdminView: View {
     // at the top of that screen, matching the web /members page.
     @State private var waitingCount = 0
 
-    // Public sign-up form. Submissions land in the Signup requests queue.
-    private let joinURL = URL(string: "https://showpicker.club/join")!
-
     var body: some View {
         List {
             Section("Insights") {
@@ -35,26 +32,6 @@ struct AdminView: View {
                     Label("Manage members", systemImage: "person.2.badge.gearshape")
                 }
                 .badge(waitingCount)
-            }
-            Section {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Sign-up link")
-                        Link("showpicker.club/join", destination: joinURL)
-                            .font(.caption)
-                    }
-                    Spacer()
-                    ShareLink(item: joinURL,
-                              subject: Text("Show Picker Club"),
-                              message: Text("Join Show Picker Club")) {
-                        Image(systemName: "square.and.arrow.up").font(.title3)
-                    }
-                    .buttonStyle(.borderless)
-                }
-            } header: {
-                Text("Invite")
-            } footer: {
-                Text("Send this to someone you want in the club — they fill out the form and land at the top of Manage members.")
             }
             Section("Content") {
                 NavigationLink {

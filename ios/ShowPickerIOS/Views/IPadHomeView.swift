@@ -57,7 +57,6 @@ struct IPadHomeView: View {
     // Admin accordion expansion; opens automatically when an admin tool is in
     // focus (e.g. after a detail-column reset) so the current page stays visible.
     @State private var adminExpanded = false
-    private let joinURL = URL(string: "https://showpicker.club/join")!
 
     private var myMember: Member? {
         guard let slug = auth.memberSlug else { return nil }
@@ -217,11 +216,6 @@ struct IPadHomeView: View {
                             .tag(SidebarItem.adminUrlCleanup)
                         Label("Vibe trait scoring", systemImage: "sparkles")
                             .tag(SidebarItem.adminVibe)
-                        ShareLink(item: joinURL,
-                                  subject: Text("Show Picker Club"),
-                                  message: Text("Join Show Picker Club")) {
-                            Label("Sign-up link", systemImage: "square.and.arrow.up")
-                        }
                     } label: {
                         Label("Admin", systemImage: "wrench.and.screwdriver")
                     }
