@@ -88,8 +88,8 @@
     <p class="lede">Show Picker Club is a private group of friends and family who share what they're watching, want to watch, and recommend. Tell us a little about yourself and we'll be in touch.</p>
 
     <form id="f">
-      <label for="full_name">Full name</label>
-      <input type="text" id="full_name" name="full_name" autocomplete="name" required maxlength="100">
+      <label for="full_name">First and last name</label>
+      <input type="text" id="full_name" name="full_name" autocomplete="name" required maxlength="100" placeholder="e.g. Robin Askins">
 
       <label for="email">Email</label>
       <input type="email" id="email" name="email" autocomplete="email" inputmode="email" required maxlength="200" placeholder="you@example.com">
@@ -115,8 +115,6 @@
       e.preventDefault();
       msg.className = '';
       msg.textContent = '';
-      btn.disabled = true;
-      btn.textContent = 'Sending…';
 
       const body = {
         full_name: document.getElementById('full_name').value.trim(),
@@ -124,6 +122,15 @@
         phone:     document.getElementById('phone').value.trim(),
         source:    document.getElementById('source').value.trim(),
       };
+
+      if (body.full_name.split(/\s+/).filter(Boolean).length < 2) {
+        msg.className = 'msg err';
+        msg.textContent = 'Enter your first and last name.';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
 
       try {
         const res = await fetch('/api/signup-request', {

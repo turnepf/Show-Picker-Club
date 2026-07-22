@@ -211,12 +211,18 @@ struct LoginView: View {
             }
     }
 
+    // Requires a first *and* last token — a single word leaves last_name
+    // NULL server-side (functions/_shared/enroll.js#hasFirstAndLast).
+    private var hasFirstAndLast: Bool {
+        fullName.split(whereSeparator: { $0.isWhitespace }).count >= 2
+    }
+
     private var nameStep: some View {
         VStack(spacing: 24) {
             TextField("First and last name", text: $fullName)
                 .textContentType(.name)
             continueButton(title: "Create my account",
-                           disabled: fullName.trimmingCharacters(in: .whitespaces).count < 2) {
+                           disabled: !hasFirstAndLast) {
                 await submitName()
             }
         }
@@ -292,6 +298,13 @@ struct LoginView: View {
                 case .success: break   // RootTabView jumps to My Shows
                 case .needsName: show(.name)
                 }
+            } catch API.APIError.badResponse(400) {
+                // Apple shared only one name component (rare) — the server
+                // needs a first and last name, so fall to the name screen
+                // with what we have pre-filled rather than a dead-end error.
+                show(.name)
+                fullName = name
+                errorText = "Apple only shared part of your name — add your last name too."
             } catch API.APIError.badResponse(401) {
                 errorText = "That Apple ID isn't linked to a member yet. Pick \"Share My Email\" with the address the owner has on file, or continue with email."
             } catch API.APIError.badResponse(429) {
@@ -376,7 +389,10 @@ struct LoginView: View {
 
     private func submitName() async {
         let name = fullName.trimmingCharacters(in: .whitespaces)
-        guard name.count >= 2 else { return }
+        guard hasFirstAndLast else {
+            errorText = "Enter your first and last name."
+            return
+        }
         submitting = true
         defer { submitting = false }
         do {
@@ -390,6 +406,8 @@ struct LoginView: View {
                                       code: code.trimmingCharacters(in: .whitespaces),
                                       fullName: name)
             }
+        } catch API.APIError.badResponse(400) {
+            errorText = "Enter your first and last name."
         } catch API.APIError.badResponse(409) {
             errorText = "That email already belongs to a member — go back and log in."
         } catch API.APIError.badResponse(429) {

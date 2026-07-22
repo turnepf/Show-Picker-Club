@@ -269,9 +269,10 @@ struct SharedTitle: Codable, Identifiable {
     var id: String { title }
 }
 
-// /api/admin-create-member result (success or {error}). editor_name is the
-// greeting name for the welcome intro; phone is the normalized E.164 number
-// the Text-intro button sends to.
+// Shape of a freshly-created member, returned by the internal createMember()
+// routine — reaches the client only via SignupActionResult.created (a /join
+// approve). editor_name is the greeting name for the welcome intro; phone is
+// the normalized E.164 number the Text-intro button sends to.
 struct CreateMemberResult: Codable {
     let ok: Bool?
     let slug: String?

@@ -23,7 +23,6 @@ enum SidebarItem: Hashable {
     // whose entries mirror the iPhone AdminView's options, each opening its
     // screen in the detail column.
     case adminReporting
-    case adminCreateMember
     case adminManageMembers
     case adminUrlCleanup
     case adminVibe
@@ -118,7 +117,7 @@ struct IPadHomeView: View {
 
     private func isAdminItem(_ item: SidebarItem) -> Bool {
         switch item {
-        case .adminReporting, .adminCreateMember, .adminManageMembers,
+        case .adminReporting, .adminManageMembers,
              .adminUrlCleanup, .adminVibe:
             return true
         default:
@@ -208,8 +207,6 @@ struct IPadHomeView: View {
                     DisclosureGroup(isExpanded: $adminExpanded) {
                         Label("Reporting", systemImage: "chart.bar.xaxis")
                             .tag(SidebarItem.adminReporting)
-                        Label("Create member", systemImage: "person.badge.plus")
-                            .tag(SidebarItem.adminCreateMember)
                         Label("Manage members", systemImage: "person.2.badge.gearshape")
                             .tag(SidebarItem.adminManageMembers)
                         Label("Show Cleanup", systemImage: "link.badge.plus")
@@ -363,8 +360,6 @@ struct IPadHomeView: View {
                 SubscriptionAuditView()
             case .adminReporting:
                 ReportingView().environmentObject(auth)
-            case .adminCreateMember:
-                CreateMemberView().environmentObject(auth)
             case .adminManageMembers:
                 ManageMembersView().environmentObject(auth)
             case .adminUrlCleanup:

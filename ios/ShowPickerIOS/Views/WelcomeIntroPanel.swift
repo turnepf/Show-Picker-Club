@@ -1,9 +1,9 @@
 import SwiftUI
 
-// "Welcome intro" — the message the operator sends a freshly created or
-// approved member, mirroring the web /members intro panel: identical text,
-// Copy and Text (SMS) actions. Collapsed by default so approved cards stay
-// short; used by ManageMembersView (approved requests) and CreateMemberView.
+// "Welcome intro" — the message the operator sends a freshly approved
+// member, mirroring the web /members intro panel: identical text, Copy and
+// Text (SMS) actions. Collapsed by default so approved cards stay short;
+// used by ManageMembersView (approved requests).
 struct WelcomeIntroPanel: View {
     let slug: String
     // Greeting name — the server's editor_name (first name) when available.

@@ -250,24 +250,6 @@ enum API {
         return try JSONDecoder().decode(T.self, from: data)
     }
 
-    // Create a new member (operator only). First/last name travel separately
-    // so a shared list can carry a multi-word first name ("Paula & Brad").
-    // Decodes the body on success or failure so the caller can surface the
-    // server's error message.
-    static func createMember(firstName: String, lastName: String?, phone: String?, emails: String?) async throws -> CreateMemberResult {
-        guard let url = URL(string: baseString + "/api/admin-create-member") else { throw APIError.badURL }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        var body: [String: Any] = ["first_name": firstName]
-        if let l = lastName, !l.isEmpty { body["last_name"] = l }
-        if let p = phone, !p.isEmpty { body["phone"] = p }
-        if let e = emails, !e.isEmpty { body["emails"] = e }
-        req.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, _) = try await URLSession.shared.data(for: req)
-        return try JSONDecoder().decode(CreateMemberResult.self, from: data)
-    }
-
     // Resolve a conflict: set every active copy of a title to one network.
     static func resolveUrlConflict(title: String, network: String) async throws -> AdminActionResult {
         try await postDecoding("/api/admin-url-cleanup",

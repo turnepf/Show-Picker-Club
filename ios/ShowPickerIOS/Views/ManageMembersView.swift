@@ -21,6 +21,10 @@ struct ManageMembersView: View {
     @State private var workingSlug: String?
     @State private var banner: String?
 
+    // Tap a platform badge above the roster to show only members who've
+    // ever used it; tap the active one again to clear. nil = no filter.
+    @State private var platformFilter: String?
+
     // Duplicates panel state: which account each group keeps, the merge
     // target for lone hidden-email accounts, the manual-merge picks, and
     // the pending confirmation (merges and ignores both confirm first,
@@ -66,7 +70,16 @@ struct ManageMembersView: View {
                 }
             }
             dupeSections
-            Section("Members") {
+            Section {
+                platformFilterRow
+            } header: {
+                Text("Filter by platform")
+            } footer: {
+                if let key = platformFilter, let label = Self.platformBadgeOrder.first(where: { $0.0 == key })?.1 {
+                    Text("Showing members who've used \(label). Tap it again to clear.")
+                }
+            }
+            Section("Members (\(sortedMembers.count))") {
                 ForEach(sortedMembers) { m in
                     NavigationLink {
                         MemberDetailAdminView(member: m) { await load() }
@@ -593,21 +606,43 @@ struct ManageMembersView: View {
         ("web-large", "Large Web"),
     ]
 
-    @ViewBuilder private func platformBadges(_ m: AdminMember) -> some View {
-        let used = Set(m.platforms ?? [])
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
-                ForEach(Self.platformBadgeOrder, id: \.0) { key, label in
+    // Same badges, same layout, but tappable: picks which platform
+    // `sortedMembers` filters the roster down to.
+    @ViewBuilder private var platformFilterRow: some View {
+        FlowLayout(spacing: 4) {
+            ForEach(Self.platformBadgeOrder, id: \.0) { key, label in
+                let selected = platformFilter == key
+                Button {
+                    platformFilter = selected ? nil : key
+                } label: {
                     Text(label)
                         .font(.caption2.weight(.medium))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1)
                         .background(
-                            used.contains(key) ? Color.accentColor.opacity(0.15) : Color.clear,
+                            selected ? Color.accentColor.opacity(0.15) : Color.clear,
                             in: Capsule())
-                        .overlay(Capsule().stroke(Color.secondary.opacity(0.25), lineWidth: used.contains(key) ? 0 : 1))
-                        .foregroundStyle(used.contains(key) ? Color.accentColor : Color.secondary.opacity(0.45))
+                        .overlay(Capsule().stroke(Color.secondary.opacity(0.25), lineWidth: selected ? 0 : 1))
+                        .foregroundStyle(selected ? Color.accentColor : Color.secondary)
                 }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder private func platformBadges(_ m: AdminMember) -> some View {
+        let used = Set(m.platforms ?? [])
+        FlowLayout(spacing: 4) {
+            ForEach(Self.platformBadgeOrder, id: \.0) { key, label in
+                Text(label)
+                    .font(.caption2.weight(.medium))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(
+                        used.contains(key) ? Color.accentColor.opacity(0.15) : Color.clear,
+                        in: Capsule())
+                    .overlay(Capsule().stroke(Color.secondary.opacity(0.25), lineWidth: used.contains(key) ? 0 : 1))
+                    .foregroundStyle(used.contains(key) ? Color.accentColor : Color.secondary.opacity(0.45))
             }
         }
     }
@@ -660,10 +695,13 @@ struct ManageMembersView: View {
     // bottom, alphabetically. The server normalises the timestamp format,
     // so plain string comparison orders correctly.
     private var sortedMembers: [AdminMember] {
+        let filtered = platformFilter.map { key in
+            members.filter { ($0.platforms ?? []).contains(key) }
+        } ?? members
         let byName: (AdminMember, AdminMember) -> Bool = {
             $0.personName.localizedCaseInsensitiveCompare($1.personName) == .orderedAscending
         }
-        return members.sorted {
+        return filtered.sorted {
             switch ($0.lastActivityAt, $1.lastActivityAt) {
             case (nil, nil): return byName($0, $1)
             case (nil, _): return false
@@ -921,5 +959,47 @@ private struct MemberDetailAdminView: View {
                 await onChange()
             }
         } catch { banner = "Network error. Try again." }
+    }
+}
+
+// Wraps subviews onto new rows instead of overflowing or scrolling —
+// mirrors the web roster's `flex-wrap` platform badges on narrow widths.
+private struct FlowLayout: Layout {
+    var spacing: CGFloat = 4
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > maxWidth {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        y += rowHeight
+        return CGSize(width: maxWidth.isFinite ? maxWidth : x, height: y)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX
+        var y = bounds.minY
+        var rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > bounds.minX, x + size.width > bounds.maxX {
+                x = bounds.minX
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
     }
 }
