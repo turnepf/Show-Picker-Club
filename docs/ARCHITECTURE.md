@@ -102,7 +102,7 @@ Join table for per-show cast.
 | `platform`      | TEXT | Migration 016. One of `_shared/platform.js#KNOWN_PLATFORMS` (`iphone`, `ipad`, `mac`, `watchos`, `tvos`, `web-small`, `web-large`), self-reported via the `X-Client-Platform` header and stamped by `/auth/check`. Deleted with the session on logout/disable — it's a live snapshot, not history; see `member_platforms` for durable per-member tracking. |
 
 ### `member_platforms`
-Migration 047. Durable "every platform this member has ever used," unlike `sessions.platform` which disappears on logout/disable. Shown as badges on the Manage Members admin page (web `/members`, iOS `ManageMembersView`).
+Migration 047. Durable "every platform this member has ever used," unlike `sessions.platform` which disappears on logout/disable. Shown as badges on the Manage Members admin page (web `/members`, iOS `ManageMembersView`); the same badges, laid out identically above the roster, double as a filter — tap one to show only members who've ever used that platform, tap it again to clear.
 
 | Column          | Type | Notes |
 |-----------------|------|-------|
