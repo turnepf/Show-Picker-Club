@@ -16,6 +16,13 @@ function json(data, status = 200) {
 }
 
 const MAX_PER_HOUR = 5;
+// Per-IP cap, separate from the per-member cap above: that one throttles
+// repeated codes to the SAME account; this one throttles a single source
+// hammering the endpoint (any member's email/phone) with a spoofed or
+// scripted client. Set well above normal shared-network use (two or three
+// members behind one home router each requesting a code) so it only bites
+// a real flood.
+const MAX_PER_IP_PER_HOUR = 10;
 const TTL_MIN = 10;
 
 function makeCode() {
@@ -72,7 +79,7 @@ export async function onRequestPost(context) {
     }
     const memberSlug = row.member_slug;
 
-    if (await overRateLimit(env, memberSlug)) {
+    if (await overRateLimit(env, memberSlug) || await overIpRateLimit(env, ip)) {
       return json({ error: 'rate_limited' }, 429);
     }
 
@@ -129,7 +136,7 @@ export async function onRequestPost(context) {
     }
   }
 
-  if (await overRateLimit(env, memberSlug)) {
+  if (await overRateLimit(env, memberSlug) || await overIpRateLimit(env, ip)) {
     return json({ error: 'rate_limited' }, 429);
   }
 
@@ -180,6 +187,20 @@ async function overRateLimit(env, memberSlug) {
     'SELECT COUNT(*) AS cnt FROM login_otps WHERE member_slug = ? AND created_at > ?'
   ).bind(memberSlug, since).first()) || { cnt: 0 };
   return cnt >= MAX_PER_HOUR;
+}
+
+// 'unknown' (missing CF-Connecting-IP — shouldn't happen behind Cloudflare,
+// but defensively) is never enforced: every such request would share one
+// bucket and could lock out unrelated members, which is worse than skipping
+// the check for that sliver of traffic. The per-member cap above still
+// applies regardless.
+async function overIpRateLimit(env, ip) {
+  if (ip === 'unknown') return false;
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { cnt } = (await env.DB.prepare(
+    'SELECT COUNT(*) AS cnt FROM login_otps WHERE ip = ? AND created_at > ?'
+  ).bind(ip, since).first()) || { cnt: 0 };
+  return cnt >= MAX_PER_IP_PER_HOUR;
 }
 
 export async function onRequestOptions() {
