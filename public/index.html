@@ -2533,6 +2533,13 @@
           return;
         }
         if (res.ok && data.needs_name) { loginShowStep('name'); return; }
+        if (res.status === 400) {
+          // Google's account name was only one word (rare) — the server
+          // needs a first and last name, so collect it like a fresh signup.
+          loginShowStep('name');
+          showLoginError('Add your first and last name to finish creating your account.');
+          return;
+        }
         if (res.status === 401) {
           showLoginError("That Google account isn't linked to a member. Use the email the group owner has on file, or ask them to add you.");
         } else {
@@ -2651,7 +2658,7 @@
 
     async function submitEnrollName() {
       const fullName = document.getElementById('loginFullName').value.trim();
-      if (fullName.length < 2) { showLoginError('Enter your name.'); return; }
+      if (fullName.split(/\s+/).filter(Boolean).length < 2) { showLoginError('Enter your first and last name.'); return; }
       const btn = document.getElementById('loginNameBtn');
       btn.disabled = true; btn.textContent = 'Creating…';
       let url, body;
@@ -2826,6 +2833,12 @@
           await finishLogin(!!payload.enrolled);
         } else if (res.ok && payload.needs_name) {
           loginShowStep('name');
+        } else if (res.status === 400) {
+          // Apple shared only one name component (rare) — fall to the name
+          // screen with what we have pre-filled instead of a dead-end error.
+          loginShowStep('name');
+          document.getElementById('loginFullName').value = nm;
+          showLoginError('Apple only shared part of your name — add your last name too.');
         } else if (res.status === 401) {
           showLoginError('That Apple ID isn\'t linked to a member. Choose "Share My Email" with the address the owner has on file, or use email.');
         } else if (res.status === 429) {

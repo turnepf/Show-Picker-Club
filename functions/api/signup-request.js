@@ -1,5 +1,6 @@
 import { sendEmail } from '../_shared/email.js';
 import { normalizePhone } from '../_shared/twilio-verify.js';
+import { hasFirstAndLast } from '../_shared/enroll.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -31,6 +32,7 @@ export async function onRequestPost(context) {
 
   if (!full_name) return json({ error: 'Name is required.' }, 400);
   if (full_name.length > 100) return json({ error: 'Name is too long.' }, 400);
+  if (!hasFirstAndLast(full_name)) return json({ error: 'Enter your first and last name.' }, 400);
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return json({ error: 'Enter a valid email address.' }, 400);
   }

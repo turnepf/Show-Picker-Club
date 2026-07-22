@@ -85,7 +85,7 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    wrangler d1 execute shows-db --remote --file=schema.sql
    ```
 
-3. **Seed at least one member + a contact for login.** New members are usually created via the admin `/setup` page once you're deployed; bootstrap by hand the first time. Login is by one-time code, so seed an email and/or phone the member will receive the code at.
+3. **Seed at least one member + a contact for login.** Once deployed, new members are created via self-enrollment (Apple/Google/email, behind the `SELF_ENROLL` secret) or by approving a `/join` request on `/members` — but there's no one yet to approve the first member in, so bootstrap it by hand. Login is by one-time code, so seed an email and/or phone the member will receive the code at.
    ```sql
    INSERT INTO members (slug, name, first_name) VALUES ('patrick', 'Patrick Turner', 'Patrick');
    INSERT INTO member_emails (email, member_slug, is_primary) VALUES ('patrick@example.com', 'patrick', 1);

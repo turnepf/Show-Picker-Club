@@ -22,11 +22,6 @@ struct AdminView: View {
             }
             Section("Members") {
                 NavigationLink {
-                    CreateMemberView()
-                } label: {
-                    Label("Create member", systemImage: "person.badge.plus")
-                }
-                NavigationLink {
                     ManageMembersView()
                 } label: {
                     Label("Manage members", systemImage: "person.2.badge.gearshape")

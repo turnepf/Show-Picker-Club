@@ -1,12 +1,3 @@
-import { isAdmin } from '../_shared/admin.js';
-
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
 // Normalise to E.164. Accepts "+CC..." as-is, treats bare 10-digit input as US,
 // and treats 11-digit input starting with 1 as US with country code already
 // included. Anything else: trust the user and just prepend "+".
@@ -68,10 +59,10 @@ export const RESERVED_SLUGS = new Set([
   'me', 'new', 'settings', 'signup', 'support', 'test', 'www',
 ]);
 
-// Core member-creation routine. Used by the operator-facing POST endpoint
-// below, the /admin page's "Approve" action, and self-enrollment
-// (_shared/enroll.js — which passes allowNoContact for Apple/Google-only
-// identities, approved: 0 for the roster hold, and enrolledVia).
+// Core member-creation routine. Used by the /join approval flow
+// (admin-signup-requests.js) and self-enrollment (_shared/enroll.js —
+// which passes allowNoContact for Apple/Google-only identities,
+// approved: 0 for the roster hold, and enrolledVia).
 // Returns either { ok: true, ...details } or { ok: false, status, error }.
 export async function createMember(env, { full_name, first_name, last_name, phone, emails, allowNoContact = false, approved = 1, enrolledVia = null }) {
   if (!full_name && !first_name) {
@@ -197,25 +188,4 @@ export async function createMember(env, { full_name, first_name, last_name, phon
     emails: emailList,
     seeded: seededTitles,
   };
-}
-
-export async function onRequestPost(context) {
-  const { request, env } = context;
-
-  if (!(await isAdmin(request, env))) {
-    return json({ error: 'Forbidden' }, 403);
-  }
-
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: 'Invalid JSON' }, 400);
-  }
-
-  const result = await createMember(env, body);
-  if (!result.ok) {
-    return json({ error: result.error }, result.status || 400);
-  }
-  return json(result);
 }
