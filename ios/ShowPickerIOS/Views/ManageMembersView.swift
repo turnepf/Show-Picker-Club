@@ -21,6 +21,10 @@ struct ManageMembersView: View {
     @State private var workingSlug: String?
     @State private var banner: String?
 
+    // Tap a platform badge above the roster to show only members who've
+    // ever used it; tap the active one again to clear. nil = no filter.
+    @State private var platformFilter: String?
+
     // Duplicates panel state: which account each group keeps, the merge
     // target for lone hidden-email accounts, the manual-merge picks, and
     // the pending confirmation (merges and ignores both confirm first,
@@ -66,7 +70,16 @@ struct ManageMembersView: View {
                 }
             }
             dupeSections
-            Section("Members") {
+            Section {
+                platformFilterRow
+            } header: {
+                Text("Filter by platform")
+            } footer: {
+                if let key = platformFilter, let label = Self.platformBadgeOrder.first(where: { $0.0 == key })?.1 {
+                    Text("Showing members who've used \(label). Tap it again to clear.")
+                }
+            }
+            Section("Members (\(sortedMembers.count))") {
                 ForEach(sortedMembers) { m in
                     NavigationLink {
                         MemberDetailAdminView(member: m) { await load() }
@@ -593,6 +606,30 @@ struct ManageMembersView: View {
         ("web-large", "Large Web"),
     ]
 
+    // Same badges, same layout, but tappable: picks which platform
+    // `sortedMembers` filters the roster down to.
+    @ViewBuilder private var platformFilterRow: some View {
+        FlowLayout(spacing: 4) {
+            ForEach(Self.platformBadgeOrder, id: \.0) { key, label in
+                let selected = platformFilter == key
+                Button {
+                    platformFilter = selected ? nil : key
+                } label: {
+                    Text(label)
+                        .font(.caption2.weight(.medium))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(
+                            selected ? Color.accentColor.opacity(0.15) : Color.clear,
+                            in: Capsule())
+                        .overlay(Capsule().stroke(Color.secondary.opacity(0.25), lineWidth: selected ? 0 : 1))
+                        .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
     @ViewBuilder private func platformBadges(_ m: AdminMember) -> some View {
         let used = Set(m.platforms ?? [])
         FlowLayout(spacing: 4) {
@@ -658,10 +695,13 @@ struct ManageMembersView: View {
     // bottom, alphabetically. The server normalises the timestamp format,
     // so plain string comparison orders correctly.
     private var sortedMembers: [AdminMember] {
+        let filtered = platformFilter.map { key in
+            members.filter { ($0.platforms ?? []).contains(key) }
+        } ?? members
         let byName: (AdminMember, AdminMember) -> Bool = {
             $0.personName.localizedCaseInsensitiveCompare($1.personName) == .orderedAscending
         }
-        return members.sorted {
+        return filtered.sorted {
             switch ($0.lastActivityAt, $1.lastActivityAt) {
             case (nil, nil): return byName($0, $1)
             case (nil, _): return false

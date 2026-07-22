@@ -224,8 +224,12 @@ there is no separate "New members" page or link anywhere anymore.
 Processed (approved/rejected) requests carry a **Hide**
 action on both surfaces — hiding dismisses the row for good (server-side
 `hidden_at`, so every client's queue empties out), while pending requests
-can't be hidden. When adding a member-management capability, add it
-to both surfaces in the same change or note the follow-up in the Backlog.
+can't be hidden. Above the roster, the same platform badges shown per-member
+(iPhone, iPad, Apple Watch, Mac, Apple TV, Small Web, Large Web) double as a
+filter on both surfaces — tap one to show only members who've ever used
+that platform, tap it again to clear. When adding a member-management
+capability, add it to both surfaces in the same change or note the
+follow-up in the Backlog.
 
 ## Future / not built
 
