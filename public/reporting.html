@@ -141,14 +141,20 @@
     }
 
     // Friendly labels + a stable display order for the platform breakdown.
+    // 'ios' is a legacy value from before iPhone/iPad/Mac were told apart —
+    // kept as a fallback until every client has updated.
     const PLATFORM_LABELS = {
-      'ios': 'iOS',
-      'tvos': 'tvOS',
+      'iphone': 'iPhone',
+      'ipad': 'iPad',
+      'mac': 'Mac',
+      'watchos': 'Apple Watch',
+      'tvos': 'Apple TV',
       'web-large': 'Web (large)',
       'web-small': 'Web (small)',
+      'ios': 'iOS (legacy)',
       'unknown': 'Unknown',
     };
-    const PLATFORM_ORDER = ['ios', 'tvos', 'web-large', 'web-small', 'unknown'];
+    const PLATFORM_ORDER = ['iphone', 'ipad', 'mac', 'watchos', 'tvos', 'web-large', 'web-small', 'ios', 'unknown'];
 
     function platformSection(byPlatform) {
       const bp = byPlatform || {};

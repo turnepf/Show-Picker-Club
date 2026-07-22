@@ -53,9 +53,10 @@ export async function onRequestGet(context) {
       `SELECT COUNT(DISTINCT member_slug) as cnt FROM sessions WHERE last_seen_at >= datetime('now', '-30 days')`),
   };
 
-  // Active sessions broken down by client platform (ios / tvos / web-small /
-  // web-large). Counts distinct sessions, not members: a member can be active
-  // on more than one platform, and anonymous tvOS devices have no member.
+  // Active sessions broken down by client platform (see
+  // _shared/platform.js#KNOWN_PLATFORMS). Counts distinct sessions, not
+  // members: a member can be active on more than one platform, and
+  // anonymous tvOS devices have no member.
   // Defensive: the platform column arrives in migration 016, so fall back to
   // an empty breakdown rather than 500 the whole dashboard if it's missing.
   const activeByPlatform = { day: {}, week: {}, month: {} };

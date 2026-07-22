@@ -575,8 +575,41 @@ struct ManageMembersView: View {
             Text(contactSummary(m)).font(.caption).foregroundStyle(.secondary)
             Text(lastActivityText(m.lastActivityAt)).font(.caption).foregroundStyle(.secondary)
             activityPills(m)
+            platformBadges(m)
         }
         .opacity(m.disabled == true ? 0.6 : 1)
+    }
+
+    // Every platform the member has ever used, side by side like the
+    // activity pills above them — dim when unused, filled when earned.
+    // "Ever used" (not a recent window): once lit, a badge stays lit.
+    private static let platformBadgeOrder: [(String, String)] = [
+        ("iphone", "iPhone"),
+        ("ipad", "iPad"),
+        ("watchos", "Apple Watch"),
+        ("mac", "Mac"),
+        ("tvos", "Apple TV"),
+        ("web-small", "Small Web"),
+        ("web-large", "Large Web"),
+    ]
+
+    @ViewBuilder private func platformBadges(_ m: AdminMember) -> some View {
+        let used = Set(m.platforms ?? [])
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 4) {
+                ForEach(Self.platformBadgeOrder, id: \.0) { key, label in
+                    Text(label)
+                        .font(.caption2.weight(.medium))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(
+                            used.contains(key) ? Color.accentColor.opacity(0.15) : Color.clear,
+                            in: Capsule())
+                        .overlay(Capsule().stroke(Color.secondary.opacity(0.25), lineWidth: used.contains(key) ? 0 : 1))
+                        .foregroundStyle(used.contains(key) ? Color.accentColor : Color.secondary.opacity(0.45))
+                }
+            }
+        }
     }
 
     // Per-list 30-day adds, colour-coded to the list like the web roster's

@@ -37,6 +37,22 @@
       font-weight: 500;
     }
     .pill strong { font-weight: 700; }
+    .platforms {
+      margin: 0 0 10px; font-size: 12px;
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    }
+    .platform-pill {
+      display: inline-flex; align-items: baseline; gap: 4px;
+      padding: 2px 8px; border-radius: 999px;
+      border: 1px solid var(--border-soft); font-size: 11px;
+      color: var(--ink-muted); font-weight: 500; opacity: 0.45;
+    }
+    .platform-pill.active {
+      color: var(--ink);
+      border-color: color-mix(in oklch, var(--accent) 35%, transparent);
+      background: color-mix(in oklch, var(--accent) 12%, var(--surface));
+      opacity: 1;
+    }
     .meta { color: var(--ink-muted); font-size: 12px; font-family: ui-monospace, monospace; }
     .meta .never { color: var(--danger); }
     .field { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
@@ -906,6 +922,25 @@ If you see something you like on someone else's list, tap the **+** to add it to
         .join(' ');
     }
 
+    // Platform badges: every platform a member has ever used lights up,
+    // side by side like the activity pills above them. "Ever used" (not a
+    // recent window) — once a badge is earned it stays lit.
+    const PLATFORM_BADGES = [
+      ['iphone', 'iPhone'],
+      ['ipad', 'iPad'],
+      ['watchos', 'Apple Watch'],
+      ['mac', 'Mac'],
+      ['tvos', 'Apple TV'],
+      ['web-small', 'Small Web'],
+      ['web-large', 'Large Web'],
+    ];
+    function platformBadges(platforms) {
+      const used = new Set(platforms || []);
+      return PLATFORM_BADGES
+        .map(([k, label]) => `<span class="platform-pill${used.has(k) ? ' active' : ''}">${escapeHtml(label)}</span>`)
+        .join(' ');
+    }
+
     function relTime(d) {
       const days = Math.floor((new Date() - d) / 86400000);
       let when;
@@ -956,6 +991,7 @@ If you see something you like on someone else's list, tap the **+** to add it to
             <div class="meta">${formatLastActivity(m.last_activity_at)}</div>
           </div>
           ${activityRow}
+          <div class="platforms">${platformBadges(m.platforms)}</div>
           <div class="field">
             <label>First name(s)</label>
             <input class="firstname" type="text" value="${escapeHtml(m.first_name || '')}" placeholder="Alice — or Paula &amp; Brad for a shared list">

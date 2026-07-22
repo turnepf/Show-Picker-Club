@@ -99,6 +99,19 @@ Join table for per-show cast.
 | `expires_at`    | TEXT NOT NULL | 30 days from creation. |
 | `created_at`    | TEXT | |
 | `last_seen_at`  | TEXT | Bumped by `/auth/check`, throttled to once per hour per session. Drives DAU/WAU/MAU in reporting. |
+| `platform`      | TEXT | Migration 016. One of `_shared/platform.js#KNOWN_PLATFORMS` (`iphone`, `ipad`, `mac`, `watchos`, `tvos`, `web-small`, `web-large`), self-reported via the `X-Client-Platform` header and stamped by `/auth/check`. Deleted with the session on logout/disable — it's a live snapshot, not history; see `member_platforms` for durable per-member tracking. |
+
+### `member_platforms`
+Migration 047. Durable "every platform this member has ever used," unlike `sessions.platform` which disappears on logout/disable. Shown as badges on the Manage Members admin page (web `/members`, iOS `ManageMembersView`).
+
+| Column          | Type | Notes |
+|-----------------|------|-------|
+| `member_slug`   | TEXT | Part of the PK (with `platform`). |
+| `platform`      | TEXT | One of `KNOWN_PLATFORMS`; see `sessions.platform` above. |
+| `first_seen_at` | TEXT NOT NULL | Set once, on first insert. |
+| `last_seen_at`  | TEXT NOT NULL | Updated on every recognized `X-Client-Platform` header (unthrottled — a plain `ON CONFLICT DO UPDATE`; club-scale traffic makes the write volume a non-issue). |
+
+Stamped from two call sites, both via `_shared/platform.js#recordPlatformUsage()`: `_shared/auth.js#getSession()` (every authenticated API call — the reliable catch-all, since native apps send the header on every request) and `auth/check.js` (covers the web app, which only sends the header on that one ping). watchOS never calls `/auth/check` — it relays its session from the phone via WatchConnectivity and calls API endpoints directly — so `getSession()` is its only coverage.
 
 ### `failed_logins`
 Used by login throttling. Auto-pruned (>7 days) by the daily backup workflow.
@@ -264,6 +277,8 @@ The demo member's data auto-resets (`_shared/demo.js`): each demo sign-in snapsh
 `/auth/check` is hit on every page load by the SPA. It bumps `sessions.last_seen_at`, but throttled — the `UPDATE` clause only fires when `last_seen_at IS NULL OR last_seen_at < datetime('now', '-1 hour')`. This means at most one write per session per hour, with no read-then-write.
 
 `last_seen_at` feeds **Reporting** only: DAU / WAU / MAU = `COUNT(DISTINCT member_slug) FROM sessions WHERE last_seen_at >= ...`. The home-page member ordering is library-based (`last_activity_at` on `/api/members`), not session-based.
+
+Platform breakdown (Reporting's "Active by platform" and the Manage Members badges) reads `_shared/platform.js#KNOWN_PLATFORMS` — the single source of truth for valid `X-Client-Platform` values, imported by both `_shared/auth.js` and `auth/check.js` so they can't drift out of sync with each other (they used to define it separately, and the duplicate silently dropped `watchos`).
 
 Durable login tracking is separate: `members.last_login_at` (stamped by `_shared/session.js#issueSession` on every login). The `sessions` table cannot answer "when did this member last log in" — logout, admin disable, and account deletion all delete session rows — so the admin member list (`/api/admin-member-emails`) and the engagement script read `last_login_at`, falling back to sessions only when the column is NULL. The endpoint normalises the value to fraction-less UTC ISO (`2026-07-19T08:30:00Z`) because the shipped iOS admin screen's `ISO8601DateFormatter` rejects fractional seconds.
 

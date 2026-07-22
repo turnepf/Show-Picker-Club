@@ -92,7 +92,9 @@ struct ReportingView: View {
     }
 
     // Stable display order for the platform breakdown; unknown keys sort last.
-    private static let platformOrder = ["ios", "tvos", "web-large", "web-small", "unknown"]
+    // "ios" is a legacy value from before iPhone/iPad/Mac were told apart —
+    // kept as a fallback until every client has updated.
+    private static let platformOrder = ["iphone", "ipad", "mac", "watchos", "tvos", "web-large", "web-small", "ios", "unknown"]
 
     private func platformKeys(_ bp: PlatformWindows) -> [String] {
         var keys = Set(bp.day.keys)
@@ -105,10 +107,14 @@ struct ReportingView: View {
 
     private func platformLabel(_ key: String) -> String {
         switch key {
-        case "ios": return "iOS"
-        case "tvos": return "tvOS"
+        case "iphone": return "iPhone"
+        case "ipad": return "iPad"
+        case "mac": return "Mac"
+        case "watchos": return "Apple Watch"
+        case "tvos": return "Apple TV"
         case "web-large": return "Web (large)"
         case "web-small": return "Web (small)"
+        case "ios": return "iOS (legacy)"
         case "unknown": return "Unknown"
         default: return key
         }
