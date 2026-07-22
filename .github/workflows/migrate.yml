@@ -1,9 +1,10 @@
 name: Apply D1 migration
 
-# Migrations are NOT auto-applied on deploy (deploy.yml only ships
-# public/ + functions/). Run this manually after merging a migration that
-# adds or changes columns the Functions rely on — otherwise the deployed
-# code references columns the production database doesn't have yet.
+# deploy.yml already applies pending migrations automatically on every push
+# to main, before the code deploy — so this manual workflow isn't needed for
+# the normal path of merging a migration alongside the code that depends on
+# it. Use this instead to apply a migration ahead of merging its code, or to
+# run one against prod outside of a main push.
 #
 # Actions tab → "Apply D1 migration" → Run workflow → pick the file.
 on:

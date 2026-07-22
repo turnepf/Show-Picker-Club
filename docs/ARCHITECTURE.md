@@ -514,12 +514,18 @@ The moment a member edits a seeded row (changes list, notes, etc.), archives one
 
 ### `.github/workflows/deploy.yml`
 - Trigger: push to `main`, or manual dispatch.
-- Steps: checkout, install Node 22 + wrangler, `wrangler pages deploy public --project-name=shows --branch=main --commit-dirty=true`.
+- Steps: checkout, install Node 22 + wrangler, **apply pending D1 migrations** (`bash scripts/apply-migrations.sh` — self-tracked via `schema_migrations`, runs *before* the deploy so new columns/tables exist before the code that depends on them goes live), `wrangler pages deploy public --project-name=shows --branch=main --commit-dirty=true`.
 - **Post-deploy smoke test** (15s settle + checks):
   - `/.env` probe — must return > 10KB (i.e. the SPA shell, not the actual file).
   - Security headers — CSP, HSTS, X-Frame-Options, Permissions-Policy must be present on `/`.
   - Auth gates — `POST /api/shows/share`, `GET /api/reporting`, `POST /api/enrich`, `POST /api/sync-urls` must each return 401.
 - Required secrets: `CLOUDFLARE_API_TOKEN` (Pages:Edit + D1:Edit), `CLOUDFLARE_ACCOUNT_ID`.
+
+### `.github/workflows/migrate.yml` ("Apply D1 migration")
+- Trigger: manual dispatch only, with a `file` input (bare `NNN_*.sql` resolves under `migrations/`).
+- Steps: checkout, install wrangler, `wrangler d1 execute shows-db --remote --file=<file>`.
+- Since `deploy.yml` already applies pending migrations automatically, this is only needed to apply a migration *ahead of* merging its code, or to run one against prod outside of a `main` push.
+- Required secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
 
 ### `.github/workflows/backup.yml`
 - Trigger: daily at 03:00 UTC, or manual dispatch.
