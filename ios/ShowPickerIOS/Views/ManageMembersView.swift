@@ -595,19 +595,17 @@ struct ManageMembersView: View {
 
     @ViewBuilder private func platformBadges(_ m: AdminMember) -> some View {
         let used = Set(m.platforms ?? [])
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
-                ForEach(Self.platformBadgeOrder, id: \.0) { key, label in
-                    Text(label)
-                        .font(.caption2.weight(.medium))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .background(
-                            used.contains(key) ? Color.accentColor.opacity(0.15) : Color.clear,
-                            in: Capsule())
-                        .overlay(Capsule().stroke(Color.secondary.opacity(0.25), lineWidth: used.contains(key) ? 0 : 1))
-                        .foregroundStyle(used.contains(key) ? Color.accentColor : Color.secondary.opacity(0.45))
-                }
+        FlowLayout(spacing: 4) {
+            ForEach(Self.platformBadgeOrder, id: \.0) { key, label in
+                Text(label)
+                    .font(.caption2.weight(.medium))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(
+                        used.contains(key) ? Color.accentColor.opacity(0.15) : Color.clear,
+                        in: Capsule())
+                    .overlay(Capsule().stroke(Color.secondary.opacity(0.25), lineWidth: used.contains(key) ? 0 : 1))
+                    .foregroundStyle(used.contains(key) ? Color.accentColor : Color.secondary.opacity(0.45))
             }
         }
     }
@@ -921,5 +919,47 @@ private struct MemberDetailAdminView: View {
                 await onChange()
             }
         } catch { banner = "Network error. Try again." }
+    }
+}
+
+// Wraps subviews onto new rows instead of overflowing or scrolling —
+// mirrors the web roster's `flex-wrap` platform badges on narrow widths.
+private struct FlowLayout: Layout {
+    var spacing: CGFloat = 4
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > maxWidth {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        y += rowHeight
+        return CGSize(width: maxWidth.isFinite ? maxWidth : x, height: y)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX
+        var y = bounds.minY
+        var rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > bounds.minX, x + size.width > bounds.maxX {
+                x = bounds.minX
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
     }
 }
