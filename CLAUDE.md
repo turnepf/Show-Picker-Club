@@ -51,7 +51,7 @@ Local preview of the site + Functions (uses a local D1 unless you point it at re
 wrangler pages dev public
 ```
 
-Run a migration against production D1 (requires `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`; usually done via the "Apply D1 migration" GitHub Action instead):
+Run a migration against production D1 out of band (requires `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`; normally unnecessary — see below — but useful to apply a migration ahead of merging its code, or via the "Apply D1 migration" GitHub Action):
 
 ```bash
 wrangler d1 execute shows-db --remote --file=migrations/NNN_name.sql
@@ -70,7 +70,7 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 ## Deploys, migrations, and CI
 
 - **Push to `main` deploys production automatically** (`.github/workflows/deploy.yml`), then smoke-tests: `/.env` must serve the SPA shell, security headers must be present, and auth-gated endpoints must 401.
-- **Migrations are NOT applied on deploy.** After merging a migration the Functions depend on, run the "Apply D1 migration" workflow (Actions tab → pick the file) *before or with* the deploy, or the deployed code references columns production doesn't have.
+- **`deploy.yml` applies pending D1 migrations automatically**, in the same run, before the Pages deploy step (`scripts/apply-migrations.sh`, self-tracked via `schema_migrations`). Merging a migration in the same PR as the code that depends on it is the normal path and needs no extra operator step. The manual "Apply D1 migration" workflow (Actions tab → pick the file) is only for applying a migration *ahead of* merging its code, or running one against prod outside of a `main` push.
 - Other workflows: daily D1 backup to Google Drive (`backup.yml`), hourly demo reset, monthly dormant digest, and scheduled enrichment/vibe/watch-URL fills — the scheduled ones call admin endpoints with an `X-Cron-Secret` header.
 
 ## Architecture essentials
