@@ -575,10 +575,14 @@ struct AdminMember: Codable, Identifiable {
     let disabled: Bool?
     let approved: Bool?
     let enrolledVia: String?
+    // Every platform this member has ever used the app from (migration 047);
+    // absent on an older server. Values match X-Client-Platform: iphone,
+    // ipad, mac, watchos, tvos, web-small, web-large.
+    let platforms: [String]?
     var id: String { slug }
 
     enum CodingKeys: String, CodingKey {
-        case slug, name, emails, phones, disabled, approved
+        case slug, name, emails, phones, disabled, approved, platforms
         case firstName = "first_name"
         case lastInitial = "last_initial"
         case lastName = "last_name"

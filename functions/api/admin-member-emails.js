@@ -52,12 +52,15 @@ export async function onRequestGet(context) {
   // test as the dormant digest). Normalised inside MAX so the mixed
   // storage formats (datetime('now') vs JS toISOString) compare correctly.
   const since = "datetime('now', '-30 days')";
-  // disabled (migration 030) / approved + enrolled_via (migration 031) with
-  // column-less retries so the page keeps working mid-rollout.
+  // disabled (migration 030) / approved + enrolled_via (migration 031) /
+  // member_platforms (migration 047) with column-less retries so the page
+  // keeps working mid-rollout.
   const memberQuery = (extras) => env.DB.prepare(`
     SELECT m.slug, m.name, m.first_name, m.last_initial, m.last_name,
            ${extras >= 1 ? 'm.is_admin, m.disabled,' : '0 AS is_admin, 0 AS disabled,'}
            ${extras >= 2 ? 'm.approved, m.enrolled_via,' : '1 AS approved, NULL AS enrolled_via,'}
+           ${extras >= 3 ? `(SELECT GROUP_CONCAT(platform, ',') FROM member_platforms
+                              WHERE member_slug = m.slug) AS platforms,` : 'NULL AS platforms,'}
            (SELECT GROUP_CONCAT(email, ',')
               FROM (SELECT email FROM member_emails
                      WHERE member_slug = m.slug
@@ -96,7 +99,8 @@ export async function onRequestGet(context) {
       FROM members m
      ORDER BY m.first_name COLLATE NOCASE
   `);
-  const { results } = await memberQuery(2).all()
+  const { results } = await memberQuery(3).all()
+    .catch(() => memberQuery(2).all())
     .catch(() => memberQuery(1).all())
     .catch(() => memberQuery(0).all());
   const members = (results || []).map(r => ({
@@ -114,6 +118,7 @@ export async function onRequestGet(context) {
     last_login: r.last_login || null,
     show_count: r.show_count || 0,
     last_activity_at: r.last_activity_at || null,
+    platforms: r.platforms ? r.platforms.split(',').filter(Boolean) : [],
     activity_30d: {
       watching: r.act_watching || 0,
       waiting: r.act_waiting || 0,

@@ -1,5 +1,6 @@
 import Foundation
 import ShowPickerCore
+import UIKit
 
 // Data layer for the home-screen widgets. Widgets run in their own process:
 // public reads (Trending) hit the API cookie-less; member reads (Upcoming)
@@ -99,6 +100,13 @@ enum WidgetData {
 
     static var isSignedIn: Bool { SharedSession.memberSlug != nil }
 
+    // Matches API.currentPlatform in the main app target — widgets run in
+    // their own process but UIDevice still reflects the host device.
+    private static let platform: String = {
+        if ProcessInfo.processInfo.isMacCatalystApp { return "mac" }
+        return UIDevice.current.userInterfaceIdiom == .pad ? "ipad" : "iphone"
+    }()
+
     // MARK: Plumbing
 
     private static func getJSON<T: Decodable>(path: String, cookie: String? = nil) async -> T? {
@@ -106,7 +114,7 @@ enum WidgetData {
         var req = URLRequest(url: url)
         req.httpShouldHandleCookies = false
         if let cookie, !cookie.isEmpty { req.setValue(cookie, forHTTPHeaderField: "Cookie") }
-        req.setValue("ios", forHTTPHeaderField: "X-Client-Platform")
+        req.setValue(platform, forHTTPHeaderField: "X-Client-Platform")
         req.cachePolicy = .reloadRevalidatingCacheData
         guard let (data, resp) = try? await URLSession.shared.data(for: req),
               let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode)

@@ -1,3 +1,5 @@
+import { platformOf, recordPlatformUsage } from './platform.js';
+
 export async function getSession(request, env) {
   const cookie = request.headers.get('Cookie') || '';
   const match = cookie.match(/session=([^;]+)/);
@@ -17,7 +19,16 @@ export async function getSession(request, env) {
       'SELECT email, member_slug, expires_at FROM sessions WHERE id = ?'
     ).bind(match[1]);
     const session = await withDisabled.first().catch(() => plain.first());
-    if (session && new Date(session.expires_at) > new Date()) return session;
+    if (session && new Date(session.expires_at) > new Date()) {
+      // Native apps send this on every request, so this is the reliable
+      // catch-all for platform usage -- including watchOS, which relays its
+      // session from the phone and never calls /auth/check itself. Not
+      // awaited: getSession() gates every authenticated endpoint, and this
+      // write is best-effort analytics, not worth blocking every response on.
+      const platform = platformOf(request);
+      if (platform) recordPlatformUsage(env, session.member_slug, platform);
+      return session;
+    }
   } catch (e) {}
   return null;
 }

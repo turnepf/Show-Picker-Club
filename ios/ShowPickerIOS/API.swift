@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 // Async client for showpicker.club. Read endpoints are unauthed; write
 // endpoints rely on the session cookie set by /auth/login — URLSession's
@@ -7,6 +8,14 @@ import Foundation
 
 enum API {
     static let baseString = "https://showpicker.club"
+
+    // Platform usage tracking (Manage Members badges): Mac Catalyst first —
+    // UIDevice still reports .phone/.pad under Catalyst — then iPad vs
+    // iPhone by interface idiom.
+    static let currentPlatform: String = {
+        if ProcessInfo.processInfo.isMacCatalystApp { return "mac" }
+        return UIDevice.current.userInterfaceIdiom == .pad ? "ipad" : "iphone"
+    }()
 
     // Error payload the JSON senders decode from a non-2xx body. Declared at
     // the type level (not inside the generic sendJSON) because Swift forbids
@@ -87,7 +96,7 @@ enum API {
         var req = URLRequest(url: url)
         req.cachePolicy = .reloadRevalidatingCacheData
         // Platform usage tracking: /auth/check stamps this onto the session.
-        req.setValue("ios", forHTTPHeaderField: "X-Client-Platform")
+        req.setValue(currentPlatform, forHTTPHeaderField: "X-Client-Platform")
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse else { throw APIError.badResponse(-1) }
         guard (200..<300).contains(http.statusCode) else { throw APIError.badResponse(http.statusCode) }
@@ -119,7 +128,7 @@ enum API {
         guard let url = URL(string: baseString + "/api/export") else { throw APIError.badURL }
         var req = URLRequest(url: url)
         req.cachePolicy = .reloadIgnoringLocalCacheData
-        req.setValue("ios", forHTTPHeaderField: "X-Client-Platform")
+        req.setValue(currentPlatform, forHTTPHeaderField: "X-Client-Platform")
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse else { throw APIError.badResponse(-1) }
         guard (200..<300).contains(http.statusCode) else { throw APIError.badResponse(http.statusCode) }
@@ -688,7 +697,7 @@ enum API {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("ios", forHTTPHeaderField: "X-Client-Platform")
+        req.setValue(currentPlatform, forHTTPHeaderField: "X-Client-Platform")
         // Filter out nil values so JSON omits them.
         let compact = body.compactMapValues { $0 }
         req.httpBody = try JSONSerialization.data(withJSONObject: compact)
