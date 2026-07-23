@@ -442,6 +442,13 @@ struct ShowDetailView: View {
         do {
             if let updated = try await API.rateShow(id: id, rating: value, season: season) {
                 ratings = updated
+            } else {
+                // Queued offline — no fresh summary to apply yet, so fold
+                // the tapped value into local state ourselves. It'll be
+                // replaced by the real summary next time this show loads
+                // after the queue drains.
+                let base = ratings ?? RatingsSummary()
+                ratings = season.map { base.withMineSeason($0, value: value) } ?? base.withMine(value)
             }
         } catch let e as API.APIError where e.status == 401 {
             addAlert = AddAlert(title: "Logged out",

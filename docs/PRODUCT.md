@@ -303,8 +303,22 @@ A few intentional omissions:
     rating, tap-row entry for overall + each season, gated to lists other
     than Next Up). tvOS and watchOS are view-only (TMDB Rating + Club
     Rating + owner's rating; rate from iPhone/iPad) — consistent with both
-    already being view-only/read-only apps generally. No native bulk
-    rate-your-backlog screen — that flow stays web-only for now.
+    already being view-only/read-only apps generally.
+  - **Native bulk rate-your-backlog (shipped in code):** iOS/iPad get a
+    "Rate my backlog" screen (`RateBacklogView`), mirroring
+    `/rate-backlog` — every unrated overall show, tap-row entry, rated
+    shows drop off the list immediately. Surfaced next to Subscription
+    audit on Home, the iPad sidebar, and a member's own page. Season
+    ratings aren't listed there by design; "Rate seasons" on a row opens
+    the full detail screen. tvOS/watchOS don't get this screen — no entry
+    UI on either app.
+  - **Offline rating queue (shipped in code):** rating a show while
+    offline (from the detail screen or the bulk backlog screen) queues it
+    as a `.rate` `PendingMutation` instead of failing, same as any other
+    offline edit — it replays automatically on reconnect. The tapped value
+    is folded into local state right away so the UI doesn't wait on a
+    server round-trip that hasn't happened yet, and an already-tapped show
+    in the backlog list won't reappear before the queue actually syncs it.
   - **Not building yet:** clearing/un-rating a show once rated — revisit if
     it's requested.
   - **Ships as v1.1, build 19** — version bumped in both `ios/ShowPickerIOS.xcodeproj`

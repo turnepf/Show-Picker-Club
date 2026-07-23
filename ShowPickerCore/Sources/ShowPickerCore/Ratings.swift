@@ -59,10 +59,58 @@ public struct RatingsSummary: Codable, Hashable, Sendable {
     enum CodingKeys: String, CodingKey {
         case average, count, seasons, mine, mineSeasons, owner, ownerSeasons, ownerName
     }
+
+    // Copy-with helpers for optimistic local updates — e.g. when a rating
+    // was queued offline and there's no freshly-recomputed summary back
+    // from the server yet, fold the tapped value in locally so the UI
+    // reflects it immediately.
+    public func withMine(_ value: Int) -> RatingsSummary {
+        RatingsSummary(average: average, count: count, seasons: seasons, mine: value,
+                       mineSeasons: mineSeasons, owner: owner, ownerSeasons: ownerSeasons,
+                       ownerName: ownerName)
+    }
+
+    public func withMineSeason(_ season: Int, value: Int) -> RatingsSummary {
+        var s = mineSeasons
+        s[season] = value
+        return RatingsSummary(average: average, count: count, seasons: seasons, mine: mine,
+                              mineSeasons: s, owner: owner, ownerSeasons: ownerSeasons,
+                              ownerName: ownerName)
+    }
 }
 
 // Response from PUT /api/shows/:id/rating.
 public struct RatingResponse: Codable, Sendable {
     public let ok: Bool
     public let ratings: RatingsSummary?
+}
+
+// One row in the "rate your backlog" bulk flow (GET /api/rate-backlog) — a
+// show the member hasn't given an overall rating yet. Mirrors
+// functions/api/rate-backlog.js.
+public struct RateBacklogShow: Codable, Identifiable, Sendable {
+    public let id: Int
+    public let title: String
+    public let posterUrl: String?
+    public let movie: Int?
+    public let list: String
+    public let seasonsReleased: Int?
+
+    public var isMovie: Bool { (movie ?? 0) == 1 }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, list, movie
+        case posterUrl = "poster_url"
+        case seasonsReleased = "seasons_released"
+    }
+}
+
+public struct RateBacklogResponse: Codable, Sendable {
+    public let shows: [RateBacklogShow]
+    public let hasAny: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case shows
+        case hasAny = "has_any"
+    }
 }

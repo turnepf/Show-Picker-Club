@@ -184,13 +184,40 @@ enum API {
     }
 
     // Rate my own copy of a show — overall (season nil) or a specific
-    // season. Instant-save from the caller (no separate confirm step);
-    // returns the freshly recomputed summary so the view can update
-    // without a refetch. Online-only for now — not routed through the
-    // offline queue (see ios/ShowPickerIOS/Offline).
+    // season. Instant-save from the caller (no separate confirm step).
+    // Online: returns the freshly recomputed summary so the view can
+    // update without a refetch. Offline: queues the rating (replayed once
+    // connectivity returns, same as move/archive/etc.) and returns nil —
+    // callers should fold the tapped value into their local state
+    // themselves (see RatingsSummary.withMine/withMineSeason) rather than
+    // waiting on a summary that isn't coming yet.
     static func rateShow(id: Int, rating: Int, season: Int? = nil) async throws -> RatingsSummary? {
+        do {
+            return try await rateShowRemote(id: id, rating: rating, season: season)
+        } catch {
+            if isOffline(error) {
+                await OfflineQueue.shared.enqueueRate(id: id, rating: rating, season: season)
+                return nil
+            }
+            throw error
+        }
+    }
+
+    static func rateShowRemote(id: Int, rating: Int, season: Int? = nil) async throws -> RatingsSummary? {
         let r: RatingResponse = try await putJSON("/api/shows/\(id)/rating", body: ["rating": rating, "season": season])
         return r.ratings
+    }
+
+    // Backing list for the "rate your backlog" bulk flow: every show the
+    // member hasn't given an overall rating yet. Offline-cached like other
+    // reads (keyed by member, same as showDetail keys by show id — this is
+    // session-scoped server-side, so a flat cache key could otherwise leak
+    // a stale list across members on a shared device). The bulk screen
+    // further filters out anything with a pending offline rating (see
+    // OfflineQueue.pendingRating) so an already-tapped show doesn't
+    // reappear before it's actually synced.
+    static func rateBacklog(member: String) async throws -> RateBacklogResponse {
+        try await getCached("/api/rate-backlog", cacheKey: "rate_backlog_\(member)")
     }
 
     static func actors(showId: Int) async throws -> [Actor] {

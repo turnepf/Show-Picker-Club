@@ -190,7 +190,7 @@ Everything lives in `ShowPickerIOS/Offline/`:
 Offline/
 ├── Connectivity.swift     NWPathMonitor → isOnline; kicks a flush on reconnect
 ├── OfflineCache.swift     disk JSON cache for read endpoints (Application Support)
-├── PendingMutation.swift  one queued write (add / update / move / archive / delete)
+├── PendingMutation.swift  one queued write (add / update / move / archive / delete / rate)
 ├── OfflineQueue.swift     shows-per-member snapshot + the write queue + flush
 └── OfflineBanner.swift    the status strip shown in Home + Member views
 ```
@@ -222,10 +222,11 @@ Offline/
 ### Limits
 
 - Only edits to *your own* library queue offline — add / edit / move / archive /
-  delete, including adding a cached search result onto
-  one of your lists. Suggesting or sending a show to *another* member, login,
-  and the admin tools still need a connection and surface their usual errors
-  offline.
+  delete / rate, including adding a cached search result onto
+  one of your lists and rating from either the show detail screen or the
+  "Rate my backlog" bulk screen. Suggesting or sending a show to *another*
+  member, login, and the admin tools still need a connection and surface
+  their usual errors offline.
 - The share extension is a separate process and remains online-only.
 - Enrichment (ratings, cast, premiere dates) for a show added offline fills in
   after it syncs and the server enriches it.
@@ -250,7 +251,8 @@ Offline/
 | Share from Netflix / Apple TV / etc. → Next Up | ✅ (Share Extension) |
 | Calendar feed (Subscribe in Calendar) | ✅ (per-member webcal:// button at the bottom of their list) |
 | Recommendations / "Picks for you" | ❌ Removed from the client (see note) |
-| Offline browsing + offline edits | ✅ (cached reads, queued add/edit/move/archive, auto-sync on reconnect) |
+| Offline browsing + offline edits | ✅ (cached reads, queued add/edit/move/archive/rate, auto-sync on reconnect) |
+| Rate my backlog (bulk rating) | ✅ (`RateBacklogView`; offline ratings queue and sync) |
 | Field toggle pills (hide ratings/networks/etc.) | ❌ Not planned for iOS |
 | Vibe profile | ✅ (`VibeView`, linked from a member's list) |
 

@@ -157,6 +157,11 @@ struct MemberView: View {
                         } label: {
                             Label("Subscription audit", systemImage: "creditcard")
                         }
+                        NavigationLink {
+                            RateBacklogView()
+                        } label: {
+                            Label("Rate my backlog", systemImage: "star.fill")
+                        }
                     }
                 }
             }

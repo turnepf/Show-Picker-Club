@@ -9,7 +9,7 @@ import Foundation
 // the real id is swapped in for any later mutation that referenced the temp id.
 struct PendingMutation: Codable, Identifiable, Equatable {
     enum Kind: String, Codable {
-        case add, update, move, archive, delete
+        case add, update, move, archive, delete, rate
     }
 
     let id: UUID
@@ -30,6 +30,8 @@ struct PendingMutation: Codable, Identifiable, Equatable {
     var watchingWith: String?
     var archived: Bool?
     var targetList: String?   // .move only
+    var rating: Int?          // .rate only
+    var season: Int?          // .rate only — nil = overall
 
     init(kind: Kind, showId: Int, memberSlug: String?) {
         self.id = UUID()
@@ -46,6 +48,7 @@ struct PendingMutation: Codable, Identifiable, Equatable {
         case .move:    return "Move show"
         case .archive: return "Archive show"
         case .delete:  return "Delete show"
+        case .rate:    return season != nil ? "Rate season \(season!)" : "Rate show"
         }
     }
 }
