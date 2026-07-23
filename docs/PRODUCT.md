@@ -249,10 +249,12 @@ A few intentional omissions:
   (July 2026). `ios/ShowPickerIOS/Views/WhatsNewView.swift` still carries the
   coming-soon block — make the same swap there in the next build.
 
-- **Member star ratings.** (Amy, Susan — 7/2026.) Members can rate shows
-  they've watched, and those ratings show up alongside the IMDB number —
-  friends' stars answer "Patrick liked it, so I'll like it too." Susan asked
-  for exactly this from the other side: she wants to rate shows herself.
+- **Member star ratings.** (Amy Brownlee 7/16, Susan 7/22, Rob Maltzhan
+  7/23 — 2026.) Members can rate shows they've watched, and those ratings
+  show up alongside the IMDB number — friends' stars answer "Patrick liked
+  it, so I'll like it too." Susan asked for exactly this from the other
+  side: she wants to rate shows herself. Rob's ask (7/23) is both halves at
+  once: "add a 1-10 rating & see other's rating."
 
 - **Bracket competition.** (Amy — 7/2026.) A bracket-style tournament built
   from the group's shows, where members who have watched a show vote for
