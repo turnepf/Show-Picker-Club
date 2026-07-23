@@ -121,6 +121,15 @@
     }
     .btn-update:hover { background: var(--accent-hover); }
     .btn-update:disabled { background: var(--ink-faint); cursor: not-allowed; }
+    .btn-dismiss {
+      padding: 8px 14px;
+      background: transparent; color: var(--ink-muted);
+      border: 1px solid var(--border); border-radius: 5px;
+      font-size: 13px; cursor: pointer; font-family: inherit;
+      white-space: nowrap;
+    }
+    .btn-dismiss:hover { color: var(--danger-deep); border-color: var(--danger); }
+    .btn-dismiss:disabled { cursor: not-allowed; opacity: 0.6; }
 
     .row-err {
       grid-column: 1 / -1;
@@ -325,6 +334,7 @@
             <input type="text" class="other-input${otherClass}" placeholder="New network name" value="${escapeAttr(otherValue)}">
             <input type="text" class="title-input" placeholder="Fix title" value="${escapeAttr(show.title)}" autocomplete="off">
             <button class="btn-rename" type="button">Rename</button>
+            <button class="btn-dismiss" type="button">No good link — dismiss</button>
             <div class="row-err"></div>
           </div>
         </div>
@@ -432,6 +442,40 @@
         }
         renameBtn.disabled = false;
         renameBtn.textContent = old;
+      });
+
+      // No good link exists for this title (ambiguous, unlisted, etc.) —
+      // dismiss it from the queue permanently rather than leaving it stuck.
+      const dismissBtn = rowEl.querySelector('.btn-dismiss');
+      dismissBtn.addEventListener('click', async () => {
+        if (!confirm(`Stop flagging "${titleInput.value.trim()}" in Show Cleanup? There's no way to undo this from the page.`)) return;
+        errBox.textContent = '';
+        dismissBtn.disabled = true;
+        const old = dismissBtn.textContent;
+        dismissBtn.textContent = '…';
+        try {
+          const res = await fetch('/api/admin-url-cleanup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'dismiss', title: titleInput.value.trim() }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            errBox.textContent = data.error || `Error (${res.status})`;
+            dismissBtn.disabled = false;
+            dismissBtn.textContent = old;
+            return;
+          }
+          rowEl.classList.add('removing');
+          setTimeout(() => {
+            rowEl.remove();
+            updateRemaining(-1);
+          }, 250);
+        } catch (e) {
+          errBox.textContent = 'Network error: ' + e.message;
+          dismissBtn.disabled = false;
+          dismissBtn.textContent = old;
+        }
       });
     }
 

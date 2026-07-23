@@ -11,6 +11,15 @@ function json(data, status = 200) {
   });
 }
 
+// Operator-dismissed titles (see migrations/048) — titles that genuinely
+// have no good deep link to paste, so they'd otherwise sit in the queue
+// forever. /api/admin-url-cleanup creates this table on demand (identical
+// statement to the migration) so deploy order doesn't matter.
+const CREATE_IGNORES_TABLE = `CREATE TABLE IF NOT EXISTS url_cleanup_ignores (
+  ltitle TEXT NOT NULL PRIMARY KEY,
+  created_at TEXT DEFAULT (datetime('now'))
+)`;
+
 // URL hygiene isn't taste-related — Paula and any other taste-excluded
 // members still need their placeholder URLs cleaned up, so this queue
 // covers every active row regardless of the taste exclusion list.
@@ -35,6 +44,7 @@ const BAD_URL = `(s.network_url IS NULL
 const QUEUE_FILTER = `
   s.archived = 0
   AND ${BAD_URL}
+  AND LOWER(s.title) NOT IN (SELECT ltitle FROM url_cleanup_ignores)
   -- Exempt HBO Max search-fallback URLs: they're the best deep link we
   -- can offer for titles Watchmode only knows as auto-play URLs, so
   -- they shouldn't show up in the queue every cleanup pass. Two shapes:
@@ -350,6 +360,19 @@ export async function onRequestPost(context) {
   }
 
   const action = body.action || 'list';
+  await env.DB.prepare(CREATE_IGNORES_TABLE).run();
+
+  if (action === 'dismiss') {
+    // Operator marked a title as having no good link available — stop
+    // surfacing it in the queue. Scoped by title (case-insensitive), same
+    // grouping the queue itself uses.
+    const title = String(body.title || '').trim();
+    if (!title) return json({ error: 'title required' }, 400);
+    await env.DB.prepare(
+      'INSERT OR IGNORE INTO url_cleanup_ignores (ltitle) VALUES (LOWER(?))'
+    ).bind(title).run();
+    return json({ ok: true });
+  }
 
   if (action === 'save') {
     const id = parseInt(body.id, 10);
