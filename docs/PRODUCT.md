@@ -256,7 +256,7 @@ A few intentional omissions:
     (Feedback was split — Amy and Susan both suggested 1-5 for entry
     simplicity, Rob wanted 1-10 — settled on 1-10 for consistency with the
     other rating already on the card.) TMDB Rating itself now lives inside
-    the Ratings section, directly above Club average, instead of sitting
+    the Ratings section, directly above Club Rating, instead of sitting
     apart in the catalog-data card below.
   - **Entry (shipped):** a 10-segment tap-row (not a slider or numeric
     field) — tap a position, it saves instantly, no Save button. One
