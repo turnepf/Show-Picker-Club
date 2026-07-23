@@ -297,12 +297,20 @@ A few intentional omissions:
     `?show=<id>` deep link) to rate by season instead. Surfaced as "Rate my
     backlog" alongside Subscription audit in the sidebars and the mobile
     under-list row.
-  - **Not yet built:** native support for iOS/iPad (full entry + display),
-    tvOS (view-only), and watchOS (view-only).
+  - **Native support (shipped in code, not yet archived/submitted):**
+    iOS/iPad get full entry + display — a "Ratings" section on
+    `ShowDetailView` mirroring the web (TMDB Rating, Club Rating, owner's
+    rating, tap-row entry for overall + each season, gated to lists other
+    than Next Up). tvOS and watchOS are view-only (TMDB Rating + Club
+    Rating + owner's rating; rate from iPhone/iPad) — consistent with both
+    already being view-only/read-only apps generally. No native bulk
+    rate-your-backlog screen — that flow stays web-only for now.
   - **Not building yet:** clearing/un-rating a show once rated — revisit if
     it's requested.
-  - **Ships as v1.1** (and the next build number) — once native parity
-    lands, not yet.
+  - **Ships as v1.1, build 19** — version bumped in both `ios/ShowPickerIOS.xcodeproj`
+    and `tvos/ShowPickerTV.xcodeproj`; still needs an actual Xcode
+    archive + TestFlight/App Store submission (can't be done from this
+    environment — no Mac/Xcode here).
 
 - **Episode-level ratings.** (Amy — 7/24/2026, feedback on the ratings
   design doc.) Rate individual episodes, not just overall/season, shared

@@ -39,11 +39,17 @@ The app is **already in TestFlight**, so shipping a new build is just *archive +
 
 **The build number is a fixed value shared by every target.** All targets
 (app, share extension, widget extension, watch app) carry the same
-`CURRENT_PROJECT_VERSION` (currently 18), set at the project level, so Apple's
+`CURRENT_PROJECT_VERSION` (currently 19), set at the project level, so Apple's
 parent/extension version-match rule always passes. Bump that one value before
 archiving a new build for App Store Connect. (Earlier date-based auto-stamping
 scripts were removed — they conflicted with the Xcode build graph once the
 watch targets were added.)
+
+tvOS is a **separate** `.xcodeproj` (`tvos/ShowPickerTV.xcodeproj`) with its
+own `CURRENT_PROJECT_VERSION`/`MARKETING_VERSION` — bumping this project
+doesn't touch that one. Bump both together when shipping a release that
+covers both, so the numbers stay in sync (they're independent settings that
+just happen to match today).
 
 > A TestFlight **tester group** has been set up for this app, so builds can be assigned to it for external testing (internal testers still auto-update).
 

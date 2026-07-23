@@ -164,18 +164,33 @@ enum API {
         }
     }
 
-    static func showDetail(id: Int) async throws -> Show {
+    // Returns the show alongside its ratings summary (average/count always;
+    // `mine`/`owner` depend on the session — see RatingsSummary). `ratings`
+    // is nil until the show has a tmdb_id (not yet enriched).
+    static func showDetail(id: Int) async throws -> ShowResponse {
         do {
             let r: ShowResponse = try await get("/api/shows/\(id)")
             OfflineCache.save(r, for: "show_\(id)")
-            return r.show
+            return r
         } catch {
             if isOffline(error) {
-                if let cached = OfflineCache.load(ShowResponse.self, for: "show_\(id)") { return cached.show }
-                if let local = await OfflineQueue.shared.cachedShow(id: id) { return local }
+                if let cached = OfflineCache.load(ShowResponse.self, for: "show_\(id)") { return cached }
+                if let local = await OfflineQueue.shared.cachedShow(id: id) {
+                    return ShowResponse(show: local, ratings: nil)
+                }
             }
             throw error
         }
+    }
+
+    // Rate my own copy of a show — overall (season nil) or a specific
+    // season. Instant-save from the caller (no separate confirm step);
+    // returns the freshly recomputed summary so the view can update
+    // without a refetch. Online-only for now — not routed through the
+    // offline queue (see ios/ShowPickerIOS/Offline).
+    static func rateShow(id: Int, rating: Int, season: Int? = nil) async throws -> RatingsSummary? {
+        let r: RatingResponse = try await putJSON("/api/shows/\(id)/rating", body: ["rating": rating, "season": season])
+        return r.ratings
     }
 
     static func actors(showId: Int) async throws -> [Actor] {

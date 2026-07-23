@@ -111,7 +111,7 @@ Entry is gated to shows on any list except Next Up (`list !== 'next'`), enforced
 
 `GET /api/rate-backlog` (session required) backs `/rate-backlog`, the one-page bulk-rate flow: every active show the member has except Next Up and archived rows, left-joined to `show_ratings` for the member's existing overall (`season_number = 0`) rating, unrated shows first. Overall-only by design — each row links to `/<slug>?show=<id>` (the show's detail page, which `showMember()` opens directly via a `show` query param) for season-level rating.
 
-Not yet built: native (iOS/tvOS/watchOS) support.
+Native support: `ShowPickerCore/Sources/ShowPickerCore/Ratings.swift` defines `RatingsSummary`/`SeasonRatingSummary`/`RatingSubmission`/`RatingResponse`, shared by all three Apple targets; `ShowResponse` carries `ratings` as a sibling of `show` (matching the JSON shape, not nested). iOS gets full entry via `API.rateShow(id:rating:season:)` and a "Ratings" section in `ShowDetailView` (`RatingTapRow`/`RatingEntryRow` in `Views/RatingTapRow.swift`); tvOS and watchOS only read `ratings` off their existing show-detail calls and render it (no write path — both apps are view-only/read-only generally). No native bulk rate-your-backlog screen; that stays web-only.
 
 ### `sessions`
 | Column          | Type | Notes |

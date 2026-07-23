@@ -18,6 +18,9 @@ struct ShowDetailView: View {
     @State private var showingEdit = false
     @State private var addingToMine = false
     @State private var addAlert: AddAlert?
+    // Average/count always present once the show has a tmdb_id; `mine`/
+    // `owner` depend on the session — see RatingsSummary.
+    @State private var ratings: RatingsSummary?
 
     private var title: String { show?.title ?? initialTitle }
     private var network: String? { show?.network ?? initialNetwork }
@@ -147,14 +150,42 @@ struct ShowDetailView: View {
                 }
             }
 
-            // Catalog facts about the show itself, grouped below.
-            if hasCatalog {
-                Section {
+            // Ratings — directly below My Lists. TMDB Rating and Club Rating
+            // show on every card, logged in or not (ratings key off tmdb_id,
+            // not this row's id, so they're the same regardless of whose
+            // copy this is). Entry (instant-save tap row) is gated to lists
+            // other than Next Up, matching the backend's own gating in
+            // PUT /api/shows/:id/rating. Nothing renders until the show has
+            // a tmdb_id (ratings is nil until then).
+            if let ratings {
+                Section("Ratings") {
                     if let r = rating, !r.isEmpty {
                         LabeledContent("TMDB Rating") {
                             Text("\(Image(systemName: "star.fill")) \(r)").foregroundStyle(.orange)
                         }
                     }
+                    LabeledContent("Club Rating", value: clubRatingText)
+                    if let owner = ratings.owner {
+                        LabeledContent(ownerRatingLabel, value: "\(owner)/10")
+                    }
+                    if ratingEligible {
+                        RatingEntryRow(label: yourRatingLabel, value: ratings.mine) { value in
+                            Task { await rate(value, season: nil) }
+                        }
+                        ForEach(seasonNumbers, id: \.self) { s in
+                            RatingEntryRow(label: seasonLabel(s), value: ratings.mineSeasons[s]) { value in
+                                Task { await rate(value, season: s) }
+                            }
+                        }
+                    } else if myCopy?.list == ShowList.next.rawValue {
+                        LabeledContent("Your rating", value: "Start watching to rate")
+                    }
+                }
+            }
+
+            // Catalog facts about the show itself, grouped below.
+            if hasCatalog {
+                Section {
                     if let s = show {
                         if s.isMovie { LabeledContent("Type", value: "Movie") }
                         if let series = s.seriesText { LabeledContent("Series", value: series) }
@@ -209,11 +240,53 @@ struct ShowDetailView: View {
     }
     private var hasDirector: Bool { (show?.director.map { !$0.isEmpty }) ?? false }
     private var hasCatalog: Bool {
-        if let r = rating, !r.isEmpty { return true }
+        // TMDB Rating moved into the Ratings section above — no longer
+        // part of what makes this catalog card worth showing.
         guard let s = show else { return false }
         return s.isMovie || s.seriesText != nil || !s.genreList.isEmpty
             || s.seasonDatesText != nil || (s.contentRating.map { !$0.isEmpty } ?? false)
             || s.releaseYear != nil || s.runtimeText != nil
+    }
+
+    // Eligible to enter a rating: I have this show on one of my own lists,
+    // and it's not Next Up (not watched yet) — matching the backend's own
+    // gating in PUT /api/shows/:id/rating.
+    private var ratingEligible: Bool {
+        guard let m = mineActive else { return false }
+        return m.list != ShowList.next.rawValue
+    }
+
+    private var clubRatingText: String {
+        guard let avg = ratings?.average else { return "No ratings yet" }
+        let count = ratings?.count ?? 0
+        return String(format: "%.1f/10 (%d rating%@)", avg, count, count == 1 ? "" : "s")
+    }
+
+    private var ownerRatingLabel: String {
+        "\(ratings?.ownerName ?? "")'s rating"
+    }
+
+    private var yourRatingLabel: String {
+        if let mine = ratings?.mine { return "Your rating — \(mine)/10" }
+        return "Your rating"
+    }
+
+    // Season numbers to show entry rows for — TV only, and only once
+    // seasons_released is known.
+    private var seasonNumbers: [Int] {
+        guard let show, !show.isMovie, let n = show.seasonsReleased, n > 0 else { return [] }
+        return Array(1...n)
+    }
+
+    private func seasonLabel(_ s: Int) -> String {
+        var label = "Season \(s)"
+        if let avg = ratings?.seasons[s]?.average {
+            label += String(format: " · avg %.1f/10 (%d)", avg, ratings?.seasons[s]?.count ?? 0)
+        }
+        if let mine = ratings?.mineSeasons[s] {
+            label += " — \(mine)/10"
+        }
+        return label
     }
 
     // The four list chips, current one filled. Tapping a chip moves/adds/
@@ -308,7 +381,7 @@ struct ShowDetailView: View {
 
     private func load() async {
         if let id {
-            if let s = try? await API.showDetail(id: id) { show = s }
+            if let r = try? await API.showDetail(id: id) { show = r.show; ratings = r.ratings }
             cast = (try? await API.actors(showId: id)) ?? []
         }
         await refreshMyCopy()
@@ -357,6 +430,24 @@ struct ShowDetailView: View {
                                 message: "“\(title)” was added to your \(list.title) list.")
         } catch {
             addAlert = AddAlert(title: "Couldn’t restore",
+                                message: "Something went wrong. Please try again.")
+        }
+    }
+
+    // Tap-row entry: instant save, no confirm step. The endpoint returns
+    // the freshly recomputed summary, so update straight from that instead
+    // of a separate refetch.
+    private func rate(_ value: Int, season: Int?) async {
+        guard let id = mineActive?.id else { return }
+        do {
+            if let updated = try await API.rateShow(id: id, rating: value, season: season) {
+                ratings = updated
+            }
+        } catch let e as API.APIError where e.status == 401 {
+            addAlert = AddAlert(title: "Logged out",
+                                message: "Your session expired — sign in again from Home.")
+        } catch {
+            addAlert = AddAlert(title: "Couldn’t save rating",
                                 message: "Something went wrong. Please try again.")
         }
     }
