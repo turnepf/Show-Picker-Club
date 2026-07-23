@@ -243,12 +243,6 @@ A few intentional omissions:
 
 ## Backlog
 
-- **iOS What's New still teases the shipped apps.** The web What's New
-  replaced its "Coming soon" card (watch app, complication, Mac app) with a
-  single dated 7/16 App Store launch entry when the universal app went live
-  (July 2026). `ios/ShowPickerIOS/Views/WhatsNewView.swift` still carries the
-  coming-soon block — make the same swap there in the next build.
-
 - **Member ratings.** (Amy Brownlee 7/16, Susan 7/22, Rob Maltzhan 7/23 —
   2026.) Members rate shows 1-10 (whole numbers), and those ratings show up
   alongside the IMDB number — friends' stars answer "Patrick liked it, so
