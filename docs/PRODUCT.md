@@ -271,6 +271,10 @@ A few intentional omissions:
   deliberate call on scope (per-episode threads? spoiler-safety by episode
   progress?) before building.
 
+- **Trailer link broken on Apple TV.** (Patrick — 7/23/2026.) The YouTube
+  trailer link (`shows.trailer_key`) doesn't work on tvOS. Needs
+  investigation — web/iOS behavior not yet confirmed as working or broken.
+
 ## Shipped (formerly backlog)
 
 - **Title-healing bandaids retired (July 2026).** Since TMDB type-ahead
