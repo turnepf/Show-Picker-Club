@@ -109,7 +109,9 @@ Member ratings (docs/PRODUCT.md backlog: "Member ratings"). Migration 053. Keyed
 
 Entry is gated to shows on any list except Next Up (`list !== 'next'`), enforced server-side in `PUT /api/shows/:id/rating`; a show with no `tmdb_id` yet (not enriched) can't be rated either. The average/count show on every card regardless of login state — a deliberate, scoped exception to the otherwise-tiny public surface (`GET /api/shows/:id` returns the summary in its public/redacted branch too, never member names or individual scores beyond the specific owner being viewed).
 
-Not yet built: the bulk "rate your backlog" flow, Trending/Search-all-libraries rendering the standard (read-only-for-non-owners) show card so rating is reachable from there, and native (iOS/tvOS/watchOS) support.
+`GET /api/rate-backlog` (session required) backs `/rate-backlog`, the one-page bulk-rate flow: every show the member has except Next Up (archived included), left-joined to `show_ratings` for the member's existing overall (`season_number = 0`) rating, unrated shows first. Overall-only by design — each row links to `/<slug>?show=<id>` (the show's detail page, which `showMember()` opens directly via a `show` query param) for season-level rating.
+
+Not yet built: native (iOS/tvOS/watchOS) support.
 
 ### `sessions`
 | Column          | Type | Notes |
@@ -205,6 +207,7 @@ The complete map:
 | `GET /api/members`                     | `functions/api/members.js`                 | GET     | none (full names + calendar tokens only with a session) |
 | `GET /api/popular`                     | `functions/api/popular.js`                 | GET     | none |
 | `GET /api/activity`                    | `functions/api/activity.js`                | GET     | session |
+| `GET /api/rate-backlog`                | `functions/api/rate-backlog.js`            | GET     | session — backs `/rate-backlog`, the bulk-rate flow |
 | `GET /api/recommendations`             | `functions/api/recommendations.js`         | GET     | session (legacy — no longer called by any client) |
 | `GET /api/vibe`                        | `functions/api/vibe.js`                    | GET     | session |
 | `GET /api/shows`                       | `functions/api/shows.js`                   | GET     | session |
