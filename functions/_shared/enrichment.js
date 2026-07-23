@@ -176,6 +176,46 @@ export async function fetchEnrichmentById(tmdbId, mediaType, env) {
   }
 }
 
+// Pick the best TMDB search hit for a title: prefer an exact (case/space-
+// insensitive) title match — TMDB sorts by popularity, so a popular spin-off
+// ("Below Deck Mediterranean") can outrank the exact original ("Below
+// Deck") — and fall back to the most-popular result otherwise.
+function pickBestMatch(results, mediaType, title) {
+  const want = title.replace(/\s+/g, ' ').trim().toLowerCase();
+  return results.find(
+    (r) => ((mediaType === 'movie' ? r.title : r.name) || '')
+      .replace(/\s+/g, ' ').trim().toLowerCase() === want
+  ) || results[0];
+}
+
+// Lightweight TMDB search: resolves just the canonical id + media type for a
+// title, without the detail/credits/person calls fetchEnrichment does for a
+// full add or edit. One subrequest per title (two if the stored media type
+// doesn't match and the flip is needed) instead of up to ~7 — for a backfill
+// pass working through many titles in one invocation, that's the difference
+// between finishing the batch and silently running out of budget partway
+// through it.
+export async function searchTmdbId(title, env, isMovie) {
+  const token = env.TMDB_TOKEN;
+  if (!token) return { tmdbId: null, tmdbType: null };
+  const mediaTypes = isMovie ? ['movie', 'tv'] : ['tv', 'movie'];
+  try {
+    for (const t of mediaTypes) {
+      const s = await tmdbFetch(
+        `/search/${t}?query=${encodeURIComponent(title)}&language=en-US&page=1`,
+        token
+      );
+      if (s.results?.length) {
+        const pick = pickBestMatch(s.results, t, title);
+        return { tmdbId: pick.id, tmdbType: t };
+      }
+    }
+  } catch (_) {
+    // TMDB errored — nothing to resolve.
+  }
+  return { tmdbId: null, tmdbType: null };
+}
+
 export async function fetchEnrichment(title, env, isMovie) {
   const token = env.TMDB_TOKEN;
   // Try the stored media type first, then the other one. Documentaries and
@@ -198,15 +238,7 @@ export async function fetchEnrichment(title, env, isMovie) {
       }
 
       if (search) {
-        // TMDB sorts by popularity, so a popular spin-off ("Below Deck
-        // Mediterranean") can outrank the exact-title original ("Below Deck")
-        // and hand it the wrong poster. Prefer a result whose title matches
-        // exactly (case-insensitive); fall back to the most-popular result.
-        const want = title.replace(/\s+/g, ' ').trim().toLowerCase();
-        const pick = search.results.find(
-          (r) => ((mediaType === 'movie' ? r.title : r.name) || '')
-            .replace(/\s+/g, ' ').trim().toLowerCase() === want
-        ) || search.results[0];
+        const pick = pickBestMatch(search.results, mediaType, title);
         const result = await enrichFromTmdbId(
           pick.id, mediaType, env,
           tmdbPosterUrl(pick.poster_path)
