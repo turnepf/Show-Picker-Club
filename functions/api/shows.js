@@ -170,10 +170,11 @@ export async function onRequestPost(context) {
 
   const result = await env.DB.prepare(
     `INSERT INTO shows (title, network, network_url, recommended_by, rating, list, notes, movie, full_series, watching_with, poster_url, network_logo_url, member_slug, added_by,
-       overview, backdrop_url, tmdb_rating, content_rating, trailer_key, director, director_imdb_id, runtime, release_year, watch_link)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       overview, backdrop_url, tmdb_rating, content_rating, trailer_key, director, director_imdb_id, runtime, release_year, watch_link, tmdb_id, tmdb_type)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(finalTitle, finalNetwork, finalUrl, recommended_by || null, enriched.rating, list, notes || null, movie || 0, full_series || 0, watching_with || null, enriched.posterUrl || null, enriched.networkLogoUrl || null, session.member_slug, session.email,
-    enriched.overview || null, enriched.backdropUrl || null, enriched.tmdbRating || null, enriched.contentRating || null, enriched.trailerKey || null, enriched.director || null, enriched.directorImdbId || null, enriched.runtime || null, enriched.releaseYear || null, enriched.watchLink || null).run();
+    enriched.overview || null, enriched.backdropUrl || null, enriched.tmdbRating || null, enriched.contentRating || null, enriched.trailerKey || null, enriched.director || null, enriched.directorImdbId || null, enriched.runtime || null, enriched.releaseYear || null, enriched.watchLink || null,
+    enriched.tmdbId || null, enriched.tmdbType || null).run();
 
   const showId = result.meta.last_row_id;
   if (enriched.actors.length > 0) {
