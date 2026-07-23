@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rate Your Backlog — Show Picker Club</title>
+  <meta name="apple-itunes-app" content="app-id=6780282764">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
+  <link rel="stylesheet" href="/styles.css?v=5">
+  <style>
+    :root { --tint: #6D63EB; }
+    @media (prefers-color-scheme: dark) { :root { --tint: #8D87F5; } }
+    body { padding: 24px 16px 60px; }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; position: relative; }
+    .topbar a.back { color: var(--tint); text-decoration: none; font-size: 16px; position: relative; z-index: 1; padding: 4px 8px 4px 0; }
+    .topbar h1 {
+      font-family: var(--font-sans); font-size: 17px; font-weight: 600; color: var(--ink);
+      position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap;
+    }
+    .intro { font-size: 13px; color: var(--ink-muted); line-height: 1.5; margin: 0 0 18px; }
+    .empty-card { background: var(--surface); border-radius: 10px; padding: 32px; text-align: center; color: var(--ink-muted); font-size: 14px; line-height: 1.6; }
+    .err { color: var(--danger-deep); font-size: 13px; text-align: center; padding: 20px; }
+
+    .rb-row {
+      display: flex; gap: 12px; align-items: flex-start;
+      background: var(--surface); border-radius: 10px; padding: 12px;
+      margin-bottom: 8px; box-shadow: 0 1px 3px oklch(0.18 0.03 50 / 0.06);
+    }
+    .rb-poster { flex: 0 0 auto; width: 40px; height: 60px; border-radius: 5px; overflow: hidden; background: var(--border-soft); }
+    .rb-poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .rb-info { flex: 1 1 auto; min-width: 0; }
+    .rb-title { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+    .rb-meta { font-size: 12px; color: var(--ink-muted); margin-bottom: 8px; }
+    .rb-meta a { color: var(--tint); text-decoration: none; margin-left: 6px; }
+    .rb-meta a:hover { text-decoration: underline; }
+    .rb-rated-label { font-size: 12px; color: var(--ink-muted); margin-bottom: 4px; }
+    .rb-rated-label .val { color: var(--ink); font-weight: 600; }
+
+    /* Same 10-segment tap-row as the show detail card (public/index.html) —
+       overall rating only here; season ratings link through to the detail
+       page instead of duplicating that UI in a condensed list. */
+    .rating-row { display: flex; gap: 3px; }
+    .rating-seg {
+      flex: 1 1 0; height: 20px;
+      border: 1.5px solid var(--border-soft); border-radius: 4px;
+      cursor: pointer; transition: background 0.1s, border-color 0.1s;
+    }
+    .rating-seg:hover { border-color: var(--accent); }
+    .rating-seg.filled { background: var(--accent); border-color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <a class="back" href="/" title="Home">&#8249; Home</a>
+      <h1>Rate Your Backlog</h1>
+    </div>
+    <p class="intro">Every show you've got, one page — tap a number and it saves instantly, no need to open each one. Want to rate a show by season instead of just overall? Tap "Rate seasons" to open its detail page.</p>
+    <div id="content"><div class="empty-card">Loading&hellip;</div></div>
+    <div class="footer" id="footer"></div>
+  </div>
+
+  <script src="/shell.js?v=2" defer></script>
+  <script>
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]);
+    }
+
+    let mySlug = null;
+    const LIST_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved' };
+
+    function ratingRowHtml(id, value) {
+      let segs = '';
+      for (let i = 1; i <= 10; i++) {
+        segs += `<div class="rating-seg${value && i <= value ? ' filled' : ''}" onclick="rate(${id}, ${i}, this)"></div>`;
+      }
+      return `<div class="rating-row" id="row-${id}">${segs}</div>`;
+    }
+
+    function rowMeta(show) {
+      const parts = [];
+      if (show.archived) parts.push('Archived');
+      else if (LIST_LABELS[show.list]) parts.push(LIST_LABELS[show.list]);
+      let meta = escapeHtml(parts.join(' · '));
+      if (!show.movie && show.seasons_released && mySlug) {
+        meta += ` <a href="/${encodeURIComponent(mySlug)}?show=${show.id}">Rate seasons &rarr;</a>`;
+      } else if (mySlug) {
+        meta += ` <a href="/${encodeURIComponent(mySlug)}?show=${show.id}">View &rarr;</a>`;
+      }
+      return meta;
+    }
+
+    function render(shows) {
+      const content = document.getElementById('content');
+      if (!shows.length) {
+        content.innerHTML = `<div class="empty-card">Nothing to rate yet — add some shows to Watching, Awaiting, or Loved first.</div>`;
+        return;
+      }
+      content.innerHTML = shows.map(show => `
+        <div class="rb-row">
+          <div class="rb-poster">${show.poster_url ? `<img src="${escapeHtml(show.poster_url)}" alt="" loading="lazy">` : ''}</div>
+          <div class="rb-info">
+            <div class="rb-title">${escapeHtml(show.title)}</div>
+            <div class="rb-meta">${rowMeta(show)}</div>
+            <div class="rb-rated-label" id="label-${show.id}">${show.my_rating ? `Your rating — <span class="val">${show.my_rating}/10</span>` : 'Not rated yet'}</div>
+            ${ratingRowHtml(show.id, show.my_rating)}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function rate(id, value, el) {
+      // Instant, optimistic-ish: update the tapped row's fill immediately,
+      // then reconcile with the server response.
+      const row = document.getElementById(`row-${id}`);
+      if (row) {
+        [...row.children].forEach((seg, i) => seg.classList.toggle('filled', i < value));
+      }
+      try {
+        const res = await fetch(`/api/shows/${id}/rating`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rating: value }),
+        });
+        if (!res.ok) { load(); return; }
+        const data = await res.json();
+        const label = document.getElementById(`label-${id}`);
+        if (label && data.ratings) {
+          label.innerHTML = data.ratings.mine ? `Your rating — <span class="val">${data.ratings.mine}/10</span>` : 'Not rated yet';
+        }
+      } catch { load(); }
+    }
+
+    async function load() {
+      const content = document.getElementById('content');
+      try {
+        const check = await fetch('/auth/check');
+        const checkData = await check.json();
+        if (!checkData.authenticated || !checkData.member) {
+          content.innerHTML = `<div class="empty-card">
+            Log in from your member page first, then come back here to rate your backlog.
+          </div>`;
+          return;
+        }
+        mySlug = checkData.member;
+
+        const res = await fetch('/api/rate-backlog');
+        if (res.status === 401) {
+          content.innerHTML = `<div class="empty-card">
+            Log in from your member page first, then come back here to rate your backlog.
+          </div>`;
+          return;
+        }
+        if (!res.ok) { content.innerHTML = `<div class="err">Failed to load (${res.status}).</div>`; return; }
+        const data = await res.json();
+        render(data.shows || []);
+      } catch (e) {
+        content.innerHTML = `<div class="err">Failed to load: ${escapeHtml(e.message || e)}</div>`;
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

@@ -1178,6 +1178,7 @@
          duplicate under-list row hides (Vibe + Calendar live in the nav on
          every layout now). */
       #showPage .member-extras #subscriptionsLink { display: none; }
+      #showPage .member-extras #rateBacklogLink { display: none; }
       /* Pushed show detail covers the detail column, not the sidebar —
          offset by the letterbox margin plus the sidebar width. */
       #detailPage {
@@ -1292,6 +1293,11 @@
             <span class="ios-item-icon"><svg class="ic"><use href="#i-calendar-plus"/></svg></span>
             <span class="ios-item-label">Calendar</span>
           </a>
+          <a class="ios-item hidden home-ratebacklog-row" href="/rate-backlog">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-star-fill"/></svg></span>
+            <span class="ios-item-label">Rate my backlog</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
           <a class="ios-item hidden home-subs-row" href="/subscriptions">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
             <span class="ios-item-label">Subscription audit</span>
@@ -1390,6 +1396,10 @@
           <span class="ios-item-icon"><svg class="ic"><use href="#i-calendar-plus"/></svg></span>
           <span class="ios-item-label">Calendar</span>
         </a>
+        <a class="ios-item hidden member-ratebacklog-row" href="/rate-backlog">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-star-fill"/></svg></span>
+          <span class="ios-item-label">Rate my backlog</span>
+        </a>
         <a class="ios-item hidden member-subs-row" href="/subscriptions">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
           <span class="ios-item-label">Subscription audit</span>
@@ -1440,6 +1450,11 @@
            Calendar moved to the home nav / split-view sidebar.) -->
       <div class="member-extras">
         <nav class="ios-group">
+          <a class="ios-item hidden" id="rateBacklogLink" href="/rate-backlog" title="Rate everything you've already watched, one page at a time">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-star-fill"/></svg></span>
+            <span class="ios-item-label">Rate my backlog</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
           <a class="ios-item hidden" id="subscriptionsLink" href="/subscriptions" title="See which streaming subscriptions you actually need right now">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
             <span class="ios-item-label">Subscription audit</span>
@@ -2114,6 +2129,14 @@
       updateHeaderTitle();
       updateDesc();
 
+      // Deep link straight into a show's detail screen — used by
+      // rate-backlog.html's "Rate seasons" link (?show=<id>).
+      const showParam = new URLSearchParams(location.search).get('show');
+      if (showParam) {
+        const showId = parseInt(showParam, 10);
+        if (Number.isInteger(showId)) openDetail(showId);
+      }
+
       checkAuth().then(() => {
         // Enrichment + URL sync mutate the DB, so they're gated to logged-in members only.
         if (!authMember) return;
@@ -2358,9 +2381,10 @@
               r.href = `/${authMember}#${r.dataset.list}`;
               r.classList.remove('hidden');
             });
-            // Subscription audit is personal — surfaced in the Home sidebar
-            // once you're logged in.
+            // Subscription audit and Rate my backlog are personal —
+            // surfaced in the Home sidebar once you're logged in.
             document.querySelectorAll('.home-subs-row').forEach(r => r.classList.remove('hidden'));
+            document.querySelectorAll('.home-ratebacklog-row').forEach(r => r.classList.remove('hidden'));
           }
           const homeLoginRow = document.getElementById('homeLoginRow');
           if (homeLoginRow && authMember) homeLoginRow.classList.add('hidden');
@@ -2369,11 +2393,15 @@
           if (authMember && typeof memberSlug !== 'undefined' && authMember === memberSlug) {
             const addBtn = document.getElementById('addBtn');
             if (addBtn) addBtn.classList.remove('hidden');
-            // Subscription audit is personal — only on your own page. Shown
-            // both under the list (mobile) and in the sidebar (split view).
+            // Subscription audit and Rate my backlog are personal — only on
+            // your own page. Shown both under the list (mobile) and in the
+            // sidebar (split view).
             const subsLink = document.getElementById('subscriptionsLink');
             if (subsLink) subsLink.classList.remove('hidden');
             document.querySelectorAll('.member-subs-row').forEach(r => r.classList.remove('hidden'));
+            const rateBacklogLink = document.getElementById('rateBacklogLink');
+            if (rateBacklogLink) rateBacklogLink.classList.remove('hidden');
+            document.querySelectorAll('.member-ratebacklog-row').forEach(r => r.classList.remove('hidden'));
           }
           const logoutBtn = document.getElementById('logoutBtn');
           if (logoutBtn) logoutBtn.classList.remove('hidden');
@@ -2421,6 +2449,9 @@
       const subsLink = document.getElementById('subscriptionsLink');
       if (subsLink) subsLink.classList.add('hidden');
       document.querySelectorAll('.home-subs-row, .member-subs-row').forEach(r => r.classList.add('hidden'));
+      const rateBacklogLink = document.getElementById('rateBacklogLink');
+      if (rateBacklogLink) rateBacklogLink.classList.add('hidden');
+      document.querySelectorAll('.home-ratebacklog-row, .member-ratebacklog-row').forEach(r => r.classList.add('hidden'));
       document.querySelectorAll('.vibe-row, .calendar-feed-row').forEach(r => r.classList.add('hidden'));
       document.querySelectorAll('.side-admin').forEach(el => el.classList.add('hidden'));
       updateLoginBtnLabel();
@@ -3811,6 +3842,11 @@
       detailShow = show;
       detailActors = actors || [];
       if (ratings !== undefined) detailRatings = ratings;
+      // Always render from the persisted value, not just this call's
+      // argument — reRenderDetail() (called after every list move/add/
+      // archive) re-renders without a fresh ratings fetch, and without this
+      // the whole Ratings section would vanish on every such re-render.
+      ratings = detailRatings;
       document.getElementById('detailNavTitle').textContent = show.title;
       const loggedIn = !!authMember;
       const realUrl = detailRealUrl(show.network_url);
