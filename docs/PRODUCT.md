@@ -250,18 +250,18 @@ A few intentional omissions:
   coming-soon block — make the same swap there in the next build.
 
 - **Member ratings.** (Amy Brownlee 7/16, Susan 7/22, Rob Maltzhan 7/23 —
-  2026.) Members rate shows 1-5 (whole numbers), and those ratings show up
+  2026.) Members rate shows 1-10 (whole numbers), and those ratings show up
   alongside the IMDB number — friends' stars answer "Patrick liked it, so
   I'll like it too." Amy and Susan asked for the two halves separately
   (seeing others' ratings; being able to rate herself); Rob's ask (7/23) was
   both at once: "add a 1-10 rating & see other's rating." Design, settled
   7/23, feedback gathered 7/24 (Google Doc sent to Amy/Rob/Susan):
-  - **Scale:** 1-5, not 1-10 — Rob preferred 1-10, but Amy and Susan both
-    called out 1-10 as excessive for entry, and 2-of-3 settled it. Needs a
-    visual treatment distinct from the existing "TMDB Rating" field (shown
-    out of 10) so the two scales don't read as directly comparable numbers
-    on the same card — not just a smaller version of the same control.
-  - **Entry:** a 5-segment tap-row (not a slider or numeric field) — tap a
+  - **Scale:** 1-10, matching the existing "TMDB Rating" field's scale so
+    the two numbers on the same card mean the same thing at a glance.
+    (Feedback was split — Amy and Susan both suggested 1-5 for entry
+    simplicity, Rob wanted 1-10 — settled on 1-10 for consistency with the
+    other rating already on the card.)
+  - **Entry:** a 10-segment tap-row (not a slider or numeric field) — tap a
     position, it saves instantly, no Save button. One overall rating per
     show, plus optional independent per-season ratings (keyed off the
     `seasons_released` count). A new "Ratings" section sits directly below
@@ -295,6 +295,19 @@ A few intentional omissions:
   - **Not building yet:** clearing/un-rating a show once rated — revisit if
     it's requested.
   - **Ships as v1.1** (and the next build number).
+
+- **Episode-level ratings.** (Amy — 7/24/2026, feedback on the ratings
+  design doc.) Rate individual episodes, not just overall/season, shared
+  with other members watching the same show. A step below season-level
+  granularity — not part of the ratings design above, captured here for
+  later. Overlaps with the "Group watch / episode chat" scope question
+  below (per-episode visibility, spoiler safety).
+
+- **Similar-taste discovery.** (Susan — 7/24/2026, feedback on the ratings
+  design doc.) Use member ratings to find other members with similar taste
+  and surface what they're watching — "find people with similar tastes and
+  see what they are watching," in her words. Adjacent to "Find something to
+  watch" below, but driven by ratings rather than vibe traits.
 
 - **Bracket competition.** (Amy — 7/2026.) A bracket-style tournament built
   from the group's shows, where members who have watched a show vote for
