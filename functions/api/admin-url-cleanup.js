@@ -216,12 +216,13 @@ async function commitTitleFix(env, oldTitle, rawNew, enriched) {
             tmdb_rating = COALESCE(?, tmdb_rating), content_rating = COALESCE(?, content_rating),
             trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director),
             runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
-            network = COALESCE(network, ?), watch_link = COALESCE(?, watch_link)
+            network = COALESCE(network, ?), watch_link = COALESCE(?, watch_link),
+            tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type)
       WHERE LOWER(title) = LOWER(?) AND archived = 0`
   ).bind(enriched.rating, enriched.posterUrl, enriched.networkLogoUrl,
     enriched.overview, enriched.backdropUrl, enriched.tmdbRating, enriched.contentRating,
     enriched.trailerKey, enriched.director, enriched.runtime, enriched.releaseYear,
-    enriched.providerNetwork, enriched.watchLink, finalTitle).run();
+    enriched.providerNetwork, enriched.watchLink, enriched.tmdbId, enriched.tmdbType, finalTitle).run();
 
   if (enriched.actors.length > 0) {
     const { results: copies } = await env.DB.prepare(
@@ -579,12 +580,13 @@ export async function onRequestPost(context) {
                 trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director),
                 runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
                 network = COALESCE(network, ?), watch_link = COALESCE(?, watch_link),
+                tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type),
                 enriched_at = datetime('now')
           WHERE LOWER(title) = LOWER(?) AND archived = 0`
       ).bind(enriched.posterUrl, enriched.networkLogoUrl, enriched.rating,
         enriched.overview, enriched.backdropUrl, enriched.tmdbRating, enriched.contentRating,
         enriched.trailerKey, enriched.director, enriched.runtime, enriched.releaseYear,
-        enriched.providerNetwork, enriched.watchLink, row.title).run();
+        enriched.providerNetwork, enriched.watchLink, enriched.tmdbId, enriched.tmdbType, row.title).run();
     } else {
       // Nothing found — stamp so the title rotates to the back of the
       // oldest-first background pass instead of blocking it every round.

@@ -92,6 +92,25 @@ Join table for per-show cast.
 | `name`     | TEXT NOT NULL | |
 | `imdb_id`  | TEXT | NULL for seeded rows and legacy enrichments that predate TMDB actor ids. |
 
+### `show_ratings`
+Member ratings (docs/PRODUCT.md backlog: "Member ratings"). Migration 053. Keyed off `(tmdb_id, tmdb_type)` rather than any one member's `shows` row, so every member's independent copy of the same title shares one rating pool.
+
+| Column          | Type | Notes |
+|-----------------|------|-------|
+| `id`            | INTEGER PK | |
+| `tmdb_id`       | INTEGER NOT NULL | |
+| `tmdb_type`     | TEXT NOT NULL | `movie` or `tv`. |
+| `season_number` | INTEGER NOT NULL DEFAULT 0 | `0` = the overall rating; `1+` = that season (matches `seasons_released`'s numbering). A sentinel, not NULL — SQLite's UNIQUE constraint treats every NULL as distinct, so a NULL-based "one overall rating per member" rule wouldn't actually be enforced. |
+| `member_slug`   | TEXT NOT NULL REFERENCES members(slug) | |
+| `rating`        | INTEGER NOT NULL CHECK 1-10 | |
+| `created_at` / `updated_at` | TEXT | |
+
+`UNIQUE (tmdb_id, tmdb_type, season_number, member_slug)` — one row per member per title per season (or overall). `functions/_shared/ratings.js` owns validation (`isValidRating`), the upsert, and `getRatingsSummary()` (club average + count, the viewer's own ratings, and — when viewing a specific other member's copy — that member's ratings too, overall and per season).
+
+Entry is gated to shows on any list except Next Up (`list !== 'next'`), enforced server-side in `PUT /api/shows/:id/rating`; a show with no `tmdb_id` yet (not enriched) can't be rated either. The average/count show on every card regardless of login state — a deliberate, scoped exception to the otherwise-tiny public surface (`GET /api/shows/:id` returns the summary in its public/redacted branch too, never member names or individual scores beyond the specific owner being viewed).
+
+Not yet built: the bulk "rate your backlog" flow, Trending/Search-all-libraries rendering the standard (read-only-for-non-owners) show card so rating is reachable from there, and native (iOS/tvOS/watchOS) support.
+
 ### `sessions`
 | Column          | Type | Notes |
 |-----------------|------|-------|
@@ -201,6 +220,7 @@ The complete map:
 | `POST /api/shows/reorder`              | `functions/api/shows/reorder.js`           | POST    | session (own rows only) |
 | `PUT /api/shows/[id]/archive`          | `functions/api/shows/[id]/archive.js`      | PUT     | session |
 | `GET /api/shows/[id]/actors`           | `functions/api/shows/[id]/actors.js`       | GET     | none |
+| `PUT /api/shows/[id]/rating`           | `functions/api/shows/[id]/rating.js`       | PUT     | session (own copy only, list != Next Up, tmdb_id required) |
 | `POST /api/suggestions`                | `functions/api/suggestions.js`             | POST    | retired 2026-07 — returns 410 Gone |
 | `POST /api/enrich`                     | `functions/api/enrich.js`                  | POST    | session or `CRON_SECRET` header |
 | `POST /api/sync-urls`                  | `functions/api/sync-urls.js`               | POST    | session (demo member's rows excluded as URL sources) |
