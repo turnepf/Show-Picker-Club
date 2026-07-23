@@ -47,6 +47,15 @@ export async function onRequestPost(context) {
       ).bind(enriched.tmdbId, enriched.tmdbType, row.title).run();
       matched += result.meta.changes;
     } else {
+      // Stamp enriched_at on a miss so this title rotates to the back of the
+      // queue next call (same idiom as admin-url-cleanup.js's re_enrich) —
+      // without this, an unresolved title keeps the oldest enriched_at and
+      // wins the ORDER BY race every single call, starving the rest of the
+      // backlog of a turn.
+      await env.DB.prepare(
+        `UPDATE shows SET enriched_at = datetime('now')
+         WHERE LOWER(title) = LOWER(?) AND tmdb_id IS NULL`
+      ).bind(row.title).run();
       unresolved.push({ id: row.id, title: row.title, movie: !!row.movie });
     }
   }
