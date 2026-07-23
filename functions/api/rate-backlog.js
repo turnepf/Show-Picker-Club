@@ -4,15 +4,15 @@ function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
 }
 
+const ELIGIBLE_WHERE = `s.member_slug = ? AND s.list != 'next' AND s.archived = 0 AND s.tmdb_id IS NOT NULL`;
+
 // Backing data for the one-page "rate your backlog" flow
-// (public/rate-backlog.html): every show the member has except Next Up
-// (archived included — same scope as the ratings feature generally),
-// paired with their existing overall rating if they've already set one.
-// Unrated shows sort first so the flow is naturally "knock out what's
-// left"; already-rated ones stay reachable further down in case someone
-// wants to revise one. Season ratings aren't listed here — this is
-// overall-only by design; the page links each title through to its detail
-// screen for season-level rating.
+// (public/rate-backlog.html): only shows the member hasn't given an
+// overall rating yet (season ratings don't count — this is overall-only
+// by design, the page links each title through to its detail screen for
+// season-level rating). Once everything's rated, the list is empty and
+// the page says so — `has_any` tells it apart from never having had
+// anything eligible to rate in the first place.
 export async function onRequestGet(context) {
   const { request, env } = context;
   const session = await getSession(request, env);
@@ -21,15 +21,20 @@ export async function onRequestGet(context) {
   }
 
   const { results } = await env.DB.prepare(
-    `SELECT s.id, s.title, s.poster_url, s.movie, s.list, s.archived, s.seasons_released,
-            r.rating AS my_rating
+    `SELECT s.id, s.title, s.poster_url, s.movie, s.list, s.seasons_released
      FROM shows s
-     LEFT JOIN show_ratings r
-       ON r.tmdb_id = s.tmdb_id AND r.tmdb_type = s.tmdb_type
-       AND r.season_number = 0 AND r.member_slug = s.member_slug
-     WHERE s.member_slug = ? AND s.list != 'next' AND s.tmdb_id IS NOT NULL
-     ORDER BY (r.rating IS NULL) DESC, s.title ASC`
+     WHERE ${ELIGIBLE_WHERE}
+       AND NOT EXISTS (
+         SELECT 1 FROM show_ratings r
+         WHERE r.tmdb_id = s.tmdb_id AND r.tmdb_type = s.tmdb_type
+           AND r.season_number = 0 AND r.member_slug = s.member_slug
+       )
+     ORDER BY s.title ASC`
   ).bind(session.member_slug).all();
 
-  return new Response(JSON.stringify({ shows: results }), { headers: corsHeaders() });
+  const { cnt: eligibleTotal } = (await env.DB.prepare(
+    `SELECT COUNT(*) AS cnt FROM shows s WHERE ${ELIGIBLE_WHERE}`
+  ).bind(session.member_slug).first()) || { cnt: 0 };
+
+  return new Response(JSON.stringify({ shows: results, has_any: eligibleTotal > 0 }), { headers: corsHeaders() });
 }

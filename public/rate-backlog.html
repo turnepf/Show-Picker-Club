@@ -35,8 +35,6 @@
     .rb-meta { font-size: 12px; color: var(--ink-muted); margin-bottom: 8px; }
     .rb-meta a { color: var(--tint); text-decoration: none; margin-left: 6px; }
     .rb-meta a:hover { text-decoration: underline; }
-    .rb-rated-label { font-size: 12px; color: var(--ink-muted); margin-bottom: 4px; }
-    .rb-rated-label .val { color: var(--ink); font-weight: 600; }
 
     /* Same 10-segment tap-row as the show detail card (public/index.html) —
        overall rating only here; season ratings link through to the detail
@@ -57,7 +55,7 @@
       <a class="back" href="/" title="Home">&#8249; Home</a>
       <h1>Rate Your Backlog</h1>
     </div>
-    <p class="intro">Every show you've got, one page — tap a number and it saves instantly, no need to open each one. Want to rate a show by season instead of just overall? Tap "Rate seasons" to open its detail page.</p>
+    <p class="intro">Everything you haven't rated yet, one page — tap a number and it saves instantly, then the show drops off the list. Want to rate a show by season instead of just overall? Tap "Rate seasons" to open its detail page.</p>
     <div id="content"><div class="empty-card">Loading&hellip;</div></div>
     <div class="footer" id="footer"></div>
   </div>
@@ -71,18 +69,17 @@
     let mySlug = null;
     const LIST_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved' };
 
-    function ratingRowHtml(id, value) {
+    function ratingRowHtml(id) {
       let segs = '';
       for (let i = 1; i <= 10; i++) {
-        segs += `<div class="rating-seg${value && i <= value ? ' filled' : ''}" onclick="rate(${id}, ${i}, this)"></div>`;
+        segs += `<div class="rating-seg" onclick="rate(${id}, ${i})"></div>`;
       }
       return `<div class="rating-row" id="row-${id}">${segs}</div>`;
     }
 
     function rowMeta(show) {
       const parts = [];
-      if (show.archived) parts.push('Archived');
-      else if (LIST_LABELS[show.list]) parts.push(LIST_LABELS[show.list]);
+      if (LIST_LABELS[show.list]) parts.push(LIST_LABELS[show.list]);
       let meta = escapeHtml(parts.join(' · '));
       if (!show.movie && show.seasons_released && mySlug) {
         meta += ` <a href="/${encodeURIComponent(mySlug)}?show=${show.id}">Rate seasons &rarr;</a>`;
@@ -92,43 +89,49 @@
       return meta;
     }
 
-    function render(shows) {
+    const DONE_MESSAGE = `<div class="empty-card">You've rated everything in your backlog — nice work! Season ratings aren't tracked here; open a show's detail page for those.</div>`;
+
+    // Only unrated shows are listed (overall rating; season ratings don't
+    // count) — once a show's rated it no longer belongs in this list, so
+    // rate() removes its row instead of just updating it in place.
+    function render(shows, hasAny) {
       const content = document.getElementById('content');
       if (!shows.length) {
-        content.innerHTML = `<div class="empty-card">Nothing to rate yet — add some shows to Watching, Awaiting, or Loved first.</div>`;
+        content.innerHTML = hasAny
+          ? DONE_MESSAGE
+          : `<div class="empty-card">Nothing to rate yet — add some shows to Watching, Awaiting, or Loved first.</div>`;
         return;
       }
       content.innerHTML = shows.map(show => `
-        <div class="rb-row">
+        <div class="rb-row" id="rb-row-${show.id}">
           <div class="rb-poster">${show.poster_url ? `<img src="${escapeHtml(show.poster_url)}" alt="" loading="lazy">` : ''}</div>
           <div class="rb-info">
             <div class="rb-title">${escapeHtml(show.title)}</div>
             <div class="rb-meta">${rowMeta(show)}</div>
-            <div class="rb-rated-label" id="label-${show.id}">${show.my_rating ? `Your rating — <span class="val">${show.my_rating}/10</span>` : 'Not rated yet'}</div>
-            ${ratingRowHtml(show.id, show.my_rating)}
+            ${ratingRowHtml(show.id)}
           </div>
         </div>
       `).join('');
     }
 
-    async function rate(id, value, el) {
-      // Instant, optimistic-ish: update the tapped row's fill immediately,
-      // then reconcile with the server response.
+    async function rate(id, value) {
       const row = document.getElementById(`row-${id}`);
-      if (row) {
-        [...row.children].forEach((seg, i) => seg.classList.toggle('filled', i < value));
-      }
+      if (row) [...row.children].forEach((seg, i) => seg.classList.toggle('filled', i < value));
       try {
         const res = await fetch(`/api/shows/${id}/rating`, {
           method: 'PUT', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ rating: value }),
         });
         if (!res.ok) { load(); return; }
-        const data = await res.json();
-        const label = document.getElementById(`label-${id}`);
-        if (label && data.ratings) {
-          label.innerHTML = data.ratings.mine ? `Your rating — <span class="val">${data.ratings.mine}/10</span>` : 'Not rated yet';
-        }
+        // Rated — it no longer belongs in this unrated-only list. A short
+        // pause so the filled tap-row is visible for a beat before the row
+        // leaves, rather than vanishing the instant it's tapped.
+        setTimeout(() => {
+          const rbRow = document.getElementById(`rb-row-${id}`);
+          if (rbRow) rbRow.remove();
+          const content = document.getElementById('content');
+          if (content && !content.querySelector('.rb-row')) content.innerHTML = DONE_MESSAGE;
+        }, 350);
       } catch { load(); }
     }
 
@@ -154,7 +157,7 @@
         }
         if (!res.ok) { content.innerHTML = `<div class="err">Failed to load (${res.status}).</div>`; return; }
         const data = await res.json();
-        render(data.shows || []);
+        render(data.shows || [], !!data.has_any);
       } catch (e) {
         content.innerHTML = `<div class="err">Failed to load: ${escapeHtml(e.message || e)}</div>`;
       }

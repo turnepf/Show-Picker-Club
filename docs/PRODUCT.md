@@ -287,9 +287,11 @@ A few intentional omissions:
     (`tmdb_id`/`tmdb_type` on `shows`, migration 049), not any one member's
     row — see the TMDB-canonical-id work above. `show_ratings` (migration
     053) and `functions/_shared/ratings.js` own validation/aggregation.
-  - **Bulk rate-your-backlog (shipped):** `/rate-backlog` — every show not
-    on Next Up (archived included), overall rating only, 10-segment tap-row,
-    unrated shows sorted first. Each title links to its detail page (new
+  - **Bulk rate-your-backlog (shipped):** `/rate-backlog` — every active
+    show not on Next Up (archived excluded — tried including it, cut it
+    after actually using the flow), overall rating only, 10-segment
+    tap-row, unrated shows sorted first. Each title links to its detail
+    page (new
     `?show=<id>` deep link) to rate by season instead. Surfaced as "Rate my
     backlog" alongside Subscription audit in the sidebars and the mobile
     under-list row.

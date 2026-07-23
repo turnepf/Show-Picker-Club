@@ -48,8 +48,7 @@ export async function onRequestGet(context) {
   // last_activity_at is the member's most recent member-initiated library
   // touch and is what both admin member lists sort by. Broader than the
   // 30-day count columns: a seeded row with updated_at set counts too,
-  // because updated_at only ever moves on member intent (same engagement
-  // test as the dormant digest). Normalised inside MAX so the mixed
+  // because updated_at only ever moves on member intent. Normalised inside MAX so the mixed
   // storage formats (datetime('now') vs JS toISOString) compare correctly.
   const since = "datetime('now', '-30 days')";
   // disabled (migration 030) / approved + enrolled_via (migration 031) /
