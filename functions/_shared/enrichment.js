@@ -158,6 +158,7 @@ async function enrichFromTmdbId(tmdbId, mediaType, env, fallbackPoster = null) {
 
   return {
     canonicalTitle, rating, actors, posterUrl, networkLogoUrl, directorImdbId,
+    tmdbId, tmdbType: mediaType,
     ...detailFields,
   };
 }
@@ -166,7 +167,7 @@ async function enrichFromTmdbId(tmdbId, mediaType, env, fallbackPoster = null) {
 // search, so skip title-guessing entirely. Returns the empty shape when the
 // lookup fails (caller falls back to fetchEnrichment's title search).
 export async function fetchEnrichmentById(tmdbId, mediaType, env) {
-  const empty = { canonicalTitle: null, rating: null, actors: [], posterUrl: null, networkLogoUrl: null, directorImdbId: null, ...EMPTY_DETAIL };
+  const empty = { canonicalTitle: null, rating: null, actors: [], posterUrl: null, networkLogoUrl: null, directorImdbId: null, tmdbId: null, tmdbType: null, ...EMPTY_DETAIL };
   if (!env.TMDB_TOKEN || !tmdbId) return empty;
   try {
     return await enrichFromTmdbId(tmdbId, mediaType === 'movie' ? 'movie' : 'tv', env);
@@ -217,5 +218,5 @@ export async function fetchEnrichment(title, env, isMovie) {
     }
   }
 
-  return { canonicalTitle: null, rating: null, actors: [], posterUrl: null, networkLogoUrl: null, directorImdbId: null, ...EMPTY_DETAIL };
+  return { canonicalTitle: null, rating: null, actors: [], posterUrl: null, networkLogoUrl: null, directorImdbId: null, tmdbId: null, tmdbType: null, ...EMPTY_DETAIL };
 }

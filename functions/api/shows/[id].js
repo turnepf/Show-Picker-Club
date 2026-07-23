@@ -100,12 +100,13 @@ export async function onRequestPut(context) {
         director_imdb_id = COALESCE(?, director_imdb_id),
         runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
         watch_link = COALESCE(?, watch_link),
+        tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type),
         updated_at = datetime('now') WHERE id = ?`
   ).bind(title, finalNetwork, network_url, recommended_by, list, notes, movie, full_series, watching_with, rating, archived,
     enriched.posterUrl || null, enriched.networkLogoUrl || null,
     enriched.overview || null, enriched.backdropUrl || null, enriched.tmdbRating || null, enriched.contentRating || null,
     enriched.trailerKey || null, enriched.director || null, enriched.directorImdbId || null, enriched.runtime || null, enriched.releaseYear || null,
-    enriched.watchLink || null, params.id).run();
+    enriched.watchLink || null, enriched.tmdbId || null, enriched.tmdbType || null, params.id).run();
 
   if (enriched.actors.length > 0) {
     await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(params.id).run();

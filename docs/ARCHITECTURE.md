@@ -79,6 +79,8 @@ Login is by one-time code or Sign in with Apple — there are no stored password
 | `runtime`           | INTEGER | Minutes. Migration 042. |
 | `release_year`      | INTEGER | First release / first-air year. Migration 042. |
 | `watch_link`        | TEXT | TMDB/JustWatch "where to watch" page. A **fallback only** — the UI prefers the real deep-link `network_url` and shows this aggregator page only when no deep link exists. Migration 042. |
+| `tmdb_id`           | INTEGER | TMDB's id for the matched title. Migration 049. Canonical cross-member join key: a member rating table keys off `(tmdb_id, tmdb_type)` rather than any one member's row, so every member's independent copy of the same show shares one rating pool. Captured on insert/edit whenever enrichment resolves a match (`_shared/enrichment.js`'s `enrichFromTmdbId`/`fetchEnrichment` now return it); NULL for rows added before migration 049 until the one-time `/api/admin-tmdb-backfill` pass fills them in. |
+| `tmdb_type`         | TEXT | `movie` or `tv`, alongside `tmdb_id` — TMDB ids aren't unique across the two (movie #550 and tv #550 are different titles), so the pair is the real key. Migration 049. |
 
 ### `actors`
 Join table for per-show cast.
@@ -214,6 +216,7 @@ The complete map:
 | `GET/POST /api/admin-dupe-ignores`     | `functions/api/admin-dupe-ignores.js`      | GET, POST | admin session — list / dismiss / restore Possible-duplicates matches |
 | `POST /api/admin-vibe-fill`            | `functions/api/admin-vibe-fill.js`         | POST    | admin session or `CRON_SECRET` header |
 | `POST /api/admin-url-cleanup`          | `functions/api/admin-url-cleanup.js`       | POST    | admin session |
+| `POST /api/admin-tmdb-backfill`        | `functions/api/admin-tmdb-backfill.js`     | POST    | admin session — one-time `tmdb_id`/`tmdb_type` backfill for rows added before migration 049; call repeatedly until `remaining` is 0, then review `unresolved` manually |
 | `POST /api/admin-sms-test`             | `functions/api/admin-sms-test.js`          | POST    | admin session |
 | `POST /api/admin-fill-watch-urls`      | `functions/api/admin-fill-watch-urls.js`   | POST    | admin session or `CRON_SECRET` header |
 | `POST /api/admin-dormant-digest`       | `functions/api/admin-dormant-digest.js`    | POST    | admin session or `CRON_SECRET` header |
