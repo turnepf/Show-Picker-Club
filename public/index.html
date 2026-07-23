@@ -1080,6 +1080,28 @@
       font-family: inherit; cursor: pointer;
     }
     .detail-card .detail-action:first-child { border-top: none; }
+    .rating-count { color: var(--ink-muted); font-size: 12px; font-weight: 400; }
+    .rating-entry {
+      padding: 8px 16px 12px;
+      border-top: 1px solid var(--border-soft);
+    }
+    .detail-card-title + .rating-entry { border-top: none; }
+    .rating-entry-label { font-size: 13px; color: var(--ink-muted); margin-bottom: 6px; }
+    /* 10-segment tap-row — deliberately not a slider or numeric field:
+       tap a position and it saves instantly. Distinct from the plain
+       "★ 7.3" TMDB Rating row above so the two 1-10 scales never blur
+       together visually even though they share a scale. */
+    .rating-row { display: flex; gap: 3px; }
+    .rating-seg {
+      flex: 1 1 0;
+      height: 22px;
+      border: 1.5px solid var(--border-soft);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .rating-seg:hover { border-color: var(--accent); }
+    .rating-seg.filled { background: var(--accent); border-color: var(--accent); }
     .detail-action:hover { background: color-mix(in srgb, var(--tint) 8%, transparent); }
     .detail-action.danger { color: var(--danger-deep); }
     .detail-action.danger:hover { background: var(--danger-soft); }
@@ -3699,6 +3721,9 @@
     // My own row for the open show (active or archived), so the detail's
     // actions manage MY copy — not whatever copy opened the screen.
     let detailMyCopy = null;
+    // { average, count, seasons, mine, mineSeasons, owner, ownerSeasons,
+    //   ownerName } from GET /api/shows/:id — see functions/_shared/ratings.js.
+    let detailRatings = null;
     const ALL_LISTS = ['watching', 'waiting', 'recommending', 'next'];
 
     // Repoint the old inline-expand entry point at the detail screen so every
@@ -3712,6 +3737,18 @@
 
     function detailRow(k, v) {
       return `<div class="detail-row"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+    }
+
+    // 10-segment tap-row for entering a 1-10 rating — not a slider or numeric
+    // field, tap a position and it saves instantly (see detailRate below).
+    // `season` is null for the overall rating, or a season number.
+    function ratingTapRow(value, season) {
+      const seasonArg = season === null ? 'null' : season;
+      let segs = '';
+      for (let i = 1; i <= 10; i++) {
+        segs += `<div class="rating-seg${value && i <= value ? ' filled' : ''}" onclick="detailRate(${i}, ${seasonArg})"></div>`;
+      }
+      return `<div class="rating-row">${segs}</div>`;
     }
 
     // Minutes → "1h 52m" / "45m".
@@ -3739,9 +3776,10 @@
       document.body.style.overflow = 'hidden';
 
       let show = (typeof shows !== 'undefined' && shows.find) ? shows.find(s => s.id === id) : null;
+      let ratings = null;
       try {
         const res = await fetch('/api/shows/' + id);
-        if (res.ok) { const d = await res.json(); if (d.show) show = d.show; }
+        if (res.ok) { const d = await res.json(); if (d.show) show = d.show; ratings = d.ratings || null; }
       } catch {}
       if (!show) { body.innerHTML = '<div class="loading">Couldn’t load this show.</div>'; return; }
 
@@ -3752,7 +3790,7 @@
       } catch {}
       detailShow = show;
       await resolveMyCopy();
-      renderDetail(show, actors);
+      renderDetail(show, actors, ratings);
     }
 
     // Find my own row for the open title (active or archived) so the detail
@@ -3769,9 +3807,10 @@
       } catch {}
     }
 
-    function renderDetail(show, actors) {
+    function renderDetail(show, actors, ratings) {
       detailShow = show;
       detailActors = actors || [];
+      if (ratings !== undefined) detailRatings = ratings;
       document.getElementById('detailNavTitle').textContent = show.title;
       const loggedIn = !!authMember;
       const realUrl = detailRealUrl(show.network_url);
@@ -3876,6 +3915,42 @@
         }
         html += `<div class="detail-card"><div class="detail-card-title">My Lists</div>${memberInner}</div>`;
       }
+      // Ratings — directly below My Lists. Club average shows on every
+      // card, logged in or not; a specific member's own rating shows when
+      // viewing their copy; entry (instant-save tap-row) is gated to lists
+      // other than Next Up, matching the backend's own gating in
+      // functions/api/shows/[id]/rating.js. Nothing renders here until the
+      // show has a tmdb_id (ratings key off that, not this row's id).
+      if (ratings) {
+        let ratingsInner = '';
+        const avgText = (ratings.average != null)
+          ? `${ratings.average.toFixed(1)}/10 <span class="rating-count">(${ratings.count} rating${ratings.count === 1 ? '' : 's'})</span>`
+          : 'No ratings yet';
+        ratingsInner += detailRow('Club average', avgText);
+        if (ratings.owner != null) {
+          ratingsInner += detailRow(`${escapeHtml(ratings.ownerName || '')}'s rating`, `${ratings.owner}/10`);
+        }
+        const eligible = loggedIn && detailMyCopy && detailMyCopy.list !== 'next';
+        if (eligible) {
+          ratingsInner += `<div class="rating-entry"><div class="rating-entry-label">Your rating${ratings.mine ? ` — ${ratings.mine}/10` : ''}</div>${ratingTapRow(ratings.mine, null)}</div>`;
+          const seasonCount = show.movie ? 0 : (show.seasons_released || 0);
+          for (let s = 1; s <= seasonCount; s++) {
+            const seasonAvg = ratings.seasons[s];
+            const mine = ratings.mineSeasons[s] || null;
+            const avgPart = seasonAvg ? ` · avg ${seasonAvg.average}/10 (${seasonAvg.count})` : '';
+            const minePart = mine ? ` — ${mine}/10` : '';
+            ratingsInner += `<div class="rating-entry"><div class="rating-entry-label">Season ${s}${avgPart}${minePart}</div>${ratingTapRow(mine, s)}</div>`;
+          }
+        } else if (loggedIn && detailMyCopy && detailMyCopy.list === 'next') {
+          ratingsInner += detailRow('Your rating', 'Start watching to rate');
+        } else if (!show.movie && show.seasons_released) {
+          for (let s = 1; s <= show.seasons_released; s++) {
+            const seasonAvg = ratings.seasons[s];
+            if (seasonAvg) ratingsInner += detailRow(`Season ${s}`, `${seasonAvg.average}/10 (${seasonAvg.count})`);
+          }
+        }
+        html += `<div class="detail-card"><div class="detail-card-title">Ratings</div>${ratingsInner}</div>`;
+      }
       // The remaining catalog data (rating, type, genres, dates, …), grouped in
       // its own section below.
       if (rows.length) html += `<div class="detail-card">${rows.join('')}</div>`;
@@ -3928,6 +4003,22 @@
         showToast(`Moved to ${LIST_LABELS[list] || list}`);
         if (typeof loadShows === 'function') loadShows();
         await reRenderDetail();
+      } catch { showToast('Network error', { tone: 'error' }); }
+    }
+
+    // Tap-row entry: instant save, no confirm step. The endpoint returns the
+    // freshly recomputed summary, so re-render straight from that instead of
+    // a separate re-fetch.
+    async function detailRate(value, season) {
+      if (!detailMyCopy) return;
+      try {
+        const res = await fetch(`/api/shows/${detailMyCopy.id}/rating`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(season === null ? { rating: value } : { rating: value, season }),
+        });
+        if (!res.ok) { failToast(res, 'Couldn’t save rating'); return; }
+        const data = await res.json();
+        if (detailShow) renderDetail(detailShow, detailActors, data.ratings);
       } catch { showToast('Network error', { tone: 'error' }); }
     }
 

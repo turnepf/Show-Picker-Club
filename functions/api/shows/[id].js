@@ -3,6 +3,7 @@ import { getSession } from '../../_shared/auth.js';
 import { canonicalNetwork, networkFromUrl } from '../../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../../_shared/watch-providers.js';
 import { safeNetworkUrl } from '../../_shared/url-utils.js';
+import { getRatingsSummary } from '../../_shared/ratings.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -30,11 +31,32 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: corsHeaders() });
   }
   const session = await getSession(request, env);
+  // Average + count show on every card, logged in or not (a deliberate,
+  // scoped exception to the tiny public surface — see docs/PRODUCT.md).
+  // `mine` only populates for a logged-in viewer; `owner` only populates
+  // when viewing a specific other member's copy (never your own — nothing
+  // extra to say when owner === viewer).
+  const ratings = await getRatingsSummary(env, {
+    tmdbId: show.tmdb_id,
+    tmdbType: show.tmdb_type,
+    viewerSlug: session ? session.member_slug : null,
+    ownerSlug: show.member_slug,
+  });
+  // Name for the "<member>'s rating" line — only needed when there's an
+  // owner rating to label. Same fallback chain as the Search-all-libraries
+  // member tag (index.html): first_name override, else first word of name.
+  if (ratings && ratings.owner !== null) {
+    const owner = await env.DB.prepare(
+      'SELECT first_name, name FROM members WHERE slug = ?'
+    ).bind(show.member_slug).first();
+    ratings.ownerName = (owner && (owner.first_name || (owner.name || '').split(' ')[0])) || show.member_slug;
+  }
+
   // Full row (notes, watching_with, recommended_by, added_by) is for the
   // show's owner only. Other members get catalog fields plus enough context
   // to say "on Watching · <member>"; logged-out visitors get catalog only.
   if (session && session.member_slug === show.member_slug) {
-    return new Response(JSON.stringify({ show }), { headers: corsHeaders() });
+    return new Response(JSON.stringify({ show, ratings }), { headers: corsHeaders() });
   }
   const redacted = {};
   for (const k of PUBLIC_SHOW_FIELDS) if (k in show) redacted[k] = show[k];
@@ -42,7 +64,7 @@ export async function onRequestGet(context) {
     redacted.list = show.list;
     redacted.member_slug = show.member_slug;
   }
-  return new Response(JSON.stringify({ show: redacted }), { headers: corsHeaders() });
+  return new Response(JSON.stringify({ show: redacted, ratings }), { headers: corsHeaders() });
 }
 
 export async function onRequestPut(context) {

@@ -248,47 +248,52 @@ A few intentional omissions:
   alongside the IMDB number — friends' stars answer "Patrick liked it, so
   I'll like it too." Amy and Susan asked for the two halves separately
   (seeing others' ratings; being able to rate herself); Rob's ask (7/23) was
-  both at once: "add a 1-10 rating & see other's rating." Design, settled
-  7/23, feedback gathered 7/24 (Google Doc sent to Amy/Rob/Susan):
+  both at once: "add a 1-10 rating & see other's rating." Design settled
+  7/23, feedback gathered 7/24 (Google Doc sent to Amy/Rob/Susan), **shipped
+  on web 7/24**:
   - **Scale:** 1-10, matching the existing "TMDB Rating" field's scale so
     the two numbers on the same card mean the same thing at a glance.
     (Feedback was split — Amy and Susan both suggested 1-5 for entry
     simplicity, Rob wanted 1-10 — settled on 1-10 for consistency with the
     other rating already on the card.)
-  - **Entry:** a 10-segment tap-row (not a slider or numeric field) — tap a
-    position, it saves instantly, no Save button. One overall rating per
-    show, plus optional independent per-season ratings (keyed off the
-    `seasons_released` count). A new "Ratings" section sits directly below
-    "My Lists" on the show card.
-  - **Visibility:** every card — regardless of viewer or which member's copy
-    it is — shows the whole club's average (rounded to one decimal).
-    Opening a show from a specific member's list additionally shows that
-    member's own rating as a separate line, so "which friend liked it"
-    isn't lost in the aggregate.
-  - **Entry gating:** a member can only enter their own rating on a show
-    that's on one of their own lists, except Next Up — shows not yet
-    watched only ever display the average.
-  - **Getting started:** a one-page bulk-rate flow lists every show not on
-    Next Up (archived included) so a member can rate their backlog without
-    opening each card; same instant-save, no per-show confirmation.
-  - **Entry points:** clicking a list-assignment button pops the rating
-    control, including from Trending and Search-all-libraries — which will
-    need to start rendering the standard show card (read-only fields, plus
-    list-quick-actions to add to your own lists) instead of their current
-    lighter row. A non-owner's view of the card hides owner-only fields
-    (notes, network editing) but keeps ratings and list actions.
-  - **Public surface:** the catalog-level show detail (the one part of the
-    app visible without logging in) also shows the deidentified club
-    average — a deliberate, scoped exception to the otherwise-tiny public
-    surface (member identity and individual scores never appear there).
-  - **Cross-member identity:** ratings key off TMDB id (not any one
-    member's row), so every member's copy of the same title shares one
-    rating pool. This requires persisting `tmdb_id`/`tmdb_type` on `shows`
-    (not currently stored) and a one-time backfill pass over existing rows,
-    with unmatched titles reviewed manually rather than an ongoing queue.
+  - **Entry (shipped):** a 10-segment tap-row (not a slider or numeric
+    field) — tap a position, it saves instantly, no Save button. One
+    overall rating per show, plus optional independent per-season ratings
+    (keyed off `seasons_released`). The "Ratings" section sits directly
+    below "My Lists" on the show card.
+  - **Visibility (shipped):** every card — regardless of viewer or which
+    member's copy it is — shows the whole club's average (rounded to one
+    decimal). Opening a show from a specific member's copy additionally
+    shows that member's own rating as a separate line, so "which friend
+    liked it" isn't lost in the aggregate.
+  - **Entry gating (shipped):** a member can only enter their own rating on
+    a show that's on one of their own lists, except Next Up — shows not yet
+    watched only ever display the average. Enforced server-side
+    (`PUT /api/shows/:id/rating`), not just hidden in the UI.
+  - **Entry points (shipped, turned out to need no new work):** Trending
+    and Search-all-libraries already open the same show-detail card
+    (`openDetail()`) as a member's own page, and that card's "My Lists"
+    section already scopes to the *viewer's own* copy rather than whoever's
+    copy is being viewed — so a non-owner already only ever sees their own
+    notes/fields (never the card-opener's), and the list chips already let
+    any viewer add the show to their own list. The originally-anticipated
+    "build a separate non-owner card" work wasn't actually needed.
+  - **Public surface (shipped):** the catalog-level show detail (the one
+    part of the app visible without logging in) also shows the deidentified
+    club average — a deliberate, scoped exception to the otherwise-tiny
+    public surface (member identity and individual scores never appear
+    there).
+  - **Cross-member identity (shipped):** ratings key off TMDB id
+    (`tmdb_id`/`tmdb_type` on `shows`, migration 049), not any one member's
+    row — see the TMDB-canonical-id work above. `show_ratings` (migration
+    053) and `functions/_shared/ratings.js` own validation/aggregation.
+  - **Not yet built:** the one-page "rate your backlog" bulk flow (every
+    show not on Next Up, archived included); native support for iOS/iPad
+    (full entry + display), tvOS (view-only), and watchOS (view-only).
   - **Not building yet:** clearing/un-rating a show once rated — revisit if
     it's requested.
-  - **Ships as v1.1** (and the next build number).
+  - **Ships as v1.1** (and the next build number) — once native parity and
+    the bulk-rate flow land, not yet.
 
 - **Episode-level ratings.** (Amy — 7/24/2026, feedback on the ratings
   design doc.) Rate individual episodes, not just overall/season, shared
