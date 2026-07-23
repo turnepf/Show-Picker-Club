@@ -318,9 +318,12 @@ A few intentional omissions:
   deliberate call on scope (per-episode threads? spoiler-safety by episode
   progress?) before building.
 
-- **Trailer link broken on Apple TV.** (Patrick — 7/23/2026.) The YouTube
-  trailer link (`shows.trailer_key`) doesn't work on tvOS. Needs
-  investigation — web/iOS behavior not yet confirmed as working or broken.
+- **Trailer link broken on Apple TV.** (Patrick — 7/23-7/24/2026.) The
+  YouTube trailer link (`shows.trailer_key`) opens the YouTube app on tvOS
+  but not to that show's specific trailer video — confirmed working
+  correctly (deep-links to the right video) on web and iOS. Patrick wants a
+  broader links pass (deep links generally, especially Apple TV) after the
+  ratings feature ships — not just this one bug.
 
 ## Shipped (formerly backlog)
 
