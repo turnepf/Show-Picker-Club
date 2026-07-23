@@ -59,7 +59,7 @@ export async function onRequestPost(context) {
         `UPDATE shows SET enriched_at = datetime('now')
          WHERE LOWER(title) = LOWER(?) AND tmdb_id IS NULL`
       ).bind(row.title).run();
-      unresolved.push({ id: row.id, title: row.title, movie: !!row.movie });
+      unresolved.push({ id: row.id, title: row.title, movie: !!row.movie, reason: found.reason });
     }
   }
 
