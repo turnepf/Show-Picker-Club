@@ -117,8 +117,7 @@ export async function onRequestGet(context) {
   // Who has never logged in since we started tracking it (migration 013), and
   // for each, whether their library is still just the seeded rows. seeds_only
   // is true when nothing beyond the seeds has happened: no member-added show,
-  // no archive, no edit (updated_at moved off created_at). Mirrors the
-  // "engagement beyond seeds" test used by the dormant-member digest.
+  // no archive, no edit (updated_at moved off created_at).
   let neverLoggedIn = [];
   try {
     const { results } = await env.DB.prepare(

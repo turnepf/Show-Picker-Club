@@ -1473,7 +1473,7 @@
   <div id="detailPage">
     <div class="detail-nav">
       <div class="detail-nav-inner">
-        <button onclick="closeDetail()" aria-label="Back">&#8249; Back</button>
+        <button onclick="detailBack()" aria-label="Back">&#8249; Back</button>
         <span class="detail-nav-title" id="detailNavTitle"></span>
       </div>
     </div>
@@ -2134,7 +2134,7 @@
       const showParam = new URLSearchParams(location.search).get('show');
       if (showParam) {
         const showId = parseInt(showParam, 10);
-        if (Number.isInteger(showId)) openDetail(showId);
+        if (Number.isInteger(showId)) openDetail(showId, true);
       }
 
       checkAuth().then(() => {
@@ -3755,6 +3755,11 @@
     // { average, count, seasons, mine, mineSeasons, owner, ownerSeasons,
     //   ownerName } from GET /api/shows/:id — see functions/_shared/ratings.js.
     let detailRatings = null;
+    // True when the open show was reached via a ?show=<id> deep link (e.g.
+    // from rate-backlog.html) rather than a click within this page — so
+    // there's no "list underneath" the overlay actually came from. Set
+    // fresh on every openDetail() call; see detailBack().
+    let detailFromDeepLink = false;
     const ALL_LISTS = ['watching', 'waiting', 'recommending', 'next'];
 
     // Repoint the old inline-expand entry point at the detail screen so every
@@ -3798,7 +3803,8 @@
       return [];
     }
 
-    async function openDetail(id) {
+    async function openDetail(id, fromDeepLink) {
+      detailFromDeepLink = !!fromDeepLink;
       const page = document.getElementById('detailPage');
       const body = document.getElementById('detailBody');
       document.getElementById('detailNavTitle').textContent = '';
@@ -4005,6 +4011,16 @@
       detailShow = null;
     }
 
+    // The visible Back control (and Escape): if this show was reached via a
+    // ?show=<id> deep link, there's no list "underneath" the overlay to
+    // reveal — the page was loaded fresh just to show this one card — so go
+    // to the actual previous page (e.g. rate-backlog.html) instead of
+    // uncovering a list the member never chose to look at.
+    function detailBack() {
+      if (detailFromDeepLink) { history.back(); return; }
+      closeDetail();
+    }
+
     function detailEdit(id) { closeDetail(); openEditModal(id); }
 
     // Re-resolve my copy and re-render, so the detail's actions reflect the
@@ -4106,7 +4122,7 @@
     }
 
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && document.getElementById('detailPage').classList.contains('open')) closeDetail();
+      if (e.key === 'Escape' && document.getElementById('detailPage').classList.contains('open')) detailBack();
     });
   </script>
   <script src="/app-banner.js?v=3" defer></script>

@@ -1,18 +1,18 @@
-name: Hourly demo-account reset
+name: Daily demo-account reset
 
 # The demo account (DEMO_LOGIN_EMAIL) auto-restores to its baseline snapshot
 # one hour after each demo sign-in. The login path runs the check lazily, but
-# if nobody signs in again the junk would linger — this hourly job is the
+# if nobody signs in again the junk would linger — this daily job is the
 # backstop that runs the same check on a clock. A no-op whenever the demo
-# login is unconfigured, the data is clean, or the hour hasn't passed.
+# login is unconfigured or the data is already clean.
 #
 # Required repo secret (Settings → Secrets and variables → Actions):
 #   CRON_SECRET — must match the CRON_SECRET Pages secret set on the project
 
 on:
   schedule:
-    # Hourly, five past the hour (GitHub delays :00 crons the most).
-    - cron: '5 * * * *'
+    # Daily at 04:05 UTC (~midnight EST) — off-peak, clear of the 03:00 backup.
+    - cron: '5 4 * * *'
   workflow_dispatch:  # Manual trigger from Actions tab
 
 jobs:

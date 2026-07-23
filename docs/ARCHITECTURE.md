@@ -109,7 +109,7 @@ Member ratings (docs/PRODUCT.md backlog: "Member ratings"). Migration 053. Keyed
 
 Entry is gated to shows on any list except Next Up (`list !== 'next'`), enforced server-side in `PUT /api/shows/:id/rating`; a show with no `tmdb_id` yet (not enriched) can't be rated either. The average/count show on every card regardless of login state — a deliberate, scoped exception to the otherwise-tiny public surface (`GET /api/shows/:id` returns the summary in its public/redacted branch too, never member names or individual scores beyond the specific owner being viewed).
 
-`GET /api/rate-backlog` (session required) backs `/rate-backlog`, the one-page bulk-rate flow: every show the member has except Next Up (archived included), left-joined to `show_ratings` for the member's existing overall (`season_number = 0`) rating, unrated shows first. Overall-only by design — each row links to `/<slug>?show=<id>` (the show's detail page, which `showMember()` opens directly via a `show` query param) for season-level rating.
+`GET /api/rate-backlog` (session required) backs `/rate-backlog`, the one-page bulk-rate flow: every active show the member has except Next Up and archived rows, left-joined to `show_ratings` for the member's existing overall (`season_number = 0`) rating, unrated shows first. Overall-only by design — each row links to `/<slug>?show=<id>` (the show's detail page, which `showMember()` opens directly via a `show` query param) for season-level rating.
 
 Not yet built: native (iOS/tvOS/watchOS) support.
 
@@ -242,7 +242,6 @@ The complete map:
 | `POST /api/admin-tmdb-backfill`        | `functions/api/admin-tmdb-backfill.js`     | POST    | admin session — one-time `tmdb_id`/`tmdb_type` backfill for rows added before migration 049; call repeatedly until `remaining` is 0, then review `unresolved` manually |
 | `POST /api/admin-sms-test`             | `functions/api/admin-sms-test.js`          | POST    | admin session |
 | `POST /api/admin-fill-watch-urls`      | `functions/api/admin-fill-watch-urls.js`   | POST    | admin session or `CRON_SECRET` header |
-| `POST /api/admin-dormant-digest`       | `functions/api/admin-dormant-digest.js`    | POST    | admin session or `CRON_SECRET` header |
 | `POST /api/admin-demo-reset`           | `functions/api/admin-demo-reset.js`        | POST    | admin session or `CRON_SECRET` header |
 | `GET /calendar/[slug].ics`             | `functions/calendar/[slug].js`             | GET     | `?key=<calendar_token>` (per-member secret) |
 
@@ -297,7 +296,7 @@ Enrollment responses include `enrolled: true` alongside the usual `{success, slu
 
 `DEMO_LOGIN_EMAIL` + `DEMO_LOGIN_CODE` (Cloudflare secrets) enable a reviewer/demo login: that one email signs in with a fixed code. `DEMO_APPLE_FALLBACK=true` additionally routes unrecognized Apple IDs into the same demo member. With the secrets unset, all of it is inert.
 
-The demo member's data auto-resets (`_shared/demo.js`): each demo sign-in snapshots the account's shows/actors/subscriptions as a baseline (if clean) and arms a reset for one hour later. The reset runs lazily at the next demo sign-in and hourly via the `demo-reset.yml` GitHub Action → `POST /api/admin-demo-reset`. The demo member's rows are ignored as URL-sync sources. (Cross-member writes — suggestions, shares — were retired for everyone in 2026-07.)
+The demo member's data auto-resets (`_shared/demo.js`): each demo sign-in snapshots the account's shows/actors/subscriptions as a baseline (if clean) and arms a reset for one hour later. The reset runs lazily at the next demo sign-in and daily via the `demo-reset.yml` GitHub Action → `POST /api/admin-demo-reset`. The demo member's rows are ignored as URL-sync sources. (Cross-member writes — suggestions, shares — were retired for everyone in 2026-07.)
 
 ### Session activity tracking
 
@@ -560,12 +559,6 @@ The moment a member edits a seeded row (changes list, notes, etc.), archives one
 - Trigger: daily at 03:00 UTC, or manual dispatch.
 - Steps: install rclone, install Node + wrangler, `wrangler d1 export shows-db --remote --output /tmp/...`, upload to Google Drive (`gdrive:Shows-Backups/`), prune drive backups older than 30 days, prune `failed_logins` rows older than 7 days.
 - Required secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RCLONE_CONF` (full rclone config including drive token).
-
-### `.github/workflows/dormant-digest.yml`
-- Trigger: 14:00 UTC on the 1st of each month, or manual dispatch.
-- Steps: `curl POST /api/admin-dormant-digest` with the `X-Cron-Secret` header. The endpoint computes the dormant-member list and texts the operator's primary phone via the app's Twilio integration.
-- Required secret: `CRON_SECRET` (must match the `CRON_SECRET` Pages secret).
-- "Dormant" = a member with no non-seed shows, no edits, no archives, and no session ping in the last 30 days.
 
 ## Excluded members
 
