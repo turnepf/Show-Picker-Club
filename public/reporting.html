@@ -235,6 +235,7 @@
           ${windowCard('Edits', d.edited_shows)}
           ${windowCard('Archived', d.archived_shows)}
           ${windowCard('New members', d.new_members)}
+          ${windowCard('People who rated', d.rating_members)}
           ${dwmCard('Active members', d.active_members || {})}
         </div>
 
@@ -252,6 +253,13 @@
               <div class="metrics">
                 <div class="metric"><div class="metric-val">${fmt(totals.active_shows)}</div><div class="metric-lbl">Active</div></div>
                 <div class="metric"><div class="metric-val">${fmt(totals.archived_shows)}</div><div class="metric-lbl">Archived</div></div>
+              </div>
+            </div>
+            <div class="card">
+              <h3>Ratings</h3>
+              <div class="metrics">
+                <div class="metric"><div class="metric-val">${fmt((d.ratings_submitted || {}).all_time)}</div><div class="metric-lbl">Submitted</div></div>
+                <div class="metric"><div class="metric-val">${fmt(d.ratings_titles)}</div><div class="metric-lbl">Titles rated</div></div>
               </div>
             </div>
             <div class="card">

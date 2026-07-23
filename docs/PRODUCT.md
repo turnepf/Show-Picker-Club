@@ -167,7 +167,8 @@ A small operator dashboard:
 
 - **DAU / WAU / MAU** — distinct sessions that have pinged within each window (1 / 7 / 30 days).
 - **New, edited, archived counts** — per show, in day/week/month/all-time windows.
-- **Totals** — members, active shows, archived shows, shows per list.
+- **People who rated** — distinct members who submitted a rating (new or changed), in the same day/week/month/all-time windows as the show counts above.
+- **Totals** — members, active shows, archived shows, shows per list, ratings submitted, titles rated.
 - **Top networks** and **top shared titles** across the club.
 
 Recently removed: "Most active members," "Recently archived," "Seed-only members," "Member activity." The data sources for those queries still exist if they need to be restored.
