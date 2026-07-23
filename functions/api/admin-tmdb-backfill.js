@@ -1,5 +1,5 @@
 import { isAdmin } from '../_shared/admin.js';
-import { fetchEnrichment } from '../_shared/enrichment.js';
+import { searchTmdbId } from '../_shared/enrichment.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -11,11 +11,12 @@ function json(data, status = 200) {
 // One-time backfill: rows added before migration 049 have no
 // tmdb_id/tmdb_type. Member ratings need that pair to pool across every
 // member's independent copy of the same title, so this walks rows missing
-// it, re-runs the title search, and writes the id/type onto every copy
-// sharing that title (a fetch for one member's copy covers everyone's).
-// Titles TMDB can't confidently match come back in `unresolved` for a
-// one-time manual review — this is a single-use pass, not an ongoing queue
-// like /url-cleanup, since it only needs to run once at launch.
+// it, re-runs a lightweight TMDB search (searchTmdbId — id/type only, no
+// detail/cast/rating fetch), and writes the id/type onto every copy sharing
+// that title (a lookup for one member's copy covers everyone's). Titles
+// TMDB can't confidently match come back in `unresolved` for a one-time
+// manual review — this is a single-use pass, not an ongoing queue like
+// /url-cleanup, since it only needs to run once at launch.
 export async function onRequestPost(context) {
   const { request, env } = context;
   if (!(await isAdmin(request, env))) {
@@ -25,8 +26,10 @@ export async function onRequestPost(context) {
   let body = {};
   try { body = await request.json(); } catch (_) {}
   // Soft cap per invocation, well under Cloudflare's subrequest ceiling —
-  // call repeatedly until `remaining` hits 0.
-  const maxTitles = parseInt(body.max_titles ?? '40', 10);
+  // call repeatedly until `remaining` hits 0. searchTmdbId costs 1-2
+  // subrequests/title (vs. fetchEnrichment's ~7 for a full add/edit), so
+  // this can run a much bigger batch per call than a full-enrichment pass.
+  const maxTitles = parseInt(body.max_titles ?? '100', 10);
 
   const { results: rows } = await env.DB.prepare(
     `SELECT id, title, movie FROM shows
@@ -39,12 +42,12 @@ export async function onRequestPost(context) {
   let matched = 0;
   const unresolved = [];
   for (const row of rows) {
-    const enriched = await fetchEnrichment(row.title, env, !!row.movie);
-    if (enriched.tmdbId) {
+    const found = await searchTmdbId(row.title, env, !!row.movie);
+    if (found.tmdbId) {
       const result = await env.DB.prepare(
         `UPDATE shows SET tmdb_id = ?, tmdb_type = ?
          WHERE LOWER(title) = LOWER(?) AND tmdb_id IS NULL`
-      ).bind(enriched.tmdbId, enriched.tmdbType, row.title).run();
+      ).bind(found.tmdbId, found.tmdbType, row.title).run();
       matched += result.meta.changes;
     } else {
       // Stamp enriched_at on a miss so this title rotates to the back of the
