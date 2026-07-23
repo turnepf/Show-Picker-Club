@@ -250,13 +250,18 @@ A few intentional omissions:
   coming-soon block — make the same swap there in the next build.
 
 - **Member ratings.** (Amy Brownlee 7/16, Susan 7/22, Rob Maltzhan 7/23 —
-  2026.) Members rate shows 1-10 (whole numbers), and those ratings show up
+  2026.) Members rate shows 1-5 (whole numbers), and those ratings show up
   alongside the IMDB number — friends' stars answer "Patrick liked it, so
   I'll like it too." Amy and Susan asked for the two halves separately
   (seeing others' ratings; being able to rate herself); Rob's ask (7/23) was
   both at once: "add a 1-10 rating & see other's rating." Design, settled
-  7/23:
-  - **Entry:** a 10-segment tap-row (not a slider or numeric field) — tap a
+  7/23, feedback gathered 7/24 (Google Doc sent to Amy/Rob/Susan):
+  - **Scale:** 1-5, not 1-10 — Rob preferred 1-10, but Amy and Susan both
+    called out 1-10 as excessive for entry, and 2-of-3 settled it. Needs a
+    visual treatment distinct from the existing "TMDB Rating" field (shown
+    out of 10) so the two scales don't read as directly comparable numbers
+    on the same card — not just a smaller version of the same control.
+  - **Entry:** a 5-segment tap-row (not a slider or numeric field) — tap a
     position, it saves instantly, no Save button. One overall rating per
     show, plus optional independent per-season ratings (keyed off the
     `seasons_released` count). A new "Ratings" section sits directly below

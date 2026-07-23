@@ -95,10 +95,21 @@ const EMPTY_DETAIL = {
   releaseYear: null, providerNetwork: null, watchLink: null,
 };
 
-async function tmdbFetch(path, token) {
+// Retries on 429 (rate limit) with backoff — otherwise a burst of many
+// sequential calls in one invocation (a backfill batch, a detail fetch's
+// parallel cast/person lookups) starts getting rate-limited partway through,
+// and every caller here just reads that as "no results" and gives up on
+// titles that would have matched fine with a moment's wait.
+async function tmdbFetch(path, token, attempt = 0) {
   const res = await fetch(`https://api.themoviedb.org/3${path}`, {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
   });
+  if (res.status === 429 && attempt < 3) {
+    const retryAfter = parseInt(res.headers.get('Retry-After'), 10);
+    const waitMs = Number.isFinite(retryAfter) ? retryAfter * 1000 : 500 * (attempt + 1);
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+    return tmdbFetch(path, token, attempt + 1);
+  }
   return res.json();
 }
 
@@ -197,8 +208,9 @@ function pickBestMatch(results, mediaType, title) {
 // through it.
 export async function searchTmdbId(title, env, isMovie) {
   const token = env.TMDB_TOKEN;
-  if (!token) return { tmdbId: null, tmdbType: null };
+  if (!token) return { tmdbId: null, tmdbType: null, reason: 'no_tmdb_token' };
   const mediaTypes = isMovie ? ['movie', 'tv'] : ['tv', 'movie'];
+  let reason = 'no_results';
   try {
     for (const t of mediaTypes) {
       const s = await tmdbFetch(
@@ -209,11 +221,12 @@ export async function searchTmdbId(title, env, isMovie) {
         const pick = pickBestMatch(s.results, t, title);
         return { tmdbId: pick.id, tmdbType: t };
       }
+      if (s.success === false) reason = s.status_message || 'tmdb_error';
     }
-  } catch (_) {
-    // TMDB errored — nothing to resolve.
+  } catch (e) {
+    reason = `exception: ${e.message}`;
   }
-  return { tmdbId: null, tmdbType: null };
+  return { tmdbId: null, tmdbType: null, reason };
 }
 
 export async function fetchEnrichment(title, env, isMovie) {
