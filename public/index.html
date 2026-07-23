@@ -1089,8 +1089,9 @@
     .rating-entry-label { font-size: 13px; color: var(--ink-muted); margin-bottom: 6px; }
     /* 10-segment tap-row — deliberately not a slider or numeric field:
        tap a position and it saves instantly. Distinct from the plain
-       "★ 7.3" TMDB Rating row above so the two 1-10 scales never blur
-       together visually even though they share a scale. */
+       "★ 7.3" TMDB Rating row directly above it in the same Ratings
+       section, so the two 1-10 scales never blur together visually even
+       though they share a scale. */
     .rating-row { display: flex; gap: 3px; }
     .rating-seg {
       flex: 1 1 0;
@@ -3873,8 +3874,9 @@
       if (show.trailer_key) topRows.push(detailRow('Trailer', `<a href="https://www.youtube.com/watch?v=${encodeURIComponent(show.trailer_key)}" target="_blank" rel="noopener">▶ Watch trailer</a>`));
 
       const rows = [];
-      // Single audience score, sourced from TMDB (`rating` carries it now).
-      if (show.rating) rows.push(detailRow('TMDB Rating', `★ ${escapeHtml(show.rating)}`));
+      // TMDB Rating moved into the Ratings section (above Club average) so
+      // both scores live together instead of the audience score sitting
+      // apart from the member ones.
       // The list + the member-edited fields (recommender, watching-with, notes)
       // live in the separate "My Lists" section built below — they're member
       // specific, not catalog data, so they're not in these rows.
@@ -3965,6 +3967,7 @@
       // show has a tmdb_id (ratings key off that, not this row's id).
       if (ratings) {
         let ratingsInner = '';
+        if (show.rating) ratingsInner += detailRow('TMDB Rating', `★ ${escapeHtml(show.rating)}`);
         const avgText = (ratings.average != null)
           ? `${ratings.average.toFixed(1)}/10 <span class="rating-count">(${ratings.count} rating${ratings.count === 1 ? '' : 's'})</span>`
           : 'No ratings yet';
