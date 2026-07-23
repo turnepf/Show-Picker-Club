@@ -249,12 +249,47 @@ A few intentional omissions:
   (July 2026). `ios/ShowPickerIOS/Views/WhatsNewView.swift` still carries the
   coming-soon block — make the same swap there in the next build.
 
-- **Member star ratings.** (Amy Brownlee 7/16, Susan 7/22, Rob Maltzhan
-  7/23 — 2026.) Members can rate shows they've watched, and those ratings
-  show up alongside the IMDB number — friends' stars answer "Patrick liked
-  it, so I'll like it too." Susan asked for exactly this from the other
-  side: she wants to rate shows herself. Rob's ask (7/23) is both halves at
-  once: "add a 1-10 rating & see other's rating."
+- **Member ratings.** (Amy Brownlee 7/16, Susan 7/22, Rob Maltzhan 7/23 —
+  2026.) Members rate shows 1-10 (whole numbers), and those ratings show up
+  alongside the IMDB number — friends' stars answer "Patrick liked it, so
+  I'll like it too." Amy and Susan asked for the two halves separately
+  (seeing others' ratings; being able to rate herself); Rob's ask (7/23) was
+  both at once: "add a 1-10 rating & see other's rating." Design, settled
+  7/23:
+  - **Entry:** a 10-segment tap-row (not a slider or numeric field) — tap a
+    position, it saves instantly, no Save button. One overall rating per
+    show, plus optional independent per-season ratings (keyed off the
+    `seasons_released` count). A new "Ratings" section sits directly below
+    "My Lists" on the show card.
+  - **Visibility:** every card — regardless of viewer or which member's copy
+    it is — shows the whole club's average (rounded to one decimal).
+    Opening a show from a specific member's list additionally shows that
+    member's own rating as a separate line, so "which friend liked it"
+    isn't lost in the aggregate.
+  - **Entry gating:** a member can only enter their own rating on a show
+    that's on one of their own lists, except Next Up — shows not yet
+    watched only ever display the average.
+  - **Getting started:** a one-page bulk-rate flow lists every show not on
+    Next Up (archived included) so a member can rate their backlog without
+    opening each card; same instant-save, no per-show confirmation.
+  - **Entry points:** clicking a list-assignment button pops the rating
+    control, including from Trending and Search-all-libraries — which will
+    need to start rendering the standard show card (read-only fields, plus
+    list-quick-actions to add to your own lists) instead of their current
+    lighter row. A non-owner's view of the card hides owner-only fields
+    (notes, network editing) but keeps ratings and list actions.
+  - **Public surface:** the catalog-level show detail (the one part of the
+    app visible without logging in) also shows the deidentified club
+    average — a deliberate, scoped exception to the otherwise-tiny public
+    surface (member identity and individual scores never appear there).
+  - **Cross-member identity:** ratings key off TMDB id (not any one
+    member's row), so every member's copy of the same title shares one
+    rating pool. This requires persisting `tmdb_id`/`tmdb_type` on `shows`
+    (not currently stored) and a one-time backfill pass over existing rows,
+    with unmatched titles reviewed manually rather than an ongoing queue.
+  - **Not building yet:** clearing/un-rating a show once rated — revisit if
+    it's requested.
+  - **Ships as v1.1** (and the next build number).
 
 - **Bracket competition.** (Amy — 7/2026.) A bracket-style tournament built
   from the group's shows, where members who have watched a show vote for
