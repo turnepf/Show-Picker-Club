@@ -177,7 +177,7 @@ Recently removed: "Most active members," "Recently archived," "Seed-only members
 
 Three secret-protected admin pages (all require the `ADMIN_SECRET` value to be entered in the page):
 
-- **/setup** — create a new member. Enter a name plus the phone and/or email they'll receive login codes at; the page generates a slug, picks 8 seed shows from highly-rated club picks (2 per list), and copies them in as `added_by='seed'` rows. The new member sees these on first login.
+- **/setup** — create a new member. Enter a name plus the phone and/or email they'll receive login codes at; the page generates a slug. New members start with an empty library — seeding a starter library of 8 popular picks was retired 2026-07; members created before then keep whatever seed rows they still have.
 - **/url-cleanup** — queue of shows missing a real network URL (still on a generic search link). Operator can paste a deep link; the page pushes it to every member's copy of that show. Also surfaces **wrong titles**: shows whose name never matched a real title (no poster after enrichment) even though their link works. Most fix themselves — the real name is recovered from the show's own streaming-page link (og:title) during enrichment and when this page loads; only the ones automation can't confidently match are listed, and renaming re-enriches every copy and pulls the right poster.
 - **/vibe-admin** — batch-score show traits using Claude. Picks shows missing a `show_traits` row, sends each title to Claude with a calibration prompt that asks for 27 trait scores (0–1), writes the result back. Used to backfill the trait data that powers Vibe.
 
@@ -185,8 +185,7 @@ There is no admin role in the session model — admin actions are gated purely b
 
 ## Member lifecycle
 
-- **Created** by an operator via `/setup` (or by hand-INSERT during bootstrap).
-- **Seeded** with 8 shows automatically (2 per list, drawn from the existing club's highly-rated picks).
+- **Created** by an operator via `/setup` (or by hand-INSERT during bootstrap). Starts with an empty library — auto-seeding a starter library was retired 2026-07.
 - **Logs in** for the first time with a one-time code (text or email), or Sign in with Apple.
 - **Engages** by editing notes, moving shows between lists, adding new shows, archiving, or sharing. Any of these flips the member out of "seed-only" status and they begin showing in popular, recommendations, and vibe.
 - **Goes dormant** when 60 days pass without a session ping; the member card disappears from the home page picker until they come back. They're still reachable by direct URL.

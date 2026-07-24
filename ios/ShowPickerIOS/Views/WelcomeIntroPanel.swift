@@ -20,7 +20,7 @@ struct WelcomeIntroPanel: View {
     // Kept word-for-word in sync with buildIntroPanel() in public/members.html.
     private var intro: String {
         """
-        Hey \(displayName)! I set you up on Show Picker Club. It's a shared show tracker where we all keep track of what we're watching, what's next, and what we'd recommend. I seeded yours with some popular shows to get you started; if any don't interest you, just tap Edit, then Archive to remove them.
+        Hey \(displayName)! I set you up on Show Picker Club. It's a shared show tracker where we all keep track of what we're watching, what's next, and what we'd recommend. Your list starts empty — tap + Add to add your own shows and movies.
 
         Your list:
         \(url)
