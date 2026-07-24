@@ -15,34 +15,6 @@ function normalizePhone(input) {
   return null;
 }
 
-async function pickSeeds(env) {
-  const lists = ['watching', 'waiting', 'recommending', 'next'];
-  const picks = [];
-  for (const list of lists) {
-    const { results } = await env.DB.prepare(`
-      SELECT s.id, s.title, s.network, s.network_url, s.rating, s.list, s.full_series
-      FROM shows s
-      WHERE s.archived = 0
-        AND s.list = ?
-        AND s.rating IS NOT NULL
-        AND CAST(s.rating AS REAL) >= 7.5
-        AND s.network IS NOT NULL AND s.network != ''
-        AND s.network_url IS NOT NULL AND s.network_url != ''
-        AND s.network_url NOT LIKE '%search%'
-        AND s.network_url NOT LIKE '%/s?%'
-        AND s.network_url NOT LIKE '%?q=%'
-        AND s.network_url NOT LIKE '%?query=%'
-        AND EXISTS (SELECT 1 FROM actors a WHERE a.show_id = s.id)
-        AND (SELECT COUNT(DISTINCT t.member_slug) FROM shows t WHERE LOWER(t.title) = LOWER(s.title) AND t.archived = 0) BETWEEN 1 AND 2
-      GROUP BY LOWER(s.title)
-      ORDER BY RANDOM()
-      LIMIT 2
-    `).bind(list).all();
-    picks.push(...results);
-  }
-  return picks;
-}
-
 // Slugs that live at the root path (or could) — member pages are routed as
 // /<slug>, so a member slug must never shadow a page, an API prefix, or a
 // plausible future route. Candidates on this list are skipped, so a
@@ -158,26 +130,6 @@ export async function createMember(env, { full_name, first_name, last_name, phon
     ).bind(emailList[i], slug, i === 0 ? 1 : 0).run();
   }
 
-  const seeds = await pickSeeds(env);
-  const seededTitles = [];
-
-  for (const seed of seeds) {
-    const result = await env.DB.prepare(
-      "INSERT INTO shows (title, network, network_url, rating, list, full_series, member_slug, added_by, created_at, updated_at, enriched_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'seed', NULL, NULL, datetime('now'))"
-    ).bind(seed.title, seed.network, seed.network_url, seed.rating, seed.list, seed.full_series || 0, slug).run();
-
-    const newShowId = result.meta.last_row_id;
-    const { results: actors } = await env.DB.prepare(
-      'SELECT name FROM actors WHERE show_id = ?'
-    ).bind(seed.id).all();
-
-    if (actors.length > 0) {
-      const stmt = env.DB.prepare('INSERT INTO actors (show_id, name) VALUES (?, ?)');
-      await env.DB.batch(actors.map(a => stmt.bind(newShowId, a.name)));
-    }
-    seededTitles.push(`${seed.title} (${seed.list})`);
-  }
-
   return {
     ok: true,
     slug,
@@ -186,6 +138,5 @@ export async function createMember(env, { full_name, first_name, last_name, phon
     url: `https://showpicker.club/${slug}`,
     phone: phoneE164,
     emails: emailList,
-    seeded: seededTitles,
   };
 }

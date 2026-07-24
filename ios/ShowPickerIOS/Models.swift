@@ -280,11 +280,10 @@ struct CreateMemberResult: Codable {
     let editorName: String?
     let url: String?
     let phone: String?
-    let seeded: [String]?
     let error: String?
 
     enum CodingKeys: String, CodingKey {
-        case ok, slug, name, url, phone, seeded, error
+        case ok, slug, name, url, phone, error
         case editorName = "editor_name"
     }
 }
