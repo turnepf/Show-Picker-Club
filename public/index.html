@@ -511,6 +511,11 @@
     .side-list-row.selected .ios-item-icon { color: #fff; }
     .ios-footnote { font-size: 12px; color: var(--ink-quiet); line-height: 1.5; padding: 0 16px; margin: -10px 0 22px; }
     .ios-footnote a { color: inherit; }
+    /* Brief nav callout for a newly-shipped feature (currently: ratings). */
+    .nav-announce { font-size: 12.5px; color: var(--tint); line-height: 1.4; padding: 0 16px; margin: 2px 0 16px; }
+    /* Same idea, above the show list itself — only ever shown on Watching,
+       where a member lands first after logging in. */
+    .list-announce { text-align: center; font-size: 12px; color: var(--tint); padding: 2px 0 10px; }
 
     /* Orange star rating, matching the iOS rows' .orange Label */
     .ios-rating { display: inline-flex; align-items: center; gap: 3px; color: var(--ios-orange); font-size: 13px; font-weight: 500; white-space: nowrap; }
@@ -1238,6 +1243,8 @@
           <button class="btn btn-save join-cta-btn" onclick="login()">Create your free account</button>
         </div>
 
+        <p class="nav-announce">★ New: rate any show 1–10 and see the club's average.</p>
+
         <!-- iPhone home shows a single "My Shows" row; the desktop split
              view expands it into the four lists, exactly like the iPad
              sidebar (the rows deep-link to your page with the list open). -->
@@ -1349,6 +1356,7 @@
         <button class="icon-btn" title="Search all libraries" aria-label="Search all libraries" onclick="openLandingSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
         <button class="icon-btn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
       </div>
+      <p class="nav-announce">★ New: rate any show 1–10 and see the club's average.</p>
       <!-- One-tap way home while browsing someone else's lists — the lists
            group below belongs to whoever's page this is, so without this
            there's no visible route back to your own shows. Toggled by
@@ -3078,6 +3086,15 @@
       } else if (manualMode) {
         container.innerHTML =
           `<div class="drag-hint">Shown in ${escapeHtml(owners)}'s own order.</div>`
+          + container.innerHTML;
+      }
+
+      // Brief ratings callout, own Watching list only — this is the first
+      // list a member sees after logging in, so it's the highest-traffic
+      // spot to mention the feature.
+      if (currentTab === 'watching' && isOwnPage) {
+        container.innerHTML =
+          `<div class="list-announce">★ New: tap a show to rate it 1–10.</div>`
           + container.innerHTML;
       }
 
