@@ -1243,7 +1243,7 @@
           <button class="btn btn-save join-cta-btn" onclick="login()">Create your free account</button>
         </div>
 
-        <p class="nav-announce">★ New: rate any show 1–10 and see the club's average.</p>
+        <p class="nav-announce">★ New: rate any show and see the club's average.</p>
 
         <!-- iPhone home shows a single "My Shows" row; the desktop split
              view expands it into the four lists, exactly like the iPad
@@ -1356,7 +1356,7 @@
         <button class="icon-btn" title="Search all libraries" aria-label="Search all libraries" onclick="openLandingSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
         <button class="icon-btn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
       </div>
-      <p class="nav-announce">★ New: rate any show 1–10 and see the club's average.</p>
+      <p class="nav-announce">★ New: rate any show and see the club's average.</p>
       <!-- One-tap way home while browsing someone else's lists — the lists
            group below belongs to whoever's page this is, so without this
            there's no visible route back to your own shows. Toggled by
@@ -3094,7 +3094,7 @@
       // spot to mention the feature.
       if (currentTab === 'watching' && isOwnPage) {
         container.innerHTML =
-          `<div class="list-announce">★ New: tap a show to rate it 1–10.</div>`
+          `<div class="list-announce">★ New: tap a show to rate it.</div>`
           + container.innerHTML;
       }
 
