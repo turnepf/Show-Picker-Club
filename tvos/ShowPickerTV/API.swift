@@ -224,10 +224,11 @@ enum API {
     }
 
     // Full row for one show (genres, notes, recommender, dates, URL) — but
-    // not cast, which lives at a separate endpoint.
-    static func showDetail(id: Int) async throws -> Show {
-        let r: ShowResponse = try await get("/api/shows/\(id)")
-        return r.show
+    // not cast, which lives at a separate endpoint. Also returns the
+    // ratings summary (average/count always; nil until the show has a
+    // tmdb_id) — tvOS is view-only for ratings, no write call here.
+    static func showDetail(id: Int) async throws -> ShowResponse {
+        try await get("/api/shows/\(id)")
     }
 
     static func actors(showId: Int) async throws -> [Actor] {

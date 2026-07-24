@@ -24,6 +24,10 @@ struct ShowDetailView: View {
     @State private var openFailed = false
     @State private var working = false
     @State private var actionMessage: String?
+    // Average/count always present once the show has a tmdb_id; `owner`
+    // populates only when viewing a specific other member's copy. tvOS is
+    // view-only for ratings — rate from iPhone/iPad.
+    @State private var ratings: RatingsSummary?
     @Environment(\.openURL) private var openURL
 
     private var title: String { show?.title ?? initialTitle }
@@ -105,6 +109,7 @@ struct ShowDetailView: View {
                         // The list controls live right under the buttons so the
                         // whole screen fits without scrolling on the TV.
                         actionsSection
+                        ratingsSection
                     }
                     Spacer()
                 }
@@ -181,6 +186,34 @@ struct ShowDetailView: View {
                 }
             }
         }
+    }
+
+    // Club Rating shows on every card, logged in or not; a specific
+    // member's own rating shows when viewing their copy. View-only —
+    // rate from iPhone/iPad. Nothing renders until the show has a
+    // tmdb_id (ratings is nil until then).
+    @ViewBuilder private var ratingsSection: some View {
+        if let ratings {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Ratings")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundColor(Theme.text)
+                Text(clubRatingText)
+                    .font(.system(size: 24))
+                    .foregroundColor(Theme.text.opacity(0.8))
+                if let owner = ratings.owner {
+                    Text("\(ratings.ownerName ?? "")’s rating — \(owner)/10")
+                        .font(.system(size: 24))
+                        .foregroundColor(Theme.text.opacity(0.8))
+                }
+            }
+        }
+    }
+
+    private var clubRatingText: String {
+        guard let avg = ratings?.average else { return "Club Rating: No ratings yet" }
+        let count = ratings?.count ?? 0
+        return String(format: "Club Rating: %.1f/10 (%d rating%@)", avg, count, count == 1 ? "" : "s")
     }
 
     private func chipTap(_ list: ShowList) async {
@@ -567,7 +600,7 @@ struct ShowDetailView: View {
         async let actors = API.actors(showId: id)
 
         if skipITunes {
-            if let s = try? await detail { show = s }
+            if let r = try? await detail { show = r.show; ratings = r.ratings }
             cast = (try? await actors) ?? []
             await refreshMyCopy()
             lookedUp = true
@@ -575,7 +608,7 @@ struct ShowDetailView: View {
         }
 
         async let appleURL = API.appleTVLookup(title: initialTitle)
-        if let s = try? await detail { show = s }
+        if let r = try? await detail { show = r.show; ratings = r.ratings }
         cast = (try? await actors) ?? []
         appleTVUrl = await appleURL
         await refreshMyCopy()

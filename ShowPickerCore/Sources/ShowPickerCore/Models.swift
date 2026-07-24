@@ -261,5 +261,18 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
 }
 
 public struct ShowsResponse: Codable, Sendable { public let shows: [Show] }
-public struct ShowResponse: Codable, Sendable { public let show: Show }
+// `ratings` is a sibling of `show` in the API response, not nested under it
+// (functions/api/shows/[id].js) — nil whenever the show has no tmdb_id yet.
+public struct ShowResponse: Codable, Sendable {
+    public let show: Show
+    public let ratings: RatingsSummary?
+
+    // Explicit public init — the synthesized memberwise init is only
+    // internal even though the struct is public, so other modules (the
+    // apps' offline-cache fallbacks) couldn't construct one without this.
+    public init(show: Show, ratings: RatingsSummary? = nil) {
+        self.show = show
+        self.ratings = ratings
+    }
+}
 public struct ActorsResponse: Codable, Sendable { public let actors: [Actor] }

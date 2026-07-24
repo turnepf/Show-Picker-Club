@@ -8,6 +8,10 @@ struct WatchDetailView: View {
     @EnvironmentObject private var auth: WatchAuth
     @State private var full: Show?
     @State private var cast: [Actor] = []
+    // Average/count always present once the show has a tmdb_id; `owner`
+    // populates only when viewing a specific other member's copy. The
+    // watch is view-only for ratings — rate from iPhone/iPad.
+    @State private var ratings: RatingsSummary?
 
     private var s: Show { full ?? show }
 
@@ -51,8 +55,15 @@ struct WatchDetailView: View {
                         row("Network", n)
                     }
                 }
-                // Single audience score, sourced from TMDB (`rating` carries it now).
+                // Single audience score, sourced from TMDB (`rating` carries it now),
+                // grouped with the club's own rating.
                 if let r = s.rating, !r.isEmpty { row("TMDB Rating", "★ \(r)") }
+                if let ratings {
+                    row("Club Rating", clubRatingText)
+                    if let owner = ratings.owner {
+                        row("\(ratings.ownerName ?? "")’s rating", "\(owner)/10")
+                    }
+                }
                 if let l = ShowList(rawValue: s.list) { row("List", l.title) }
                 if let up = s.nextUpRange { row("Next episode", up) }
                 if let series = s.seriesText { row("Series", series) }
@@ -112,8 +123,17 @@ struct WatchDetailView: View {
         }
     }
 
+    private var clubRatingText: String {
+        guard let avg = ratings?.average else { return "No ratings yet" }
+        let count = ratings?.count ?? 0
+        return String(format: "%.1f/10 (%d rating%@)", avg, count, count == 1 ? "" : "s")
+    }
+
     private func load() async {
-        if let s = try? await WatchAPI.showDetail(id: show.id, cookie: auth.cookieHeader) { full = s }
+        if let r = try? await WatchAPI.showDetail(id: show.id, cookie: auth.cookieHeader) {
+            full = r.show
+            ratings = r.ratings
+        }
         cast = (try? await WatchAPI.actors(showId: show.id, cookie: auth.cookieHeader)) ?? []
     }
 }

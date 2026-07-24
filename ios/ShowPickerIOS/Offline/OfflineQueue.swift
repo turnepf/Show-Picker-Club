@@ -128,6 +128,26 @@ final class OfflineQueue: ObservableObject {
         append(m)
     }
 
+    // Queue a rating made while offline. Dedupes against any earlier
+    // pending rating for the same show+season first — if the member taps a
+    // few different values before reconnecting, only the last one actually
+    // needs to replay.
+    func enqueueRate(id: Int, rating: Int, season: Int?) {
+        pending.removeAll { $0.kind == .rate && $0.showId == id && $0.season == season }
+        var m = PendingMutation(kind: .rate, showId: id, memberSlug: cachedShow(id: id)?.memberSlug)
+        m.rating = rating
+        m.season = season
+        append(m)
+    }
+
+    // The most recent not-yet-synced rating for a show+season, if any —
+    // lets the UI reflect an offline submission before it's replayed
+    // (e.g. so a rated show drops off the rate-your-backlog list right
+    // away instead of waiting for a connection).
+    func pendingRating(showId: Int, season: Int?) -> Int? {
+        pending.last { $0.kind == .rate && $0.showId == showId && $0.season == season }?.rating
+    }
+
     private func append(_ m: PendingMutation) {
         pending.append(m)
         persistPending()
@@ -194,6 +214,9 @@ final class OfflineQueue: ObservableObject {
         case .delete:
             try await API.deleteShowRemote(id: m.showId)
             return nil
+        case .rate:
+            _ = try await API.rateShowRemote(id: m.showId, rating: m.rating ?? 0, season: m.season)
+            return nil
         }
     }
 
@@ -256,6 +279,11 @@ final class OfflineQueue: ObservableObject {
             }
         case .delete:
             shows.removeAll { $0.id == m.showId }
+        case .rate:
+            // A rating doesn't change anything on the Show snapshot itself
+            // (it's a separate summary keyed by tmdb_id, not a Show field)
+            // — pendingRating(showId:season:) is the read path for it.
+            break
         }
     }
 

@@ -112,6 +112,11 @@ struct HomeView: View {
                             } label: {
                                 Label("Subscription audit", systemImage: "creditcard")
                             }
+                            NavigationLink {
+                                RateBacklogView()
+                            } label: {
+                                Label("Rate my backlog", systemImage: "star.fill")
+                            }
                         }
                         if auth.isAdmin {
                             NavigationLink {

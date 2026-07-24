@@ -41,6 +41,30 @@ export async function onRequestGet(context) {
       `SELECT COUNT(*) as cnt FROM members WHERE 1=1 ${createdFilter}`);
   }
 
+  // Ratings (migration 053): how many people submitted a rating, and how
+  // many ratings were submitted, in each window. Uses updated_at (bumped on
+  // every insert *and* update) rather than created_at, so re-rating a title
+  // still counts as activity in the window, matching what "submitted"
+  // implies. Defensive: report zeros rather than 500 the whole dashboard if
+  // the table isn't there yet (a stale preview branch pre-migration-053).
+  const ratingMembers = {};
+  const ratingsSubmitted = {};
+  try {
+    for (const [label, , updatedFilter] of windows) {
+      ratingMembers[label] = await countOver(env,
+        `SELECT COUNT(DISTINCT member_slug) as cnt FROM show_ratings WHERE 1=1 ${updatedFilter}`);
+      ratingsSubmitted[label] = await countOver(env,
+        `SELECT COUNT(*) as cnt FROM show_ratings WHERE 1=1 ${updatedFilter}`);
+    }
+  } catch (_) { /* show_ratings not migrated yet */ }
+
+  // Distinct titles with at least one rating (all-time), for the Totals card.
+  let ratingsTitles = 0;
+  try {
+    ratingsTitles = await countOver(env,
+      `SELECT COUNT(*) as cnt FROM (SELECT DISTINCT tmdb_id, tmdb_type FROM show_ratings)`);
+  } catch (_) { /* show_ratings not migrated yet */ }
+
   // Active members = distinct logged-in members whose session pinged within
   // the window. last_seen_at is bumped (throttled to 1/hour) on every
   // /auth/check, so this approximates DAU/WAU/MAU for authenticated visits.
@@ -149,6 +173,9 @@ export async function onRequestGet(context) {
     edited_shows: editedShows,
     archived_shows: archivedShows,
     new_members: newMembers,
+    rating_members: ratingMembers,
+    ratings_submitted: ratingsSubmitted,
+    ratings_titles: ratingsTitles,
     active_members: activeMembers,
     active_by_platform: activeByPlatform,
     totals,

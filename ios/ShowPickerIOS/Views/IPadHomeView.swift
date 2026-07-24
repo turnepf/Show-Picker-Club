@@ -19,6 +19,7 @@ enum SidebarItem: Hashable {
     case whatsNew
     case vibe
     case subscriptionAudit
+    case rateBacklog
     // Admin sub-tools. The sidebar's Admin row is a disclosure accordion
     // whose entries mirror the iPhone AdminView's options, each opening its
     // screen in the detail column.
@@ -202,6 +203,8 @@ struct IPadHomeView: View {
                 if myMember != nil {
                     Label("Subscription audit", systemImage: "creditcard")
                         .tag(SidebarItem.subscriptionAudit)
+                    Label("Rate my backlog", systemImage: "star.fill")
+                        .tag(SidebarItem.rateBacklog)
                 }
                 if auth.isAdmin {
                     DisclosureGroup(isExpanded: $adminExpanded) {
@@ -358,6 +361,8 @@ struct IPadHomeView: View {
                 }
             case .subscriptionAudit:
                 SubscriptionAuditView()
+            case .rateBacklog:
+                RateBacklogView()
             case .adminReporting:
                 ReportingView().environmentObject(auth)
             case .adminManageMembers:

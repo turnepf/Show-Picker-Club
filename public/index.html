@@ -3874,7 +3874,7 @@
       if (show.trailer_key) topRows.push(detailRow('Trailer', `<a href="https://www.youtube.com/watch?v=${encodeURIComponent(show.trailer_key)}" target="_blank" rel="noopener">▶ Watch trailer</a>`));
 
       const rows = [];
-      // TMDB Rating moved into the Ratings section (above Club average) so
+      // TMDB Rating moved into the Ratings section (above Club Rating) so
       // both scores live together instead of the audience score sitting
       // apart from the member ones.
       // The list + the member-edited fields (recommender, watching-with, notes)
@@ -3959,7 +3959,7 @@
         }
         html += `<div class="detail-card"><div class="detail-card-title">My Lists</div>${memberInner}</div>`;
       }
-      // Ratings — directly below My Lists. Club average shows on every
+      // Ratings — directly below My Lists. Club Rating shows on every
       // card, logged in or not; a specific member's own rating shows when
       // viewing their copy; entry (instant-save tap-row) is gated to lists
       // other than Next Up, matching the backend's own gating in
@@ -3971,7 +3971,7 @@
         const avgText = (ratings.average != null)
           ? `${ratings.average.toFixed(1)}/10 <span class="rating-count">(${ratings.count} rating${ratings.count === 1 ? '' : 's'})</span>`
           : 'No ratings yet';
-        ratingsInner += detailRow('Club average', avgText);
+        ratingsInner += detailRow('Club Rating', avgText);
         if (ratings.owner != null) {
           ratingsInner += detailRow(`${escapeHtml(ratings.ownerName || '')}'s rating`, `${ratings.owner}/10`);
         }

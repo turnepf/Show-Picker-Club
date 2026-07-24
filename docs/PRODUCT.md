@@ -167,7 +167,8 @@ A small operator dashboard:
 
 - **DAU / WAU / MAU** — distinct sessions that have pinged within each window (1 / 7 / 30 days).
 - **New, edited, archived counts** — per show, in day/week/month/all-time windows.
-- **Totals** — members, active shows, archived shows, shows per list.
+- **People who rated** — distinct members who submitted a rating (new or changed), in the same day/week/month/all-time windows as the show counts above.
+- **Totals** — members, active shows, archived shows, shows per list, ratings submitted, titles rated.
 - **Top networks** and **top shared titles** across the club.
 
 Recently removed: "Most active members," "Recently archived," "Seed-only members," "Member activity." The data sources for those queries still exist if they need to be restored.
@@ -256,7 +257,7 @@ A few intentional omissions:
     (Feedback was split — Amy and Susan both suggested 1-5 for entry
     simplicity, Rob wanted 1-10 — settled on 1-10 for consistency with the
     other rating already on the card.) TMDB Rating itself now lives inside
-    the Ratings section, directly above Club average, instead of sitting
+    the Ratings section, directly above Club Rating, instead of sitting
     apart in the catalog-data card below.
   - **Entry (shipped):** a 10-segment tap-row (not a slider or numeric
     field) — tap a position, it saves instantly, no Save button. One
@@ -297,12 +298,34 @@ A few intentional omissions:
     `?show=<id>` deep link) to rate by season instead. Surfaced as "Rate my
     backlog" alongside Subscription audit in the sidebars and the mobile
     under-list row.
-  - **Not yet built:** native support for iOS/iPad (full entry + display),
-    tvOS (view-only), and watchOS (view-only).
+  - **Native support (shipped in code, not yet archived/submitted):**
+    iOS/iPad get full entry + display — a "Ratings" section on
+    `ShowDetailView` mirroring the web (TMDB Rating, Club Rating, owner's
+    rating, tap-row entry for overall + each season, gated to lists other
+    than Next Up). tvOS and watchOS are view-only (TMDB Rating + Club
+    Rating + owner's rating; rate from iPhone/iPad) — consistent with both
+    already being view-only/read-only apps generally.
+  - **Native bulk rate-your-backlog (shipped in code):** iOS/iPad get a
+    "Rate my backlog" screen (`RateBacklogView`), mirroring
+    `/rate-backlog` — every unrated overall show, tap-row entry, rated
+    shows drop off the list immediately. Surfaced next to Subscription
+    audit on Home, the iPad sidebar, and a member's own page. Season
+    ratings aren't listed there by design; "Rate seasons" on a row opens
+    the full detail screen. tvOS/watchOS don't get this screen — no entry
+    UI on either app.
+  - **Offline rating queue (shipped in code):** rating a show while
+    offline (from the detail screen or the bulk backlog screen) queues it
+    as a `.rate` `PendingMutation` instead of failing, same as any other
+    offline edit — it replays automatically on reconnect. The tapped value
+    is folded into local state right away so the UI doesn't wait on a
+    server round-trip that hasn't happened yet, and an already-tapped show
+    in the backlog list won't reappear before the queue actually syncs it.
   - **Not building yet:** clearing/un-rating a show once rated — revisit if
     it's requested.
-  - **Ships as v1.1** (and the next build number) — once native parity
-    lands, not yet.
+  - **Ships as v1.1, build 19** — version bumped in both `ios/ShowPickerIOS.xcodeproj`
+    and `tvos/ShowPickerTV.xcodeproj`; still needs an actual Xcode
+    archive + TestFlight/App Store submission (can't be done from this
+    environment — no Mac/Xcode here).
 
 - **Episode-level ratings.** (Amy — 7/24/2026, feedback on the ratings
   design doc.) Rate individual episodes, not just overall/season, shared

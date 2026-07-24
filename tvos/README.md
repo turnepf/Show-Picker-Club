@@ -41,13 +41,14 @@ The tvOS build uploads to the **same App Store Connect app record as iOS** (shar
 bundle id), so iPhone and Apple TV ship as one universal app. Archive and upload
 the same way for both TestFlight and a public App Store release.
 
-1. In Xcode (via `ShowPickerClub.xcworkspace`): set the run destination to **Any tvOS Device**, then **Product → Archive**.
-2. In the Organizer, **Distribute App → TestFlight & App Store Connect → Upload**.
-3. In [App Store Connect](https://appstoreconnect.apple.com): the **Show Picker Club** app.
+1. **Bump the build number first.** `tvos/ShowPickerTV.xcodeproj` carries its own `CURRENT_PROJECT_VERSION`/`MARKETING_VERSION` (currently 19 / 1.1) — a **separate** setting from the iOS project's (`ios/ShowPickerIOS.xcodeproj`), even though this ships as one universal app. Bumping one doesn't bump the other; keep them in sync by hand when a release covers both.
+2. In Xcode (via `ShowPickerClub.xcworkspace`): set the run destination to **Any tvOS Device**, then **Product → Archive**.
+3. In the Organizer, **Distribute App → TestFlight & App Store Connect → Upload**.
+4. In [App Store Connect](https://appstoreconnect.apple.com): the **Show Picker Club** app.
    - **TestFlight tab** — add members as **External testers** (a group) or share the **Public Link**. The first build triggers a one-time **Beta App Review** (~a day). Testers install the **TestFlight** app on their Apple TV, accept the invite, and install from there.
    - **App Store tab** — when you're ready for a public listing, add the Apple TV screenshots/metadata to the same app and submit for review. Because it's one universal app, a single submission covers iPhone + Apple TV (and the paired Apple Watch app rides along with the iOS build).
 
-**TestFlight builds expire after 90 days.** To refresh: Archive + Upload (the build number auto-bumps) — testers auto-update.
+**TestFlight builds expire after 90 days.** To refresh: bump the build number, then Archive + Upload — testers auto-update.
 
 ## Known limitations / next steps
 

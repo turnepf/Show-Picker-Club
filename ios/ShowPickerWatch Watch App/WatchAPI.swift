@@ -16,9 +16,11 @@ enum WatchAPI {
         return r.shows
     }
 
-    static func showDetail(id: Int, cookie: String?) async throws -> Show {
-        let r: ShowResponse = try await get("/api/shows/\(id)", cookie: cookie)
-        return r.show
+    // Also returns the ratings summary (average/count always; nil until
+    // the show has a tmdb_id) — the watch is view-only for ratings, no
+    // write call here.
+    static func showDetail(id: Int, cookie: String?) async throws -> ShowResponse {
+        try await get("/api/shows/\(id)", cookie: cookie)
     }
 
     static func actors(showId: Int, cookie: String?) async throws -> [Actor] {
