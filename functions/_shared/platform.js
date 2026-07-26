@@ -1,11 +1,11 @@
 // Platform usage tracking. Clients self-identify with an X-Client-Platform
 // header; we only accept a known value so a stray header can't pollute the
 // breakdown. iphone/ipad/mac come from the iOS app (device idiom + Mac
-// Catalyst detection), tvos/watchos from their respective apps, web-small/
-// web-large from the website (split by viewport width — see
-// clientPlatformHeader() in public/index.html).
+// Catalyst detection), tvos/watchos from their respective apps, roku from the
+// Roku channel, web-small/web-large from the website (split by viewport width
+// — see clientPlatformHeader() in public/index.html).
 export const KNOWN_PLATFORMS = new Set([
-  'iphone', 'ipad', 'mac', 'watchos', 'tvos', 'web-small', 'web-large',
+  'iphone', 'ipad', 'mac', 'watchos', 'tvos', 'roku', 'web-small', 'web-large',
 ]);
 
 export function platformOf(request) {

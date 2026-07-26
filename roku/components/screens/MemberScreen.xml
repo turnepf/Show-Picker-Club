@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="MemberScreen" extends="Group">
+    <interface>
+        <field id="member" type="assocarray" />
+        <field id="authState" type="assocarray" onChange="onAuthReady" />
+        <field id="navigate" type="assocarray" alwaysNotify="true" />
+        <field id="didReturn" type="boolean" onChange="onReturn" />
+    </interface>
+    <script type="text/brightscript" uri="MemberScreen.brs" />
+    <children>
+        <Label id="heading" translation="[90,54]" font="font:LargeBoldSystemFont" color="0xF5F7FAFF" />
+        <RowList id="rows" translation="[90,150]" itemComponentName="PosterCard"
+                 numRows="4" rowSpacing="30" rowLabelColor="0xF5F7FAFF"
+                 rowItemSize="[280,440]" rowItemSpacing="[24,0]"
+                 rowHeights="[440,440,440,440]"
+                 vertFocusAnimationStyle="floatingFocus" />
+        <Label id="message" translation="[90,160]" width="1600" wrap="true"
+               font="font:MediumSystemFont" color="0xFFFFFF99" visible="false" />
+    </children>
+</component>

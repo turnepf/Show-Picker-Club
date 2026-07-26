@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="DetailScreen" extends="Group">
+    <interface>
+        <field id="showId" type="int" onChange="onIdSet" />
+        <field id="authState" type="assocarray" />
+        <field id="navigate" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="DetailScreen.brs" />
+    <children>
+        <Poster id="hero" translation="[90,80]" width="300" height="450" loadDisplayMode="scaleToFill" />
+        <Rectangle id="heroFallback" translation="[90,80]" width="300" height="450" color="0x1C1F26FF" visible="false" />
+
+        <LayoutGroup id="info" translation="[840,80]" layoutDirection="vert" itemSpacings="[14]">
+            <Label id="title" width="980" wrap="true" maxLines="2" font="font:LargeBoldSystemFont" color="0xF5F7FAFF" />
+            <Label id="meta" width="980" font="font:MediumSystemFont" color="0xFFFFFF99" />
+            <Label id="chip" font="font:SmallBoldSystemFont" color="0xF29C3DFF" />
+            <Label id="genres" width="980" font="font:SmallSystemFont" color="0xFFFFFF99" />
+            <ScrollableText id="overview" maxWidth="980" numLines="7"
+                            font="font:SmallSystemFont" color="0xF5F7FAFF" />
+            <Label id="cast" width="980" wrap="true" maxLines="2" font="font:SmallSystemFont" color="0xFFFFFF99" />
+            <Label id="ratings" width="980" font="font:SmallSystemFont" color="0xFFFFFF99" />
+        </LayoutGroup>
+
+        <ButtonGroup id="actions" translation="[840,760]" layoutDirection="horiz"
+                     buttonHeight="60" minWidth="200" horizAlignment="left" />
+        <Label id="status" translation="[90,560]" width="640" wrap="true"
+               font="font:SmallSystemFont" color="0x33C773FF" visible="false" />
+        <BusySpinner id="busy" translation="[930,500]" visible="true">
+            <Poster width="60" height="60" uri="pkg:/images/spinner.png" />
+        </BusySpinner>
+    </children>
+</component>

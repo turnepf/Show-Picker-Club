@@ -8,8 +8,9 @@ Live at [showpicker.club](https://showpicker.club).
 - **Architecture, data model, endpoints:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - **Apple TV (tvOS) app:** [`tvos/README.md`](tvos/README.md)
 - **iPhone (iOS) app:** [`ios/README.md`](ios/README.md)
+- **Roku channel:** [`roku/README.md`](roku/README.md)
 
-There are native iOS, tvOS, and watchOS apps. They share a `ShowPickerCore` Swift package (at the repo root) and are opened via the `ShowPickerClub.xcworkspace` workspace. iOS and tvOS ship as a single universal App Store app (one bundle id, `net.patrickturner.showpickerios`, running on iPhone + Apple TV).
+There are native iOS, tvOS, and watchOS apps. They share a `ShowPickerCore` Swift package (at the repo root) and are opened via the `ShowPickerClub.xcworkspace` workspace. iOS and tvOS ship as a single universal App Store app (one bundle id, `net.patrickturner.showpickerios`, running on iPhone + Apple TV). A separate native **Roku** channel (`roku/`, SceneGraph/BrightScript) hits the same `/api/*` endpoints — see [`roku/README.md`](roku/README.md).
 
 ## At a glance
 
