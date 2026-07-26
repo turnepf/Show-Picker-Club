@@ -361,6 +361,18 @@ A few intentional omissions:
   broader links pass (deep links generally, especially Apple TV) after the
   ratings feature ships — not just this one bug.
 
+- **Tag member friends.** (Patrick — 7/26/2026.) Let a member tag other
+  members on a show — captured for later; scope (what a tag means, where it
+  surfaces, whether it notifies) still to be defined. Note this brushes up
+  against the retired cross-member writes (suggest-a-show / share-to-member,
+  now 410) and the "no comments or threads" stance — needs a deliberate call
+  before building.
+
+- **Show Picker movie filter.** (Patrick — 7/26/2026.) A way to filter a
+  member's lists (or the catalog) down to just movies vs. TV, using the
+  existing `is_movie` flag on `shows`. Scope — which surfaces get the filter
+  (web lists, Trending, search, native apps) — still to be defined.
+
 ## Shipped (formerly backlog)
 
 - **Title-healing bandaids retired (July 2026).** Since TMDB type-ahead
