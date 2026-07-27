@@ -7,9 +7,9 @@ function corsHeaders() {
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const session = await getSession(request, env);
 
-  if (!session || !await isAdmin(env, session.member_slug)) {
+  const isAdminUser = await isAdmin(request, env);
+  if (!isAdminUser) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders() });
   }
 
