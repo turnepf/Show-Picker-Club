@@ -8,7 +8,9 @@
 # already exists in the repo is recorded as applied WITHOUT re-running it.
 # That's correct because production already has them and schema.sql reflects
 # the full current schema. Introduce this runner in a commit with no new
-# migration, so the baseline matches what's actually applied.
+# migration, so the baseline matches what's actually applied. `schema.sql` is
+# the complete schema for *new* databases; this runner is only for upgrading
+# an existing production database.
 #
 # Every run after that applies (and records) only files not yet in the table.
 #

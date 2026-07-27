@@ -160,8 +160,17 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ error: 'invalid' }), { status: 401, headers: corsHeaders() });
   }
 
-  await env.DB.prepare('UPDATE login_otps SET used_at = ? WHERE id = ?')
-    .bind(nowISO, otp.id).run();
+  // Consume the code atomically. Two requests can both observe the same
+  // unused row above; without the used_at predicate each could mint a
+  // session before the other writes. Only the request that changes the row
+  // owns this OTP.
+  const consumed = await env.DB.prepare(
+    'UPDATE login_otps SET used_at = ? WHERE id = ? AND used_at IS NULL'
+  ).bind(nowISO, otp.id).run();
+  if (!consumed.meta?.changes) {
+    await recordFailure(env, ip, member);
+    return new Response(JSON.stringify({ error: 'invalid' }), { status: 401, headers: corsHeaders() });
+  }
   return await issueSession(env, member);
 }
 

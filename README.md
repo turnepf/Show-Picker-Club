@@ -52,7 +52,7 @@ Only `public/` (static assets) and `functions/` (Pages Functions) are deployed. 
 │   ├── calendar/[slug].js      Per-member iCalendar feed
 │   └── _shared/                Reusable helpers (auth, enrichment, vibe traits, vibe clusters)
 ├── docs/                       Product + architecture documentation
-├── schema.sql                  Starter DB schema (not deployed)
+├── schema.sql                  Complete DB schema for fresh deployments (not deployed)
 ├── wrangler.toml               Cloudflare config
 └── .github/workflows/
     ├── deploy.yml              Push-to-main → Cloudflare Pages
@@ -80,7 +80,7 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    ```
    Copy the returned `database_id` into `wrangler.toml`.
 
-2. **Apply the schema.** Note that `schema.sql` is the starter shape; columns and tables added over time (`added_by`, `enriched_at`, `genres`, `sessions.last_seen_at`, etc.) are documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#database). New deployments should apply the schema and then any subsequent ALTERs from that doc.
+2. **Apply the schema.** `schema.sql` is the complete current schema for a fresh deployment. Historical files in `migrations/` exist only to upgrade older databases; do not run them after applying the fresh schema.
    ```bash
    wrangler d1 execute shows-db --remote --file=schema.sql
    ```
