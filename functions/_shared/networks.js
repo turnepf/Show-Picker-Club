@@ -117,6 +117,13 @@ export const NETWORKS = [
     domains: ['youtube.com', 'youtu.be'],
     search: { base: 'https://www.youtube.com/results', param: 'search_query' },
   },
+  {
+    stored: 'MGM+',
+    display: 'MGM+',
+    aliases: ['MGM', 'MGM Plus'],
+    domains: ['mgmplus.com'],
+    search: { base: 'https://www.mgmplus.com/search', param: 'q' },
+  },
 ];
 
 // Map alias-or-stored name (case-insensitive) to canonical stored value.
@@ -200,6 +207,7 @@ export const DEFAULT_PRICE_CENTS = {
   'Food Network': 699,
   'Fox': 799,
   'BritBox': 899,
+  'MGM+': 899,
 };
 
 export function defaultPriceCents(network) {
