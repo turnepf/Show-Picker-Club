@@ -3644,11 +3644,46 @@
 
     let addMyListData = null;
 
-    function openAddMyList(title, network, networkUrl, movie) {
+    async function openAddMyList(title, network, networkUrl, movie) {
       addMyListData = { title, network, network_url: networkUrl, movie };
       document.getElementById('addMyTitle').value = title;
       document.getElementById('addMyList').value = 'watching';
       document.getElementById('addMyNotes').value = '';
+
+      // Try to get TMDB suggestion if no network was provided
+      if (!network && title) {
+        try {
+          const res = await fetch('/api/shows/suggest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, movie: !!movie }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.suggestedNetwork) {
+              addMyListData.network = data.suggestedNetwork;
+              addMyListData.tmdb_id = data.tmdbId;
+              addMyListData.tmdb_type = data.tmdbType;
+            }
+          }
+        } catch (e) {
+          // Silently fail — the form still works without the suggestion
+        }
+      }
+
+      // Update network dropdown with suggestion
+      const networkSelect = document.getElementById('inputNetwork');
+      const networkOther = document.getElementById('inputNetworkOther');
+      if (addMyListData.network && !Array.from(networkSelect.options).some(o => o.value === addMyListData.network)) {
+        networkSelect.value = '__other';
+        networkOther.value = addMyListData.network;
+        networkOther.style.display = 'block';
+      } else {
+        networkSelect.value = addMyListData.network || '';
+        networkOther.value = '';
+        networkOther.style.display = 'none';
+      }
+
       document.getElementById('addMyListOverlay').classList.remove('hidden');
     }
 
@@ -3661,6 +3696,9 @@
       if (!authMember || !addMyListData) return;
       const list = document.getElementById('addMyList').value;
       const notes = document.getElementById('addMyNotes').value.trim() || null;
+      const networkSelect = document.getElementById('inputNetwork');
+      const networkOther = document.getElementById('inputNetworkOther');
+      const selectedNetwork = getNetwork('inputNetwork', 'inputNetworkOther');
 
       try {
         const res = await fetch('/api/shows', {
@@ -3668,12 +3706,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             title: addMyListData.title,
-            network: addMyListData.network || null,
+            network: selectedNetwork || null,
             network_url: addMyListData.network_url || null,
             notes,
             movie: addMyListData.movie || 0,
             full_series: 0,
             list,
+            tmdb_id: addMyListData.tmdb_id || null,
+            tmdb_type: addMyListData.tmdb_type || null,
           }),
         });
         const data = await res.json();

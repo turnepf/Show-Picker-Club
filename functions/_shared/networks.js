@@ -63,8 +63,8 @@ export const NETWORKS = [
   },
   {
     stored: 'Amazon Prime Video',
-    display: 'Amazon Prime Video (including MGM+, Freevee)',
-    aliases: ['Amazon', 'Amazon Prime', 'Prime Video', 'MGM+', 'MGM', 'Freevee', 'IMDb TV'],
+    display: 'Amazon Prime Video (including Freevee)',
+    aliases: ['Amazon', 'Amazon Prime', 'Prime Video', 'Freevee'],
     domains: ['amazon.com', 'primevideo.com'],
     search: { base: 'https://www.amazon.com/s', param: 'k', extra: 'i=instant-video' },
   },
