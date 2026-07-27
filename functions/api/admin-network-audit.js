@@ -14,10 +14,10 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders() });
   }
 
-  const body = await request.json().catch(() => ({}));
-  const limit = Math.min(parseInt(body.limit ?? '100', 10), 500);
-
   try {
+    const body = await request.json().catch(() => ({}));
+    const limit = Math.min(parseInt(body.limit ?? '100', 10), 500);
+
     // Get active shows that haven't been audited recently
     const { results: shows } = await env.DB.prepare(`
       SELECT DISTINCT
@@ -37,11 +37,26 @@ export async function onRequestPost(context) {
     const mismatches = [];
     const matched = [];
     const notFound = [];
+    let processed = 0;
+    let errors = 0;
 
     for (const show of shows) {
       try {
+        processed++;
+
         // Look up on TMDB
-        const result = await searchTmdbId(show.title, env, !!show.movie);
+        let result;
+        try {
+          result = await searchTmdbId(show.title, env, !!show.movie);
+        } catch (e) {
+          notFound.push({
+            title: show.title,
+            storedNetwork: show.stored_network,
+            copies: show.copies,
+            reason: `search_error: ${e.message}`,
+          });
+          continue;
+        }
 
         if (!result.tmdbId) {
           notFound.push({
@@ -54,14 +69,25 @@ export async function onRequestPost(context) {
         }
 
         // Get enrichment to see suggested network
-        const enriched = await fetchEnrichment(show.title, env, !!show.movie);
+        let enriched;
+        try {
+          enriched = await fetchEnrichment(show.title, env, !!show.movie);
+        } catch (e) {
+          notFound.push({
+            title: show.title,
+            storedNetwork: show.stored_network,
+            copies: show.copies,
+            reason: `enrichment_error: ${e.message}`,
+          });
+          continue;
+        }
 
         if (!enriched.canonicalTitle) {
           notFound.push({
             title: show.title,
             storedNetwork: show.stored_network,
             copies: show.copies,
-            reason: 'enrichment_failed',
+            reason: 'enrichment_no_title',
           });
           continue;
         }
@@ -89,17 +115,20 @@ export async function onRequestPost(context) {
           });
         }
       } catch (e) {
+        errors++;
         notFound.push({
           title: show.title,
           storedNetwork: show.stored_network,
           copies: show.copies,
-          reason: `error: ${e.message}`,
+          reason: `unexpected_error: ${e.message}`,
         });
       }
     }
 
     return new Response(JSON.stringify({
       audited: shows.length,
+      processed,
+      errors,
       matched: matched.length,
       mismatches: mismatches.length,
       notFound: notFound.length,
@@ -109,7 +138,12 @@ export async function onRequestPost(context) {
       },
     }), { headers: corsHeaders() });
   } catch (e) {
-    return new Response(JSON.stringify({ error: 'Audit failed', details: e.message }), { status: 500, headers: corsHeaders() });
+    console.error('Audit error:', e.message, e.stack);
+    return new Response(JSON.stringify({
+      error: 'Audit failed',
+      details: e.message,
+      stack: e.stack
+    }), { status: 500, headers: corsHeaders() });
   }
 }
 
