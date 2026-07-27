@@ -26,7 +26,7 @@ database_id = "..."
 
 ## Database
 
-`schema.sql` is the starter schema. Several columns and at least one column on `sessions` were added over time and live only in the production D1 — the descriptions below are the source of truth.
+`schema.sql` is the complete schema for a fresh deployment. The numbered files in `migrations/` are the historical upgrade path for existing databases; their one-off data fixes should not be run against a new database.
 
 ### `members`
 | Column         | Type | Notes                                                 |
@@ -39,7 +39,7 @@ database_id = "..."
 | `last_login_at`| TEXT             | Migration 013. Stamped on every session issue and never cleared, so it survives logout/disable (which delete `sessions` rows). Any "last login" / "never logged in" display must read this, not `MAX(sessions.created_at)`. |
 
 ### Login identity tables
-Login is by one-time code or Sign in with Apple — there are no stored passwords. The relevant tables (added by migrations, not in the base `schema.sql`):
+Login is by one-time code or Sign in with Apple — there are no stored passwords. The relevant tables are included in `schema.sql` and were introduced over time by migrations:
 
 - `member_emails` / `member_phones` — map an email or phone to a member; the address a login code is sent to and matched against.
 - `login_otps` — short-lived, single-use email codes (`member_slug`, `code`, `channel`, `expires_at`, `used_at`, and `ip`/`user_agent` of the requester — migration 046). SMS codes are held by Twilio Verify, not stored here, but a marker row with `code=''` still records the request (and its IP) for rate-limiting. The IP columns exist so unrequested codes (someone submitting a member's email/phone) can be traced to a source and blocked at the Cloudflare edge.

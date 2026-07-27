@@ -12,7 +12,7 @@ Show Picker Club — a multi-tenant TV-show/movie tracker for a small private cl
 
 Read these before making non-trivial changes — they are detailed and current:
 
-- **`docs/ARCHITECTURE.md`** — the implementation source of truth: full DB schema (production has columns beyond `schema.sql`), complete route/auth table, enrichment pipeline, vibe system, calendar feed, CI workflows, and a "Conventions that aren't obvious" section.
+- **`docs/ARCHITECTURE.md`** — the implementation source of truth: full DB schema, complete route/auth table, enrichment pipeline, vibe system, calendar feed, CI workflows, and a "Conventions that aren't obvious" section.
 - **`docs/PRODUCT.md`** — product behavior and user-facing rules (the four lists, quick actions, auth flows).
 - **`docs/APP_STORE_SUBMISSION.md`** — Apple review/submission checklist.
 - **`README.md`** — setup from scratch, secrets list, deploy/backup overview.
@@ -34,8 +34,8 @@ functions/
 ├── auth/          login, logout, request-code, apple, google, enroll, check, config
 ├── calendar/      [slug].js — per-member iCalendar feed (?key=<calendar_token>)
 └── _shared/       auth, admin, enrichment, networks, sms, email, vibe-*, demo, enroll…
-migrations/        Numbered D1 migrations (NOT auto-applied — see below)
-schema.sql         Starter schema only; docs/ARCHITECTURE.md describes the real shape
+migrations/        Numbered D1 upgrades (auto-applied on deploy when pending)
+schema.sql         Complete schema for fresh databases
 ShowPickerCore/    Shared Swift package (models) used by all Apple targets
 ios/  tvos/        SwiftUI apps; open ShowPickerClub.xcworkspace at the repo root
 scripts/           apply-migrations.sh, member-engagement.sh (operator tools)
@@ -90,7 +90,7 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 - **`updated_at` is sacred.** Only member-initiated writes bump it; enrichment writes `enriched_at` instead. `updated_at != created_at` is how the app distinguishes member intent from background jobs.
 - **Seeded rows have NULL `created_at`/`updated_at` and `added_by='seed'`.** The "seed-only member" check depends on exactly that signature.
 - **Network URLs containing `/search`, `/s?`, or `/?q=` are placeholders**, not real deep links — the frontend, sync-urls, and calendar feed all treat them as missing.
-- **`schema.sql` is not the real schema.** Production D1 has columns and tables added by `migrations/`; `docs/ARCHITECTURE.md#database` is the authoritative description.
+- **Fresh versus existing databases.** `schema.sql` creates the current complete schema for a new database. `migrations/` upgrades existing databases only; never apply the historical migration set after loading `schema.sql`.
 - **Secrets are set with `printf`, never `echo`** (trailing newlines break runtime API calls).
 - **Slug `dorothy` 301s to `whitt`** and the member displays as Dorothy; don't "fix" either side.
 - **Delete feature branches once merged and live** — local and remote. In the Claude-Code-on-the-web environment the git proxy rejects remote branch deletion (403); the user deletes merged branches themselves from GitHub's post-merge screen.

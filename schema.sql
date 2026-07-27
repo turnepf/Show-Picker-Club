@@ -1,23 +1,21 @@
+-- Complete schema for a new Show Picker Club D1 database.
+--
+-- Existing installations are upgraded through migrations/; do not apply those
+-- historical ALTER TABLE files after loading this schema.
+
 CREATE TABLE IF NOT EXISTS members (
   slug TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  -- Database-backed admin role (migration 029). Admin endpoints check this,
-  -- not a hardcoded slug in source.
+  first_name TEXT,
+  last_initial TEXT,
+  last_name TEXT,
   is_admin INTEGER NOT NULL DEFAULT 0,
-  -- Secret for the member's /calendar/<slug>.ics feed (migration 029).
   calendar_token TEXT,
-  -- Banned/disabled member (migration 030): can't log in, sessions refused.
   disabled INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT DEFAULT (datetime('now'))
-);
-
--- Key/value state for the demo-account auto-reset (migration 029):
--- 'baseline' = JSON snapshot of the demo member's data, 'reset_due_at' =
--- when the demo data should be restored to that snapshot.
-CREATE TABLE IF NOT EXISTS demo_state (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL,
-  updated_at TEXT DEFAULT (datetime('now'))
+  approved INTEGER NOT NULL DEFAULT 1,
+  enrolled_via TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  last_login_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS member_phones (
@@ -29,10 +27,84 @@ CREATE TABLE IF NOT EXISTS member_phones (
   created_at TEXT DEFAULT (datetime('now')),
   UNIQUE (phone, member_slug)
 );
-CREATE INDEX IF NOT EXISTS idx_member_phones_phone ON member_phones(phone);
-CREATE INDEX IF NOT EXISTS idx_member_phones_slug ON member_phones(member_slug);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_member_phones_primary
-  ON member_phones(member_slug) WHERE is_primary = 1;
+
+CREATE TABLE IF NOT EXISTS member_emails (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  member_slug TEXT NOT NULL REFERENCES members(slug),
+  is_primary INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE (email, member_slug)
+);
+
+CREATE TABLE IF NOT EXISTS member_apple_ids (
+  apple_sub TEXT PRIMARY KEY,
+  member_slug TEXT NOT NULL REFERENCES members(slug),
+  email TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS member_google_ids (
+  google_sub TEXT PRIMARY KEY,
+  member_slug TEXT NOT NULL REFERENCES members(slug),
+  email TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  member_slug TEXT REFERENCES members(slug),
+  expires_at TEXT NOT NULL,
+  created_at TEXT,
+  last_seen_at TEXT,
+  platform TEXT
+);
+
+CREATE TABLE IF NOT EXISTS login_otps (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  member_slug TEXT NOT NULL REFERENCES members(slug),
+  code TEXT NOT NULL,
+  channel TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  ip TEXT,
+  user_agent TEXT
+);
+
+CREATE TABLE IF NOT EXISTS enroll_otps (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  code TEXT NOT NULL,
+  ip TEXT,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS failed_logins (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ip TEXT NOT NULL,
+  member_slug TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS signup_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  full_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  source TEXT,
+  ip TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT DEFAULT (datetime('now')),
+  reviewed_at TEXT,
+  reviewed_by TEXT,
+  notes TEXT,
+  created_member_slug TEXT,
+  hidden_at TEXT
+);
 
 CREATE TABLE IF NOT EXISTS shows (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,16 +123,27 @@ CREATE TABLE IF NOT EXISTS shows (
   seasons_released INTEGER,
   poster_url TEXT,
   network_logo_url TEXT,
-  -- Operator marker: the title/network are right as stored even though no
-  -- poster ever matched — keeps the row out of the bad-titles cleanup queue.
   title_ok INTEGER DEFAULT 0,
-  -- Position within the member's list for the "My order" manual sort
-  -- (migration 033). NULL = never manually placed.
   sort_order INTEGER,
   archived INTEGER DEFAULT 0,
   member_slug TEXT REFERENCES members(slug),
   created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
+  updated_at TEXT DEFAULT (datetime('now')),
+  added_by TEXT,
+  enriched_at TEXT,
+  genres TEXT,
+  overview TEXT,
+  backdrop_url TEXT,
+  tmdb_rating TEXT,
+  content_rating TEXT,
+  trailer_key TEXT,
+  director TEXT,
+  director_imdb_id TEXT,
+  runtime INTEGER,
+  release_year INTEGER,
+  watch_link TEXT,
+  tmdb_id INTEGER,
+  tmdb_type TEXT
 );
 
 CREATE TABLE IF NOT EXISTS actors (
@@ -70,14 +153,16 @@ CREATE TABLE IF NOT EXISTS actors (
   imdb_id TEXT
 );
 
-CREATE TABLE IF NOT EXISTS sessions (
-  id TEXT PRIMARY KEY,
-  email TEXT NOT NULL,
-  member_slug TEXT,
-  expires_at TEXT NOT NULL,
-  created_at TEXT,
-  last_seen_at TEXT,
-  platform TEXT
+CREATE TABLE IF NOT EXISTS show_ratings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tmdb_id INTEGER NOT NULL,
+  tmdb_type TEXT NOT NULL,
+  season_number INTEGER NOT NULL DEFAULT 0,
+  member_slug TEXT NOT NULL REFERENCES members(slug),
+  rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 10),
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE (tmdb_id, tmdb_type, season_number, member_slug)
 );
 
 CREATE TABLE IF NOT EXISTS show_traits (
@@ -92,14 +177,8 @@ CREATE TABLE IF NOT EXISTS show_traits (
   revenge_energy REAL, status_obsession REAL, optimism REAL, nihilism REAL,
   teamwork REAL, absurdism REAL,
   unknown_show INTEGER DEFAULT 0,
-  generated_at TEXT DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS failed_logins (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  ip TEXT NOT NULL,
-  member_slug TEXT,
-  created_at TEXT NOT NULL
+  generated_at TEXT DEFAULT (datetime('now')),
+  scored_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS member_subscriptions (
@@ -115,10 +194,72 @@ CREATE TABLE IF NOT EXISTS member_subscriptions (
   UNIQUE (member_slug, network)
 );
 
+CREATE TABLE IF NOT EXISTS household_members (
+  member_slug TEXT NOT NULL REFERENCES members(slug),
+  other_slug TEXT NOT NULL REFERENCES members(slug),
+  created_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (member_slug, other_slug)
+);
+
+CREATE TABLE IF NOT EXISTS member_platforms (
+  member_slug TEXT NOT NULL REFERENCES members(slug),
+  platform TEXT NOT NULL,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  PRIMARY KEY (member_slug, platform)
+);
+
+CREATE TABLE IF NOT EXISTS demo_state (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS vibe_state (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS dupe_ignores (
+  slug_a TEXT NOT NULL,
+  slug_b TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (slug_a, slug_b)
+);
+
+CREATE TABLE IF NOT EXISTS url_cleanup_ignores (
+  ltitle TEXT PRIMARY KEY,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS tmdb_backfill_ignores (
+  ltitle TEXT PRIMARY KEY,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_member_phones_phone ON member_phones(phone);
+CREATE INDEX IF NOT EXISTS idx_member_phones_slug ON member_phones(member_slug);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_member_phones_primary ON member_phones(member_slug) WHERE is_primary = 1;
+CREATE INDEX IF NOT EXISTS idx_member_emails_email ON member_emails(email);
+CREATE INDEX IF NOT EXISTS idx_member_emails_slug ON member_emails(member_slug);
+CREATE INDEX IF NOT EXISTS idx_member_apple_ids_slug ON member_apple_ids(member_slug);
+CREATE INDEX IF NOT EXISTS idx_member_google_ids_slug ON member_google_ids(member_slug);
+CREATE INDEX IF NOT EXISTS idx_sessions_last_seen ON sessions(last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_login_otps_lookup ON login_otps(member_slug, code, used_at);
+CREATE INDEX IF NOT EXISTS idx_login_otps_expires ON login_otps(expires_at);
+CREATE INDEX IF NOT EXISTS idx_login_otps_ip_time ON login_otps(ip, created_at);
+CREATE INDEX IF NOT EXISTS idx_enroll_otps_lookup ON enroll_otps(email, code, used_at);
+CREATE INDEX IF NOT EXISTS idx_enroll_otps_created ON enroll_otps(created_at);
+CREATE INDEX IF NOT EXISTS idx_failed_logins_ip_time ON failed_logins(ip, created_at);
+CREATE INDEX IF NOT EXISTS idx_signup_requests_status ON signup_requests(status);
+CREATE INDEX IF NOT EXISTS idx_signup_requests_created ON signup_requests(created_at);
 CREATE INDEX IF NOT EXISTS idx_shows_list ON shows(list);
 CREATE INDEX IF NOT EXISTS idx_shows_archived ON shows(archived);
 CREATE INDEX IF NOT EXISTS idx_shows_member ON shows(member_slug);
+CREATE INDEX IF NOT EXISTS idx_shows_member_archived_title ON shows(member_slug, archived, title COLLATE NOCASE);
+CREATE INDEX IF NOT EXISTS idx_shows_active_title ON shows(archived, title COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_actors_show_id ON actors(show_id);
-CREATE INDEX IF NOT EXISTS idx_failed_logins_ip_time ON failed_logins(ip, created_at);
-CREATE INDEX IF NOT EXISTS idx_sessions_last_seen ON sessions(last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_show_ratings_title ON show_ratings(tmdb_id, tmdb_type);
 CREATE INDEX IF NOT EXISTS idx_member_subs_slug ON member_subscriptions(member_slug);
+CREATE INDEX IF NOT EXISTS idx_household_member ON household_members(member_slug);
