@@ -120,9 +120,24 @@ struct HomeView: View {
                         }
                         if auth.isAdmin {
                             NavigationLink {
-                                AdminView().environmentObject(auth)
+                                ReportingView()
                             } label: {
-                                Label("Admin", systemImage: "wrench.and.screwdriver")
+                                Label("Reporting", systemImage: "chart.bar.xaxis")
+                            }
+                            NavigationLink {
+                                ManageMembersView()
+                            } label: {
+                                Label("Manage members", systemImage: "person.2.badge.gearshape")
+                            }
+                            NavigationLink {
+                                UrlCleanupView()
+                            } label: {
+                                Label("Show Cleanup", systemImage: "link.badge.plus")
+                            }
+                            NavigationLink {
+                                VibeAdminView()
+                            } label: {
+                                Label("Vibe trait scoring", systemImage: "sparkles")
                             }
                         }
                     }
