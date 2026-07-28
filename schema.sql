@@ -238,6 +238,29 @@ CREATE TABLE IF NOT EXISTS tmdb_backfill_ignores (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS groups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  creator_slug TEXT NOT NULL REFERENCES members(slug),
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS group_members (
+  group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  member_slug TEXT NOT NULL REFERENCES members(slug) ON DELETE CASCADE,
+  joined_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (group_id, member_slug)
+);
+
+CREATE TABLE IF NOT EXISTS group_invites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  token TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  created_by TEXT NOT NULL REFERENCES members(slug),
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_member_phones_phone ON member_phones(phone);
 CREATE INDEX IF NOT EXISTS idx_member_phones_slug ON member_phones(member_slug);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_member_phones_primary ON member_phones(member_slug) WHERE is_primary = 1;
@@ -263,3 +286,9 @@ CREATE INDEX IF NOT EXISTS idx_actors_show_id ON actors(show_id);
 CREATE INDEX IF NOT EXISTS idx_show_ratings_title ON show_ratings(tmdb_id, tmdb_type);
 CREATE INDEX IF NOT EXISTS idx_member_subs_slug ON member_subscriptions(member_slug);
 CREATE INDEX IF NOT EXISTS idx_household_member ON household_members(member_slug);
+CREATE INDEX IF NOT EXISTS idx_groups_creator ON groups(creator_slug);
+CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
+CREATE INDEX IF NOT EXISTS idx_group_members_member ON group_members(member_slug);
+CREATE INDEX IF NOT EXISTS idx_group_invites_group ON group_invites(group_id);
+CREATE INDEX IF NOT EXISTS idx_group_invites_token ON group_invites(token);
+CREATE INDEX IF NOT EXISTS idx_group_invites_expires ON group_invites(expires_at);

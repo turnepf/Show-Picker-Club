@@ -1,0 +1,226 @@
+import SwiftUI
+import ShowPickerCore
+
+struct GroupsListView: View {
+    @State private var groups: [Group] = []
+    @State private var loading = true
+    @State private var error: String?
+    @State private var showingCreate = false
+    @State private var showingJoin = false
+    @State private var newGroupName = ""
+    @State private var joinToken = ""
+    @State private var path: [Route] = []
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            VStack(spacing: 0) {
+                if loading {
+                    VStack {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Loading groups…")
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 12)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemBackground))
+                } else if let error = error {
+                    VStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.largeTitle)
+                            .foregroundStyle(.orange)
+                        Text("Couldn't load groups")
+                            .font(.headline)
+                        Text(error)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Button("Try again") {
+                            Task { await load() }
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemBackground))
+                } else if groups.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "person.2.crop.square.stack")
+                            .font(.system(size: 48))
+                            .foregroundStyle(.secondary)
+                        Text("No groups yet")
+                            .font(.headline)
+                        Text("Create a group to get started")
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 12) {
+                            Button(action: { showingCreate = true }) {
+                                Label("Create", systemImage: "plus")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            Button(action: { showingJoin = true }) {
+                                Label("Join", systemImage: "person.badge.plus")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemBackground))
+                } else {
+                    List {
+                        ForEach(groups) { group in
+                            NavigationLink(value: Route.groupDetail(group.id)) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(group.name)
+                                        .font(.headline)
+                                    Text("\(group.memberCount) member\(group.memberCount == 1 ? "" : "s")")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Groups")
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+                case .groupDetail(let id):
+                    GroupDetailView(groupId: id)
+                default:
+                    EmptyView()
+                }
+            }
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Menu {
+                        Button(action: { showingCreate = true }) {
+                            Label("Create group", systemImage: "plus")
+                        }
+                        Button(action: { showingJoin = true }) {
+                            Label("Join group", systemImage: "person.badge.plus")
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingCreate) {
+                createGroupSheet
+            }
+            .sheet(isPresented: $showingJoin) {
+                joinGroupSheet
+            }
+        }
+        .task {
+            await load()
+        }
+    }
+
+    @ViewBuilder
+    private var createGroupSheet: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                TextField("Group name", text: $newGroupName)
+                    .textFieldStyle(.roundedBorder)
+                    .padding()
+                Spacer()
+            }
+            .navigationTitle("Create Group")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showingCreate = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") {
+                        Task {
+                            await createGroup()
+                        }
+                    }
+                    .disabled(newGroupName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var joinGroupSheet: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                Text("Enter the invite code to join a group")
+                    .foregroundStyle(.secondary)
+                TextField("Invite code", text: $joinToken)
+                    .textFieldStyle(.roundedBorder)
+                    .padding()
+                Spacer()
+            }
+            .navigationTitle("Join Group")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showingJoin = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Join") {
+                        Task {
+                            await joinGroup()
+                        }
+                    }
+                    .disabled(joinToken.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func load() async {
+        loading = true
+        error = nil
+        do {
+            let response = try await API.groups()
+            self.groups = response.groups
+            loading = false
+        } catch {
+            self.error = API.failureLine(error, action: "load groups")
+            loading = false
+        }
+    }
+
+    @MainActor
+    private func createGroup() async {
+        let name = newGroupName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+
+        do {
+            let (group, _) = try await API.createGroup(name: name)
+            newGroupName = ""
+            showingCreate = false
+            await load()
+            path.append(.groupDetail(group.id))
+        } catch {
+            error = API.failureLine(error, action: "create group")
+        }
+    }
+
+    @MainActor
+    private func joinGroup() async {
+        let token = joinToken.trimmingCharacters(in: .whitespaces)
+        guard !token.isEmpty else { return }
+
+        do {
+            let result = try await API.joinGroup(token: token)
+            joinToken = ""
+            showingJoin = false
+            await load()
+            path.append(.groupDetail(result.groupId))
+        } catch {
+            error = API.failureLine(error, action: "join group")
+        }
+    }
+}
+
+#Preview {
+    GroupsListView()
+}

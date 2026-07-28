@@ -16,6 +16,7 @@ import SwiftUI
 enum SidebarItem: Hashable {
     case list(ShowList)
     case trending
+    case groups
     case whatsNew
     case vibe
     case subscriptionAudit
@@ -155,6 +156,10 @@ struct IPadHomeView: View {
                         .tag(SidebarItem.trending)
                 }
                 whatsNewRow
+                if myMember != nil {
+                    Label("Groups", systemImage: "person.2.fill")
+                        .tag(SidebarItem.groups)
+                }
                 // Vibe is personal: logged-in members only, opening their own.
                 if myMember != nil {
                     Label("Vibe", systemImage: "sparkles")
@@ -329,6 +334,8 @@ struct IPadHomeView: View {
                 }
             case .trending:
                 TrendingListView(shows: popular)
+            case .groups:
+                GroupsListView()
             case .whatsNew:
                 WhatsNewView()
             case .vibe:

@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Groups — Show Picker Club</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Show Picker">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-itunes-app" content="app-id=6780282764">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/favicon.svg">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
+  <link rel="stylesheet" href="/styles.css?v=5">
+  <style>
+    :root { --tint: #6D63EB; }
+    @media (prefers-color-scheme: dark) { :root { --tint: #8D87F5; } }
+    body { padding-top: 0; }
+    header {
+      background: color-mix(in srgb, var(--surface-2) 86%, transparent);
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      color: var(--ink);
+      border-bottom: 1px solid var(--border-soft);
+      padding: 12px 20px;
+      padding-top: calc(12px + env(safe-area-inset-top, 0px));
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 720px;
+      margin: 0 auto;
+      position: relative;
+    }
+    .header-top a.back {
+      color: var(--tint);
+      text-decoration: none;
+      font-size: 16px;
+      line-height: 1;
+      padding: 6px 10px 6px 0;
+      position: relative; z-index: 1;
+    }
+    .header-top h1 {
+      font-family: var(--font-sans);
+      font-size: 17px;
+      font-weight: 600;
+      position: absolute;
+      left: 50%; transform: translateX(-50%);
+      white-space: nowrap;
+    }
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+    }
+    .group-card {
+      background: var(--surface);
+      border: 1px solid var(--border-soft);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .group-card:hover { border-color: var(--tint); }
+    .group-card h3 { margin: 0 0 4px; font-size: 16px; font-weight: 600; color: var(--ink); }
+    .group-card p { margin: 0; font-size: 13px; color: var(--ink-muted); }
+    .group-trending { margin-top: 8px; font-size: 12px; }
+    .group-trending-title { color: var(--ink-muted); margin-bottom: 4px; }
+    .group-show { display: inline-block; background: var(--surface-2); padding: 2px 6px; border-radius: 4px; margin-right: 4px; margin-bottom: 2px; font-size: 11px; }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .modal h2 { margin: 0 0 16px; font-size: 18px; font-weight: 600; }
+    .modal input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border-soft);
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 16px;
+      box-sizing: border-box;
+    }
+    .modal input:focus { outline: none; border-color: var(--tint); }
+    .modal-buttons { display: flex; gap: 8px; }
+    .modal-buttons button { flex: 1; padding: 10px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
+    .modal-buttons .btn-cancel { background: var(--surface-2); color: var(--ink); }
+    .modal-buttons .btn-submit { background: var(--tint); color: white; }
+
+    .invite-section {
+      background: var(--surface-2);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 20px;
+    }
+    .invite-section h3 { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+    .invite-link-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .invite-link-input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid var(--border-soft);
+      border-radius: 6px;
+      font-size: 12px;
+      background: var(--surface);
+      color: var(--ink);
+      font-family: monospace;
+    }
+    .invite-link-btn {
+      padding: 8px 12px;
+      background: var(--tint);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .invite-link-btn:hover { opacity: 0.9; }
+
+    .join-section {
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .join-section h2 { font-size: 20px; font-weight: 600; margin: 0 0 8px; }
+    .join-section p { color: var(--ink-muted); font-size: 14px; margin: 0 0 20px; }
+    .join-input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .join-input-row input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid var(--border-soft);
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .join-input-row button {
+      padding: 10px 20px;
+      background: var(--tint);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .member-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .member-item:last-child { border-bottom: none; }
+    .member-info h4 { margin: 0; font-size: 14px; font-weight: 500; }
+    .member-info p { margin: 0; font-size: 12px; color: var(--ink-muted); }
+
+    .show-list { display: flex; flex-direction: column; gap: 12px; }
+    .show-item {
+      display: flex;
+      gap: 12px;
+      padding: 12px;
+      background: var(--surface-2);
+      border-radius: 8px;
+    }
+    .show-item img { width: 40px; height: 60px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+    .show-meta h4 { margin: 0 0 2px; font-size: 13px; font-weight: 500; }
+    .show-meta p { margin: 0; font-size: 11px; color: var(--ink-muted); }
+
+    #createGroupBtn, #joinGroupBtn {
+      background: var(--tint);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-right: 8px;
+      margin-bottom: 16px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--ink-muted);
+    }
+    .empty-state h3 { font-size: 16px; margin: 0 0 8px; }
+    .empty-state p { font-size: 13px; margin: 0; }
+
+    #groupsList { display: none; }
+    #groupDetail { display: none; }
+    #joinFlow { display: none; }
+
+    body { background: var(--surface-2); }
+  </style>
+  <script src="/shell.js?v=2" defer></script>
+  <script src="/app-banner.js?v=4" defer></script>
+</head>
+<body>
+  <header>
+    <div class="header-top">
+      <a class="back" href="/" title="Home" aria-label="Back to home">&#8249; Home</a>
+      <h1 id="pageTitle">Groups</h1>
+    </div>
+  </header>
+
+  <main>
+    <!-- Groups List View -->
+    <div id="groupsList">
+      <div style="margin-bottom: 20px;">
+        <button id="createGroupBtn" onclick="showCreateGroupModal()">Create Group</button>
+        <button id="joinGroupBtn" onclick="showJoinFlow()">Join a Group</button>
+      </div>
+      <div id="groupsContainer" class="show-list"></div>
+      <div id="emptyGroups" class="empty-state" style="display: none;">
+        <h3>No groups yet</h3>
+        <p>Create or join a group to get started.</p>
+      </div>
+    </div>
+
+    <!-- Group Detail View -->
+    <div id="groupDetail">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+        <div>
+          <h2 id="groupName" style="margin: 0; font-size: 22px; font-weight: 600;"></h2>
+          <p id="memberCount" style="margin: 4px 0 0; color: var(--ink-muted); font-size: 13px;"></p>
+        </div>
+        <button id="groupMenuBtn" onclick="toggleGroupMenu()" style="background: none; border: none; font-size: 20px; cursor: pointer; padding: 8px;">⋯</button>
+      </div>
+
+      <div id="groupMenu" style="display: none; background: var(--surface-2); border-radius: 8px; padding: 8px; margin-bottom: 20px;">
+        <button id="inviteBtn" onclick="showInviteModal()" style="display: block; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; margin-bottom: 8px;">Invite Members</button>
+        <button id="leaveBtn" onclick="leaveGroup()" style="display: block; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; color: #d32f2f; margin-bottom: 8px;">Leave Group</button>
+        <button id="deleteBtn" onclick="deleteGroup()" style="display: none; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; color: #d32f2f;">Delete Group</button>
+      </div>
+
+      <h3 style="margin: 24px 0 12px; font-size: 16px; font-weight: 600;">Group Trending</h3>
+      <div id="groupTrendingList" class="show-list" style="margin-bottom: 24px;"></div>
+
+      <h3 style="margin: 24px 0 12px; font-size: 16px; font-weight: 600;">Members</h3>
+      <div id="membersList"></div>
+    </div>
+
+    <!-- Join Flow -->
+    <div id="joinFlow">
+      <div class="join-section">
+        <h2>Join a Group</h2>
+        <p>Enter the invite code to join a group</p>
+        <div class="join-input-row">
+          <input id="joinTokenInput" type="text" placeholder="Invite code" maxlength="24">
+          <button onclick="joinGroup()">Join</button>
+        </div>
+        <p id="joinStatus" style="font-size: 12px; color: var(--ink-muted); margin: 0;"></p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Create Group Modal -->
+  <div id="createGroupModal" class="modal-overlay">
+    <div class="modal">
+      <h2>Create a Group</h2>
+      <input id="groupNameInput" type="text" placeholder="Group name" maxlength="100">
+      <div class="modal-buttons">
+        <button class="btn-cancel" onclick="closeCreateGroupModal()">Cancel</button>
+        <button class="btn-submit" onclick="createGroup()">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invite Modal -->
+  <div id="inviteModal" class="modal-overlay">
+    <div class="modal">
+      <h2>Invite to Group</h2>
+      <p style="color: var(--ink-muted); font-size: 13px; margin: 0 0 16px;">Share this link with people you want to invite:</p>
+      <div class="invite-link-row">
+        <input id="inviteLinkInput" class="invite-link-input" type="text" readonly>
+        <button id="copyInviteLinkBtn" class="invite-link-btn" onclick="copyInviteLink()">Copy</button>
+      </div>
+      <p id="inviteLinkExpire" style="color: var(--ink-muted); font-size: 12px; margin: 12px 0 0;"></p>
+      <div class="modal-buttons" style="margin-top: 20px;">
+        <button class="btn-cancel" onclick="closeInviteModal()" style="flex: 1;">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '';
+    let currentGroupId = null;
+    let authMember = null;
+
+    // Check auth on load
+    (async () => {
+      try {
+        const res = await fetch('/api/members/me');
+        if (res.ok) {
+          const data = await res.json();
+          authMember = data.member?.slug;
+          if (!authMember) {
+            window.location.href = '/';
+            return;
+          }
+          const params = new URLSearchParams(window.location.search);
+          const joinToken = params.get('token');
+          if (joinToken) {
+            showJoinPreview(joinToken);
+          } else {
+            loadGroupsList();
+          }
+        } else {
+          window.location.href = '/';
+        }
+      } catch (e) {
+        console.error('Auth check failed:', e);
+        window.location.href = '/';
+      }
+    })();
+
+    async function loadGroupsList() {
+      try {
+        const res = await fetch('/api/groups');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        showGroupsList(data.groups || []);
+      } catch (e) {
+        console.error('Failed to load groups:', e);
+        document.getElementById('groupsContainer').innerHTML = '<p>Error loading groups. Try again.</p>';
+      }
+    }
+
+    function showGroupsList(groups) {
+      const container = document.getElementById('groupsContainer');
+      const empty = document.getElementById('emptyGroups');
+      document.getElementById('groupsList').style.display = 'block';
+      document.getElementById('groupDetail').style.display = 'none';
+      document.getElementById('joinFlow').style.display = 'none';
+      document.getElementById('pageTitle').textContent = 'Groups';
+
+      if (groups.length === 0) {
+        container.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      container.innerHTML = groups.map(g => `
+        <div class="group-card" onclick="loadGroupDetail(${g.id})">
+          <h3>${escapeHtml(g.name)}</h3>
+          <p>${g.member_count} member${g.member_count !== 1 ? 's' : ''}</p>
+        </div>
+      `).join('');
+    }
+
+    async function loadGroupDetail(groupId) {
+      try {
+        const res = await fetch(`/api/groups/${groupId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        currentGroupId = groupId;
+        showGroupDetail(data.group, data.members, data.is_creator);
+      } catch (e) {
+        console.error('Failed to load group:', e);
+        alert('Error loading group');
+      }
+    }
+
+    async function loadGroupTrending(groupId) {
+      try {
+        const res = await fetch(`/api/groups/${groupId}/trending`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        renderTrending(data.shows || []);
+      } catch (e) {
+        console.error('Failed to load trending:', e);
+      }
+    }
+
+    function showGroupDetail(group, members, isCreator) {
+      document.getElementById('groupsList').style.display = 'none';
+      document.getElementById('groupDetail').style.display = 'block';
+      document.getElementById('joinFlow').style.display = 'none';
+      document.getElementById('pageTitle').textContent = escapeHtml(group.name);
+      document.getElementById('groupName').textContent = escapeHtml(group.name);
+      document.getElementById('memberCount').textContent = `${members.length} member${members.length !== 1 ? 's' : ''}`;
+      document.getElementById('deleteBtn').style.display = isCreator ? 'block' : 'none';
+
+      renderMembers(members);
+      loadGroupTrending(group.id);
+    }
+
+    function renderTrending(shows) {
+      const container = document.getElementById('groupTrendingList');
+      if (shows.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--ink-muted); padding: 20px;">No shows yet</p>';
+        return;
+      }
+      container.innerHTML = shows.map(show => `
+        <div class="show-item">
+          ${show.poster_url ? `<img src="${escapeHtml(show.poster_url)}" alt="">` : '<div style="width: 40px; height: 60px; background: var(--surface); border-radius: 4px;"></div>'}
+          <div class="show-meta" style="flex: 1;">
+            <h4>${escapeHtml(show.title)}</h4>
+            <p>${show.members ? 'Added by: ' + show.members.join(', ') : 'No info'}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderMembers(members) {
+      const container = document.getElementById('membersList');
+      container.innerHTML = members.map(m => `
+        <div class="member-item">
+          <div class="member-info">
+            <h4>${escapeHtml(m.first_name || m.slug)}</h4>
+            <p>${m.show_count} show${m.show_count !== 1 ? 's' : ''} (${m.watching_count} watching)</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showCreateGroupModal() {
+      document.getElementById('createGroupModal').classList.add('open');
+      document.getElementById('groupNameInput').focus();
+    }
+
+    function closeCreateGroupModal() {
+      document.getElementById('createGroupModal').classList.remove('open');
+      document.getElementById('groupNameInput').value = '';
+    }
+
+    async function createGroup() {
+      const name = document.getElementById('groupNameInput').value.trim();
+      if (!name) {
+        alert('Please enter a group name');
+        return;
+      }
+      try {
+        const res = await fetch('/api/groups', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        closeCreateGroupModal();
+        showInviteModalWithToken(data.invite.url, data.invite.expires_at);
+        setTimeout(loadGroupsList, 500);
+      } catch (e) {
+        console.error('Failed to create group:', e);
+        alert('Error creating group');
+      }
+    }
+
+    function showInviteModal() {
+      if (!currentGroupId) return;
+      generateNewInvite();
+    }
+
+    async function generateNewInvite() {
+      try {
+        const res = await fetch(`/api/groups/${currentGroupId}/invite`, { method: 'POST' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        showInviteModalWithToken(data.url, data.expires_at);
+      } catch (e) {
+        console.error('Failed to generate invite:', e);
+        alert('Error generating invite link');
+      }
+    }
+
+    function showInviteModalWithToken(url, expiresAt) {
+      const modal = document.getElementById('inviteModal');
+      document.getElementById('inviteLinkInput').value = url;
+      const expiryDate = new Date(expiresAt).toLocaleDateString();
+      document.getElementById('inviteLinkExpire').textContent = `Link expires on ${expiryDate}`;
+      modal.classList.add('open');
+      document.getElementById('copyInviteLinkBtn').textContent = 'Copy';
+    }
+
+    function closeInviteModal() {
+      document.getElementById('inviteModal').classList.remove('open');
+    }
+
+    function copyInviteLink() {
+      const input = document.getElementById('inviteLinkInput');
+      input.select();
+      document.execCommand('copy');
+      const btn = document.getElementById('copyInviteLinkBtn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+    }
+
+    async function leaveGroup() {
+      if (!confirm('Leave this group?')) return;
+      try {
+        const res = await fetch(`/api/groups/${currentGroupId}/leave`, { method: 'POST' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        toggleGroupMenu();
+        loadGroupsList();
+      } catch (e) {
+        console.error('Failed to leave group:', e);
+        alert('Error leaving group');
+      }
+    }
+
+    async function deleteGroup() {
+      if (!confirm('Delete this group? This cannot be undone.')) return;
+      try {
+        const res = await fetch(`/api/groups/${currentGroupId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        toggleGroupMenu();
+        loadGroupsList();
+      } catch (e) {
+        console.error('Failed to delete group:', e);
+        alert('Error deleting group');
+      }
+    }
+
+    function toggleGroupMenu() {
+      const menu = document.getElementById('groupMenu');
+      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function showJoinFlow() {
+      document.getElementById('groupsList').style.display = 'none';
+      document.getElementById('groupDetail').style.display = 'none';
+      document.getElementById('joinFlow').style.display = 'block';
+      document.getElementById('pageTitle').textContent = 'Join a Group';
+      document.getElementById('joinTokenInput').focus();
+    }
+
+    async function showJoinPreview(token) {
+      try {
+        const res = await fetch(`/api/groups/join?token=${encodeURIComponent(token)}`);
+        if (!res.ok) {
+          if (res.status === 410) {
+            alert('This invite link has expired');
+          } else if (res.status === 404) {
+            alert('This invite link is not valid');
+          } else {
+            alert('Error');
+          }
+          window.location.href = '/groups';
+          return;
+        }
+        const data = await res.json();
+        if (data.join_required) {
+          showJoinFlow();
+          document.getElementById('joinTokenInput').value = token;
+        } else if (data.ok) {
+          alert('You\'ve joined the group!');
+          window.location.href = '/groups';
+        }
+      } catch (e) {
+        console.error('Failed to preview invite:', e);
+        alert('Error loading invite');
+        window.location.href = '/groups';
+      }
+    }
+
+    async function joinGroup() {
+      const token = document.getElementById('joinTokenInput').value.trim();
+      if (!token) {
+        alert('Please enter an invite code');
+        return;
+      }
+      try {
+        const res = await fetch(`/api/groups/join?token=${encodeURIComponent(token)}`);
+        if (res.status === 409) {
+          alert('You\'re already in this group');
+          return;
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        alert('Successfully joined the group!');
+        loadGroupsList();
+      } catch (e) {
+        console.error('Failed to join group:', e);
+        alert('Error joining group');
+      }
+    }
+
+    function escapeHtml(text) {
+      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+      return String(text || '').replace(/[&<>"']/g, c => map[c]);
+    }
+  </script>
+</body>
+</html>

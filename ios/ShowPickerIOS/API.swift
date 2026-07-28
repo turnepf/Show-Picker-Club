@@ -440,6 +440,58 @@ enum API {
         try await postDecoding("/api/admin-vibe-fill", body: ["action": "cancel_background_rescore"])
     }
 
+    // MARK: Groups
+
+    static func groups() async throws -> GroupsResponse {
+        try await get("/api/groups")
+    }
+
+    static func groupDetail(id: Int) async throws -> GroupDetail {
+        try await get("/api/groups/\(id)")
+    }
+
+    static func groupTrending(id: Int) async throws -> [PopularShow] {
+        struct TrendingResponse: Decodable { let shows: [PopularShow] }
+        let r: TrendingResponse = try await get("/api/groups/\(id)/trending")
+        return r.shows
+    }
+
+    static func createGroup(name: String) async throws -> (Group, GroupInvite) {
+        struct CreateResponse: Decodable { let group: Group; let invite: GroupInvite }
+        let r: CreateResponse = try await postJSON("/api/groups", body: ["name": name])
+        return (r.group, r.invite)
+    }
+
+    static func generateGroupInvite(groupId: Int) async throws -> GroupInvite {
+        try await postJSON("/api/groups/\(groupId)/invite", body: [:])
+    }
+
+    @discardableResult
+    static func joinGroup(token: String) async throws -> (ok: Bool, groupId: Int) {
+        struct JoinResponse: Decodable { let ok: Bool; let group_id: Int }
+        let r: JoinResponse = try await get("/api/groups/join?token=\(token)")
+        return (r.ok, r.group_id)
+    }
+
+    @discardableResult
+    static func leaveGroup(id: Int) async throws -> Bool {
+        struct Ack: Decodable { let ok: Bool? }
+        let r: Ack = try await postJSON("/api/groups/\(id)/leave", body: [:])
+        return r.ok ?? false
+    }
+
+    @discardableResult
+    static func deleteGroup(id: Int) async throws -> Bool {
+        guard let url = URL(string: baseString + "/api/groups/\(id)") else { throw APIError.badURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        let (_, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw APIError.badResponse((resp as? HTTPURLResponse)?.statusCode ?? -1)
+        }
+        return true
+    }
+
     // MARK: Auth
 
     static func loginWithEmail(email: String, code: String) async throws -> LoginResponse {

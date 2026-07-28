@@ -35,6 +35,10 @@ struct HomeView: View {
                         .padding(.top, 40)
                     } else {
                         popularShelf
+                        // Groups are for logged-in members only
+                        if auth.isLoggedIn {
+                            groupsSection
+                        }
                         // The roster endpoint is public (the web landing page
                         // renders it), but member show lists 401 without a
                         // session — tapping a member while logged out is a
@@ -82,6 +86,22 @@ struct HomeView: View {
                     .padding(.vertical, 30)
                 }
             }
+        }
+    }
+
+    private var groupsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            sectionHeader("Groups")
+            NavigationLink(value: Route.groupsList) {
+                Text("Browse your groups")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundColor(Theme.text)
+                    .padding(30)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Theme.cardBackground)
+                    .cornerRadius(16)
+            }
+            .buttonStyle(PushButtonStyle())
         }
     }
 

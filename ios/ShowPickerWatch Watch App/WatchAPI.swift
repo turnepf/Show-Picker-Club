@@ -28,6 +28,20 @@ enum WatchAPI {
         return r.actors
     }
 
+    static func groups(cookie: String?) async throws -> [Group] {
+        let r: GroupsResponse = try await get("/api/groups", cookie: cookie)
+        return r.groups
+    }
+
+    static func groupDetail(id: Int, cookie: String?) async throws -> GroupDetail {
+        try await get("/api/groups/\(id)", cookie: cookie)
+    }
+
+    static func groupTrending(id: Int, cookie: String?) async throws -> [PopularShow] {
+        let r: TrendingResponse = try await get("/api/groups/\(id)/trending", cookie: cookie)
+        return r.shows
+    }
+
     private static func get<T: Decodable>(_ path: String, cookie: String?) async throws -> T {
         guard let url = URL(string: base + path) else { throw APIError.badURL }
         var req = URLRequest(url: url)
