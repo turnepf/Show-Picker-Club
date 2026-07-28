@@ -38,73 +38,49 @@ struct WatchDetailView: View {
                     Text(ov).font(.caption2).foregroundStyle(.secondary)
                 }
 
-                if let n = s.network, !n.isEmpty {
-                    // Spell the affordance out — a bare network name reads as
-                    // a label, so nobody realized it led to the show.
-                    if s.hasRealUrl, let u = s.networkUrl, let url = URL(string: u) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("Network").font(.caption2).foregroundStyle(.secondary)
-                            Link("Watch on \(n)", destination: url).font(.footnote)
+                // Cast right under the overview. Plain names, not links —
+                // watchOS has no browser, so the IMDB links these used to
+                // carry went nowhere.
+                if !cast.isEmpty {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Cast").font(.caption2).foregroundStyle(.secondary)
+                        ForEach(Array(cast.prefix(6).enumerated()), id: \.offset) { item in
+                            Text(item.element.name).font(.footnote)
                         }
-                    } else if let wl = s.whereToWatchURL {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(n).font(.caption2).foregroundStyle(.secondary)
-                            Link("Where to watch", destination: wl).font(.footnote)
-                        }
-                    } else {
-                        row("Network", n)
                     }
                 }
-                // Single audience score, sourced from TMDB (`rating` carries it now),
-                // grouped with the club's own rating.
-                if let r = s.rating, !r.isEmpty { row("TMDB Rating", "★ \(r)") }
+                // Creator/Director just below the cast, plain text (the IMDB
+                // link this used to carry is dead on the watch).
+                if let d = s.director, !d.isEmpty {
+                    row(s.directorLabel, d)
+                }
+
+                // Where to watch — informational only. The watch can't open a
+                // streaming service, so this is a plain label, not a link.
+                if let n = s.network, !n.isEmpty {
+                    Text("Watch on \(n)").font(.footnote)
+                }
+
+                // Ratings grouped together, the club's own score first.
                 if let ratings {
                     row("Club Rating", clubRatingText)
                     if let owner = ratings.owner {
                         row("\(ratings.ownerName ?? "")’s rating", "\(owner)/10")
                     }
                 }
+                // Single audience score, sourced from TMDB (`rating` carries it now).
+                if let r = s.rating, !r.isEmpty { row("TMDB Rating", "★ \(r)") }
+
                 if let l = ShowList(rawValue: s.list) { row("List", l.title) }
                 if let up = s.nextUpRange { row("Next episode", up) }
                 if let series = s.seriesText { row("Series", series) }
                 if s.isMovie { row("Type", "Movie") }
                 if let cr = s.contentRating, !cr.isEmpty { row("Rated", cr) }
                 if let y = s.releaseYear { row("Year", String(y)) }
-                if let d = s.director, !d.isEmpty {
-                    // Link a single-person credit to their IMDB page (like cast).
-                    if let url = s.directorURL {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(s.directorLabel).font(.caption2).foregroundStyle(.secondary)
-                            Link(d, destination: url).font(.footnote)
-                        }
-                    } else {
-                        row(s.directorLabel, d)
-                    }
-                }
-                if let turl = s.trailerURL {
-                    Link("▶ Trailer", destination: turl).font(.footnote)
-                }
                 if !s.genreList.isEmpty { row("Genres", s.genreList.joined(separator: ", ")) }
                 if let rt = s.runtimeText { row("Runtime", rt) }
                 if let by = s.recommendedBy, !by.isEmpty { row("From", by) }
                 if let w = s.watchingWith, !w.isEmpty { row("With", w) }
-                if !cast.isEmpty {
-                    // One line per actor so each can be its own IMDB link
-                    // (inline links inside a joined Text aren't tappable on
-                    // watchOS). Unlinked names are legacy rows the enrich
-                    // backfill hasn't reached yet.
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Cast").font(.caption2).foregroundStyle(.secondary)
-                        ForEach(Array(cast.prefix(6).enumerated()), id: \.offset) { item in
-                            if let imdb = item.element.imdbId, !imdb.isEmpty,
-                               let url = URL(string: "https://www.imdb.com/name/\(imdb)/") {
-                                Link(item.element.name, destination: url).font(.footnote)
-                            } else {
-                                Text(item.element.name).font(.footnote)
-                            }
-                        }
-                    }
-                }
                 if let notes = s.notes, !notes.isEmpty {
                     Text(notes).font(.caption2).foregroundStyle(.secondary).italic()
                 }
