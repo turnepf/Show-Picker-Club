@@ -1,4 +1,14 @@
 /setup    /members  301
 /requests /members  301
 /admin    /members  301
+!/groups.html
+!/whats-new.html
+!/vibe.html
+!/vibe-admin.html
+!/subscriptions.html
+!/rate-backlog.html
+!/members.html
+!/reporting.html
+!/url-cleanup.html
+!/join.html
 /*  /index.html  200
