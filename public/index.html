@@ -3950,10 +3950,10 @@
         if (seriesParts.length) rows.push(detailRow('Series', escapeHtml(seriesParts.join(', '))));
       }
       if (show.genres) rows.push(detailRow('Genres', escapeHtml(show.genres)));
+      if (show.runtime) rows.push(detailRow('Runtime', escapeHtml(runtimeText(show.runtime))));
       if (show.next_season_date) rows.push(detailRow('Next episode', escapeHtml(formatSeasonRange(show))));
       if (show.content_rating) rows.push(detailRow('Rated', escapeHtml(show.content_rating)));
       if (show.release_year) rows.push(detailRow('Year', escapeHtml(String(show.release_year))));
-      if (show.runtime) rows.push(detailRow('Runtime', escapeHtml(runtimeText(show.runtime))));
       // Creator/Director renders as a standard label/value row grouped in the
       // Cast card (built below). Link a single-person credit to their IMDB page
       // (mirrors the cast links); a multi-creator credit (comma in the name)
