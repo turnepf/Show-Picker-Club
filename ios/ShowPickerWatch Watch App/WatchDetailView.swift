@@ -70,7 +70,6 @@ struct WatchDetailView: View {
                 if s.isMovie { row("Type", "Movie") }
                 if let cr = s.contentRating, !cr.isEmpty { row("Rated", cr) }
                 if let y = s.releaseYear { row("Year", String(y)) }
-                if let rt = s.runtimeText { row("Runtime", rt) }
                 if let d = s.director, !d.isEmpty {
                     // Link a single-person credit to their IMDB page (like cast).
                     if let url = s.directorURL {
@@ -86,6 +85,7 @@ struct WatchDetailView: View {
                     Link("▶ Trailer", destination: turl).font(.footnote)
                 }
                 if !s.genreList.isEmpty { row("Genres", s.genreList.joined(separator: ", ")) }
+                if let rt = s.runtimeText { row("Runtime", rt) }
                 if let by = s.recommendedBy, !by.isEmpty { row("From", by) }
                 if let w = s.watchingWith, !w.isEmpty { row("With", w) }
                 if !cast.isEmpty {

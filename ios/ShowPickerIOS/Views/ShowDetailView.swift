@@ -192,6 +192,9 @@ struct ShowDetailView: View {
                         if !s.genreList.isEmpty {
                             LabeledContent("Genres", value: s.genreList.joined(separator: " · "))
                         }
+                        if let rt = s.runtimeText {
+                            LabeledContent("Runtime", value: rt)
+                        }
                         if let dates = s.seasonDatesText {
                             LabeledContent("Next episode", value: dates)
                         }
@@ -200,9 +203,6 @@ struct ShowDetailView: View {
                         }
                         if let y = s.releaseYear {
                             LabeledContent("Year", value: String(y))
-                        }
-                        if let rt = s.runtimeText {
-                            LabeledContent("Runtime", value: rt)
                         }
                     }
                 }
