@@ -77,6 +77,11 @@ struct HomeView: View {
                     // section further down.
                     Section {
                         whatsNewRow
+                        if myMember != nil {
+                            NavigationLink(value: Route.groups) {
+                                Label("Groups", systemImage: "person.2.fill")
+                            }
+                        }
                         // Vibe is personal: logged-in members only, opening
                         // their own vibe.
                         if let me = myMember {
@@ -195,6 +200,10 @@ struct HomeView: View {
                 case .pick(let title, let network, let rating, let posterUrl, let networkUrl):
                     ShowDetailView(id: nil, initialTitle: title, initialNetwork: network,
                                    initialRating: rating, initialPoster: posterUrl, initialNetworkUrl: networkUrl)
+                case .groups:
+                    GroupsListView()
+                case .groupDetail(let id):
+                    GroupDetailView(groupId: id)
                 case .whatsNew:
                     WhatsNewView()
                 }
@@ -388,5 +397,7 @@ enum Route: Hashable {
     // detail from its title so the user chooses a list, rather than adding it
     // silently.
     case pick(title: String, network: String?, rating: String?, posterUrl: String?, networkUrl: String?)
+    case groups
+    case groupDetail(Int)
     case whatsNew
 }
