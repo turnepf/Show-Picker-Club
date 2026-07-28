@@ -20,9 +20,7 @@ enum SidebarItem: Hashable {
     case vibe
     case subscriptionAudit
     case rateBacklog
-    // Admin sub-tools. The sidebar's Admin row is a disclosure accordion
-    // whose entries mirror the iPhone AdminView's options, each opening its
-    // screen in the detail column.
+    // Admin tools shown directly in the menu when user is an admin
     case adminReporting
     case adminManageMembers
     case adminUrlCleanup
