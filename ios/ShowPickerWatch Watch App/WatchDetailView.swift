@@ -56,9 +56,9 @@ struct WatchDetailView: View {
                 }
 
                 // Where to watch — informational only. The watch can't open a
-                // streaming service, so this is a plain label, not a link.
+                // streaming service, so this is a plain labeled row, not a link.
                 if let n = s.network, !n.isEmpty {
-                    Text("Watch on \(n)").font(.footnote)
+                    row("Network", n)
                 }
 
                 // Ratings grouped together, the club's own score first.
