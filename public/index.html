@@ -1311,9 +1311,24 @@
             <span class="ios-item-label">Subscription audit</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
-          <a class="ios-item hidden side-admin" href="/members">
+          <a class="ios-item hidden side-admin-reporting" href="/reporting">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-text-plus"/></svg></span>
+            <span class="ios-item-label">Reporting</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden side-admin-members" href="/members">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-person-plus"/></svg></span>
+            <span class="ios-item-label">Manage members</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden side-admin-cleanup" href="/url-cleanup">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-wrench"/></svg></span>
-            <span class="ios-item-label">Admin</span>
+            <span class="ios-item-label">Show Cleanup</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden side-admin-vibe" href="/vibe-admin">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
+            <span class="ios-item-label">Vibe trait scoring</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
         </nav>
@@ -1413,9 +1428,21 @@
           <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
           <span class="ios-item-label">Subscription audit</span>
         </a>
-        <a class="ios-item hidden side-admin" href="/members">
+        <a class="ios-item hidden side-admin-reporting" href="/reporting">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-text-plus"/></svg></span>
+          <span class="ios-item-label">Reporting</span>
+        </a>
+        <a class="ios-item hidden side-admin-members" href="/members">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-person-plus"/></svg></span>
+          <span class="ios-item-label">Manage members</span>
+        </a>
+        <a class="ios-item hidden side-admin-cleanup" href="/url-cleanup">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-wrench"/></svg></span>
-          <span class="ios-item-label">Admin</span>
+          <span class="ios-item-label">Show Cleanup</span>
+        </a>
+        <a class="ios-item hidden side-admin-vibe" href="/vibe-admin">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
+          <span class="ios-item-label">Vibe trait scoring</span>
         </a>
       </nav>
       <h3 class="ios-group-header">Members</h3>
@@ -2370,11 +2397,11 @@
               a.classList.remove('hidden');
             });
           }
-          // Surface the Admin rows (wrench) in the Home list and sidebar only
+          // Surface the Admin rows in the Home list and sidebar only
           // when this session belongs to the operator. /auth/check sets
           // is_admin server-side, so we don't have to hardcode the slug here.
           if (data.is_admin) {
-            document.querySelectorAll('.side-admin').forEach(el => el.classList.remove('hidden'));
+            document.querySelectorAll('.side-admin-reporting, .side-admin-members, .side-admin-cleanup, .side-admin-vibe').forEach(el => el.classList.remove('hidden'));
           }
           // Home: swap the login row for My Shows — a single row on small
           // screens, the four lists (iPad sidebar) on the split view.
@@ -2462,7 +2489,7 @@
       if (rateBacklogLink) rateBacklogLink.classList.add('hidden');
       document.querySelectorAll('.home-ratebacklog-row, .member-ratebacklog-row').forEach(r => r.classList.add('hidden'));
       document.querySelectorAll('.vibe-row, .calendar-feed-row').forEach(r => r.classList.add('hidden'));
-      document.querySelectorAll('.side-admin').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.side-admin-reporting, .side-admin-members, .side-admin-cleanup, .side-admin-vibe').forEach(el => el.classList.add('hidden'));
       updateLoginBtnLabel();
       updateSideListsHeader();
       updateHeaderTitle();

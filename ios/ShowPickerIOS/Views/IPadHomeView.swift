@@ -54,9 +54,6 @@ struct IPadHomeView: View {
 
     private let memberRowHeight: CGFloat = 38
     private let memberWindowRows = 5
-    // Admin accordion expansion; opens automatically when an admin tool is in
-    // focus (e.g. after a detail-column reset) so the current page stays visible.
-    @State private var adminExpanded = false
 
     private var myMember: Member? {
         guard let slug = auth.memberSlug else { return nil }
@@ -110,21 +107,8 @@ struct IPadHomeView: View {
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
             if let url = activity.webpageURL { route(url: url) }
         }
-        // Keep the Admin accordion open whenever one of its tools is selected.
-        .onChange(of: selection) { _, sel in
-            if sel.map(isAdminItem) == true { adminExpanded = true }
-        }
     }
 
-    private func isAdminItem(_ item: SidebarItem) -> Bool {
-        switch item {
-        case .adminReporting, .adminManageMembers,
-             .adminUrlCleanup, .adminVibe:
-            return true
-        default:
-            return false
-        }
-    }
 
     // Distinguishes both "which section" and "whose lists" so switching members
     // rebuilds the detail stack even when the same list stays selected.
@@ -207,18 +191,14 @@ struct IPadHomeView: View {
                         .tag(SidebarItem.rateBacklog)
                 }
                 if auth.isAdmin {
-                    DisclosureGroup(isExpanded: $adminExpanded) {
-                        Label("Reporting", systemImage: "chart.bar.xaxis")
-                            .tag(SidebarItem.adminReporting)
-                        Label("Manage members", systemImage: "person.2.badge.gearshape")
-                            .tag(SidebarItem.adminManageMembers)
-                        Label("Show Cleanup", systemImage: "link.badge.plus")
-                            .tag(SidebarItem.adminUrlCleanup)
-                        Label("Vibe trait scoring", systemImage: "sparkles")
-                            .tag(SidebarItem.adminVibe)
-                    } label: {
-                        Label("Admin", systemImage: "wrench.and.screwdriver")
-                    }
+                    Label("Reporting", systemImage: "chart.bar.xaxis")
+                        .tag(SidebarItem.adminReporting)
+                    Label("Manage members", systemImage: "person.2.badge.gearshape")
+                        .tag(SidebarItem.adminManageMembers)
+                    Label("Show Cleanup", systemImage: "link.badge.plus")
+                        .tag(SidebarItem.adminUrlCleanup)
+                    Label("Vibe trait scoring", systemImage: "sparkles")
+                        .tag(SidebarItem.adminVibe)
                 }
             }
             if !members.isEmpty {
