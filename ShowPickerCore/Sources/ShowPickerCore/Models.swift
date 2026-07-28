@@ -276,3 +276,120 @@ public struct ShowResponse: Codable, Sendable {
     }
 }
 public struct ActorsResponse: Codable, Sendable { public let actors: [Actor] }
+
+public struct Group: Codable, Identifiable, Hashable, Sendable {
+    public let id: Int
+    public let name: String
+    public let creatorSlug: String
+    public let createdAt: String
+    public let memberCount: Int
+    public let isCreator: Bool
+
+    public init(id: Int, name: String, creatorSlug: String, createdAt: String, memberCount: Int = 0, isCreator: Bool = false) {
+        self.id = id
+        self.name = name
+        self.creatorSlug = creatorSlug
+        self.createdAt = createdAt
+        self.memberCount = memberCount
+        self.isCreator = isCreator
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, creatorSlug = "creator_slug", createdAt = "created_at"
+        case memberCount = "member_count", isCreator = "is_creator"
+    }
+}
+
+public struct GroupMember: Codable, Identifiable, Hashable, Sendable {
+    public let slug: String
+    public let firstName: String?
+    public let lastName: String?
+    public let showCount: Int
+    public let watchingCount: Int
+    public let awaitingCount: Int
+    public let lastActivityAt: String?
+
+    public var id: String { slug }
+    public var displayName: String {
+        if let first = firstName {
+            return first
+        }
+        return slug
+    }
+
+    public init(
+        slug: String,
+        firstName: String? = nil,
+        lastName: String? = nil,
+        showCount: Int = 0,
+        watchingCount: Int = 0,
+        awaitingCount: Int = 0,
+        lastActivityAt: String? = nil
+    ) {
+        self.slug = slug
+        self.firstName = firstName
+        self.lastName = lastName
+        self.showCount = showCount
+        self.watchingCount = watchingCount
+        self.awaitingCount = awaitingCount
+        self.lastActivityAt = lastActivityAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case slug, firstName = "first_name", lastName = "last_name"
+        case showCount = "show_count", watchingCount = "watching_count"
+        case awaitingCount = "awaiting_count", lastActivityAt = "last_activity_at"
+    }
+}
+
+public struct GroupDetail: Codable, Sendable {
+    public let group: Group
+    public let members: [GroupMember]
+    public let isCreator: Bool
+    public let canManage: Bool
+
+    public init(group: Group, members: [GroupMember], isCreator: Bool = false, canManage: Bool = false) {
+        self.group = group
+        self.members = members
+        self.isCreator = isCreator
+        self.canManage = canManage
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case group, members, isCreator = "is_creator", canManage = "can_manage"
+    }
+}
+
+public struct GroupInvite: Codable, Sendable {
+    public let token: String
+    public let expiresAt: String
+    public let url: String
+
+    public init(token: String, expiresAt: String, url: String) {
+        self.token = token
+        self.expiresAt = expiresAt
+        self.url = url
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case token, expiresAt = "expires_at", url
+    }
+}
+
+public struct GroupResponse: Codable, Sendable {
+    public let group: Group
+    public let invite: GroupInvite?
+
+    public init(group: Group, invite: GroupInvite? = nil) {
+        self.group = group
+        self.invite = invite
+    }
+}
+
+public struct GroupsResponse: Codable, Sendable {
+    public let groups: [Group]
+
+    public init(groups: [Group]) {
+        self.groups = groups
+    }
+}
