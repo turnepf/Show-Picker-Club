@@ -1,14 +1,14 @@
-/setup    /members  301
-/requests /members  301
-/admin    /members  301
-!/groups.html
-!/whats-new.html
-!/vibe.html
-!/vibe-admin.html
-!/subscriptions.html
-!/rate-backlog.html
-!/members.html
-!/reporting.html
-!/url-cleanup.html
-!/join.html
-/*  /index.html  200
+/setup         /members        301
+/requests      /members        301
+/admin         /members        301
+/groups        /groups.html    200
+/whats-new     /whats-new.html 200
+/vibe          /vibe.html      200
+/vibe-admin    /vibe-admin.html 200
+/subscriptions /subscriptions.html 200
+/rate-backlog  /rate-backlog.html 200
+/members       /members.html   200
+/reporting     /reporting.html 200
+/url-cleanup   /url-cleanup.html 200
+/join          /join.html      200
+/*             /index.html     200
