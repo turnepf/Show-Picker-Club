@@ -91,12 +91,6 @@
     '.shell-side .ios-item.selected { background: var(--tint); color: #fff; }' +
     '.shell-side .ios-item.selected .ios-item-icon { color: #fff; }' +
     '.shell-side .shell-members { max-height: 250px; overflow-y: auto; }' +
-    /* Admin accordion: the wrench row toggles an indented sub-list. */
-    '.shell-side .shell-admin-toggle .ios-item-chev { transition: transform 0.15s ease-out; }' +
-    '.shell-side .shell-admin-toggle.open .ios-item-chev { transform: rotate(90deg); }' +
-    '.shell-admin-sub { border-top: 1px solid var(--border-soft); }' +
-    '.shell-admin-sub .ios-item { padding-left: 48px; min-height: 40px; font-size: 15px; }' +
-    '.shell-admin-sub .ios-item + .ios-item::after { left: 48px; }' +
     '.shell-side .ios-footnote { font-size: 12px; color: var(--ink-quiet); line-height: 1.5; padding: 0 16px; margin: -10px 0 22px; }' +
     '.shell-menu { position: fixed; z-index: 500; min-width: 180px; background: var(--surface); border-radius: 13px; box-shadow: 0 10px 40px rgba(0,0,0,0.22), 0 1px 3px rgba(0,0,0,0.12); padding: 4px 0; overflow: hidden; }' +
     '.shell-menu button { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 11px 16px; background: none; border: none; font-family: var(--font-sans); font-size: 16px; color: var(--danger); cursor: pointer; }' +
@@ -242,27 +236,16 @@
           '</div>';
       }
       // Discovery + account group, kept separate from My Shows above:
-      // Trending, What's New, Subscription audit, then Admin.
+      // Trending, What's New, Subscription audit, then Admin (flat, not nested).
       var discover = iconRow('/?home', 'Trending', 'flame') +
         iconRow('/whats-new', "What's New", 'sparkles', { selected: location.pathname === '/whats-new' });
       if (authMember) {
         discover += iconRow('/subscriptions', 'Subscription audit', 'creditcard', { selected: location.pathname === '/subscriptions' });
       }
       if (auth.is_admin) {
-        // Accordion: expanded automatically on an admin page, with the
-        // current page highlighted; the wrench row toggles it elsewhere.
-        var onAdminPage = ADMIN_PAGES.some(function (p) { return p.href === location.pathname; });
-        var subRows = ADMIN_PAGES.map(function (p) {
-          return '<a class="ios-item no-icon' + (p.href === location.pathname ? ' selected' : '') + '" href="' + p.href + '">' +
-            '<span class="ios-item-label">' + esc(p.label) + '</span></a>';
+        discover += ADMIN_PAGES.map(function (p) {
+          return iconRow(p.href, p.label, 'wrench', { selected: p.href === location.pathname });
         }).join('');
-        discover +=
-          '<button class="ios-item shell-admin-toggle' + (onAdminPage ? ' open' : '') + '" type="button">' +
-          '<span class="ios-item-icon"><svg class="ic"><use href="#s-wrench"/></svg></span>' +
-          '<span class="ios-item-label">Admin</span>' +
-          '<svg class="ic ios-item-chev"><use href="#s-chevron-right"/></svg>' +
-          '</button>' +
-          '<div class="shell-admin-sub"' + (onAdminPage ? '' : ' hidden') + '>' + subRows + '</div>';
       }
       html += '<div class="ios-group">' + discover + '</div>';
       if (members.length) {
@@ -277,15 +260,6 @@
       }
       html += '<p class="ios-footnote">Ratings and metadata from IMDb (via OMDb) and TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>';
       side.querySelector('.shell-groups').innerHTML = html;
-
-      var adminToggle = side.querySelector('.shell-admin-toggle');
-      if (adminToggle) {
-        adminToggle.addEventListener('click', function () {
-          var sub = side.querySelector('.shell-admin-sub');
-          var open = adminToggle.classList.toggle('open');
-          if (sub) sub.hidden = !open;
-        });
-      }
     });
   }
 
