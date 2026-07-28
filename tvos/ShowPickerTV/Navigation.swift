@@ -9,6 +9,8 @@ enum Route: Hashable {
     // detail from its title so the user can choose a list, rather than adding
     // it silently.
     case pick(title: String, network: String?, rating: String?, posterUrl: String?, networkUrl: String?)
+    case groupsList
+    case groupDetail(Int)
 }
 
 extension View {
@@ -38,6 +40,10 @@ private struct RouteScreen: View {
             case .pick(let title, let network, let rating, let posterUrl, let networkUrl):
                 ShowDetailView(id: nil, initialTitle: title, initialNetwork: network,
                                initialRating: rating, initialPoster: posterUrl, initialNetworkUrl: networkUrl)
+            case .groupsList:
+                GroupsListViewTV()
+            case .groupDetail(let id):
+                GroupDetailViewTV(groupId: id)
             }
         }
         .onExitCommand { dismiss() }

@@ -27,17 +27,25 @@ struct ListsView: View {
                     .padding(.horizontal)
                 } else {
                     List {
-                        ForEach(ShowList.allCases) { list in
-                            let items = shows.filter { $0.list == list.rawValue && !$0.isArchived }
-                            NavigationLink {
-                                ListShowsView(list: list, shows: items)
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Circle().fill(Self.color(for: list)).frame(width: 10, height: 10)
-                                    Text(list.title)
-                                    Spacer()
-                                    Text("\(items.count)").foregroundStyle(.secondary)
+                        Section("Your Lists") {
+                            ForEach(ShowList.allCases) { list in
+                                let items = shows.filter { $0.list == list.rawValue && !$0.isArchived }
+                                NavigationLink {
+                                    ListShowsView(list: list, shows: items)
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        Circle().fill(Self.color(for: list)).frame(width: 10, height: 10)
+                                        Text(list.title)
+                                        Spacer()
+                                        Text("\(items.count)").foregroundStyle(.secondary)
+                                    }
                                 }
+                            }
+                        }
+
+                        Section("Groups") {
+                            NavigationLink("Browse Groups") {
+                                GroupsWatchView()
                             }
                         }
                     }
