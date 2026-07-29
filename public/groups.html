@@ -228,7 +228,7 @@
 <body>
   <header>
     <div class="header-top">
-      <a class="back" href="/" title="Home" aria-label="Back to home">&#8249; Home</a>
+      <a id="backLink" class="back" href="/" title="Home" aria-label="Back to home">&#8249; Home</a>
       <h1 id="pageTitle">Groups</h1>
     </div>
   </header>
@@ -364,6 +364,12 @@
       document.getElementById('joinFlow').style.display = 'none';
       document.getElementById('pageTitle').textContent = 'Groups';
 
+      // Reset back button to home
+      const backLink = document.getElementById('backLink');
+      backLink.textContent = '‹ Home';
+      backLink.href = '/';
+      backLink.onclick = null;
+
       if (groups.length === 0) {
         container.innerHTML = '';
         empty.style.display = 'block';
@@ -410,6 +416,15 @@
       document.getElementById('groupName').textContent = escapeHtml(group.name);
       document.getElementById('memberCount').textContent = `${members.length} member${members.length !== 1 ? 's' : ''}`;
       document.getElementById('deleteBtn').style.display = isCreator ? 'block' : 'none';
+
+      // Update back button to return to groups list
+      const backLink = document.getElementById('backLink');
+      backLink.textContent = '‹ Groups';
+      backLink.href = '#';
+      backLink.onclick = (e) => {
+        e.preventDefault();
+        loadGroupsList();
+      };
 
       renderMembers(members);
       loadGroupTrending(group.id);
