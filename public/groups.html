@@ -316,6 +316,7 @@
     const API_BASE = '';
     let currentGroupId = null;
     let authMember = null;
+    let originalSidebarHtml = null;
 
     // Check auth on load
     (async () => {
@@ -369,6 +370,12 @@
       backLink.textContent = '‹ Home';
       backLink.href = '/';
       backLink.onclick = null;
+
+      // Restore original sidebar
+      const shellGroups = document.querySelector('.shell-groups');
+      if (shellGroups && originalSidebarHtml) {
+        shellGroups.innerHTML = originalSidebarHtml;
+      }
 
       if (groups.length === 0) {
         container.innerHTML = '';
@@ -425,6 +432,28 @@
         e.preventDefault();
         loadGroupsList();
       };
+
+      // Update sidebar to show group members instead of club members
+      const shellGroups = document.querySelector('.shell-groups');
+      if (shellGroups) {
+        // Save original sidebar before modifying
+        if (!originalSidebarHtml) {
+          originalSidebarHtml = shellGroups.innerHTML;
+        }
+        shellGroups.innerHTML = `
+          <h3 class="ios-group-header">${escapeHtml(group.name)}</h3>
+          <nav class="ios-group shell-members">
+            ${members.map(m => `
+              <a class="ios-item no-icon" href="/${escapeHtml(m.slug)}">
+                <span class="ios-item-label">${escapeHtml(m.first_name || m.slug)}</span>
+                <span class="ios-item-detail">${m.show_count} show${m.show_count !== 1 ? 's' : ''}</span>
+                <svg class="ic ios-item-chev"><use href="#s-chevron-right"/></svg>
+              </a>
+            `).join('')}
+          </nav>
+          <p class="ios-footnote">Ratings and metadata from IMDb (via OMDb) and TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+        `;
+      }
 
       renderMembers(members);
       loadGroupTrending(group.id);
