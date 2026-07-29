@@ -320,10 +320,10 @@
     // Check auth on load
     (async () => {
       try {
-        const res = await fetch('/api/members/me');
+        const res = await fetch('/auth/check');
         if (res.ok) {
           const data = await res.json();
-          authMember = data.member?.slug;
+          authMember = data.member;
           if (!authMember) {
             window.location.href = '/';
             return;
