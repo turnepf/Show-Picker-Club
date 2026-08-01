@@ -441,6 +441,12 @@
       ];
 
       let html = `
+        <div class="ios-group">
+          <a class="ios-item" href="/?home" style="color: var(--tint);">
+            <span class="ios-item-icon"><svg class="ic"><use href="#s-play-circle"/></svg></span>
+            <span class="ios-item-label">Back to My Shows</span>
+          </a>
+        </div>
         <h3 class="ios-group-header">${escapeHtml(group.name)}</h3>
         <div class="ios-group">
           <a class="ios-item no-icon" href="#" onclick="showGroupTrendingView(event)">
