@@ -4,6 +4,12 @@ import { getSession } from '../_shared/auth.js';
 // household plus the roster of other members to choose from; PUT replaces the
 // caller's household set. The audit (/api/subscriptions) pools shows across the
 // member + their saved household. Directed per-member — see migration 045.
+//
+// Backward compatibility note: This endpoint exposes a full roster (household +
+// members list) for older apps that use picker-based household selection. New
+// apps should use the invite-based flow: POST /api/household/invite to generate
+// a code, then POST /api/household/join to accept it (like groups). The roster
+// logic here will be removed after new apps pass approval.
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };

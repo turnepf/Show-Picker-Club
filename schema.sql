@@ -201,6 +201,14 @@ CREATE TABLE IF NOT EXISTS household_members (
   PRIMARY KEY (member_slug, other_slug)
 );
 
+CREATE TABLE IF NOT EXISTS household_invites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  inviter_slug TEXT NOT NULL REFERENCES members(slug) ON DELETE CASCADE,
+  code TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS member_platforms (
   member_slug TEXT NOT NULL REFERENCES members(slug),
   platform TEXT NOT NULL,
@@ -286,6 +294,8 @@ CREATE INDEX IF NOT EXISTS idx_actors_show_id ON actors(show_id);
 CREATE INDEX IF NOT EXISTS idx_show_ratings_title ON show_ratings(tmdb_id, tmdb_type);
 CREATE INDEX IF NOT EXISTS idx_member_subs_slug ON member_subscriptions(member_slug);
 CREATE INDEX IF NOT EXISTS idx_household_member ON household_members(member_slug);
+CREATE INDEX IF NOT EXISTS idx_household_invites_code ON household_invites(code);
+CREATE INDEX IF NOT EXISTS idx_household_invites_inviter ON household_invites(inviter_slug);
 CREATE INDEX IF NOT EXISTS idx_groups_creator ON groups(creator_slug);
 CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
 CREATE INDEX IF NOT EXISTS idx_group_members_member ON group_members(member_slug);
