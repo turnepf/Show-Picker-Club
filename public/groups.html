@@ -312,18 +312,10 @@
     </div>
   </div>
 
-  <!-- Show Detail Modal -->
-  <div id="showDetailModal" class="modal-overlay" style="align-items: flex-start; padding-top: 60px;">
-    <div class="modal" style="max-width: 600px; max-height: 80vh; overflow-y: auto;">
-      <button onclick="closeShowDetail()" style="position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 24px; cursor: pointer; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">×</button>
-      <div id="showDetailContent"></div>
-    </div>
-  </div>
 
   <script>
     const API_BASE = '';
     let currentGroupId = null;
-    let currentMemberSlug = null;
     let currentGroupData = null;
     let authMember = null;
     let originalSidebarHtml = null;
@@ -425,20 +417,13 @@
       }
     }
 
-    function updateGroupSidebar(group, members, selectedMember = null) {
+    function updateGroupSidebar(group, members) {
       const shellGroups = document.querySelector('.shell-groups');
       if (!shellGroups) return;
 
       if (!originalSidebarHtml) {
         originalSidebarHtml = shellGroups.innerHTML;
       }
-
-      const LISTS = [
-        { list: 'watching', label: 'Watching', icon: 'play-circle' },
-        { list: 'waiting', label: 'Awaiting', icon: 'hourglass' },
-        { list: 'recommending', label: 'Loved', icon: 'thumbsup' },
-        { list: 'next', label: 'Next Up', icon: 'text-plus' },
-      ];
 
       let html = `
         <div class="ios-group">
@@ -457,27 +442,13 @@
         <h3 class="ios-group-header">Members</h3>
         <nav class="ios-group shell-members">
           ${members.map(m => `
-            <a class="ios-item no-icon${selectedMember === m.slug ? ' selected' : ''}" href="#" onclick="showGroupMemberView('${escapeHtml(m.slug)}', event)">
+            <a class="ios-item no-icon" href="#" onclick="showGroupMemberView('${escapeHtml(m.slug)}', event)">
               <span class="ios-item-label">${escapeHtml(m.first_name || m.slug)}</span>
               <span class="ios-item-detail">${m.show_count} show${m.show_count !== 1 ? 's' : ''}</span>
             </a>
           `).join('')}
-        </nav>`;
-
-      if (selectedMember) {
-        html += `
-          <h3 class="ios-group-header">${escapeHtml(selectedMember)}'s Lists</h3>
-          <div class="ios-group">`;
-        LISTS.forEach(l => {
-          html += `<a class="ios-item" href="javascript:void(0)" onclick="return loadMemberShowList('${escapeHtml(selectedMember)}', '${l.list}', event) || false">
-            <span class="ios-item-icon"><svg class="ic"><use href="#s-${l.icon}"/></svg></span>
-            <span class="ios-item-label">${l.label}</span>
-          </a>`;
-        });
-        html += `</div>`;
-      }
-
-      html += `<p class="ios-footnote">Ratings and metadata from IMDb (via OMDb) and TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>`;
+        </nav>
+        <p class="ios-footnote">Ratings and metadata from IMDb (via OMDb) and TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>`;
       shellGroups.innerHTML = html;
     }
 
@@ -500,7 +471,6 @@
       };
 
       currentGroupData = { group, members, isCreator };
-      currentMemberSlug = null;
       updateGroupSidebar(group, members);
       renderMembers(members);
       loadGroupTrending(group.id);
@@ -518,53 +488,11 @@
     function showGroupMemberView(memberSlug, event) {
       event.preventDefault();
       if (!currentGroupData) return;
-      currentMemberSlug = memberSlug;
-      updateGroupSidebar(currentGroupData.group, currentGroupData.members, memberSlug);
-
-      // Show selected member's watching list in main area
-      const member = currentGroupData.members.find(m => m.slug === memberSlug);
-      if (member) {
-        document.getElementById('pageTitle').textContent = escapeHtml(member.first_name || member.slug);
-        loadMemberShowList(memberSlug, 'watching');
-      }
+      // Navigate to the member's page with group context in URL
+      // This uses the standard app's show rendering and all features
+      window.location.href = `/${memberSlug}?group=${currentGroupId}`;
     }
 
-    async function loadMemberShowList(memberSlug, listType, event) {
-      if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-      const container = document.getElementById('groupTrendingList');
-      container.innerHTML = '<p style="text-align: center; color: var(--ink-muted); padding: 40px 20px;">Loading…</p>';
-
-      try {
-        const res = await fetch(`/api/shows?member=${encodeURIComponent(memberSlug)}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-
-        // Filter by list type and archived status
-        const shows = (data.shows || []).filter(s => s.list === listType && !s.archived);
-
-        if (shows.length === 0) {
-          container.innerHTML = `<p style="text-align: center; color: var(--ink-muted); padding: 40px 20px;">No shows in this list</p>`;
-          return;
-        }
-
-        container.innerHTML = shows.map(show => `
-          <div class="show-item" onclick="showShowDetail(${show.id})" style="cursor: pointer;">
-            ${show.poster_url ? `<img src="${escapeHtml(show.poster_url)}" alt="${escapeHtml(show.title)}">` : '<div style="width: 40px; height: 60px; background: var(--surface); border-radius: 4px;"></div>'}
-            <div class="show-meta" style="flex: 1;">
-              <h4>${escapeHtml(show.title)}</h4>
-              <p>${show.network ? escapeHtml(show.network) : 'Unknown'}</p>
-            </div>
-          </div>
-        `).join('');
-      } catch (e) {
-        console.error('Failed to load shows:', e);
-        container.innerHTML = '<p style="text-align: center; color: var(--ink-muted); padding: 40px 20px;">Error loading shows</p>';
-      }
-      return false;
-    }
 
     function renderTrending(shows) {
       const container = document.getElementById('groupTrendingList');
@@ -572,15 +500,21 @@
         container.innerHTML = '<p style="text-align: center; color: var(--ink-muted); padding: 20px;">No shows yet</p>';
         return;
       }
-      container.innerHTML = shows.map(show => `
-        <div class="show-item" onclick="showShowDetail(${show.id})" style="cursor: pointer;">
-          ${show.poster_url ? `<img src="${escapeHtml(show.poster_url)}" alt="">` : '<div style="width: 40px; height: 60px; background: var(--surface); border-radius: 4px;"></div>'}
-          <div class="show-meta" style="flex: 1;">
-            <h4>${escapeHtml(show.title)}</h4>
-            <p>${show.members ? 'Added by: ' + show.members.join(', ') : 'No info'}</p>
-          </div>
-        </div>
-      `).join('');
+      container.innerHTML = shows.map(show => {
+        const firstMember = show.members && show.members.length > 0 ? show.members[0] : null;
+        const memberLink = firstMember ? `/${escapeHtml(firstMember)}?show=${show.id}` : '#';
+        return `
+          <a href="${memberLink}" style="text-decoration: none; color: inherit;">
+            <div class="show-item">
+              ${show.poster_url ? `<img src="${escapeHtml(show.poster_url)}" alt="">` : '<div style="width: 40px; height: 60px; background: var(--surface); border-radius: 4px;"></div>'}
+              <div class="show-meta" style="flex: 1;">
+                <h4>${escapeHtml(show.title)}</h4>
+                <p>${show.members ? 'Added by: ' + show.members.join(', ') : 'No info'}</p>
+              </div>
+            </div>
+          </a>
+        `;
+      }).join('');
     }
 
     function renderMembers(members) {
@@ -757,48 +691,6 @@
       }
     }
 
-    async function showShowDetail(showId) {
-      const modal = document.getElementById('showDetailModal');
-      const content = document.getElementById('showDetailContent');
-      content.innerHTML = '<p style="text-align: center; color: var(--ink-muted); padding: 40px 20px;">Loading…</p>';
-      modal.classList.add('open');
-
-      try {
-        const res = await fetch(`/api/shows/${showId}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const show = data.show;
-
-        let html = `
-          <div style="display: flex; gap: 16px; margin-bottom: 20px;">
-            ${show.poster_url ? `<img src="${escapeHtml(show.poster_url)}" alt="${escapeHtml(show.title)}" style="width: 100px; height: 150px; border-radius: 8px; object-fit: cover; flex-shrink: 0;">` : '<div style="width: 100px; height: 150px; background: var(--surface-2); border-radius: 8px;"></div>'}
-            <div style="flex: 1;">
-              <h2 style="margin: 0 0 8px; font-size: 20px;">${escapeHtml(show.title)}</h2>
-              <p style="margin: 0 0 8px; color: var(--ink-muted); font-size: 14px;">${show.network ? escapeHtml(show.network) : 'Unknown network'}</p>
-              ${show.rating ? `<p style="margin: 0 0 8px; font-size: 14px;">★ ${show.rating}</p>` : ''}
-              <p style="margin: 0; font-size: 13px; color: var(--ink-quiet);">${show.list ? escapeHtml(show.list.charAt(0).toUpperCase() + show.list.slice(1)) : 'Unknown'} list</p>
-            </div>
-          </div>
-        `;
-
-        if (show.overview) {
-          html += `<p style="margin: 16px 0; font-size: 14px; line-height: 1.5;">${escapeHtml(show.overview)}</p>`;
-        }
-
-        if (show.genres) {
-          html += `<p style="margin: 16px 0; font-size: 13px; color: var(--ink-muted);">${escapeHtml(show.genres)}</p>`;
-        }
-
-        content.innerHTML = html;
-      } catch (e) {
-        console.error('Failed to load show:', e);
-        content.innerHTML = '<p style="text-align: center; color: var(--ink-muted); padding: 40px 20px;">Error loading show details</p>';
-      }
-    }
-
-    function closeShowDetail() {
-      document.getElementById('showDetailModal').classList.remove('open');
-    }
 
     function escapeHtml(text) {
       const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
