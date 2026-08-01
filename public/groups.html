@@ -315,6 +315,8 @@
   <script>
     const API_BASE = '';
     let currentGroupId = null;
+    let currentMemberSlug = null;
+    let currentGroupData = null;
     let authMember = null;
     let originalSidebarHtml = null;
 
@@ -415,6 +417,56 @@
       }
     }
 
+    function updateGroupSidebar(group, members, selectedMember = null) {
+      const shellGroups = document.querySelector('.shell-groups');
+      if (!shellGroups) return;
+
+      if (!originalSidebarHtml) {
+        originalSidebarHtml = shellGroups.innerHTML;
+      }
+
+      const LISTS = [
+        { list: 'watching', label: 'Watching', icon: 'play-circle' },
+        { list: 'waiting', label: 'Awaiting', icon: 'hourglass' },
+        { list: 'recommending', label: 'Loved', icon: 'thumbsup' },
+        { list: 'next', label: 'Next Up', icon: 'text-plus' },
+      ];
+
+      let html = `
+        <h3 class="ios-group-header">${escapeHtml(group.name)}</h3>
+        <div class="ios-group">
+          <a class="ios-item no-icon" href="#" onclick="showGroupTrendingView(event)">
+            <span class="ios-item-label">${escapeHtml(group.name)}</span>
+            <svg class="ic ios-item-chev"><use href="#s-chevron-right"/></svg>
+          </a>
+        </div>
+        <h3 class="ios-group-header">Members</h3>
+        <nav class="ios-group shell-members">
+          ${members.map(m => `
+            <a class="ios-item no-icon${selectedMember === m.slug ? ' selected' : ''}" href="#" onclick="showGroupMemberView('${escapeHtml(m.slug)}', event)">
+              <span class="ios-item-label">${escapeHtml(m.first_name || m.slug)}</span>
+              <span class="ios-item-detail">${m.show_count} show${m.show_count !== 1 ? 's' : ''}</span>
+            </a>
+          `).join('')}
+        </nav>`;
+
+      if (selectedMember) {
+        html += `
+          <h3 class="ios-group-header">${escapeHtml(selectedMember)}'s Lists</h3>
+          <div class="ios-group">`;
+        LISTS.forEach(l => {
+          html += `<a class="ios-item" href="/${escapeHtml(selectedMember)}#${l.list}">
+            <span class="ios-item-icon"><svg class="ic"><use href="#s-${l.icon}"/></svg></span>
+            <span class="ios-item-label">${l.label}</span>
+          </a>`;
+        });
+        html += `</div>`;
+      }
+
+      html += `<p class="ios-footnote">Ratings and metadata from IMDb (via OMDb) and TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>`;
+      shellGroups.innerHTML = html;
+    }
+
     function showGroupDetail(group, members, isCreator) {
       document.getElementById('groupsList').style.display = 'none';
       document.getElementById('groupDetail').style.display = 'block';
@@ -433,30 +485,35 @@
         loadGroupsList();
       };
 
-      // Update sidebar to show group members instead of club members
-      const shellGroups = document.querySelector('.shell-groups');
-      if (shellGroups) {
-        // Save original sidebar before modifying
-        if (!originalSidebarHtml) {
-          originalSidebarHtml = shellGroups.innerHTML;
-        }
-        shellGroups.innerHTML = `
-          <h3 class="ios-group-header">${escapeHtml(group.name)}</h3>
-          <nav class="ios-group shell-members">
-            ${members.map(m => `
-              <a class="ios-item no-icon" href="/${escapeHtml(m.slug)}">
-                <span class="ios-item-label">${escapeHtml(m.first_name || m.slug)}</span>
-                <span class="ios-item-detail">${m.show_count} show${m.show_count !== 1 ? 's' : ''}</span>
-                <svg class="ic ios-item-chev"><use href="#s-chevron-right"/></svg>
-              </a>
-            `).join('')}
-          </nav>
-          <p class="ios-footnote">Ratings and metadata from IMDb (via OMDb) and TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
-        `;
-      }
-
+      currentGroupData = { group, members, isCreator };
+      currentMemberSlug = null;
+      updateGroupSidebar(group, members);
       renderMembers(members);
       loadGroupTrending(group.id);
+    }
+
+    function showGroupTrendingView(event) {
+      event.preventDefault();
+      if (!currentGroupData) return;
+      currentMemberSlug = null;
+      updateGroupSidebar(currentGroupData.group, currentGroupData.members);
+      renderMembers(currentGroupData.members);
+      loadGroupTrending(currentGroupId);
+    }
+
+    function showGroupMemberView(memberSlug, event) {
+      event.preventDefault();
+      if (!currentGroupData) return;
+      currentMemberSlug = memberSlug;
+      updateGroupSidebar(currentGroupData.group, currentGroupData.members, memberSlug);
+
+      // Show selected member's info in main area
+      const member = currentGroupData.members.find(m => m.slug === memberSlug);
+      if (member) {
+        document.getElementById('pageTitle').textContent = escapeHtml(member.first_name || member.slug);
+        const trendingContainer = document.getElementById('groupTrendingList');
+        trendingContainer.innerHTML = `<p style="text-align: center; color: var(--ink-muted); padding: 20px;">Click a list in the sidebar to view ${escapeHtml(member.first_name || member.slug)}'s shows</p>`;
+      }
     }
 
     function renderTrending(shows) {
