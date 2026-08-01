@@ -68,11 +68,8 @@
       transition: all 0.2s;
     }
     .group-card:hover { border-color: var(--tint); }
-    .group-card h3 { margin: 0 0 4px; font-size: 16px; font-weight: 600; color: var(--ink); }
+    .group-card h3 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
     .group-card p { margin: 0; font-size: 13px; color: var(--ink-muted); }
-    .group-trending { margin-top: 8px; font-size: 12px; }
-    .group-trending-title { color: var(--ink-muted); margin-bottom: 4px; }
-    .group-show { display: inline-block; background: var(--surface-2); padding: 2px 6px; border-radius: 4px; margin-right: 4px; margin-bottom: 2px; font-size: 11px; }
 
     .modal-overlay {
       display: none;
@@ -109,18 +106,6 @@
     .modal-buttons .btn-cancel { background: var(--surface-2); color: var(--ink); }
     .modal-buttons .btn-submit { background: var(--tint); color: white; }
 
-    .invite-section {
-      background: var(--surface-2);
-      border-radius: 12px;
-      padding: 16px;
-      margin-top: 20px;
-    }
-    .invite-section h3 { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
-    .invite-link-row {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
     .invite-link-input {
       flex: 1;
       padding: 8px 12px;
@@ -172,42 +157,6 @@
       cursor: pointer;
     }
 
-    .member-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 0;
-      border-bottom: 1px solid var(--border-soft);
-    }
-    .member-item:last-child { border-bottom: none; }
-    .member-info h4 { margin: 0; font-size: 14px; font-weight: 500; }
-    .member-info p { margin: 0; font-size: 12px; color: var(--ink-muted); }
-
-    .show-list { display: flex; flex-direction: column; gap: 12px; }
-    .show-item {
-      display: flex;
-      gap: 12px;
-      padding: 12px;
-      background: var(--surface-2);
-      border-radius: 8px;
-    }
-    .show-item img { width: 40px; height: 60px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
-    .show-meta h4 { margin: 0 0 2px; font-size: 13px; font-weight: 500; }
-    .show-meta p { margin: 0; font-size: 11px; color: var(--ink-muted); }
-
-    #createGroupBtn, #joinGroupBtn {
-      background: var(--tint);
-      color: white;
-      border: none;
-      padding: 10px 16px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      margin-right: 8px;
-      margin-bottom: 16px;
-    }
-
     .empty-state {
       text-align: center;
       padding: 40px 20px;
@@ -216,58 +165,103 @@
     .empty-state h3 { font-size: 16px; margin: 0 0 8px; }
     .empty-state p { font-size: 13px; margin: 0; }
 
+    .member-row {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border-soft);
+      cursor: pointer;
+    }
+    .member-row:last-child { border-bottom: none; }
+    .member-row h4 { margin: 0; font-size: 15px; font-weight: 500; }
+    .member-row p { margin: 4px 0 0; font-size: 13px; color: var(--ink-muted); }
+
+    .list-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-soft);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .list-tab {
+      padding: 12px 16px;
+      border: none;
+      background: none;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--ink-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      border-bottom: 3px solid transparent;
+      position: relative;
+      bottom: -1px;
+    }
+    .list-tab.active {
+      color: var(--ink);
+      border-bottom-color: var(--tint);
+    }
+
     #groupsList { display: none; }
-    #groupDetail { display: none; }
+    #groupView { display: none; }
+    #memberView { display: none; }
+    #showDetail { display: none; }
     #joinFlow { display: none; }
 
     body { background: var(--surface-2); }
   </style>
+  <script src="/show-renderer.js"></script>
   <script src="/shell.js?v=2" defer></script>
   <script src="/app-banner.js?v=4" defer></script>
 </head>
 <body>
   <header>
     <div class="header-top">
-      <a id="backLink" class="back" href="/" title="Home" aria-label="Back to home">&#8249; Home</a>
+      <a id="backLink" class="back" href="#" style="display: none;" onclick="navBack(); return false;">‹</a>
       <h1 id="pageTitle">Groups</h1>
     </div>
   </header>
 
   <main>
-    <!-- Groups List View -->
+    <!-- Groups List (root view) -->
     <div id="groupsList">
       <div style="margin-bottom: 20px;">
-        <button id="createGroupBtn" onclick="showCreateGroupModal()">Create Group</button>
-        <button id="joinGroupBtn" onclick="showJoinFlow()">Join a Group</button>
+        <button style="background: var(--tint); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; margin-right: 8px;" onclick="showCreateGroupModal()">Create Group</button>
+        <button style="background: var(--tint); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;" onclick="showJoinFlow()">Join a Group</button>
       </div>
-      <div id="groupsContainer" class="show-list"></div>
+      <div id="groupsContainer"></div>
       <div id="emptyGroups" class="empty-state" style="display: none;">
         <h3>No groups yet</h3>
         <p>Create or join a group to get started.</p>
       </div>
     </div>
 
-    <!-- Group Detail View -->
-    <div id="groupDetail">
+    <!-- Group View (members + trending) -->
+    <div id="groupView">
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
-        <div>
-          <h2 id="groupName" style="margin: 0; font-size: 22px; font-weight: 600;"></h2>
-          <p id="memberCount" style="margin: 4px 0 0; color: var(--ink-muted); font-size: 13px;"></p>
-        </div>
+        <h2 id="groupViewTitle" style="margin: 0; font-size: 22px; font-weight: 600;"></h2>
         <button id="groupMenuBtn" onclick="toggleGroupMenu()" style="background: none; border: none; font-size: 20px; cursor: pointer; padding: 8px;">⋯</button>
       </div>
-
       <div id="groupMenu" style="display: none; background: var(--surface-2); border-radius: 8px; padding: 8px; margin-bottom: 20px;">
         <button id="inviteBtn" onclick="showInviteModal()" style="display: block; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; margin-bottom: 8px;">Invite Members</button>
-        <button id="leaveBtn" onclick="leaveGroup()" style="display: block; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; color: #d32f2f; margin-bottom: 8px;">Leave Group</button>
+        <button id="leaveBtn" onclick="leaveGroup()" style="display: block; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; margin-bottom: 8px;">Leave Group</button>
         <button id="deleteBtn" onclick="deleteGroup()" style="display: none; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; color: #d32f2f;">Delete Group</button>
       </div>
+      <h3 style="margin: 0 0 12px; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-quiet);">Members</h3>
+      <div id="groupMembersList"></div>
+      <h3 style="margin: 20px 0 12px; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-quiet);">Group Trending</h3>
+      <div id="groupTrendingList"></div>
+    </div>
 
-      <h3 style="margin: 24px 0 12px; font-size: 16px; font-weight: 600;">Group Trending</h3>
-      <div id="groupTrendingList" class="show-list" style="margin-bottom: 24px;"></div>
+    <!-- Member View (list tabs + shows) -->
+    <div id="memberView">
+      <h2 id="memberViewTitle" style="margin: 0 0 16px; font-size: 22px; font-weight: 600;"></h2>
+      <div class="list-tabs" id="listTabs"></div>
+      <div id="memberShowsList"></div>
+    </div>
 
-      <h3 style="margin: 24px 0 12px; font-size: 16px; font-weight: 600;">Members</h3>
-      <div id="membersList"></div>
+    <!-- Show Detail -->
+    <div id="showDetail">
+      <h2 id="showDetailTitle" style="margin: 0 0 20px; font-size: 22px; font-weight: 600;"></h2>
+      <div id="showDetailContent" style="margin-bottom: 40px;"></div>
     </div>
 
     <!-- Join Flow -->
@@ -283,17 +277,6 @@
       </div>
     </div>
   </main>
-
-  <!-- Show Detail Modal -->
-  <div id="showDetailModal" class="modal-overlay" style="display: none; position: fixed; z-index: 2000;">
-    <div style="width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; background: var(--surface); border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
-      <div style="padding: 16px; border-bottom: 1px solid var(--border-soft); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--surface); z-index: 10;">
-        <h2 id="showDetailTitle" style="margin: 0; font-size: 18px; font-weight: 600;"></h2>
-        <button onclick="closeShowDetail()" style="background: none; border: none; font-size: 24px; cursor: pointer; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">×</button>
-      </div>
-      <div id="showDetailContent" style="padding: 20px;"></div>
-    </div>
-  </div>
 
   <!-- Create Group Modal -->
   <div id="createGroupModal" class="modal-overlay">
@@ -312,7 +295,7 @@
     <div class="modal">
       <h2>Invite to Group</h2>
       <p style="color: var(--ink-muted); font-size: 13px; margin: 0 0 16px;">Share this link with people you want to invite:</p>
-      <div class="invite-link-row">
+      <div style="display: flex; gap: 8px; align-items: center;">
         <input id="inviteLinkInput" class="invite-link-input" type="text" readonly>
         <button id="copyInviteLinkBtn" class="invite-link-btn" onclick="copyInviteLink()">Copy</button>
       </div>
@@ -323,20 +306,27 @@
     </div>
   </div>
 
-
   <script>
-    const API_BASE = '';
-    // Group Mode state
-    let currentGroupId = null;
+    // Stack-based navigation
+    let navStack = [];
+    let authMember = null;
     let currentGroupData = null;
     let currentMemberSlug = null;
-    let currentListType = null;
-    let currentMemberShows = null;
-    // App state
-    let authMember = null;
-    let originalSidebarHtml = null;
+    let currentListType = 'watching';
+    let currentMemberShows = [];
+    let detailShow = null;
+    let detailMyCopy = null;
+    let detailActors = [];
 
-    // Check auth on load
+    const ALL_LISTS = ['watching', 'waiting', 'recommending', 'next'];
+    const LIST_LABELS = {
+      watching: 'Watching',
+      waiting: 'Awaiting',
+      recommending: 'Loved',
+      next: 'Next Up'
+    };
+
+    // Initialize on page load
     (async () => {
       try {
         const res = await fetch('/auth/check');
@@ -352,7 +342,7 @@
           if (joinToken) {
             showJoinPreview(joinToken);
           } else {
-            loadGroupsList();
+            navPush('groupsList', loadGroupsList);
           }
         } else {
           window.location.href = '/';
@@ -363,241 +353,440 @@
       }
     })();
 
+    // Navigation stack management
+    function navPush(view, loadFn) {
+      navStack.push(view);
+      updateNav();
+      if (loadFn) loadFn();
+    }
+
+    function navBack() {
+      if (navStack.length > 1) {
+        navStack.pop();
+        updateNav();
+        const view = navStack[navStack.length - 1];
+        if (view === 'groupsList') loadGroupsList();
+        else if (view === 'groupView') renderGroupView();
+        else if (view === 'memberView') renderMemberView();
+      }
+    }
+
+    function updateNav() {
+      const view = navStack[navStack.length - 1];
+      document.getElementById('groupsList').style.display = view === 'groupsList' ? 'block' : 'none';
+      document.getElementById('groupView').style.display = view === 'groupView' ? 'block' : 'none';
+      document.getElementById('memberView').style.display = view === 'memberView' ? 'block' : 'none';
+      document.getElementById('showDetail').style.display = view === 'showDetail' ? 'block' : 'none';
+      document.getElementById('joinFlow').style.display = view === 'joinFlow' ? 'block' : 'none';
+
+      const backLink = document.getElementById('backLink');
+      backLink.style.display = navStack.length > 1 ? 'block' : 'none';
+    }
+
+    // Views
     async function loadGroupsList() {
       try {
         const res = await fetch('/api/groups');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        showGroupsList(data.groups || []);
+        document.getElementById('pageTitle').textContent = 'Groups';
+        const container = document.getElementById('groupsContainer');
+        const empty = document.getElementById('emptyGroups');
+
+        if (data.groups.length === 0) {
+          container.innerHTML = '';
+          empty.style.display = 'block';
+          return;
+        }
+        empty.style.display = 'none';
+        container.innerHTML = data.groups.map(g => `
+          <div class="group-card" onclick="openGroup(${g.id})">
+            <h3>${escapeHtml(g.name)}</h3>
+            <p>${g.member_count} member${g.member_count !== 1 ? 's' : ''}</p>
+          </div>
+        `).join('');
       } catch (e) {
         console.error('Failed to load groups:', e);
         document.getElementById('groupsContainer').innerHTML = '<p>Error loading groups. Try again.</p>';
       }
     }
 
-    function showGroupsList(groups) {
-      const container = document.getElementById('groupsContainer');
-      const empty = document.getElementById('emptyGroups');
-      document.getElementById('groupsList').style.display = 'block';
-      document.getElementById('groupDetail').style.display = 'none';
-      document.getElementById('joinFlow').style.display = 'none';
-      document.getElementById('pageTitle').textContent = 'Groups';
-
-      // Reset back button to home
-      const backLink = document.getElementById('backLink');
-      backLink.textContent = '‹ Home';
-      backLink.href = '/';
-      backLink.onclick = null;
-
-      // Restore original sidebar
-      const shellGroups = document.querySelector('.shell-groups');
-      if (shellGroups && originalSidebarHtml) {
-        shellGroups.innerHTML = originalSidebarHtml;
-      }
-
-      // Reset state
-      currentGroupId = null;
-      currentGroupData = null;
-      currentMemberSlug = null;
-      currentListType = null;
-      currentMemberShows = null;
-
-      if (groups.length === 0) {
-        container.innerHTML = '';
-        empty.style.display = 'block';
-        return;
-      }
-      empty.style.display = 'none';
-      container.innerHTML = groups.map(g => `
-        <div class="group-card" onclick="enterGroupMode(${g.id})">
-          <h3>${escapeHtml(g.name)}</h3>
-          <p>${g.member_count} member${g.member_count !== 1 ? 's' : ''}</p>
-        </div>
-      `).join('');
-    }
-
-    // === GROUP MODE ARCHITECTURE ===
-    // State: currentGroupId, currentGroupData, currentMemberSlug, currentListType, currentMemberShows
-
-    async function enterGroupMode(groupId) {
+    async function openGroup(groupId) {
       try {
         const res = await fetch(`/api/groups/${groupId}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-
-        currentGroupId = groupId;
-        currentGroupData = { group: data.group, members: data.members, isCreator: data.is_creator };
+        currentGroupData = data;
         currentMemberSlug = null;
-        currentListType = null;
-        currentMemberShows = null;
-
-        document.getElementById('groupsList').style.display = 'none';
-        document.getElementById('groupDetail').style.display = 'block';
-        document.getElementById('joinFlow').style.display = 'none';
-        document.getElementById('pageTitle').textContent = escapeHtml(data.group.name);
-        document.getElementById('groupName').textContent = escapeHtml(data.group.name);
-        document.getElementById('memberCount').textContent = `${data.members.length} member${data.members.length !== 1 ? 's' : ''}`;
-        document.getElementById('deleteBtn').style.display = data.is_creator ? 'block' : 'none';
-
-        const backLink = document.getElementById('backLink');
-        backLink.textContent = '‹ Groups';
-        backLink.href = '#';
-        backLink.onclick = (e) => {
-          e.preventDefault();
-          loadGroupsList();
-        };
-
-        renderGroupMode();
+        currentListType = 'watching';
+        navPush('groupView', renderGroupView);
       } catch (e) {
-        console.error('Failed to enter group:', e);
+        console.error('Failed to load group:', e);
         alert('Error loading group');
       }
     }
 
-    function selectGroupMember(memberSlug) {
-      currentMemberSlug = memberSlug;
-      currentListType = 'watching'; // default to Watching
-      loadMemberShows(memberSlug);
-      renderGroupMode();
-    }
+    async function renderGroupView() {
+      if (!currentGroupData) return;
+      document.getElementById('pageTitle').textContent = escapeHtml(currentGroupData.group.name);
+      document.getElementById('groupViewTitle').textContent = escapeHtml(currentGroupData.group.name);
+      document.getElementById('deleteBtn').style.display = currentGroupData.is_creator ? 'block' : 'none';
 
-    function selectGroupList(listType) {
-      if (!currentMemberSlug) return;
-      currentListType = listType;
-      renderGroupMode();
-    }
+      // Members
+      const membersList = document.getElementById('groupMembersList');
+      membersList.innerHTML = currentGroupData.members.map(m => `
+        <div class="member-row" onclick="openMember('${escapeHtml(m.slug)}')">
+          <h4>${escapeHtml(m.first_name || m.slug)}</h4>
+          <p>${m.show_count} show${m.show_count !== 1 ? 's' : ''}</p>
+        </div>
+      `).join('');
 
-    function viewGroupTrending() {
-      currentMemberSlug = null;
-      currentListType = null;
-      renderGroupMode();
-    }
-
-    async function loadMemberShows(memberSlug) {
+      // Trending
       try {
-        const res = await fetch(`/api/shows?member=${encodeURIComponent(memberSlug)}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        currentMemberShows = data.shows || [];
-      } catch (e) {
-        console.error('Failed to load shows:', e);
-        currentMemberShows = [];
-      }
-    }
-
-    function renderGroupMode() {
-      renderGroupSidebar();
-      renderGroupMainArea();
-    }
-
-    function renderGroupSidebar() {
-      const shellGroups = document.querySelector('.shell-groups');
-      if (!shellGroups) return;
-
-      if (!originalSidebarHtml) {
-        originalSidebarHtml = shellGroups.innerHTML;
-      }
-
-      const LISTS = [
-        { list: 'watching', label: 'Watching', icon: 'play-circle' },
-        { list: 'waiting', label: 'Awaiting', icon: 'hourglass' },
-        { list: 'recommending', label: 'Loved', icon: 'thumbsup' },
-        { list: 'next', label: 'Next Up', icon: 'text-plus' },
-      ];
-
-      let html = `
-        <div class="ios-group">
-          <a class="ios-item" href="/?home" style="color: var(--tint);">
-            <span class="ios-item-icon"><svg class="ic"><use href="#s-play-circle"/></svg></span>
-            <span class="ios-item-label">Back to My Shows</span>
-          </a>
-        </div>
-        <h3 class="ios-group-header">${escapeHtml(currentGroupData.group.name)}</h3>
-        <div class="ios-group">
-          <a class="ios-item no-icon" href="#" onclick="viewGroupTrending(); return false;">
-            <span class="ios-item-label">Group Trending</span>
-            <svg class="ic ios-item-chev"><use href="#s-flame"/></svg>
-          </a>
-        </div>
-        <h3 class="ios-group-header">Members</h3>
-        <nav class="ios-group shell-members">
-          ${currentGroupData.members.map(m => `
-            <a class="ios-item no-icon${currentMemberSlug === m.slug ? ' selected' : ''}" href="#" onclick="selectGroupMember('${escapeHtml(m.slug)}'); return false;">
-              <span class="ios-item-label">${escapeHtml(m.first_name || m.slug)}</span>
-              <span class="ios-item-detail">${m.show_count} show${m.show_count !== 1 ? 's' : ''}</span>
-            </a>
-          `).join('')}
-        </nav>`;
-
-      if (currentMemberSlug) {
-        const member = currentGroupData.members.find(m => m.slug === currentMemberSlug);
-        html += `
-          <h3 class="ios-group-header">${escapeHtml((member?.first_name || currentMemberSlug) + "'s Lists")}</h3>
-          <div class="ios-group">`;
-        LISTS.forEach(l => {
-          html += `<a class="ios-item${currentListType === l.list ? ' selected' : ''}" href="#" onclick="selectGroupList('${l.list}'); return false;">
-            <span class="ios-item-icon"><svg class="ic"><use href="#s-${l.icon}"/></svg></span>
-            <span class="ios-item-label">${l.label}</span>
-          </a>`;
-        });
-        html += `</div>`;
-      }
-
-      html += `<p class="ios-footnote">Ratings and metadata from IMDb (via OMDb) and TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>`;
-      shellGroups.innerHTML = html;
-    }
-
-    function renderGroupMainArea() {
-      const titleEl = document.getElementById('pageTitle');
-      const trendingContainer = document.getElementById('groupTrendingList');
-
-      if (!currentMemberSlug) {
-        // Show group trending
-        titleEl.textContent = `${escapeHtml(currentGroupData.group.name)} Trending`;
-        loadGroupTrending(currentGroupId);
-      } else {
-        // Show member's list
-        const member = currentGroupData.members.find(m => m.slug === currentMemberSlug);
-        const listLabel = ['watching', 'waiting', 'recommending', 'next'].find(l => l === currentListType)
-          ? ['Watching', 'Awaiting', 'Loved', 'Next Up'][['watching', 'waiting', 'recommending', 'next'].indexOf(currentListType)]
-          : 'Shows';
-        titleEl.textContent = `${escapeHtml(member?.first_name || currentMemberSlug)}'s ${listLabel}`;
-
-        if (currentMemberShows) {
-          const filteredShows = currentMemberShows.filter(s => s.list === currentListType && !s.archived);
-          renderShowList(filteredShows, trendingContainer);
+        const res = await fetch(`/api/groups/${currentGroupData.group.id}/trending`);
+        if (res.ok) {
+          const data = await res.json();
+          const shows = data.shows || [];
+          document.getElementById('groupTrendingList').innerHTML = renderShowList(shows, {
+            onClickId: openShowFromList,
+            showRating: true,
+            showChevron: true,
+            caption: null
+          });
         }
-      }
-    }
-
-    async function loadGroupTrending(groupId) {
-      try {
-        const res = await fetch(`/api/groups/${groupId}/trending`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        renderShowList(data.shows || [], document.getElementById('groupTrendingList'), true);
       } catch (e) {
         console.error('Failed to load trending:', e);
       }
     }
 
-    function renderShowList(shows, container, isTrending = false) {
-      if (shows.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: var(--ink-muted); padding: 40px 20px;">No shows</p>';
-        return;
+    async function openMember(memberSlug) {
+      currentMemberSlug = memberSlug;
+      currentListType = 'watching';
+      try {
+        const res = await fetch(`/api/shows?member=${encodeURIComponent(memberSlug)}`);
+        if (res.ok) {
+          const data = await res.json();
+          currentMemberShows = data.shows || [];
+        }
+      } catch (e) {
+        console.error('Failed to load member shows:', e);
+        currentMemberShows = [];
       }
-      container.innerHTML = shows.map(show => `
-        <div class="show-item" onclick="openShowDetail(${show.id}); return false;" style="cursor: pointer;">
-          ${show.poster_url ? `<img src="${escapeHtml(show.poster_url)}" alt="">` : '<div style="width: 40px; height: 60px; background: var(--surface); border-radius: 4px;"></div>'}
-          <div class="show-meta" style="flex: 1;">
-            <h4>${escapeHtml(show.title)}</h4>
-            <p>${isTrending && show.members ? 'Added by: ' + show.members.join(', ') : show.network || 'Unknown'}</p>
-          </div>
-        </div>
-      `).join('');
+      navPush('memberView', renderMemberView);
     }
 
+    function renderMemberView() {
+      if (!currentMemberSlug) return;
+      const member = currentGroupData.members.find(m => m.slug === currentMemberSlug);
+      document.getElementById('pageTitle').textContent = escapeHtml(member?.first_name || currentMemberSlug);
+      document.getElementById('memberViewTitle').textContent = `${escapeHtml(member?.first_name || currentMemberSlug)}'s Shows`;
 
+      // List tabs
+      const tabs = document.getElementById('listTabs');
+      tabs.innerHTML = ALL_LISTS.map(list => `
+        <button class="list-tab${list === currentListType ? ' active' : ''}" onclick="switchList('${list}')">
+          ${LIST_LABELS[list]}
+        </button>
+      `).join('');
+
+      // Shows for current list
+      const filtered = currentMemberShows.filter(s => s.list === currentListType && !s.archived);
+      document.getElementById('memberShowsList').innerHTML = renderShowList(filtered, {
+        onClickId: openShowFromList,
+        showRating: true,
+        showChevron: true,
+        currentTab: currentListType
+      });
+    }
+
+    function switchList(list) {
+      currentListType = list;
+      renderMemberView();
+    }
+
+    async function openShowFromList(showId) {
+      detailShow = null;
+      detailMyCopy = null;
+      detailActors = [];
+
+      try {
+        const res = await fetch('/api/shows/' + showId);
+        if (res.ok) {
+          const data = await res.json();
+          detailShow = data.show;
+        }
+        if (!detailShow) return;
+
+        try {
+          const ar = await fetch('/api/shows/' + showId + '/actors');
+          if (ar.ok) {
+            const ad = await ar.json();
+            detailActors = ad.actors || [];
+          }
+        } catch {}
+
+        await resolveMyCopy(detailShow);
+        navPush('showDetail', renderShowDetail);
+      } catch (e) {
+        console.error('Failed to load show:', e);
+      }
+    }
+
+    async function resolveMyCopy(show) {
+      detailMyCopy = null;
+      if (!authMember || !show) return;
+      try {
+        const res = await fetch(`/api/shows?member=${encodeURIComponent(authMember.slug)}&include_archived=1`);
+        if (!res.ok) return;
+        const d = await res.json();
+        const t = (show.title || '').toLowerCase();
+        detailMyCopy = (d.shows || []).find(s => (s.title || '').toLowerCase() === t) || null;
+      } catch {}
+    }
+
+    function renderShowDetail() {
+      if (!detailShow) return;
+      document.getElementById('pageTitle').textContent = escapeHtml(detailShow.title);
+      document.getElementById('showDetailTitle').textContent = escapeHtml(detailShow.title);
+
+      const loggedIn = !!authMember;
+      let html = '';
+
+      // Poster/backdrop
+      if (detailShow.backdrop_url) {
+        html += `<div style="width:100%;margin-bottom:16px;"><img src="${safeUrl(detailShow.backdrop_url)}" alt="" loading="lazy" style="width:100%;border-radius:10px;display:block;"></div>`;
+      } else if (detailShow.poster_url) {
+        html += `<div style="margin-bottom:16px;"><img src="${safeUrl(detailShow.poster_url)}" alt="" loading="lazy" style="width:100%;border-radius:10px;display:block;"></div>`;
+      }
+
+      // Overview
+      if (detailShow.overview) {
+        html += `<div style="margin-bottom:16px;color:var(--ink);font-size:15px;line-height:1.6;">${escapeHtml(detailShow.overview)}</div>`;
+      }
+
+      // Network/Watch
+      if (detailShow.network) {
+        const realUrl = detailShow.network_url && !detailShow.network_url.includes('/search') && !detailShow.network_url.includes('/s?') && !detailShow.network_url.includes('?q=') && !detailShow.network_url.includes('?query=');
+        const linkHtml = realUrl
+          ? `<a href="${safeUrl(detailShow.network_url)}" target="_blank" rel="noopener" style="color:var(--tint);text-decoration:none;">Watch on ${escapeHtml(detailShow.network)}</a>`
+          : (detailShow.watch_link
+              ? `${escapeHtml(detailShow.network)} · <a href="${safeUrl(detailShow.watch_link)}" target="_blank" rel="noopener" style="color:var(--tint);text-decoration:none;">Where to watch</a>`
+              : escapeHtml(detailShow.network));
+        html += `<div style="margin-bottom:12px;padding:12px;background:var(--surface-2);border-radius:8px;"><strong>Network:</strong> ${linkHtml}</div>`;
+      }
+
+      // Trailer
+      if (detailShow.trailer_key) {
+        html += `<div style="margin-bottom:12px;"><a href="https://www.youtube.com/watch?v=${encodeURIComponent(detailShow.trailer_key)}" target="_blank" rel="noopener" style="color:var(--tint);text-decoration:none;">▶ Watch trailer</a></div>`;
+      }
+
+      // Cast
+      if (detailActors.length || detailShow.director) {
+        html += `<div style="margin-bottom:16px;padding:12px;background:var(--surface-2);border-radius:8px;">`;
+        if (detailShow.director) {
+          const dirVal = (detailShow.director_imdb_id && !detailShow.director.includes(','))
+            ? `<a href="https://www.imdb.com/name/${encodeURIComponent(detailShow.director_imdb_id)}/" target="_blank" rel="noopener" style="color:var(--tint);text-decoration:none;">${escapeHtml(detailShow.director)}</a>`
+            : escapeHtml(detailShow.director);
+          html += `<div style="margin-bottom:8px;"><strong>${detailShow.movie ? 'Director' : 'Creator'}:</strong> ${dirVal}</div>`;
+        }
+        if (detailActors.length) {
+          const cast = detailActors.map(a => a.imdb_id
+            ? `<a href="https://www.imdb.com/name/${encodeURIComponent(a.imdb_id)}/" target="_blank" rel="noopener" style="color:var(--tint);text-decoration:none;">${escapeHtml(a.name)}</a>`
+            : escapeHtml(a.name)).join(', ');
+          html += `<div><strong>Cast:</strong> ${cast}</div>`;
+        }
+        html += `</div>`;
+      }
+
+      // My Lists
+      if (loggedIn && authMember) {
+        const curList = (detailMyCopy && !detailMyCopy.archived) ? detailMyCopy.list : null;
+        const chips = ALL_LISTS.map(l => `
+          <button style="padding:10px 16px;border:1px solid var(--border-soft);border-radius:8px;background:${l === curList ? 'var(--tint)' : 'var(--surface-2)'};color:${l === curList ? 'white' : 'var(--ink)'};font-weight:500;cursor:pointer;margin-right:8px;margin-bottom:8px;" onclick="detailChip('${l}')">
+            ${LIST_LABELS[l]}
+          </button>
+        `).join('');
+        html += `<div style="margin-bottom:16px;padding:12px;background:var(--surface-2);border-radius:8px;">
+          <div style="font-weight:600;margin-bottom:12px;">My Lists</div>
+          ${chips}`;
+        if (detailMyCopy && detailMyCopy.archived) {
+          html += `<div style="margin-top:8px;color:var(--ink-muted);font-size:13px;">Status: Archived</div>`;
+        }
+        html += `</div>`;
+      }
+
+      // Metadata
+      const metaRows = [];
+      if (detailShow.movie) metaRows.push(`<div><strong>Type:</strong> Movie</div>`);
+      if (detailShow.content_rating) metaRows.push(`<div><strong>Rated:</strong> ${escapeHtml(detailShow.content_rating)}</div>`);
+      if (detailShow.release_year) metaRows.push(`<div><strong>Year:</strong> ${escapeHtml(String(detailShow.release_year))}</div>`);
+      if (detailShow.genres) metaRows.push(`<div><strong>Genres:</strong> ${escapeHtml(detailShow.genres)}</div>`);
+      if (detailShow.runtime) metaRows.push(`<div><strong>Runtime:</strong> ${escapeHtml(detailShow.runtime)} min</div>`);
+      if (metaRows.length) {
+        html += `<div style="padding:12px;background:var(--surface-2);border-radius:8px;">${metaRows.join('')}</div>`;
+      }
+
+      document.getElementById('showDetailContent').innerHTML = html;
+    }
+
+    async function detailChip(list) {
+      if (!detailMyCopy) {
+        await detailAdd(list);
+      } else if (detailMyCopy.archived) {
+        await detailRestore(detailMyCopy.id, list);
+      } else if (detailMyCopy.list === list) {
+        return;
+      } else {
+        await detailMove(detailMyCopy.id, list);
+      }
+    }
+
+    async function detailAdd(list) {
+      if (!detailShow || !authMember) return;
+      try {
+        const res = await fetch('/api/shows', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: detailShow.title,
+            network: detailShow.network,
+            network_url: detailShow.network_url,
+            list: list,
+            movie: detailShow.movie,
+            tmdb_id: detailShow.tmdb_id,
+            tmdb_type: detailShow.tmdb_type
+          })
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        detailMyCopy = data.show;
+        renderShowDetail();
+        if (currentMemberSlug) {
+          await resolveMemberShows();
+          renderMemberView();
+        }
+      } catch (e) {
+        console.error('Failed to add show:', e);
+      }
+    }
+
+    async function detailMove(id, list) {
+      try {
+        const res = await fetch(`/api/shows/${id}/move`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ list })
+        });
+        if (!res.ok) return;
+        await resolveMyCopy(detailShow);
+        renderShowDetail();
+        if (currentMemberSlug) {
+          await resolveMemberShows();
+          renderMemberView();
+        }
+      } catch (e) {
+        console.error('Failed to move show:', e);
+      }
+    }
+
+    async function detailRestore(id, list) {
+      try {
+        const res = await fetch(`/api/shows/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ archived: 0, list })
+        });
+        if (!res.ok) return;
+        await resolveMyCopy(detailShow);
+        renderShowDetail();
+        if (currentMemberSlug) {
+          await resolveMemberShows();
+          renderMemberView();
+        }
+      } catch (e) {
+        console.error('Failed to restore show:', e);
+      }
+    }
+
+    async function resolveMemberShows() {
+      if (!currentMemberSlug) return;
+      try {
+        const res = await fetch(`/api/shows?member=${encodeURIComponent(currentMemberSlug)}`);
+        if (res.ok) {
+          const data = await res.json();
+          currentMemberShows = data.shows || [];
+        }
+      } catch {}
+    }
+
+    // Group management
+    function toggleGroupMenu() {
+      const menu = document.getElementById('groupMenu');
+      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function showInviteModal() {
+      if (!currentGroupData) return;
+      generateNewInvite();
+    }
+
+    async function generateNewInvite() {
+      try {
+        const res = await fetch(`/api/groups/${currentGroupData.group.id}/invite`, { method: 'POST' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        document.getElementById('inviteLinkInput').value = data.url;
+        const expiryDate = new Date(data.expires_at).toLocaleDateString();
+        document.getElementById('inviteLinkExpire').textContent = `Link expires on ${expiryDate}`;
+        document.getElementById('inviteModal').classList.add('open');
+        document.getElementById('copyInviteLinkBtn').textContent = 'Copy';
+      } catch (e) {
+        console.error('Failed to generate invite:', e);
+      }
+    }
+
+    function closeInviteModal() {
+      document.getElementById('inviteModal').classList.remove('open');
+    }
+
+    function copyInviteLink() {
+      const input = document.getElementById('inviteLinkInput');
+      input.select();
+      document.execCommand('copy');
+      const btn = document.getElementById('copyInviteLinkBtn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+    }
+
+    async function leaveGroup() {
+      if (!confirm('Leave this group?')) return;
+      try {
+        const res = await fetch(`/api/groups/${currentGroupData.group.id}/leave`, { method: 'POST' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        navStack = ['groupsList'];
+        updateNav();
+        loadGroupsList();
+        toggleGroupMenu();
+      } catch (e) {
+        console.error('Failed to leave group:', e);
+      }
+    }
+
+    async function deleteGroup() {
+      if (!confirm('Delete this group? This cannot be undone.')) return;
+      try {
+        const res = await fetch(`/api/groups/${currentGroupData.group.id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        navStack = ['groupsList'];
+        updateNav();
+        loadGroupsList();
+        toggleGroupMenu();
+      } catch (e) {
+        console.error('Failed to delete group:', e);
+      }
+    }
+
+    // Modals
     function showCreateGroupModal() {
       document.getElementById('createGroupModal').classList.add('open');
       document.getElementById('groupNameInput').focus();
@@ -623,117 +812,40 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         closeCreateGroupModal();
-        showInviteModalWithToken(data.invite.url, data.invite.expires_at);
+        document.getElementById('inviteLinkInput').value = data.invite.url;
+        document.getElementById('inviteLinkExpire').textContent = `Link expires on ${new Date(data.invite.expires_at).toLocaleDateString()}`;
+        document.getElementById('inviteModal').classList.add('open');
         setTimeout(loadGroupsList, 500);
       } catch (e) {
         console.error('Failed to create group:', e);
-        alert('Error creating group');
       }
-    }
-
-    function showInviteModal() {
-      if (!currentGroupId) return;
-      generateNewInvite();
-    }
-
-    async function generateNewInvite() {
-      try {
-        const res = await fetch(`/api/groups/${currentGroupId}/invite`, { method: 'POST' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        showInviteModalWithToken(data.url, data.expires_at);
-      } catch (e) {
-        console.error('Failed to generate invite:', e);
-        alert('Error generating invite link');
-      }
-    }
-
-    function showInviteModalWithToken(url, expiresAt) {
-      const modal = document.getElementById('inviteModal');
-      document.getElementById('inviteLinkInput').value = url;
-      const expiryDate = new Date(expiresAt).toLocaleDateString();
-      document.getElementById('inviteLinkExpire').textContent = `Link expires on ${expiryDate}`;
-      modal.classList.add('open');
-      document.getElementById('copyInviteLinkBtn').textContent = 'Copy';
-    }
-
-    function closeInviteModal() {
-      document.getElementById('inviteModal').classList.remove('open');
-    }
-
-    function copyInviteLink() {
-      const input = document.getElementById('inviteLinkInput');
-      input.select();
-      document.execCommand('copy');
-      const btn = document.getElementById('copyInviteLinkBtn');
-      btn.textContent = 'Copied!';
-      setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
-    }
-
-    async function leaveGroup() {
-      if (!confirm('Leave this group?')) return;
-      try {
-        const res = await fetch(`/api/groups/${currentGroupId}/leave`, { method: 'POST' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        toggleGroupMenu();
-        loadGroupsList();
-      } catch (e) {
-        console.error('Failed to leave group:', e);
-        alert('Error leaving group');
-      }
-    }
-
-    async function deleteGroup() {
-      if (!confirm('Delete this group? This cannot be undone.')) return;
-      try {
-        const res = await fetch(`/api/groups/${currentGroupId}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        toggleGroupMenu();
-        loadGroupsList();
-      } catch (e) {
-        console.error('Failed to delete group:', e);
-        alert('Error deleting group');
-      }
-    }
-
-    function toggleGroupMenu() {
-      const menu = document.getElementById('groupMenu');
-      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
     }
 
     function showJoinFlow() {
-      document.getElementById('groupsList').style.display = 'none';
-      document.getElementById('groupDetail').style.display = 'none';
-      document.getElementById('joinFlow').style.display = 'block';
-      document.getElementById('pageTitle').textContent = 'Join a Group';
-      document.getElementById('joinTokenInput').focus();
+      navPush('joinFlow', () => {
+        document.getElementById('pageTitle').textContent = 'Join a Group';
+        document.getElementById('joinTokenInput').focus();
+      });
     }
 
     async function showJoinPreview(token) {
       try {
         const res = await fetch(`/api/groups/join?token=${encodeURIComponent(token)}`);
         if (!res.ok) {
-          if (res.status === 410) {
-            alert('This invite link has expired');
-          } else if (res.status === 404) {
-            alert('This invite link is not valid');
-          } else {
-            alert('Error');
-          }
           window.location.href = '/groups';
           return;
         }
         const data = await res.json();
         if (data.join_required) {
-          showJoinFlow();
-          document.getElementById('joinTokenInput').value = token;
+          navPush('joinFlow', () => {
+            document.getElementById('pageTitle').textContent = 'Join a Group';
+            document.getElementById('joinTokenInput').value = token;
+          });
         } else if (data.ok) {
-          alert('You\'ve joined the group!');
           window.location.href = '/groups';
         }
       } catch (e) {
         console.error('Failed to preview invite:', e);
-        alert('Error loading invite');
         window.location.href = '/groups';
       }
     }
@@ -751,280 +863,19 @@
           return;
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
         alert('Successfully joined the group!');
+        navStack = ['groupsList'];
+        updateNav();
         loadGroupsList();
       } catch (e) {
         console.error('Failed to join group:', e);
-        alert('Error joining group');
       }
     }
 
-
-    function escapeHtml(text) {
-      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-      return String(text || '').replace(/[&<>"']/g, c => map[c]);
-    }
-
-    function safeUrl(url) {
-      if (!url) return '';
-      try {
-        const u = new URL(url);
-        return (u.protocol === 'http:' || u.protocol === 'https:') ? url : '';
-      } catch { return ''; }
-    }
-
-    // Show detail modal state
-    let detailShow = null;
-    let detailMyCopy = null;
-    let detailActors = [];
-
-    const ALL_LISTS = ['watching', 'waiting', 'recommending', 'next'];
-    const LIST_LABELS = {
-      watching: 'Watching',
-      waiting: 'Awaiting',
-      recommending: 'Loved',
-      next: 'Next Up'
+    // Global click handler for show renderer
+    window.__showRendererClickHandler = (showId) => {
+      openShowFromList(showId);
     };
-
-    async function openShowDetail(id) {
-      detailShow = null;
-      detailMyCopy = null;
-      detailActors = [];
-
-      const modal = document.getElementById('showDetailModal');
-      document.getElementById('showDetailContent').innerHTML = '<div style="text-align: center; color: var(--ink-muted);">Loading…</div>';
-      modal.style.display = 'flex';
-
-      try {
-        // Fetch show details
-        const res = await fetch('/api/shows/' + id);
-        if (res.ok) {
-          const data = await res.json();
-          detailShow = data.show;
-        }
-
-        if (!detailShow) {
-          document.getElementById('showDetailContent').innerHTML = '<div style="text-align: center; color: var(--ink-muted);">Couldn\'t load this show.</div>';
-          return;
-        }
-
-        // Fetch actors
-        try {
-          const ar = await fetch('/api/shows/' + id + '/actors');
-          if (ar.ok) {
-            const ad = await ar.json();
-            detailActors = ad.actors || [];
-          }
-        } catch {}
-
-        // Resolve my copy
-        await resolveMyCopy(detailShow);
-
-        // Render detail
-        renderShowDetail(detailShow, detailActors);
-      } catch (e) {
-        console.error('Failed to load show:', e);
-        document.getElementById('showDetailContent').innerHTML = '<div style="text-align: center; color: var(--ink-muted);">Error loading show.</div>';
-      }
-    }
-
-    async function resolveMyCopy(show) {
-      detailMyCopy = null;
-      if (!authMember || !show) return;
-      try {
-        const res = await fetch(`/api/shows?member=${encodeURIComponent(authMember.slug)}&include_archived=1`);
-        if (!res.ok) return;
-        const d = await res.json();
-        const t = (show.title || '').toLowerCase();
-        detailMyCopy = (d.shows || []).find(s => (s.title || '').toLowerCase() === t) || null;
-      } catch {}
-    }
-
-    function renderShowDetail(show, actors) {
-      document.getElementById('showDetailTitle').textContent = escapeHtml(show.title || 'Show');
-      const loggedIn = !!authMember;
-      let html = '';
-
-      // Poster/backdrop
-      if (show.backdrop_url) {
-        html += `<div style="width:100%;margin-bottom:12px;"><img src="${safeUrl(show.backdrop_url)}" alt="" loading="lazy" style="width:100%;border-radius:10px;display:block;"></div>`;
-      } else if (show.poster_url) {
-        html += `<div style="margin-bottom:12px;"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy" style="width:100%;border-radius:10px;display:block;"></div>`;
-      }
-
-      // Overview
-      if (show.overview) {
-        html += `<div style="margin-bottom:16px;color:var(--ink);font-size:14px;line-height:1.5;">${escapeHtml(show.overview)}</div>`;
-      }
-
-      // Network/Watch
-      if (show.network) {
-        const realUrl = show.network_url && !show.network_url.includes('/search') && !show.network_url.includes('/s?') && !show.network_url.includes('?q=') && !show.network_url.includes('?query=');
-        const linkHtml = realUrl
-          ? `<a href="${safeUrl(show.network_url)}" target="_blank" rel="noopener" style="color:var(--tint);text-decoration:none;">Watch on ${escapeHtml(show.network)}</a>`
-          : (show.watch_link
-              ? `${escapeHtml(show.network)} · <a href="${safeUrl(show.watch_link)}" target="_blank" rel="noopener" style="color:var(--tint);text-decoration:none;">Where to watch</a>`
-              : escapeHtml(show.network));
-        html += `<div style="margin-bottom:12px;padding:12px;background:var(--surface-2);border-radius:8px;"><strong>Network:</strong> ${linkHtml}</div>`;
-      }
-
-      // Trailer
-      if (show.trailer_key) {
-        html += `<div style="margin-bottom:12px;"><a href="https://www.youtube.com/watch?v=${encodeURIComponent(show.trailer_key)}" target="_blank" rel="noopener" style="color:var(--tint);text-decoration:none;">▶ Watch trailer</a></div>`;
-      }
-
-      // Cast
-      if (actors.length || show.director) {
-        html += `<div style="margin-bottom:16px;padding:12px;background:var(--surface-2);border-radius:8px;">`;
-        if (show.director) {
-          const dirVal = (show.director_imdb_id && !show.director.includes(','))
-            ? `<a href="https://www.imdb.com/name/${encodeURIComponent(show.director_imdb_id)}/" target="_blank" rel="noopener" style="color:var(--tint);text-decoration:none;">${escapeHtml(show.director)}</a>`
-            : escapeHtml(show.director);
-          html += `<div style="margin-bottom:8px;"><strong>${show.movie ? 'Director' : 'Creator'}:</strong> ${dirVal}</div>`;
-        }
-        if (actors.length) {
-          const cast = actors.map(a => a.imdb_id
-            ? `<a href="https://www.imdb.com/name/${encodeURIComponent(a.imdb_id)}/" target="_blank" rel="noopener" style="color:var(--tint);text-decoration:none;">${escapeHtml(a.name)}</a>`
-            : escapeHtml(a.name)).join(', ');
-          html += `<div><strong>Cast:</strong> ${cast}</div>`;
-        }
-        html += `</div>`;
-      }
-
-      // My Lists (logged in users only)
-      if (loggedIn && authMember) {
-        const curList = (detailMyCopy && !detailMyCopy.archived) ? detailMyCopy.list : null;
-        const chips = ALL_LISTS.map(l => `
-          <button style="padding:10px 16px;border:1px solid var(--border-soft);border-radius:8px;background:${l === curList ? 'var(--tint)' : 'var(--surface-2)'};color:${l === curList ? 'white' : 'var(--ink)'};font-weight:500;cursor:pointer;margin-right:8px;margin-bottom:8px;" onclick="detailChip('${l}')">
-            ${LIST_LABELS[l] || l}
-          </button>
-        `).join('');
-        html += `<div style="margin-bottom:16px;padding:12px;background:var(--surface-2);border-radius:8px;">
-          <div style="font-weight:600;margin-bottom:12px;">My Lists</div>
-          ${chips}`;
-        if (detailMyCopy && detailMyCopy.archived) {
-          html += `<div style="margin-top:8px;color:var(--ink-muted);font-size:13px;">Status: Archived</div>`;
-        }
-        html += `</div>`;
-      }
-
-      // Metadata
-      const metaRows = [];
-      if (show.movie) metaRows.push(`<div><strong>Type:</strong> Movie</div>`);
-      if (show.content_rating) metaRows.push(`<div><strong>Rated:</strong> ${escapeHtml(show.content_rating)}</div>`);
-      if (show.release_year) metaRows.push(`<div><strong>Year:</strong> ${escapeHtml(String(show.release_year))}</div>`);
-      if (show.genres) metaRows.push(`<div><strong>Genres:</strong> ${escapeHtml(show.genres)}</div>`);
-      if (show.runtime) metaRows.push(`<div><strong>Runtime:</strong> ${escapeHtml(show.runtime)} min</div>`);
-
-      if (metaRows.length) {
-        html += `<div style="padding:12px;background:var(--surface-2);border-radius:8px;">${metaRows.join('')}</div>`;
-      }
-
-      document.getElementById('showDetailContent').innerHTML = html;
-    }
-
-    function closeShowDetail() {
-      document.getElementById('showDetailModal').style.display = 'none';
-      detailShow = null;
-      detailMyCopy = null;
-      detailActors = [];
-    }
-
-    async function detailChip(list) {
-      if (!detailMyCopy) {
-        // Add show to list
-        await detailAdd(list);
-      } else if (detailMyCopy.archived) {
-        // Restore from archive
-        await detailRestore(detailMyCopy.id, list);
-      } else if (detailMyCopy.list === list) {
-        // Already on list, no-op
-        return;
-      } else {
-        // Move to different list
-        await detailMove(detailMyCopy.id, list);
-      }
-    }
-
-    async function detailAdd(list) {
-      if (!detailShow || !authMember) return;
-      try {
-        const res = await fetch('/api/shows', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: detailShow.title,
-            network: detailShow.network,
-            network_url: detailShow.network_url,
-            list: list,
-            movie: detailShow.movie,
-            tmdb_id: detailShow.tmdb_id,
-            tmdb_type: detailShow.tmdb_type
-          })
-        });
-        if (!res.ok) {
-          alert('Error adding show');
-          return;
-        }
-        const data = await res.json();
-        detailMyCopy = data.show;
-        renderShowDetail(detailShow, detailActors);
-        if (typeof loadMemberShows === 'function' && currentMemberSlug) {
-          await loadMemberShows(currentMemberSlug);
-          renderGroupMode();
-        }
-      } catch (e) {
-        console.error('Failed to add show:', e);
-        alert('Error adding show');
-      }
-    }
-
-    async function detailMove(id, list) {
-      try {
-        const res = await fetch(`/api/shows/${id}/move`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ list })
-        });
-        if (!res.ok) {
-          alert('Error moving show');
-          return;
-        }
-        await resolveMyCopy(detailShow);
-        renderShowDetail(detailShow, detailActors);
-        if (typeof loadMemberShows === 'function' && currentMemberSlug) {
-          await loadMemberShows(currentMemberSlug);
-          renderGroupMode();
-        }
-      } catch (e) {
-        console.error('Failed to move show:', e);
-        alert('Error moving show');
-      }
-    }
-
-    async function detailRestore(id, list) {
-      try {
-        const res = await fetch(`/api/shows/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ archived: 0, list })
-        });
-        if (!res.ok) {
-          alert('Error restoring show');
-          return;
-        }
-        await resolveMyCopy(detailShow);
-        renderShowDetail(detailShow, detailActors);
-        if (typeof loadMemberShows === 'function' && currentMemberSlug) {
-          await loadMemberShows(currentMemberSlug);
-          renderGroupMode();
-        }
-      } catch (e) {
-        console.error('Failed to restore show:', e);
-        alert('Error restoring show');
-      }
-    }
   </script>
 </body>
 </html>
