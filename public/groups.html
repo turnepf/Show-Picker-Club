@@ -276,7 +276,7 @@
 <body>
   <header>
     <div class="header-top">
-      <a id="backLink" class="back" href="#" style="display: none;" onclick="navBack(); return false;">‹</a>
+      <a id="backLink" class="back" href="#" style="display: none;"></a>
       <h1 id="pageTitle">Groups</h1>
     </div>
   </header>
@@ -441,7 +441,17 @@
       document.getElementById('joinFlow').style.display = view === 'joinFlow' ? 'block' : 'none';
 
       const backLink = document.getElementById('backLink');
-      backLink.style.display = navStack.length > 1 ? 'block' : 'none';
+      if (navStack.length === 1) {
+        // At root: show "Home" link
+        backLink.textContent = 'Home';
+        backLink.style.display = 'block';
+        backLink.onclick = () => { window.location.href = '/'; return false; };
+      } else {
+        // Nested views: show back chevron
+        backLink.textContent = '‹';
+        backLink.style.display = 'block';
+        backLink.onclick = () => { navBack(); return false; };
+      }
     }
 
     // Views
