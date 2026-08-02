@@ -489,8 +489,8 @@
 
     async function renderGroupView() {
       if (!currentGroupData) return;
-      document.getElementById('pageTitle').textContent = escapeHtml(currentGroupData.group.name);
-      document.getElementById('groupViewTitle').textContent = escapeHtml(currentGroupData.group.name);
+      document.getElementById('pageTitle').textContent = currentGroupData.group.name;
+      document.getElementById('groupViewTitle').textContent = currentGroupData.group.name;
       document.getElementById('deleteBtn').style.display = currentGroupData.is_creator ? 'block' : 'none';
 
       // Members
@@ -539,8 +539,8 @@
     function renderMemberView() {
       if (!currentMemberSlug) return;
       const member = currentGroupData.members.find(m => m.slug === currentMemberSlug);
-      document.getElementById('pageTitle').textContent = escapeHtml(member?.first_name || currentMemberSlug);
-      document.getElementById('memberViewTitle').textContent = `${escapeHtml(member?.first_name || currentMemberSlug)}'s Shows`;
+      document.getElementById('pageTitle').textContent = member?.first_name || currentMemberSlug;
+      document.getElementById('memberViewTitle').textContent = `${member?.first_name || currentMemberSlug}'s Shows`;
 
       // List tabs
       const tabs = document.getElementById('listTabs');
@@ -607,8 +607,8 @@
 
     function renderShowDetail() {
       if (!detailShow) return;
-      document.getElementById('pageTitle').textContent = escapeHtml(detailShow.title);
-      document.getElementById('showDetailTitle').textContent = escapeHtml(detailShow.title);
+      document.getElementById('pageTitle').textContent = detailShow.title;
+      document.getElementById('showDetailTitle').textContent = detailShow.title;
 
       const loggedIn = !!authMember;
       let html = '';
