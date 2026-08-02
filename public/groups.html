@@ -273,6 +273,11 @@
     .network-counts { text-align: center; font-size: 12px; color: var(--ink-quiet); padding: 12px 0 4px; }
   </style>
   <script src="/show-renderer.js"></script>
+  <script>
+    // Set nav context before loading nav.js
+    window.navContext = { page: 'groups', backLabel: 'Groups' };
+  </script>
+  <script src="/nav.js"></script>
   <script src="/shell.js?v=2" defer></script>
   <script src="/app-banner.js?v=4" defer></script>
 </head>
@@ -443,18 +448,21 @@
       document.getElementById('showDetail').style.display = view === 'showDetail' ? 'block' : 'none';
       document.getElementById('joinFlow').style.display = view === 'joinFlow' ? 'block' : 'none';
 
-      const backLink = document.getElementById('backLink');
-      if (navStack.length === 1) {
-        // At root: show "Home" link
-        backLink.textContent = 'Home';
-        backLink.style.display = 'block';
-        backLink.onclick = () => { window.location.href = '/'; return false; };
-      } else {
-        // Nested views: show back chevron
-        backLink.textContent = '‹';
-        backLink.style.display = 'block';
-        backLink.onclick = () => { navBack(); return false; };
+      // Update shared nav label based on current view
+      let backLabel = 'Groups';
+      if (navStack.length > 1) {
+        const currentView = view;
+        if (currentView === 'groupView' && currentGroupData) {
+          backLabel = 'Groups';
+        } else if (currentView === 'memberView' && currentMemberSlug) {
+          // Get member name from currentGroupData if available
+          const member = currentGroupData?.members?.find(m => m.slug === currentMemberSlug);
+          backLabel = member?.first_name || currentMemberSlug;
+        } else if (currentView === 'showDetail' && detailShow) {
+          backLabel = detailShow.title;
+        }
       }
+      window.updateNavLabel(backLabel);
     }
 
     // Views

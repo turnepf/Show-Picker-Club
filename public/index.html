@@ -1741,6 +1741,11 @@
   <script type="text/javascript" src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
   <script src="/show-renderer.js"></script>
   <script>
+    // Set nav context before loading nav.js
+    window.navContext = { page: 'home' };
+  </script>
+  <script src="/nav.js"></script>
+  <script>
     let shows = [];
     let currentTab = 'watching';
     // isEditor removed: per-row actions now always show on own page when logged in.
