@@ -311,6 +311,7 @@
       </div>
       <div id="groupMenu" style="display: none; background: var(--surface-2); border-radius: 8px; padding: 8px; margin-bottom: 20px;">
         <button id="inviteBtn" onclick="showInviteModal()" style="display: block; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; margin-bottom: 8px;">Invite Members</button>
+        <button id="renameBtn" onclick="showRenameModal()" style="display: none; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; margin-bottom: 8px;">Rename Group</button>
         <button id="leaveBtn" onclick="leaveGroup()" style="display: block; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; margin-bottom: 8px;">Leave Group</button>
         <button id="deleteBtn" onclick="deleteGroup()" style="display: none; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; color: #d32f2f;">Delete Group</button>
       </div>
@@ -371,6 +372,18 @@
       <p id="inviteLinkExpire" style="color: var(--ink-muted); font-size: 12px; margin: 12px 0 0;"></p>
       <div class="modal-buttons" style="margin-top: 20px;">
         <button class="btn-cancel" onclick="closeInviteModal()" style="flex: 1;">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename Modal -->
+  <div id="renameModal" class="modal-overlay">
+    <div class="modal">
+      <h2>Rename Group</h2>
+      <input id="renameInput" type="text" placeholder="Group name" maxlength="100">
+      <div class="modal-buttons">
+        <button class="btn-cancel" onclick="closeRenameModal()">Cancel</button>
+        <button class="btn-submit" onclick="renameGroup()">Rename</button>
       </div>
     </div>
   </div>
@@ -512,6 +525,7 @@
       if (!currentGroupData) return;
       document.getElementById('pageTitle').textContent = currentGroupData.group.name;
       document.getElementById('groupViewTitle').textContent = currentGroupData.group.name;
+      document.getElementById('renameBtn').style.display = currentGroupData.is_creator ? 'block' : 'none';
       document.getElementById('deleteBtn').style.display = currentGroupData.is_creator ? 'block' : 'none';
 
       // Members
@@ -872,6 +886,48 @@
         toggleGroupMenu();
       } catch (e) {
         console.error('Failed to delete group:', e);
+      }
+    }
+
+    function showRenameModal() {
+      if (!currentGroupData) return;
+      document.getElementById('renameInput').value = currentGroupData.group.name;
+      document.getElementById('renameModal').classList.add('open');
+      document.getElementById('renameInput').focus();
+      document.getElementById('renameInput').select();
+      toggleGroupMenu();
+    }
+
+    function closeRenameModal() {
+      document.getElementById('renameModal').classList.remove('open');
+      document.getElementById('renameInput').value = '';
+    }
+
+    async function renameGroup() {
+      const newName = document.getElementById('renameInput').value.trim();
+      if (!newName) {
+        alert('Please enter a group name');
+        return;
+      }
+      if (newName === currentGroupData.group.name) {
+        closeRenameModal();
+        return;
+      }
+      try {
+        const res = await fetch(`/api/groups/${currentGroupData.group.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        currentGroupData.group = data.group;
+        document.getElementById('groupViewTitle').textContent = currentGroupData.group.name;
+        window.updateNavLabel(currentGroupData.group.name);
+        closeRenameModal();
+      } catch (e) {
+        console.error('Failed to rename group:', e);
+        alert('Failed to rename group');
       }
     }
 
