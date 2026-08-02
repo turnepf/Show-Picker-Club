@@ -502,6 +502,21 @@
     /* …but rows that always have a visible row somewhere above keep theirs. */
     .ios-item + .ios-item.always-sep::after { display: block; }
     .ios-item-icon { display: inline-flex; color: var(--tint); }
+
+    /* Nav spacer for visual grouping */
+    .nav-spacer { height: 12px; }
+
+    /* Badge for unrated count */
+    .nav-badge {
+      display: inline-block;
+      background: var(--tint);
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 10px;
+      margin-left: 4px;
+    }
     .ios-item-icon .ic { width: 22px; height: 22px; }
     .ios-item-label { flex: 1; min-width: 0; }
     .ios-item-detail { color: var(--ink-quiet); font-size: 13px; white-space: nowrap; }
@@ -1277,24 +1292,22 @@
           </button>
         </nav>
 
-        <!-- Discovery + account group, kept separate from My Shows above:
-             Trending, What's New, Subscription audit, then Admin. On the
-             desktop split view Trending is a sidebar entry (its rows render
-             in the detail column beside it); on the iPhone layout it becomes
-             the inline section below, so its row here is hidden. -->
+        <!-- Discovery + account group, reordered per new nav structure -->
         <nav class="ios-group">
-          <span class="ios-item side-list-row selected home-side-trending hidden" id="trendingSideGroup">
-            <span class="ios-item-icon"><svg class="ic"><use href="#i-flame"/></svg></span>
-            <span class="ios-item-label">Trending</span>
-          </span>
+          <div class="nav-spacer"></div>
           <a class="ios-item" href="/groups.html">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-people"/></svg></span>
             <span class="ios-item-label">Groups</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
-          <a class="ios-item" href="/whats-new">
-            <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
-            <span class="ios-item-label">What's New</span>
+          <a class="ios-item hidden home-ratebacklog-row" href="/rate-backlog">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-star-fill"/></svg></span>
+            <span class="ios-item-label">Rate my backlog<span class="nav-badge" id="rateBacklogBadge"></span></span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden home-subs-row" href="/subscriptions">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
+            <span class="ios-item-label">Subscription audit</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
           <a class="ios-item hidden vibe-row" href="/vibe">
@@ -1306,24 +1319,20 @@
             <span class="ios-item-icon"><svg class="ic"><use href="#i-calendar-plus"/></svg></span>
             <span class="ios-item-label">Calendar</span>
           </a>
-          <a class="ios-item hidden home-ratebacklog-row" href="/rate-backlog">
-            <span class="ios-item-icon"><svg class="ic"><use href="#i-star-fill"/></svg></span>
-            <span class="ios-item-label">Rate my backlog</span>
+          <a class="ios-item" href="/whats-new">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
+            <span class="ios-item-label">What's New</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
-          <a class="ios-item hidden home-subs-row" href="/subscriptions">
-            <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
-            <span class="ios-item-label">Subscription audit</span>
+          <div class="nav-spacer"></div>
+          <a class="ios-item hidden side-admin-reporting" href="/reporting">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-text-plus"/></svg></span>
+            <span class="ios-item-label">Reporting</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
           <a class="ios-item hidden side-admin-members" href="/members">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-person-plus"/></svg></span>
             <span class="ios-item-label">Manage members</span>
-            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
-          </a>
-          <a class="ios-item hidden side-admin-reporting" href="/reporting">
-            <span class="ios-item-icon"><svg class="ic"><use href="#i-text-plus"/></svg></span>
-            <span class="ios-item-label">Reporting</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
           <a class="ios-item hidden side-admin-cleanup" href="/url-cleanup">
@@ -1336,17 +1345,16 @@
             <span class="ios-item-label">Vibe trait scoring</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
+          <span class="ios-item side-list-row selected home-side-trending hidden" id="trendingSideGroup">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-flame"/></svg></span>
+            <span class="ios-item-label">Trending list</span>
+          </span>
         </nav>
 
         <!-- Small screens: Trending inline, iPhone-style. -->
         <div id="popularSection" style="display: none;">
           <h3 class="ios-group-header">Trending</h3>
           <div id="popularList" class="show-list" style="margin-bottom: 22px;"></div>
-        </div>
-
-        <div id="membersSection" class="hidden">
-          <h3 class="ios-group-header">Members</h3>
-          <nav class="ios-group" id="membersList"></nav>
         </div>
 
         <p class="ios-footnote">Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
@@ -1406,20 +1414,20 @@
           <span class="ios-item-label">Next Up</span>
         </button>
       </nav>
-      <!-- Discovery + account group, kept separate from the lists above:
-           Trending, What's New, Subscription audit, then Admin. -->
+      <!-- Discovery + account group, reordered to match home nav -->
       <nav class="ios-group">
-        <a class="ios-item" href="/?home">
-          <span class="ios-item-icon"><svg class="ic"><use href="#i-flame"/></svg></span>
-          <span class="ios-item-label">Trending</span>
-        </a>
+        <div class="nav-spacer"></div>
         <a class="ios-item" href="/groups">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-people"/></svg></span>
           <span class="ios-item-label">Groups</span>
         </a>
-        <a class="ios-item" href="/whats-new">
-          <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
-          <span class="ios-item-label">What's New</span>
+        <a class="ios-item hidden member-ratebacklog-row" href="/rate-backlog">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-star-fill"/></svg></span>
+          <span class="ios-item-label">Rate my backlog<span class="nav-badge" id="memberRateBacklogBadge"></span></span>
+        </a>
+        <a class="ios-item hidden member-subs-row" href="/subscriptions">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
+          <span class="ios-item-label">Subscription audit</span>
         </a>
         <a class="ios-item hidden vibe-row" href="/vibe">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
@@ -1429,14 +1437,11 @@
           <span class="ios-item-icon"><svg class="ic"><use href="#i-calendar-plus"/></svg></span>
           <span class="ios-item-label">Calendar</span>
         </a>
-        <a class="ios-item hidden member-ratebacklog-row" href="/rate-backlog">
-          <span class="ios-item-icon"><svg class="ic"><use href="#i-star-fill"/></svg></span>
-          <span class="ios-item-label">Rate my backlog</span>
+        <a class="ios-item" href="/whats-new">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
+          <span class="ios-item-label">What's New</span>
         </a>
-        <a class="ios-item hidden member-subs-row" href="/subscriptions">
-          <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
-          <span class="ios-item-label">Subscription audit</span>
-        </a>
+        <div class="nav-spacer"></div>
         <a class="ios-item hidden side-admin-reporting" href="/reporting">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-text-plus"/></svg></span>
           <span class="ios-item-label">Reporting</span>
@@ -1452,6 +1457,10 @@
         <a class="ios-item hidden side-admin-vibe" href="/vibe-admin">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
           <span class="ios-item-label">Vibe trait scoring</span>
+        </a>
+        <a class="ios-item" href="/?home">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-flame"/></svg></span>
+          <span class="ios-item-label">Trending</span>
         </a>
       </nav>
       <h3 class="ios-group-header">Members</h3>
@@ -2117,6 +2126,18 @@
         });
         renderHomeMembers();
         setupCalendarLinks(data.members);
+        // If logged in, fetch my shows to populate the rate backlog badge
+        if (authMember) {
+          try {
+            const showsRes = await fetch(`/api/shows?member=${authMember}`);
+            if (showsRes.ok) {
+              const showsData = await showsRes.json();
+              shows = showsData.shows || [];
+              updateRateBacklogBadge();
+            }
+          } catch (e) {}
+        }
+
       } catch (e) {}
 
       // Trending renders twice: inline for the iPhone layout, and into the
@@ -2968,6 +2989,7 @@
         }
         const data = await res.json();
         shows = data.shows || [];
+        updateRateBacklogBadge();
         renderShows();
       } catch (e) {
         document.getElementById('loading').textContent = 'Failed to load shows.';
@@ -2986,6 +3008,24 @@
       empty.classList.remove('hidden');
     }
 
+    // Update "Rate my backlog" badge with count of unrated shows
+    function updateRateBacklogBadge() {
+      if (!shows || !shows.length) return;
+      const unratedCount = shows.filter(s =>
+        ['watching', 'waiting', 'recommending'].includes(s.list) && !s.rating
+      ).length;
+
+      const homeBadge = document.getElementById('rateBacklogBadge');
+      const memberBadge = document.getElementById('memberRateBacklogBadge');
+
+      if (unratedCount > 0) {
+        if (homeBadge) homeBadge.textContent = unratedCount;
+        if (memberBadge) memberBadge.textContent = unratedCount;
+      } else {
+        if (homeBadge) homeBadge.textContent = '';
+        if (memberBadge) memberBadge.textContent = '';
+      }
+    }
 
     const TAB_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved', next: 'Next Up' };
 
