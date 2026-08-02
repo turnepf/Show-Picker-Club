@@ -1730,6 +1730,7 @@
   </div>
 
   <script type="text/javascript" src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
+  <script src="/show-renderer.js"></script>
   <script>
     let shows = [];
     let currentTab = 'watching';
@@ -1742,6 +1743,9 @@
     let authMember = null;
     let searchMode = 'member';
     let owners = '';
+
+    // Global click handler for show-renderer.js: when a show card is clicked
+    window.__showRendererClickHandler = (showId) => openDetail(showId);
 
     // Platform usage tracking: tell the server which web form factor this is so
     // reporting can split web into small- vs large-screen. The breakpoint
@@ -3063,93 +3067,17 @@
       }
       empty.classList.add('hidden');
 
-      container.innerHTML = filtered.map(show => {
-        const rating = show.rating
-          ? `<span class="show-rating"><span class="star">&#9733;</span>${escapeHtml(show.rating)}</span>`
-          : '';
-        const series = show.full_series ? ' <span title="Series Complete">🎬</span>' : '';
-        const movieTag = show.movie ? ' <span class="show-movie">(Movie)</span>' : '';
-
-        // Minimal, iOS-style row: title + a muted caption. Everything else —
-        // actions, cast, notes, the watch link — lives on the detail screen
-        // the whole row taps into.
-        const captionParts = [];
-        if (show.network) captionParts.push(escapeHtml(show.network));
-        if (currentTab === 'next' && show.recommended_by) captionParts.push(`rec'd by ${escapeHtml(show.recommended_by)}`);
-        const caption = captionParts.length ? `<div class="show-sub">${captionParts.join(' · ')}</div>` : '';
-
-        let dateLine = '';
-        const seasons = seasonsText(show);
-        // A premiere date shows on EVERY list, not just Watching/Awaiting —
-        // a show you Loved can drop a surprise new season, and that date is
-        // exactly the nudge to move it back to Watching.
-        if (show.next_season_date) {
-          dateLine = `<div class="show-sub">Next episode: ${formatSeasonRange(show)}${seasons ? ` · ${seasons}` : ''}</div>`;
-        } else if (seasons) {
-          dateLine = `<div class="show-sub">${seasons}</div>`;
-        }
-
-        const poster = show.poster_url
-          ? `<img class="row-poster" src="${safeUrl(show.poster_url)}" alt="" loading="lazy">`
-          : `<div class="row-poster row-poster-empty">🎬</div>`;
-
-        return `
-          <div class="show ios-row" id="row-${show.id}" onclick="openDetail(${show.id})">
-            <div class="ios-row-main">
-              ${poster}
-              <div class="ios-row-text">
-                <div class="ios-row-title">${escapeHtml(show.title)}${series}${movieTag}</div>
-                ${caption}
-                ${dateLine}
-              </div>
-              ${rating}
-              ${canDrag
-                ? `<span class="drag-handle" title="Drag to reorder">&#x2630;</span>`
-                : `<span class="ios-row-chevron">&#8250;</span>`}
-            </div>
-          </div>`;
-      }).join('');
-
-      // In "My Order" the how-to sits right above the rows, so the ☰ handles
-      // never appear unexplained. NOTE: the drag listeners are attached at
-      // the END of renderShows — the footer appends below use innerHTML +=,
-      // which re-parses the container and would silently drop any listeners
-      // attached here.
-      if (canDrag) {
-        container.innerHTML =
-          `<div class="drag-hint">My Order — press the ☰ handle and drag a show up or down. Your order is saved.</div>`
-          + container.innerHTML;
-      } else if (manualMode) {
-        container.innerHTML =
-          `<div class="drag-hint">Shown in ${escapeHtml(owners)}'s own order.</div>`
-          + container.innerHTML;
-      }
-
-      // Brief ratings callout, own Watching list only — this is the first
-      // list a member sees after logging in, so it's the highest-traffic
-      // spot to mention the feature.
-      if (currentTab === 'watching' && isOwnPage) {
-        container.innerHTML =
-          `<div class="list-announce">★ New: tap a show to rate it.</div>`
-          + container.innerHTML;
-      }
-
-      // Footer: legend + network counts
-      const hasFullSeries = filtered.some(s => s.full_series);
-      const networkCounts = {};
-      filtered.forEach(s => {
-        if (!s.network) return;
-        networkCounts[s.network] = (networkCounts[s.network] || 0) + 1;
+      // Use shared show-renderer.js to render the list for consistency across the app
+      container.innerHTML = renderShowList(filtered, {
+        onClickId: (showId) => openDetail(showId),
+        showRating: true,
+        showChevron: !canDrag,
+        showDragHandle: canDrag,
+        currentTab,
+        showFooter: true,
+        canDrag,
+        owners
       });
-      const countsHtml = Object.entries(networkCounts)
-        .sort((a, b) => b[1] - a[1])
-        .map(([n, c]) => `${n} (${c})`)
-        .join(' &middot; ');
-      const legendParts = [];
-      if (hasFullSeries) legendParts.push('🎬 Series Complete');
-      const legend = legendParts.join(' | ');
-      if (legend) container.innerHTML += `<div class="network-counts">${legend}</div>`;
-      if (countsHtml) container.innerHTML += `<div class="network-counts">${countsHtml}</div>`;
 
       // Last DOM write is done — now it's safe to wire the ☰ drag handles.
       if (canDrag) attachDragHandles(container);
