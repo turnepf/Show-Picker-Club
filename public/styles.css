@@ -233,3 +233,8 @@ body.admin-page {
     --shadow-card: 0 1px 2px oklch(0 0 0 / 0.45), 0 10px 30px oklch(0 0 0 / 0.55);
   }
 }
+
+/* Admin pages: hide nav on mobile since sidebar is also hidden */
+@media (max-width: 1023px) {
+  .admin-nav { display: none; }
+}
