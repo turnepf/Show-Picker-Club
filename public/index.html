@@ -1984,9 +1984,9 @@
         const res = await fetch('/auth/check', { headers: clientPlatformHeader() });
         const data = await res.json();
         if (data.authenticated && data.member) {
-          // replace(), not assign(), so Back doesn't bounce to / and
-          // immediately redirect again — it skips straight past the root.
-          window.location.replace('/' + data.member);
+          // Show home screen first for discovery (Groups, trending, etc),
+          // then users can navigate to their lists from there.
+          showLanding();
           return;
         }
       } catch (e) {}
