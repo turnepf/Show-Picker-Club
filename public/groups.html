@@ -508,12 +508,19 @@
         if (res.ok) {
           const data = await res.json();
           const shows = data.shows || [];
-          document.getElementById('groupTrendingList').innerHTML = renderShowList(shows, {
-            onClickId: openShowFromList,
-            showRating: true,
-            showChevron: true,
-            caption: null
-          });
+          // Add member names as caption for each show
+          const showsWithMembers = shows.map(s => ({
+            ...s,
+            _memberCaption: s.members && s.members.length > 0 ? s.members.join(', ') : ''
+          }));
+          document.getElementById('groupTrendingList').innerHTML = showsWithMembers.map(show =>
+            renderShowCard(show, {
+              onClickId: openShowFromList,
+              showRating: true,
+              showChevron: true,
+              caption: show._memberCaption
+            })
+          ).join('');
         }
       } catch (e) {
         console.error('Failed to load trending:', e);
