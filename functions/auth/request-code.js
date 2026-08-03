@@ -1,6 +1,6 @@
 import { sendEmail, loginCodeEmail, signupCodeEmail } from '../_shared/email.js';
 import { sendVerification, normalizePhone } from '../_shared/twilio-verify.js';
-import { selfEnrollEnabled, turnstileOk, enrollmentThrottled } from '../_shared/enroll.js';
+import { turnstileOk, enrollmentThrottled } from '../_shared/enroll.js';
 
 // Only browsers on our own site send this Origin on a POST; native apps
 // (URLSession) never do. We use that to require a Turnstile challenge on the
@@ -115,12 +115,10 @@ export async function onRequestPost(context) {
       'SELECT member_slug FROM member_emails WHERE LOWER(email) = ? LIMIT 1'
     ).bind(emailInput).first();
     if (!row) {
-      // Unknown email. With self-enroll on, this is a signup: send a signup
-      // code instead. Either way the response is the same { success: true },
-      // so callers can't probe which emails belong to members.
-      if (selfEnrollEnabled(env)) {
-        await maybeSendSignupCode(context, emailInput, ip, body.turnstile_token, captchaVerified);
-      }
+      // Unknown email — this is a signup: send a signup code instead. Either
+      // way the response is the same { success: true }, so callers can't
+      // probe which emails belong to members.
+      await maybeSendSignupCode(context, emailInput, ip, body.turnstile_token, captchaVerified);
       return json({ success: true });
     }
     memberSlug = row.member_slug;
@@ -154,7 +152,7 @@ export async function onRequestPost(context) {
   return json({ success: true });
 }
 
-// Signup-code path for unknown emails (self-enroll only). All failures are
+// Signup-code path for unknown emails. All failures are
 // silent — the caller already returned { success: true } shape regardless,
 // and every guard here (Turnstile, global circuit breaker, per-IP and
 // per-email caps) exists to stop abuse, not to inform the abuser.

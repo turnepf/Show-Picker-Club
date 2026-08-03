@@ -1,11 +1,10 @@
 // Completes an email self-enrollment: the client verified a signup code via
 // POST /auth/login (which answered { needs_name: true } without consuming
 // the code), collected the person's name, and now finishes here. The code is
-// consumed, the member is created (unapproved — held off the roster until
-// the operator approves), and a session is issued in one step.
+// consumed, the member is created, and a session is issued in one step.
 
 import { issueSession } from '../_shared/session.js';
-import { selfEnrollEnabled, enrollmentThrottled, enrollMember } from '../_shared/enroll.js';
+import { enrollmentThrottled, enrollMember } from '../_shared/enroll.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -21,8 +20,6 @@ const WINDOW_MIN = 15;
 export async function onRequestPost(context) {
   const { env, request } = context;
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-
-  if (!selfEnrollEnabled(env)) return json({ error: 'signups_closed' }, 403);
 
   // Same per-IP failure window as /auth/login — this endpoint also takes a
   // guessable code.

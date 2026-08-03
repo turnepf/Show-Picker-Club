@@ -12,8 +12,12 @@ CREATE TABLE IF NOT EXISTS members (
   is_admin INTEGER NOT NULL DEFAULT 0,
   calendar_token TEXT,
   disabled INTEGER NOT NULL DEFAULT 0,
-  approved INTEGER NOT NULL DEFAULT 1,
+  -- How the account came to exist: 'email' | 'apple' | 'google'. NULL only
+  -- for rows that predate self-enrollment (or a hand-seeded first member).
   enrolled_via TEXT,
+  -- Origin IP of the enrollment, used for the per-IP signup cap. Deleted
+  -- with the member.
+  enroll_ip TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   last_login_at TEXT
 );
@@ -88,22 +92,6 @@ CREATE TABLE IF NOT EXISTS failed_logins (
   ip TEXT NOT NULL,
   member_slug TEXT,
   created_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS signup_requests (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  full_name TEXT NOT NULL,
-  email TEXT NOT NULL,
-  phone TEXT NOT NULL,
-  source TEXT,
-  ip TEXT,
-  status TEXT NOT NULL DEFAULT 'pending',
-  created_at TEXT DEFAULT (datetime('now')),
-  reviewed_at TEXT,
-  reviewed_by TEXT,
-  notes TEXT,
-  created_member_slug TEXT,
-  hidden_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS shows (
@@ -269,6 +257,7 @@ CREATE TABLE IF NOT EXISTS group_invites (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE INDEX IF NOT EXISTS idx_members_enroll_ip ON members(enroll_ip, created_at);
 CREATE INDEX IF NOT EXISTS idx_member_phones_phone ON member_phones(phone);
 CREATE INDEX IF NOT EXISTS idx_member_phones_slug ON member_phones(member_slug);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_member_phones_primary ON member_phones(member_slug) WHERE is_primary = 1;
@@ -283,8 +272,6 @@ CREATE INDEX IF NOT EXISTS idx_login_otps_ip_time ON login_otps(ip, created_at);
 CREATE INDEX IF NOT EXISTS idx_enroll_otps_lookup ON enroll_otps(email, code, used_at);
 CREATE INDEX IF NOT EXISTS idx_enroll_otps_created ON enroll_otps(created_at);
 CREATE INDEX IF NOT EXISTS idx_failed_logins_ip_time ON failed_logins(ip, created_at);
-CREATE INDEX IF NOT EXISTS idx_signup_requests_status ON signup_requests(status);
-CREATE INDEX IF NOT EXISTS idx_signup_requests_created ON signup_requests(created_at);
 CREATE INDEX IF NOT EXISTS idx_shows_list ON shows(list);
 CREATE INDEX IF NOT EXISTS idx_shows_archived ON shows(archived);
 CREATE INDEX IF NOT EXISTS idx_shows_member ON shows(member_slug);

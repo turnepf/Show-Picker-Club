@@ -110,11 +110,9 @@ export async function onRequestPost(context) {
     env.DB.prepare('DELETE FROM member_apple_ids WHERE member_slug = ?').bind(slug),
     env.DB.prepare('DELETE FROM login_otps WHERE member_slug = ?').bind(slug),
     env.DB.prepare('DELETE FROM sessions WHERE member_slug = ?').bind(slug),
-    // Scrub PII from the signup audit trail but keep the row (it's the
-    // operator's record that an account existed and was deleted).
-    env.DB.prepare(
-      "UPDATE signup_requests SET full_name = '(deleted)', email = '', phone = '' WHERE created_member_slug = ?"
-    ).bind(slug),
+    // The members row carries the signup's origin IP (enroll_ip), so deleting
+    // it takes the last of the enrollment record with it — there is no
+    // separate audit table to scrub any more (migration 058).
     env.DB.prepare('DELETE FROM members WHERE slug = ?').bind(slug),
   ];
   // member_google_ids only exists from migration 031 — include it, retry

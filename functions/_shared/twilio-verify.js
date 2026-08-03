@@ -79,8 +79,9 @@ export async function checkVerification(env, { to, code }) {
   return { ok: true, approved: data.status === 'approved' };
 }
 
-// Normalise to E.164 the same way admin-create-member does, so a phone
-// the user types into the login modal matches the format we stored.
+// Normalise to E.164 so a phone the user types into the login modal matches
+// the format we stored. The canonical implementation — the roster editor
+// (admin-member-emails.js) imports it from here.
 export function normalizePhone(input) {
   if (!input) return null;
   const trimmed = String(input).trim();

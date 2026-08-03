@@ -2,14 +2,14 @@
 // browser an ID token (a JWT signed by Google); we verify it against
 // Google's published keys, then map it to a member — first by the stable
 // Google user id (`sub`, via member_google_ids), then by verified email.
-// With SELF_ENROLL on, an unrecognized identity becomes a new (unapproved)
-// member — Google tokens carry the person's name, so no extra screen needed.
+// An unrecognized identity becomes a new member — Google tokens carry the
+// person's name, so no extra screen needed.
 //
 // Inert unless GOOGLE_CLIENT_ID is configured (comma-separated list allowed,
 // e.g. a web client id plus a future iOS client id).
 
 import { issueSession } from '../_shared/session.js';
-import { selfEnrollEnabled, enrollmentThrottled, enrollMember } from '../_shared/enroll.js';
+import { enrollmentThrottled, enrollMember } from '../_shared/enroll.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -163,7 +163,7 @@ export async function onRequestPost(context) {
 
   // 3) Self-enrollment. Google tokens carry the display name, so the extra
   // name screen is only needed if the claim is somehow absent.
-  if (!memberSlug && selfEnrollEnabled(env)) {
+  if (!memberSlug) {
     if (!email) {
       await recordFailure(env, ip);
       return new Response(JSON.stringify({ error: 'unrecognized' }), { status: 401, headers: corsHeaders() });

@@ -11,19 +11,14 @@ export async function onRequestGet(context) {
     });
   }
 
-  // Held (not-yet-approved) members' adds stay out of the club-wide feed —
-  // approved filter with a column-less retry (migration 031).
-  const feedQuery = (withApproved) => env.DB.prepare(
+  const { results } = await env.DB.prepare(
     `SELECT s.title, s.list, s.member_slug, h.name as member_name, s.created_at
      FROM shows s
      JOIN members h ON h.slug = s.member_slug
      WHERE s.archived = 0
-       ${withApproved ? 'AND COALESCE(h.approved, 1) = 1' : ''}
      ORDER BY s.created_at DESC
      LIMIT 15`
-  );
-  const { results } = await feedQuery(true).all()
-    .catch(() => feedQuery(false).all());
+  ).all();
 
   // Deduplicate bulk adds: group by member + timestamp (within 2 seconds)
   const feed = [];

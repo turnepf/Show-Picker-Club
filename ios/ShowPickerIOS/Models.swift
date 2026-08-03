@@ -269,55 +269,6 @@ struct SharedTitle: Codable, Identifiable {
     var id: String { title }
 }
 
-// Shape of a freshly-created member, returned by the internal createMember()
-// routine — reaches the client only via SignupActionResult.created (a /join
-// approve). editor_name is the greeting name for the welcome intro; phone is
-// the normalized E.164 number the Text-intro button sends to.
-struct CreateMemberResult: Codable {
-    let ok: Bool?
-    let slug: String?
-    let name: String?
-    let editorName: String?
-    let url: String?
-    let phone: String?
-    let error: String?
-
-    enum CodingKeys: String, CodingKey {
-        case ok, slug, name, url, phone, error
-        case editorName = "editor_name"
-    }
-}
-
-// /api/admin-signup-requests — pending /join requests for the operator.
-struct SignupRequest: Codable, Identifiable {
-    let id: Int
-    let fullName: String
-    let email: String?
-    let phone: String?
-    let source: String?
-    let status: String
-    let createdAt: String?
-    let reviewedBy: String?
-    let notes: String?
-    let createdMemberSlug: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id, email, phone, source, status, notes
-        case fullName = "full_name"
-        case createdAt = "created_at"
-        case reviewedBy = "reviewed_by"
-        case createdMemberSlug = "created_member_slug"
-    }
-}
-
-struct SignupRequestsResponse: Codable { let requests: [SignupRequest] }
-
-struct SignupActionResult: Codable {
-    let ok: Bool?
-    let error: String?
-    let created: CreateMemberResult?
-}
-
 // /api/admin-url-cleanup — queue of titles missing a real network URL.
 struct UrlQueueItem: Codable, Identifiable {
     let id: Int
@@ -573,7 +524,6 @@ struct AdminMember: Codable, Identifiable {
     // Status flags (optional so decoding survives an older server).
     let isAdmin: Bool?
     let disabled: Bool?
-    let approved: Bool?
     let enrolledVia: String?
     // Every platform this member has ever used the app from (migration 047);
     // absent on an older server. Values match X-Client-Platform: iphone,
@@ -582,7 +532,7 @@ struct AdminMember: Codable, Identifiable {
     var id: String { slug }
 
     enum CodingKeys: String, CodingKey {
-        case slug, name, emails, phones, disabled, approved, platforms
+        case slug, name, emails, phones, disabled, platforms
         case firstName = "first_name"
         case lastInitial = "last_initial"
         case lastName = "last_name"

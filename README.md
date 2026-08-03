@@ -13,7 +13,7 @@ There are native iOS, tvOS, and watchOS apps. They share a `ShowPickerCore` Swif
 
 ## At a glance
 
-- **Multi-tenant.** One deployment, many members. Each member is a slug (`/whitt`, `/patrick`) with their own lists; they sign in with a one-time code (text or email), Sign in with Apple, or Sign in with Google (web). With `SELF_ENROLL` on, anyone can join — new members are held off the roster until the operator approves.
+- **Multi-tenant.** One deployment, many members. Each member is a slug (`/whitt`, `/patrick`) with their own lists; they sign in with a one-time code (text or email), Sign in with Apple, or Sign in with Google (web). Signup is open and self-service — anyone can join and is a full member immediately.
 - **Auto-enriched.** TMDB supplies everything: audience rating, canonical titles, cast (with IMDB links), the creator/director (with an IMDB link), next-season dates, finale dates, series-ended flags, and genres.
 - **Social.** Browse every member's lists and cross-library search; add anything you see to your own lists. (Push-style "suggest to another member" was retired 2026-07 — near-zero usage.)
 - **Vibe.** `/vibe` profiles each member's taste across 27 trait dimensions and assigns one of seven cluster identities.
@@ -27,7 +27,7 @@ There are native iOS, tvOS, and watchOS apps. They share a `ShowPickerCore` Swif
 - **Database:** Cloudflare D1 (SQLite at the edge).
 - **Enrichment:** TMDB API (sole source — OMDB retired 2026-07).
 - **Vibe trait scoring:** Claude API (Sonnet 4.6 with prompt caching), admin-triggered batch only.
-- **Auth:** One-time codes (SMS via Twilio Verify, email via Resend) plus Sign in with Apple and Sign in with Google (web); HttpOnly session cookies, 30-day expiry. Optional self-enrollment behind the `SELF_ENROLL` kill switch, with self-service account deletion.
+- **Auth:** One-time codes (SMS via Twilio Verify, email via Resend) plus Sign in with Apple and Sign in with Google (web); HttpOnly session cookies, 30-day expiry. Open self-enrollment (rate-limited, no approval step), with self-service account deletion.
 
 ## Project structure
 
@@ -85,7 +85,7 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    wrangler d1 execute shows-db --remote --file=schema.sql
    ```
 
-3. **Seed at least one member + a contact for login.** Once deployed, new members are created via self-enrollment (Apple/Google/email, behind the `SELF_ENROLL` secret) or by approving a `/join` request on `/members` — but there's no one yet to approve the first member in, so bootstrap it by hand. Login is by one-time code, so seed an email and/or phone the member will receive the code at.
+3. **Seed at least one member + a contact for login.** Members create their own accounts by signing up (Apple/Google/email), and the first admin has to exist before anyone can be promoted, so bootstrap one by hand. Login is by one-time code, so seed an email and/or phone the member will receive the code at. Grant it admin with `UPDATE members SET is_admin = 1 WHERE slug = 'patrick';`.
    ```sql
    INSERT INTO members (slug, name, first_name) VALUES ('patrick', 'Patrick Turner', 'Patrick');
    INSERT INTO member_emails (email, member_slug, is_primary) VALUES ('patrick@example.com', 'patrick', 1);
@@ -108,10 +108,10 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    country, set the non-secret `WATCHMODE_REGION` var (e.g. `GB`, `CA`) in
    the Cloudflare Pages dashboard → Settings → Environment variables.
 
-   **Reviewer / demo login (optional).** The app is invite-only with no public
-   sign-up, so App Review needs a way in. Create a throwaway demo member with an
-   email (in `member_emails`), then set these two secrets to let that one email
-   log in with a fixed code — no SMS/email round-trip needed:
+   **Reviewer / demo login (optional).** App Review can sign up like anyone
+   else, but a fresh account has an empty library. Create a throwaway demo
+   member with an email (in `member_emails`), then set these two secrets to let
+   that one email log in with a fixed code — no SMS/email round-trip needed:
    ```bash
    printf "demo@example.com" | wrangler pages secret put DEMO_LOGIN_EMAIL --project-name shows
    printf "424242"           | wrangler pages secret put DEMO_LOGIN_CODE  --project-name shows  # 6 digits → iOS auto-submits
@@ -126,29 +126,20 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    `.github/workflows/demo-reset.yml`). The demo account also can't suggest
    or share shows into real members' lists.
 
-   To also let **Sign in with Apple** reach the demo — which App Review tests
-   directly, and the reason a prior submission was rejected under Guideline
-   2.1(a) — turn on the Apple fallback. Any Apple ID that isn't a real member
-   then signs into the same demo member (resolved from `DEMO_LOGIN_EMAIL`);
-   real members still match first, and the demo link is never persisted:
-   ```bash
-   printf "1" | wrangler pages secret put DEMO_APPLE_FALLBACK --project-name shows
-   ```
-   The fallback is inert while `SELF_ENROLL` is on (unknown Apple IDs become
-   real accounts instead); unset it once self-enrollment launches. See the full
-   pre-submission steps in [`docs/APP_STORE_SUBMISSION.md`](docs/APP_STORE_SUBMISSION.md).
+   App Review signs in with the demo email and code above. (`DEMO_APPLE_FALLBACK`,
+   which used to route unrecognized Apple IDs into the demo member, was removed
+   in 2026-08 — signup now turns any unrecognized Apple identity into a real
+   account, so the fallback could never fire.) See the full pre-submission steps
+   in [`docs/APP_STORE_SUBMISSION.md`](docs/APP_STORE_SUBMISSION.md).
 
-   **Self-enrollment (optional).** With `SELF_ENROLL` set, anyone can create an
-   account: Sign in with Apple, Sign in with Google, or an emailed signup code
-   (the login form becomes "Log in or sign up"). New members get full personal
-   use immediately but are held off the home roster, vibe pages, search,
-   activity, and trending until approved on `/members`; each signup emails the
-   operator. Guards: a global circuit breaker (20 signups/day, tune with the
-   non-secret `SELF_ENROLL_MAX_PER_DAY` var), 3 attempts/IP/day, per-email code
-   caps, optional Cloudflare Turnstile, and a reserved-slug blocklist. Unset
-   `SELF_ENROLL` to revert to invite-only instantly — no deploy needed.
+   **Self-enrollment.** Always on and the only way accounts are created:
+   Sign in with Apple, Sign in with Google, or an emailed signup code. A new
+   member is a full member immediately — on the roster, in search, activity,
+   trending, and vibe — and each signup emails the operator. Guards: a global
+   circuit breaker (20 signups/day, tune with the non-secret
+   `SELF_ENROLL_MAX_PER_DAY` var), 3 signups/IP/day, per-email code caps,
+   optional Cloudflare Turnstile, and a reserved-slug blocklist.
    ```bash
-   printf "1"            | wrangler pages secret put SELF_ENROLL          --project-name shows
    # Optional — Sign in with Google on the web (create an OAuth client id in
    # Google Cloud console with showpicker.club as an authorized origin):
    printf "xxx.apps.googleusercontent.com" | wrangler pages secret put GOOGLE_CLIENT_ID --project-name shows

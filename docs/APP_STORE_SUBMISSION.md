@@ -1,9 +1,9 @@
 # App Store Submission Checklist
 
-A pre-flight list for every App Store submission of Show Picker Club. It exists
-because the app is invite-only with no public sign-up, which trips up App Review
-in two predictable ways — a login wall and a privacy-label mismatch. Both are
-covered below.
+A pre-flight list for every App Store submission of Show Picker Club. Signup is
+open — a reviewer can create their own account with Sign in with Apple — but a
+demo account with real data still makes the review go smoothly, and the
+privacy-label mismatch still bites. Both are covered below.
 
 The listing is **universal**: one bundle id covers iPhone + Mac (Catalyst) +
 Apple TV (the watch app rides along with the iOS build), so one submission
@@ -17,9 +17,10 @@ Work top to bottom before you hit **Submit for Review**.
 
 ## 1. Give App Review a way in (Guideline 2.1(a) — App Completeness)
 
-App Review signs in with **their own Apple ID**, which is not a member, so a
-strict invite-only build shows them an error and gets rejected ("unable to log
-in with Sign in with Apple"). Open the demo door before submitting.
+App Review signs in with **their own Apple ID**. Signup is open, so that now
+creates a real account for them and satisfies 2.1(a) on its own — but a fresh
+account has an empty library, so also provide the demo account below: it is
+pre-populated, and it is what the Review notes point at.
 
 - [ ] A throwaway **demo member** exists, with an email in `member_emails` and a
       little sample data on its lists so the app looks alive.
@@ -27,36 +28,20 @@ in with Sign in with Apple"). Open the demo door before submitting.
       ```bash
       printf "demo@example.com" | wrangler pages secret put DEMO_LOGIN_EMAIL   --project-name shows
       printf "424242"           | wrangler pages secret put DEMO_LOGIN_CODE    --project-name shows  # 6 digits
-      printf "1"                | wrangler pages secret put DEMO_APPLE_FALLBACK --project-name shows
       ```
       - `DEMO_LOGIN_EMAIL` + `DEMO_LOGIN_CODE` → the email/code reviewer login
         (`functions/auth/login.js`).
-      - `DEMO_APPLE_FALLBACK=1` → **Sign in with Apple** by an unrecognized Apple
-        ID lands in that same demo member (`functions/auth/apple.js`). This is
-        the piece that fixes the 2.1(a) rejection.
-      - **Exception — self-enroll live:** with the `SELF_ENROLL` secret set,
-        the Apple handler enrolls an unrecognized Apple ID as a brand-new
-        member and `DEMO_APPLE_FALLBACK` is inert (`functions/auth/apple.js`).
-        That also satisfies 2.1(a) — the reviewer signs up like anyone else.
-        In that mode skip `DEMO_APPLE_FALLBACK`, keep the demo email/code for
-        the Review notes, and expect Apple sign-in to create a fresh account
-        in the verification below.
+      - There is no `DEMO_APPLE_FALLBACK` any more (removed 2026-08). Signup is
+        open, so an unrecognized Apple ID becomes a real member instead of
+        landing in the demo (`functions/auth/apple.js`).
 - [ ] Redeploy so the secrets take effect, then **verify both paths yourself**:
       - Tap *Sign in with Apple* with a personal Apple ID that is not a member →
-        you land in the demo member's account (or a fresh self-enrolled one,
-        if `SELF_ENROLL` is on).
+        you're asked for a name and a fresh account is created.
       - Enter the demo email + code on the login screen → the demo account.
 - [ ] Repeat the email + code sign-in **on an Apple TV** (on-screen keyboard) —
       the reviewer exercises the tvOS half of the universal app the same way.
 - [ ] Fill in **App Store Connect → App Review Information → Sign-In required**
       with the demo email + code (see Review Notes below).
-
-**Making it public instead of review-only:** leave `DEMO_APPLE_FALLBACK=1` on
-permanently and anyone can try the app via Sign in with Apple; they share the
-one demo member. To go back to a strict invite-only wall, unset the secret:
-```bash
-wrangler pages secret delete DEMO_APPLE_FALLBACK --project-name shows
-```
 
 ## 2. Fix the privacy label (Guideline 5.1.2(i) — Data Use and Sharing)
 
@@ -105,11 +90,10 @@ skip this section.) Draft:
 
 > Thank you for the review.
 >
-> **2.1(a) — Sign in with Apple:** The app is an invitation-only club. We have
-> enabled a demo path so review can sign in with their own Apple ID and land in
-> a fully functional demo account — just tap "Sign in with Apple" on the login
-> screen. A demo email + one-time code is also provided in App Review
-> Information if you prefer that route.
+> **2.1(a) — Sign in with Apple:** Sign-up is open, so review can sign in with
+> their own Apple ID and land in the app — just tap "Sign in with Apple" on the
+> login screen and an account is created. A pre-populated demo email + one-time code is also provided in App
+> Review Information if you prefer that route.
 >
 > **5.1.2(i) — Tracking:** The app does not track users — it uses no
 > advertising, data brokers, or cross-app tracking. We have corrected the App
@@ -119,25 +103,7 @@ skip this section.) Draft:
 ## 5. Review Notes to paste into App Store Connect
 
 ```
-This is an invitation-only TV-show club (no public sign-up).
-
-To sign in, either:
-  • Tap "Sign in with Apple" — an unrecognized Apple ID is signed into a
-    fully functional demo account.
-  • Or use the demo login on the same screen:
-      Email: <DEMO_LOGIN_EMAIL>
-      Code:  <DEMO_LOGIN_CODE>
-
-The app does not track users: no advertising, data brokers, or cross-app
-tracking, so no App Tracking Transparency prompt is presented.
-```
-(Fill in the real demo email/code — keep them out of git.)
-
-**Self-enroll variant** — with `SELF_ENROLL` on, Apple sign-in creates a
-fresh account instead of landing in the demo, so use this wording:
-
-```
-This is an invitation-only TV-show club. New members can also self-enroll.
+This is a TV-show tracking club with open sign-up.
 
 To sign in, either:
   • Tap "Sign in with Apple" — you'll be asked for a name and a new
@@ -146,12 +112,10 @@ To sign in, either:
       Email: <DEMO_LOGIN_EMAIL>
       Code:  <DEMO_LOGIN_CODE>
 
-The demo code is entered in the app's own login screen (it is a fixed
-code, not sent by email).
-
 The app does not track users: no advertising, data brokers, or cross-app
 tracking, so no App Tracking Transparency prompt is presented.
 ```
+(Fill in the real demo email/code — keep them out of git.)
 
 ## 5a. App Store Connect gotchas (hit during the July 2026 resubmission)
 
@@ -225,7 +189,7 @@ one ever sees more than one prompt:
 
 ### Why these two keep coming up
 
-Both stem from the invite-only model: there is no public account, so anything
-that assumes a real user (the login, the "we collect Name" label) needs an
-explicit accommodation for a reviewer who is a stranger to the club. Steps 1
-and 2 are that accommodation.
+Both stem from the club model: a reviewer arrives as a stranger with an empty
+account, so anything that assumes an established user (a populated library, the
+"we collect Name" label) needs an explicit accommodation. Steps 1 and 2 are that
+accommodation.

@@ -8,7 +8,7 @@ A shared tracker for a small private TV/movie club. Each member maintains their 
 
 ## Who it's for
 
-A closed group of friends and family (~20 members in production). Everyone has a member slug (e.g. `/whitt`), signs in with a one-time code (text/email) or Sign in with Apple, and has full edit rights over their own lists. No public registration unless self-enrollment is switched on (the `SELF_ENROLL` secret) — with it on, anyone can create an account, held off the roster until the operator approves.
+A group of friends and family (~20 members in production). Everyone has a member slug (e.g. `/whitt`), signs in with a one-time code (text/email), Sign in with Apple, or Sign in with Google, and has full edit rights over their own lists. Registration is open and self-service: anyone can create an account and is a full member the moment they do. There is no invite, no operator approval, and no way for the operator to create an account on someone's behalf.
 
 ## The four lists
 
@@ -206,25 +206,18 @@ That's a deliberate scope call (a 10-foot UI is the wrong place for a ban
 button), not a gap to fill.
 
 Member management on both admin surfaces covers: roster with status badges
-(ADMIN / DISABLED / PENDING), always ordered by most recent library
+(ADMIN / DISABLED), always ordered by most recent library
 activity (`last_activity_at` — no sort picker; members with no recorded
 activity sink to the bottom), last activity timestamp and 30-day counts
 (last login is no longer shown — activity is the engagement signal that
 matters), rename (slug
 and URL never change), email/phone editing, disable/enable
-(kills sessions), approving held self-enrolled members, admin
+(kills sessions), and admin
 promote/demote (`/api/admin-member-role`; the server refuses to demote the
 last admin, and a full hand-off is promote-then-demote-yourself — this is
-the path the `admin_must_demote_first` account-deletion error points at),
-and a single "New members" queue holding both `/join` requests and held
-self-enrolled members. The queue sits at the top of the members list on
-both surfaces (web `/members`; iOS Manage members, whose Admin-row badge
-counts everyone waiting) and the whole section disappears once empty —
-there is no separate "New members" page or link anywhere anymore.
-Processed (approved/rejected) requests carry a **Hide**
-action on both surfaces — hiding dismisses the row for good (server-side
-`hidden_at`, so every client's queue empties out), while pending requests
-can't be hidden. Above the roster, the same platform badges shown per-member
+the path the `admin_must_demote_first` account-deletion error points at).
+There is no new-members queue and nothing to approve — people sign
+themselves up and are live immediately. Above the roster, the same platform badges shown per-member
 (iPhone, iPad, Apple Watch, Mac, Apple TV, Small Web, Large Web) double as a
 filter on both surfaces — tap one to show only members who've ever used
 that platform, tap it again to clear. When adding a member-management
@@ -398,12 +391,12 @@ A few intentional omissions:
   `member_google_ids` (migration 031) then falls back to verified email,
   and self-enrolls. Gated on `GOOGLE_CLIENT_ID` (returns 501 until set).
 
-- **Open signup — shipped as the `/join` flow.** Public `/join` form →
-  `signup_requests` table → operator approves from the queue at the top
-  of `/members`. Approval runs the
-  create-member flow and hands the operator intro text to send manually
-  (no automated welcome email). Naming differs from the original spec
-  (`/join` not `/signup`, `signup_requests` not `pending_signups`).
+- **Open signup.** Shipped first as a `/join` request form with an
+  operator approval queue; simplified in 2026-08 to direct self-enrollment.
+  Anyone signing up via email code, Apple, or Google becomes a full member
+  immediately — the request form, the approval queue, the held-member state,
+  and manual member creation are all gone. Abuse is handled by rate limits
+  (daily circuit breaker, per-IP cap, Turnstile), not by a human gate.
 
 - **SMS login codes.** Resolved by reworking the Twilio setup, which cleared
   the A2P 10DLC verification problem that had shelved it in June 2026.

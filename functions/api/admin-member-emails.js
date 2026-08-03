@@ -1,27 +1,11 @@
 import { isAdmin } from '../_shared/admin.js';
+import { normalizePhone } from '../_shared/twilio-verify.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
-}
-
-// Match the canonical normaliser in admin-create-member.js so this admin
-// path inserts the same shape: + and country code, or +1 prepended for
-// bare 10-digit US input.
-function normalizePhone(input) {
-  if (!input) return null;
-  const trimmed = String(input).trim();
-  if (trimmed.startsWith('+')) {
-    const digits = trimmed.slice(1).replace(/\D/g, '');
-    return digits.length >= 7 && digits.length <= 15 ? '+' + digits : null;
-  }
-  const digits = trimmed.replace(/\D/g, '');
-  if (digits.length === 10) return '+1' + digits;
-  if (digits.length === 11 && digits.startsWith('1')) return '+' + digits;
-  if (digits.length >= 7 && digits.length <= 15) return '+' + digits;
-  return null;
 }
 
 // GET: list every member with their current emails, phones, and last
@@ -51,13 +35,13 @@ export async function onRequestGet(context) {
   // because updated_at only ever moves on member intent. Normalised inside MAX so the mixed
   // storage formats (datetime('now') vs JS toISOString) compare correctly.
   const since = "datetime('now', '-30 days')";
-  // disabled (migration 030) / approved + enrolled_via (migration 031) /
+  // disabled (migration 030) / enrolled_via (migration 031) /
   // member_platforms (migration 047) with column-less retries so the page
   // keeps working mid-rollout.
   const memberQuery = (extras) => env.DB.prepare(`
     SELECT m.slug, m.name, m.first_name, m.last_initial, m.last_name,
            ${extras >= 1 ? 'm.is_admin, m.disabled,' : '0 AS is_admin, 0 AS disabled,'}
-           ${extras >= 2 ? 'm.approved, m.enrolled_via,' : '1 AS approved, NULL AS enrolled_via,'}
+           ${extras >= 2 ? 'm.enrolled_via,' : 'NULL AS enrolled_via,'}
            ${extras >= 3 ? `(SELECT GROUP_CONCAT(platform, ',') FROM member_platforms
                               WHERE member_slug = m.slug) AS platforms,` : 'NULL AS platforms,'}
            (SELECT GROUP_CONCAT(email, ',')
@@ -107,7 +91,6 @@ export async function onRequestGet(context) {
     name: r.name,
     is_admin: !!r.is_admin,
     disabled: !!r.disabled,
-    approved: !!r.approved,
     enrolled_via: r.enrolled_via || null,
     first_name: r.first_name,
     last_initial: r.last_initial,

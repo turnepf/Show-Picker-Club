@@ -31,12 +31,11 @@ function displayNames(rows) {
 }
 
 async function rosterExcluding(env, slug) {
-  const q = (withApproved) => env.DB.prepare(
+  const { results } = await env.DB.prepare(
     `SELECT slug, name, first_name, last_initial FROM members
-      WHERE slug != ?${withApproved ? ' AND COALESCE(approved, 1) = 1' : ''}
+      WHERE slug != ?
       ORDER BY name`
-  ).bind(slug).all();
-  const { results } = await q(true).catch(() => q(false)).catch(() => ({ results: [] }));
+  ).bind(slug).all().catch(() => ({ results: [] }));
   return displayNames(results || []);
 }
 

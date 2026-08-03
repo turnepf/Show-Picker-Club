@@ -22,7 +22,6 @@
 //   - member_subscriptions, deduped on (member, network).
 //   - sessions — the member's signed-in devices flip to the kept account
 //     instead of being logged out.
-//   - signup_requests.created_member_slug (audit trail follows the keeper).
 //   - members.last_login_at — target takes the max of the two.
 // login_otps for the source are deleted; then the source member row is.
 
@@ -139,11 +138,7 @@ export async function onRequestPost(context) {
     env.DB.prepare('UPDATE sessions SET member_slug = ?2 WHERE member_slug = ?1')
       .bind(source, target),
     env.DB.prepare('DELETE FROM login_otps WHERE member_slug = ?1').bind(source),
-    // 8) Audit trail follows the keeper.
-    env.DB.prepare(
-      'UPDATE signup_requests SET created_member_slug = ?2 WHERE created_member_slug = ?1'
-    ).bind(source, target),
-    // 9) Keep the freshest last-login on the target. NULLIF/COALESCE because
+    // 8) Keep the freshest last-login on the target. NULLIF/COALESCE because
     //    scalar MAX() returns NULL if either side is NULL; ISO strings
     //    compare lexicographically. Must run before the source row deletes.
     env.DB.prepare(

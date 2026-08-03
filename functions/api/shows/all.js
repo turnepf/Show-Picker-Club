@@ -15,9 +15,7 @@ export async function onRequestGet(context) {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  // Held (not-yet-approved) members' rows are visible only to themselves —
-  // approved filter with a column-less retry (migration 031).
-  const allQuery = (withApproved) => env.DB.prepare(
+  const { results } = await env.DB.prepare(
     `SELECT s.id, s.title, s.network, s.network_url, s.rating, s.movie,
             s.full_series, s.list, s.member_slug, s.genres,
             -- Artwork is per-row and backfills row-by-row; borrow from any
@@ -37,11 +35,8 @@ export async function onRequestGet(context) {
      FROM shows s
      JOIN members m ON m.slug = s.member_slug
      WHERE s.archived = 0
-       ${withApproved ? 'AND (COALESCE(m.approved, 1) = 1 OR s.member_slug = ?)' : ''}
      ORDER BY s.title COLLATE NOCASE`
-  ).bind(...(withApproved ? [session.member_slug || ''] : []));
-  const { results } = await allQuery(true).all()
-    .catch(() => allQuery(false).all());
+  ).all();
 
   // First-name display, disambiguated with a last initial only on collision
   // (same policy as /api/members).

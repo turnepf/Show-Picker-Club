@@ -3,15 +3,12 @@
 // the token to an existing member — first by the email Apple shares (against
 // member_emails), thereafter by the stable Apple user id (`sub`).
 //
-// With SELF_ENROLL on, an unrecognized identity becomes a new (unapproved)
-// member: the client is asked for a name via { needs_name: true } if it
-// didn't send one (Apple only provides the name to the client, and only on
-// the very first authorization). With SELF_ENROLL off, unrecognized
-// identities are rejected as before (or land in the demo, if that's on).
+// An unrecognized identity becomes a new member: the client is asked for a
+// name via { needs_name: true } if it didn't send one (Apple only provides
+// the name to the client, and only on the very first authorization).
 
-import { demoMemberSlug, noteDemoLogin } from '../_shared/demo.js';
 import { issueSession } from '../_shared/session.js';
-import { selfEnrollEnabled, enrollmentThrottled, enrollMember } from '../_shared/enroll.js';
+import { enrollmentThrottled, enrollMember } from '../_shared/enroll.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -31,16 +28,6 @@ function allowedClientIds(env) {
   const configured = (env.APPLE_CLIENT_ID || '')
     .split(',').map((s) => s.trim()).filter(Boolean);
   return configured.length ? configured : DEFAULT_CLIENT_IDS;
-}
-
-// When enabled, an Apple ID we don't recognize is signed into the shared demo
-// member instead of being turned away. Off unless DEMO_APPLE_FALLBACK is a
-// truthy string. Flip it on for App Review (who sign in with their own Apple
-// ID and would otherwise hit the invite-only wall), or leave it on to let
-// anyone try the app.
-function demoFallbackEnabled(env) {
-  const v = (env.DEMO_APPLE_FALLBACK || '').trim().toLowerCase();
-  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
 }
 
 // The demo member is the one behind DEMO_LOGIN_EMAIL — a single source of
@@ -178,12 +165,12 @@ export async function onRequestPost(context) {
     }
   }
 
-  // 3) Self-enrollment: unrecognized identity + SELF_ENROLL on → create a
-  // new (unapproved) member. Needs a name: Apple gives it to the CLIENT only
-  // (and only on first authorization), so if none came with the request we
-  // answer { needs_name: true } and the client re-posts the same token with
+  // 3) Self-enrollment: an unrecognized identity becomes a new member.
+  // Needs a name: Apple gives it to the CLIENT only (and only on first
+  // authorization), so if none came with the request we answer
+  // { needs_name: true } and the client re-posts the same token with
   // full_name. The token is re-verified on that second call.
-  if (!memberSlug && selfEnrollEnabled(env)) {
+  if (!memberSlug) {
     if (!email) {
       // No email claim at all (rare; e.g. token from a prior app install
       // whose relay was deleted). Nothing to key the account to — refuse.
@@ -210,19 +197,11 @@ export async function onRequestPost(context) {
     return await issueSession(env, created.slug, { enrolled: true });
   }
 
-  // 4) Demo / public trial fallback: no real member matched, but the demo
-  // fallback is on — sign this Apple ID into the shared demo member. The link
-  // is deliberately NOT persisted to member_apple_ids: if this person is later
-  // added as a real member, their next sign-in re-resolves to their own
-  // account instead of staying pinned to the demo. Inert while SELF_ENROLL is
-  // on (the enrollment branch above wins) — unset DEMO_APPLE_FALLBACK once
-  // self-enroll launches; the fixed email/code demo login covers App Review.
-  if (!memberSlug && demoFallbackEnabled(env)) {
-    memberSlug = await demoMemberSlug(env);
-    // Demo sign-ins arm the one-hour auto-reset (see _shared/demo.js).
-    if (memberSlug) await noteDemoLogin(env, memberSlug);
-  }
-
+  // The enrollment branch above returns for every unrecognized identity that
+  // carries an email, so reaching here means Apple sent no email claim at
+  // all. (This is where DEMO_APPLE_FALLBACK used to route reviewers into the
+  // shared demo member; with signup always open there is nothing left for it
+  // to catch — App Review uses the DEMO_LOGIN_EMAIL/DEMO_LOGIN_CODE login.)
   if (!memberSlug) {
     await recordFailure(env, ip, null);
     return new Response(JSON.stringify({ error: 'unrecognized' }), { status: 401, headers: corsHeaders() });

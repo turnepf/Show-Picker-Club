@@ -15,13 +15,9 @@ export async function onRequestGet(context) {
   // count — only owning a real (self-added, suggested-in, or shared-in)
   // show registers as activity. NULL added_by predates the column and is
   // treated as engaged since only member-added shows ever had NULL there.
-  // Held (not-yet-approved) self-enrolled members are hidden from the
-  // roster — except from themselves, so their own page header and app views
-  // keep working while they wait. If members.calendar_token (migration 029)
-  // or members.approved (migration 031) doesn't exist yet, retry with a
-  // simpler shape so the home page keeps rendering.
-  const selfSlug = session?.member_slug || '';
-  const query = (withToken, withApproved) => env.DB.prepare(
+  // If members.calendar_token (migration 029) doesn't exist yet, retry with
+  // a simpler shape so the home page keeps rendering.
+  const query = (withToken) => env.DB.prepare(
     `SELECT h.slug, h.name, h.first_name, h.last_initial,${withToken ? ' h.calendar_token,' : ''}
             COUNT(CASE WHEN s.archived = 0 THEN s.id END) as show_count,
             COUNT(CASE WHEN s.archived = 0 AND s.list = 'watching' THEN s.id END) as watching_count,
@@ -34,13 +30,10 @@ export async function onRequestGet(context) {
             ) as last_activity_at
      FROM members h
      LEFT JOIN shows s ON s.member_slug = h.slug
-     ${withApproved ? 'WHERE COALESCE(h.approved, 1) = 1 OR h.slug = ?' : ''}
      GROUP BY h.slug, h.name, h.first_name, h.last_initial
      ORDER BY last_activity_at DESC NULLS LAST, h.name`
-  ).bind(...(withApproved ? [selfSlug] : [])).all();
-  const { results } = await query(true, true)
-    .catch(() => query(true, false))
-    .catch(() => query(false, false));
+  ).all();
+  const { results } = await query(true).catch(() => query(false));
 
   const firstNameCounts = {};
   for (const m of results) {

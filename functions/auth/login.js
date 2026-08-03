@@ -1,7 +1,6 @@
 import { checkVerification, normalizePhone } from '../_shared/twilio-verify.js';
 import { issueSession } from '../_shared/session.js';
 import { noteDemoLogin } from '../_shared/demo.js';
-import { selfEnrollEnabled } from '../_shared/enroll.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -124,19 +123,17 @@ export async function onRequestPost(context) {
       'SELECT member_slug FROM member_emails WHERE LOWER(email) = ? LIMIT 1'
     ).bind(email).first();
     if (!row) {
-      // Unknown email: with self-enroll on, the code may be a signup code
-      // (enroll_otps). If it checks out, tell the client to collect a name
-      // and finish via POST /auth/enroll — the code is NOT consumed here,
-      // so the two-step stays within the code's 10-minute TTL.
-      if (selfEnrollEnabled(env)) {
-        const pending = await env.DB.prepare(
-          `SELECT id FROM enroll_otps
-             WHERE email = ? AND code = ? AND used_at IS NULL AND expires_at > ?
-             ORDER BY created_at DESC LIMIT 1`
-        ).bind(email, code, new Date().toISOString()).first().catch(() => null);
-        if (pending) {
-          return new Response(JSON.stringify({ needs_name: true }), { status: 200, headers: corsHeaders() });
-        }
+      // Unknown email: the code may be a signup code (enroll_otps). If it
+      // checks out, tell the client to collect a name and finish via
+      // POST /auth/enroll — the code is NOT consumed here, so the two-step
+      // stays within the code's 10-minute TTL.
+      const pending = await env.DB.prepare(
+        `SELECT id FROM enroll_otps
+           WHERE email = ? AND code = ? AND used_at IS NULL AND expires_at > ?
+           ORDER BY created_at DESC LIMIT 1`
+      ).bind(email, code, new Date().toISOString()).first().catch(() => null);
+      if (pending) {
+        return new Response(JSON.stringify({ needs_name: true }), { status: 200, headers: corsHeaders() });
       }
       await recordFailure(env, ip, null);
       return new Response(JSON.stringify({ error: 'invalid' }), { status: 401, headers: corsHeaders() });

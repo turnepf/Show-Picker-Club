@@ -455,7 +455,6 @@
       .ios-item.home-side-trending:not(.hidden) { display: flex; }
       .ios-item.home-side-trending:not(.hidden) + .ios-item::after { display: block; }
       #popularSection { display: none !important; }
-      #membersList { max-height: 250px; overflow-y: auto; }
       /* The single My Shows row expands into the four lists (iPad). */
       .ios-item.home-list-row:not(.hidden) { display: flex; }
       #homeListsHeader:not(.hidden) { display: block; }
@@ -1250,9 +1249,8 @@
           <button class="icon-btn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
         </div>
 
-        <!-- Join pitch for logged-out visitors, but only when self-enrollment
-             is actually open (/auth/config → self_enroll) — invite-only
-             deployments never show it. Toggled by maybeShowJoinCta(). -->
+        <!-- Join pitch for logged-out visitors. Toggled by
+             maybeShowJoinCta(). -->
         <div class="join-cta hidden" id="joinCta">
           <p class="join-cta-pitch">Track the shows and movies you're watching, see when seasons come back, and share picks with friends.</p>
           <button class="btn btn-save join-cta-btn" onclick="login()">Create your free account</button>
@@ -2076,31 +2074,6 @@
       </a>`;
     }
 
-    let allHomeMembers = [];
-    let homeShowAllMembers = false;
-    const HOME_MEMBER_PREVIEW = 6;
-
-    function renderHomeMembers() {
-      const list = document.getElementById('membersList');
-      if (!list || !allHomeMembers.length) return;
-      const visible = homeShowAllMembers ? allHomeMembers : allHomeMembers.slice(0, HOME_MEMBER_PREVIEW);
-      let html = visible.map(m => memberRowHtml(m)).join('');
-      if (allHomeMembers.length > HOME_MEMBER_PREVIEW) {
-        const label = homeShowAllMembers ? 'Show fewer' : `Show all ${allHomeMembers.length} members`;
-        html += `<button class="ios-item" onclick="toggleHomeMembers()" style="color: var(--tint); font-size: 15px;">
-          <span class="ios-item-icon"><svg class="ic"><use href="#i-chevron-${homeShowAllMembers ? 'up' : 'down'}"/></svg></span>
-          <span class="ios-item-label">${label}</span>
-        </button>`;
-      }
-      list.innerHTML = html;
-      document.getElementById('membersSection').classList.remove('hidden');
-    }
-
-    function toggleHomeMembers() {
-      homeShowAllMembers = !homeShowAllMembers;
-      renderHomeMembers();
-    }
-
     // Nav rows for YOUR calendar feed (home nav + member-page sidebar).
     // Feeds authenticate with a per-member token and the API only returns
     // your own, so whichever row has one is yours; logged out, none do and
@@ -2119,17 +2092,10 @@
       document.getElementById('landingPage').classList.remove('hidden');
       document.title = 'Show Picker Club';
       try {
+        // The home page no longer lists members; this is here for the
+        // calendar-feed rows, which need the caller's own calendar_token.
         const res = await fetch('/api/members');
         const data = await res.json();
-        // Most recently active first, then most active (Watching + Next Up +
-        // Loved) as the tiebreaker — the same order as the member-page
-        // sidebar, so the roster reads the same everywhere.
-        allHomeMembers = (data.members || []).slice().sort((a, b) => {
-          const la = a.last_activity_at || '', lb = b.last_activity_at || '';
-          if (la !== lb) return lb.localeCompare(la);
-          return memberActiveCount(b) - memberActiveCount(a);
-        });
-        renderHomeMembers();
         setupCalendarLinks(data.members);
         // If logged in, fetch my shows to populate the rate backlog badge
         if (authMember) {
@@ -2393,19 +2359,15 @@
     // Header login button: visible only when logged out. Once logged in, the
     // Log out button takes over; per-row actions show inline on your own page
     // (no edit-mode toggle needed).
-    // Landing join pitch: only for logged-out visitors, and only when
-    // self-enrollment is open (/auth/config, cached by loadAuthConfig).
-    // Invite-only deployments (SELF_ENROLL unset) never see it.
-    async function maybeShowJoinCta() {
+    // Landing join pitch: shown to every logged-out visitor. Signing up is
+    // the only way to become a member, so it is always the right offer.
+    function maybeShowJoinCta() {
       const cta = document.getElementById('joinCta');
       if (!cta) return;
       if (authMember) { cta.classList.add('hidden'); return; }
-      const cfg = await loadAuthConfig();
-      cta.classList.toggle('hidden', !cfg.self_enroll);
-      if (cfg.self_enroll) {
-        const loginRowLabel = document.querySelector('#homeLoginRow .ios-item-label');
-        if (loginRowLabel) loginRowLabel.textContent = 'Log in or sign up';
-      }
+      cta.classList.remove('hidden');
+      const loginRowLabel = document.querySelector('#homeLoginRow .ios-item-label');
+      if (loginRowLabel) loginRowLabel.textContent = 'Log in or sign up';
     }
 
     function updateLoginBtnLabel() {
@@ -2549,7 +2511,7 @@
       try {
         const res = await fetch('/auth/config');
         authConfig = await res.json();
-      } catch { authConfig = { self_enroll: false, google_client_id: null, turnstile_site_key: null }; }
+      } catch { authConfig = { google_client_id: null, turnstile_site_key: null }; }
       return authConfig;
     }
 
@@ -2598,9 +2560,10 @@
       });
       loginShowStep('choose');
       const cfg = await loadAuthConfig();
-      // Signup wording + terms line only when enrollment is actually open.
-      document.getElementById('loginTitle').textContent = cfg.self_enroll ? 'Log in or sign up' : 'Log in';
-      document.getElementById('loginTermsLine').classList.toggle('hidden', !cfg.self_enroll);
+      // Every visitor can sign up, so the modal always says so and always
+      // carries the terms line.
+      document.getElementById('loginTitle').textContent = 'Log in or sign up';
+      document.getElementById('loginTermsLine').classList.remove('hidden');
       mountGoogleButton(cfg);
     }
 
