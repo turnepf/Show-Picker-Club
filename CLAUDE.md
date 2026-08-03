@@ -28,7 +28,8 @@ Only `public/` (static assets) and `functions/` (Pages Functions) are deployed �
 ```
 public/            Deployed static pages: index.html (SPA), vibe, subscriptions,
                    members/reporting/url-cleanup/vibe-admin (admin tools; /admin 301s to /members),
-                   sw.js + manifest.json (PWA), _headers (CSP), _redirects (SPA fallback)
+                   sw.js (tombstone — the PWA was retired 2026-08; don't delete
+                   the file, see ARCHITECTURE.md), _headers (CSP), _redirects
 functions/
 ├── api/           /api/* endpoints (one file per route; [param].js for dynamic segments)
 ├── auth/          login, logout, request-code, apple, google, enroll, check, config

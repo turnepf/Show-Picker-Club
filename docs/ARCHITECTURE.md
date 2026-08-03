@@ -355,16 +355,13 @@ Native SwiftUI apps for iOS, tvOS, and watchOS call the same public `/api/*` end
 
 A native **Roku** channel (`roku/`, SceneGraph/BrightScript) hits the same endpoints and behaves like the tvOS app, built from standard Roku controls. It self-identifies as `X-Client-Platform: roku` (added to `KNOWN_PLATFORMS`). Because Roku has no cookie jar, the channel captures the `session=<uuid>` cookie from `/auth/login`'s `Set-Cookie`, persists it in the Roku registry, and replays it as a manual `Cookie` header on every request (`roku/components/tasks/ApiTask.brs`). Like the other native clients it sends no `Origin` header, so `/auth/request-code` never issues a Turnstile challenge. Roku platform limits mean streaming deep links and trailers behave differently than on tvOS (see `roku/README.md`). Not part of the Cloudflare Pages output (`pages_build_output_dir = "public"`), so it doesn't affect the web deploy.
 
-## Service worker + PWA
+## Service worker + PWA (retired 2026-08)
 
-`public/sw.js` implements a network-first strategy with a single `shows-v1` cache:
+The web app is no longer installable. `public/manifest.json` is gone, along with the `<link rel="manifest">` and `apple-mobile-web-app-*` tags on `index.html`, `groups.html`, and `whats-new.html`, and the CSP's `manifest-src` directive. The native Apple apps cover the install-to-home-screen case; the web is a browser page again, with no offline caching.
 
-- `install`: `self.skipWaiting()`.
-- `activate`: `clients.claim()` so the new SW takes over open tabs.
-- `fetch`: on success, clone into cache and return; on failure, fall back to cached response if present.
-- Skips caching `/api/*` and `/auth/*` (always live).
+**`public/sw.js` is retained deliberately, as a tombstone** — do not delete it yet. It now registers no `fetch` handler and does one thing on `activate`: clear every Cache Storage bucket, then `self.registration.unregister()`. This is the only way to evict the workers already installed on members' devices. Deleting the file would not do it: `_redirects` maps `/*` to the SPA shell, so `/sw.js` would return index.html as `text/html` with a 200. A 404 unregisters a worker; an HTML 200 fails the update check on a MIME mismatch and leaves the old worker and its stale cache installed indefinitely. `index.html` also runs a `getRegistrations().unregister()` + `caches.delete()` sweep on load, so members who reach a member page are cleaned up immediately rather than on the browser's next update check.
 
-`public/manifest.json` is a standard PWA manifest with `display: standalone`, theme colors matching the app palette, and the `favicon.svg` as the icon. This is what enables Apple's "Add to Home Screen" experience.
+`worker-src 'self'` stays in the CSP while the tombstone drains. Once `/sw.js` stops seeing traffic, both it and that directive can go.
 
 ## Security headers
 
@@ -373,6 +370,7 @@ A native **Roku** channel (`roku/`, SceneGraph/BrightScript) hits the same endpo
 - **Content-Security-Policy:** `default-src 'self'`, plus `'unsafe-inline'` for scripts and styles (the SPA uses inline event handlers), and explicit allow-list for Google Analytics and Tag Manager. No third-party iframes, no inline base URI.
 - **Strict-Transport-Security:** `max-age=31536000; includeSubDomains`.
 - **X-Frame-Options:** `DENY`.
+- **X-Content-Type-Options:** `nosniff`.
 - **Permissions-Policy:** disables camera, microphone, geolocation, payment, USB, accelerometer, gyroscope, magnetometer, interest-cohort.
 
 The deploy smoke test verifies these headers are present after each push.

@@ -13,6 +13,11 @@
   "entries": [
     {
       "date": "8/3",
+      "title": "The web app is a web page again.",
+      "body": "Adding Show Picker Club to your home screen from a browser used to install it as a mini-app that kept working offline. The iPhone, iPad, Apple TV, and Apple Watch apps do that job properly now, so the web version has gone back to being an ordinary web page: it needs a connection, and an old home-screen icon becomes a plain bookmark. Nothing about your lists changes. Web only — the apps are unaffected."
+    },
+    {
+      "date": "8/3",
       "title": "Joining is instant.",
       "body": "Anyone signing up now becomes a full member the moment they finish — no waiting to be let in, and they show up in search, Trending, activity, and Vibe right away. Everywhere: web, iPhone, iPad, Apple TV, and Apple Watch."
     },

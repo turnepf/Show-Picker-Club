@@ -7,10 +7,6 @@
   <meta name="description" content="Track the TV shows and movies you watch with friends. Four simple lists, automatic show info, and premiere dates — free on the web, iPhone, and Apple TV.">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-CP9N26NG19"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-CP9N26NG19');</script>
-  <link rel="manifest" href="/manifest.json">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Show Picker">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <!-- Native Smart App Banner: iPhone/iPad Safari's one prompt for the app
        (OPEN when installed, GET when not). app-banner.js bows out there. -->
   <meta name="apple-itunes-app" content="app-id=6780282764">
@@ -2199,7 +2195,19 @@
         }
       });
       loadShows();
-      if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+      // The PWA is retired (the native apps replaced it). Evict any service
+      // worker and cache left over from when it wasn't. /sw.js is now a
+      // tombstone that unregisters itself; this sweep is the belt to that
+      // braces, clearing browsers on this page without waiting for their
+      // next update check.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations()
+          .then(regs => regs.forEach(reg => reg.unregister()))
+          .catch(() => {});
+      }
+      if (window.caches) {
+        caches.keys().then(keys => keys.forEach(k => caches.delete(k))).catch(() => {});
+      }
     }
 
     // ── iPad-style sidebar sync (≥1024px split view) ─────────────────

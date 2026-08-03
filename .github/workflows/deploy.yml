@@ -57,7 +57,7 @@ jobs:
           fi
           # Security headers must be present.
           headers=$(curl -sSI "https://showpicker.club/?nocache=$RANDOM")
-          for h in content-security-policy strict-transport-security x-frame-options permissions-policy; do
+          for h in content-security-policy strict-transport-security x-frame-options x-content-type-options permissions-policy; do
             if ! echo "$headers" | grep -qi "^$h:"; then
               echo "::error::missing header $h"
               fail=1
