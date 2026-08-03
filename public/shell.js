@@ -59,7 +59,9 @@
     /* The sidebar owns navigation, so a page's own top pill nav / back
        link is redundant on the split view and bows out. */
     '  .shell-detail .admin-nav { display: none; }' +
-    '  .shell-detail .topbar a.back, .shell-detail .header-top a.back { display: none; }' +
+    /* …except a back that pops an in-page view (groups: group → member →
+       show). That one is the only way back up the stack, so it stays. */
+    '  .shell-detail .topbar a.back:not(.is-in-page), .shell-detail .header-top a.back:not(.is-in-page) { display: none; }' +
     /* The page title is absolutely positioned (an iOS-nav centering trick
        against the back link). With the back link hidden the bar has no
        in-flow content and collapses to its padding, so following content

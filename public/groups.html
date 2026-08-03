@@ -44,9 +44,22 @@
       line-height: 1;
       padding: 6px 10px 6px 0;
       position: relative; z-index: 1;
+      /* Comfortable touch target; the label is set by updateNav(), so the
+         chevron comes from CSS to survive a textContent-only update. */
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      max-width: 45%;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
+    .header-top a.back::before { content: '\2039'; margin-right: 5px; font-size: 20px; }
     @media (min-width: 1024px) {
-      .header-top a.back { display: none !important; }
+      /* The shell sidebar owns Home at this width, so a back that would only
+         leave the page is redundant — but one that pops an in-page view
+         (group → member → show) is the sole way back up the stack. */
+      .header-top a.back:not(.is-in-page) { display: none !important; }
     }
     .header-top h1 {
       font-family: var(--font-sans);
@@ -274,8 +287,11 @@
   </style>
   <script src="/show-renderer.js"></script>
   <script>
-    // Set nav context before loading nav.js
-    window.navContext = { page: 'groups', backLabel: 'Groups' };
+    // Set nav context before loading nav.js. No backLabel here on purpose:
+    // updateNav() owns the label (it names the view the back button returns
+    // to), and nav.js applies ctx.backLabel on DOMContentLoaded — which can
+    // land after the first updateNav() and overwrite it with a stale value.
+    window.navContext = { page: 'groups' };
   </script>
   <script src="/nav.js"></script>
   <script src="/shell.js?v=2" defer></script>
@@ -450,6 +466,9 @@
         if (view === 'groupsList') loadGroupsList();
         else if (view === 'groupView') renderGroupView();
         else if (view === 'memberView') renderMemberView();
+      } else {
+        // Root of the stack: nothing to pop, so leave for the home page.
+        window.location.href = '/';
       }
     }
 
@@ -461,21 +480,37 @@
       document.getElementById('showDetail').style.display = view === 'showDetail' ? 'block' : 'none';
       document.getElementById('joinFlow').style.display = view === 'joinFlow' ? 'block' : 'none';
 
-      // Update shared nav label based on current view
-      let backLabel = 'Groups';
-      if (navStack.length > 1) {
-        const currentView = view;
-        if (currentView === 'groupView' && currentGroupData) {
-          backLabel = 'Groups';
-        } else if (currentView === 'memberView' && currentMemberSlug) {
-          // Get member name from currentGroupData if available
-          const member = currentGroupData?.members?.find(m => m.slug === currentMemberSlug);
-          backLabel = member?.first_name || currentMemberSlug;
-        } else if (currentView === 'showDetail' && detailShow) {
-          backLabel = detailShow.title;
-        }
+      const back = backDestination();
+      const backLink = document.getElementById('backLink');
+      if (backLink) {
+        backLink.style.display = '';
+        // Marks a back that pops a view rather than leaving the page. At
+        // >=1024px the shell sidebar owns Home, so only this kind survives
+        // (see the media query above and the matching rule in shell.js).
+        backLink.classList.toggle('is-in-page', back.inPage);
+        backLink.href = back.inPage ? '#' : '/';
+        backLink.setAttribute('aria-label', back.inPage ? 'Back to ' + back.label : 'Back to home');
+        backLink.title = back.label;
       }
-      window.updateNavLabel(backLabel);
+      window.updateNavLabel(back.label);
+    }
+
+    // The back control names where it GOES, not where you are: from a
+    // member's shows it reads the group you came from; from a show detail
+    // it reads that member (or the group, if you opened it from group
+    // trending). At the root of the stack there is nothing to pop, so it
+    // leaves for the home page instead.
+    function backDestination() {
+      const dest = navStack[navStack.length - 2];
+      if (!dest) return { label: 'Home', inPage: false };
+      if (dest === 'groupView') {
+        return { label: currentGroupData?.group?.name || 'Group', inPage: true };
+      }
+      if (dest === 'memberView') {
+        const member = currentGroupData?.members?.find(m => m.slug === currentMemberSlug);
+        return { label: member?.first_name || currentMemberSlug || 'Member', inPage: true };
+      }
+      return { label: 'Groups', inPage: true };
     }
 
     // Views
