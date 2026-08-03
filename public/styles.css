@@ -122,6 +122,9 @@ body.admin-page { padding: 32px 16px 80px; }
   text-decoration: none;
 }
 .admin-nav a.back:hover { color: var(--ink); text-decoration: none; }
+/* The label rides along only on small screens (see the media query below),
+   where the chevron alone would be a bare, unlabelled tap target. */
+.admin-nav a.back .back-label { display: none; }
 .admin-title {
   font-family: var(--font-sans);
   font-size: var(--text-lg);
@@ -234,7 +237,22 @@ body.admin-page {
   }
 }
 
-/* Admin pages: hide nav on mobile since sidebar is also hidden */
+/* Admin pages on a phone: the four cross-page links would wrap onto their
+   own row, so they stay hidden — but the back control has to survive. It's
+   the only way off an admin page at this width (the home sidebar isn't
+   rendered), and hiding the whole nav used to strand the operator there.
+   Matches the member page's small-screen back control: chevron + "Home". */
 @media (max-width: 1023px) {
-  .admin-nav { display: none; }
+  .admin-nav a:not(.back) { display: none; }
+  .admin-nav { margin-bottom: 10px; }
+  .admin-nav a.back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    /* 44px keeps it a comfortable touch target. */
+    min-height: 44px;
+    margin-right: 0;
+    color: var(--accent);
+  }
+  .admin-nav a.back .back-label { display: inline; font-size: var(--text-sm); }
 }
