@@ -217,7 +217,10 @@ promote/demote (`/api/admin-member-role`; the server refuses to demote the
 last admin, and a full hand-off is promote-then-demote-yourself — this is
 the path the `admin_must_demote_first` account-deletion error points at).
 There is no new-members queue and nothing to approve — people sign
-themselves up and are live immediately. Above the roster, the same platform badges shown per-member
+themselves up and are live immediately. (The iPhone/iPad app still carries
+the old queue UI in its source until the post-launch cleanup build; with the
+endpoints gone it always renders empty, so the operator sees the same thing
+on both surfaces.) Above the roster, the same platform badges shown per-member
 (iPhone, iPad, Apple Watch, Mac, Apple TV, Small Web, Large Web) double as a
 filter on both surfaces — tap one to show only members who've ever used
 that platform, tap it again to clear. When adding a member-management
