@@ -36,7 +36,9 @@
 
   // Installed-PWA windows: no browser chrome, so the bar would collide with
   // the iOS status bar (black-translucent) — and those users already have a
-  // home-screen entry point. Skip.
+  // home-screen entry point. Skip. The PWA was retired with the native apps,
+  // but home-screen installs made before that keep opening standalone, so
+  // this guard stays until they age out.
   if ((window.matchMedia && matchMedia('(display-mode: standalone)').matches) ||
       navigator.standalone) return;
 

@@ -43,8 +43,7 @@ Only `public/` (static assets) and `functions/` (Pages Functions) are deployed. 
 │   ├── url-cleanup.html        Admin: fix missing network URLs (secret-gated)
 │   ├── vibe-admin.html         Admin: batch-score trait vectors (secret-gated)
 │   ├── app-banner.js           Dismissible "get the app" App Store banner (Apple devices)
-│   ├── manifest.json           PWA manifest
-│   ├── sw.js                   Service worker
+│   ├── sw.js                   Service-worker tombstone (unregisters the retired PWA)
 │   ├── _headers                Security headers (CSP, HSTS, etc.)
 │   └── _redirects              SPA fallback + legacy slug rewrites
 ├── functions/
