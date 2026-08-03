@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="ApiTask" extends="Task">
+    <interface>
+        <!-- request: { method, path, body, tag } -->
+        <field id="request" type="assocarray" />
+        <!-- result: { statusCode, ok, body, json, tag } -->
+        <field id="result" type="assocarray" />
+    </interface>
+    <script type="text/brightscript" uri="ApiTask.brs" />
+</component>

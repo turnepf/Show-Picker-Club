@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Portrait poster tile used by RowLists and grids (mirrors tvOS ShowCard). -->
+<component name="PosterCard" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContentSet" />
+        <field id="focusPercent" type="float" onChange="onFocusChange" />
+        <field id="width" type="float" value="280" />
+        <field id="height" type="float" value="420" />
+    </interface>
+    <script type="text/brightscript" uri="PosterCard.brs" />
+    <children>
+        <Rectangle id="bg" width="280" height="420" color="0x1C1F26FF" />
+        <Poster id="poster" width="280" height="420" loadDisplayMode="scaleToFill" failedBitmapUri="" />
+        <Label id="fallbackTitle" width="256" height="396" translation="[12,12]"
+               wrap="true" maxLines="4" font="font:MediumBoldSystemFont" color="0xF5F7FAFF" visible="false" />
+        <Poster id="netlogo" width="64" height="26" translation="[204,12]" loadDisplayMode="scaleToZoom" visible="false" />
+        <Label id="badge" translation="[12,12]" color="0xFFFFFFFF" font="font:SmallestBoldSystemFont" visible="false" />
+        <Rectangle id="titleScrim" width="280" height="86" translation="[0,334]" color="0x000000E6" visible="false" />
+        <Label id="title" width="256" height="76" translation="[12,344]" wrap="true" maxLines="2"
+               font="font:SmallBoldSystemFont" color="0xF5F7FAFF" visible="false" />
+    </children>
+</component>

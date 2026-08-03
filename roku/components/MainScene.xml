@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="MainScene" extends="Scene">
+    <interface>
+        <field id="launchArgs" type="assocarray" />
+    </interface>
+    <script type="text/brightscript" uri="MainScene.brs" />
+    <children>
+        <Rectangle id="bg" width="1920" height="1080" color="0x0D0F14FF" />
+        <Group id="viewHolder" />
+        <BusySpinner id="spinner" translation="[930,500]" visible="false">
+            <Poster width="60" height="60" uri="pkg:/images/spinner.png" />
+        </BusySpinner>
+    </children>
+</component>

@@ -126,7 +126,7 @@ Native support: `ShowPickerCore/Sources/ShowPickerCore/Ratings.swift` defines `R
 | `expires_at`    | TEXT NOT NULL | 30 days from creation. |
 | `created_at`    | TEXT | |
 | `last_seen_at`  | TEXT | Bumped by `/auth/check`, throttled to once per hour per session. Drives DAU/WAU/MAU in reporting. |
-| `platform`      | TEXT | Migration 016. One of `_shared/platform.js#KNOWN_PLATFORMS` (`iphone`, `ipad`, `mac`, `watchos`, `tvos`, `web-small`, `web-large`), self-reported via the `X-Client-Platform` header and stamped by `/auth/check`. Deleted with the session on logout/disable — it's a live snapshot, not history; see `member_platforms` for durable per-member tracking. |
+| `platform`      | TEXT | Migration 016. One of `_shared/platform.js#KNOWN_PLATFORMS` (`iphone`, `ipad`, `mac`, `watchos`, `tvos`, `roku`, `web-small`, `web-large`), self-reported via the `X-Client-Platform` header and stamped by `/auth/check`. Deleted with the session on logout/disable — it's a live snapshot, not history; see `member_platforms` for durable per-member tracking. |
 
 ### `member_platforms`
 Migration 047. Durable "every platform this member has ever used," unlike `sessions.platform` which disappears on logout/disable. Shown as badges on the Manage Members admin page (web `/members`, iOS `ManageMembersView`); the same badges, laid out identically above the roster, double as a filter — tap one to show only members who've ever used that platform, tap it again to clear.
@@ -352,6 +352,8 @@ Admin tools. Each requires an admin session; they show a "log in first" hint oth
 ## Native clients
 
 Native SwiftUI apps for iOS, tvOS, and watchOS call the same public `/api/*` endpoints as the web. They share a `ShowPickerCore` Swift package (at the repo root) that holds the `Show` / `Actor` / `ShowList` models and their response wrappers, and are opened together via `ShowPickerClub.xcworkspace`. iOS and tvOS share one bundle id (`net.patrickturner.showpickerios`) and ship as a single universal App Store app (iPhone + Apple TV). The watchOS app (`watch/ShowPickerWatch`) is paired to the iPhone and receives its session via WatchConnectivity; its reads are public. Platform usage tracking now includes a `watchos` platform value.
+
+A native **Roku** channel (`roku/`, SceneGraph/BrightScript) hits the same endpoints and behaves like the tvOS app, built from standard Roku controls. It self-identifies as `X-Client-Platform: roku` (added to `KNOWN_PLATFORMS`). Because Roku has no cookie jar, the channel captures the `session=<uuid>` cookie from `/auth/login`'s `Set-Cookie`, persists it in the Roku registry, and replays it as a manual `Cookie` header on every request (`roku/components/tasks/ApiTask.brs`). Like the other native clients it sends no `Origin` header, so `/auth/request-code` never issues a Turnstile challenge. Roku platform limits mean streaming deep links and trailers behave differently than on tvOS (see `roku/README.md`). Not part of the Cloudflare Pages output (`pages_build_output_dir = "public"`), so it doesn't affect the web deploy.
 
 ## Service worker + PWA
 
