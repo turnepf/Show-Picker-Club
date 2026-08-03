@@ -260,7 +260,9 @@
         html += '<h3 class="ios-group-header">Members</h3><div class="ios-group shell-members">' +
           sorted.map(memberRow).join('') + '</div>';
       }
-      html += '<p class="ios-footnote">Ratings and metadata from IMDb (via OMDb) and TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>';
+      /* TMDB is the sole enrichment source (OMDB retired 2026-07), so the
+         credit names it alone — same wording as index.html's sidebar. */
+      html += '<p class="ios-footnote">Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>';
       side.querySelector('.shell-groups').innerHTML = html;
     });
   }
