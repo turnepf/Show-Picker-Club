@@ -239,6 +239,18 @@ A few intentional omissions:
 
 ## Backlog
 
+- **SMS consent language promises retired notifications.** `public/sms.html`
+  and the SMS section of `public/privacy.html` both say members receive texts
+  "when another member recommends or shares a show with you". Those features
+  were retired 2026-07 and their endpoints return 410, so those texts can no
+  longer be sent. This is over-disclosure rather than under-disclosure, so
+  it is not a compliance problem and there is no rush — but it is wrong.
+  Not a drive-by fix: `sms.html` quotes verbatim the consent language
+  registered with Twilio for A2P 10DLC, so the page and the registered
+  campaign text have to change together. `sms.html` also still describes the
+  club as "invitation-only", which stopped being true when approval was
+  removed in 2026-08.
+
 - **Member ratings.** (Amy Brownlee 7/16, Susan 7/22, Rob Maltzhan 7/23 —
   2026.) Members rate shows 1-10 (whole numbers), and those ratings show up
   alongside the IMDB number — friends' stars answer "Patrick liked it, so

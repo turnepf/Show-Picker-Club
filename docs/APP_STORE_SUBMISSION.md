@@ -133,13 +133,42 @@ tracking, so no App Tracking Transparency prompt is presented.
 - [ ] **Apple TV privacy policy is pasted TEXT, not a URL** (tvOS has no
       browser). App Privacy → Privacy Policy → the Apple TV field wants the
       plain-text rendering of `public/privacy.html`. Blocks Add for Review
-      if empty.
+      if empty. **Because it is a paste, it does not track edits to the
+      file** — re-paste whenever `public/privacy.html` has changed since the
+      last submission. `git log -1 --format=%as public/privacy.html` gives
+      the date it last changed; the policy's own "Last updated" line should
+      match what you paste. **Outstanding: it changed 2026-08-03** (retired
+      OMDB dropped from the third-party list; the operator-adds-you signup
+      path removed) and has not been re-pasted since.
 - [ ] **Version Number field on each platform's version page** matches
       `MARKETING_VERSION` — a page created as 1.0 keeps saying 1.0 until
       edited, even with a 1.0.1 build attached.
 - [ ] **Age-rating questionnaire updates** (e.g. the 2026 social-media
       questions) answered — for this app: no chat/messaging, no public UGC;
       lists and notes are visible only inside the private club.
+
+## 5b. Deferred Apple-side cleanup (carried from the 2026-08 approval removal)
+
+Backend approval was removed in migration 058, but the Apple targets were
+deliberately left on known-good code so the launch archive wouldn't build
+from unverified edits. Both items below are safe to leave — nothing is
+broken — but clear them in the first build after the apps have shipped.
+
+- [ ] **tvOS still credits the retired OMDB.** `GroupsListViewTV.swift` and
+      `tvos/ShowPickerTV/HomeView.swift` display "Ratings and metadata from
+      IMDb (via OMDb) and TMDB". TMDB has been the sole source since
+      2026-07. Replace with the string iOS and the web already use:
+      "Ratings and metadata from TMDB. This product uses the TMDB API but is
+      not endorsed or certified by TMDB." (iOS is already correct — only its
+      code comments mention OMDb.)
+- [ ] **Strip the inert approval queue from the iPhone/iPad app.** The
+      endpoints it calls are gone, so it renders empty and degrades cleanly
+      (see the note in `docs/ARCHITECTURE.md` under `members.html`). To
+      remove: the queue sections in `ManageMembersView.swift`,
+      `SignupRequest`/`CreateMemberResult` in `Models.swift`,
+      `signupRequests()`/`actOnSignupRequest()`/`approveMember()` in
+      `API.swift`, `WelcomeIntroPanel.swift`, and the `AdminView` waiting
+      badge.
 
 ## 6. Standard build hygiene
 
