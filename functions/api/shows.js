@@ -38,8 +38,11 @@ export async function onRequestGet(context) {
   const archivedFilter = includeArchived ? '' : 'AND s.archived = 0';
   const { results } = await env.DB.prepare(
     `SELECT s.*,
-       (SELECT json_group_array(json_object('name', a.name, 'imdb_id', a.imdb_id)) FROM actors a WHERE a.show_id = s.id) as actors
-     FROM shows s WHERE s.member_slug = ? ${archivedFilter} ORDER BY s.title COLLATE NOCASE`
+       (SELECT json_group_array(json_object('name', a.name, 'imdb_id', a.imdb_id)) FROM actors a WHERE a.show_id = s.id) as actors,
+       sr.rating as user_rating
+     FROM shows s
+     LEFT JOIN show_ratings sr ON s.tmdb_id = sr.tmdb_id AND s.member_slug = sr.member_slug AND sr.season_number = 0
+     WHERE s.member_slug = ? ${archivedFilter} ORDER BY s.title COLLATE NOCASE`
   ).bind(member).all();
   // Personal fields are for the list's owner only. Notes, who's watching
   // with them, and who recommended a show were written as private memos —
