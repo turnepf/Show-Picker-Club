@@ -116,6 +116,19 @@ export async function onRequestGet(context) {
     }
   } catch (_) { /* auth_method column not migrated yet */ }
 
+  // Calendar feed usage (migration 061): how many members' feeds a client has
+  // actually fetched lately, and how many have ever been fetched at all.
+  let calendarUsage = null;
+  try {
+    calendarUsage = await env.DB.prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM members WHERE calendar_fetched_at >= datetime('now', '-7 days')) AS week,
+         (SELECT COUNT(*) FROM members WHERE calendar_fetched_at >= datetime('now', '-30 days')) AS month,
+         (SELECT COUNT(*) FROM members WHERE calendar_fetched_at IS NOT NULL) AS ever,
+         (SELECT COALESCE(SUM(calendar_fetch_count), 0) FROM members) AS fetches`
+    ).first();
+  } catch (_) { /* columns not migrated yet */ }
+
   // Account creation method, all time (migration 031's enrolled_via).
   const enrolledVia = {};
   try {
@@ -208,6 +221,7 @@ export async function onRequestGet(context) {
     active_members: activeMembers,
     active_by_platform: activeByPlatform,
     signin_methods: signinMethods,
+    calendar_usage: calendarUsage,
     enrolled_via: enrolledVia,
     totals,
     members_login: membersLogin,

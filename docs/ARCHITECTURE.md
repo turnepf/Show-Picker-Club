@@ -36,6 +36,7 @@ database_id = "..."
 | `first_name`   | TEXT             | Override for display name (rare collisions).|
 | `last_initial` | TEXT             | Suffix used to disambiguate two first-name collisions. |
 | `created_at`   | TEXT             | Default `datetime('now')`.                  |
+| `calendar_fetched_at` / `calendar_fetch_count`| TEXT / INTEGER | Migration 061. Stamped by `/calendar/<slug>.ics` on every successful fetch (best-effort, never fatal). A subscribed calendar polls on its own schedule, so these are the only signal that the feed is in use at all — surfaced as the Reporting **Calendar** card. |
 | `last_login_method`| TEXT          | Migration 059. How they last got in (`apple` | `google` | `email` | `sms` | `demo`), stamped beside `last_login_at` and durable for the same reason. Shown per member in Manage Members. |
 | `last_login_at`| TEXT             | Migration 013. Stamped on every session issue and never cleared, so it survives logout/disable (which delete `sessions` rows). Any "last login" / "never logged in" display must read this, not `MAX(sessions.created_at)`. |
 | `enrolled_via` | TEXT             | Migration 031. How the account came to exist: `email` \| `apple` \| `google`; NULL only for rows predating self-enrollment. |

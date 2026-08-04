@@ -181,6 +181,9 @@ struct Reporting: Codable {
     // what it costs to run.
     let signinMethods: SigninMethodWindows?
     let enrolledVia: [String: Int]?
+    // Calendar feed usage — nothing recorded it before migration 061, so this
+    // is nil against an older server.
+    let calendarUsage: CalendarUsage?
     let totals: ReportTotals
     let membersLogin: LoginStats?
     let neverLoggedIn: [NeverLoggedInMember]?
@@ -201,6 +204,7 @@ struct Reporting: Codable {
         case activeByPlatform = "active_by_platform"
         case signinMethods = "signin_methods"
         case enrolledVia = "enrolled_via"
+        case calendarUsage = "calendar_usage"
         case membersLogin = "members_login"
         case neverLoggedIn = "never_logged_in"
         case topNetworks = "top_networks"
@@ -246,6 +250,14 @@ struct SigninMethodWindows: Codable {
     let week: [String: Int]
     let month: [String: Int]
     let quarter: [String: Int]
+}
+
+// Members whose feed a calendar client actually fetched, plus total fetches.
+struct CalendarUsage: Codable {
+    let week: Int
+    let month: Int
+    let ever: Int
+    let fetches: Int
 }
 
 struct LoginStats: Codable {

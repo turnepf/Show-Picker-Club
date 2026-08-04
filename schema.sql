@@ -23,7 +23,11 @@ CREATE TABLE IF NOT EXISTS members (
   -- How they last got in: 'apple' | 'google' | 'email' | 'sms' | 'demo'.
   -- Durable for the same reason last_login_at is — session rows are deleted
   -- on logout, disable and deletion.
-  last_login_method TEXT
+  last_login_method TEXT,
+  -- Calendar feed usage (migration 061): a subscribed client polls on its own
+  -- schedule, so these say whether the feed is actually in use.
+  calendar_fetched_at TEXT,
+  calendar_fetch_count INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS member_phones (

@@ -30,6 +30,15 @@ export async function onRequestGet(context) {
     return new Response('Not found', { status: 404 });
   }
 
+  // Usage (migration 061). A subscribed calendar polls on its own schedule, so
+  // this is the only way to know whether the feature is used at all. Not
+  // awaited and never fatal: the feed matters, the bookkeeping doesn't.
+  context.waitUntil(env.DB.prepare(
+    `UPDATE members SET calendar_fetched_at = datetime('now'),
+            calendar_fetch_count = COALESCE(calendar_fetch_count, 0) + 1
+      WHERE slug = ?`
+  ).bind(slug).run().catch(() => {}));
+
   const { results } = await env.DB.prepare(
     `SELECT id, title, network, network_url, list, recommended_by,
             next_season_date, season_end_date

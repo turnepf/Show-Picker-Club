@@ -41,6 +41,18 @@ struct ReportingView: View {
                         Text("Sessions minted per method. Sessions last 30 days, so the 90-day window is the one to read before retiring a channel. \"unknown\" is a session from before this was tracked.")
                     }
                 }
+                if let cal = r.calendarUsage {
+                    Section {
+                        metric("Feeds fetched (7 days)", cal.week)
+                        metric("Feeds fetched (30 days)", cal.month)
+                        metric("Feeds ever fetched", cal.ever)
+                        metric("Total fetches", cal.fetches)
+                    } header: {
+                        Text("Calendar")
+                    } footer: {
+                        Text("A subscribed calendar polls on its own schedule, so a member whose feed is being fetched has it live somewhere. Counting started when this shipped — give it a day before reading it.")
+                    }
+                }
                 if let ev = r.enrolledVia, !ev.isEmpty {
                     Section {
                         ForEach(ev.sorted(by: { $0.value > $1.value }), id: \.key) { pair in

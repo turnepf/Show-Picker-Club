@@ -51,29 +51,25 @@ struct HomeView: View {
                 OfflineBanner()
 
                 List {
-                    if let me = myMember {
-                        Section {
+                    // One nav group: My Shows leads, then the rest in the
+                    // same order as the web nav and the iPad sidebar —
+                    // Groups, Rate my backlog, Subscription audit, Vibe,
+                    // Calendar, What's New. Trending is the content section
+                    // below rather than a row, same as the web at phone
+                    // width. (Admin lives behind the account icon.)
+                    Section {
+                        if let me = myMember {
                             NavigationLink(value: Route.member(me)) {
                                 Label("My Shows", systemImage: "person.crop.circle")
                                     .font(.body.weight(.semibold))
                             }
-                        }
-                    } else if !auth.isLoggedIn {
-                        Section {
+                        } else if !auth.isLoggedIn {
                             Button {
                                 showingLogin = true
                             } label: {
                                 Label("Log in to see your shows", systemImage: "person.crop.circle.badge.plus")
                             }
                         }
-                    }
-                    // Discovery + account group, separated from My Shows
-                    // above, in the same order as the web nav and the iPad
-                    // sidebar: Groups, Rate my backlog, Subscription audit,
-                    // Vibe, Calendar, What's New, then Admin. Trending is the
-                    // content section below rather than a row — same as the
-                    // web at phone width.
-                    Section {
                         if myMember != nil {
                             NavigationLink(value: Route.groups) {
                                 Label("Groups", systemImage: "person.2.fill")

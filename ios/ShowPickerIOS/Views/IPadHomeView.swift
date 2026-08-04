@@ -150,11 +150,12 @@ struct IPadHomeView: View {
                     }
                 }
             }
-            // Discovery + account group, kept separate from the member lists
-            // above, in the same order as the web sidebar and iPhone Home:
-            // Groups, Trending, Rate my backlog, Subscription audit, Vibe,
-            // Calendar, What's New, then Admin.
-            Section {
+            // Same group as the lists above rather than a separate one —
+            // the gap read as a divide the nav doesn't actually have. Order
+            // matches the web sidebar and iPhone Home: Groups, Trending,
+            // Rate my backlog, Subscription audit, Vibe, Calendar, What's
+            // New, then Admin.
+            Group {
                 if myMember != nil {
                     Label("Groups", systemImage: "person.2.fill")
                         .tag(SidebarItem.groups)
