@@ -256,3 +256,159 @@ body.admin-page {
   }
   .admin-nav a.back .back-label { display: inline; font-size: var(--text-sm); }
 }
+
+/* ── Show detail + list chips ───────────────────────────────────────
+   The detail screen renders from renderShowDetailBody() in
+   show-renderer.js on every page that shows one (the main app and the
+   groups page), so its vocabulary lives here rather than in either
+   page's own <style> — one definition, no drift. */
+.list-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.list-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  border: 1.5px solid var(--chip-color);
+  border-radius: 6px;
+  color: var(--chip-color);
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+  text-align: center;
+  -webkit-text-size-adjust: 100%;
+  box-sizing: border-box;
+}
+.list-chip.selected {
+  background: var(--chip-color);
+  color: #fff;
+}
+/* Read-only four-across list chips on the detail screen (not a picker). */
+.detail-list-chips { grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 12px 16px; margin-bottom: 0; }
+.detail-list-chips .list-chip { cursor: pointer; height: 32px; font-size: 11px; }
+.detail-list-chips .list-chip:hover { background: color-mix(in oklch, var(--chip-color) 14%, transparent); }
+.detail-list-chips .list-chip.selected:hover { background: var(--chip-color); }
+
+.detail-poster { text-align: center; margin: 6px 0 16px; }
+.detail-poster img {
+  width: 160px; max-width: 45%; height: auto;
+  border-radius: 12px; box-shadow: var(--shadow-card, 0 4px 16px rgba(0,0,0,0.18));
+}
+
+.detail-card {
+  background: var(--surface);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px oklch(0.18 0.03 50 / 0.06);
+}
+.detail-card-title {
+  font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--ink-quiet);
+  padding: 14px 16px 4px;
+}
+.detail-row {
+  display: flex; justify-content: space-between; gap: 14px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 14px;
+}
+.detail-card .detail-row:first-of-type,
+.detail-card-title + .detail-row { border-top: none; }
+.detail-row .k { color: var(--ink-muted); flex: 0 0 auto; }
+.detail-row .v { color: var(--ink); text-align: right; min-width: 0; }
+.detail-row .v a { color: var(--info); text-decoration: none; }
+.detail-prose { padding: 12px 16px; font-size: 14px; color: var(--ink-muted); line-height: 1.5; }
+.detail-prose a { color: var(--info); text-decoration: none; }
+.detail-prose a:hover { text-decoration: underline; }
+.detail-action {
+  display: block; width: 100%; box-sizing: border-box;
+  text-align: center; padding: 13px 16px;
+  background: var(--surface); border: none;
+  border-top: 1px solid var(--border-soft);
+  color: var(--tint); font-size: 15px; font-weight: 600;
+  font-family: inherit; cursor: pointer;
+}
+.detail-card .detail-action:first-child { border-top: none; }
+
+.rating-count { color: var(--ink-muted); font-size: 12px; font-weight: 400; }
+.rating-entry {
+  padding: 8px 16px 12px;
+  border-top: 1px solid var(--border-soft);
+}
+.detail-card-title + .rating-entry { border-top: none; }
+.rating-entry-label { font-size: 13px; color: var(--ink-muted); margin-bottom: 6px; }
+/* 10-segment tap-row — deliberately not a slider or numeric field:
+   tap a position and it saves instantly. Distinct from the plain
+   "★ 7.3" TMDB Rating row directly above it in the same Ratings
+   section, so the two 1-10 scales never blur together visually even
+   though they share a scale. */
+.rating-row { display: flex; gap: 3px; }
+.rating-seg {
+  flex: 1 1 0;
+  height: 22px;
+  border: 1.5px solid var(--border-soft);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+.rating-seg:hover { border-color: var(--accent); }
+.rating-seg.filled { background: var(--accent); border-color: var(--accent); }
+.detail-action:hover { background: color-mix(in srgb, var(--tint) 8%, transparent); }
+.detail-action.danger { color: var(--danger-deep); }
+.detail-action.danger:hover { background: var(--danger-soft); }
+
+/* ── Show cards ─────────────────────────────────────────────────────
+   Every show row in the app comes out of renderShowCard() in
+   show-renderer.js — member lists, Trending, search results, group
+   lists, Rate my backlog. One definition here so the row can't look
+   different depending on which page rendered it. */
+.show-list {
+  background: var(--surface);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px oklch(0.18 0.03 50 / 0.06);
+}
+.show-list:empty { display: none; }
+.show { border-bottom: 1px solid var(--border-soft); }
+
+/* Minimal iOS-style member rows: whole row taps into the detail screen. */
+.ios-row { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ios-row:active { background: var(--surface-2); }
+.ios-row .ios-row-main { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.row-poster {
+  width: 42px; height: 63px; flex-shrink: 0;
+  object-fit: cover; border-radius: 6px; background: var(--surface-2, rgba(0,0,0,0.06));
+}
+.row-poster-empty {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; opacity: 0.5;
+}
+.ios-row-text { flex: 1; min-width: 0; }
+.ios-row-title { font-weight: 600; color: var(--ink); font-size: 15px; line-height: 1.3; }
+.ios-row .show-sub { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+.ios-row .show-rating { flex: 0 0 auto; }
+.ios-row-chevron { flex: 0 0 auto; color: var(--ink-faint); font-weight: 700; font-size: 18px; line-height: 1; }
+
+.drag-hint {
+  text-align: center; font-size: 12px; color: var(--accent);
+  padding: 2px 0 10px;
+}
+.drag-handle {
+  font-size: 20px; line-height: 1; color: var(--ink-faint);
+  padding: 10px 2px 10px 12px;
+  cursor: grab;
+  touch-action: none;           /* the handle drags; it never scrolls */
+  user-select: none; -webkit-user-select: none;
+}
+.ios-row.dragging {
+  opacity: 0.85;
+  box-shadow: var(--shadow-card);
+  transform: scale(1.01);
+  position: relative; z-index: 5;
+}
+body.no-select { user-select: none; -webkit-user-select: none; }
+.list-announce { text-align: center; font-size: 12px; color: var(--tint); padding: 2px 0 10px; }
+.network-counts { text-align: center; font-size: 12px; color: var(--ink-quiet); padding: 12px 0 4px; }

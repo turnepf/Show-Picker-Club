@@ -9,7 +9,7 @@
   <link rel="apple-touch-icon" href="/favicon.svg">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
-  <link rel="stylesheet" href="/styles.css?v=5">
+  <link rel="stylesheet" href="/styles.css?v=6">
   <style>
     :root { --tint: #6D63EB; }
     @media (prefers-color-scheme: dark) { :root { --tint: #8D87F5; } }
@@ -70,18 +70,44 @@
       margin: 0 auto;
       padding: 24px 20px 60px;
     }
-    .group-card {
+    /* Inset-grouped list vocabulary, matching the sidebar nav (shell.js) and
+       the main app's own nav, so the groups list and a group's member list
+       read as the same control. Scoped to main: the shell's own .shell-side
+       rules stay untouched. */
+    main .ios-group {
       background: var(--surface);
-      border: 1px solid var(--border-soft);
       border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 12px;
-      cursor: pointer;
-      transition: all 0.2s;
+      overflow: hidden;
+      margin-bottom: 22px;
+      box-shadow: 0 1px 3px oklch(0.18 0.03 50 / 0.06);
     }
-    .group-card:hover { border-color: var(--tint); }
-    .group-card h3 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
-    .group-card p { margin: 0; font-size: 13px; color: var(--ink-muted); }
+    main .ios-group-header {
+      font-size: 13px; font-weight: 400;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--ink-quiet);
+      padding: 0 16px 7px; margin: 2px 0 0;
+    }
+    main .ios-item {
+      position: relative;
+      display: flex; align-items: center; gap: 12px;
+      width: 100%; min-height: 44px;
+      padding: 10px 14px;
+      background: none; border: none;
+      font-family: var(--font-sans); font-size: 16px; line-height: 1.3; text-align: left;
+      color: var(--ink); text-decoration: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+    main .ios-item:active { background: var(--surface-2); }
+    main .ios-item + .ios-item::after {
+      content: ""; position: absolute; left: 48px; right: 0; top: 0;
+      height: 1px; background: var(--border-soft);
+    }
+    main .ios-item.no-icon + .ios-item.no-icon::after { left: 14px; }
+    main .ios-item-label { flex: 1; min-width: 0; }
+    main .ios-item-detail { color: var(--ink-quiet); font-size: 13px; white-space: nowrap; }
+    main .ios-item-chev { width: 15px; height: 15px; flex: 0 0 auto; color: var(--ink-faint); }
 
     .modal-overlay {
       display: none;
@@ -177,15 +203,6 @@
     .empty-state h3 { font-size: 16px; margin: 0 0 8px; }
     .empty-state p { font-size: 13px; margin: 0; }
 
-    .member-row {
-      padding: 12px 0;
-      border-bottom: 1px solid var(--border-soft);
-      cursor: pointer;
-    }
-    .member-row:last-child { border-bottom: none; }
-    .member-row h4 { margin: 0; font-size: 15px; font-weight: 500; }
-    .member-row p { margin: 4px 0 0; font-size: 13px; color: var(--ink-muted); }
-
     .list-tabs {
       display: flex;
       gap: 8px;
@@ -228,60 +245,10 @@
       :root { --ios-orange: #FF9F0A; }
     }
 
-    .show-list {
-      background: var(--surface);
-      border-radius: 14px;
-      overflow: hidden;
-      box-shadow: 0 1px 3px oklch(0.18 0.03 50 / 0.06);
-    }
-    .show-list:empty { display: none; }
-    .show { border-bottom: 1px solid var(--border-soft); }
-    .show-row { padding: 12px 14px; align-items: center; }
 
-    .ios-row { cursor: pointer; -webkit-tap-highlight-color: transparent; }
-    .ios-row:active { background: var(--surface-2); }
-    .ios-row .ios-row-main { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
-    .row-poster {
-      width: 42px; height: 63px; flex-shrink: 0;
-      object-fit: cover; border-radius: 6px; background: var(--surface-2, rgba(0,0,0,0.06));
-    }
-    .row-poster-empty {
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px; opacity: 0.5;
-    }
-    .ios-row-text { flex: 1; min-width: 0; }
-    .ios-row-title { font-weight: 600; color: var(--ink); font-size: 15px; line-height: 1.3; }
-    .ios-row .show-sub { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
-    .ios-row .show-rating { flex: 0 0 auto; }
-    .ios-row-chevron { flex: 0 0 auto; color: var(--ink-faint); font-weight: 700; font-size: 18px; line-height: 1; }
 
-    .show-rating { color: var(--ink-muted); font-size: 13px; white-space: nowrap; }
-    .show-rating .star { color: var(--star); }
-    .show-movie { font-weight: 400; color: var(--ink-quiet); font-size: 12px; }
-
-    .drag-hint {
-      text-align: center; font-size: 12px; color: var(--accent);
-      padding: 2px 0 10px;
-    }
-    .drag-handle {
-      font-size: 20px; line-height: 1; color: var(--ink-faint);
-      padding: 10px 2px 10px 12px;
-      cursor: grab;
-      touch-action: none;
-      user-select: none; -webkit-user-select: none;
-    }
-    .ios-row.dragging {
-      opacity: 0.85;
-      box-shadow: var(--shadow-card);
-      transform: scale(1.01);
-      position: relative; z-index: 5;
-    }
-    body.no-select { user-select: none; -webkit-user-select: none; }
-
-    .list-announce { text-align: center; font-size: 12px; color: var(--tint); padding: 2px 0 10px; }
-    .network-counts { text-align: center; font-size: 12px; color: var(--ink-quiet); padding: 12px 0 4px; }
   </style>
-  <script src="/show-renderer.js"></script>
+  <script src="/show-renderer.js?v=2"></script>
   <script>
     // Set nav context before loading nav.js. No backLabel here on purpose:
     // updateNav() owns the label (it names the view the back button returns
@@ -290,7 +257,7 @@
     window.navContext = { page: 'groups' };
   </script>
   <script src="/nav.js"></script>
-  <script src="/shell.js?v=2" defer></script>
+  <script src="/shell.js?v=3" defer></script>
   <script src="/app-banner.js?v=4" defer></script>
 </head>
 <body>
@@ -327,17 +294,17 @@
         <button id="leaveBtn" onclick="leaveGroup()" style="display: block; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; margin-bottom: 8px;">Leave Group</button>
         <button id="deleteBtn" onclick="deleteGroup()" style="display: none; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; color: #d32f2f;">Delete Group</button>
       </div>
-      <h3 style="margin: 0 0 12px; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-quiet);">Members</h3>
+      <h3 class="ios-group-header">Members</h3>
       <div id="groupMembersList"></div>
-      <h3 style="margin: 20px 0 12px; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-quiet);">Group Trending</h3>
-      <div id="groupTrendingList"></div>
+      <h3 class="ios-group-header">Group Trending</h3>
+      <div id="groupTrendingList" class="show-list"></div>
     </div>
 
     <!-- Member View (list tabs + shows) -->
     <div id="memberView">
       <h2 id="memberViewTitle" style="margin: 0 0 16px; font-size: 22px; font-weight: 600;"></h2>
       <div class="list-tabs" id="listTabs"></div>
-      <div id="memberShowsList"></div>
+      <div id="memberShowsList" class="show-list"></div>
     </div>
 
     <!-- Show Detail -->
@@ -411,6 +378,9 @@
     let detailShow = null;
     let detailMyCopy = null;
     let detailActors = [];
+    // { average, count, seasons, mine, mineSeasons, owner, ownerSeasons,
+    //   ownerName } — rides along on GET /api/shows/:id.
+    let detailRatings = null;
 
     const ALL_LISTS = ['watching', 'waiting', 'recommending', 'next'];
     const LIST_LABELS = {
@@ -525,12 +495,13 @@
           return;
         }
         empty.style.display = 'none';
-        container.innerHTML = data.groups.map(g => `
-          <div class="group-card" onclick="openGroup(${g.id})">
-            <h3>${escapeHtml(g.name)}</h3>
-            <p>${g.member_count} member${g.member_count !== 1 ? 's' : ''}</p>
-          </div>
-        `).join('');
+        container.innerHTML = '<div class="ios-group">' + data.groups.map(g => `
+          <button type="button" class="ios-item no-icon" onclick="openGroup(${g.id})">
+            <span class="ios-item-label">${escapeHtml(g.name)}</span>
+            <span class="ios-item-detail">${g.member_count} member${g.member_count !== 1 ? 's' : ''}</span>
+            <svg class="ic ios-item-chev"><use href="#s-chevron-right"/></svg>
+          </button>
+        `).join('') + '</div>';
       } catch (e) {
         console.error('Failed to load groups:', e);
         document.getElementById('groupsContainer').innerHTML = '<p>Error loading groups. Try again.</p>';
@@ -561,12 +532,13 @@
 
       // Members
       const membersList = document.getElementById('groupMembersList');
-      membersList.innerHTML = currentGroupData.members.map(m => `
-        <div class="member-row" onclick="openMember('${escapeHtml(m.slug)}')">
-          <h4>${escapeHtml(m.first_name || m.slug)}</h4>
-          <p>${m.show_count} show${m.show_count !== 1 ? 's' : ''}</p>
-        </div>
-      `).join('');
+      membersList.innerHTML = '<div class="ios-group">' + currentGroupData.members.map(m => `
+        <button type="button" class="ios-item no-icon" onclick="openMember('${escapeHtml(m.slug)}')">
+          <span class="ios-item-label">${escapeHtml(m.first_name || m.slug)}</span>
+          <span class="ios-item-detail">${m.show_count} show${m.show_count !== 1 ? 's' : ''}</span>
+          <svg class="ic ios-item-chev"><use href="#s-chevron-right"/></svg>
+        </button>
+      `).join('') + '</div>';
 
       // Trending
       try {
@@ -642,12 +614,14 @@
       detailShow = null;
       detailMyCopy = null;
       detailActors = [];
+      detailRatings = null;
 
       try {
         const res = await fetch('/api/shows/' + showId);
         if (res.ok) {
           const data = await res.json();
           detailShow = data.show;
+          detailRatings = data.ratings || null;
         }
         if (!detailShow) return;
 
@@ -682,85 +656,36 @@
       if (!detailShow) return;
       document.getElementById('pageTitle').textContent = detailShow.title;
       document.getElementById('showDetailTitle').textContent = detailShow.title;
+      // Same body as the main app's detail screen (show-renderer.js). Edit /
+      // Archive are left off: this page has no edit modal, and the browsing
+      // stack here is for looking at somebody else's list. Everything else —
+      // the list chips, ratings entry, catalog rows — behaves identically.
+      document.getElementById('showDetailContent').innerHTML = renderShowDetailBody(detailShow, {
+        actors: detailActors,
+        loggedIn: !!authMember,
+        myCopy: detailMyCopy,
+        ratings: detailRatings,
+        listLabels: LIST_LABELS,
+        allLists: ALL_LISTS,
+      });
+    }
 
-      const loggedIn = !!authMember;
-      let html = '';
-
-      // Poster/backdrop
-      if (detailShow.backdrop_url) {
-        html += `<div style="width:100%;margin-bottom:16px;"><img src="${safeUrl(detailShow.backdrop_url)}" alt="" loading="lazy" style="width:100%;border-radius:10px;display:block;"></div>`;
-      } else if (detailShow.poster_url) {
-        html += `<div style="margin-bottom:16px;"><img src="${safeUrl(detailShow.poster_url)}" alt="" loading="lazy" style="width:100%;border-radius:10px;display:block;"></div>`;
+    // Instant-save rating from the tap-row, then re-render from the fresh
+    // ratings the endpoint hands back.
+    async function detailRate(value, season) {
+      if (!detailMyCopy) return;
+      try {
+        const res = await fetch(`/api/shows/${detailMyCopy.id}/rating`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(season === null ? { rating: value } : { rating: value, season }),
+        });
+        if (!res.ok) { alert('Could not save rating'); return; }
+        const data = await res.json();
+        detailRatings = data.ratings;
+        renderShowDetail();
+      } catch (e) {
+        console.error('Failed to save rating:', e);
       }
-
-      // Overview
-      if (detailShow.overview) {
-        html += `<div style="margin-bottom:16px;color:var(--ink);font-size:15px;line-height:1.6;">${escapeHtml(detailShow.overview)}</div>`;
-      }
-
-      // Network/Watch
-      if (detailShow.network) {
-        const realUrl = detailShow.network_url && !detailShow.network_url.includes('/search') && !detailShow.network_url.includes('/s?') && !detailShow.network_url.includes('?q=') && !detailShow.network_url.includes('?query=');
-        const linkHtml = realUrl
-          ? `<a href="${safeUrl(detailShow.network_url)}" target="_blank" rel="noopener" style="color:var(--tint);text-decoration:none;">Watch on ${escapeHtml(detailShow.network)}</a>`
-          : (detailShow.watch_link
-              ? `${escapeHtml(detailShow.network)} · <a href="${safeUrl(detailShow.watch_link)}" target="_blank" rel="noopener" style="color:var(--tint);text-decoration:none;">Where to watch</a>`
-              : escapeHtml(detailShow.network));
-        html += `<div style="margin-bottom:12px;padding:12px;background:var(--surface-2);border-radius:8px;"><strong>Network:</strong> ${linkHtml}</div>`;
-      }
-
-      // Trailer
-      if (detailShow.trailer_key) {
-        html += `<div style="margin-bottom:12px;"><a href="https://www.youtube.com/watch?v=${encodeURIComponent(detailShow.trailer_key)}" target="_blank" rel="noopener" style="color:var(--tint);text-decoration:none;">▶ Watch trailer</a></div>`;
-      }
-
-      // Cast
-      if (detailActors.length || detailShow.director) {
-        html += `<div style="margin-bottom:16px;padding:12px;background:var(--surface-2);border-radius:8px;">`;
-        if (detailShow.director) {
-          const dirVal = (detailShow.director_imdb_id && !detailShow.director.includes(','))
-            ? `<a href="https://www.imdb.com/name/${encodeURIComponent(detailShow.director_imdb_id)}/" target="_blank" rel="noopener" style="color:var(--tint);text-decoration:none;">${escapeHtml(detailShow.director)}</a>`
-            : escapeHtml(detailShow.director);
-          html += `<div style="margin-bottom:8px;"><strong>${detailShow.movie ? 'Director' : 'Creator'}:</strong> ${dirVal}</div>`;
-        }
-        if (detailActors.length) {
-          const cast = detailActors.map(a => a.imdb_id
-            ? `<a href="https://www.imdb.com/name/${encodeURIComponent(a.imdb_id)}/" target="_blank" rel="noopener" style="color:var(--tint);text-decoration:none;">${escapeHtml(a.name)}</a>`
-            : escapeHtml(a.name)).join(', ');
-          html += `<div><strong>Cast:</strong> ${cast}</div>`;
-        }
-        html += `</div>`;
-      }
-
-      // My Lists
-      if (loggedIn && authMember) {
-        const curList = (detailMyCopy && !detailMyCopy.archived) ? detailMyCopy.list : null;
-        const chips = ALL_LISTS.map(l => `
-          <button style="padding:10px 16px;border:1px solid var(--border-soft);border-radius:8px;background:${l === curList ? 'var(--tint)' : 'var(--surface-2)'};color:${l === curList ? 'white' : 'var(--ink)'};font-weight:500;cursor:pointer;margin-right:8px;margin-bottom:8px;" onclick="detailChip('${l}')">
-            ${LIST_LABELS[l]}
-          </button>
-        `).join('');
-        html += `<div style="margin-bottom:16px;padding:12px;background:var(--surface-2);border-radius:8px;">
-          <div style="font-weight:600;margin-bottom:12px;">My Lists</div>
-          ${chips}`;
-        if (detailMyCopy && detailMyCopy.archived) {
-          html += `<div style="margin-top:8px;color:var(--ink-muted);font-size:13px;">Status: Archived</div>`;
-        }
-        html += `</div>`;
-      }
-
-      // Metadata
-      const metaRows = [];
-      if (detailShow.movie) metaRows.push(`<div><strong>Type:</strong> Movie</div>`);
-      if (detailShow.content_rating) metaRows.push(`<div><strong>Rated:</strong> ${escapeHtml(detailShow.content_rating)}</div>`);
-      if (detailShow.release_year) metaRows.push(`<div><strong>Year:</strong> ${escapeHtml(String(detailShow.release_year))}</div>`);
-      if (detailShow.genres) metaRows.push(`<div><strong>Genres:</strong> ${escapeHtml(detailShow.genres)}</div>`);
-      if (detailShow.runtime) metaRows.push(`<div><strong>Runtime:</strong> ${escapeHtml(detailShow.runtime)} min</div>`);
-      if (metaRows.length) {
-        html += `<div style="padding:12px;background:var(--surface-2);border-radius:8px;">${metaRows.join('')}</div>`;
-      }
-
-      document.getElementById('showDetailContent').innerHTML = html;
     }
 
     async function detailChip(list) {

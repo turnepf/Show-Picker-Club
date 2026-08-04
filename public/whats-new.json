@@ -12,16 +12,6 @@
   ],
   "entries": [
     {
-      "date": "8/3",
-      "title": "The web app is a web page again.",
-      "body": "Adding Show Picker Club to your home screen from a browser used to install it as a mini-app that kept working offline. The iPhone, iPad, Apple TV, and Apple Watch apps do that job properly now, so the web version has gone back to being an ordinary web page: it needs a connection, and an old home-screen icon becomes a plain bookmark. Nothing about your lists changes. Web only — the apps are unaffected."
-    },
-    {
-      "date": "8/3",
-      "title": "Joining is instant.",
-      "body": "Anyone signing up now becomes a full member the moment they finish — no waiting to be let in, and they show up in search, Trending, activity, and Vibe right away. Everywhere: web, iPhone, iPad, Apple TV, and Apple Watch."
-    },
-    {
       "date": "7/28",
       "title": "Private groups.",
       "body": "Share show lists with just your friends, not the whole club. Create a private group, invite friends via link, then browse what they're watching this month (Trending), see their show counts, and manage members — all in the group. iPhone, iPad, and web let you create groups, invite, and manage. Apple TV and Apple Watch let you browse your groups and see what's trending, read-only. Thanks Fiona!"
@@ -35,11 +25,6 @@
       "date": "7/21",
       "title": "Audit subscriptions for your whole household.",
       "body": "On the Subscription audit, tap Household at the top and check the members you share streaming services with. Your audit then pools everyone's shows — so a service someone in your household is watching counts as one to keep, instead of looking cancellable just because it's not on your own list. Your household is remembered. Now on the web, iPhone, iPad, and Mac. Thanks Matt K for the idea!"
-    },
-    {
-      "date": "7/21",
-      "title": "Cleaner ratings, tappable creators.",
-      "body": "Show details now show a single audience score instead of two, the cast moves up right under the title, and the creator or director's name is now a tappable link to their page (just like the cast). All automatic. Now on the web, iPhone, iPad, Apple TV, and Apple Watch."
     },
     {
       "date": "7/20",
@@ -57,34 +42,14 @@
       "body": "App version 1.0.3 brings two widgets: Trending (what the club is picking up right now) and Upcoming Premieres (your next premieres from Watching and Awaiting, by date), in small, medium, and large sizes — plus an iPhone Lock Screen version of Upcoming. Tap any show to jump straight to its card in the app."
     },
     {
-      "date": "7/19",
-      "title": "App update 1.0.3 — parity pass.",
-      "body": "Now on iPhone, iPad, Apple TV, and Apple Watch: My Order drag sorting, search that finds your archived shows (iPhone), a six-second Undo after archiving (iPhone), duplicate detection when adding (iPhone), actor search on Apple TV, per-network counts under every list, tappable IMDb cast links, premiere dates on every list, clearer “Watch on …” links, and universal links — a shared showpicker.club link tapped in Messages or Mail opens right in the app."
-    },
-    {
-      "date": "7/19",
-      "title": "Members list now sorts by recent activity.",
-      "body": "The Members roster everywhere now puts the most recently active member first instead of whoever has the most shows — so the list surfaces who's actually around. Now on the web (home and sidebar), iPhone, and Apple TV; iPad already sorted this way."
-    },
-    {
       "date": "7/17",
       "title": "Put your lists in your order.",
       "body": "Every list's sort menu now has My Order (drag to sort) on your own page. Pick it and each row grows a ☰ handle — drag shows up or down and the order saves instantly, per list. On another member's page the same menu offers “their Order” so you can browse a list the way its owner arranged it (viewing only — you can't change their order). Apple TV and Apple Watch show saved orders automatically. Thanks Joe P!"
     },
     {
       "date": "7/17",
-      "title": "Friendlier move buttons.",
-      "body": "A show's detail screen now leads with the moves each list is designed around — “Watched it → Loved”, “Season done → Awaiting”, “Start watching” — matching the app's swipe actions, with plain “Move to” for the rest."
-    },
-    {
-      "date": "7/17",
       "title": "Premiere dates on every list.",
       "body": "The “📅 Next episode” line now shows on Loved and Next Up too, not just Watching and Awaiting — sometimes a show you thought was done drops a surprise season, and that date is your nudge to move it back to Watching."
-    },
-    {
-      "date": "7/17",
-      "title": "Clearer watch links.",
-      "body": "Show detail pages now say “Watch on Netflix” instead of just the network name, so it's obvious the link opens the show on that service."
     },
     {
       "date": "7/16",
@@ -111,7 +76,7 @@
     {
       "date": "7/2",
       "title": "See the full poster.",
-      "body": "Tap a show's artwork on its detail page to view it full screen, on any platform."
+      "body": "Tapping a show's artwork on its detail page opened it full screen. (Retired 8/2026 — the tap turned out to confuse more people than it helped, on every platform. Detail screens still lead with the full-width image.)"
     },
     {
       "date": "6/29",
@@ -129,11 +94,6 @@
       "body": "Show rows now tell you how many seasons have dropped, right next to the premiere date (e.g. “Next episode: 6/1 · 3 seasons”). Thanks Paula!"
     },
     {
-      "date": "6/29",
-      "title": "Straight to your shows.",
-      "body": "Open the app or the site while you're logged in and you land right on your own list, instead of the home page."
-    },
-    {
       "date": "5/21",
       "title": "Calendar feed.",
       "body": "Each member page has a 📅 Calendar feed link. Subscribe in Apple Calendar, Google Calendar, or Fantastical to get upcoming season premieres and finales from that member's Watching and Awaiting lists, updated daily."
@@ -143,21 +103,6 @@
       "title": "Vibe.",
       "body": "See a personality fingerprint based on each member's taste: cluster name, top trait signals, balance read, and shows aligned with the vibe. Pick any member from the dropdown. Thanks Matt!",
       "link": { "label": "showpicker.club/vibe", "url": "/vibe" }
-    },
-    {
-      "date": "4/28",
-      "title": "One-tap Add.",
-      "body": "The + Add button appears on your member page as soon as you're logged in. No need to click Edit first."
-    },
-    {
-      "date": "4/26",
-      "title": "Cleaner show rows.",
-      "body": "Each show is one tidy line: title, network, rating. The detail screen carries genre, cast, who recommended it, next season dates, who you're watching with, and notes; only the lines with data show up."
-    },
-    {
-      "date": "4/21",
-      "title": "My Shows link.",
-      "body": "When logged in, a quick “My Shows” link appears on the home page just below the title."
     },
     {
       "date": "4/17",
@@ -178,16 +123,6 @@
       "date": "4/16",
       "title": "What Members Are Watching.",
       "body": "The home page shows the most popular shows across all members. Tap + to add any of them to your own list."
-    },
-    {
-      "date": "4/15",
-      "title": "New domain!",
-      "body": "Show Picker Club is now at showpicker.club. The old link still works too."
-    },
-    {
-      "date": "4/15",
-      "title": "Share shows to other members.",
-      "body": "See a show on someone else's list that you want to add to yours? Send it to another member's Up Next list, carrying over the rating, network link, actors, and all the details. (Retired 7/2026 — copy shows onto your own list from search or a show's detail screen instead.)"
     },
     {
       "date": "4/15",

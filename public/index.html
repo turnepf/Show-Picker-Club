@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="/favicon.svg">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
-  <link rel="stylesheet" href="/styles.css?v=5">
+  <link rel="stylesheet" href="/styles.css?v=6">
   <style>
     header {
       background: var(--header-bg);
@@ -183,11 +183,8 @@
     .show-title.clickable:hover { color: var(--accent); text-decoration-color: var(--accent); }
     .show-title.clickable:hover .chev svg { stroke: var(--accent); }
 
-    .show-movie { font-weight: 400; color: var(--ink-quiet); font-size: 12px; }
 
 
-    .show-rating { color: var(--ink-muted); font-size: 13px; white-space: nowrap; }
-    .show-rating .star { color: var(--star); }
 
     .show-network { color: var(--info); text-decoration: none; font-size: 13px; white-space: nowrap; }
     .show-network:hover { text-decoration: underline; }
@@ -201,34 +198,6 @@
     .show-detail-line { font-size: 12px; color: var(--ink-muted); padding: 2px 0; }
     .show-meta { font-size: 12px; color: var(--ink-muted); padding: 0 0 6px 16px; }
 
-    .list-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
-    .list-chip {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 34px;
-      font-size: 12px;
-      font-family: inherit;
-      font-weight: 500;
-      border: 1.5px solid var(--chip-color);
-      border-radius: 6px;
-      color: var(--chip-color);
-      cursor: pointer;
-      transition: all 0.15s;
-      user-select: none;
-      text-align: center;
-      -webkit-text-size-adjust: 100%;
-      box-sizing: border-box;
-    }
-    .list-chip.selected {
-      background: var(--chip-color);
-      color: #fff;
-    }
-    /* Read-only four-across list chips on the detail screen (not a picker). */
-    .detail-list-chips { grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 12px 16px; margin-bottom: 0; }
-    .detail-list-chips .list-chip { cursor: pointer; height: 32px; font-size: 11px; }
-    .detail-list-chips .list-chip:hover { background: color-mix(in oklch, var(--chip-color) 14%, transparent); }
-    .detail-list-chips .list-chip.selected:hover { background: var(--chip-color); }
     .show-via { color: var(--list-recommending); font-size: 12px; font-style: italic; white-space: nowrap; }
     .show-on { color: var(--ink-quiet); font-size: 13px; }
     .show-watching-with { color: var(--ink-muted); font-size: 13px; white-space: nowrap; }
@@ -326,27 +295,8 @@
     }
     .search-add-btn:hover { color: var(--accent); }
 
-    .network-counts { text-align: center; font-size: 12px; color: var(--ink-quiet); padding: 12px 0 4px; }
 
     /* "My Order" drag-to-reorder */
-    .drag-hint {
-      text-align: center; font-size: 12px; color: var(--accent);
-      padding: 2px 0 10px;
-    }
-    .drag-handle {
-      font-size: 20px; line-height: 1; color: var(--ink-faint);
-      padding: 10px 2px 10px 12px;
-      cursor: grab;
-      touch-action: none;           /* the handle drags; it never scrolls */
-      user-select: none; -webkit-user-select: none;
-    }
-    .ios-row.dragging {
-      opacity: 0.85;
-      box-shadow: var(--shadow-card);
-      transform: scale(1.01);
-      position: relative; z-index: 5;
-    }
-    body.no-select { user-select: none; -webkit-user-select: none; }
 
     /* Sort + future filter controls above the list. Right-aligned utility row. */
     .list-controls {
@@ -407,10 +357,10 @@
     .home-title a { color: inherit; text-decoration: none; }
     .home-detail { display: none; }
     /* The Trending row only belongs to the desktop split view; on the iPhone
-       layout Trending is the inline section below. Hidden here, and its
-       trailing hairline suppressed so the What's New row leads the card. */
+       layout Trending is the inline section below. It sits under Groups, so
+       the row beneath it carries always-sep and keeps its hairline whether or
+       not Trending is rendered. */
     .ios-item.home-side-trending { display: none; }
-    .ios-item.home-side-trending + .ios-item::after { display: none; }
     /* Desktop-only affordances (four-list group header + rows). */
     .ios-item.home-list-row, #homeListsHeader { display: none; }
 
@@ -445,11 +395,9 @@
       .home-detail { display: block; overflow-y: auto; padding: 0 24px 48px; }
       .home-detail-inner { max-width: 720px; margin: 0 auto; }
       /* Trending is a sidebar entry with a detail column on wide screens
-         (iPad); an inline section on small ones (iPhone). Once its data has
-         loaded it leads the discovery card, so the What's New row below it
-         gets its hairline back. */
+         (iPad); an inline section on small ones (iPhone). It appears directly
+         under Groups once its data has loaded. */
       .ios-item.home-side-trending:not(.hidden) { display: flex; }
-      .ios-item.home-side-trending:not(.hidden) + .ios-item::after { display: block; }
       #popularSection { display: none !important; }
       /* The single My Shows row expands into the four lists (iPad). */
       .ios-item.home-list-row:not(.hidden) { display: flex; }
@@ -533,11 +481,8 @@
     .nav-announce { font-size: 12.5px; color: var(--tint); line-height: 1.4; padding: 0 16px; margin: 2px 0 16px; }
     /* Same idea, above the show list itself — only ever shown on Watching,
        where a member lands first after logging in. */
-    .list-announce { text-align: center; font-size: 12px; color: var(--tint); padding: 2px 0 10px; }
 
     /* Orange star rating, matching the iOS rows' .orange Label */
-    .ios-rating { display: inline-flex; align-items: center; gap: 3px; color: var(--ios-orange); font-size: 13px; font-weight: 500; white-space: nowrap; }
-    .ios-rating .ic { width: 13px; height: 13px; }
 
     /* Round tint icon buttons (nav bars / title bars) */
     .icon-btn {
@@ -926,33 +871,6 @@
     }
     @media (max-width: 600px) { main { margin: 8px auto 32px; padding: 12px 12px 32px; } }
 
-    .show-list {
-      background: var(--surface);
-      border-radius: 14px;
-      overflow: hidden;
-      box-shadow: 0 1px 3px oklch(0.18 0.03 50 / 0.06);
-    }
-    .show-list:empty { display: none; }
-    .show { border-bottom: 1px solid var(--border-soft); }
-    .show-row { padding: 12px 14px; align-items: center; }
-
-    /* Minimal iOS-style member rows: whole row taps into the detail screen. */
-    .ios-row { cursor: pointer; -webkit-tap-highlight-color: transparent; }
-    .ios-row:active { background: var(--surface-2); }
-    .ios-row .ios-row-main { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
-    .row-poster {
-      width: 42px; height: 63px; flex-shrink: 0;
-      object-fit: cover; border-radius: 6px; background: var(--surface-2, rgba(0,0,0,0.06));
-    }
-    .row-poster-empty {
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px; opacity: 0.5;
-    }
-    .ios-row-text { flex: 1; min-width: 0; }
-    .ios-row-title { font-weight: 600; color: var(--ink); font-size: 15px; line-height: 1.3; }
-    .ios-row .show-sub { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
-    .ios-row .show-rating { flex: 0 0 auto; }
-    .ios-row-chevron { flex: 0 0 auto; color: var(--ink-faint); font-weight: 700; font-size: 18px; line-height: 1; }
 
     /* Row title becomes a tappable disclosure into the detail screen. */
     .show-title.clickable { text-decoration: none; }
@@ -1051,11 +969,6 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .detail-body { max-width: 640px; margin: 16px auto 60px; padding: 0 14px; }
-    .detail-poster { text-align: center; margin: 6px 0 16px; }
-    .detail-poster img {
-      width: 160px; max-width: 45%; height: auto;
-      border-radius: 12px; box-shadow: var(--shadow-card, 0 4px 16px rgba(0,0,0,0.18));
-    }
     /* Click the detail poster to view it full screen; click again to close. */
     .poster-lightbox {
       position: fixed; inset: 0; z-index: 400;
@@ -1068,67 +981,6 @@
       border-radius: 12px;
       box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
     }
-    .detail-card {
-      background: var(--surface);
-      border-radius: 14px;
-      overflow: hidden;
-      margin-bottom: 16px;
-      box-shadow: 0 1px 3px oklch(0.18 0.03 50 / 0.06);
-    }
-    .detail-card-title {
-      font-size: 12px; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.04em; color: var(--ink-quiet);
-      padding: 14px 16px 4px;
-    }
-    .detail-row {
-      display: flex; justify-content: space-between; gap: 14px;
-      padding: 11px 16px;
-      border-top: 1px solid var(--border-soft);
-      font-size: 14px;
-    }
-    .detail-card .detail-row:first-of-type,
-    .detail-card-title + .detail-row { border-top: none; }
-    .detail-row .k { color: var(--ink-muted); flex: 0 0 auto; }
-    .detail-row .v { color: var(--ink); text-align: right; min-width: 0; }
-    .detail-row .v a { color: var(--info); text-decoration: none; }
-    .detail-prose { padding: 12px 16px; font-size: 14px; color: var(--ink-muted); line-height: 1.5; }
-    .detail-prose a { color: var(--info); text-decoration: none; }
-    .detail-prose a:hover { text-decoration: underline; }
-    .detail-action {
-      display: block; width: 100%; box-sizing: border-box;
-      text-align: center; padding: 13px 16px;
-      background: var(--surface); border: none;
-      border-top: 1px solid var(--border-soft);
-      color: var(--tint); font-size: 15px; font-weight: 600;
-      font-family: inherit; cursor: pointer;
-    }
-    .detail-card .detail-action:first-child { border-top: none; }
-    .rating-count { color: var(--ink-muted); font-size: 12px; font-weight: 400; }
-    .rating-entry {
-      padding: 8px 16px 12px;
-      border-top: 1px solid var(--border-soft);
-    }
-    .detail-card-title + .rating-entry { border-top: none; }
-    .rating-entry-label { font-size: 13px; color: var(--ink-muted); margin-bottom: 6px; }
-    /* 10-segment tap-row — deliberately not a slider or numeric field:
-       tap a position and it saves instantly. Distinct from the plain
-       "★ 7.3" TMDB Rating row directly above it in the same Ratings
-       section, so the two 1-10 scales never blur together visually even
-       though they share a scale. */
-    .rating-row { display: flex; gap: 3px; }
-    .rating-seg {
-      flex: 1 1 0;
-      height: 22px;
-      border: 1.5px solid var(--border-soft);
-      border-radius: 4px;
-      cursor: pointer;
-      transition: background 0.1s, border-color 0.1s;
-    }
-    .rating-seg:hover { border-color: var(--accent); }
-    .rating-seg.filled { background: var(--accent); border-color: var(--accent); }
-    .detail-action:hover { background: color-mix(in srgb, var(--tint) 8%, transparent); }
-    .detail-action.danger { color: var(--danger-deep); }
-    .detail-action.danger:hover { background: var(--danger-soft); }
 
     /* Bottom-sheet modals ------------------------------------------ */
     .modal-overlay { align-items: flex-end; }
@@ -1237,6 +1089,7 @@
     <symbol id="i-export" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 15V3.5M8.5 7 12 3.5 15.5 7M5 13v5.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V13"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5.2v13.6M5.2 12h13.6"/></symbol>
     <symbol id="i-creditcard" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.8" y="5.5" width="18.4" height="13" rx="2.2"/><path d="M2.8 9.8h18.4" stroke-width="2.2"/></g></symbol>
+    <symbol id="i-people" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="9.2" cy="9" r="3.2"/><path d="M3.4 19.2c.9-3 3-4.4 5.8-4.4s4.9 1.4 5.8 4.4"/><path d="M16.4 6.3a3.2 3.2 0 0 1 0 6.1"/><path d="M17.6 14.9c2.1.3 3.4 1.7 4 4.3"/></g></symbol>
     <symbol id="i-calendar-plus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.4"/><path d="M3.5 9.7h17M8 2.8v4M16 2.8v4M12 12.3v5.4M9.3 15h5.4"/></g></symbol>
   </svg>
 
@@ -1296,13 +1149,16 @@
 
         <!-- Discovery + account group, reordered per new nav structure -->
         <nav class="ios-group">
-          <div class="nav-spacer"></div>
-          <a class="ios-item" href="/groups.html">
+          <a class="ios-item" href="/groups">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-people"/></svg></span>
             <span class="ios-item-label">Groups</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
-          <a class="ios-item hidden home-ratebacklog-row" href="/rate-backlog">
+          <span class="ios-item side-list-row selected home-side-trending hidden" id="trendingSideGroup">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-flame"/></svg></span>
+            <span class="ios-item-label">Trending</span>
+          </span>
+          <a class="ios-item hidden always-sep home-ratebacklog-row" href="/rate-backlog">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-star-fill"/></svg></span>
             <span class="ios-item-label">Rate my backlog<span class="nav-badge" id="rateBacklogBadge"></span></span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
@@ -1347,10 +1203,6 @@
             <span class="ios-item-label">Vibe trait scoring</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
-          <span class="ios-item side-list-row selected home-side-trending hidden" id="trendingSideGroup">
-            <span class="ios-item-icon"><svg class="ic"><use href="#i-flame"/></svg></span>
-            <span class="ios-item-label">Trending list</span>
-          </span>
         </nav>
 
         <!-- Small screens: Trending inline, iPhone-style. -->
@@ -1418,7 +1270,6 @@
       </nav>
       <!-- Discovery + account group, reordered to match home nav -->
       <nav class="ios-group">
-        <div class="nav-spacer"></div>
         <a class="ios-item" href="/groups">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-people"/></svg></span>
           <span class="ios-item-label">Groups</span>
@@ -1741,7 +1592,7 @@
   </div>
 
   <script type="text/javascript" src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
-  <script src="/show-renderer.js"></script>
+  <script src="/show-renderer.js?v=2"></script>
   <script>
     // Set nav context before loading nav.js
     window.navContext = { page: 'home' };
@@ -2044,25 +1895,10 @@
 
     // Trending row, mirroring the iOS popularRow: poster, title, network
     // caption, orange star rating, disclosure chevron into the detail.
+    // Trending rows are ordinary show cards — same renderer as every list,
+    // so the poster, title, caption and rating never drift from them.
     function trendingRowHtml(show) {
-      const poster = show.poster_url
-        ? `<img class="row-poster" src="${safeUrl(show.poster_url)}" alt="" loading="lazy">`
-        : `<div class="row-poster row-poster-empty">🎬</div>`;
-      const network = show.network ? `<div class="show-sub">${escapeHtml(show.network)}</div>` : '';
-      const rating = show.rating
-        ? `<span class="ios-rating"><svg class="ic"><use href="#i-star-fill"/></svg>${escapeHtml(show.rating)}</span>`
-        : '';
-      return `<div class="show ios-row" onclick="openDetail(${show.id})">
-        <div class="ios-row-main">
-          ${poster}
-          <div class="ios-row-text">
-            <div class="ios-row-title">${escapeHtml(show.title)}</div>
-            ${network}
-          </div>
-          ${rating}
-          <span class="ios-row-chevron">&#8250;</span>
-        </div>
-      </div>`;
+      return renderShowCard(show, { onClickId: openDetail, showRating: true, showChevron: true });
     }
 
     // Member row for Home and the sidebar roster. keepHash carries the open
@@ -3580,30 +3416,24 @@
       const meta = `<div class="search-meta">${matches.length} match${matches.length === 1 ? '' : 'es'}</div>`;
       container.innerHTML = meta + matches.map(show => {
         const list = show.archived ? 'Archived' : (labelFor[show.list] || show.list);
-        const network = show.network ? ` <span class="show-on">on</span> <span class="show-network-plain">${escapeHtml(show.network)}</span>` : '';
-        const rating = show.rating ? ` <span class="show-rating"><span class="star">&#9733;</span>${escapeHtml(show.rating)}</span>` : '';
-        const movieTag = show.movie ? ' <span class="show-movie">(Movie)</span>' : '';
-        const series = show.full_series ? ' <span title="Series Complete">🎬</span>' : '';
         const memberTag = searchMode === 'all'
           ? ` · ${escapeHtml(show.member_first_name || (show.member_name || '').split(' ')[0] || show.member_slug)}`
           : '';
-        const listLabel = `<span class="search-list-label">· ${escapeHtml(list)}${memberTag}</span>`;
+        // The caption carries what search adds over a plain list row: which
+        // list the copy is on, and (in all-libraries mode) whose it is.
+        const captionParts = [];
+        if (show.network) captionParts.push(escapeHtml(show.network));
+        captionParts.push(`${escapeHtml(list)}${memberTag}`);
         const addBtn = searchMode === 'all'
           ? `<button class="search-add-btn" data-add-idx="${show.id}" title="Add to my list">+</button>`
           : '';
-        const poster = show.poster_url
-          ? `<img class="row-poster" src="${safeUrl(show.poster_url)}" alt="" loading="lazy">`
-          : `<div class="row-poster row-poster-empty">🎬</div>`;
-        return `
-          <div class="show ios-row" onclick="openDetail(${show.id})">
-            <div class="show-row">
-              ${addBtn}
-              ${poster}
-              <span class="show-info">
-                <span class="show-title clickable">${escapeHtml(show.title)}</span>${network}${rating}${series}${movieTag}${listLabel}
-              </span>
-            </div>
-          </div>`;
+        return renderShowCard(show, {
+          onClickId: openDetail,
+          showRating: true,
+          showChevron: false,
+          caption: captionParts.join(' · '),
+          prefixHtml: addBtn,
+        });
       }).join('');
 
       if (searchMode === 'all') {
@@ -3812,35 +3642,10 @@
     // existing onclick="toggleExpand(id)" now opens the pushed view.
     function toggleExpand(id) { openDetail(id); }
 
-    function detailRealUrl(url) {
-      return !!url && !url.includes('/search') && !url.includes('/s?')
-        && !url.includes('?q=') && !url.includes('?query=') && url !== '#';
-    }
-
-    function detailRow(k, v) {
-      return `<div class="detail-row"><span class="k">${k}</span><span class="v">${v}</span></div>`;
-    }
-
     // 10-segment tap-row for entering a 1-10 rating — not a slider or numeric
     // field, tap a position and it saves instantly (see detailRate below).
     // `season` is null for the overall rating, or a season number.
-    function ratingTapRow(value, season) {
-      const seasonArg = season === null ? 'null' : season;
-      let segs = '';
-      for (let i = 1; i <= 10; i++) {
-        segs += `<div class="rating-seg${value && i <= value ? ' filled' : ''}" onclick="detailRate(${i}, ${seasonArg})"></div>`;
-      }
-      return `<div class="rating-row">${segs}</div>`;
-    }
-
     // Minutes → "1h 52m" / "45m".
-    function runtimeText(min) {
-      const n = parseInt(min, 10);
-      if (!n) return '';
-      const h = Math.floor(n / 60), m = n % 60;
-      return h ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
-    }
-
     function detailPromotions(list) {
       if (list === 'watching') return [{ label: 'Watched it → Loved', target: 'recommending' }, { label: 'Season done → Awaiting', target: 'waiting' }];
       if (list === 'waiting') return [{ label: "It's back → Watching", target: 'watching' }];
@@ -3893,164 +3698,24 @@
     function renderDetail(show, actors, ratings) {
       detailShow = show;
       detailActors = actors || [];
+      // Render from the persisted value below, not just this call's argument —
+      // reRenderDetail() (called after every list move/add/archive) re-renders
+      // without a fresh ratings fetch, and without this the whole Ratings
+      // section would vanish on every such re-render.
       if (ratings !== undefined) detailRatings = ratings;
-      // Always render from the persisted value, not just this call's
-      // argument — reRenderDetail() (called after every list move/add/
-      // archive) re-renders without a fresh ratings fetch, and without this
-      // the whole Ratings section would vanish on every such re-render.
-      ratings = detailRatings;
       document.getElementById('detailNavTitle').textContent = show.title;
-      const loggedIn = !!authMember;
-      const realUrl = detailRealUrl(show.network_url);
-
-      // Title lives in the nav bar above the image (enlarged) — no redundant
-      // "Title" row here. The top card leads with where to watch + the trailer,
-      // then Cast, then the rest of the metadata below.
-      const topRows = [];
-      if (show.network) {
-        // Spell the affordance out — a bare network name reads as a label,
-        // not a link, so nobody realized it opened the show on the service.
-        topRows.push(detailRow('Network', realUrl
-          ? `<a href="${safeUrl(show.network_url)}" target="_blank" rel="noopener">Watch on ${escapeHtml(show.network)}</a>`
-          : (show.watch_link
-              ? `${escapeHtml(show.network)} · <a href="${safeUrl(show.watch_link)}" target="_blank" rel="noopener">Where to watch</a>`
-              : escapeHtml(show.network))));
-      }
-      if (show.trailer_key) topRows.push(detailRow('Trailer', `<a href="https://www.youtube.com/watch?v=${encodeURIComponent(show.trailer_key)}" target="_blank" rel="noopener">▶ Watch trailer</a>`));
-
-      const rows = [];
-      // TMDB Rating moved into the Ratings section (above Club Rating) so
-      // both scores live together instead of the audience score sitting
-      // apart from the member ones.
-      // The list + the member-edited fields (recommender, watching-with, notes)
-      // live in the separate "My Lists" section built below — they're member
-      // specific, not catalog data, so they're not in these rows.
-      if (show.movie) rows.push(detailRow('Type', 'Movie'));
-      // Series row folds in the season count: "4 Seasons, Complete", or just
-      // "2 Seasons" when it's still running (or just "Complete" if the count is
-      // unknown).
-      {
-        const n = show.seasons_released;
-        const seasonsStr = (typeof n === 'number' && n > 0) ? `${n} Season${n === 1 ? '' : 's'}` : null;
-        const seriesParts = [];
-        if (seasonsStr) seriesParts.push(seasonsStr);
-        if (show.full_series) seriesParts.push('Complete');
-        if (seriesParts.length) rows.push(detailRow('Series', escapeHtml(seriesParts.join(', '))));
-      }
-      if (show.genres) rows.push(detailRow('Genres', escapeHtml(show.genres)));
-      if (show.runtime) rows.push(detailRow('Runtime', escapeHtml(runtimeText(show.runtime))));
-      if (show.next_season_date) rows.push(detailRow('Next episode', escapeHtml(formatSeasonRange(show))));
-      if (show.content_rating) rows.push(detailRow('Rated', escapeHtml(show.content_rating)));
-      if (show.release_year) rows.push(detailRow('Year', escapeHtml(String(show.release_year))));
-      // Creator/Director renders as a standard label/value row grouped in the
-      // Cast card (built below). Link a single-person credit to their IMDB page
-      // (mirrors the cast links); a multi-creator credit (comma in the name)
-      // stays plain so the whole list doesn't point at just the first person.
-      let creatorRow = '';
-      if (show.director) {
-        const dirVal = (show.director_imdb_id && !show.director.includes(','))
-          ? `<a href="https://www.imdb.com/name/${encodeURIComponent(show.director_imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(show.director)}</a>`
-          : escapeHtml(show.director);
-        creatorRow = detailRow(show.movie ? 'Director' : 'Creator', dirVal);
-      }
-
-      let html = '';
-      // One image, not two: the wide backdrop is the hero when we have one;
-      // otherwise fall back to the poster (still tap-to-expand).
-      if (show.backdrop_url) {
-        html += `<div class="detail-backdrop" style="width:100%;margin-bottom:12px;"><img src="${safeUrl(show.backdrop_url)}" alt="" loading="lazy" style="width:100%;border-radius:10px;display:block;"></div>`;
-      } else if (show.poster_url) {
-        // No tap-to-enlarge — the affordance confused people.
-        html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy"></div>`;
-      }
-      // Overview (plot synopsis) sits right under the title/image.
-      if (show.overview) html += `<div class="detail-card"><div class="detail-prose">${escapeHtml(show.overview)}</div></div>`;
-      // Top card: Network, then Trailer.
-      if (topRows.length) html += `<div class="detail-card">${topRows.join('')}</div>`;
-      // Cast — with the creator/director grouped underneath — directly under
-      // the trailer, both as standard label/value rows (names right-aligned).
-      if (actors.length || creatorRow) {
-        let castInner = '';
-        if (actors.length) {
-          const cast = actors.map(a => a.imdb_id
-            ? `<a href="https://www.imdb.com/name/${encodeURIComponent(a.imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(a.name)}</a>`
-            : escapeHtml(a.name)).join(', ');
-          castInner += detailRow('Cast', cast);
-        }
-        castInner += creatorRow;
-        html += `<div class="detail-card">${castInner}</div>`;
-      }
-      // My-lists / member section — for logged-in members. The four list chips
-      // ARE the move/add control: tap a chip to put the show on that list (move
-      // an active copy, restore an archived one, or add it if I don't have it).
-      // The member-edited fields (recommender, watching-with, notes) show when
-      // I have the title.
-      if (loggedIn) {
-        const curList = (detailMyCopy && !detailMyCopy.archived) ? detailMyCopy.list : null;
-        const chipColor = { watching: 'var(--list-watching)', waiting: 'var(--list-waiting)', recommending: 'var(--list-recommending)', next: 'var(--accent)' };
-        const chips = ALL_LISTS.map(l =>
-          `<div class="list-chip${l === curList ? ' selected' : ''}" style="--chip-color: ${chipColor[l]};" onclick="detailChip('${l}')">${escapeHtml(LIST_LABELS[l] || l)}</div>`
-        ).join('');
-        let memberInner = `<div class="list-chips detail-list-chips">${chips}</div>`;
-        if (detailMyCopy && detailMyCopy.archived) memberInner += detailRow('Status', 'Archived');
-        if (detailMyCopy && detailMyCopy.recommended_by) memberInner += detailRow('Recommended by', escapeHtml(detailMyCopy.recommended_by));
-        if (detailMyCopy && detailMyCopy.watching_with) memberInner += detailRow('Watching with', escapeHtml(detailMyCopy.watching_with));
-        if (detailMyCopy && detailMyCopy.notes) memberInner += `<div class="detail-prose"><strong>Notes:</strong> ${escapeHtml(detailMyCopy.notes)}</div>`;
-        // Edit / Archive live here in the member section (only for a copy I
-        // actively have) — no separate actions card at the bottom.
-        if (detailMyCopy && !detailMyCopy.archived) {
-          memberInner += `<button class="detail-action" onclick="detailEdit(${detailMyCopy.id})">Edit</button>`;
-          memberInner += `<button class="detail-action danger" onclick="detailArchive(${detailMyCopy.id})">Archive</button>`;
-        }
-        html += `<div class="detail-card"><div class="detail-card-title">My Lists</div>${memberInner}</div>`;
-      }
-      // Ratings — directly below My Lists. Club Rating shows on every
-      // card, logged in or not; a specific member's own rating shows when
-      // viewing their copy; entry (instant-save tap-row) is gated to lists
-      // other than Next Up, matching the backend's own gating in
-      // functions/api/shows/[id]/rating.js. Nothing renders here until the
-      // show has a tmdb_id (ratings key off that, not this row's id).
-      if (ratings) {
-        let ratingsInner = '';
-        if (show.rating) ratingsInner += detailRow('TMDB Rating', `★ ${escapeHtml(show.rating)}`);
-        const avgText = (ratings.average != null)
-          ? `${ratings.average.toFixed(1)}/10 <span class="rating-count">(${ratings.count} rating${ratings.count === 1 ? '' : 's'})</span>`
-          : 'No ratings yet';
-        ratingsInner += detailRow('Club Rating', avgText);
-        if (ratings.owner != null) {
-          ratingsInner += detailRow(`${escapeHtml(ratings.ownerName || '')}'s rating`, `${ratings.owner}/10`);
-        }
-        const eligible = loggedIn && detailMyCopy && detailMyCopy.list !== 'next';
-        if (eligible) {
-          ratingsInner += `<div class="rating-entry"><div class="rating-entry-label">Your rating${ratings.mine ? ` — ${ratings.mine}/10` : ''}</div>${ratingTapRow(ratings.mine, null)}</div>`;
-          const seasonCount = show.movie ? 0 : (show.seasons_released || 0);
-          for (let s = 1; s <= seasonCount; s++) {
-            const seasonAvg = ratings.seasons[s];
-            const mine = ratings.mineSeasons[s] || null;
-            const avgPart = seasonAvg ? ` · avg ${seasonAvg.average}/10 (${seasonAvg.count})` : '';
-            const minePart = mine ? ` — ${mine}/10` : '';
-            ratingsInner += `<div class="rating-entry"><div class="rating-entry-label">Season ${s}${avgPart}${minePart}</div>${ratingTapRow(mine, s)}</div>`;
-          }
-        } else if (loggedIn && detailMyCopy && detailMyCopy.list === 'next') {
-          ratingsInner += detailRow('Your rating', 'Start watching to rate');
-        } else if (!show.movie && show.seasons_released) {
-          for (let s = 1; s <= show.seasons_released; s++) {
-            const seasonAvg = ratings.seasons[s];
-            if (seasonAvg) ratingsInner += detailRow(`Season ${s}`, `${seasonAvg.average}/10 (${seasonAvg.count})`);
-          }
-        }
-        html += `<div class="detail-card"><div class="detail-card-title">Ratings</div>${ratingsInner}</div>`;
-      }
-      // The remaining catalog data (rating, type, genres, dates, …), grouped in
-      // its own section below.
-      if (rows.length) html += `<div class="detail-card">${rows.join('')}</div>`;
-
-      // No "Watch on …" action here — the Network row above is the watch
-      // link, and it renders whenever the same real URL exists.
-      // Edit/Archive now live in the My Lists section above, and the browser's
-      // own share button covers sharing — so there's no actions card here.
-
-      document.getElementById('detailBody').innerHTML = html;
+      // The body itself is shared with the groups page (show-renderer.js) so
+      // the two detail screens can't drift apart. Edit/Archive are ours only:
+      // they open this page's edit modal.
+      document.getElementById('detailBody').innerHTML = renderShowDetailBody(show, {
+        actors: detailActors,
+        loggedIn: !!authMember,
+        myCopy: detailMyCopy,
+        ratings: detailRatings,
+        listLabels: LIST_LABELS,
+        allLists: ALL_LISTS,
+        showActions: true,
+      });
     }
 
     function closeDetail() {

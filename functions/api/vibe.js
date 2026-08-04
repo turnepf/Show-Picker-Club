@@ -186,6 +186,27 @@ function outlierPicks(memberFp, scoredRows) {
 }
 
 async function enrichPick(env, p) {
+  // A representative live copy of this title. The web page renders picks with
+  // the shared show card (public/show-renderer.js), which needs the artwork
+  // and season data — and an id, so tapping a pick can open the same show
+  // detail screen as everywhere else. Prefer a copy that actually has a
+  // poster so the card isn't stuck on the placeholder.
+  const showRow = await env.DB.prepare(
+    `SELECT id, poster_url, movie, seasons_released, full_series, next_season_date
+     FROM shows
+     WHERE LOWER(title) = ? AND archived = 0
+     ORDER BY (poster_url IS NULL OR poster_url = ''), id
+     LIMIT 1`
+  ).bind(p.title_lower).first();
+  if (showRow) {
+    p.id = showRow.id;
+    p.poster_url = showRow.poster_url;
+    p.movie = showRow.movie;
+    p.seasons_released = showRow.seasons_released;
+    p.full_series = showRow.full_series;
+    p.next_season_date = showRow.next_season_date;
+  }
+
   const genreRow = await env.DB.prepare(
     `SELECT genres FROM shows
      WHERE LOWER(title) = ? AND archived = 0 AND genres IS NOT NULL AND genres != ''

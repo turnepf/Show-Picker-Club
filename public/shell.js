@@ -4,8 +4,9 @@
  * Secondary pages (What's New, Subscriptions, Vibe, Reporting) include this
  * with <script src="/shell.js" defer></script>. On ≥1024px screens it wraps
  * the page in the same letterboxed split view as the main app: the sidebar
- * (My Shows lists; then Trending, What's New, Subscription audit, Admin;
- * then Members) on the left, the page
+ * (My Shows lists; then Groups, Trending, Rate my backlog, Subscription
+ * audit, Vibe, Calendar, What's New, Admin; then Members) on the left, the
+ * page
  * itself as the detail column. Small screens are untouched — the sidebar
  * stays hidden and the page keeps its own single-column layout.
  *
@@ -35,6 +36,9 @@
     '<symbol id="s-chevron-right" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M9 5.5 15.7 12 9 18.5"/></symbol>' +
     '<symbol id="s-logout" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5H7.8A1.8 1.8 0 0 0 6 6.3v11.4a1.8 1.8 0 0 0 1.8 1.8h5.7M10.5 12h10M17 8.5 20.5 12 17 15.5"/></symbol>' +
     '<symbol id="s-export" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 15V3.5M8.5 7 12 3.5 15.5 7M5 13v5.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V13"/></symbol>' +
+    '<symbol id="s-people" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="9.2" cy="9" r="3.2"/><path d="M3.4 19.2c.9-3 3-4.4 5.8-4.4s4.9 1.4 5.8 4.4"/><path d="M16.4 6.3a3.2 3.2 0 0 1 0 6.1"/><path d="M17.6 14.9c2.1.3 3.4 1.7 4 4.3"/></g></symbol>' +
+    '<symbol id="s-star-fill" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3.2 14.6 8.6 20.5 9.4 16.2 13.5 17.3 19.4 12 16.5 6.7 19.4 7.8 13.5 3.5 9.4 9.4 8.6Z"/></symbol>' +
+    '<symbol id="s-calendar-plus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.4"/><path d="M3.5 9.7h17M8 2.8v4M16 2.8v4M12 12.3v5.4M9.3 15h5.4"/></g></symbol>' +
     '<symbol id="s-creditcard" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.8" y="5.5" width="18.4" height="13" rx="2.2"/><path d="M2.8 9.8h18.4" stroke-width="2.2"/></g></symbol>' +
     '</svg>';
 
@@ -92,6 +96,9 @@
     '.shell-side .ios-item-chev { width: 15px; height: 15px; color: var(--ink-faint); }' +
     '.shell-side .ios-item.selected { background: var(--tint); color: #fff; }' +
     '.shell-side .ios-item.selected .ios-item-icon { color: #fff; }' +
+    '.shell-side .nav-spacer { height: 12px; }' +
+    '.shell-side .nav-badge { display: inline-block; background: var(--tint); color: #fff; font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 10px; margin-left: 4px; line-height: 1; white-space: nowrap; vertical-align: middle; flex-shrink: 0; }' +
+    '.shell-side .nav-badge:empty { display: none; }' +
     '.shell-side .shell-members { max-height: 250px; overflow-y: auto; }' +
     '.shell-side .ios-footnote { font-size: 12px; color: var(--ink-quiet); line-height: 1.5; padding: 0 16px; margin: -10px 0 22px; }' +
     '.shell-menu { position: fixed; z-index: 500; min-width: 180px; background: var(--surface); border-radius: 13px; box-shadow: 0 10px 40px rgba(0,0,0,0.22), 0 1px 3px rgba(0,0,0,0.12); padding: 4px 0; overflow: hidden; }' +
@@ -106,21 +113,22 @@
     { list: 'next', label: 'Next Up', icon: 'text-plus' },
   ];
 
-  // Operator pages, in the same order as the old top pill nav (Reporting
-  // added; it lives under Admin on iOS). The new-members queue lives at the
-  // top of Members now — /admin just redirects there.
+  // Operator pages — same order, labels and icons as index.html's sidebar,
+  // so the nav reads identically wherever you are. The new-members queue
+  // lives at the top of Members now; /admin just redirects there.
   var ADMIN_PAGES = [
-    { href: '/members', label: 'Members' },
-    { href: '/url-cleanup', label: 'Show Cleanup' },
-    { href: '/vibe-admin', label: 'Vibe admin' },
-    { href: '/reporting', label: 'Reporting' },
+    { href: '/reporting', label: 'Reporting', icon: 'text-plus' },
+    { href: '/members', label: 'Manage members', icon: 'person-plus' },
+    { href: '/url-cleanup', label: 'Show Cleanup', icon: 'wrench' },
+    { href: '/vibe-admin', label: 'Vibe trait scoring', icon: 'sparkles' },
   ];
 
   function iconRow(href, label, icon, opts) {
     opts = opts || {};
+    var badge = opts.badgeId ? '<span class="nav-badge" id="' + opts.badgeId + '"></span>' : '';
     return '<a class="ios-item' + (opts.selected ? ' selected' : '') + '" href="' + esc(href) + '">' +
       '<span class="ios-item-icon"><svg class="ic"><use href="#s-' + icon + '"/></svg></span>' +
-      '<span class="ios-item-label">' + esc(label) + '</span></a>';
+      '<span class="ios-item-label">' + esc(label) + badge + '</span></a>';
   }
 
   function memberRow(m) {
@@ -237,16 +245,29 @@
           iconRow('/?home', 'Log in to see your shows', 'person-plus') +
           '</div>';
       }
-      // Discovery + account group, kept separate from My Shows above:
-      // Trending, What's New, Subscription audit, then Admin (flat, not nested).
-      var discover = iconRow('/?home', 'Trending', 'flame') +
-        iconRow('/whats-new', "What's New", 'sparkles', { selected: location.pathname === '/whats-new' });
+      // Discovery + account group, kept separate from My Shows above, in the
+      // same order as index.html's sidebar: Groups, Trending, Rate my backlog,
+      // Subscription audit, Vibe, Calendar, What's New, then Admin below a
+      // spacer. The personal rows need a session, so they're gated on
+      // authMember exactly like the main app gates its own copies.
+      var path = location.pathname;
+      var discover = iconRow('/groups', 'Groups', 'people', { selected: path === '/groups' || path === '/groups.html' }) +
+        iconRow('/?home', 'Trending', 'flame');
       if (authMember) {
-        discover += iconRow('/subscriptions', 'Subscription audit', 'creditcard', { selected: location.pathname === '/subscriptions' });
+        discover += iconRow('/rate-backlog', 'Rate my backlog', 'star-fill', { selected: path === '/rate-backlog', badgeId: 'shellRateBacklogBadge' });
+        discover += iconRow('/subscriptions', 'Subscription audit', 'creditcard', { selected: path === '/subscriptions' });
+        discover += iconRow('/vibe?member=' + encodeURIComponent(authMember), 'Vibe', 'sparkles', { selected: path === '/vibe' });
+        // Calendar feeds authenticate with a per-member token and /api/members
+        // only returns your own, so whichever row has one is yours.
+        var mine = members.find(function (m) { return m.calendar_token; });
+        if (mine) {
+          discover += iconRow('webcal://showpicker.club/calendar/' + encodeURIComponent(mine.slug) + '.ics?key=' + encodeURIComponent(mine.calendar_token), 'Calendar', 'calendar-plus');
+        }
       }
+      discover += iconRow('/whats-new', "What's New", 'sparkles', { selected: path === '/whats-new' });
       if (auth.is_admin) {
-        discover += ADMIN_PAGES.map(function (p) {
-          return iconRow(p.href, p.label, 'wrench', { selected: p.href === location.pathname });
+        discover += '<div class="nav-spacer"></div>' + ADMIN_PAGES.map(function (p) {
+          return iconRow(p.href, p.label, p.icon, { selected: p.href === path });
         }).join('');
       }
       html += '<div class="ios-group">' + discover + '</div>';
@@ -264,6 +285,14 @@
          credit names it alone — same wording as index.html's sidebar. */
       html += '<p class="ios-footnote">Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>';
       side.querySelector('.shell-groups').innerHTML = html;
+
+      var badge = document.getElementById('shellRateBacklogBadge');
+      if (badge) {
+        fetch('/api/rate-backlog-count')
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) { if (d && d.count > 0) badge.textContent = d.count; })
+          .catch(function () {});
+      }
     });
   }
 

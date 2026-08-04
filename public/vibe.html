@@ -9,7 +9,7 @@
   <meta name="apple-itunes-app" content="app-id=6780282764">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
-  <link rel="stylesheet" href="/styles.css?v=5">
+  <link rel="stylesheet" href="/styles.css?v=6">
   <style>
     /* The native app's tint, so chrome and actions match iOS. */
     :root { --tint: #6D63EB; }
@@ -61,26 +61,15 @@
     .balance-item .pill.dark { background: var(--ink); color: #fff; }
     .balance-item .pill.warm { background: var(--accent-soft); color: var(--tab-up-next); }
 
-    .pick-row { padding: 10px 0; border-bottom: 1px solid var(--border-soft); font-size: 14px; }
-    .pick-row:last-child { border-bottom: none; }
-    .pick-row .pick-line { display: flex; align-items: center; gap: 10px; }
-    .pick-row .pick-add {
+    /* The one thing a vibe pick adds to a standard show card: a "+" that
+       opens the add-to-my-list modal. */
+    .pick-add {
       flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
       background: var(--tint); color: #fff; border: none; font-size: 16px; line-height: 1;
       cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center;
     }
-    .pick-row .pick-add:hover { filter: brightness(0.92); }
-    .pick-row .pick-info { flex: 1; min-width: 0; }
-    .pick-row .pick-title { font-weight: 600; color: var(--ink); cursor: pointer; }
-    .pick-row .pick-title:hover { color: var(--tint); }
-    .pick-row .pick-network { color: var(--ink-muted); }
-    .pick-row .pick-network a { color: var(--tint); text-decoration: none; }
-    .pick-row .pick-rating { color: var(--ink-quiet); }
-    .pick-row .pick-list-tag { color: var(--ink-quiet); font-size: 12px; margin-left: 6px; text-transform: capitalize; }
-    .pick-detail { display: none; padding: 8px 0 4px; font-size: 13px; color: var(--ink-muted); line-height: 1.5; }
-    .pick-detail.open { display: block; }
-    .pick-detail .pick-detail-line { display: flex; gap: 8px; }
-    .pick-detail .pick-detail-key { color: var(--ink-quiet); flex: 0 0 70px; }
+    .pick-add:hover { filter: brightness(0.92); }
+    .pick-empty { padding: 14px 16px; font-size: 13px; color: var(--ink-faint); }
 
     .modal-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.5);
@@ -142,7 +131,8 @@
     .hero, .modal-card { border-radius: 16px; }
     .topbar select { border-radius: 9px; }
   </style>
-  <script src="/shell.js?v=2" defer></script>
+  <script src="/show-renderer.js?v=2"></script>
+  <script src="/shell.js?v=3" defer></script>
   <script src="/app-banner.js?v=4" defer></script>
 </head>
 <body>
@@ -181,18 +171,7 @@
   </div>
 
   <script>
-    function safeUrl(url) {
-      if (!url || typeof url !== 'string') return '#';
-      const t = url.trim();
-      return /^https?:\/\//i.test(t) ? t : '#';
-    }
-    function escapeHtml(s) {
-      return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]);
-    }
-    function fmtUrl(u) {
-      if (!u) return '';
-      try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; }
-    }
+    // escapeHtml() and safeUrl() come from show-renderer.js — one copy.
 
     const TOP_TRAITS = ['Complexity', 'Warmth', 'Curiosity', 'Empathy'];
 
@@ -225,36 +204,24 @@
     let pageMember = null;     // slug of the member whose vibe we're viewing
     let currentPicks = [];     // both aligned + outlier; indexed by data-pick-key
 
+    // Picks render with the shared show card (show-renderer.js), same as
+    // every other list in the app. Genre and cast used to expand inline here;
+    // they live on the show's detail screen, which the card now opens — one
+    // detail card everywhere instead of a second, thinner one on this page.
     function renderPickRow(p, key, opts) {
-      const showAdd = opts.canAdd;
-      const link = p.network_url
-        ? `<a href="${escapeHtml(safeUrl(p.network_url))}" target="_blank" rel="noopener">${escapeHtml(p.network || fmtUrl(p.network_url))}</a>`
-        : escapeHtml(p.network || '');
-      const rating = p.rating ? ` &middot; <span class="pick-rating">&#9733;${escapeHtml(p.rating)}</span>` : '';
-      const listTag = p.list ? ` <span class="pick-list-tag">(${escapeHtml(p.list === 'next' ? 'Next Up' : p.list)})</span>` : '';
-
-      const detailLines = [];
-      if (p.genres) detailLines.push(`<div class="pick-detail-line"><span class="pick-detail-key">Genre:</span><span>${escapeHtml(p.genres)}</span></div>`);
-      if (p.actors && p.actors.length) detailLines.push(`<div class="pick-detail-line"><span class="pick-detail-key">Cast:</span><span>${escapeHtml(p.actors.join(', '))}</span></div>`);
-      const detailHtml = detailLines.length
-        ? `<div class="pick-detail" id="pick-detail-${key}">${detailLines.join('')}</div>`
-        : '';
-
-      const addBtn = showAdd
+      const captionParts = [];
+      if (p.network) captionParts.push(escapeHtml(p.network));
+      if (p.list) captionParts.push(escapeHtml(p.list === 'next' ? 'Next Up' : p.list));
+      const addBtn = opts.canAdd
         ? `<button class="pick-add" data-pick-key="${key}" title="Add to my list" aria-label="Add to my list">+</button>`
         : '';
-
-      return `<div class="pick-row">
-        <div class="pick-line">
-          ${addBtn}
-          <div class="pick-info">
-            <span class="pick-title" data-pick-key="${key}">${escapeHtml(p.title)}</span>${listTag}
-            ${link ? ` <span class="pick-network">on ${link}</span>` : ''}
-            ${rating}
-          </div>
-        </div>
-        ${detailHtml}
-      </div>`;
+      return renderShowCard(p, {
+        onClickId: p.id ? true : null,
+        showRating: true,
+        showChevron: !!p.id,
+        caption: captionParts.join(' · '),
+        prefixHtml: addBtn,
+      });
     }
 
     function renderMember(m) {
@@ -300,13 +267,13 @@
         const key = pickKey(i, 'aligned');
         currentPicks.push({ key, data: p });
         return renderPickRow(p, key, { canAdd: isOwnPage });
-      }).join('') || '<div class="pick-row" style="color:var(--ink-faint);">No aligned picks available.</div>';
+      }).join('') || '<div class="pick-empty">No aligned picks available.</div>';
 
       const outliers = (m.outlier_picks || []).map((p, i) => {
         const key = pickKey(i, 'outlier');
         currentPicks.push({ key, data: p });
         return renderPickRow(p, key, { canAdd: false });
-      }).join('') || '<div class="pick-row" style="color:var(--ink-faint);">Not enough scored shows to find outliers.</div>';
+      }).join('') || '<div class="pick-empty">Not enough scored shows to find outliers.</div>';
 
       const blendRows = (c.blend || []).map(b => {
         const pct = Math.max(0, Math.round(b.similarity * 100));
@@ -367,29 +334,35 @@
         <div class="section">
           <h2>Shows aligned with your vibe</h2>
           <p class="blend-note">Trait-similarity picks from across the club, closest in mood to your fingerprint.</p>
-          ${aligned}
+          <div class="show-list">${aligned}</div>
         </div>
 
         <div class="section">
           <h2>Shows that don't make sense</h2>
           <p class="blend-note">Shows already on this list whose trait pattern is the opposite of the fingerprint: outliers in the member's own taste.</p>
-          ${outliers}
+          <div class="show-list">${outliers}</div>
         </div>
       `;
     }
 
     function bindPickInteractions() {
-      document.querySelectorAll('.pick-title').forEach(el => {
-        el.addEventListener('click', () => {
-          const key = el.dataset.pickKey;
-          const detail = document.getElementById(`pick-detail-${key}`);
-          if (detail) detail.classList.toggle('open');
+      document.querySelectorAll('.pick-add').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          // The button sits inside the card, which is itself a link to the
+          // detail screen — don't navigate out from under the modal.
+          e.stopPropagation();
+          openAddModal(btn.dataset.pickKey);
         });
       });
-      document.querySelectorAll('.pick-add').forEach(btn => {
-        btn.addEventListener('click', () => openAddModal(btn.dataset.pickKey));
-      });
     }
+
+    // Show cards open the detail screen on the member page whose vibe is
+    // showing, so a pick lands on the same card as everywhere else.
+    window.__showRendererClickHandler = (showId) => {
+      const slug = pageMember || authMember;
+      if (!slug || !showId) return;
+      location.href = `/${encodeURIComponent(slug)}?show=${encodeURIComponent(showId)}`;
+    };
 
     function openAddModal(key) {
       const entry = currentPicks.find(p => p.key === key);
