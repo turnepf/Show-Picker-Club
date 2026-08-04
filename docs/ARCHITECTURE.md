@@ -124,7 +124,7 @@ Native support: `ShowPickerCore/Sources/ShowPickerCore/Ratings.swift` defines `R
 | `id`            | TEXT PK | UUID. |
 | `email`         | TEXT NOT NULL | Display/identifier for the session (member's first name or name). |
 | `member_slug`   | TEXT | Which member this session can edit. |
-| `expires_at`    | TEXT NOT NULL | 30 days from creation. |
+| `expires_at`    | TEXT NOT NULL | 30 days, sliding. `/auth/check` extends it to a fresh 30 days (and re-sends the cookie with the new `Expires`) whenever the session is more than a day into its window, so an active member is never logged out for being active. Both halves have to move together — the row decides authorization, the cookie's own `Expires` decides whether the client still sends it. |
 | `created_at`    | TEXT | |
 | `last_seen_at`  | TEXT | Bumped by `/auth/check`, throttled to once per hour per session. Drives DAU/WAU/MAU in reporting. |
 | `auth_method`   | TEXT | Migration 059. How this session was authenticated: `apple` | `google` | `email` | `sms` | `demo`. NULL for sessions minted before the column existed. Counted by `/api/reporting`'s `signin_methods` (7/30/90-day windows) — the number that says whether an auth channel still earns what it costs to run. |
@@ -445,6 +445,23 @@ Two surfaces:
 
 ### Synchronous (`_shared/enrichment.js#fetchEnrichment`)
 Called from `POST /api/shows` (and edit / suggestion paths). Returns `{canonicalTitle, rating, actors, directorImdbId}` plus the richer detail fields (see below) so the new row inserts with everything already filled in. TMDB is the sole source; `rating` is TMDB's `vote_average`.
+
+**Canonical people + cast depth (migration 060).** Cast used to be capped at
+4 per title, which routinely cut a major character, and every actor was stored
+per show — the same person on five shows was five independent rows, so an IMDB
+id resolved on one show did nothing for the others. `people` (keyed on TMDB's
+person id) and `people_by_name` (name → imdb_id, for creators and legacy rows)
+are what we already know: `_shared/people.js#knownByPersonIds` skips the TMDB
+`/person/{id}/external_ids` call for anyone we've seen before, which is what
+makes storing `CAST_DEPTH = 12` affordable inside the subrequest budget when a
+club's shows share actors constantly. `fillActorIdsFromKnownPeople()` runs on
+every `/api/enrich` call and links unlinked actor rows from that cache in pure
+SQL, with no TMDB requests at all — the metered backfill pass only handles
+what the cache can't. `actors.ord` stores TMDB's billing order so "the first
+few" means the principals. Creators come back from `GET /api/shows/:id` as a
+`creators` array of `{name, imdb_id}` (up to 4, resolved per name): `director`
+is one comma-joined string carrying a single id for the first credit, so a
+co-created show could previously link none of its creators.
 
 **Rich detail fields (migration 042).** The one TMDB detail call already made pulls extra data via `append_to_response=credits,external_ids,videos,watch/providers,{content_ratings|release_dates}` — a single HTTP request, no extra subrequest budget. `extractTmdbDetailFields()` (exported from `enrichment.js`, shared by the add-time path and the background passes) pulls `overview`, `backdrop_url`, `tmdb_rating`, `content_rating`, `trailer_key`, `director`/creator, `runtime`, `release_year`, plus a **provider network**
 (for a series, `runtime` reads TMDB's `episode_run_time`, then falls back to

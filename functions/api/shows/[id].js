@@ -4,6 +4,7 @@ import { canonicalNetwork, networkFromUrl } from '../../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../../_shared/watch-providers.js';
 import { safeNetworkUrl } from '../../_shared/url-utils.js';
 import { getRatingsSummary } from '../../_shared/ratings.js';
+import { creatorsForShow } from '../../_shared/people.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -98,8 +99,13 @@ export async function onRequestGet(context) {
   // Full row (notes, watching_with, recommended_by, added_by) is for the
   // show's owner only. Other members get catalog fields plus enough context
   // to say "on Watching · <member>"; logged-out visitors get catalog only.
+  // Creators as a linkable list: `director` is one comma-joined string with a
+  // single id for the first credit, so a co-created show could never link
+  // more than one name. The canonical people table resolves each name.
+  const creators = await creatorsForShow(env, show);
+
   if (session && session.member_slug === show.member_slug) {
-    return new Response(JSON.stringify({ show, ratings, group_watchers }), { headers: corsHeaders() });
+    return new Response(JSON.stringify({ show, ratings, group_watchers, creators }), { headers: corsHeaders() });
   }
   const redacted = {};
   for (const k of PUBLIC_SHOW_FIELDS) if (k in show) redacted[k] = show[k];
@@ -107,7 +113,7 @@ export async function onRequestGet(context) {
     redacted.list = show.list;
     redacted.member_slug = show.member_slug;
   }
-  return new Response(JSON.stringify({ show: redacted, ratings, group_watchers }), { headers: corsHeaders() });
+  return new Response(JSON.stringify({ show: redacted, ratings, group_watchers, creators }), { headers: corsHeaders() });
 }
 
 export async function onRequestPut(context) {
@@ -175,8 +181,8 @@ export async function onRequestPut(context) {
 
   if (enriched.actors.length > 0) {
     await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(params.id).run();
-    const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id) VALUES (?, ?, ?)');
-    await env.DB.batch(enriched.actors.map(a => stmt.bind(params.id, a.name, a.imdb_id || null)));
+    const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id) VALUES (?, ?, ?, ?, ?)');
+    await env.DB.batch(enriched.actors.map((a, i) => stmt.bind(params.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null)));
   }
 
   // If the network changed (or we landed on a placeholder URL), kick off

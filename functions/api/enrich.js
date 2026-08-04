@@ -1,6 +1,7 @@
 import { getSession } from '../_shared/auth.js';
 import { cronAuthorized } from '../_shared/secrets.js';
 import { fetchEnrichment, extractTmdbDetailFields } from '../_shared/enrichment.js';
+import { fillActorIdsFromKnownPeople } from '../_shared/people.js';
 
 // TMDB GET that works with either credential the worker has configured:
 // the v4 Bearer token (TMDB_TOKEN, what the shared enrichment path uses) is
@@ -309,6 +310,12 @@ export async function onRequestPost(context) {
     }
   }
 
+  // Free pass first: link actor rows to people we already resolved on some
+  // other show. Pure SQL, no TMDB requests, so it runs every call and takes
+  // the easy half of the backlog before the metered pass below spends any
+  // budget on it.
+  const actorIdsFromCache = await fillActorIdsFromKnownPeople(env);
+
   // Actor IMDB-id backfill — self-healing, no admin action required.
   // imdb_id is only ever written by the TMDB enrichment path (at add/edit time).
   // Shows added before that path existed, or via a legacy path that omitted it
@@ -340,17 +347,17 @@ export async function onRequestPost(context) {
         const { results: copies } = await env.DB.prepare(
           'SELECT id FROM shows WHERE LOWER(title) = LOWER(?) AND archived = 0'
         ).bind(show.title).all();
-        const insert = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id) VALUES (?, ?, ?)');
+        const insert = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id) VALUES (?, ?, ?, ?, ?)');
         for (const copy of copies) {
           await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(copy.id).run();
-          await env.DB.batch(actors.map(a => insert.bind(copy.id, a.name, a.imdb_id || null)));
+          await env.DB.batch(actors.map((a, i) => insert.bind(copy.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null)));
           actorImdbFilled++;
         }
       } catch (e) {}
     }
   }
 
-  return new Response(JSON.stringify({ enriched, tmdbUpdated, actorImdbFilled }), {
+  return new Response(JSON.stringify({ enriched, tmdbUpdated, actorImdbFilled, actorIdsFromCache }), {
     headers: { 'Content-Type': 'application/json' },
   });
 }

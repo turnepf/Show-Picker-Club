@@ -266,6 +266,11 @@ public struct ShowsResponse: Codable, Sendable { public let shows: [Show] }
 public struct ShowResponse: Codable, Sendable {
     public let show: Show
     public let ratings: RatingsSummary?
+    // Creators as individually linkable people. `show.director` is one
+    // comma-joined string carrying a single IMDB id for the first credit, so
+    // a co-created show could only ever link one name; the server resolves
+    // each name against the canonical people table instead.
+    public let creators: [Credit]?
     // Other members of MY groups with this same title on their Watching
     // list — a sibling of `show` too, and empty unless the viewer is in a
     // group with someone who's watching it.
@@ -274,19 +279,45 @@ public struct ShowResponse: Codable, Sendable {
     // Explicit public init — the synthesized memberwise init is only
     // internal even though the struct is public, so other modules (the
     // apps' offline-cache fallbacks) couldn't construct one without this.
-    public init(show: Show, ratings: RatingsSummary? = nil, groupWatchers: [GroupWatcher]? = nil) {
+    public init(show: Show, ratings: RatingsSummary? = nil, groupWatchers: [GroupWatcher]? = nil,
+                creators: [Credit]? = nil) {
         self.show = show
         self.ratings = ratings
         self.groupWatchers = groupWatchers
+        self.creators = creators
     }
 
     enum CodingKeys: String, CodingKey {
-        case show, ratings, groupWatchers = "group_watchers"
+        case show, ratings, creators, groupWatchers = "group_watchers"
     }
 }
 
 // One fellow group member watching a title. First name only — that's all
 // the endpoint sends, and all the card needs.
+// One credited person, with their IMDB id when we know it. Same shape for
+// creators and cast.
+public struct Credit: Codable, Identifiable, Hashable, Sendable {
+    public let name: String
+    public let imdbId: String?
+
+    public var id: String { name }
+
+    public var url: URL? {
+        guard let imdbId, !imdbId.isEmpty else { return nil }
+        return URL(string: "https://www.imdb.com/name/\(imdbId)/")
+    }
+
+    public init(name: String, imdbId: String? = nil) {
+        self.name = name
+        self.imdbId = imdbId
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case imdbId = "imdb_id"
+    }
+}
+
 public struct GroupWatcher: Codable, Identifiable, Hashable, Sendable {
     public let slug: String
     public let name: String

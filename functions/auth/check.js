@@ -38,12 +38,29 @@ export async function onRequestGet(context) {
     'SELECT is_admin FROM members WHERE slug = ?'
   ).bind(session.member_slug).first().catch(() => null);
 
+  // Sliding expiry: a session used inside its 30-day window gets another 30
+  // days, so an active member is never logged out for being active. Only
+  // slides once a day (the row is already >1 day from a full window), so a
+  // chatty client doesn't rewrite the row and the cookie on every launch.
+  // Both halves have to move together — the DB row decides whether a request
+  // is authorized, the cookie's own Expires decides whether the client still
+  // sends it — so the refreshed Set-Cookie rides along on this response.
+  const headers = { 'Content-Type': 'application/json' };
+  const fullWindowMs = 30 * 24 * 60 * 60 * 1000;
+  const expiresAt = new Date(session.expires_at);
+  if (expiresAt.getTime() - Date.now() < fullWindowMs - 24 * 60 * 60 * 1000) {
+    const renewed = new Date(Date.now() + fullWindowMs);
+    context.waitUntil(env.DB.prepare(
+      'UPDATE sessions SET expires_at = ? WHERE id = ?'
+    ).bind(renewed.toISOString(), match[1]).run().catch(() => {}));
+    headers['Set-Cookie'] =
+      `session=${match[1]}; Path=/; Expires=${renewed.toUTCString()}; HttpOnly; Secure; SameSite=Lax`;
+  }
+
   return new Response(JSON.stringify({
     authenticated: true,
     email: session.email,
     member: session.member_slug,
     is_admin: !!memberRow?.is_admin,
-  }), {
-    headers: { 'Content-Type': 'application/json' },
-  });
+  }), { headers });
 }

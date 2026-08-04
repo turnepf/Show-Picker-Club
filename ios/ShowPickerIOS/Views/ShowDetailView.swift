@@ -24,6 +24,8 @@ struct ShowDetailView: View {
     // Fellow group members with this title on their Watching list. Empty
     // unless I'm in a group with someone who's watching it.
     @State private var groupWatchers: [GroupWatcher] = []
+    // Creators resolved to individual people by the server (up to four).
+    @State private var creators: [Credit] = []
 
     private var title: String { show?.title ?? initialTitle }
     private var network: String? { show?.network ?? initialNetwork }
@@ -113,8 +115,13 @@ struct ShowDetailView: View {
                         Text(castLine).font(.callout).foregroundStyle(.secondary)
                     }
                     if let s = show, let d = s.director, !d.isEmpty {
-                        // Link a single-person credit to their IMDB page (like cast).
-                        if let url = s.directorURL {
+                        // Each creator links on its own. A co-created show
+                        // used to link none of them: one stored id belongs to
+                        // the first credit, so linking the joined string would
+                        // have pointed everyone at one person.
+                        if !creators.isEmpty {
+                            LabeledContent(s.directorLabel) { creatorLine }
+                        } else if let url = s.directorURL {
                             LabeledContent(s.directorLabel) { Link(d, destination: url) }
                         } else {
                             LabeledContent(s.directorLabel, value: d)
@@ -266,6 +273,20 @@ struct ShowDetailView: View {
         groupWatchers.map(\.name).joined(separator: ", ")
     }
     private var hasDirector: Bool { (show?.director.map { !$0.isEmpty }) ?? false }
+
+    // "Dan Erickson, Ben Stiller" with each name its own link when we know
+    // their IMDB id, plain text when we don't.
+    private var creatorLine: Text {
+        creators.reduce(Text("")) { line, credit in
+            let sep = line == Text("") ? Text("") : Text(", ")
+            var name = AttributedString(credit.name)
+            if let url = credit.url {
+                name.link = url
+                name.underlineStyle = .single
+            }
+            return line + sep + Text(name)
+        }
+    }
     private var hasCatalog: Bool {
         // TMDB Rating moved into the Ratings section above — no longer
         // part of what makes this catalog card worth showing.
@@ -413,6 +434,7 @@ struct ShowDetailView: View {
                 show = r.show
                 ratings = r.ratings
                 groupWatchers = r.groupWatchers ?? []
+                creators = r.creators ?? []
             }
             cast = (try? await API.actors(showId: id)) ?? []
         }

@@ -181,8 +181,8 @@ export async function onRequestPost(context) {
 
   const showId = result.meta.last_row_id;
   if (enriched.actors.length > 0) {
-    const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id) VALUES (?, ?, ?)');
-    await env.DB.batch(enriched.actors.map(a => stmt.bind(showId, a.name, a.imdb_id || null)));
+    const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id) VALUES (?, ?, ?, ?, ?)');
+    await env.DB.batch(enriched.actors.map((a, i) => stmt.bind(showId, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null)));
   }
 
   // If we ended up on a search-URL placeholder (no user paste, no sibling

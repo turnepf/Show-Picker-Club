@@ -6,6 +6,12 @@
 // arrive canonical — see docs/PRODUCT.md.)
 
 import { knownNetwork } from './networks.js';
+import { knownByPersonIds, rememberPeople } from './people.js';
+
+// How many cast members we store per title. Clients show the top few;
+// storing more means a search by actor can find the character actor nobody
+// bills, and re-enriching to go deeper later costs a full TMDB round trip.
+export const CAST_DEPTH = 12;
 
 // The extra sub-requests we fold into the TMDB detail call via
 // append_to_response — one HTTP request, no extra Cloudflare subrequest budget.
@@ -154,21 +160,48 @@ async function enrichFromTmdbId(tmdbId, mediaType, env, fallbackPoster = null) {
   // Single rating, straight from TMDB (OMDB retired).
   const rating = detailFields.tmdbRating;
 
-  // Actor IMDB IDs + the creator/director's IMDB id, all in parallel.
-  const cast = (detail.credits?.cast || []).slice(0, 4);
+  // Cast, in TMDB's billing order — `cast` comes back sorted by `order`, so
+  // the first entries ARE the principals. The old cap of 4 routinely cut a
+  // major character; 12 covers a main ensemble without turning the card into
+  // a phone book, and clients decide how many of those to draw.
+  const cast = (detail.credits?.cast || []).slice(0, CAST_DEPTH);
+  // Anyone we've already resolved on another show costs no request at all —
+  // which is what makes a deeper cast affordable inside the subrequest
+  // budget, since a club's shows share actors constantly.
+  const knownIds = env ? await knownByPersonIds(env, cast.map(p => p.id)) : new Map();
   const [actors, directorImdbId] = await Promise.all([
     Promise.all(
-      cast.map(async (person) => {
+      cast.map(async (person, i) => {
+        const cached = knownIds.get(person.id);
+        if (cached) {
+          return { name: person.name, imdb_id: cached, tmdb_person_id: person.id, ord: i };
+        }
         try {
           const ext = await tmdbFetch(`/person/${person.id}/external_ids`, token);
-          return { name: person.name, imdb_id: ext.imdb_id || null };
+          return { name: person.name, imdb_id: ext.imdb_id || null, tmdb_person_id: person.id, ord: i };
         } catch (_) {
-          return { name: person.name, imdb_id: null };
+          return { name: person.name, imdb_id: null, tmdb_person_id: person.id, ord: i };
         }
       })
     ),
     personImdbId(detailFields.directorPersonId, token),
   ]);
+
+  // Bank everyone we resolved, including the creator, so the next show they
+  // turn up on is free — and so a name-only credit elsewhere can be linked.
+  if (env) {
+    const learned = actors
+      .filter(a => a.imdb_id)
+      .map(a => ({ tmdbPersonId: a.tmdb_person_id, name: a.name, imdbId: a.imdb_id }));
+    if (directorImdbId && detailFields.director && !detailFields.director.includes(',')) {
+      learned.push({
+        tmdbPersonId: detailFields.directorPersonId,
+        name: detailFields.director,
+        imdbId: directorImdbId,
+      });
+    }
+    await rememberPeople(env, learned).catch(() => {});
+  }
 
   const posterUrl = tmdbPosterUrl(detail.poster_path) || fallbackPoster;
   const netLogoPath = detail.networks && detail.networks[0] && detail.networks[0].logo_path;

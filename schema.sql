@@ -147,7 +147,34 @@ CREATE TABLE IF NOT EXISTS actors (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   show_id INTEGER REFERENCES shows(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  imdb_id TEXT
+  imdb_id TEXT,
+  -- TMDB billing order, 0 = top-billed. Cast is stored CAST_DEPTH deep and
+  -- clients draw the first few, so this is what makes "the first few" mean
+  -- the principals.
+  ord INTEGER,
+  tmdb_person_id INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_actors_show_ord ON actors(show_id, ord);
+
+-- Canonical people (migration 060): one row per human rather than one per
+-- (show, human), so an actor we've resolved on any show links on every show
+-- and costs no TMDB request the next time. `people` is keyed on TMDB's person
+-- id; `people_by_name` carries the name→imdb_id pairs we only know by name
+-- (creators, legacy actor rows).
+CREATE TABLE IF NOT EXISTS people (
+  tmdb_person_id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  name_lower TEXT NOT NULL,
+  imdb_id TEXT,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_people_name_lower ON people(name_lower);
+
+CREATE TABLE IF NOT EXISTS people_by_name (
+  name_lower TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  imdb_id TEXT NOT NULL,
+  updated_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS show_ratings (
