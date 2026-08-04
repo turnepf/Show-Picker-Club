@@ -80,9 +80,38 @@ The **+** button on any show row opens a share modal. The original member can co
 
 Logged in as yourself, every row gets Edit and Archive buttons inline. Editing re-runs enrichment if the title changes. Archive sets `archived=1`; archived shows are still searchable but don't appear in lists, trending, or vibe.
 
+## Web app status
+
+**Frozen as of 2026-08. Likely to be replaced by a marketing site.**
+
+The web member app has no users. Every member is on the iPhone/iPad app, and
+the cost of keeping two frontends in step was real: a full day of work in
+2026-08 went into fixing drift *between* web surfaces (five different show-row
+implementations, two show-detail implementations, two different sidebar navs)
+and then porting the same fixes to Swift. That work is done — `show-renderer.js`
+and `ShowRow.swift` are now the single renderers on each side — which is the
+cheapest moment to stop, not a reason to keep going.
+
+What this means in practice:
+
+- **No new member-facing features on the web.** They go to iOS/iPad.
+- **The web still gets** security fixes, repairs when something breaks, and any
+  change to `functions/api/*` — the apps run on those endpoints, so the backend
+  is not frozen in any sense.
+- **The landing and auth surface stays working**, because a shared
+  `showpicker.club` link is how someone finds the app in the first place.
+- **The `public/` admin tools are redundant**, not load-bearing: Reporting,
+  Manage members, Show Cleanup and Vibe trait scoring all exist in the iOS app.
+
+The expected end state is `showpicker.club` as a marketing page pointing at the
+App Store, with the member app removed. Until that's decided, nothing is being
+deleted — freezing is reversible in a way that ripping it out isn't. If a member
+ever asks for web access (an Android user, or someone who won't install an app),
+that's the signal to revisit.
+
 ## Native apps
 
-Alongside the web app / PWA there are native iOS, tvOS, and watchOS clients. The watchOS app (paired to the iPhone) shows the four lists → shows → detail; its session is handed off from the phone, and member reads depend on that handed-off session (they are not public). There is deliberately no watch-face complication (one shipped briefly in 2026-07 and was retired — it rendered unreliably on device).
+The native iOS, tvOS and watchOS clients are where the product actually lives (see Web app status above; the PWA itself was retired in 2026-08). The watchOS app (paired to the iPhone) shows the four lists → shows → detail; its session is handed off from the phone, and member reads depend on that handed-off session (they are not public). There is deliberately no watch-face complication (one shipped briefly in 2026-07 and was retired — it rendered unreliably on device).
 
 The iOS app ships **home-screen widgets** on iPhone, iPad, and Mac (the Mac Catalyst build): **Trending** (public, the club's rolling top adds; small/medium/large + extra-large on iPad/Mac) and **Upcoming Premieres** (the signed-in member's next premieres by date; small/medium/large + iPhone Lock Screen). Tapping a show opens its card in the app via `showpicker.club/show/<id>` universal links. tvOS and watchOS have no widget equivalent.
 

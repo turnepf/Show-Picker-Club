@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Show Picker Club — a multi-tenant TV-show/movie tracker for a small private club, live at [showpicker.club](https://showpicker.club). Each member (`/patrick`, `/whitt`) keeps four ranked lists (Watching, Awaiting, Loved, Next Up). Web frontend + Cloudflare backend live in this repo alongside native SwiftUI apps for iOS, tvOS, and watchOS.
+Show Picker Club — a multi-tenant TV-show/movie tracker for a small private club, live at [showpicker.club](https://showpicker.club). Each member (`/patrick`, `/whitt`) keeps four ranked lists (Watching, Awaiting, Loved, Next Up). The native SwiftUI apps for iOS, tvOS and watchOS are the product members actually use; the web frontend is frozen (see `docs/PRODUCT.md#web-app-status`) and the Cloudflare backend in this repo serves both.
 
 **Stack:** Static HTML + vanilla JS (no framework, no build step) in `public/`; Cloudflare Pages Functions (file-system-routed JS) in `functions/`; Cloudflare D1 (SQLite) with the `DB` binding from `wrangler.toml`; OMDB + TMDB for enrichment; Claude API for vibe trait scoring; Twilio/Resend for login codes.
 
@@ -100,14 +100,25 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 
 ## Working preferences
 
-- **Every feature request is a cross-platform conversation.** The product
-  ships on web, iOS/iPad, tvOS, and watchOS. When a new feature or change is
-  requested, always enumerate all platforms and state explicitly which get
-  the feature and which don't (and why — e.g. tvOS is view-only, watch is
-  read-only). Never silently implement for one platform; parity gaps that
-  slip through are expensive to rediscover. What's New content is centralized
-  in `public/whats-new.json` — update it (with platform tags) when shipping
-  member-visible features.
+- **The web member app is frozen (2026-08). Build features for the Apple apps.**
+  Nobody uses the web client, and keeping it at parity was costing more than it
+  returned. New member-facing features go to iOS/iPad; do **not** build them for
+  the web, and don't offer to. The web app is expected to be reduced to a
+  marketing site pointing at the App Store — see `docs/PRODUCT.md#web-app-status`
+  before doing anything substantial to `public/`. What still gets worked on
+  there: security fixes, anything actually broken, the `/api/*` endpoints (the
+  apps depend on them), and the landing/auth surface. The admin tools in
+  `public/` (Reporting, Manage members, Show Cleanup, Vibe trait scoring) are
+  already in the iOS app, so they don't need web work either.
+
+- **Feature requests still name their platforms.** The product ships on
+  iOS/iPad, tvOS, and watchOS. When a feature is requested, state which get it
+  and which don't (tvOS is view-only, watch is read-only) — parity gaps between
+  the Apple targets are still expensive to rediscover. Just don't add "and the
+  web" to that list unless asked. What's New content is centralized in
+  `public/whats-new.json` (shared by the web page and the iOS app) — update it
+  when shipping member-visible features, and keep entries to actual features,
+  not cleanups or polish.
 
 - **Never put `#` comments in terminal commands meant for the user to paste.**
   Pasted into their zsh, comment lines execute as garbage commands and break
