@@ -516,6 +516,9 @@
       vertical-align: middle;
       flex-shrink: 0;
     }
+    /* No count (zero unrated, or shows not loaded yet) — otherwise the padding
+       and tint background paint a stray pill after the label. */
+    .nav-badge:empty { display: none; }
     .ios-item-label { display: flex; align-items: center; gap: 4px; }
     .ios-item-icon .ic { width: 22px; height: 22px; }
     .ios-item-label { flex: 1; min-width: 0; }
