@@ -335,8 +335,9 @@ public struct Group: Codable, Identifiable, Hashable, Sendable {
         // D1 has no boolean type, so is_creator arrives as 1/0 from the SQL
         // CASE — but read a real JSON boolean too, in case the endpoint ever
         // computes it in JS the way the group-detail payload does.
-        if let flag = try? c.decodeIfPresent(Bool.self, forKey: .isCreator) {
-            isCreator = flag ?? false
+        // A missing key throws here too, and lands on the Int branch's default.
+        if let flag = try? c.decode(Bool.self, forKey: .isCreator) {
+            isCreator = flag
         } else {
             isCreator = (try c.decodeIfPresent(Int.self, forKey: .isCreator) ?? 0) != 0
         }
