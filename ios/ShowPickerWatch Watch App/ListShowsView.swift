@@ -1,8 +1,9 @@
 import SwiftUI
 import ShowPickerCore
 
-// Screen 2: the shows on one list — just the title and network, per spec.
-// Tapping opens the detail.
+// Screen 2: the shows on one list. Title, then the two facts worth a glance
+// without opening anything: where it airs (with the premiere/finale date when
+// there is one) and its rating. Tapping opens the detail.
 struct ListShowsView: View {
     let list: ShowList
     let shows: [Show]
@@ -15,8 +16,11 @@ struct ListShowsView: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(show.title).font(.headline).lineLimit(2)
-                        if let n = show.network, !n.isEmpty {
-                            Text(n).font(.caption2).foregroundStyle(.secondary)
+                        if let sub = subtitle(show) {
+                            Text(sub).font(.caption2).foregroundStyle(.secondary)
+                        }
+                        if let r = show.rating, !r.isEmpty {
+                            Text("★ \(r)").font(.caption2).foregroundStyle(.orange)
                         }
                     }
                 }
@@ -37,6 +41,15 @@ struct ListShowsView: View {
                 Text("Nothing here yet.").font(.footnote).foregroundStyle(.secondary)
             }
         }
+    }
+
+    // "Netflix · 6/12" — the network, plus the premiere date (or the finale's,
+    // when that's all there is). Either half alone still renders.
+    private func subtitle(_ show: Show) -> String? {
+        let parts = [show.network, show.seasonDatesText]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     // Watching/Awaiting lead with the soonest premiere; the rest by rating —

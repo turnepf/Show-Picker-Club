@@ -12,22 +12,28 @@ struct WatchDetailView: View {
     // populates only when viewing a specific other member's copy. The
     // watch is view-only for ratings — rate from iPhone/iPad.
     @State private var ratings: RatingsSummary?
+    // Others in my groups watching this same title. Comes back on the same
+    // detail call; empty for a logged-out watch or a member in no groups.
+    @State private var groupWatchers: [GroupWatcher] = []
 
     private var s: Show { full ?? show }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                if let p = s.posterUrl, let url = URL(string: p) {
-                    AsyncImage(url: url) { phase in
+                // Backdrop first, poster only as the fallback — same order as
+                // the phone. A 16:9 still fills the watch's width; a portrait
+                // poster wasted most of it on letterboxing.
+                if let hero = heroURL {
+                    AsyncImage(url: hero.url) { phase in
                         if let image = phase.image {
                             image.resizable().scaledToFit()
                         } else {
                             Color.gray.opacity(0.2)
                         }
                     }
+                    .aspectRatio(hero.isBackdrop ? 16.0 / 9.0 : 2.0 / 3.0, contentMode: .fit)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 120)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
 
@@ -55,15 +61,29 @@ struct WatchDetailView: View {
                     row(s.directorLabel, d)
                 }
 
+                // Who else in my groups is watching this, above the network
+                // line — the social context reads before the where-to-watch.
+                if !groupWatchers.isEmpty {
+                    row("Also watching", groupWatchers.map(\.name).joined(separator: ", "))
+                }
+
                 // Where to watch — informational only. The watch can't open a
                 // streaming service, so this is a plain labeled row, not a link.
                 if let n = s.network, !n.isEmpty {
                     row("Network", n)
                 }
 
-                // Ratings grouped together, the club's own score first.
+                // Ratings grouped together, the club's own score first, then
+                // mine, then whoever's copy this is. Rating happens on the
+                // phone; the watch just reports the numbers.
                 if let ratings {
                     row("Club Rating", clubRatingText)
+                    if let mine = ratings.mine {
+                        row("Your rating", "\(mine)/10")
+                    }
+                    if let seasons = mySeasonRatingsText {
+                        row("Your seasons", seasons)
+                    }
                     if let owner = ratings.owner {
                         row("\(ratings.ownerName ?? "")’s rating", "\(owner)/10")
                     }
@@ -72,7 +92,9 @@ struct WatchDetailView: View {
                 if let r = s.rating, !r.isEmpty { row("TMDB Rating", "★ \(r)") }
 
                 if let l = ShowList(rawValue: s.list) { row("List", l.title) }
-                if let up = s.nextUpRange { row("Next episode", up) }
+                // Premiere when there is one, else the finale date ("through
+                // 6/12") — the phone's fallback, which the watch was missing.
+                if let dates = s.seasonDatesText { row("Next episode", dates) }
                 if let series = s.seriesText { row("Series", series) }
                 if s.isMovie { row("Type", "Movie") }
                 if let cr = s.contentRating, !cr.isEmpty { row("Rated", cr) }
@@ -99,6 +121,20 @@ struct WatchDetailView: View {
         }
     }
 
+    // Backdrop (16:9) when the row has one, poster (2:3) otherwise, so the
+    // frame can match whichever it drew.
+    private var heroURL: (url: URL, isBackdrop: Bool)? {
+        if let b = s.backdropUrl, !b.isEmpty, let url = URL(string: b) { return (url, true) }
+        if let p = s.posterUrl, !p.isEmpty, let url = URL(string: p) { return (url, false) }
+        return nil
+    }
+
+    // "S1 8 · S2 9" — only the seasons I've actually rated.
+    private var mySeasonRatingsText: String? {
+        guard let mine = ratings?.mineSeasons, !mine.isEmpty else { return nil }
+        return mine.keys.sorted().map { "S\($0) \(mine[$0]!)" }.joined(separator: " · ")
+    }
+
     private var clubRatingText: String {
         guard let avg = ratings?.average else { return "No ratings yet" }
         let count = ratings?.count ?? 0
@@ -109,6 +145,7 @@ struct WatchDetailView: View {
         if let r = try? await WatchAPI.showDetail(id: show.id, cookie: auth.cookieHeader) {
             full = r.show
             ratings = r.ratings
+            groupWatchers = r.groupWatchers ?? []
         }
         cast = (try? await WatchAPI.actors(showId: show.id, cookie: auth.cookieHeader)) ?? []
     }

@@ -25,9 +25,16 @@ export function extractTmdbDetailFields(detail, mediaType) {
     ? `https://image.tmdb.org/t/p/w780${detail.backdrop_path}` : null;
   const tmdbRating = (typeof detail.vote_average === 'number' && detail.vote_average > 0)
     ? detail.vote_average.toFixed(1) : null;
+  // Episode length for a series. TMDB's episode_run_time is empty for a large
+  // share of modern shows, which left "Runtime" blank on every client for most
+  // TV — so fall back to an actual episode's runtime (the latest that aired,
+  // else the next scheduled one). Both ride along in the same detail payload.
   const runtime = mediaType === 'movie'
     ? (detail.runtime || null)
-    : ((Array.isArray(detail.episode_run_time) && detail.episode_run_time[0]) || null);
+    : ((Array.isArray(detail.episode_run_time) && detail.episode_run_time.find((n) => n > 0))
+       || detail.last_episode_to_air?.runtime
+       || detail.next_episode_to_air?.runtime
+       || null);
   const releaseDate = mediaType === 'movie' ? detail.release_date : detail.first_air_date;
   const releaseYear = releaseDate ? (parseInt(String(releaseDate).slice(0, 4), 10) || null) : null;
 
