@@ -28,7 +28,14 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders() });
   }
 
-  const group = await env.DB.prepare('SELECT id, name, creator_slug, created_at FROM groups WHERE id = ?').bind(groupId).first();
+  // Same shape as the group list — the apps decode one Group model, and the
+  // detail screen gates its Delete action on is_creator.
+  const group = await env.DB.prepare(
+    `SELECT id, name, creator_slug, created_at,
+            (SELECT COUNT(*) FROM group_members WHERE group_id = groups.id) AS member_count,
+            CASE WHEN creator_slug = ? THEN 1 ELSE 0 END AS is_creator
+     FROM groups WHERE id = ?`
+  ).bind(session.member_slug, groupId).first();
   if (!group) {
     return new Response(JSON.stringify({ error: 'Group not found' }), { status: 404, headers: corsHeaders() });
   }

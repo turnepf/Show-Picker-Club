@@ -1,19 +1,23 @@
 import SwiftUI
+import UIKit
 import ShowPickerCore
 
+// SwiftUI declares its own `Group` (the view container), so the model type has
+// to be spelled `ShowPickerCore.Group` in any file that imports both.
 struct GroupDetailView: View {
     let groupId: Int
-    @State private var group: Group?
+    @State private var group: ShowPickerCore.Group?
     @State private var members: [GroupMember] = []
     @State private var trending: [PopularShow] = []
     @State private var loading = true
-    @State private var error: String?
+    @State private var errorText: String?
     @State private var selectedTab: Tab = .trending
     @State private var showingInvite = false
-    @State private var showingMenu = false
+    @State private var confirmingLeave = false
+    @State private var confirmingDelete = false
     @State private var inviteUrl: String?
     @State private var inviteExpiry: String?
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.dismiss) private var dismiss
 
     enum Tab {
         case trending
@@ -31,14 +35,14 @@ struct GroupDetailView: View {
                         .padding(.top, 12)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let error = error {
+            } else if let errorText = errorText {
                 VStack(spacing: 12) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.largeTitle)
                         .foregroundStyle(.orange)
                     Text("Couldn't load group")
                         .font(.headline)
-                    Text(error)
+                    Text(errorText)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Button("Try again") {
@@ -47,38 +51,14 @@ struct GroupDetailView: View {
                     .buttonStyle(.bordered)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let group = group {
+            } else if group != nil {
                 VStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(group.name)
-                                    .font(.title2.bold())
-                                Text("\(members.count) member\(members.count == 1 ? "" : "s")")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Menu {
-                                Button(action: { Task { await generateInvite() } }) {
-                                    Label("Invite members", systemImage: "person.badge.plus")
-                                }
-                                Button(action: { Task { await leaveGroup() } }) {
-                                    Label("Leave", systemImage: "arrowshape.turn.up.left")
-                                }
-                                if group.isCreator {
-                                    Button(action: { Task { await deleteGroup() } }, role: .destructive) {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
-                            } label: {
-                                Image(systemName: "ellipsis")
-                                    .font(.title3)
-                            }
-                        }
-                        .padding()
-                    }
-                    .background(Color(.secondarySystemBackground))
+                    Text("\(members.count) member\(members.count == 1 ? "" : "s")")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
 
                     Picker("Tab", selection: $selectedTab) {
                         Text("Trending").tag(Tab.trending)
@@ -98,23 +78,60 @@ struct GroupDetailView: View {
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else {
-                            List {
-                                ForEach(trending) { show in
-                                    trendingRow(show)
+                            List(trending) { show in
+                                NavigationLink(value: Route.detail(id: show.id, title: show.title,
+                                                                   network: show.network, rating: show.rating)) {
+                                    ShowRow(show, caption: addedByCaption(show))
                                 }
                             }
                         }
                     } else {
-                        List {
-                            ForEach(members) { member in
-                                memberRow(member)
-                            }
+                        List(members) { member in
+                            memberRow(member)
                         }
                     }
                 }
             }
         }
-        .navigationBarBackButtonHidden(false)
+        .navigationTitle(group?.name ?? "Group")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if let group = group {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button {
+                            Task { await generateInvite() }
+                        } label: {
+                            Label("Invite members", systemImage: "person.badge.plus")
+                        }
+                        Button {
+                            confirmingLeave = true
+                        } label: {
+                            Label("Leave", systemImage: "arrowshape.turn.up.left")
+                        }
+                        if group.isCreator {
+                            Button(role: .destructive) {
+                                confirmingDelete = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
+            }
+        }
+        .confirmationDialog("Leave this group?", isPresented: $confirmingLeave, titleVisibility: .visible) {
+            Button("Leave", role: .destructive) { Task { await leaveGroup() } }
+            Button("Cancel", role: .cancel) { }
+        }
+        .confirmationDialog("Delete this group?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { Task { await deleteGroup() } }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This can't be undone. Nobody in the group keeps access.")
+        }
         .sheet(isPresented: $showingInvite) {
             inviteSheet
         }
@@ -123,44 +140,27 @@ struct GroupDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private func trendingRow(_ show: PopularShow) -> some View {
-        HStack(spacing: 12) {
-            if let posterUrl = show.posterUrl, let url = URL(string: posterUrl) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                } placeholder: {
-                    Color.gray
-                }
-                .frame(width: 40, height: 60)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-            } else {
-                Color.gray
-                    .frame(width: 40, height: 60)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(show.title)
-                    .font(.headline)
-                    .lineLimit(2)
-                if !show.members.isEmpty {
-                    Text("Added by: \(show.members.joined(separator: ", "))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                if let rating = show.rating {
-                    Text("⭐ \(rating)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
+    // The server stamps expires_at with Date#toISOString, so it carries
+    // fractional seconds that a default ISO8601DateFormatter won't parse.
+    private static func expiryLine(_ iso: String) -> String? {
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var date = parser.date(from: iso)
+        if date == nil {
+            parser.formatOptions = [.withInternetDateTime]
+            date = parser.date(from: iso)
         }
-        .padding(.vertical, 4)
+        guard let date else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
+    }
+
+    // Trending's caption says whose lists a title is on; ShowRow falls back to
+    // the network line when the endpoint sent no members.
+    private func addedByCaption(_ show: PopularShow) -> String? {
+        guard let names = show.members, !names.isEmpty else { return nil }
+        return "Added by: \(names.joined(separator: ", "))"
     }
 
     @ViewBuilder
@@ -190,6 +190,9 @@ struct GroupDetailView: View {
                                 .truncationMode(.middle)
                                 .lineLimit(1)
                             Spacer()
+                            ShareLink(item: url) {
+                                Image(systemName: "square.and.arrow.up")
+                            }
                             Button {
                                 UIPasteboard.general.string = url
                             } label: {
@@ -223,7 +226,7 @@ struct GroupDetailView: View {
     @MainActor
     private func load() async {
         loading = true
-        error = nil
+        errorText = nil
         do {
             let detail = try await API.groupDetail(id: groupId)
             self.group = detail.group
@@ -233,7 +236,7 @@ struct GroupDetailView: View {
             self.trending = shows
             loading = false
         } catch {
-            self.error = API.failureLine(error, action: "load group")
+            self.errorText = API.failureLine(error, action: "load group")
             loading = false
         }
     }
@@ -243,67 +246,36 @@ struct GroupDetailView: View {
         do {
             let invite = try await API.generateGroupInvite(groupId: groupId)
             inviteUrl = invite.url
-            let date = ISO8601DateFormatter().date(from: invite.expiresAt)
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            inviteExpiry = date.map { formatter.string(from: $0) }
+            inviteExpiry = Self.expiryLine(invite.expiresAt)
             showingInvite = true
         } catch {
-            error = API.failureLine(error, action: "generate invite")
+            self.errorText = API.failureLine(error, action: "generate invite")
         }
     }
 
     @MainActor
     private func leaveGroup() async {
-        let alert = UIAlertController(
-            title: "Leave Group",
-            message: "Are you sure you want to leave this group?",
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Leave", style: .destructive) { _ in
-            Task {
-                do {
-                    _ = try await API.leaveGroup(id: groupId)
-                    dismiss()
-                } catch {
-                    error = API.failureLine(error, action: "leave group")
-                }
-            }
-        })
-        if let scene = UIApplication.shared.connectedScenes.first,
-           let window = (scene as? UIWindowScene)?.windows.first,
-           let rootVC = window.rootViewController {
-            rootVC.present(alert, animated: true)
+        do {
+            _ = try await API.leaveGroup(id: groupId)
+            dismiss()
+        } catch {
+            self.errorText = API.failureLine(error, action: "leave group")
         }
     }
 
     @MainActor
     private func deleteGroup() async {
-        let alert = UIAlertController(
-            title: "Delete Group",
-            message: "Are you sure? This can't be undone.",
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { _ in
-            Task {
-                do {
-                    _ = try await API.deleteGroup(id: groupId)
-                    dismiss()
-                } catch {
-                    error = API.failureLine(error, action: "delete group")
-                }
-            }
-        })
-        if let scene = UIApplication.shared.connectedScenes.first,
-           let window = (scene as? UIWindowScene)?.windows.first,
-           let rootVC = window.rootViewController {
-            rootVC.present(alert, animated: true)
+        do {
+            _ = try await API.deleteGroup(id: groupId)
+            dismiss()
+        } catch {
+            self.errorText = API.failureLine(error, action: "delete group")
         }
     }
 }
 
 #Preview {
-    GroupDetailView(groupId: 1)
+    NavigationStack {
+        GroupDetailView(groupId: 1)
+    }
 }

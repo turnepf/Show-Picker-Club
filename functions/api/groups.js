@@ -67,7 +67,14 @@ export async function onRequestPost(context) {
     'INSERT INTO group_invites (group_id, token, expires_at, created_by) VALUES (?, ?, ?, ?)'
   ).bind(groupId, token, expiresAt, session.member_slug).run();
 
-  const group = await env.DB.prepare('SELECT id, name, creator_slug, created_at FROM groups WHERE id = ?').bind(groupId).first();
+  // Same shape as the group list: the apps decode one Group model, so a
+  // freshly created group carries its member_count and is_creator too.
+  const group = await env.DB.prepare(
+    `SELECT id, name, creator_slug, created_at,
+            (SELECT COUNT(*) FROM group_members WHERE group_id = groups.id) AS member_count,
+            CASE WHEN creator_slug = ? THEN 1 ELSE 0 END AS is_creator
+     FROM groups WHERE id = ?`
+  ).bind(session.member_slug, groupId).first();
   return new Response(JSON.stringify({
     group,
     invite: {

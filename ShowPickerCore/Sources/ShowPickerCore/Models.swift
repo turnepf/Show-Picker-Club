@@ -321,6 +321,26 @@ public struct Group: Codable, Identifiable, Hashable, Sendable {
         case id, name, creatorSlug = "creator_slug", createdAt = "created_at"
         case memberCount = "member_count", isCreator = "is_creator"
     }
+
+    // member_count / is_creator are computed columns the group list carries but
+    // a single-group payload may not, so they decode as absent-means-default
+    // rather than failing the whole group.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        creatorSlug = try c.decode(String.self, forKey: .creatorSlug)
+        createdAt = try c.decode(String.self, forKey: .createdAt)
+        memberCount = try c.decodeIfPresent(Int.self, forKey: .memberCount) ?? 0
+        // D1 has no boolean type, so is_creator arrives as 1/0 from the SQL
+        // CASE — but read a real JSON boolean too, in case the endpoint ever
+        // computes it in JS the way the group-detail payload does.
+        if let flag = try? c.decodeIfPresent(Bool.self, forKey: .isCreator) {
+            isCreator = flag ?? false
+        } else {
+            isCreator = (try c.decodeIfPresent(Int.self, forKey: .isCreator) ?? 0) != 0
+        }
+    }
 }
 
 public struct GroupMember: Codable, Identifiable, Hashable, Sendable {

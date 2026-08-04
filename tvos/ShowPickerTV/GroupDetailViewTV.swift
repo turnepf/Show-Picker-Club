@@ -1,19 +1,14 @@
 import SwiftUI
 import ShowPickerCore
 
+// SwiftUI has its own `Group`, so the model needs qualifying in type position.
 struct GroupDetailViewTV: View {
     let groupId: Int
-    @State private var group: Group?
+    @State private var group: ShowPickerCore.Group?
     @State private var members: [GroupMember] = []
     @State private var trending: [PopularShow] = []
     @State private var loading = true
     @State private var errorText: String?
-    @State private var selectedTab: Tab = .trending
-
-    enum Tab {
-        case trending
-        case members
-    }
 
     var body: some View {
         ZStack {
@@ -48,43 +43,11 @@ struct GroupDetailViewTV: View {
                         }
                         .padding(.top, 20)
 
-                        Picker("Tab", selection: $selectedTab) {
-                            Text("Trending").tag(Tab.trending)
-                            Text("Members").tag(Tab.members)
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal)
-                        .frame(height: 60)
-
-                        if selectedTab == .trending {
-                            if trending.isEmpty {
-                                Text("No shows yet")
-                                    .font(.system(size: 28))
-                                    .foregroundColor(Theme.muted)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(60)
-                            } else {
-                                LazyVStack(alignment: .leading, spacing: 20) {
-                                    ForEach(trending) { show in
-                                        trendingRow(show)
-                                    }
-                                }
-                            }
-                        } else {
-                            if members.isEmpty {
-                                Text("No members")
-                                    .font(.system(size: 28))
-                                    .foregroundColor(Theme.muted)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(60)
-                            } else {
-                                LazyVStack(alignment: .leading, spacing: 20) {
-                                    ForEach(members) { member in
-                                        memberRow(member)
-                                    }
-                                }
-                            }
-                        }
+                        // Stacked sections rather than a tab picker: the same
+                        // shape as a member's screen, and the focus engine
+                        // always has something to land on.
+                        trendingSection
+                        membersSection
                     }
                     .padding(.horizontal, 60)
                     .padding(.bottom, 60)
@@ -95,50 +58,54 @@ struct GroupDetailViewTV: View {
         .task { await load() }
     }
 
-    @ViewBuilder
-    private func trendingRow(_ show: PopularShow) -> some View {
-        HStack(spacing: 20) {
-            if let posterUrl = show.posterUrl, let url = URL(string: posterUrl) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                } placeholder: {
-                    Color.gray
-                }
-                .frame(width: 60, height: 90)
-                .cornerRadius(8)
+    private var trendingSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            sectionHeader("Trending")
+            if trending.isEmpty {
+                Text("Nobody in this group has added a show yet.")
+                    .font(.system(size: 24))
+                    .foregroundColor(Theme.muted)
             } else {
-                Color.gray
-                    .frame(width: 60, height: 90)
-                    .cornerRadius(8)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text(show.title)
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundColor(Theme.text)
-                    .lineLimit(2)
-
-                if !show.members.isEmpty {
-                    Text("Added by: \(show.members.joined(separator: ", "))")
-                        .font(.system(size: 18))
-                        .foregroundColor(Theme.muted)
-                        .lineLimit(1)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 40), count: 4),
+                          spacing: 40) {
+                    ForEach(trending) { show in
+                        NavigationLink(value: Route.detail(id: show.id, title: show.title,
+                                                           network: show.network, rating: show.rating)) {
+                            ShowCard(title: show.title,
+                                     subtitle: addedBy(show),
+                                     networkLogoUrl: show.networkLogoUrl,
+                                     posterUrl: show.posterUrl)
+                        }
+                        .buttonStyle(PushButtonStyle())
+                    }
                 }
-
-                if let rating = show.rating {
-                    Text("⭐ \(rating)")
-                        .font(.system(size: 18))
-                        .foregroundColor(Theme.muted)
-                }
+                .padding(.vertical, 20)
             }
-
-            Spacer()
         }
-        .padding(20)
-        .background(Theme.cardBackground)
-        .cornerRadius(12)
+    }
+
+    private var membersSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            sectionHeader("Members")
+            LazyVStack(alignment: .leading, spacing: 20) {
+                ForEach(members) { member in
+                    memberRow(member)
+                }
+            }
+        }
+    }
+
+    private func sectionHeader(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 32, weight: .semibold))
+            .foregroundColor(Theme.text)
+    }
+
+    // Whose lists a title is on — the one thing a group card says that the
+    // Home shelf's card doesn't. nil when the endpoint sent no members.
+    private func addedBy(_ show: PopularShow) -> String? {
+        guard let names = show.members, !names.isEmpty else { return nil }
+        return names.joined(separator: ", ")
     }
 
     @ViewBuilder
@@ -173,5 +140,7 @@ struct GroupDetailViewTV: View {
 }
 
 #Preview {
-    GroupDetailViewTV(groupId: 1)
+    NavigationStack {
+        GroupDetailViewTV(groupId: 1)
+    }
 }

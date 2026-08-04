@@ -1,11 +1,12 @@
 import SwiftUI
 import ShowPickerCore
 
+// Pushed onto Home's stack, so links push there — no path binding of its own.
+// SwiftUI has its own `Group`, so the model needs qualifying in type position.
 struct GroupsListViewTV: View {
-    @State private var groups: [Group] = []
+    @State private var groups: [ShowPickerCore.Group] = []
     @State private var loading = true
     @State private var errorText: String?
-    @Binding var path: NavigationPath
 
     var body: some View {
         ScrollView {
@@ -77,7 +78,7 @@ struct GroupsListViewTV: View {
 }
 
 struct GroupTileTV: View {
-    let group: Group
+    let group: ShowPickerCore.Group
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -101,5 +102,7 @@ struct GroupTileTV: View {
 }
 
 #Preview {
-    GroupsListViewTV(path: .constant(NavigationPath()))
+    NavigationStack {
+        GroupsListViewTV()
+    }
 }

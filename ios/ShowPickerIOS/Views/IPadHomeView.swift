@@ -339,7 +339,7 @@ struct IPadHomeView: View {
             case .trending:
                 TrendingListView(shows: popular)
             case .groups:
-                GroupsListView()
+                GroupsListView(path: $detailPath)
             case .whatsNew:
                 WhatsNewView()
             case .vibe:
@@ -375,6 +375,10 @@ struct IPadHomeView: View {
         case .pick(let title, let network, let rating, let posterUrl, let networkUrl):
             ShowDetailView(id: nil, initialTitle: title, initialNetwork: network,
                            initialRating: rating, initialPoster: posterUrl, initialNetworkUrl: networkUrl)
+        case .groups:
+            GroupsListView(path: $detailPath)
+        case .groupDetail(let id):
+            GroupDetailView(groupId: id)
         case .whatsNew:
             WhatsNewView()
         }

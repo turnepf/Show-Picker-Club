@@ -189,6 +189,34 @@ Members a person shares streaming services with, so the audit pools everyone's s
   Saved `member_subscriptions` rows are merged in (status, price, resubscribe date), and totals (service count, est. monthly spend, potential savings) are computed. Savings = sum of price over non-cancelled services whose verdict is `cancel` / `pause` / `pause_tba`.
 - **PUT** upserts one service's saved decision. Only the fields the caller actually sends are overwritten (a status change won't wipe a saved price), via per-field `CASE WHEN ?` flags in the `ON CONFLICT` clause. `{ remove: true }` deletes a manual service.
 
+## Private groups
+
+Migration 056: `groups` (name + `creator_slug`), `group_members` (the join
+table membership is checked against on every group route), and `group_invites`
+(a 24-character token with a 7-day `expires_at`). A group is private to its
+members — every endpoint below the group id verifies membership and 403s
+otherwise; only the creator can delete.
+
+- **One `Group` payload shape.** Every endpoint that returns a group returns
+  `id`, `name`, `creator_slug`, `created_at`, plus the computed `member_count`
+  and `is_creator` (1/0 — D1 has no boolean). The Apple apps decode a single
+  `ShowPickerCore.Group` from all three, and the detail screen gates its
+  Delete action on `is_creator`, so an endpoint that drops those columns
+  silently disables it.
+- **Group Trending** mirrors `/api/popular` but scoped to the group's members
+  and the last 30 days, ranked by how many of them added the title. Each row
+  carries `members` (first names) so the apps can caption a row with who added
+  it.
+- **Joining is a link.** `POST /api/groups/[id]/invite` mints the token and the
+  share URL (`/groups/join?token=…`); opening it signed in joins the group,
+  signed out it previews the group name and asks for a login.
+- **Platforms.** iPhone and iPad create, invite, join, leave and delete. Apple
+  TV browses groups read-only (`GroupsListViewTV` / `GroupDetailViewTV`), which
+  is why the tvOS API client has only the three read calls. The watch has no
+  groups at all. Note that `SwiftUI.Group` collides with the model in any file
+  that uses it in type position — spell it `ShowPickerCore.Group` there
+  (`CoreImports.swift` re-exports the package into every file of the app).
+
 ## Routing
 
 Two routing systems combine:
@@ -230,6 +258,14 @@ The complete map:
 | `GET /api/shows/[id]/actors`           | `functions/api/shows/[id]/actors.js`       | GET     | none |
 | `PUT /api/shows/[id]/rating`           | `functions/api/shows/[id]/rating.js`       | PUT     | session (own copy only, list != Next Up, tmdb_id required) |
 | `POST /api/suggestions`                | `functions/api/suggestions.js`             | POST    | retired 2026-07 — returns 410 Gone |
+| `GET /api/groups`                      | `functions/api/groups.js`                  | GET     | session — the caller's own groups |
+| `POST /api/groups`                     | `functions/api/groups.js`                  | POST    | session — creates the group, joins the caller, returns a first invite |
+| `GET /api/groups/[id]`                 | `functions/api/groups/[id].js`             | GET     | session + membership (403 otherwise) |
+| `DELETE /api/groups/[id]`              | `functions/api/groups/[id].js`             | DELETE  | session + creator |
+| `POST /api/groups/[id]/invite`         | `functions/api/groups/[id]/invite.js`      | POST    | session + membership — mints a 7-day token |
+| `POST /api/groups/[id]/leave`          | `functions/api/groups/[id]/leave.js`       | POST    | session + membership |
+| `GET /api/groups/[id]/trending`        | `functions/api/groups/[id]/trending.js`    | GET     | session + membership — top 10 titles the group added in 30 days |
+| `GET /api/groups/join?token=`          | `functions/api/groups/join.js`             | GET     | session joins; without one, returns a name-only preview |
 | `POST /api/enrich`                     | `functions/api/enrich.js`                  | POST    | session or `CRON_SECRET` header |
 | `POST /api/sync-urls`                  | `functions/api/sync-urls.js`               | POST    | session (demo member's rows excluded as URL sources) |
 | `GET /api/reporting`                   | `functions/api/reporting.js`               | GET     | admin session |

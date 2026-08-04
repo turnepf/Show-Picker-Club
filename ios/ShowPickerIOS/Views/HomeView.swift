@@ -204,7 +204,7 @@ struct HomeView: View {
                     ShowDetailView(id: nil, initialTitle: title, initialNetwork: network,
                                    initialRating: rating, initialPoster: posterUrl, initialNetworkUrl: networkUrl)
                 case .groups:
-                    GroupsListView()
+                    GroupsListView(path: $path)
                 case .groupDetail(let id):
                     GroupDetailView(groupId: id)
                 case .whatsNew:

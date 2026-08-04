@@ -1,117 +1,117 @@
 import SwiftUI
 import ShowPickerCore
 
+// Pushed onto the host's stack (HomeView on iPhone, the iPad detail column), so
+// it pushes group detail through the binding it's handed rather than owning a
+// nested NavigationStack of its own. SwiftUI's own `Group` means the model type
+// has to be spelled `ShowPickerCore.Group` here.
 struct GroupsListView: View {
-    @State private var groups: [Group] = []
+    @Binding var path: [Route]
+    @State private var groups: [ShowPickerCore.Group] = []
     @State private var loading = true
-    @State private var error: String?
+    @State private var errorText: String?
     @State private var showingCreate = false
     @State private var showingJoin = false
     @State private var newGroupName = ""
     @State private var joinToken = ""
-    @State private var path: [Route] = []
 
     var body: some View {
-        NavigationStack(path: $path) {
-            VStack(spacing: 0) {
-                if loading {
-                    VStack {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                        Text("Loading groups…")
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 12)
+        VStack(spacing: 0) {
+            if loading {
+                VStack {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                    Text("Loading groups…")
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 12)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground))
+            } else if let errorText = errorText {
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundStyle(.orange)
+                    Text("Couldn't load groups")
+                        .font(.headline)
+                    Text(errorText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Button("Try again") {
+                        Task { await load() }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemBackground))
-                } else if let error = error {
-                    VStack(spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.largeTitle)
-                            .foregroundStyle(.orange)
-                        Text("Couldn't load groups")
-                            .font(.headline)
-                        Text(error)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Button("Try again") {
-                            Task { await load() }
+                    .buttonStyle(.bordered)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground))
+            } else if groups.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "person.2.crop.square.stack")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.secondary)
+                    Text("No groups yet")
+                        .font(.headline)
+                    Text("Create a group to get started")
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        Button {
+                            showingCreate = true
+                        } label: {
+                            Label("Create", systemImage: "plus")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        Button {
+                            showingJoin = true
+                        } label: {
+                            Label("Join", systemImage: "person.badge.plus")
+                                .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemBackground))
-                } else if groups.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "person.2.crop.square.stack")
-                            .font(.system(size: 48))
-                            .foregroundStyle(.secondary)
-                        Text("No groups yet")
-                            .font(.headline)
-                        Text("Create a group to get started")
-                            .foregroundStyle(.secondary)
-                        HStack(spacing: 12) {
-                            Button(action: { showingCreate = true }) {
-                                Label("Create", systemImage: "plus")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            Button(action: { showingJoin = true }) {
-                                Label("Join", systemImage: "person.badge.plus")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground))
+            } else {
+                List(groups) { group in
+                    NavigationLink(value: Route.groupDetail(group.id)) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(group.name)
+                                .font(.headline)
+                            Text("\(group.memberCount) member\(group.memberCount == 1 ? "" : "s")")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                         }
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemBackground))
-                } else {
-                    List {
-                        ForEach(groups) { group in
-                            NavigationLink(value: Route.groupDetail(group.id)) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(group.name)
-                                        .font(.headline)
-                                    Text("\(group.memberCount) member\(group.memberCount == 1 ? "" : "s")")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(.vertical, 4)
-                            }
-                        }
+                        .padding(.vertical, 4)
                     }
                 }
             }
-            .navigationTitle("Groups")
-            .navigationDestination(for: Route.self) { route in
-                switch route {
-                case .groupDetail(let id):
-                    GroupDetailView(groupId: id)
-                default:
-                    EmptyView()
-                }
-            }
-            .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Menu {
-                        Button(action: { showingCreate = true }) {
-                            Label("Create group", systemImage: "plus")
-                        }
-                        Button(action: { showingJoin = true }) {
-                            Label("Join group", systemImage: "person.badge.plus")
-                        }
+        }
+        .navigationTitle("Groups")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button {
+                        showingCreate = true
                     } label: {
-                        Image(systemName: "plus")
+                        Label("Create group", systemImage: "plus")
                     }
+                    Button {
+                        showingJoin = true
+                    } label: {
+                        Label("Join group", systemImage: "person.badge.plus")
+                    }
+                } label: {
+                    Image(systemName: "plus")
                 }
             }
-            .sheet(isPresented: $showingCreate) {
-                createGroupSheet
-            }
-            .sheet(isPresented: $showingJoin) {
-                joinGroupSheet
-            }
+        }
+        .sheet(isPresented: $showingCreate) {
+            createGroupSheet
+        }
+        .sheet(isPresented: $showingJoin) {
+            joinGroupSheet
         }
         .task {
             await load()
@@ -153,6 +153,8 @@ struct GroupsListView: View {
                     .foregroundStyle(.secondary)
                 TextField("Invite code", text: $joinToken)
                     .textFieldStyle(.roundedBorder)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
                     .padding()
                 Spacer()
             }
@@ -177,13 +179,13 @@ struct GroupsListView: View {
     @MainActor
     private func load() async {
         loading = true
-        error = nil
+        errorText = nil
         do {
             let response = try await API.groups()
             self.groups = response.groups
             loading = false
         } catch {
-            self.error = API.failureLine(error, action: "load groups")
+            self.errorText = API.failureLine(error, action: "load groups")
             loading = false
         }
     }
@@ -200,7 +202,7 @@ struct GroupsListView: View {
             await load()
             path.append(.groupDetail(group.id))
         } catch {
-            error = API.failureLine(error, action: "create group")
+            self.errorText = API.failureLine(error, action: "create group")
         }
     }
 
@@ -216,11 +218,13 @@ struct GroupsListView: View {
             await load()
             path.append(.groupDetail(result.groupId))
         } catch {
-            error = API.failureLine(error, action: "join group")
+            self.errorText = API.failureLine(error, action: "join group")
         }
     }
 }
 
 #Preview {
-    GroupsListView()
+    NavigationStack {
+        GroupsListView(path: .constant([]))
+    }
 }

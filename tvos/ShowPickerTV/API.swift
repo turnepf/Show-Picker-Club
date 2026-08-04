@@ -236,6 +236,42 @@ enum API {
         return r.actors
     }
 
+    // MARK: Groups (session-gated, read-only on tvOS)
+
+    // Creating, inviting, joining and leaving all happen on iPhone, iPad or
+    // the web — the Apple TV only browses the groups you're already in.
+
+    static func groups() async throws -> GroupsResponse {
+        try await get("/api/groups")
+    }
+
+    static func groupDetail(id: Int) async throws -> GroupDetail {
+        try await get("/api/groups/\(id)")
+    }
+
+    static func groupTrending(id: Int) async throws -> [PopularShow] {
+        struct TrendingResponse: Decodable { let shows: [PopularShow] }
+        let r: TrendingResponse = try await get("/api/groups/\(id)/trending")
+        return r.shows
+    }
+
+    // MARK: Error copy
+
+    // One line a screen can show verbatim. A 401 means the session lapsed, and
+    // on tvOS signing back in is the Account tab; everything else reads the
+    // same whether it was a server error or a decode failure.
+    static func failureLine(_ error: Error, action: String) -> String {
+        if case APIError.badResponse(401) = error {
+            return "You're logged out — sign in again from the Account tab."
+        }
+        if let urlError = error as? URLError,
+           [.notConnectedToInternet, .networkConnectionLost, .cannotFindHost,
+            .cannotConnectToHost, .timedOut, .dataNotAllowed].contains(urlError.code) {
+            return "The Apple TV is offline — couldn't \(action)."
+        }
+        return "Couldn't \(action). Try again."
+    }
+
     // iTunes Search API — public, no auth. Returns a tv.apple.com URL for
     // shows / movies in Apple's catalog. Opening it on tvOS lands on the
     // Apple TV app's show page, which has "Watch on <Service>" buttons that
