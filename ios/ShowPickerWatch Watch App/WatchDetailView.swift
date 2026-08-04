@@ -136,9 +136,13 @@ struct WatchDetailView: View {
     // shows and the wrist was missing. Only seasons anyone has rated.
     private var clubSeasonRatingsText: String? {
         guard let seasons = ratings?.seasons, !seasons.isEmpty else { return nil }
-        return seasons.keys.sorted()
-            .compactMap { s in seasons[s].map { String(format: "S%d %.1f", s, $0.average) } }
-            .joined(separator: " · ")
+        // average is nil for a season nobody has rated yet — those drop out
+        // rather than printing an empty score.
+        let parts = seasons.keys.sorted().compactMap { s -> String? in
+            guard let avg = seasons[s]?.average else { return nil }
+            return String(format: "S%d %.1f", s, avg)
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     // "S1 8 · S2 9" — only the seasons I've actually rated.

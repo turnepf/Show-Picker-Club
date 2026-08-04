@@ -199,12 +199,12 @@ struct ShowDetailView: View {
                         // else's copy) — the club's season averages are still
                         // worth reading, which is what the web shows.
                         ForEach(seasonNumbers, id: \.self) { s in
-                            if let avg = ratings.seasons[s] {
+                            if let summary = ratings.seasons[s], let avg = summary.average {
                                 // Plain label here: seasonLabel() folds the
                                 // average into the label for the entry rows,
                                 // which would say it twice in this branch.
                                 LabeledContent("Season \(s)",
-                                               value: String(format: "%.1f/10 (%d)", avg.average, avg.count))
+                                               value: String(format: "%.1f/10 (%d)", avg, summary.count))
                             }
                         }
                     }
