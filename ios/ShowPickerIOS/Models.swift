@@ -134,9 +134,14 @@ struct PopularShow: Codable, Identifiable, Hashable {
     let genres: String?
     let members: [String]?
     let posterUrl: String?
+    // /api/popular returns `movie`; the shared row shows the "(Movie)" tag
+    // from it, same as every other list. (The endpoint groups by title and
+    // carries no season data, so Trending rows have no premiere line — on
+    // the web either.)
+    let movie: Int?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, network, rating, genres, members
+        case id, title, network, rating, genres, members, movie
         case networkUrl = "network_url"
         case posterUrl = "poster_url"
     }

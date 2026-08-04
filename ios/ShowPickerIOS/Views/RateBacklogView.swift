@@ -75,35 +75,43 @@ struct RateBacklogView: View {
     }
 }
 
-// One row: poster, title, list label, tap-row. "Rate seasons" links to the
-// full detail screen for TV shows with a known season count.
+// One row: the shared show card with the rating tap-row dropped in under the
+// text. "Rate seasons" links to the full detail screen for TV shows with a
+// known season count.
 private struct RateBacklogRow: View {
     let show: RateBacklogShow
     let onRate: (Int) async -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            PosterThumb(url: show.posterUrl, width: 44, height: 66)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(show.title).font(.subheadline).fontWeight(.semibold)
-                HStack(spacing: 8) {
-                    if let label = ShowList(rawValue: show.list)?.title {
-                        Text(label).font(.caption).foregroundStyle(.secondary)
-                    }
+        // No star rating on the right: the point of this row is the score
+        // you're about to give it, and a TMDB "8.3" sitting beside an empty
+        // tap-row reads as one. The `extra:` label is spelled out because an
+        // unlabelled trailing closure is ambiguous between ShowRow's
+        // leading-only and extra-only inits.
+        ShowRow(
+            show,
+            caption: ShowList(rawValue: show.list)?.title,
+            showRating: false,
+            alignment: .top,
+            extra: {
+                VStack(alignment: .leading, spacing: 6) {
+                    // Season-level rating lives on the detail screen rather
+                    // than duplicating that UI in a condensed list.
                     if !show.isMovie, let n = show.seasonsReleased, n > 0 {
                         NavigationLink("Rate seasons") {
                             ShowDetailView(id: show.id, initialTitle: show.title,
-                                          initialNetwork: nil, initialRating: nil,
-                                          initialPoster: show.posterUrl)
+                                           initialNetwork: nil, initialRating: nil,
+                                           initialPoster: show.posterUrl)
                         }
                         .font(.caption)
                     }
+                    RatingTapRow(value: nil) { value in
+                        Task { await onRate(value) }
+                    }
                 }
-                RatingTapRow(value: nil) { value in
-                    Task { await onRate(value) }
-                }
+                .padding(.top, 2)
             }
-        }
+        )
         .padding(.vertical, 4)
     }
 }

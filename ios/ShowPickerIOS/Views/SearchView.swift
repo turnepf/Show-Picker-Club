@@ -90,43 +90,35 @@ struct SearchView: View {
     }
 
     @ViewBuilder private func resultRowLabel(_ s: AllShow) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            if auth.isLoggedIn {
-                Menu {
-                    ForEach(ShowList.allCases) { l in
-                        Button(l.title) { Task { await addToMine(s, list: l) } }
+        // Cross-library search adds two things to a plain row: the "+" that
+        // copies a show onto one of my lists, and a caption naming which list
+        // the copy is on and whose it is.
+        ShowRow(
+            s,
+            caption: [s.network, "\(s.listLabel) · \(s.ownerLabel)"].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
+            alignment: .top,
+            leading: {
+                if auth.isLoggedIn {
+                    Menu {
+                        ForEach(ShowList.allCases) { l in
+                            Button(l.title) { Task { await addToMine(s, list: l) } }
+                        }
+                    } label: {
+                        Image(systemName: "plus.circle.fill").foregroundStyle(Color.accentColor)
                     }
-                } label: {
-                    Image(systemName: "plus.circle.fill").foregroundStyle(Color.accentColor)
+                    // Borderless so the plus keeps its own tap target inside
+                    // the NavigationLink row instead of the tap navigating.
+                    .buttonStyle(.borderless)
+                    .disabled(addingId == s.id)
                 }
-                // Borderless so the plus keeps its own tap target inside the
-                // NavigationLink row instead of the tap navigating.
-                .buttonStyle(.borderless)
-                .disabled(addingId == s.id)
-            }
-            PosterThumb(url: s.posterUrl)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(s.title).font(.body)
-                    if s.isFullSeries { Text("🎬") }
-                    if s.isMovie { Text("(Movie)").font(.caption).foregroundStyle(.secondary) }
-                }
-                HStack(spacing: 6) {
-                    if let n = s.network, !n.isEmpty { Text(n) }
-                    Text("· \(s.listLabel) · \(s.ownerLabel)")
-                }
-                .font(.caption).foregroundStyle(.secondary)
+            },
+            extra: {
                 if !s.genreList.isEmpty {
                     Text(s.genreList.joined(separator: " · "))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }
-            Spacer()
-            if let r = s.rating, !r.isEmpty {
-                Label(r, systemImage: "star.fill")
-                    .font(.caption).labelStyle(.titleAndIcon).foregroundStyle(.orange)
-            }
-        }
+        )
     }
 
     private func load() async {

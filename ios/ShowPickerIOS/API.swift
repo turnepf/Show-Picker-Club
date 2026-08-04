@@ -220,6 +220,15 @@ enum API {
         try await getCached("/api/rate-backlog", cacheKey: "rate_backlog_\(member)")
     }
 
+    // Just the unrated count, for the "Rate my backlog" nav badge — the same
+    // rows rateBacklog() returns, counted server-side so Home doesn't pull the
+    // whole backlog (posters, titles, season counts) to render one integer.
+    static func rateBacklogCount() async throws -> Int {
+        let r: RateBacklogCountResponse = try await getCached(
+            "/api/rate-backlog-count", cacheKey: "rate_backlog_count")
+        return r.count
+    }
+
     static func actors(showId: Int) async throws -> [Actor] {
         let r: ActorsResponse = try await getCached("/api/shows/\(showId)/actors", cacheKey: "actors_\(showId)")
         return r.actors

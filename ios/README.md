@@ -253,6 +253,7 @@ Offline/
 | Recommendations / "Picks for you" | ❌ Removed from the client (see note) |
 | Offline browsing + offline edits | ✅ (cached reads, queued add/edit/move/archive/rate, auto-sync on reconnect) |
 | Rate my backlog (bulk rating) | ✅ (`RateBacklogView`; offline ratings queue and sync) |
+| Unrated-count badge on "Rate my backlog" | ✅ (`API.rateBacklogCount()` → `GET /api/rate-backlog-count`) |
 | Field toggle pills (hide ratings/networks/etc.) | ❌ Not planned for iOS |
 | Vibe profile | ✅ (`VibeView`, linked from a member's list) |
 
@@ -277,3 +278,27 @@ Two things to know before it works end to end:
    Until then, Apple sign-in returns an error and you can fall back to phone/email codes.
 
 On the Xcode side, the **Sign in with Apple** capability is already declared in `ShowPickerIOS.entitlements`. With automatic signing and a paid Apple Developer account, Xcode registers it on your App ID when you select your Team. The token audience is the app bundle id (`net.patrickturner.showpickerios`); if you change the bundle id, set `APPLE_CLIENT_ID` in the Pages environment to match.
+
+## One show row, one nav
+
+Every show row in the app — Trending, a member's four lists, cross-library
+search, in-library search, Rate my backlog — is `ShowRow` (`Views/ShowRow.swift`),
+the SwiftUI counterpart of `renderShowCard()` in `public/show-renderer.js`. Same
+anatomy in the same order: poster, title with the 🎬 series badge and `(Movie)`
+tag, a caption line, the premiere/season line, then the star rating. A screen's
+own additions go through `leading` (an accessory before the poster, e.g. search's
+"+") and `extra` (content under the text, e.g. the backlog's rating tap-row),
+mirroring the web renderer's `prefixHtml`/`extraHtml`. Models opt in by
+conforming to `ShowRowDisplayable` — `Show`, `AllShow`, `PopularShow` and
+`RateBacklogShow` all do. Add a show row anywhere else by calling `ShowRow`, not
+by rebuilding an `HStack` around `PosterThumb`: five screens each had their own
+and they had drifted (different badges, only one showed premiere dates).
+
+`TitleHitRow` is deliberately not a `ShowRow` — it renders TMDB type-ahead
+search hits (title + year + media type), not shows in anybody's library.
+
+The discovery nav is in the same order everywhere it appears (iPhone `HomeView`,
+iPad sidebar `IPadHomeView`, the web's `index.html` and `shell.js`): Groups,
+Trending, Rate my backlog, Subscription audit, Vibe, Calendar, What's New, then
+the admin rows. On iPhone, Trending is the content section below the nav rather
+than a row, matching the web at phone width.

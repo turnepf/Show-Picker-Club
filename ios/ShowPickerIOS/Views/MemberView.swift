@@ -367,50 +367,19 @@ struct MemberView: View {
         }
     }
 
-    // "Next episode: 6/1 · 3 seasons" — premiere range plus the seasons count when
-    // both are known; either part alone otherwise. nil if neither exists.
-    private func nextUpLine(_ s: Show) -> String? {
-        let parts = [s.nextUpRange.map { "Next episode: \($0)" }, s.seasonsText].compactMap { $0 }
+    // Next Up rows name who recommended the show; every other list just shows
+    // the network. The premiere/season line comes from ShowRow itself.
+    private func rowCaption(_ s: Show) -> String? {
+        var parts: [String] = []
+        if let n = s.network, !n.isEmpty { parts.append(n) }
+        if currentList == .next, let by = s.recommendedBy, !by.isEmpty {
+            parts.append("rec'd by \(by)")
+        }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    @ViewBuilder private func row(_ s: Show) -> some View {
-        HStack(spacing: 12) {
-            PosterThumb(url: s.posterUrl)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(s.title).font(.body)
-                    if s.isFullSeries { Text("🎬") }
-                }
-                HStack(spacing: 6) {
-                    if let n = s.network, !n.isEmpty {
-                        Text(n).foregroundStyle(.secondary)
-                    }
-                    if let by = s.recommendedBy, !by.isEmpty, currentList == .next {
-                        Text("· rec'd by \(by)").foregroundStyle(.secondary)
-                    }
-                }
-                .font(.caption)
-                // A premiere date shows on EVERY list — a Loved show that
-                // drops a surprise season is exactly what to surface.
-                if s.nextUpRange != nil, let line = nextUpLine(s) {
-                    Text(line)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if let seasons = s.seasonsText {
-                    Text(seasons)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            if let r = s.rating, !r.isEmpty {
-                Label(r, systemImage: "star.fill")
-                    .font(.caption)
-                    .labelStyle(.titleAndIcon)
-                    .foregroundStyle(.orange)
-            }
-        }
+    private func row(_ s: Show) -> some View {
+        ShowRow(s, caption: rowCaption(s))
     }
 
     private func load() async {

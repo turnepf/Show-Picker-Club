@@ -114,3 +114,9 @@ public struct RateBacklogResponse: Codable, Sendable {
         case hasAny = "has_any"
     }
 }
+
+// GET /api/rate-backlog-count — the unrated count on its own, for the
+// "Rate my backlog" nav badge.
+public struct RateBacklogCountResponse: Codable, Sendable {
+    public let count: Int
+}

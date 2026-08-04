@@ -33,6 +33,8 @@ struct IPadHomeView: View {
     @Environment(\.openURL) private var openURL
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
+    // Unrated count for the "Rate my backlog" badge. 0 draws no badge.
+    @State private var backlogCount = 0
     @State private var loading = true
     // Roster fetch threw — shown only when there's nothing to display, so an
     // empty roster reads as a load failure, not an empty club.
@@ -149,19 +151,28 @@ struct IPadHomeView: View {
                 }
             }
             // Discovery + account group, kept separate from the member lists
-            // above: Trending, What's New, Subscription audit, then Admin.
+            // above, in the same order as the web sidebar and iPhone Home:
+            // Groups, Trending, Rate my backlog, Subscription audit, Vibe,
+            // Calendar, What's New, then Admin.
             Section {
-                if !popular.isEmpty {
-                    Label("Trending", systemImage: "flame")
-                        .tag(SidebarItem.trending)
-                }
-                whatsNewRow
                 if myMember != nil {
                     Label("Groups", systemImage: "person.2.fill")
                         .tag(SidebarItem.groups)
                 }
-                // Vibe is personal: logged-in members only, opening their own.
+                if !popular.isEmpty {
+                    Label("Trending", systemImage: "flame")
+                        .tag(SidebarItem.trending)
+                }
+                // Subscription audit and Rate my backlog are personal, so they
+                // only appear once you're signed in — matching the web sidebar
+                // and your own MemberView.
                 if myMember != nil {
+                    Label("Rate my backlog", systemImage: "star.fill")
+                        .tag(SidebarItem.rateBacklog)
+                        .badge(backlogCount)
+                    Label("Subscription audit", systemImage: "creditcard")
+                        .tag(SidebarItem.subscriptionAudit)
+                    // Vibe is personal too: opens the member's own vibe.
                     Label("Vibe", systemImage: "sparkles")
                         .tag(SidebarItem.vibe)
                 }
@@ -185,14 +196,7 @@ struct IPadHomeView: View {
                         }
                     }
                 }
-                // Subscription audit is personal, so it only appears once you're
-                // signed in — matching the web sidebar and your own MemberView.
-                if myMember != nil {
-                    Label("Subscription audit", systemImage: "creditcard")
-                        .tag(SidebarItem.subscriptionAudit)
-                    Label("Rate my backlog", systemImage: "star.fill")
-                        .tag(SidebarItem.rateBacklog)
-                }
+                whatsNewRow
                 if auth.isAdmin {
                     Label("Reporting", systemImage: "chart.bar.xaxis")
                         .tag(SidebarItem.adminReporting)
@@ -418,6 +422,7 @@ struct IPadHomeView: View {
             return $0.activeCount > $1.activeCount
         }
         popular = pr ?? popular
+        backlogCount = auth.isLoggedIn ? ((try? await API.rateBacklogCount()) ?? 0) : 0
         if let link = pendingLink {
             pendingLink = nil
             route(url: link)
@@ -455,22 +460,7 @@ private struct TrendingListView: View {
     var body: some View {
         List(shows) { s in
             NavigationLink(value: Route.detail(id: s.id, title: s.title, network: s.network, rating: s.rating)) {
-                HStack(spacing: 12) {
-                    PosterThumb(url: s.posterUrl)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(s.title)
-                        if let n = s.network, !n.isEmpty {
-                            Text(n).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer()
-                    if let r = s.rating, !r.isEmpty {
-                        Label(r, systemImage: "star.fill")
-                            .font(.caption)
-                            .labelStyle(.titleAndIcon)
-                            .foregroundStyle(.orange)
-                    }
-                }
+                ShowRow(s)
             }
         }
         .navigationTitle("Trending")

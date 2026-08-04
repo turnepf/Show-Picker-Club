@@ -77,27 +77,15 @@ struct MemberSearchView: View {
                            initialNetwork: s.network, initialRating: s.rating,
                            initialPoster: s.posterUrl, initialNetworkUrl: s.networkUrl)
         } label: {
-            HStack(alignment: .top, spacing: 10) {
-                PosterThumb(url: s.posterUrl)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(s.title).font(.body)
-                        if s.isFullSeries { Text("🎬") }
-                        if s.isMovie { Text("(Movie)").font(.caption).foregroundStyle(.secondary) }
-                    }
-                    HStack(spacing: 6) {
-                        if let n = s.network, !n.isEmpty { Text(n) }
-                        Text("· \(s.isArchived ? "Archived" : (ShowList(rawValue: s.list)?.title ?? s.list))")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(s.isArchived ? Color.orange : Color.secondary)
-                }
-                Spacer()
-                if let r = s.rating, !r.isEmpty {
-                    Label(r, systemImage: "star.fill")
-                        .font(.caption).labelStyle(.titleAndIcon).foregroundStyle(.orange)
-                }
-            }
+            // Searching your own library turns up archived copies too, so the
+            // caption names the list — in orange when the copy is archived.
+            ShowRow(
+                s,
+                caption: [s.network, s.isArchived ? "Archived" : (ShowList(rawValue: s.list)?.title ?? s.list)]
+                    .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
+                captionTint: s.isArchived ? .orange : nil,
+                alignment: .top
+            )
         }
     }
 

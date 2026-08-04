@@ -5,6 +5,8 @@ struct HomeView: View {
     @Environment(\.openURL) private var openURL
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
+    // Unrated count for the "Rate my backlog" badge. 0 draws no badge.
+    @State private var backlogCount = 0
     @State private var loading = true
     // Roster fetch threw — shown only when there's nothing to display, so an
     // empty Members section reads as a load failure, not an empty club.
@@ -71,15 +73,27 @@ struct HomeView: View {
                             }
                         }
                     }
-                    // Discovery + account group, separated from My Shows above:
-                    // What's New, Vibe, Calendar + Subscription audit
-                    // (personal), then Admin. Trending is its own content
-                    // section further down.
+                    // Discovery + account group, separated from My Shows
+                    // above, in the same order as the web nav and the iPad
+                    // sidebar: Groups, Rate my backlog, Subscription audit,
+                    // Vibe, Calendar, What's New, then Admin. Trending is the
+                    // content section below rather than a row — same as the
+                    // web at phone width.
                     Section {
-                        whatsNewRow
                         if myMember != nil {
                             NavigationLink(value: Route.groups) {
                                 Label("Groups", systemImage: "person.2.fill")
+                            }
+                            NavigationLink {
+                                RateBacklogView()
+                            } label: {
+                                Label("Rate my backlog", systemImage: "star.fill")
+                            }
+                            .badge(backlogCount)
+                            NavigationLink {
+                                SubscriptionAuditView()
+                            } label: {
+                                Label("Subscription audit", systemImage: "creditcard")
                             }
                         }
                         // Vibe is personal: logged-in members only, opening
@@ -111,18 +125,7 @@ struct HomeView: View {
                                 }
                             }
                         }
-                        if myMember != nil {
-                            NavigationLink {
-                                SubscriptionAuditView()
-                            } label: {
-                                Label("Subscription audit", systemImage: "creditcard")
-                            }
-                            NavigationLink {
-                                RateBacklogView()
-                            } label: {
-                                Label("Rate my backlog", systemImage: "star.fill")
-                            }
-                        }
+                        whatsNewRow
                         if auth.isAdmin {
                             NavigationLink {
                                 ReportingView()
@@ -324,22 +327,7 @@ struct HomeView: View {
     }
 
     private func popularRow(_ s: PopularShow) -> some View {
-        HStack(spacing: 12) {
-            PosterThumb(url: s.posterUrl)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(s.title).font(.body)
-                if let n = s.network, !n.isEmpty {
-                    Text(n).font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            if let r = s.rating, !r.isEmpty {
-                Label(r, systemImage: "star.fill")
-                    .font(.caption)
-                    .labelStyle(.titleAndIcon)
-                    .foregroundStyle(.orange)
-            }
-        }
+        ShowRow(s)
     }
 
     private func memberRow(_ m: Member) -> some View {
@@ -369,6 +357,7 @@ struct HomeView: View {
             return $0.activeCount > $1.activeCount
         }
         popular = pr ?? popular
+        backlogCount = auth.isLoggedIn ? ((try? await API.rateBacklogCount()) ?? 0) : 0
         if let link = pendingLink {
             pendingLink = nil
             route(url: link)
