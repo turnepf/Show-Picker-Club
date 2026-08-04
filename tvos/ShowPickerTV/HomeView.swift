@@ -1,11 +1,16 @@
 import SwiftUI
+import ShowPickerCore
 
-// The "Home" tab: browse what members are watching and the member directory.
-// Auth and the member's own lists live in their own tabs.
+// The "Home" tab: Trending, plus your groups as the way into other members'
+// lists. It used to list the whole club roster; groups replaced that on
+// purpose — a group is people you chose, and the roster wasn't something
+// most members could put names to. Auth and your own lists live in their
+// own tabs.
 struct HomeView: View {
     @Binding var path: NavigationPath
     @EnvironmentObject private var auth: AuthStore
     @State private var members: [Member] = []
+    @State private var groups: [ShowPickerCore.Group] = []
     @State private var popular: [PopularShow] = []
     @State private var loading = true
     @State private var errorText: String?
@@ -82,19 +87,34 @@ struct HomeView: View {
         }
     }
 
+    // Your groups, as the way into other people's lists — the club roster used
+    // to sit here, and most members don't know half of it. A group you're in
+    // is a set of people you actually chose.
     private var groupsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             sectionHeader("Groups")
-            NavigationLink(value: Route.groupsList) {
-                Text("Browse your groups")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundColor(Theme.text)
-                    .padding(30)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Theme.cardBackground)
-                    .cornerRadius(16)
+            if groups.isEmpty {
+                NavigationLink(value: Route.groupsList) {
+                    Text("Browse your groups")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(Theme.text)
+                        .padding(30)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Theme.cardBackground)
+                        .cornerRadius(16)
+                }
+                .buttonStyle(PushButtonStyle())
+            } else {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 30), count: 3),
+                          spacing: 30) {
+                    ForEach(groups) { group in
+                        NavigationLink(value: Route.groupDetail(group.id)) {
+                            GroupTileTV(group: group)
+                        }
+                        .buttonStyle(PushButtonStyle())
+                    }
+                }
             }
-            .buttonStyle(PushButtonStyle())
         }
     }
 
@@ -119,6 +139,9 @@ struct HomeView: View {
                 return $0.activeCount > $1.activeCount
             }
             popular = try await p
+            // Session-gated and non-fatal: logged out (or no groups) just
+            // means the section falls back to its browse link.
+            groups = (try? await API.groups().groups) ?? []
         } catch {
             errorText = "Couldn't load. Check the connection and try again."
         }
