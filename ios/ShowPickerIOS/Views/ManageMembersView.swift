@@ -442,7 +442,7 @@ struct ManageMembersView: View {
         else { parts.append(m.emails.joined(separator: ", ")) }
         let c = m.showCount ?? 0
         parts.append("\(c) own show\(c == 1 ? "" : "s")")
-        parts.append(lastLoginText(m.lastLogin))
+        parts.append(lastLoginText(m.lastLogin, method: m.lastLoginMethod))
         return parts.joined(separator: " · ")
     }
 
@@ -777,9 +777,24 @@ func lastActivityText(_ iso: String?) -> String {
     return "last activity \(relTime(d))"
 }
 
-func lastLoginText(_ iso: String?) -> String {
+// "last login 3d ago via Apple" — the method is what says whether a login
+// channel is still earning its keep, per member rather than in aggregate.
+func lastLoginText(_ iso: String?, method: String? = nil) -> String {
     guard let iso, let d = parseServerDate(iso) else { return "never logged in" }
-    return "last login \(relTime(d))"
+    var line = "last login \(relTime(d))"
+    if let m = method, !m.isEmpty { line += " via \(loginMethodLabel(m))" }
+    return line
+}
+
+func loginMethodLabel(_ key: String) -> String {
+    switch key {
+    case "apple": return "Apple"
+    case "google": return "Google"
+    case "email": return "email code"
+    case "sms": return "text code"
+    case "demo": return "demo login"
+    default: return key
+    }
 }
 
 private struct MemberDetailAdminView: View {

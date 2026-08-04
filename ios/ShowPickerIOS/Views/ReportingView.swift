@@ -30,6 +30,28 @@ struct ReportingView: View {
                 if let rm = r.ratingMembers {
                     Section("People who rated") { windowRows(rm) }
                 }
+                if let sm = r.signinMethods {
+                    Section {
+                        methodRows("Last 7 days", sm.week)
+                        methodRows("Last 30 days", sm.month)
+                        methodRows("Last 90 days", sm.quarter)
+                    } header: {
+                        Text("How people sign in")
+                    } footer: {
+                        Text("Sessions minted per method. Sessions last 30 days, so the 90-day window is the one to read before retiring a channel. \"unknown\" is a session from before this was tracked.")
+                    }
+                }
+                if let ev = r.enrolledVia, !ev.isEmpty {
+                    Section {
+                        ForEach(ev.sorted(by: { $0.value > $1.value }), id: \.key) { pair in
+                            metric(Self.methodLabel(pair.key), pair.value)
+                        }
+                    } header: {
+                        Text("How accounts were created")
+                    } footer: {
+                        Text("All time. Retiring a sign-in channel means the accounts created through it need another way in.")
+                    }
+                }
                 if let l = r.membersLogin, l.ever != nil || l.never != nil {
                     Section("Logins") {
                         if let e = l.ever { metric("Logged in (ever)", e) }
@@ -82,6 +104,36 @@ struct ReportingView: View {
         .overlay { if loading && data == nil { ProgressView() } }
         .task { await load() }
         .refreshable { await load() }
+    }
+
+    // One window of sign-in methods: "Last 30 days — Apple 14 · Email 3".
+    @ViewBuilder private func methodRows(_ label: String, _ counts: [String: Int]) -> some View {
+        let total = counts.values.reduce(0, +)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(label)
+                Spacer()
+                Text("\(total)").foregroundStyle(.secondary).monospacedDigit()
+            }
+            if total > 0 {
+                Text(counts.sorted { $0.value > $1.value }
+                        .map { "\(Self.methodLabel($0.key)) \($0.value)" }
+                        .joined(separator: " · "))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private static func methodLabel(_ key: String) -> String {
+        switch key {
+        case "apple": return "Apple"
+        case "google": return "Google"
+        case "email": return "Email code"
+        case "sms": return "Text code"
+        case "demo": return "Demo account"
+        default: return key.capitalized
+        }
     }
 
     // "Generated Aug 4, 2026 at 1:12 PM" — says how stale the numbers are,

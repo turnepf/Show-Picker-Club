@@ -87,7 +87,7 @@ export async function onRequestPost(context) {
       // Restore the baseline if a previous visitor's hour is up, then arm
       // the next auto-reset for one hour from now.
       await noteDemoLogin(env, row.member_slug);
-      return await issueSession(env, row.member_slug);
+      return await issueSession(env, row.member_slug, {}, 'demo');
     }
     // Secret set but no matching member — fall through to the normal flow
     // rather than silently succeeding on a misconfiguration.
@@ -114,7 +114,7 @@ export async function onRequestPost(context) {
       await recordFailure(env, ip, row.member_slug);
       return new Response(JSON.stringify({ error: 'invalid' }), { status: 401, headers: corsHeaders() });
     }
-    return await issueSession(env, row.member_slug);
+    return await issueSession(env, row.member_slug, {}, 'sms');
   }
 
   // ---- Email path: lookup our locally-stored OTP ----
@@ -168,7 +168,7 @@ export async function onRequestPost(context) {
     await recordFailure(env, ip, member);
     return new Response(JSON.stringify({ error: 'invalid' }), { status: 401, headers: corsHeaders() });
   }
-  return await issueSession(env, member);
+  return await issueSession(env, member, {}, 'email');
 }
 
 

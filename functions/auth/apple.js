@@ -194,7 +194,7 @@ export async function onRequestPost(context) {
     if (!created.ok) {
       return new Response(JSON.stringify({ error: created.error }), { status: created.status || 400, headers: corsHeaders() });
     }
-    return await issueSession(env, created.slug, { enrolled: true });
+    return await issueSession(env, created.slug, { enrolled: true }, 'apple');
   }
 
   // The enrollment branch above returns for every unrecognized identity that
@@ -207,7 +207,7 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ error: 'unrecognized' }), { status: 401, headers: corsHeaders() });
   }
 
-  return await issueSession(env, memberSlug);
+  return await issueSession(env, memberSlug, {}, 'apple');
 }
 
 

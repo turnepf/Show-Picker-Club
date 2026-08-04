@@ -36,6 +36,7 @@ database_id = "..."
 | `first_name`   | TEXT             | Override for display name (rare collisions).|
 | `last_initial` | TEXT             | Suffix used to disambiguate two first-name collisions. |
 | `created_at`   | TEXT             | Default `datetime('now')`.                  |
+| `last_login_method`| TEXT          | Migration 059. How they last got in (`apple` | `google` | `email` | `sms` | `demo`), stamped beside `last_login_at` and durable for the same reason. Shown per member in Manage Members. |
 | `last_login_at`| TEXT             | Migration 013. Stamped on every session issue and never cleared, so it survives logout/disable (which delete `sessions` rows). Any "last login" / "never logged in" display must read this, not `MAX(sessions.created_at)`. |
 | `enrolled_via` | TEXT             | Migration 031. How the account came to exist: `email` \| `apple` \| `google`; NULL only for rows predating self-enrollment. |
 | `enroll_ip`    | TEXT             | Migration 058. Origin IP of the signup, backing the per-IP enrollment cap. Deleted with the member. |
@@ -126,6 +127,7 @@ Native support: `ShowPickerCore/Sources/ShowPickerCore/Ratings.swift` defines `R
 | `expires_at`    | TEXT NOT NULL | 30 days from creation. |
 | `created_at`    | TEXT | |
 | `last_seen_at`  | TEXT | Bumped by `/auth/check`, throttled to once per hour per session. Drives DAU/WAU/MAU in reporting. |
+| `auth_method`   | TEXT | Migration 059. How this session was authenticated: `apple` | `google` | `email` | `sms` | `demo`. NULL for sessions minted before the column existed. Counted by `/api/reporting`'s `signin_methods` (7/30/90-day windows) — the number that says whether an auth channel still earns what it costs to run. |
 | `platform`      | TEXT | Migration 016. One of `_shared/platform.js#KNOWN_PLATFORMS` (`iphone`, `ipad`, `mac`, `watchos`, `tvos`, `roku`, `web-small`, `web-large`), self-reported via the `X-Client-Platform` header and stamped by `/auth/check`. Deleted with the session on logout/disable — it's a live snapshot, not history; see `member_platforms` for durable per-member tracking. |
 
 ### `member_platforms`

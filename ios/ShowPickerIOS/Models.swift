@@ -176,6 +176,11 @@ struct Reporting: Codable {
     let ratingsTitles: Int?
     let activeMembers: ActiveWindow
     let activeByPlatform: PlatformWindows?
+    // Sessions minted per auth method (week/month/quarter), and how every
+    // account was created. What decides whether an auth channel still earns
+    // what it costs to run.
+    let signinMethods: SigninMethodWindows?
+    let enrolledVia: [String: Int]?
     let totals: ReportTotals
     let membersLogin: LoginStats?
     let neverLoggedIn: [NeverLoggedInMember]?
@@ -194,6 +199,8 @@ struct Reporting: Codable {
         case ratingsTitles = "ratings_titles"
         case activeMembers = "active_members"
         case activeByPlatform = "active_by_platform"
+        case signinMethods = "signin_methods"
+        case enrolledVia = "enrolled_via"
         case membersLogin = "members_login"
         case neverLoggedIn = "never_logged_in"
         case topNetworks = "top_networks"
@@ -231,6 +238,14 @@ struct PlatformWindows: Codable {
     let day: [String: Int]
     let week: [String: Int]
     let month: [String: Int]
+}
+
+// Sign-ins by method over longer windows than the platform breakdown — a
+// 30-day cookie means daily counts say almost nothing.
+struct SigninMethodWindows: Codable {
+    let week: [String: Int]
+    let month: [String: Int]
+    let quarter: [String: Int]
 }
 
 struct LoginStats: Codable {
@@ -645,6 +660,9 @@ struct AdminMember: Codable, Identifiable {
     let emails: [String]
     let phones: [String]
     let lastLogin: String?
+    // How they last got in: apple | google | email | sms | demo.
+    // nil for a member who hasn't logged in since migration 059.
+    let lastLoginMethod: String?
     let lastActivityAt: String?
     let activity30d: MemberActivity?
     // Non-seed active shows — the duplicates panel ranks the default keeper
@@ -667,6 +685,7 @@ struct AdminMember: Codable, Identifiable {
         case lastInitial = "last_initial"
         case lastName = "last_name"
         case lastLogin = "last_login"
+        case lastLoginMethod = "last_login_method"
         case lastActivityAt = "last_activity_at"
         case activity30d = "activity_30d"
         case showCount = "show_count"

@@ -44,6 +44,7 @@ export async function onRequestGet(context) {
            ${extras >= 2 ? 'm.enrolled_via,' : 'NULL AS enrolled_via,'}
            ${extras >= 3 ? `(SELECT GROUP_CONCAT(platform, ',') FROM member_platforms
                               WHERE member_slug = m.slug) AS platforms,` : 'NULL AS platforms,'}
+           ${extras >= 4 ? 'm.last_login_method,' : 'NULL AS last_login_method,'}
            (SELECT GROUP_CONCAT(email, ',')
               FROM (SELECT email FROM member_emails
                      WHERE member_slug = m.slug
@@ -82,7 +83,8 @@ export async function onRequestGet(context) {
       FROM members m
      ORDER BY m.first_name COLLATE NOCASE
   `);
-  const { results } = await memberQuery(3).all()
+  const { results } = await memberQuery(4).all()
+    .catch(() => memberQuery(3).all())
     .catch(() => memberQuery(2).all())
     .catch(() => memberQuery(1).all())
     .catch(() => memberQuery(0).all());
@@ -98,6 +100,7 @@ export async function onRequestGet(context) {
     emails: r.emails ? r.emails.split(',').filter(Boolean) : [],
     phones: r.phones ? r.phones.split(',').filter(Boolean) : [],
     last_login: r.last_login || null,
+    last_login_method: r.last_login_method || null,
     show_count: r.show_count || 0,
     last_activity_at: r.last_activity_at || null,
     platforms: r.platforms ? r.platforms.split(',').filter(Boolean) : [],

@@ -19,7 +19,11 @@ CREATE TABLE IF NOT EXISTS members (
   -- with the member.
   enroll_ip TEXT,
   created_at TEXT DEFAULT (datetime('now')),
-  last_login_at TEXT
+  last_login_at TEXT,
+  -- How they last got in: 'apple' | 'google' | 'email' | 'sms' | 'demo'.
+  -- Durable for the same reason last_login_at is — session rows are deleted
+  -- on logout, disable and deletion.
+  last_login_method TEXT
 );
 
 CREATE TABLE IF NOT EXISTS member_phones (
@@ -62,8 +66,13 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at TEXT NOT NULL,
   created_at TEXT,
   last_seen_at TEXT,
-  platform TEXT
+  platform TEXT,
+  -- How this session was authenticated: 'apple' | 'google' | 'email' | 'sms'
+  -- | 'demo'. members.enrolled_via covers account creation; this covers the
+  -- ongoing cost of each channel.
+  auth_method TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_sessions_auth_method ON sessions(auth_method, created_at);
 
 CREATE TABLE IF NOT EXISTS login_otps (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

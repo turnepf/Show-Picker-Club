@@ -97,6 +97,35 @@ export async function onRequestGet(context) {
     }
   } catch (_) { /* platform column not migrated yet */ }
 
+  // How members actually sign in (migration 059): sessions minted per method
+  // over each window, plus how every account was created. This is what says
+  // whether an auth channel still earns what it costs to run — Twilio SMS
+  // bills per message, email codes need Resend. NULL auth_method = a session
+  // minted before the column existed; shown as 'unknown' rather than dropped.
+  const signinMethods = { week: {}, month: {}, quarter: {} };
+  const methodWindows = { week: '-7 days', month: '-30 days', quarter: '-90 days' };
+  try {
+    for (const [label, interval] of Object.entries(methodWindows)) {
+      const { results } = await env.DB.prepare(
+        `SELECT COALESCE(auth_method, 'unknown') AS method, COUNT(*) AS cnt
+           FROM sessions
+          WHERE created_at >= datetime('now', ?)
+          GROUP BY COALESCE(auth_method, 'unknown')`
+      ).bind(interval).all();
+      for (const row of results) signinMethods[label][row.method] = row.cnt;
+    }
+  } catch (_) { /* auth_method column not migrated yet */ }
+
+  // Account creation method, all time (migration 031's enrolled_via).
+  const enrolledVia = {};
+  try {
+    const { results } = await env.DB.prepare(
+      `SELECT COALESCE(enrolled_via, 'unknown') AS method, COUNT(*) AS cnt
+         FROM members GROUP BY COALESCE(enrolled_via, 'unknown')`
+    ).all();
+    for (const row of results) enrolledVia[row.method] = row.cnt;
+  } catch (_) { /* enrolled_via column not migrated yet */ }
+
   const totals = await env.DB.prepare(
     `SELECT
       (SELECT COUNT(*) FROM members) as members,
@@ -178,6 +207,8 @@ export async function onRequestGet(context) {
     ratings_titles: ratingsTitles,
     active_members: activeMembers,
     active_by_platform: activeByPlatform,
+    signin_methods: signinMethods,
+    enrolled_via: enrolledVia,
     totals,
     members_login: membersLogin,
     never_logged_in: neverLoggedIn,
