@@ -169,6 +169,11 @@ struct Reporting: Codable {
     let editedShows: ReportWindow
     let archivedShows: ReportWindow
     let newMembers: ReportWindow
+    // Rating activity: people who rated in the window, and the all-time
+    // submitted/titles counts.
+    let ratingMembers: ReportWindow?
+    let ratingsSubmitted: Int?
+    let ratingsTitles: Int?
     let activeMembers: ActiveWindow
     let activeByPlatform: PlatformWindows?
     let totals: ReportTotals
@@ -184,6 +189,9 @@ struct Reporting: Codable {
         case editedShows = "edited_shows"
         case archivedShows = "archived_shows"
         case newMembers = "new_members"
+        case ratingMembers = "rating_members"
+        case ratingsSubmitted = "ratings_submitted"
+        case ratingsTitles = "ratings_titles"
         case activeMembers = "active_members"
         case activeByPlatform = "active_by_platform"
         case membersLogin = "members_login"
@@ -346,9 +354,32 @@ struct UrlCleanupResponse: Codable {
     // a different service than the stored network. Present on the list action.
     let conflicts: [UrlConflict]?
     let mismatches: [UrlMismatch]?
+    // Titles where NO active copy has a poster — the observable symptom of a
+    // title TMDB can't match (a typo, a member-entered name, or a title only
+    // indexed under the opposite media type). The URL queue misses these
+    // because the row's link may be perfectly good.
+    let needsPoster: [NeedsPosterItem]?
 
     enum CodingKeys: String, CodingKey {
-        case shows, networks, conflicts, mismatches
+        case shows, networks, conflicts, mismatches, needsPoster
+    }
+}
+
+// One title with no poster on any copy. POST actions: re_enrich { id, movie }
+// to re-look-up as-is (optionally flipping the media type), or fix_title
+// { id, new_title } to rename and re-enrich.
+struct NeedsPosterItem: Codable, Identifiable {
+    let id: Int
+    let title: String
+    let movie: Int?
+    let memberCount: Int?
+    let members: String?
+
+    var isMovie: Bool { (movie ?? 0) == 1 }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, movie, members
+        case memberCount = "member_count"
     }
 }
 
@@ -713,6 +744,22 @@ struct VibeFillResult: Codable {
     let mode: String?
     let ok: Bool?
     let error: String?
+    // Per-title outcomes for the batch — what actually happened to each show,
+    // which a batch summary can't tell you.
+    let results: [VibeFillRow]?
+}
+
+struct VibeFillRow: Codable, Identifiable {
+    let title: String
+    let status: String          // ok | unknown | error
+    let error: String?
+    var id: String { title }
+
+    var line: String {
+        var s = "\(title): \(status)"
+        if let e = error, !e.isEmpty { s += " (\(e))" }
+        return s
+    }
 }
 
 // Generic admin action result (save URL / fix title).

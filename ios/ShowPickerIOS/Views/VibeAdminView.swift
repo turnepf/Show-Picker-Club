@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // Operator tool: generate Claude-based taste traits for shows that lack them,
 // or refresh existing scores. POST /api/admin-vibe-fill. Foreground fill runs
@@ -12,6 +13,8 @@ struct VibeAdminView: View {
     @State private var remaining = 0
     @State private var log: [String] = []
     @State private var busy = false
+    @State private var batchSize = 5
+    @State private var copied = false
 
     var body: some View {
         List {
@@ -39,6 +42,15 @@ struct VibeAdminView: View {
             }
 
             Section {
+                Stepper("Batch size: \(batchSize)", value: $batchSize, in: 1...25)
+                    .disabled(running)
+            } header: {
+                Text("Batch size")
+            } footer: {
+                Text("Titles per call. Bigger batches finish sooner but take longer per request — drop it if calls start timing out.")
+            }
+
+            Section {
                 if status?.rescoreActive == true {
                     Button("Cancel background re-score", role: .destructive) {
                         Task { await toggleRescore(start: false) }
@@ -47,11 +59,16 @@ struct VibeAdminView: View {
                     Button("Start background re-score") {
                         Task { await toggleRescore(start: true) }
                     }.disabled(busy || running)
+                    // Foreground: same loop as Fill, but re-scoring titles
+                    // that already have traits. Stays on this screen so the
+                    // per-title log is visible while it runs.
+                    Button("Re-score here, now") { Task { await fillLoop(rescore: true) } }
+                        .disabled(busy || running)
                 }
             } header: {
                 Text("Re-score")
             } footer: {
-                Text("Refreshes traits for every show. The background job continues via the daily cron after you leave this screen.")
+                Text("Refreshes traits for every show. The background job continues via the daily cron after you leave this screen; running it here shows each title as it goes.")
             }
 
             if processed + unknown + errors > 0 {
@@ -63,27 +80,51 @@ struct VibeAdminView: View {
             }
 
             if !log.isEmpty {
-                Section("Log") {
+                Section {
                     ForEach(Array(log.enumerated()), id: \.offset) { _, line in
                         Text(line).font(.caption.monospaced()).foregroundStyle(.secondary)
                     }
+                } header: {
+                    HStack {
+                        Text("Log")
+                        Spacer()
+                        Button("Copy") {
+                            UIPasteboard.general.string = log.reversed().joined(separator: "\n")
+                            copied = true
+                        }
+                        .font(.caption)
+                        .textCase(nil)
+                    }
+                } footer: {
+                    if copied { Text("Copied to the clipboard.") }
                 }
             }
         }
         .navigationTitle("Vibe Admin")
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadStatus() }
+        // Status moves while a background re-score runs; poll on the same
+        // 20s cadence as the web page rather than making the operator leave
+        // and come back to see progress.
+        .task(id: status?.rescoreActive) {
+            guard status?.rescoreActive == true else { return }
+            while !Task.isCancelled && status?.rescoreActive == true {
+                try? await Task.sleep(nanoseconds: 20_000_000_000)
+                if Task.isCancelled { return }
+                await loadStatus()
+            }
+        }
     }
 
     private func loadStatus() async {
         status = try? await API.vibeFillStatus()
     }
 
-    private func fillLoop() async {
+    private func fillLoop(rescore: Bool = false) async {
         running = true
         while running {
             do {
-                let r = try await API.vibeFill(count: 5, rescore: false)
+                let r = try await API.vibeFill(count: batchSize, rescore: rescore)
                 if let e = r.error {
                     log.insert("Error: \(e)", at: 0)
                     break
@@ -93,6 +134,12 @@ struct VibeAdminView: View {
                 errors += r.errors ?? 0
                 remaining = r.remaining ?? 0
                 log.insert("Batch: \(r.processed ?? 0) ok · \(r.unknown ?? 0) unknown · \(r.errors ?? 0) err — \(remaining) left", at: 0)
+                // Per-title rows under the batch line — a summary can't say
+                // WHICH title came back unknown, which is the thing worth
+                // acting on.
+                for row in (r.results ?? []).reversed() {
+                    log.insert("  \(row.line)", at: 0)
+                }
                 if remaining <= 0 { break }
             } catch {
                 log.insert("Network error — stopped.", at: 0)

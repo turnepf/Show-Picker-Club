@@ -138,11 +138,9 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 
 - **Open and merge the PR yourself — don't wait to be asked.** Finished work
   goes: commit → push → open the PR → squash-merge it → tell the user it's on
-  `main` and ready to pull into Xcode. No "want me to merge?" round trip.
-  Compiling is the one thing that can't happen here: Claude-Code-on-the-web
-  runs Linux with no Swift toolchain, so say plainly that the Apple targets
-  are unverified and the build happens on the user's Mac. Never imply a build
-  was run.
+  `main` and ready to pull into Xcode. No "want me to merge?" round trip, and
+  no reminders that the user has to compile the Apple targets — they know.
+  (This environment has no Swift toolchain; just never imply a build was run.)
 - **End every completed task with an explicit close-out.** When the work is
   done, don't wait to be asked — state plainly: what shipped, anything still
   pending on the user (merges, migrations, secrets, verifications), whether

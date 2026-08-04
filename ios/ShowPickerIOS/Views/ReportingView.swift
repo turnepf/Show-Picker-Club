@@ -27,6 +27,9 @@ struct ReportingView: View {
                 Section("Edited shows") { windowRows(r.editedShows) }
                 Section("Archived shows") { windowRows(r.archivedShows) }
                 Section("New members") { windowRows(r.newMembers) }
+                if let rm = r.ratingMembers {
+                    Section("People who rated") { windowRows(rm) }
+                }
                 if let l = r.membersLogin, l.ever != nil || l.never != nil {
                     Section("Logins") {
                         if let e = l.ever { metric("Logged in (ever)", e) }
@@ -54,6 +57,11 @@ struct ReportingView: View {
                     metric("Awaiting", r.totals.waiting)
                     metric("Loved", r.totals.recommending)
                     metric("Next Up", r.totals.next)
+                    if let submitted = r.ratingsSubmitted { metric("Ratings submitted", submitted) }
+                    if let titles = r.ratingsTitles { metric("Titles rated", titles) }
+                }
+                if let g = r.generatedAt, let when = Self.generatedLine(g) {
+                    Section { Text(when).font(.caption).foregroundStyle(.secondary) }
                 }
                 if !r.topNetworks.isEmpty {
                     Section("Top networks") {
@@ -74,6 +82,22 @@ struct ReportingView: View {
         .overlay { if loading && data == nil { ProgressView() } }
         .task { await load() }
         .refreshable { await load() }
+    }
+
+    // "Generated Aug 4, 2026 at 1:12 PM" — says how stale the numbers are,
+    // which matters on a report you can leave open.
+    private static func generatedLine(_ iso: String) -> String? {
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = parser.date(from: iso) ?? {
+            parser.formatOptions = [.withInternetDateTime]
+            return parser.date(from: iso)
+        }()
+        guard let date else { return nil }
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return "Generated \(f.string(from: date))"
     }
 
     @ViewBuilder private func windowRows(_ w: ReportWindow) -> some View {

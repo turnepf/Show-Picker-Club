@@ -289,6 +289,33 @@ enum API {
         return try await postDecoding("/api/admin-url-cleanup", body: body)
     }
 
+    // Re-run enrichment for one title as-is, optionally flipping its media
+    // type — the fix for a title TMDB indexed as the opposite of what we
+    // stored. Writes poster/logo/rating/cast onto every copy.
+    static func reEnrichShow(id: Int, movie: Bool) async throws -> AdminActionResult {
+        try await postDecoding("/api/admin-url-cleanup",
+                               body: ["action": "re_enrich", "id": id, "movie": movie ? 1 : 0])
+    }
+
+    // One background enrichment batch — posters, logos, seasons, dates. The
+    // endpoint processes the least-recently-enriched rows, so calling it
+    // repeatedly rotates through the library.
+    @discardableResult
+    static func enrich() async throws -> AdminActionResult {
+        try await postDecoding("/api/enrich", body: [:])
+    }
+
+    // Bulk: give every row with a placeholder URL the real link a sibling copy
+    // already has. Cheap, and clears most of the queue before any manual work.
+    static func inheritNetworks() async throws -> AdminActionResult {
+        try await postDecoding("/api/admin-url-cleanup", body: ["action": "inherit_networks"])
+    }
+
+    // Drop a title out of the URL queue for good — no good deep link exists.
+    static func dismissUrlTitle(_ title: String) async throws -> AdminActionResult {
+        try await postDecoding("/api/admin-url-cleanup", body: ["action": "dismiss", "title": title])
+    }
+
     // POST + decode the body regardless of HTTP status, so admin tools can show
     // the server's error message instead of a bare status code.
     private static func postDecoding<T: Decodable>(_ path: String, body: [String: Any]) async throws -> T {
