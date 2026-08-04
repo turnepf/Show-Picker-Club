@@ -6,6 +6,9 @@ struct GroupDetailViewTV: View {
     let groupId: Int
     @State private var group: ShowPickerCore.Group?
     @State private var members: [GroupMember] = []
+    // The club roster, by slug: the group payload carries first names only, so
+    // this supplies the display name and the Member value a row navigates with.
+    @State private var roster: [String: Member] = [:]
     @State private var trending: [PopularShow] = []
     @State private var loading = true
     @State private var errorText: String?
@@ -89,7 +92,16 @@ struct GroupDetailViewTV: View {
             sectionHeader("Members")
             LazyVStack(alignment: .leading, spacing: 20) {
                 ForEach(members) { member in
-                    memberRow(member)
+                    if let rosterMember = roster[member.slug] {
+                        NavigationLink(value: Route.member(rosterMember)) {
+                            memberRow(member, name: rosterMember.label)
+                        }
+                        .buttonStyle(PushButtonStyle())
+                    } else {
+                        // Roster miss: still listed, just not focusable —
+                        // their lists wouldn't load anyway.
+                        memberRow(member, name: member.displayName)
+                    }
                 }
             }
         }
@@ -109,9 +121,9 @@ struct GroupDetailViewTV: View {
     }
 
     @ViewBuilder
-    private func memberRow(_ member: GroupMember) -> some View {
+    private func memberRow(_ member: GroupMember, name: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(member.displayName)
+            Text(name)
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundColor(Theme.text)
             Text("\(member.showCount) show\(member.showCount == 1 ? "" : "s") • \(member.watchingCount) watching")
@@ -133,6 +145,11 @@ struct GroupDetailViewTV: View {
             self.members = detail.members
             let shows = try await API.groupTrending(id: groupId)
             self.trending = shows
+            // Roster last and non-fatally: it only decides whether a member
+            // row opens their lists, so a failure here shouldn't blank the group.
+            if let all = try? await API.members() {
+                self.roster = Dictionary(uniqueKeysWithValues: all.map { ($0.slug, $0) })
+            }
         } catch {
             self.errorText = API.failureLine(error, action: "load group")
         }

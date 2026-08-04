@@ -8,6 +8,10 @@ struct GroupDetailView: View {
     let groupId: Int
     @State private var group: ShowPickerCore.Group?
     @State private var members: [GroupMember] = []
+    // The club roster, by slug. The group payload carries first names only, so
+    // this is what gives a member row the same display name ("Dorothy") and
+    // the same Member value the rest of the app navigates with.
+    @State private var roster: [String: Member] = [:]
     @State private var trending: [PopularShow] = []
     @State private var loading = true
     @State private var errorText: String?
@@ -87,7 +91,16 @@ struct GroupDetailView: View {
                         }
                     } else {
                         List(members) { member in
-                            memberRow(member)
+                            if let rosterMember = roster[member.slug] {
+                                NavigationLink(value: Route.member(rosterMember)) {
+                                    memberRow(member, name: rosterMember.label)
+                                }
+                            } else {
+                                // Roster miss (a disabled account, or the call
+                                // failed): still list them, just not tappable —
+                                // their lists wouldn't load anyway.
+                                memberRow(member, name: member.displayName)
+                            }
                         }
                     }
                 }
@@ -164,9 +177,9 @@ struct GroupDetailView: View {
     }
 
     @ViewBuilder
-    private func memberRow(_ member: GroupMember) -> some View {
+    private func memberRow(_ member: GroupMember, name: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(member.displayName)
+            Text(name)
                 .font(.headline)
             Text("\(member.showCount) show\(member.showCount == 1 ? "" : "s") • \(member.watchingCount) watching")
                 .font(.caption)
@@ -235,6 +248,12 @@ struct GroupDetailView: View {
             let shows = try await API.groupTrending(id: groupId)
             self.trending = shows
             loading = false
+
+            // Roster last and non-fatally: it only decides whether a member
+            // row is tappable, so a failure here shouldn't blank the group.
+            if let all = try? await API.members() {
+                self.roster = Dictionary(uniqueKeysWithValues: all.map { ($0.slug, $0) })
+            }
         } catch {
             self.errorText = API.failureLine(error, action: "load group")
             loading = false
