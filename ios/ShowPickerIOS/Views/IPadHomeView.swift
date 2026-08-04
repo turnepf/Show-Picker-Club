@@ -21,6 +21,7 @@ enum SidebarItem: Hashable {
     case vibe
     case subscriptionAudit
     case rateBacklog
+    case calendar
     // Admin tools shown directly in the menu when user is an admin
     case adminReporting
     case adminManageMembers
@@ -30,7 +31,6 @@ enum SidebarItem: Hashable {
 
 struct IPadHomeView: View {
     @EnvironmentObject private var auth: AuthStore
-    @Environment(\.openURL) private var openURL
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
     // Unrated count for the "Rate my backlog" badge. 0 draws no badge.
@@ -177,25 +177,12 @@ struct IPadHomeView: View {
                     Label("Vibe", systemImage: "sparkles")
                         .tag(SidebarItem.vibe)
                 }
-                // Your own premiere/finale calendar feed — the token only comes
-                // back for the logged-in member's own row, so the row hides
-                // without one.
-                if let me = myMember, let token = me.calendarToken {
-                    Button {
-                        let enc = me.slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? me.slug
-                        if let url = URL(string: "webcal://showpicker.club/calendar/\(enc).ics?key=\(token)") {
-                            openURL(url)
-                        }
-                    } label: {
-                        // Buttons tint their whole label with the accent color;
-                        // keep the title primary so the row matches the rows
-                        // around it.
-                        Label {
-                            Text("Calendar").foregroundStyle(.primary)
-                        } icon: {
-                            Image(systemName: "calendar.badge.plus")
-                        }
-                    }
+                // What's coming up on your lists, with the subscribe button
+                // on the screen itself rather than firing webcal:// from the
+                // sidebar at someone who may not want a subscription.
+                if myMember != nil {
+                    Label("Calendar", systemImage: "calendar")
+                        .tag(SidebarItem.calendar)
                 }
                 whatsNewRow
                 if auth.isAdmin {
@@ -353,6 +340,12 @@ struct IPadHomeView: View {
                 SubscriptionAuditView()
             case .rateBacklog:
                 RateBacklogView()
+            case .calendar:
+                if let me = myMember {
+                    CalendarView(member: me)
+                } else {
+                    placeholder("Log in to see what's coming up.", "calendar")
+                }
             case .adminReporting:
                 ReportingView().environmentObject(auth)
             case .adminManageMembers:
@@ -384,6 +377,8 @@ struct IPadHomeView: View {
             WhatsNewView()
         // The iPad keeps its admin entries in the sidebar, but the routes
         // exist app-wide, so the switch has to answer for them.
+        case .calendar:
+            if let me = myMember { CalendarView(member: me) }
         case .adminReporting:
             ReportingView()
         case .adminMembers:

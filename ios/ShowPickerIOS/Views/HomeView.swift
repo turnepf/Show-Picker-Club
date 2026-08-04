@@ -2,7 +2,6 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject private var auth: AuthStore
-    @Environment(\.openURL) private var openURL
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
     // Unrated count for the "Rate my backlog" badge. 0 draws no badge.
@@ -74,6 +73,13 @@ struct HomeView: View {
                             NavigationLink(value: Route.groups) {
                                 Label("Groups", systemImage: "person.2.fill")
                             }
+                            // What's coming up on your own lists, with the
+                            // subscribe button on it. This used to fire
+                            // webcal:// straight at the OS, which was a dead
+                            // end for anyone who didn't want a subscription.
+                            NavigationLink(value: Route.calendar) {
+                                Label("Calendar", systemImage: "calendar")
+                            }
                             NavigationLink {
                                 RateBacklogView()
                             } label: {
@@ -93,26 +99,6 @@ struct HomeView: View {
                                 VibeView(initialSlug: me.slug)
                             } label: {
                                 Label("Vibe", systemImage: "sparkles")
-                            }
-                        }
-                        // Your own premiere/finale feed. webcal:// makes iOS
-                        // offer to add it as a subscription calendar; the token
-                        // only comes back for the logged-in member's own row.
-                        if let me = myMember, let token = me.calendarToken {
-                            Button {
-                                let enc = me.slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? me.slug
-                                if let url = URL(string: "webcal://showpicker.club/calendar/\(enc).ics?key=\(token)") {
-                                    openURL(url)
-                                }
-                            } label: {
-                                // Buttons tint their whole label with the accent
-                                // color; keep the title primary so the row matches
-                                // the NavigationLinks around it.
-                                Label {
-                                    Text("Calendar").foregroundStyle(.primary)
-                                } icon: {
-                                    Image(systemName: "calendar.badge.plus")
-                                }
                             }
                         }
                         whatsNewRow
@@ -164,6 +150,8 @@ struct HomeView: View {
                     GroupDetailView(groupId: id)
                 case .whatsNew:
                     WhatsNewView()
+                case .calendar:
+                    if let me = myMember { CalendarView(member: me) }
                 case .adminReporting:
                     ReportingView()
                 case .adminMembers:
@@ -402,6 +390,7 @@ enum Route: Hashable {
     // Admin screens live in the account menu rather than on Home, so they
     // push by value: a Button inside a Menu can append to the path, while a
     // NavigationLink inside a Menu doesn't push at all.
+    case calendar
     case adminReporting
     case adminMembers
     case adminUrlCleanup
