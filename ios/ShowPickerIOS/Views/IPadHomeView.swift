@@ -381,6 +381,16 @@ struct IPadHomeView: View {
             GroupDetailView(groupId: id)
         case .whatsNew:
             WhatsNewView()
+        // The iPad keeps its admin entries in the sidebar, but the routes
+        // exist app-wide, so the switch has to answer for them.
+        case .adminReporting:
+            ReportingView()
+        case .adminMembers:
+            ManageMembersView()
+        case .adminUrlCleanup:
+            UrlCleanupView()
+        case .adminVibe:
+            VibeAdminView()
         }
     }
 

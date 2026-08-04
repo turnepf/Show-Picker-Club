@@ -1,14 +1,24 @@
 import { getSession } from '../_shared/auth.js';
 import { cronAuthorized } from '../_shared/secrets.js';
-import { fetchEnrichment, extractTmdbDetailFields } from '../_shared/enrichment.js';
-import { fillActorIdsFromKnownPeople } from '../_shared/people.js';
+import { fetchEnrichment, extractTmdbDetailFields, CAST_DEPTH } from '../_shared/enrichment.js';
+import { fillActorIdsFromKnownPeople, knownByPersonIds, rememberPeople } from '../_shared/people.js';
 
 // TMDB GET that works with either credential the worker has configured:
 // the v4 Bearer token (TMDB_TOKEN, what the shared enrichment path uses) is
 // preferred, falling back to a v3 api_key query param (TMDB_API_KEY). The
 // poster passes below originally required TMDB_API_KEY only — if a deployment
 // sets just TMDB_TOKEN, those passes silently no-op'd (tmdbUpdated stayed 0).
+// Cloudflare caps subrequests per Worker invocation, and this endpoint is the
+// heaviest thing we run: search + detail per title, plus a person lookup for
+// anyone we haven't resolved before. Spend it deliberately — when the budget
+// is gone the batch stops early and the queue rotation picks up where it left
+// off next round, which is strictly better than a title dying mid-write.
+const SUBREQUEST_BUDGET = 45;
+let spent = 0;
+function budgetLeft() { return SUBREQUEST_BUDGET - spent; }
+
 async function tmdbGet(path, env) {
+  spent++;
   const token = env.TMDB_TOKEN;
   const sep = path.includes('?') ? '&' : '?';
   if (token) {
@@ -41,6 +51,43 @@ async function tmdbSearchFirst(title, type, env) {
     return results.find((r) => tmdbResultTitle(r, type) === want) || results[0];
   } catch (e) {
     return null;
+  }
+}
+
+// Store the cast TMDB just handed us, CAST_DEPTH deep and in billing order,
+// across every copy of the title. IMDB ids come from the canonical people
+// table when we've seen the person before (no request), and are looked up
+// only while the subrequest budget allows — anyone left unresolved is picked
+// up by a later round or by the free cache pass, so a tight budget costs
+// links, never the cast itself.
+async function refreshCastFromDetail(env, show, detail) {
+  const cast = (detail.credits?.cast || []).slice(0, CAST_DEPTH);
+  if (!cast.length) return;
+  const known = await knownByPersonIds(env, cast.map(p => p.id));
+  const people = [];
+  const rows = [];
+  for (let i = 0; i < cast.length; i++) {
+    const person = cast[i];
+    let imdbId = known.get(person.id) || null;
+    if (!imdbId && budgetLeft() > 6) {
+      imdbId = await personImdbId(person.id, env);
+      if (imdbId) people.push({ tmdbPersonId: person.id, name: person.name, imdbId });
+    }
+    rows.push({ name: person.name, imdb_id: imdbId, ord: i, tmdb_person_id: person.id });
+  }
+  await rememberPeople(env, people).catch(() => {});
+
+  const { results: copies } = await env.DB.prepare(
+    'SELECT id FROM shows WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?) AND archived = 0'
+  ).bind(show.id).all();
+  const insert = env.DB.prepare(
+    'INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id) VALUES (?, ?, ?, ?, ?)'
+  );
+  for (const copy of copies || []) {
+    // Replace rather than merge: the incoming list is authoritative and
+    // ordered, and a partial overlay would leave the old shallow tail behind.
+    await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(copy.id).run();
+    await env.DB.batch(rows.map(r => insert.bind(copy.id, r.name, r.imdb_id, r.ord, r.tmdb_person_id)));
   }
 }
 
@@ -125,11 +172,13 @@ export async function onRequestPost(context) {
   // TMDB: check next season dates for Watching and Waiting shows.
   // Cap the same way; oldest/least-recently-enriched first so the budget rotates evenly.
   const hasTmdb = !!(env.TMDB_TOKEN || env.TMDB_API_KEY);
+  spent = 0;
   let tmdbUpdated = 0;
   // A bare `catch (e) {}` around each title meant a pass that failed on every
   // single show reported exactly the same thing as a pass with nothing to do:
   // zero. Count the failures and keep the first message so a backfill run can
   // say which it was.
+  let budgetExhausted = false;
   let tvCandidates = 0;
   let movieCandidates = 0;
   let tvErrors = 0;
@@ -160,6 +209,9 @@ export async function onRequestPost(context) {
     tvCandidates = (tmdbShows || []).length;
 
     for (const show of tmdbShows) {
+      // Two calls minimum per title (search + detail); don't start one we
+      // can't finish.
+      if (budgetLeft() < 3) { budgetExhausted = true; break; }
       try {
         // Search TMDB for the show by its stored title.
         const first = await tmdbSearchFirst(show.title, 'tv', env);
@@ -255,6 +307,12 @@ export async function onRequestPost(context) {
               AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
         ).bind(posterUrl, networkLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating,
           df.trailerKey, df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.watchLink, show.id).run();
+
+        // Cast comes free with the detail call we just made — this pass used
+        // to ignore it entirely, which is why a title enriched here kept
+        // whatever shallow cast it was first given. Only people we've never
+        // resolved cost a request, and only while the budget holds.
+        await refreshCastFromDetail(env, show, detail);
         tmdbUpdated++;
       } catch (e) {
         tvErrors++;
@@ -379,6 +437,7 @@ export async function onRequestPost(context) {
   return new Response(JSON.stringify({
     enriched, tmdbUpdated, actorImdbFilled, actorIdsFromCache,
     tvCandidates, movieCandidates, tvErrors, movieErrors, lastError,
+    budgetExhausted, subrequests: spent,
   }), {
     headers: { 'Content-Type': 'application/json' },
   });

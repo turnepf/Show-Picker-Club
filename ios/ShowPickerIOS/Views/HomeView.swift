@@ -15,14 +15,11 @@ struct HomeView: View {
     @State private var showingDeleteAccount = false
     @State private var showingExport = false
     @State private var showingSearch = false
-    @State private var showAllMembers = false
     @State private var shakePick: Show?
     @State private var path: [Route] = []
     // Universal link that arrived before the roster loaded (cold launch);
     // replayed by load().
     @State private var pendingLink: URL?
-
-    private let memberPreviewCount = 6
 
     // The logged-in member, resolved against the loaded member list.
     private var myMember: Member? {
@@ -123,28 +120,6 @@ struct HomeView: View {
                             }
                         }
                         whatsNewRow
-                        if auth.isAdmin {
-                            NavigationLink {
-                                ReportingView()
-                            } label: {
-                                Label("Reporting", systemImage: "chart.bar.xaxis")
-                            }
-                            NavigationLink {
-                                ManageMembersView()
-                            } label: {
-                                Label("Manage members", systemImage: "person.2.badge.gearshape")
-                            }
-                            NavigationLink {
-                                UrlCleanupView()
-                            } label: {
-                                Label("Show Cleanup", systemImage: "link.badge.plus")
-                            }
-                            NavigationLink {
-                                VibeAdminView()
-                            } label: {
-                                Label("Vibe trait scoring", systemImage: "sparkles")
-                            }
-                        }
                     }
                     // Say why the shelf is bare instead of hiding it: a
                     // failed fetch and a genuinely quiet month look identical
@@ -164,28 +139,6 @@ struct HomeView: View {
                             }
                         }
                     }
-                    Section("Members") {
-                        if members.isEmpty && loadFailed {
-                            Text("Couldn't load the club — pull down to try again.")
-                                .foregroundStyle(.secondary)
-                        }
-                        let visible = showAllMembers ? members : Array(members.prefix(memberPreviewCount))
-                        ForEach(visible) { m in
-                            NavigationLink(value: Route.member(m)) {
-                                memberRow(m)
-                            }
-                        }
-                        if members.count > memberPreviewCount {
-                            Button {
-                                withAnimation { showAllMembers.toggle() }
-                            } label: {
-                                Label(showAllMembers ? "Show fewer" : "Show all \(members.count) members",
-                                      systemImage: showAllMembers ? "chevron.up" : "chevron.down")
-                                    .font(.callout)
-                            }
-                        }
-                    }
-
                     // Attribution required by the TMDB API terms; OMDb credited
                     // alongside since IMDb ratings come through it.
                     Section {
@@ -215,6 +168,14 @@ struct HomeView: View {
                     GroupDetailView(groupId: id)
                 case .whatsNew:
                     WhatsNewView()
+                case .adminReporting:
+                    ReportingView()
+                case .adminMembers:
+                    ManageMembersView()
+                case .adminUrlCleanup:
+                    UrlCleanupView()
+                case .adminVibe:
+                    VibeAdminView()
                 }
             }
             .sheet(isPresented: $showingDeleteAccount) {
@@ -332,6 +293,32 @@ struct HomeView: View {
                     } label: {
                         Label("Export My Lists…", systemImage: "square.and.arrow.up")
                     }
+                    // Operator tools sit behind the account icon so Home reads
+                    // the same for an admin as it does for everyone else.
+                    if auth.isAdmin {
+                        Section("Admin") {
+                            Button {
+                                path.append(.adminReporting)
+                            } label: {
+                                Label("Reporting", systemImage: "chart.bar.xaxis")
+                            }
+                            Button {
+                                path.append(.adminMembers)
+                            } label: {
+                                Label("Manage members", systemImage: "person.2.badge.gearshape")
+                            }
+                            Button {
+                                path.append(.adminUrlCleanup)
+                            } label: {
+                                Label("Show Cleanup", systemImage: "link.badge.plus")
+                            }
+                            Button {
+                                path.append(.adminVibe)
+                            } label: {
+                                Label("Vibe trait scoring", systemImage: "sparkles")
+                            }
+                        }
+                    }
                     Button(role: .destructive) {
                         Task { await auth.logout() }
                     } label: {
@@ -416,4 +403,11 @@ enum Route: Hashable {
     case groups
     case groupDetail(Int)
     case whatsNew
+    // Admin screens live in the account menu rather than on Home, so they
+    // push by value: a Button inside a Menu can append to the path, while a
+    // NavigationLink inside a Menu doesn't push at all.
+    case adminReporting
+    case adminMembers
+    case adminUrlCleanup
+    case adminVibe
 }

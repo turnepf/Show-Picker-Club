@@ -39,13 +39,6 @@ struct HomeView: View {
                         if auth.isLoggedIn {
                             groupsSection
                         }
-                        // The roster endpoint is public (the web landing page
-                        // renders it), but member show lists 401 without a
-                        // session — tapping a member while logged out is a
-                        // guaranteed dead end, so Members waits for sign-in.
-                        if auth.isLoggedIn {
-                            membersSection
-                        }
 
                         // Attribution required by the TMDB API terms; OMDb
                         // credited alongside since IMDb ratings come through it.
@@ -105,21 +98,6 @@ struct HomeView: View {
         }
     }
 
-    private var membersSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader("Members")
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 30), count: 4),
-                      spacing: 30) {
-                ForEach(members) { member in
-                    NavigationLink(value: Route.member(member)) {
-                        MemberTile(member: member, isMe: member.slug == auth.memberSlug)
-                    }
-                    .buttonStyle(PushButtonStyle())
-                }
-            }
-        }
-    }
-
     private func sectionHeader(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 32, weight: .semibold))
@@ -147,41 +125,3 @@ struct HomeView: View {
     }
 }
 
-struct MemberTile: View {
-    let member: Member
-    var isMe: Bool = false
-
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(
-                    LinearGradient(colors: [Theme.tileColor(for: member.slug),
-                                            Theme.tileColor(for: member.slug).opacity(0.78)],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing)
-                )
-                .overlay(
-                    VStack(spacing: 6) {
-                        Text(member.label)
-                            .font(.system(size: 30, weight: .bold))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                        if let c = member.watchingCount, c > 0 {
-                            Text("\(c) watching")
-                                .font(.system(size: 18))
-                                .foregroundColor(.white.opacity(0.85))
-                        }
-                    }
-                    .padding(12)
-                )
-
-            if isMe {
-                Image(systemName: "star.fill")
-                    .font(.system(size: 22))
-                    .foregroundColor(.white)
-                    .padding(12)
-            }
-        }
-        .frame(height: 170)
-    }
-}
