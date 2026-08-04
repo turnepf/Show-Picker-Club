@@ -81,6 +81,9 @@ struct WatchDetailView: View {
                     if let mine = ratings.mine {
                         row("Your rating", "\(mine)/10")
                     }
+                    if let clubSeasons = clubSeasonRatingsText {
+                        row("Club seasons", clubSeasons)
+                    }
                     if let seasons = mySeasonRatingsText {
                         row("Your seasons", seasons)
                     }
@@ -127,6 +130,15 @@ struct WatchDetailView: View {
         if let b = s.backdropUrl, !b.isEmpty, let url = URL(string: b) { return (url, true) }
         if let p = s.posterUrl, !p.isEmpty, let url = URL(string: p) { return (url, false) }
         return nil
+    }
+
+    // "S1 8.2 · S2 7.9" — what the club averaged per season, which the web
+    // shows and the wrist was missing. Only seasons anyone has rated.
+    private var clubSeasonRatingsText: String? {
+        guard let seasons = ratings?.seasons, !seasons.isEmpty else { return nil }
+        return seasons.keys.sorted()
+            .compactMap { s in seasons[s].map { String(format: "S%d %.1f", s, $0.average) } }
+            .joined(separator: " · ")
     }
 
     // "S1 8 · S2 9" — only the seasons I've actually rated.

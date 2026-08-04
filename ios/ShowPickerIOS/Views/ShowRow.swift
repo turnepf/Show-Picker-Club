@@ -64,6 +64,21 @@ extension AllShow: ShowRowDisplayable {
     var rowIsFullSeries: Bool { isFullSeries }
 }
 
+// A vibe pick draws as an ordinary show card — the API attaches a live copy's
+// artwork and season data for exactly that.
+extension VibePick: ShowRowDisplayable {
+    var rowTitle: String { title }
+    var rowPosterUrl: String? { posterUrl }
+    var rowNetwork: String? { network }
+    var rowRating: String? { rating }
+    var rowIsMovie: Bool { (movie ?? 0) == 1 }
+    var rowIsFullSeries: Bool { (fullSeries ?? 0) == 1 }
+    var rowSeasonsText: String? {
+        guard let n = seasonsReleased, n > 0 else { return nil }
+        return "\(n) season\(n == 1 ? "" : "s")"
+    }
+}
+
 extension RateBacklogShow: ShowRowDisplayable {
     var rowTitle: String { title }
     var rowPosterUrl: String? { posterUrl }

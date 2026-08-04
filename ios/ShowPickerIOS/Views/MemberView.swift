@@ -279,8 +279,16 @@ struct MemberView: View {
         }
     }
 
-    // Short description of what each list is for, shown under the tab picker.
+    // Short description of what each list is for, shown under the tab picker,
+    // with the list's own count on the end the way the web writes it —
+    // "(12 shows)" answers "how big is this list" without counting rows.
     private func listHelp(_ list: ShowList) -> String {
+        let n = shows.filter { $0.list == list.rawValue && !$0.isArchived }.count
+        let suffix = n > 0 ? " (\(n) show\(n == 1 ? "" : "s"))" : ""
+        return listBlurb(list) + suffix
+    }
+
+    private func listBlurb(_ list: ShowList) -> String {
         switch list {
         case .watching:     return "Shows you're actively watching."
         case .waiting:      return "Between seasons — premiere dates show on the calendar feed."

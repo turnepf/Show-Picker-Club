@@ -471,6 +471,13 @@ enum API {
         return (r.group, r.invite)
     }
 
+    // Creator only; 403 for anyone else. Returns the renamed group.
+    static func renameGroup(id: Int, name: String) async throws -> Group {
+        struct RenameResponse: Decodable { let group: Group }
+        let r: RenameResponse = try await sendJSON(method: "PATCH", path: "/api/groups/\(id)", body: ["name": name])
+        return r.group
+    }
+
     static func generateGroupInvite(groupId: Int) async throws -> GroupInvite {
         try await postJSON("/api/groups/\(groupId)/invite", body: [:])
     }

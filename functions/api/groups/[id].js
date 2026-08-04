@@ -65,6 +65,49 @@ export async function onRequestGet(context) {
   }), { headers: corsHeaders() });
 }
 
+// Rename a group. Creator only — the same bar as deleting it. groups.html has
+// been calling this since private groups shipped; the handler never existed,
+// so every rename came back 405.
+export async function onRequestPatch(context) {
+  const { env, request, params } = context;
+  const session = await getSession(request, env);
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders() });
+  }
+
+  const groupId = parseInt(params.id, 10);
+  if (!Number.isInteger(groupId)) {
+    return new Response(JSON.stringify({ error: 'Invalid group ID' }), { status: 400, headers: corsHeaders() });
+  }
+
+  let body = {};
+  try { body = await request.json(); } catch (e) {}
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  if (!name) {
+    return new Response(JSON.stringify({ error: 'Group name is required' }), { status: 400, headers: corsHeaders() });
+  }
+
+  const existing = await env.DB.prepare('SELECT creator_slug FROM groups WHERE id = ?').bind(groupId).first();
+  if (!existing) {
+    return new Response(JSON.stringify({ error: 'Group not found' }), { status: 404, headers: corsHeaders() });
+  }
+  if (existing.creator_slug !== session.member_slug) {
+    return new Response(JSON.stringify({ error: 'Only the creator can rename a group' }), { status: 403, headers: corsHeaders() });
+  }
+
+  await env.DB.prepare('UPDATE groups SET name = ? WHERE id = ?').bind(name, groupId).run();
+
+  // Same group shape every other endpoint returns, so clients can swap it in.
+  const group = await env.DB.prepare(
+    `SELECT id, name, creator_slug, created_at,
+            (SELECT COUNT(*) FROM group_members WHERE group_id = groups.id) AS member_count,
+            CASE WHEN creator_slug = ? THEN 1 ELSE 0 END AS is_creator
+     FROM groups WHERE id = ?`
+  ).bind(session.member_slug, groupId).first();
+
+  return new Response(JSON.stringify({ group }), { headers: corsHeaders() });
+}
+
 export async function onRequestDelete(context) {
   const { env, request, params } = context;
   const session = await getSession(request, env);
@@ -94,7 +137,7 @@ export async function onRequestOptions() {
   return new Response(null, {
     headers: {
       'Access-Control-Allow-Origin': 'https://showpicker.club',
-      'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, PATCH, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },
   });

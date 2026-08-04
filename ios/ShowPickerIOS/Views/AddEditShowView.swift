@@ -10,6 +10,12 @@ struct AddEditShowView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
     @State private var network = ""
+    // Free-text network for anything outside the canonical list. Selecting
+    // "Network not listed…" reveals the field; an existing row whose network
+    // isn't canonical (set on the web, or inherited from enrichment) opens
+    // straight into it rather than silently losing its value to the picker.
+    @State private var customNetwork = ""
+    private static let otherNetworkTag = "__other"
     @State private var list: ShowList = .watching
     @State private var notes = ""
     @State private var recommendedBy = ""
@@ -45,6 +51,17 @@ struct AddEditShowView: View {
                         ForEach(CANONICAL_NETWORKS, id: \.self) { n in
                             Text(n).tag(n)
                         }
+                        // The canonical list covers the services the club
+                        // actually uses; anything else (a regional channel,
+                        // a sports tier) was simply unenterable before. The
+                        // server canonicalizes what it recognizes and keeps
+                        // the rest as typed.
+                        Text("Network not listed…").tag(Self.otherNetworkTag)
+                    }
+                    if network == Self.otherNetworkTag {
+                        TextField("Network name", text: $customNetwork)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.words)
                     }
                 } footer: {
                     if !titleHits.isEmpty {
@@ -123,7 +140,13 @@ struct AddEditShowView: View {
     private func prefill() {
         guard let s = existing else { return }
         title = s.title
-        network = s.network ?? ""
+        let existingNetwork = s.network ?? ""
+        if !existingNetwork.isEmpty && !CANONICAL_NETWORKS.contains(existingNetwork) {
+            customNetwork = existingNetwork
+            network = Self.otherNetworkTag
+        } else {
+            network = existingNetwork
+        }
         list = ShowList(rawValue: s.list) ?? .watching
         notes = s.notes ?? ""
         recommendedBy = s.recommendedBy ?? ""
@@ -138,7 +161,10 @@ struct AddEditShowView: View {
         errorText = nil
         defer { saving = false }
         let t = title.trimmingCharacters(in: .whitespaces)
-        let net = network.isEmpty ? nil : network
+        let chosen = network == Self.otherNetworkTag
+            ? customNetwork.trimmingCharacters(in: .whitespaces)
+            : network
+        let net = chosen.isEmpty ? nil : chosen
         let n = notes.trimmingCharacters(in: .whitespaces).isEmpty ? nil : notes
         let rec = recommendedBy.trimmingCharacters(in: .whitespaces).isEmpty ? nil : recommendedBy
         let ww = watchingWith.trimmingCharacters(in: .whitespaces).isEmpty ? nil : watchingWith

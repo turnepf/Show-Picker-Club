@@ -9,7 +9,11 @@ struct SubscriptionAuditView: View {
     @State private var loading = true
     @State private var addingService = false
     @State private var newServiceName = ""
+    @State private var newServicePrice = ""
     @State private var errorText: String?
+    // Network currently being saved inline, so its controls can't be
+    // double-tapped while the round trip is in flight.
+    @State private var saving: String?
     @State private var showingHousehold = false
 
     var body: some View {
@@ -43,21 +47,27 @@ struct SubscriptionAuditView: View {
                         Text(money(a.totals.potentialSavingsCents))
                             .foregroundStyle(a.totals.potentialSavingsCents > 0 ? .green : .secondary)
                     }
+                    // The headline the numbers add up to — the web leads with
+                    // this, and it's the whole reason to open the screen.
+                    Text(a.totals.potentialSavingsCents > 0
+                         ? "You could trim about \(money(a.totals.potentialSavingsCents))/mo by pausing or cancelling the services nothing on your list needs right now."
+                         : "Everything you're paying for is pulling its weight right now. Nice.")
+                        .font(.callout)
+                        .foregroundStyle(a.totals.potentialSavingsCents > 0 ? .primary : .secondary)
                 } header: {
                     Text("Totals")
                 } footer: {
                     Text("Estimated from standard plan prices. Edit any service to set your real price.")
                 }
 
-                ForEach(a.services) { svc in
+                if a.services.isEmpty {
                     Section {
-                        NavigationLink {
-                            SubscriptionServiceEditView(service: svc) { await load() }
-                        } label: {
-                            serviceRow(svc)
-                        }
+                        Text("No streaming services to audit yet. Once you add shows with a network on your list, they'll show up here grouped by service — with a keep / pause / cancel call for each.")
+                            .foregroundStyle(.secondary)
                     }
                 }
+
+                bucketSections(a)
 
                 Section {
                     Button {
@@ -66,7 +76,11 @@ struct SubscriptionAuditView: View {
                         Label("Add a service", systemImage: "plus.circle")
                     }
                 } footer: {
-                    Text("Track a service you pay for that isn't tied to any show on your lists.")
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Track a service you pay for that isn't tied to any show on your lists.")
+                        Text("💡 Set a resubscribe date on a paused service and it lands on your Shows calendar, right next to your premiere and finale dates.")
+                        Text("Audited from the shows on your list · \(a.today)")
+                    }
                 }
             } else if !loading {
                 Section {
@@ -82,10 +96,12 @@ struct SubscriptionAuditView: View {
         .refreshable { await load() }
         .alert("Add a service", isPresented: $addingService) {
             TextField("Service name", text: $newServiceName)
-            Button("Cancel", role: .cancel) { newServiceName = "" }
+            TextField("Monthly price", text: $newServicePrice)
+                .keyboardType(.decimalPad)
+            Button("Cancel", role: .cancel) { newServiceName = ""; newServicePrice = "" }
             Button("Add") { Task { await addManual() } }
         } message: {
-            Text("Enter the name of a streaming service you pay for.")
+            Text("Enter the name of a streaming service you pay for, and what it costs per month.")
         }
         .sheet(isPresented: $showingHousehold) {
             NavigationStack {
@@ -98,6 +114,144 @@ struct SubscriptionAuditView: View {
         let hh = a.household ?? []
         if hh.isEmpty { return "Just your shows" }
         return "You + " + hh.map(\.name).joined(separator: ", ")
+    }
+
+    // verdict → bucket, mirroring subscriptions.html so the two screens tell
+    // the same story in the same order.
+    private struct Bucket {
+        let key: String
+        let title: String
+        let blurb: String
+        let verdicts: [String]
+    }
+
+    private static let buckets: [Bucket] = [
+        Bucket(key: "keep", title: "Keep", blurb: "you're watching something here now", verdicts: ["keep"]),
+        Bucket(key: "pause", title: "Pause & save", blurb: "nothing active — cancel and come back", verdicts: ["pause", "pause_tba"]),
+        Bucket(key: "start", title: "Start or skip", blurb: "queued up but not started", verdicts: ["start"]),
+        Bucket(key: "cancel", title: "Cancel candidates", blurb: "nothing here needs you", verdicts: ["cancel"]),
+        Bucket(key: "manual", title: "Other services", blurb: "tracked manually", verdicts: ["manual"]),
+    ]
+
+    // Grouped by what to DO about each service, not alphabetically: the same
+    // buckets, order and blurbs as the web. Kept out of `body` so the view
+    // builder there stays small enough to type-check quickly.
+    @ViewBuilder
+    private func bucketSections(_ a: SubscriptionAudit) -> some View {
+        ForEach(Self.buckets, id: \.key) { bucket in
+            let items = a.services.filter { bucket.verdicts.contains($0.verdict) }
+            if !items.isEmpty {
+                Section {
+                    ForEach(items) { svc in
+                        serviceCard(svc)
+                    }
+                } header: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(bucket.title) · \(items.count)")
+                        Text(bucket.blurb)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .textCase(nil)
+                    }
+                }
+            }
+        }
+    }
+
+    // One service: the summary row, the reason it landed in this bucket, the
+    // status control, the resubscribe date when it's relevant, and the shows
+    // behind the verdict. Status and date save on the spot — the edit screen
+    // is now only needed for the price.
+    @ViewBuilder
+    private func serviceCard(_ svc: SubscriptionService) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            serviceRow(svc)
+
+            Text(reason(svc))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Picker("Status", selection: Binding(
+                get: { svc.effectiveStatus },
+                set: { newValue in Task { await setStatus(svc, newValue) } }
+            )) {
+                Text("Subscribed").tag("subscribed")
+                Text("Paused").tag("paused")
+                Text("Cancelled").tag("cancelled")
+            }
+            .pickerStyle(.segmented)
+            .disabled(saving == svc.network)
+
+            // Paused, or the audit thinks it should be: put the date one tap
+            // away, pre-filled with the suggestion.
+            if svc.effectiveStatus == "paused" || svc.verdict == "pause" || svc.verdict == "pause_tba" {
+                DatePicker(
+                    "Resubscribe",
+                    selection: Binding(
+                        get: { Self.parseDay(svc.resubscribeDate ?? svc.suggestedResubscribeDate) ?? Date() },
+                        set: { newValue in Task { await setResubscribe(svc, newValue) } }
+                    ),
+                    displayedComponents: .date
+                )
+                .font(.callout)
+                .disabled(saving == svc.network)
+            }
+
+            if !svc.shows.isEmpty {
+                DisclosureGroup("Why? (\(svc.shows.count) show\(svc.shows.count == 1 ? "" : "s"))") {
+                    ForEach(svc.shows) { sh in
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(ShowList(rawValue: sh.list)?.title ?? sh.list.capitalized)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 64, alignment: .leading)
+                            Text(sh.title + ((sh.fullSeries ?? 0) == 1 ? " (ended)" : ""))
+                                .font(.caption)
+                            Spacer()
+                            if let d = sh.nextSeasonDate, !d.isEmpty {
+                                Text("returns \(Self.longDay(d))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                .font(.caption)
+            }
+
+            NavigationLink {
+                SubscriptionServiceEditView(service: svc) { await load() }
+            } label: {
+                Text(svc.isManual ? "Price & details" : "Price")
+                    .font(.caption)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    // "Cancel and resubscribe around Mar 2026, when Severance returns" —
+    // naming the show is what makes the verdict act on, not just a label.
+    private func reason(_ svc: SubscriptionService) -> String {
+        switch svc.verdict {
+        case "keep":
+            let watching = svc.shows.filter { $0.list == "watching" }.map(\.title)
+            let head = watching.prefix(3).joined(separator: ", ")
+            return "Active now: \(head)\(watching.count > 3 ? "…" : "")."
+        case "pause":
+            let returning = svc.shows.first { $0.list == "waiting" && $0.nextSeasonDate == svc.suggestedResubscribeDate }
+            let who = returning?.title ?? "A show"
+            let when = Self.monthYear(svc.suggestedResubscribeDate)
+            return "Nothing to watch right now. Cancel and resubscribe around \(when), when \(who) returns."
+        case "pause_tba":
+            return "Nothing active. You're waiting on a renewal, but no premiere date is announced yet — pause until one is."
+        case "start":
+            return "You have shows queued up here but aren't watching any yet. Start one this month or skip the service."
+        case "cancel":
+            return "Nothing watching, waiting, or up next — your shows here are finished. Safe to cancel."
+        default:
+            return "Tracked manually — no shows on your lists use it."
+        }
     }
 
     private func serviceRow(_ svc: SubscriptionService) -> some View {
@@ -136,12 +290,81 @@ struct SubscriptionAuditView: View {
         audit = try? await API.subscriptions()
     }
 
+    // Inline saves: change lands immediately, then the audit reloads so the
+    // verdict buckets and totals re-sort around it.
+    @MainActor
+    private func setStatus(_ svc: SubscriptionService, _ status: String) async {
+        saving = svc.network
+        defer { saving = nil }
+        do {
+            try await API.updateSubscription(network: svc.network, status: status,
+                                             isManual: svc.isManual ? true : nil)
+            errorText = nil
+        } catch {
+            errorText = API.failureLine(error, action: "update \(svc.network)")
+        }
+        await load()
+    }
+
+    @MainActor
+    private func setResubscribe(_ svc: SubscriptionService, _ date: Date) async {
+        saving = svc.network
+        defer { saving = nil }
+        do {
+            try await API.updateSubscription(network: svc.network,
+                                             resubscribeDate: .some(Self.dayString(date)),
+                                             isManual: svc.isManual ? true : nil)
+            errorText = nil
+        } catch {
+            errorText = API.failureLine(error, action: "set the date for \(svc.network)")
+        }
+        await load()
+    }
+
+    // Dates on the wire are plain "YYYY-MM-DD" days, not timestamps.
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    private static func parseDay(_ s: String?) -> Date? {
+        guard let s, !s.isEmpty else { return nil }
+        return dayFormatter.date(from: s)
+    }
+
+    private static func dayString(_ d: Date) -> String { dayFormatter.string(from: d) }
+
+    // "Mar 2026" for the resubscribe sentence.
+    private static func monthYear(_ s: String?) -> String {
+        guard let date = parseDay(s) else { return "then" }
+        let f = DateFormatter()
+        f.dateFormat = "MMM yyyy"
+        return f.string(from: date)
+    }
+
+    // "Mar 3, 2026" for the per-show return dates.
+    private static func longDay(_ s: String) -> String {
+        guard let date = parseDay(s) else { return s }
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        return f.string(from: date)
+    }
+
     private func addManual() async {
         let name = newServiceName.trimmingCharacters(in: .whitespaces)
+        // Web takes the price in the same dialog; without it a new manual
+        // service lands at $0 and quietly skews the monthly total.
+        let cents = Double(newServicePrice.trimmingCharacters(in: .whitespaces)).map { Int($0 * 100) }
         newServiceName = ""
+        newServicePrice = ""
         guard !name.isEmpty else { return }
         do {
-            try await API.updateSubscription(network: name, status: "subscribed", isManual: true)
+            try await API.updateSubscription(network: name, status: "subscribed",
+                                             monthlyPriceCents: cents, isManual: true)
             errorText = nil
         } catch {
             errorText = API.failureLine(error, action: "add \(name)")

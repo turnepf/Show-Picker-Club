@@ -146,8 +146,17 @@ struct HomeView: View {
                             }
                         }
                     }
-                    if !popular.isEmpty {
+                    // Say why the shelf is bare instead of hiding it: a
+                    // failed fetch and a genuinely quiet month look identical
+                    // when the section just disappears.
+                    if !popular.isEmpty || !loading {
                         Section("Trending") {
+                            if popular.isEmpty {
+                                Text(loadFailed
+                                     ? "Couldn't load trending shows — pull down to try again."
+                                     : "Nothing trending yet.")
+                                    .foregroundStyle(.secondary)
+                            }
                             ForEach(popular) { show in
                                 NavigationLink(value: Route.detail(id: show.id, title: show.title, network: show.network, rating: show.rating)) {
                                     popularRow(show)
@@ -224,6 +233,13 @@ struct HomeView: View {
                 ShakePickView(show: pick).environmentObject(auth)
             }
             .onShake { Task { await handleShake() } }
+            // A link that needed a session (a group invite) waits for one
+            // rather than being dropped when the login sheet takes over.
+            .onChange(of: auth.memberSlug) { _, slug in
+                guard slug != nil, let link = pendingLink else { return }
+                pendingLink = nil
+                route(url: link)
+            }
             // Universal links (a shared showpicker.club/<member> URL tapped in
             // Messages, Mail, etc.) arrive one of two ways depending on launch
             // state, so handle both.
@@ -244,11 +260,43 @@ struct HomeView: View {
         guard let first = url.path.split(separator: "/").first.map({ String($0).lowercased() }) else { return }
         if let show = Route.showLink(url) { path = [show]; return }
         if first == "whats-new" { path = [.whatsNew]; return }
+        // A group invite (/groups/join?token=…) is the whole point of the
+        // share link, so joining IS the navigation: accept the token, then
+        // land on the group. Already a member (409) still opens the group.
+        if first == "groups" {
+            if let token = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "token" })?.value, !token.isEmpty {
+                Task { await joinFromInvite(token, link: url) }
+            } else {
+                path = [.groups]
+            }
+            return
+        }
         let slug = first == "dorothy" ? "whitt" : first // mirror the web's 301
         if let m = members.first(where: { $0.slug == slug }) {
             path = [.member(m)]
         } else if members.isEmpty {
             pendingLink = url
+        }
+    }
+
+    // Accept a group invite and land on the group. Logged out, the token is
+    // parked and replayed once the session resolves — the invite is what
+    // brought them here, so losing it to the login sheet would waste the tap.
+    // A failed join (expired token, or already a member — the endpoint answers
+    // 409 without a body we read) still lands on Groups rather than nowhere.
+    @MainActor
+    private func joinFromInvite(_ token: String, link: URL) async {
+        guard auth.memberSlug != nil else {
+            pendingLink = link
+            showingLogin = true
+            return
+        }
+        do {
+            let result = try await API.joinGroup(token: token)
+            path = [.groups, .groupDetail(result.groupId)]
+        } catch {
+            path = [.groups]
         }
     }
 

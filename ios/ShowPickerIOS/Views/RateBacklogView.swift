@@ -76,11 +76,15 @@ struct RateBacklogView: View {
 }
 
 // One row: the shared show card with the rating tap-row dropped in under the
-// text. "Rate seasons" links to the full detail screen for TV shows with a
-// known season count.
+// text, and a link to the full detail screen — "Rate seasons" for a TV show
+// with a known season count, plain "View" otherwise.
 private struct RateBacklogRow: View {
     let show: RateBacklogShow
     let onRate: (Int) async -> Void
+
+    private var hasSeasons: Bool {
+        !show.isMovie && (show.seasonsReleased ?? 0) > 0
+    }
 
     var body: some View {
         // No star rating on the right: the point of this row is the score
@@ -97,14 +101,16 @@ private struct RateBacklogRow: View {
                 VStack(alignment: .leading, spacing: 6) {
                     // Season-level rating lives on the detail screen rather
                     // than duplicating that UI in a condensed list.
-                    if !show.isMovie, let n = show.seasonsReleased, n > 0 {
-                        NavigationLink("Rate seasons") {
-                            ShowDetailView(id: show.id, initialTitle: show.title,
-                                           initialNetwork: nil, initialRating: nil,
-                                           initialPoster: show.posterUrl)
-                        }
-                        .font(.caption)
+                    // Season-level rating lives on the detail screen; a movie
+                    // (or a series with no season count) gets the same link
+                    // as a plain way through to the card, rather than being
+                    // the one row here with no route off the list.
+                    NavigationLink(hasSeasons ? "Rate seasons" : "View") {
+                        ShowDetailView(id: show.id, initialTitle: show.title,
+                                       initialNetwork: nil, initialRating: nil,
+                                       initialPoster: show.posterUrl)
                     }
+                    .font(.caption)
                     RatingTapRow(value: nil) { value in
                         Task { await onRate(value) }
                     }

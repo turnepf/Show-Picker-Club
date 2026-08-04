@@ -187,6 +187,19 @@ struct ShowDetailView: View {
                         }
                     } else if myCopy?.list == ShowList.next.rawValue {
                         LabeledContent("Your rating", value: "Start watching to rate")
+                    } else {
+                        // Can't rate here (logged out, or this is someone
+                        // else's copy) — the club's season averages are still
+                        // worth reading, which is what the web shows.
+                        ForEach(seasonNumbers, id: \.self) { s in
+                            if let avg = ratings.seasons[s] {
+                                // Plain label here: seasonLabel() folds the
+                                // average into the label for the entry rows,
+                                // which would say it twice in this branch.
+                                LabeledContent("Season \(s)",
+                                               value: String(format: "%.1f/10 (%d)", avg.average, avg.count))
+                            }
+                        }
                     }
                 }
             }
@@ -370,11 +383,12 @@ struct ShowDetailView: View {
     }
 
     // Inline comma list with tappable IMDB links — matches the web's cast
-    // card. Actors without an IMDB id (legacy rows the enrich backfill
-    // hasn't reached yet) stay plain text.
+    // card, which lists everyone the row stores (the enrichment caps the
+    // cast itself, so there's nothing to trim here). Actors without an IMDB
+    // id (legacy rows the enrich backfill hasn't reached yet) stay plain text.
     private var castLine: AttributedString {
         var line = AttributedString()
-        for (i, actor) in cast.prefix(8).enumerated() {
+        for (i, actor) in cast.enumerated() {
             if i > 0 { line += AttributedString(", ") }
             var name = AttributedString(actor.name)
             if let imdb = actor.imdbId, !imdb.isEmpty,

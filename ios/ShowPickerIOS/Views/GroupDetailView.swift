@@ -19,6 +19,8 @@ struct GroupDetailView: View {
     @State private var showingInvite = false
     @State private var confirmingLeave = false
     @State private var confirmingDelete = false
+    @State private var renaming = false
+    @State private var renameText = ""
     @State private var inviteUrl: String?
     @State private var inviteExpiry: String?
     @Environment(\.dismiss) private var dismiss
@@ -123,6 +125,12 @@ struct GroupDetailView: View {
                             Label("Leave", systemImage: "arrowshape.turn.up.left")
                         }
                         if group.isCreator {
+                            Button {
+                                renameText = group.name
+                                renaming = true
+                            } label: {
+                                Label("Rename", systemImage: "pencil")
+                            }
                             Button(role: .destructive) {
                                 confirmingDelete = true
                             } label: {
@@ -144,6 +152,11 @@ struct GroupDetailView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This can't be undone. Nobody in the group keeps access.")
+        }
+        .alert("Rename group", isPresented: $renaming) {
+            TextField("Group name", text: $renameText)
+            Button("Save") { Task { await rename() } }
+            Button("Cancel", role: .cancel) { }
         }
         .sheet(isPresented: $showingInvite) {
             inviteSheet
@@ -257,6 +270,17 @@ struct GroupDetailView: View {
         } catch {
             self.errorText = API.failureLine(error, action: "load group")
             loading = false
+        }
+    }
+
+    @MainActor
+    private func rename() async {
+        let name = renameText.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty, name != group?.name else { return }
+        do {
+            group = try await API.renameGroup(id: groupId, name: name)
+        } catch {
+            self.errorText = API.failureLine(error, action: "rename group")
         }
     }
 

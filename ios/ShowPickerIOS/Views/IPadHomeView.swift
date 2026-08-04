@@ -445,6 +445,21 @@ struct IPadHomeView: View {
         // roster, and leaves the sidebar selection alone.
         if let show = Route.showLink(url) { detailPath = [show]; return }
         if first == "whats-new" { selection = .whatsNew; return }
+        // Group invite: joining is the navigation. Selecting Groups first
+        // means a failed join (expired token, already a member) still lands
+        // somewhere useful.
+        if first == "groups" {
+            selection = .groups
+            if let token = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "token" })?.value, !token.isEmpty {
+                Task {
+                    if let result = try? await API.joinGroup(token: token) {
+                        detailPath = [.groupDetail(result.groupId)]
+                    }
+                }
+            }
+            return
+        }
         let slug = first == "dorothy" ? "whitt" : first // mirror the web's 301
         if members.contains(where: { $0.slug == slug }) {
             focusedSlug = slug

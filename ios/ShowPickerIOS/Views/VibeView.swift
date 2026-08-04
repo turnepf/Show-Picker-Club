@@ -13,6 +13,9 @@ struct VibeView: View {
     // The vibe fetch threw — "No vibe available" must not show over a
     // failed load.
     @State private var loadFailed = false
+    // Trait list starts at the four signals that carry the read; the rest are
+    // one tap away, matching the web's "Show all traits".
+    @State private var showAllTraits = false
 
     init(initialSlug: String) {
         self.initialSlug = initialSlug
@@ -63,11 +66,18 @@ struct VibeView: View {
             if let traits = m.displayTraits { traitsSection(traits) }
             if let b = m.balance { balanceSection(b) }
             if let c = m.cluster, c.blend.count > 1 { blendSection(c.blend) }
-            if let picks = m.alignedPicks, !picks.isEmpty {
-                pickSection("Shows aligned with this vibe", picks, canAdd: isOwnVibe)
-            }
-            if let outs = m.outlierPicks, !outs.isEmpty {
-                pickSection("Outliers on this list", outs, canAdd: false)
+            pickSection("Shows aligned with this vibe", m.alignedPicks ?? [],
+                        canAdd: isOwnVibe, empty: "No aligned picks available.")
+            pickSection("Outliers on this list", m.outlierPicks ?? [],
+                        canAdd: false, empty: "Not enough scored shows to find outliers.")
+            // What the fingerprint was actually computed from — without it
+            // the whole read is unfalsifiable.
+            if let scored = m.scoredCount, let active = m.activeCount, active > 0 {
+                Section {
+                    Text("Computed from \(scored) of \(active) active shows.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -86,46 +96,95 @@ struct VibeView: View {
         }
     }
 
+    // Top signals first, the rest behind a toggle — ten bars at once is a
+    // wall, and four of them carry the read. Each says in plain English what
+    // a high score means, same copy as the web.
     private func traitsSection(_ traits: [String: Int]) -> some View {
-        Section("Trait signals") {
-            ForEach(VIBE_TRAIT_ORDER, id: \.self) { key in
-                if let v = traits[key] {
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text(key).font(.subheadline)
-                            Spacer()
-                            Text("\(v)").font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
-                        }
-                        ProgressView(value: Double(v), total: 100)
-                            .tint(.accentColor)
-                    }
-                    .padding(.vertical, 2)
+        Section {
+            ForEach(VIBE_TOP_TRAITS, id: \.self) { key in
+                traitRow(key, traits[key])
+            }
+            if showAllTraits {
+                ForEach(VIBE_TRAIT_ORDER.filter { !VIBE_TOP_TRAITS.contains($0) }, id: \.self) { key in
+                    traitRow(key, traits[key])
                 }
             }
+            Button(showAllTraits ? "Show top signals" : "Show all traits") {
+                withAnimation { showAllTraits.toggle() }
+            }
+            .font(.callout)
+        } header: {
+            Text(showAllTraits ? "Full profile" : "Top signals")
+        }
+    }
+
+    @ViewBuilder
+    private func traitRow(_ key: String, _ value: Int?) -> some View {
+        if let v = value {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack {
+                    Text(key).font(.subheadline)
+                    Spacer()
+                    Text("\(v)").font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
+                }
+                ProgressView(value: Double(v), total: 100)
+                    .tint(.accentColor)
+                if let explain = VIBE_TRAIT_EXPLAIN[key] {
+                    Text(explain)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.vertical, 2)
         }
     }
 
     private func balanceSection(_ b: VibeBalance) -> some View {
         Section("Balance read") {
             LabeledContent("Warmth vs darkness", value: b.warmthDarknessLabel)
-            LabeledContent("Genre range", value: "\(b.range)/100")
+            VStack(alignment: .leading, spacing: 3) {
+                HStack {
+                    Text("Genre range")
+                    Spacer()
+                    Text("\(b.range)/100").foregroundStyle(.secondary)
+                }
+                // The web draws this one as a bar; a bare number doesn't say
+                // whether 38 is narrow or broad.
+                ProgressView(value: Double(b.range), total: 100)
+                    .tint(.accentColor)
+            }
+            .padding(.vertical, 2)
         }
     }
 
     private func blendSection(_ blend: [VibeBlendItem]) -> some View {
         Section("Your blend") {
             ForEach(blend) { item in
-                HStack {
-                    Text(item.name)
-                    Spacer()
-                    Text(pct(item.similarity)).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text(item.name)
+                        Spacer()
+                        Text(pct(item.similarity)).foregroundStyle(.secondary)
+                    }
+                    if let explain = VIBE_BLEND_EXPLAIN[item.name] {
+                        Text(explain)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
+                .padding(.vertical, 1)
             }
         }
     }
 
-    private func pickSection(_ title: String, _ picks: [VibePick], canAdd: Bool) -> some View {
+    private func pickSection(_ title: String, _ picks: [VibePick],
+                             canAdd: Bool, empty: String) -> some View {
         Section(title) {
+            if picks.isEmpty {
+                Text(empty).font(.callout).foregroundStyle(.secondary)
+            }
             ForEach(picks) { p in
                 VibePickRow(pick: p, canAdd: canAdd)
             }
@@ -146,6 +205,9 @@ struct VibeView: View {
     }
 }
 
+// A pick reads as an ordinary show card and opens the same detail screen as
+// every other row in the app — it used to be a text line with no way through.
+// The "+" asks which list and takes notes, rather than silently choosing.
 private struct VibePickRow: View {
     let pick: VibePick
     let canAdd: Bool
@@ -153,27 +215,28 @@ private struct VibePickRow: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var added = false
     @State private var adding = false
+    @State private var choosing = false
+    @State private var chosenList: ShowList = .next
+    @State private var notes = ""
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(pick.title).font(.body)
-                let meta = [pick.network, pick.rating.map { "★ \($0)" }]
-                    .compactMap { $0 }.joined(separator: " · ")
-                if !meta.isEmpty {
-                    Text(meta).font(.caption).foregroundStyle(.secondary)
+            if let id = pick.showId {
+                NavigationLink(value: Route.detail(id: id, title: pick.title,
+                                                   network: pick.network, rating: pick.rating)) {
+                    ShowRow(pick, caption: caption)
                 }
-                if let g = pick.genres, !g.isEmpty {
-                    Text(g).font(.caption2).foregroundStyle(.secondary)
-                }
+            } else {
+                // No live copy of this title anywhere in the club, so there's
+                // no show card to open — the row still adds.
+                ShowRow(pick, caption: caption)
             }
-            Spacer()
             if canAdd {
                 if added {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                 } else {
                     Button {
-                        Task { await add() }
+                        choosing = true
                     } label: {
                         Image(systemName: "plus.circle")
                     }
@@ -182,17 +245,40 @@ private struct VibePickRow: View {
                 }
             }
         }
+        .alert("Add \(pick.title)", isPresented: $choosing) {
+            TextField("Notes (optional)", text: $notes)
+            ForEach(ShowList.allCases) { l in
+                Button(l.title) {
+                    chosenList = l
+                    Task { await add() }
+                }
+            }
+            Button("Cancel", role: .cancel) { notes = "" }
+        } message: {
+            Text("Which list?")
+        }
+    }
+
+    // Genres ride in the caption line; the network is already ShowRow's
+    // default caption, so only replace it when there's a genre to show.
+    private var caption: String? {
+        guard let g = pick.genres, !g.isEmpty else { return nil }
+        guard let n = pick.network, !n.isEmpty else { return g }
+        return "\(n) · \(g)"
     }
 
     private func add() async {
         guard let mine = auth.memberSlug else { return }
         adding = true
         defer { adding = false }
+        let note = notes.trimmingCharacters(in: .whitespaces)
+        notes = ""
         do {
             _ = try await API.addShow(
                 memberSlug: mine, title: pick.title, network: pick.network,
-                networkUrl: pick.networkUrl, list: ShowList.next.rawValue,
-                notes: nil, recommendedBy: nil, movie: false, fullSeries: false,
+                networkUrl: pick.networkUrl, list: chosenList.rawValue,
+                notes: note.isEmpty ? nil : note, recommendedBy: nil,
+                movie: (pick.movie ?? 0) == 1, fullSeries: false,
                 watchingWith: nil)
             added = true
         } catch {

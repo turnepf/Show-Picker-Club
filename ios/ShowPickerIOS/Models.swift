@@ -540,12 +540,27 @@ struct VibePick: Codable, Identifiable {
     let rating: String?
     let genres: String?
     let actors: [String]?
+    // A representative live copy of the title, attached by enrichPick() in
+    // functions/api/vibe.js so a pick renders as an ordinary show card and
+    // opens the same detail screen as everywhere else. Absent only when no
+    // unarchived copy of the title exists anywhere in the club.
+    let showId: Int?
+    let posterUrl: String?
+    let movie: Int?
+    let seasonsReleased: Int?
+    let fullSeries: Int?
+    let nextSeasonDate: String?
     var id: String { title }
 
     enum CodingKeys: String, CodingKey {
-        case title, list, network, rating, genres, actors
+        case title, list, network, rating, genres, actors, movie
+        case showId = "id"
         case titleLower = "title_lower"
         case networkUrl = "network_url"
+        case posterUrl = "poster_url"
+        case seasonsReleased = "seasons_released"
+        case fullSeries = "full_series"
+        case nextSeasonDate = "next_season_date"
     }
 }
 
@@ -555,6 +570,35 @@ let VIBE_TRAIT_ORDER: [String] = [
     "Warmth", "Empathy", "Complexity", "Cynicism risk", "Power orientation",
     "Curiosity", "Healing & growth", "Chaos tolerance",
     "Humor (warm vs cruel)", "Optimism",
+]
+
+// The four signals the screen leads with; the rest sit behind "Show all
+// traits". Same set, order and copy as vibe.html — a trait that means one
+// thing on the web and another in the app is worse than no explanation.
+let VIBE_TOP_TRAITS: [String] = ["Complexity", "Warmth", "Curiosity", "Empathy"]
+
+let VIBE_TRAIT_EXPLAIN: [String: String] = [
+    "Warmth": "How much affection, found-family, and comfort your shows lean into.",
+    "Empathy": "How much your taste rewards understanding other people's inner lives.",
+    "Complexity": "Moral ambiguity, dense plotting, and prestige-drama feel.",
+    "Cynicism risk": "Distrustful, mean-humored, or nihilistic energy.",
+    "Power orientation": "Interest in hierarchies, status games, manipulation.",
+    "Curiosity": "Ideas, puzzles, intellectual depth, learning.",
+    "Healing & growth": "Characters working through wounds and finding redemption.",
+    "Chaos tolerance": "Comfort with unpredictable, anarchic, big-swing storytelling.",
+    "Humor (warm vs cruel)": "0 = humor at others' expense, 100 = humor that's kind.",
+    "Optimism": "Hopeful, life-affirming worldview vs. bleak.",
+]
+
+let VIBE_BLEND_EXPLAIN: [String: String] = [
+    "Curious Omnivore": "Watches broadly across prestige, comedy, and comfort.",
+    "Warm Comfort Viewer": "Found-family, soft-blanket shows; low on darkness.",
+    "Prestige Drama Loyalist": "Slow burns, ambitious craft, morally ambiguous leads.",
+    "Dark Complexity Seeker": "Heavy themes with empathy underneath, not nihilism.",
+    "Satirical Cynic": "Sharp irony at the expense of the powerful.",
+    "Power Game Watcher": "Status, scheming, who-controls-whom.",
+    "Chaos Goblin": "Unhinged, absurd, emotionally chaotic. Big swings.",
+    "Empathy & Healing Viewer": "Emotional repair, redemption, chosen family.",
 ]
 
 // MARK: - Admin: member contacts (/api/admin-member-emails)
