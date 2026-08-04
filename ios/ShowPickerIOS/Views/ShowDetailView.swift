@@ -21,6 +21,9 @@ struct ShowDetailView: View {
     // Average/count always present once the show has a tmdb_id; `mine`/
     // `owner` depend on the session — see RatingsSummary.
     @State private var ratings: RatingsSummary?
+    // Fellow group members with this title on their Watching list. Empty
+    // unless I'm in a group with someone who's watching it.
+    @State private var groupWatchers: [GroupWatcher] = []
 
     private var title: String { show?.title ?? initialTitle }
     private var network: String? { show?.network ?? initialNetwork }
@@ -73,9 +76,14 @@ struct ShowDetailView: View {
                 }
             }
 
-            // Where to watch + trailer.
+            // Who else is watching (group members), then where to watch +
+            // trailer. The group line sits directly above Network so the
+            // social context reads before the "go watch it" affordance.
             if hasWatchRow {
                 Section {
+                    if !groupWatchers.isEmpty {
+                        LabeledContent("Also watching", value: groupWatchersLine)
+                    }
                     if let n = network, !n.isEmpty {
                         // Spell the affordance out — a bare network name reads as
                         // a label, so nobody realized it was the way to the show.
@@ -237,6 +245,12 @@ struct ShowDetailView: View {
     // Whether the "where to watch" section has anything to show.
     private var hasWatchRow: Bool {
         (network.map { !$0.isEmpty } ?? false) || show?.trailerURL != nil
+            || !groupWatchers.isEmpty
+    }
+
+    // "Alex, Dana" — first names only, which is all the endpoint sends.
+    private var groupWatchersLine: String {
+        groupWatchers.map(\.name).joined(separator: ", ")
     }
     private var hasDirector: Bool { (show?.director.map { !$0.isEmpty }) ?? false }
     private var hasCatalog: Bool {
@@ -381,7 +395,11 @@ struct ShowDetailView: View {
 
     private func load() async {
         if let id {
-            if let r = try? await API.showDetail(id: id) { show = r.show; ratings = r.ratings }
+            if let r = try? await API.showDetail(id: id) {
+                show = r.show
+                ratings = r.ratings
+                groupWatchers = r.groupWatchers ?? []
+            }
             cast = (try? await API.actors(showId: id)) ?? []
         }
         await refreshMyCopy()

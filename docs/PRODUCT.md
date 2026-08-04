@@ -40,6 +40,14 @@ Members only fill in title, network, and recommender — the rest is automatic. 
 
 The network dropdown lists only the modern streaming-service brand (HBO Max, Paramount+, Peacock, Hulu, Disney+, Apple TV+, Amazon Prime Video, Netflix, Starz, AMC+, Food Network, Fox, BritBox, YouTube) with parenthetical aliases that name the sub-brands they carry (e.g. "Paramount+ (including CBS, MTV, Comedy Central, Nickelodeon, BET, Showtime)"). If a member ever submits an old or sub-brand name like `HBO`, `NBC`, `Bravo`, or `FX` — via API or by pasting — it gets folded to the canonical streamer on save. See [`ARCHITECTURE.md`](ARCHITECTURE.md#networks) for the full mapping.
 
+### Also watching (groups)
+
+The show card names the other members of your groups who have that same title on their **Watching** list — an "Also watching: Alex, Dana" line sitting directly above Network. It appears wherever the card opens (your own list, another member's list, Trending, search), not only inside a group screen, and it's silent when nobody in your groups is watching it or you're in no groups.
+
+Only people you already share a group with can appear, and only their first names — the line never reveals a stranger's library, and it shows nothing to a logged-out visitor. You and the member whose copy you're looking at are both left out (you know your own lists, and their list is already on screen).
+
+Platforms: iPhone/iPad show it above Network on the show card; Apple TV shows the same line above the watch button (which is where the TV names the network). The watch app doesn't — private groups were dropped there. The web app is frozen and doesn't get it.
+
 ## Authentication
 
 A member logs in with a one-time code sent to their phone (SMS via Twilio Verify) or email (via Resend, validated against `login_otps`), or with Sign in with Apple (web, iOS, and tvOS). All paths resolve to an existing member and set a 30-day HttpOnly session cookie. There are no static per-member passwords.

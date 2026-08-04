@@ -221,7 +221,7 @@ The complete map:
 | `GET /api/shows/all`                   | `functions/api/shows/all.js`               | GET     | session |
 | `GET /api/shows/check`                 | `functions/api/shows/check.js`             | GET     | session |
 | `POST /api/shows/share`                | `functions/api/shows/share.js`             | POST    | retired 2026-07 — returns 410 Gone |
-| `GET /api/shows/[id]`                  | `functions/api/shows/[id].js`              | GET     | none; catalog fields only unless the session owns the show (notes, watching_with, recommended_by are owner-only) |
+| `GET /api/shows/[id]`                  | `functions/api/shows/[id].js`              | GET     | none; catalog fields only unless the session owns the show (notes, watching_with, recommended_by are owner-only). `group_watchers` is session-only and group-scoped — see below |
 | `PUT /api/shows/[id]`                  | `functions/api/shows/[id].js`              | PUT     | session |
 | `DELETE /api/shows/[id]`               | `functions/api/shows/[id].js`              | DELETE  | session |
 | `PUT /api/shows/[id]/move`             | `functions/api/shows/[id]/move.js`         | PUT     | session |
@@ -268,6 +268,7 @@ The `[slug]` param matches the full final segment (including `.ics`); the handle
 
   Rows are ordered by `last_activity_at DESC NULLS LAST, name`. Every client roster (web home + member-page sidebar, iPhone/iPad home, Apple TV home) keeps that order — most recent activity first, with the active-show count (Watching + Next Up + Loved) only as a tiebreaker. The web home features the top 6; the rest go behind a "Show all members" disclosure.
 - `GET /api/shows?member=<slug>&include_archived=1` — `include_archived=1` is set by the per-member search modal so archived rows can be found.
+- `GET /api/shows/[id]` — `group_watchers`: a sibling of `show`/`ratings`, listing other members of the *viewer's* groups who have this same title on their Watching list (`{ slug, name }`, first names only, sorted). Session-only and group-scoped — the viewer and the row's owner are both excluded, and nobody the viewer doesn't already share a group with can appear, so this stays inside the "everything derived from members' libraries needs a session" rule. Copies are matched the same way the rest of the app matches a title across members: `tmdb_id` when the row has one, else case-insensitive title. `[]` for a logged-out visitor or a member in no groups. Rendered as the "Also watching" row directly above Network on the iOS show card and directly above the watch button on tvOS.
 
 ## Authentication
 

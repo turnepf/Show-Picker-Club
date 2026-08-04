@@ -24,6 +24,46 @@ const PUBLIC_SHOW_FIELDS = [
   'director', 'director_imdb_id', 'runtime', 'release_year', 'watch_link',
 ];
 
+// Other members of the viewer's groups who have this same title on their
+// Watching list. Group-scoped by design: only people the viewer already
+// shares a group with are named, and only ever their first name — nothing
+// about a stranger's library leaks. The viewer and the row's owner are both
+// left out (the viewer knows their own lists, and the owner's list is
+// already on screen).
+//
+// Titles are matched the way the rest of the app matches copies across
+// members: by tmdb_id when the row has one, else case-insensitively by
+// title. Returns [] for a logged-out visitor or a member in no groups.
+async function groupWatchers(env, show, viewerSlug) {
+  if (!viewerSlug) return [];
+  const { results } = await env.DB.prepare(
+    `SELECT DISTINCT m.slug, m.first_name, m.name
+       FROM shows s
+       INNER JOIN members m ON m.slug = s.member_slug
+      WHERE s.archived = 0
+        AND s.list = 'watching'
+        AND s.member_slug != ?
+        AND s.member_slug != ?
+        AND s.member_slug IN (
+          SELECT gm.member_slug FROM group_members gm
+           WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE member_slug = ?)
+        )
+        AND (LOWER(s.title) = LOWER(?) OR (? IS NOT NULL AND s.tmdb_id = ?))
+      ORDER BY m.first_name, m.name`
+  ).bind(
+    viewerSlug,
+    show.member_slug,
+    viewerSlug,
+    show.title,
+    show.tmdb_id ?? null,
+    show.tmdb_id ?? null
+  ).all();
+  return (results || []).map((m) => ({
+    slug: m.slug,
+    name: m.first_name || (m.name || '').split(' ')[0] || m.slug,
+  }));
+}
+
 export async function onRequestGet(context) {
   const { env, request, params } = context;
   const show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(params.id).first();
@@ -52,11 +92,14 @@ export async function onRequestGet(context) {
     ratings.ownerName = (owner && (owner.first_name || (owner.name || '').split(' ')[0])) || show.member_slug;
   }
 
+  // Who else in the viewer's groups is watching this — session only.
+  const group_watchers = await groupWatchers(env, show, session ? session.member_slug : null);
+
   // Full row (notes, watching_with, recommended_by, added_by) is for the
   // show's owner only. Other members get catalog fields plus enough context
   // to say "on Watching · <member>"; logged-out visitors get catalog only.
   if (session && session.member_slug === show.member_slug) {
-    return new Response(JSON.stringify({ show, ratings }), { headers: corsHeaders() });
+    return new Response(JSON.stringify({ show, ratings, group_watchers }), { headers: corsHeaders() });
   }
   const redacted = {};
   for (const k of PUBLIC_SHOW_FIELDS) if (k in show) redacted[k] = show[k];
@@ -64,7 +107,7 @@ export async function onRequestGet(context) {
     redacted.list = show.list;
     redacted.member_slug = show.member_slug;
   }
-  return new Response(JSON.stringify({ show: redacted, ratings }), { headers: corsHeaders() });
+  return new Response(JSON.stringify({ show: redacted, ratings, group_watchers }), { headers: corsHeaders() });
 }
 
 export async function onRequestPut(context) {

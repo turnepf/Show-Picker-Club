@@ -2,6 +2,10 @@
   "_comment": "Single source of truth for What's New on every platform. The web page (whats-new.html) and the iOS app (WhatsNewView) both render this file. Keep bodies plain text; put a hyperlink in `link` (web renders it, apps ignore it). Entries whose features need a new app build wait in `coming_soon` until the build ships, then move into `entries` with a date. Dates are M/D.",
   "coming_soon": [
     {
+      "title": "See who else in your groups is watching.",
+      "body": "Open any show and you'll see which of your group members already have it on their Watching list — right above the network, wherever the show card opens. Only people you share a group with ever show up, and only their first names. On iPhone and iPad it reads “Also watching: …” above Network; Apple TV shows the same line above the watch button."
+    },
+    {
       "title": "Rate your backlog on iPhone and iPad.",
       "body": "Rate a show right from its detail screen, or knock out your whole unrated backlog from a new “Rate my backlog” screen — next to Subscription audit on Home, the iPad sidebar, and your own page. Works offline too: rate a show with no connection and it queues up and syncs the moment you're back online. Apple TV and Apple Watch show ratings but stay view-only, same as everywhere else on those apps."
     },

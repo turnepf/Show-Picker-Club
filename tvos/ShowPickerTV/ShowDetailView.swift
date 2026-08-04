@@ -28,6 +28,9 @@ struct ShowDetailView: View {
     // populates only when viewing a specific other member's copy. tvOS is
     // view-only for ratings — rate from iPhone/iPad.
     @State private var ratings: RatingsSummary?
+    // Fellow group members with this title on their Watching list. Empty
+    // unless I'm in a group with someone who's watching it.
+    @State private var groupWatchers: [GroupWatcher] = []
     @Environment(\.openURL) private var openURL
 
     private var title: String { show?.title ?? initialTitle }
@@ -103,6 +106,10 @@ struct ShowDetailView: View {
 
                         if let s = show { metaRows(s) }
 
+                        // Who else in my groups is watching this. It sits
+                        // directly above the watch button, which is where
+                        // this screen names the network.
+                        groupWatchingLine
                         watchButton
                         trailerButton
 
@@ -422,6 +429,17 @@ struct ShowDetailView: View {
         return "Next episode: \(r)"
     }
 
+    // "Also watching: Alex, Dana" — first names of the other members of my
+    // groups who have this on Watching. Nothing renders when there are none.
+    @ViewBuilder private var groupWatchingLine: some View {
+        if !groupWatchers.isEmpty {
+            Label("Also watching: \(groupWatchers.map(\.name).joined(separator: ", "))",
+                  systemImage: "person.2.fill")
+                .font(.system(size: 24))
+                .foregroundColor(Theme.text.opacity(0.7))
+        }
+    }
+
     @ViewBuilder private var watchButton: some View {
         if let s = show, s.hasRealUrl, let urlStr = s.networkUrl, let url = URL(string: urlStr) {
             Button {
@@ -600,7 +618,11 @@ struct ShowDetailView: View {
         async let actors = API.actors(showId: id)
 
         if skipITunes {
-            if let r = try? await detail { show = r.show; ratings = r.ratings }
+            if let r = try? await detail {
+                show = r.show
+                ratings = r.ratings
+                groupWatchers = r.groupWatchers ?? []
+            }
             cast = (try? await actors) ?? []
             await refreshMyCopy()
             lookedUp = true
@@ -608,7 +630,11 @@ struct ShowDetailView: View {
         }
 
         async let appleURL = API.appleTVLookup(title: initialTitle)
-        if let r = try? await detail { show = r.show; ratings = r.ratings }
+        if let r = try? await detail {
+            show = r.show
+            ratings = r.ratings
+            groupWatchers = r.groupWatchers ?? []
+        }
         cast = (try? await actors) ?? []
         appleTVUrl = await appleURL
         await refreshMyCopy()

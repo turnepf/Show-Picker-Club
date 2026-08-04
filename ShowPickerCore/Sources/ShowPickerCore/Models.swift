@@ -266,13 +266,36 @@ public struct ShowsResponse: Codable, Sendable { public let shows: [Show] }
 public struct ShowResponse: Codable, Sendable {
     public let show: Show
     public let ratings: RatingsSummary?
+    // Other members of MY groups with this same title on their Watching
+    // list — a sibling of `show` too, and empty unless the viewer is in a
+    // group with someone who's watching it.
+    public let groupWatchers: [GroupWatcher]?
 
     // Explicit public init — the synthesized memberwise init is only
     // internal even though the struct is public, so other modules (the
     // apps' offline-cache fallbacks) couldn't construct one without this.
-    public init(show: Show, ratings: RatingsSummary? = nil) {
+    public init(show: Show, ratings: RatingsSummary? = nil, groupWatchers: [GroupWatcher]? = nil) {
         self.show = show
         self.ratings = ratings
+        self.groupWatchers = groupWatchers
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case show, ratings, groupWatchers = "group_watchers"
+    }
+}
+
+// One fellow group member watching a title. First name only — that's all
+// the endpoint sends, and all the card needs.
+public struct GroupWatcher: Codable, Identifiable, Hashable, Sendable {
+    public let slug: String
+    public let name: String
+
+    public var id: String { slug }
+
+    public init(slug: String, name: String) {
+        self.slug = slug
+        self.name = name
     }
 }
 public struct ActorsResponse: Codable, Sendable { public let actors: [Actor] }
