@@ -126,6 +126,15 @@ export async function onRequestPost(context) {
   // Cap the same way; oldest/least-recently-enriched first so the budget rotates evenly.
   const hasTmdb = !!(env.TMDB_TOKEN || env.TMDB_API_KEY);
   let tmdbUpdated = 0;
+  // A bare `catch (e) {}` around each title meant a pass that failed on every
+  // single show reported exactly the same thing as a pass with nothing to do:
+  // zero. Count the failures and keep the first message so a backfill run can
+  // say which it was.
+  let tvCandidates = 0;
+  let movieCandidates = 0;
+  let tvErrors = 0;
+  let movieErrors = 0;
+  let lastError = null;
   if (hasTmdb) {
     // Cover everything a sibling copy already covers before spending budget.
     await syncArtworkAcrossCopies(env);
@@ -148,6 +157,7 @@ export async function onRequestPost(context) {
           ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`;
     const tmdbStmt = env.DB.prepare(tvSelect).bind(...tvBinds, maxTmdb);
     const { results: tmdbShows } = await tmdbStmt.all();
+    tvCandidates = (tmdbShows || []).length;
 
     for (const show of tmdbShows) {
       try {
@@ -246,7 +256,10 @@ export async function onRequestPost(context) {
         ).bind(posterUrl, networkLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating,
           df.trailerKey, df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.watchLink, show.id).run();
         tmdbUpdated++;
-      } catch (e) {}
+      } catch (e) {
+        tvErrors++;
+        if (!lastError) lastError = `tv:${show.title}: ${e && e.message ? e.message : String(e)}`;
+      }
     }
   }
 
@@ -267,6 +280,7 @@ export async function onRequestPost(context) {
         ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
     ).bind(...mvBinds, maxTmdb);
     const { results: movieShows } = await movieStmt.all();
+    movieCandidates = (movieShows || []).length;
 
     for (const show of movieShows) {
       try {
@@ -306,7 +320,10 @@ export async function onRequestPost(context) {
         ).bind(posterUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey,
           df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.providerNetwork, df.watchLink, show.id).run();
         if (posterUrl) tmdbUpdated++;
-      } catch (e) {}
+      } catch (e) {
+        movieErrors++;
+        if (!lastError) lastError = `movie:${show.title}: ${e && e.message ? e.message : String(e)}`;
+      }
     }
   }
 
@@ -357,7 +374,12 @@ export async function onRequestPost(context) {
     }
   }
 
-  return new Response(JSON.stringify({ enriched, tmdbUpdated, actorImdbFilled, actorIdsFromCache }), {
+  // tvCandidates/movieCandidates say whether a zero means "nothing to do" or
+  // "nothing worked" — the two used to be indistinguishable from outside.
+  return new Response(JSON.stringify({
+    enriched, tmdbUpdated, actorImdbFilled, actorIdsFromCache,
+    tvCandidates, movieCandidates, tvErrors, movieErrors, lastError,
+  }), {
     headers: { 'Content-Type': 'application/json' },
   });
 }

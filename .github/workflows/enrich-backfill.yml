@@ -1,10 +1,15 @@
 name: Enrich backfill (posters, logos, seasons)
 
 # One-off / on-demand backfill of TMDB enrichment across the whole library —
-# posters, network logos, seasons, genres, dates. /api/enrich processes the
-# oldest-enriched shows first (default 50 TV shows per call) and stamps
-# enriched_at, so looping rotates through everything. Idempotent and cheap once
-# the backlog is clear.
+# posters, network logos, seasons, genres, dates, runtime, cast. /api/enrich
+# processes the oldest-enriched shows first (default 50 TV shows per call) and
+# stamps enriched_at, so looping rotates through everything. Idempotent and
+# cheap once the backlog is clear.
+#
+# These are FULL passes. `mode: posters` exists for artwork-only catch-up and
+# selects rows with no poster at all — on a library whose artwork is already
+# complete it has nothing to do and reports 0 forever, which is exactly what
+# this workflow used to send.
 #
 # Auth: sends X-Cron-Secret, which /api/enrich accepts in place of a member
 # session. No `member` body → all members.
@@ -45,7 +50,7 @@ jobs:
             tresp=$(curl -sS -X POST "$URL" \
               -H "Content-Type: application/json" \
               -H "X-Cron-Secret: ${CRON_SECRET}" \
-              -d "{\"mode\":\"posters\",\"titles\":${trending},\"max_tmdb\":12}" \
+              -d "{\"titles\":${trending},\"max_tmdb\":6}" \
               -w $'\n%{http_code}')
             thttp=$(printf '%s' "$tresp" | tail -n1)
             tbody=$(printf '%s' "$tresp" | sed '$d')
@@ -55,11 +60,16 @@ jobs:
             sleep 3
           fi
 
+          # Full passes, NOT mode:posters. Posters-only selects rows where
+          # poster_url IS NULL and skips the TMDB detail call entirely, so on a
+          # library whose artwork is already complete every round reported 0
+          # and nothing else — runtime, cast depth, season data — was ever
+          # refreshed. The full pass rotates oldest-enriched-first.
           for i in $(seq 1 "$ROUNDS"); do
             resp=$(curl -sS -X POST "$URL" \
               -H "Content-Type: application/json" \
               -H "X-Cron-Secret: ${CRON_SECRET}" \
-              -d '{"mode":"posters"}' \
+              -d '{}' \
               -w $'\n%{http_code}')
             http=$(printf '%s' "$resp" | tail -n1)
             body=$(printf '%s' "$resp" | sed '$d')
@@ -67,9 +77,20 @@ jobs:
               echo "::error::round $i returned HTTP $http (CRON_SECRET rejected, or endpoint error): $body"
               exit 1
             fi
-            updated=$(printf '%s' "$body" | python3 -c "import sys,json;print(json.load(sys.stdin).get('tmdbUpdated',0))" 2>/dev/null || echo 0)
+            # Report what the pass actually saw, not just its success count: a
+            # zero with candidates and errors means something is broken, a zero
+            # with no candidates means there was nothing to do.
+            metrics=$(printf '%s' "$body" | python3 -c "import sys,json;d=json.load(sys.stdin);print('|'.join(str(x) for x in [d.get('tmdbUpdated',0), d.get('tvCandidates',0), d.get('tvErrors',0)+d.get('movieErrors',0), d.get('actorIdsFromCache',0), d.get('lastError') or '-']))" 2>/dev/null || echo "0|0|0|0|-")
+            updated=$(printf '%s' "$metrics" | cut -d'|' -f1)
+            cands=$(printf '%s' "$metrics" | cut -d'|' -f2)
+            errs=$(printf '%s' "$metrics" | cut -d'|' -f3)
+            cached=$(printf '%s' "$metrics" | cut -d'|' -f4)
+            err=$(printf '%s' "$metrics" | cut -d'|' -f5-)
             total=$((total + updated))
-            echo "round $i/$ROUNDS — tmdbUpdated: $updated (running total: $total)"
+            echo "round $i/$ROUNDS — updated: $updated · candidates: $cands · errors: $errs · actor ids from cache: $cached (running total: $total)"
+            if [ "$errs" != "0" ] && [ "$err" != "-" ]; then
+              echo "  first error: $err"
+            fi
             sleep 3
           done
           echo "Backfill complete. Total TMDB updates: $total"
