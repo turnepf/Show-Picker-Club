@@ -19,6 +19,9 @@ struct HomeView: View {
     // Universal link that arrived before the roster loaded (cold launch);
     // replayed by load().
     @State private var pendingLink: URL?
+    // "NEW" beside Groups until the member opens it once. A badge that never
+    // clears is just decoration — this one has a job and then goes away.
+    @AppStorage("seenGroups") private var seenGroups = false
     // Set after accepting a household invite from a link, so the app says
     // something happened rather than silently changing an audit total.
     @State private var showingHouseholdJoined = false
@@ -76,6 +79,7 @@ struct HomeView: View {
                             NavigationLink(value: Route.groups) {
                                 Label("Groups", systemImage: "person.2.fill")
                             }
+                            .badge(seenGroups ? nil : Text("NEW"))
                             // What's coming up on your own lists, with the
                             // subscribe button on it. This used to fire
                             // webcal:// straight at the OS, which was a dead
@@ -148,6 +152,7 @@ struct HomeView: View {
                                    initialRating: rating, initialPoster: posterUrl, initialNetworkUrl: networkUrl)
                 case .groups:
                     GroupsListView(path: $path)
+                        .onAppear { seenGroups = true }
                 case .groupDetail(let id):
                     GroupDetailView(groupId: id)
                 case .calendar:

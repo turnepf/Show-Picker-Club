@@ -51,6 +51,8 @@ struct IPadHomeView: View {
     @State private var showingLogin = false
     @State private var showingDeleteAccount = false
     @State private var showingSearch = false
+    // Same "NEW" badge as iPhone Home, cleared by opening Groups once.
+    @AppStorage("seenGroups") private var seenGroups = false
 
     private let memberRowHeight: CGFloat = 38
     private let memberWindowRows = 5
@@ -157,6 +159,7 @@ struct IPadHomeView: View {
             Group {
                 if myMember != nil {
                     Label("Groups", systemImage: "person.2.fill")
+                        .badge(seenGroups ? nil : Text("NEW"))
                         .tag(SidebarItem.groups)
                 }
                 if !popular.isEmpty {
@@ -321,6 +324,7 @@ struct IPadHomeView: View {
                 TrendingListView(shows: popular)
             case .groups:
                 GroupsListView(path: $detailPath)
+                    .onAppear { seenGroups = true }
             case .vibe:
                 if let slug = auth.memberSlug {
                     VibeView(initialSlug: slug)
