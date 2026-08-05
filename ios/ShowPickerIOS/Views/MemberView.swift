@@ -16,6 +16,33 @@ private enum SortOption: String, CaseIterable {
     }
 }
 
+// Movies / series split for a list that holds both. Sits next to SortOption
+// because it's the same kind of per-list, remembered display choice.
+enum MediaFilter: String, CaseIterable, Identifiable {
+    case all, series, movies
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return "All"
+        case .series: return "TV"
+        case .movies: return "Movies"
+        }
+    }
+
+    func matches(_ show: Show) -> Bool {
+        switch self {
+        case .all: return true
+        case .series: return !show.isMovie
+        case .movies: return show.isMovie
+        }
+    }
+
+    func count(in shows: [Show]) -> Int {
+        shows.filter { matches($0) }.count
+    }
+}
+
 struct MemberView: View {
     let member: Member
     // When set, the view is pinned to a single list (the iPad sidebar exposes
@@ -33,6 +60,10 @@ struct MemberView: View {
     // NavigationLink taps, so the row's tap gesture lands here instead.
     @State private var reorderDetail: Show?
     @State private var sortByList: [String: SortOption] = [:]
+    // Media filter per list — "what movie can we watch tonight" gets asked at
+    // the list, so it's a visible control rather than a menu item. Remembered
+    // per list, like sort.
+    @State private var mediaFilterByList: [String: MediaFilter] = [:]
     // Archive Undo: the just-archived show, shown in a 6-second bottom
     // banner (mirrors the web's undo toast).
     @State private var undoShow: Show?
@@ -77,12 +108,30 @@ struct MemberView: View {
                 .foregroundStyle(isReordering ? Color.accentColor : Color.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
-                .padding(.vertical, 6)
+                .padding(.top, 6)
+                .padding(.bottom, showsMediaChips ? 4 : 6)
+
+            // Under the help line, above the list: the filter belongs where
+            // the decision gets made. Hidden entirely on a list that's all
+            // one kind. Not shown while reordering — the help line there is
+            // the drag how-to, and the list is deliberately unfiltered.
+            if !isReordering { mediaChips }
 
             List {
                 let items = sortedItems()
                 if items.isEmpty {
-                    Group { if loadFailed && shows.isEmpty { loadFailedState } else { emptyState } }
+                    Group {
+                        if loadFailed && shows.isEmpty {
+                            loadFailedState
+                        } else if mediaFilter != .all && !listItems().isEmpty {
+                            Text(mediaFilter == .movies
+                                 ? "No movies on this list."
+                                 : "No series on this list.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            emptyState
+                        }
+                    }
                         .frame(maxWidth: .infinity, alignment: .center)
                         .listRowBackground(Color.clear)
                 } else {
@@ -279,6 +328,55 @@ struct MemberView: View {
         }
     }
 
+    // Everything on the open list, before the media filter — the chips count
+    // from this, so switching filters doesn't change the numbers on the chips.
+    private func listItems() -> [Show] {
+        shows.filter { $0.list == currentList.rawValue && !$0.isArchived }
+    }
+
+    private var mediaFilter: MediaFilter {
+        mediaFilterByList[currentList.rawValue] ?? .all
+    }
+
+    // The row only earns its space on a list that holds both kinds. On
+    // Watching, where nearly everything is a series, it stays out of the way.
+    private var showsMediaChips: Bool {
+        let items = listItems()
+        return items.contains(where: { $0.isMovie }) && items.contains(where: { !$0.isMovie })
+    }
+
+    @ViewBuilder private var mediaChips: some View {
+        if showsMediaChips {
+            let items = listItems()
+            HStack(spacing: 8) {
+                ForEach(MediaFilter.allCases) { f in
+                    chip(f, count: f.count(in: items))
+                }
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 4)
+        }
+    }
+
+    private func chip(_ f: MediaFilter, count: Int) -> some View {
+        let selected = mediaFilter == f
+        return Button {
+            withAnimation(.easeOut(duration: 0.15)) {
+                mediaFilterByList[currentList.rawValue] = f
+            }
+        } label: {
+            Text("\(f.title) \(count)")
+                .font(.caption.weight(selected ? .semibold : .regular))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(selected ? Color.accentColor.opacity(0.18) : Color(.secondarySystemBackground),
+                            in: Capsule())
+                .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
     // Short description of what each list is for, shown under the tab picker,
     // with the list's own count on the end the way the web writes it —
     // "(12 shows)" answers "how big is this list" without counting rows.
@@ -331,7 +429,7 @@ struct MemberView: View {
     // Same ordering rules as the web: undated shows sink to the bottom on
     // "Next episode", and "Date Added" is newest-first with seed (null-date) rows last.
     private func sortedItems() -> [Show] {
-        let base = shows.filter { $0.list == currentList.rawValue && !$0.isArchived }
+        let base = isReordering ? listItems() : listItems().filter { mediaFilter.matches($0) }
         switch currentSort {
         case .alpha:
             return base.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
