@@ -218,9 +218,9 @@ struct ShowDetailView: View {
     }
 
     private var clubRatingText: String {
-        guard let avg = ratings?.average else { return "Club Rating: No ratings yet" }
+        guard let avg = ratings?.average else { return "Show Picker Club Rating: No ratings yet" }
         let count = ratings?.count ?? 0
-        return String(format: "Club Rating: %.1f/10 (%d rating%@)", avg, count, count == 1 ? "" : "s")
+        return String(format: "Show Picker Club Rating: %.1f/10 (%d rating%@)", avg, count, count == 1 ? "" : "s")
     }
 
     private func chipTap(_ list: ShowList) async {

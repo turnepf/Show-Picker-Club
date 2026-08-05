@@ -77,7 +77,7 @@ struct WatchDetailView: View {
                 // mine, then whoever's copy this is. Rating happens on the
                 // phone; the watch just reports the numbers.
                 if let ratings {
-                    row("Club Rating", clubRatingText)
+                    row("Show Picker Club Rating", clubRatingText)
                     if let mine = ratings.mine {
                         row("Your rating", "\(mine)/10")
                     }

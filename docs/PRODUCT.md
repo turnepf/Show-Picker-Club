@@ -301,7 +301,7 @@ A few intentional omissions:
     (Feedback was split — Amy and Susan both suggested 1-5 for entry
     simplicity, Rob wanted 1-10 — settled on 1-10 for consistency with the
     other rating already on the card.) TMDB Rating itself now lives inside
-    the Ratings section, directly above Club Rating, instead of sitting
+    the Ratings section, directly above Show Picker Club Rating, instead of sitting
     apart in the catalog-data card below.
   - **Entry (shipped):** a 10-segment tap-row (not a slider or numeric
     field) — tap a position, it saves instantly, no Save button. One
@@ -344,7 +344,7 @@ A few intentional omissions:
     under-list row.
   - **Native support (shipped in code, not yet archived/submitted):**
     iOS/iPad get full entry + display — a "Ratings" section on
-    `ShowDetailView` mirroring the web (TMDB Rating, Club Rating, owner's
+    `ShowDetailView` mirroring the web (TMDB Rating, Show Picker Club Rating, owner's
     rating, tap-row entry for overall + each season, gated to lists other
     than Next Up). tvOS and watchOS are view-only (TMDB Rating + Club
     Rating + owner's rating; rate from iPhone/iPad) — consistent with both

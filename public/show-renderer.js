@@ -340,7 +340,7 @@ function renderShowDetailBody(show, options = {}) {
     const avgText = (ratings.average != null)
       ? `${ratings.average.toFixed(1)}/10 <span class="rating-count">(${ratings.count} rating${ratings.count === 1 ? '' : 's'})</span>`
       : 'No ratings yet';
-    ratingsInner += detailRow('Club Rating', avgText);
+    ratingsInner += detailRow('Show Picker Club Rating', avgText);
     if (ratings.owner != null) {
       ratingsInner += detailRow(`${escapeHtml(ratings.ownerName || '')}'s rating`, `${ratings.owner}/10`);
     }

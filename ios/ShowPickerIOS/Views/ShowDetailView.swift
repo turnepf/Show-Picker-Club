@@ -179,7 +179,7 @@ struct ShowDetailView: View {
                             Text("\(Image(systemName: "star.fill")) \(r)").foregroundStyle(.orange)
                         }
                     }
-                    LabeledContent("Club Rating", value: clubRatingText)
+                    LabeledContent("Show Picker Club Rating", value: clubRatingText)
                     if let owner = ratings.owner {
                         LabeledContent(ownerRatingLabel, value: "\(owner)/10")
                     }
