@@ -69,11 +69,28 @@ struct HomeView: View {
                                     .font(.body.weight(.semibold))
                             }
                         } else if !auth.isLoggedIn {
+                            // A bare login row tells someone who just
+                            // installed the app nothing about what they'd be
+                            // logging into. Trending below is browsable
+                            // without an account; this says what an account
+                            // adds.
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Keep track of what you're watching")
+                                    .font(.headline)
+                                Text("Four lists — Watching, Awaiting, Loved and Next Up — with premiere dates, ratings and where to watch. Make a group to see what your people are watching, and audit what you're paying for.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .padding(.vertical, 4)
                             Button {
                                 showingLogin = true
                             } label: {
-                                Label("Log in to see your shows", systemImage: "person.crop.circle.badge.plus")
+                                Label("Create your free account", systemImage: "person.crop.circle.badge.plus")
                             }
+                            Text("Browse what the club is watching below — no account needed.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                         if myMember != nil {
                             NavigationLink(value: Route.groups) {

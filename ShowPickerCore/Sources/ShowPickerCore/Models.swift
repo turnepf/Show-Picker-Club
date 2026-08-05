@@ -158,6 +158,54 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         case watchLink = "watch_link"
     }
 
+    // Tolerant decoding. The API varies what it sends by context — `list` and
+    // `member_slug` are session-only, catalog fields appear as migrations land
+    // — and Swift's synthesized Decodable is all-or-nothing: one missing or
+    // differently-shaped required field throws, the caller catches, and an
+    // entire screen reads "couldn't load" while every other field sat there
+    // decoded fine. That failure has cost us a blank show card (list absent
+    // for a logged-out visitor) and looked like a server outage both times.
+    //
+    // So: only `id` and `title` are genuinely required — without them there's
+    // no show — and everything else falls back rather than failing the whole
+    // payload. Real breakage still surfaces; it just surfaces as one empty
+    // row instead of an empty screen.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        list = (try? c.decode(String.self, forKey: .list)) ?? ""
+        network = try? c.decode(String.self, forKey: .network)
+        networkUrl = try? c.decode(String.self, forKey: .networkUrl)
+        recommendedBy = try? c.decode(String.self, forKey: .recommendedBy)
+        rating = try? c.decode(String.self, forKey: .rating)
+        notes = try? c.decode(String.self, forKey: .notes)
+        movie = try? c.decode(Int.self, forKey: .movie)
+        fullSeries = try? c.decode(Int.self, forKey: .fullSeries)
+        watchingWith = try? c.decode(String.self, forKey: .watchingWith)
+        nextSeasonDate = try? c.decode(String.self, forKey: .nextSeasonDate)
+        seasonEndDate = try? c.decode(String.self, forKey: .seasonEndDate)
+        seasonsReleased = try? c.decode(Int.self, forKey: .seasonsReleased)
+        genres = try? c.decode(String.self, forKey: .genres)
+        memberSlug = try? c.decode(String.self, forKey: .memberSlug)
+        posterUrl = try? c.decode(String.self, forKey: .posterUrl)
+        networkLogoUrl = try? c.decode(String.self, forKey: .networkLogoUrl)
+        createdAt = try? c.decode(String.self, forKey: .createdAt)
+        archived = try? c.decode(Int.self, forKey: .archived)
+        sortOrder = try? c.decode(Int.self, forKey: .sortOrder)
+        actors = try? c.decode(String.self, forKey: .actors)
+        overview = try? c.decode(String.self, forKey: .overview)
+        backdropUrl = try? c.decode(String.self, forKey: .backdropUrl)
+        tmdbRating = try? c.decode(String.self, forKey: .tmdbRating)
+        contentRating = try? c.decode(String.self, forKey: .contentRating)
+        trailerKey = try? c.decode(String.self, forKey: .trailerKey)
+        director = try? c.decode(String.self, forKey: .director)
+        directorImdbId = try? c.decode(String.self, forKey: .directorImdbId)
+        runtime = try? c.decode(Int.self, forKey: .runtime)
+        releaseYear = try? c.decode(Int.self, forKey: .releaseYear)
+        watchLink = try? c.decode(String.self, forKey: .watchLink)
+    }
+
     public var isMovie: Bool { (movie ?? 0) == 1 }
     public var isFullSeries: Bool { (fullSeries ?? 0) == 1 }
     public var isArchived: Bool { (archived ?? 0) == 1 }

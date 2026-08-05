@@ -1,9 +1,10 @@
 import { EXCLUDED_FROM_TASTE } from '../_shared/excluded-members.js';
+import { getSession } from '../_shared/auth.js';
 
 const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
 
 export async function onRequestGet(context) {
-  const { env } = context;
+  const { env, request } = context;
 
   // Top shows by how many members added them in the last 30 days — a rolling
   // "what the club is picking up right now" feed. The RANKING uses only recent
@@ -56,9 +57,18 @@ export async function onRequestGet(context) {
   // showed up wrong in the "Watching: ..." line. Use the dedicated
   // first_name column instead, falling back to name's first token only
   // if first_name is missing for some reason.
-  const { results: members } = await env.DB.prepare(
-    'SELECT slug, name, first_name FROM members'
-  ).all();
+  // Who gets named on a Trending row: only members of the viewer's own
+  // groups. Trending itself is public — the titles are the club's taste, and
+  // a stranger who just installed the app should see them — but "Added by"
+  // names people, and a name is exactly what someone with no account has no
+  // relationship to. Logged out, there are no groups, so there are no names.
+  const session = await getSession(request, env);
+  const { results: members } = session ? await env.DB.prepare(
+    `SELECT m.slug, m.name, m.first_name FROM members m
+      WHERE m.slug = ?1 OR m.slug IN (
+        SELECT gm.member_slug FROM group_members gm
+         WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE member_slug = ?1))`
+  ).bind(session.member_slug).all().catch(() => ({ results: [] })) : { results: [] };
   const nameMap = {};
   for (const h of members) {
     nameMap[h.slug] = h.first_name || (h.name || '').split(' ')[0];
@@ -66,7 +76,10 @@ export async function onRequestGet(context) {
 
   // Add member names to each show
   for (const show of results) {
-    show.members = (show.member_slugs || '').split(',').map(s => nameMap[s] || s).sort();
+    show.members = (show.member_slugs || '').split(',')
+      .map(s => nameMap[s])
+      .filter(Boolean)   // outside my groups (or logged out) → not named at all
+      .sort();
     delete show.member_slugs;
   }
 
