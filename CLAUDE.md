@@ -115,10 +115,9 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
   iOS/iPad, tvOS, and watchOS. When a feature is requested, state which get it
   and which don't (tvOS is view-only, watch is read-only) — parity gaps between
   the Apple targets are still expensive to rediscover. Just don't add "and the
-  web" to that list unless asked. What's New content is centralized in
-  `public/whats-new.json` (shared by the web page and the iOS app) — update it
-  when shipping member-visible features, and keep entries to actual features,
-  not cleanups or polish.
+  web" to that list unless asked. There is no in-app What's New — release
+  notes go in the App Store update text instead (retired 2026-08, along with
+  `whats-new.json`, `whats-new.html` and `WhatsNewView`).
 
 - **Never put `#` comments in terminal commands meant for the user to paste.**
   Pasted into their zsh, comment lines execute as garbage commands and break

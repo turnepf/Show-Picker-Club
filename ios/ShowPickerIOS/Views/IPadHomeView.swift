@@ -17,7 +17,6 @@ enum SidebarItem: Hashable {
     case list(ShowList)
     case trending
     case groups
-    case whatsNew
     case vibe
     case subscriptionAudit
     case rateBacklog
@@ -184,7 +183,6 @@ struct IPadHomeView: View {
                     Label("Calendar", systemImage: "calendar")
                         .tag(SidebarItem.calendar)
                 }
-                whatsNewRow
                 if auth.isAdmin {
                     Label("Reporting", systemImage: "chart.bar.xaxis")
                         .tag(SidebarItem.adminReporting)
@@ -221,11 +219,6 @@ struct IPadHomeView: View {
 
     // Lives in the discovery group beneath the member lists, rather than in
     // the account menu.
-    private var whatsNewRow: some View {
-        Label("What's New", systemImage: "sparkles")
-            .tag(SidebarItem.whatsNew)
-    }
-
     private var listsHeader: String {
         guard let m = focusedMember else { return "Shows" }
         return auth.isMe(m.slug) ? "My Shows" : "\(m.label)'s Shows"
@@ -328,8 +321,6 @@ struct IPadHomeView: View {
                 TrendingListView(shows: popular)
             case .groups:
                 GroupsListView(path: $detailPath)
-            case .whatsNew:
-                WhatsNewView()
             case .vibe:
                 if let slug = auth.memberSlug {
                     VibeView(initialSlug: slug)
@@ -373,8 +364,6 @@ struct IPadHomeView: View {
             GroupsListView(path: $detailPath)
         case .groupDetail(let id):
             GroupDetailView(groupId: id)
-        case .whatsNew:
-            WhatsNewView()
         // The iPad keeps its admin entries in the sidebar, but the routes
         // exist app-wide, so the switch has to answer for them.
         case .calendar:
@@ -442,7 +431,7 @@ struct IPadHomeView: View {
     }
 
     // Route a showpicker.club URL: /<slug> focuses that member (honoring the
-    // #list fragment the web puts in shared URLs), /whats-new opens the
+    // #list fragment the web puts in shared URLs)
     // changelog. Cold-launch links wait for the roster via pendingLink.
     @MainActor
     private func route(url: URL) {
@@ -450,7 +439,6 @@ struct IPadHomeView: View {
         // Widget taps: push the show's card onto the detail column. Needs no
         // roster, and leaves the sidebar selection alone.
         if let show = Route.showLink(url) { detailPath = [show]; return }
-        if first == "whats-new" { selection = .whatsNew; return }
         // Group invite: joining is the navigation. Selecting Groups first
         // means a failed join (expired token, already a member) still lands
         // somewhere useful.

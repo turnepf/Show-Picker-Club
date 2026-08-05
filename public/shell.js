@@ -1,7 +1,7 @@
 /*
  * Show Picker Club — shared iPad-style sidebar shell.
  *
- * Secondary pages (What's New, Subscriptions, Vibe, Reporting) include this
+ * Secondary pages (Subscriptions, Vibe, Reporting) include this
  * with <script src="/shell.js" defer></script>. On ≥1024px screens it wraps
  * the page in the same letterboxed split view as the main app: the sidebar
  * (My Shows lists; then Groups, Trending, Rate my backlog, Subscription
@@ -215,7 +215,6 @@
       '</div>' +
       '<div class="shell-groups"><div class="ios-group">' +
       iconRow('/?home', 'Log in to see your shows', 'person-plus') +
-      iconRow('/whats-new', "What's New", 'sparkles', { selected: location.pathname === '/whats-new' }) +
       '</div></div>';
 
     var sprite = document.createElement('div');
@@ -264,7 +263,6 @@
           discover += iconRow('webcal://showpicker.club/calendar/' + encodeURIComponent(mine.slug) + '.ics?key=' + encodeURIComponent(mine.calendar_token), 'Calendar', 'calendar-plus');
         }
       }
-      discover += iconRow('/whats-new', "What's New", 'sparkles', { selected: path === '/whats-new' });
       if (auth.is_admin) {
         discover += '<div class="nav-spacer"></div>' + ADMIN_PAGES.map(function (p) {
           return iconRow(p.href, p.label, p.icon, { selected: p.href === path });

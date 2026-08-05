@@ -360,7 +360,7 @@ Durable login tracking is separate: `members.last_login_at` (stamped by `_shared
 
 Single-page app. Detects whether `window.location.pathname` is empty (landing) or a slug (member page) and renders accordingly. Major UI surfaces:
 
-- **Landing:** `My Shows` link (logged in), Trending shows shelf, `Search all libraries` button, What's New changelog. The home page does not list members. Logged-out visitors get a join-pitch card with a "Create your free account" button (see [Self-enrollment](#self-enrollment-migration-031-approval-retired-in-migration-058)).
+- **Landing:** `My Shows` link (logged in), Trending shows shelf, `Search all libraries` button. The home page does not list members, and there is no What's New page — release notes live in the App Store update text (retired 2026-08). Logged-out visitors get a join-pitch card with a "Create your free account" button (see [Self-enrollment](#self-enrollment-migration-031-approval-retired-in-migration-058)).
 - **Member page:** title + tabs (Watching, Awaiting, Loved, Next Up), search button, `+ Add` button (when logged in), per-tab list of show rows with always-visible meta (Next episode on every list when a premiere date exists, Recommended by on Next Up), sort + toggle pills at the bottom, footer with `Curious?` / `Vibe` / `📅 Calendar feed` links.
 - **Modals:** Add/Edit Show, Add to My List (used from Popular and from cross-library search), Search. (Share-to-member and Suggest-a-Show were retired 2026-07.)
 
@@ -388,7 +388,7 @@ Admin tools. Each requires an admin session; they show a "log in first" hint oth
 
 ## Universal links
 
-`public/.well-known/apple-app-site-association` (served as `application/json` via a `_headers` rule — it has no extension) claims showpicker.club URLs for the iOS app (`NQ6AJVVBBJ.net.patrickturner.showpickerios`): member pages, `/`, and `/whats-new` open in-app when tapped from another app; API/auth/calendar/admin paths and web-only pages (`/vibe`, `/subscriptions`, legal pages) are excluded and stay in the browser. The app side is the `applinks:showpicker.club` Associated Domains entitlement (iOS + Catalyst) plus `route(url:)` handlers in `HomeView` (iPhone: pushes the member or What's New) and `IPadHomeView` (focuses the member in the sidebar, honoring the `#list` fragment web URLs carry). Cold-launch links park in `pendingLink` until the roster loads; the `dorothy` → `whitt` slug redirect is mirrored. Apple's CDN caches the AASA file (~hours), so entitlement/AASA changes take a re-install or a day to propagate to devices.
+`public/.well-known/apple-app-site-association` (served as `application/json` via a `_headers` rule — it has no extension) claims showpicker.club URLs for the iOS app (`NQ6AJVVBBJ.net.patrickturner.showpickerios`): member pages and `/` open in-app when tapped from another app; API/auth/calendar/admin paths and web-only pages (`/vibe`, `/subscriptions`, legal pages) are excluded and stay in the browser. The app side is the `applinks:showpicker.club` Associated Domains entitlement (iOS + Catalyst) plus `route(url:)` handlers in `HomeView` (iPhone: pushes the member) and `IPadHomeView` (focuses the member in the sidebar, honoring the `#list` fragment web URLs carry). Cold-launch links park in `pendingLink` until the roster loads; the `dorothy` → `whitt` slug redirect is mirrored. Apple's CDN caches the AASA file (~hours), so entitlement/AASA changes take a re-install or a day to propagate to devices.
 
 ## Native clients
 
@@ -398,7 +398,7 @@ A native **Roku** channel (`roku/`, SceneGraph/BrightScript) hits the same endpo
 
 ## Service worker + PWA (retired 2026-08)
 
-The web app is no longer installable. `public/manifest.json` is gone, along with the `<link rel="manifest">` and `apple-mobile-web-app-*` tags on `index.html`, `groups.html`, and `whats-new.html`, and the CSP's `manifest-src` directive. The native Apple apps cover the install-to-home-screen case; the web is a browser page again, with no offline caching.
+The web app is no longer installable. `public/manifest.json` is gone, along with the `<link rel="manifest">` and `apple-mobile-web-app-*` tags on `index.html` and `groups.html`, and the CSP's `manifest-src` directive. The native Apple apps cover the install-to-home-screen case; the web is a browser page again, with no offline caching.
 
 **`public/sw.js` is retained deliberately, as a tombstone** — do not delete it yet. It now registers no `fetch` handler and does one thing on `activate`: clear every Cache Storage bucket, then `self.registration.unregister()`. This is the only way to evict the workers already installed on members' devices. Deleting the file would not do it: `_redirects` maps `/*` to the SPA shell, so `/sw.js` would return index.html as `text/html` with a 200. A 404 unregisters a worker; an HTML 200 fails the update check on a MIME mismatch and leaves the old worker and its stale cache installed indefinitely. `index.html` also runs a `getRegistrations().unregister()` + `caches.delete()` sweep on load, so members who reach a member page are cleaned up immediately rather than on the browser's next update check.
 

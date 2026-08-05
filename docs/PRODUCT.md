@@ -64,7 +64,6 @@ The landing page (`/`) shows:
 2. **Trending** — top 10 shows by how many members added them in the last 30 days. Tap + to add to your own list. Seed-only members are excluded from this calculation.
 3. **Members** — the six members with the longest Watching lists are featured at the top (Awaiting count is the tiebreaker). A "Browse all members ▾" disclosure underneath reveals the rest of the roster, alphabetized, so anyone is reachable. The point of the featured row is to lead with members who actually have something on their list worth looking at.
 4. **Search all libraries** — opens a modal that searches every active show across every member by title or actor. Each result shows the owning member and the list it's on; logged-in users can tap + to add to their own list.
-5. **What's New** — a dated changelog of recent features (collapsed by default after a few entries).
 
 ## Member page (`/<slug>`)
 

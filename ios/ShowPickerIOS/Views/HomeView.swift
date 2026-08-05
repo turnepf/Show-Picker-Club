@@ -53,7 +53,7 @@ struct HomeView: View {
                     // One nav group: My Shows leads, then the rest in the
                     // same order as the web nav and the iPad sidebar —
                     // Groups, Rate my backlog, Subscription audit, Vibe,
-                    // Calendar, What's New. Trending is the content section
+                    // Calendar. Trending is the content section
                     // below rather than a row, same as the web at phone
                     // width. (Admin lives behind the account icon.)
                     Section {
@@ -101,7 +101,6 @@ struct HomeView: View {
                                 Label("Vibe", systemImage: "sparkles")
                             }
                         }
-                        whatsNewRow
                     }
                     // Say why the shelf is bare instead of hiding it: a
                     // failed fetch and a genuinely quiet month look identical
@@ -148,8 +147,6 @@ struct HomeView: View {
                     GroupsListView(path: $path)
                 case .groupDetail(let id):
                     GroupDetailView(groupId: id)
-                case .whatsNew:
-                    WhatsNewView()
                 case .calendar:
                     if let me = myMember { CalendarView(member: me) }
                 case .adminReporting:
@@ -197,14 +194,13 @@ struct HomeView: View {
 
     // Route a showpicker.club URL to the matching screen: /show/<id> (widget
     // taps) opens that show's card, /<slug> opens that member's lists,
-    // /whats-new opens the changelog, anything else stays on Home. On a cold
+    // anything else stays on Home. On a cold
     // launch the roster may not be loaded yet — park member URLs and replay
     // them when load() lands (show links need no roster at all).
     @MainActor
     private func route(url: URL) {
         guard let first = url.path.split(separator: "/").first.map({ String($0).lowercased() }) else { return }
         if let show = Route.showLink(url) { path = [show]; return }
-        if first == "whats-new" { path = [.whatsNew]; return }
         // A group invite (/groups/join?token=…) is the whole point of the
         // share link, so joining IS the navigation: accept the token, then
         // land on the group. Already a member (409) still opens the group.
@@ -255,14 +251,6 @@ struct HomeView: View {
         if let pick = upNext.randomElement() {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             shakePick = pick
-        }
-    }
-
-    // Leads the discovery group beneath My Shows, rather than living in the
-    // account menu.
-    private var whatsNewRow: some View {
-        NavigationLink(value: Route.whatsNew) {
-            Label("What's New", systemImage: "sparkles")
         }
     }
 
@@ -386,7 +374,6 @@ enum Route: Hashable {
     case pick(title: String, network: String?, rating: String?, posterUrl: String?, networkUrl: String?)
     case groups
     case groupDetail(Int)
-    case whatsNew
     // Admin screens live in the account menu rather than on Home, so they
     // push by value: a Button inside a Menu can append to the path, while a
     // NavigationLink inside a Menu doesn't push at all.
