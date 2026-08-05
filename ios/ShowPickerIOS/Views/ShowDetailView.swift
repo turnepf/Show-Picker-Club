@@ -389,10 +389,20 @@ struct ShowDetailView: View {
     // What the share sheet hands off. Prefer a real deep link so the
     // recipient lands on the show itself; otherwise fall back to the
     // owner's club page so the link still goes somewhere useful.
+    // Always a Show Picker link, never the streaming service's. Sharing the
+    // network URL sent people straight out of the club to Netflix; /show/<id>
+    // opens this same card — in the app for anyone who has it (the AASA
+    // claims the path), on the web for everyone else. The title rides along
+    // so the card has something to draw before its own fetch lands.
     private var shareURL: URL {
-        if let u = show?.networkUrl, isRealUrl(u), let url = URL(string: u) {
-            return url
+        let id = show?.id ?? self.id
+        if let id {
+            var comps = URLComponents(string: "https://showpicker.club/show/\(id)")
+            comps?.queryItems = [URLQueryItem(name: "title", value: title)]
+            if let url = comps?.url { return url }
         }
+        // No id yet (a Trending pick that isn't a row) — the member's page is
+        // the nearest thing that still lands inside Show Picker.
         let slug = show?.memberSlug ?? ""
         return URL(string: "https://showpicker.club/\(slug)")
             ?? URL(string: "https://showpicker.club")!
