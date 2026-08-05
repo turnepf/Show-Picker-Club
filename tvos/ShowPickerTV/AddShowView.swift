@@ -1,11 +1,13 @@
 import SwiftUI
 
-// Add a brand-new show from the TV: results appear live while typing (the
-// tvOS .searchable layout keeps the keyboard and grid on screen together —
-// a plain TextField's full-screen keyboard would hide them). Picking a
-// result pushes the list choice; the pick pins the TMDB entry so
-// server-side enrichment (genres, cast, dates, network URL) can't
-// mismatch. Notes / recommender stay phone-and-web edits.
+// Add a brand-new show from the TV. Picking a result pushes the list choice;
+// the pick pins the TMDB entry so server-side enrichment (genres, cast, dates,
+// network URL) can't mismatch. Notes / recommender stay phone-and-web edits.
+//
+// Typing is a TextField into tvOS's full-screen keyboard, not `.searchable`:
+// searchable kept the keyboard and the results grid on screen together, which
+// was the nicer layout, but it silently discarded every keystroke. Results are
+// there as soon as you dismiss the keyboard.
 struct AddShowView: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -14,6 +16,7 @@ struct AddShowView: View {
     @State private var picked: TitleHit?
     @State private var working = false
     @State private var errorText: String?
+    @FocusState private var searchFocused: Bool
 
     init(initialQuery: String = "") {
         _query = State(initialValue: initialQuery)
@@ -23,36 +26,17 @@ struct AddShowView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                if hits.isEmpty {
-                    Text(query.trimmingCharacters(in: .whitespaces).count >= 2
-                         ? "No matches yet — keep typing."
-                         : "Type a show or movie title — results appear as you type.")
-                        .font(.system(size: 26))
-                        .foregroundColor(Theme.muted)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 120)
-                } else {
-                    LazyVGrid(columns: columns, alignment: .leading, spacing: 50) {
-                        ForEach(hits) { hit in
-                            Button {
-                                errorText = nil
-                                picked = hit
-                            } label: {
-                                ShowCard(title: hit.title,
-                                         subtitle: hit.metaText,
-                                         posterUrl: hit.posterUrl)
-                            }
-                            .buttonStyle(PushButtonStyle())
-                        }
-                    }
-                    .padding(.horizontal, 60)
-                    .padding(.vertical, 40)
-                }
+            VStack(spacing: 0) {
+                TextField("Show or movie title", text: $query)
+                    .font(.system(size: 30))
+                    .focused($searchFocused)
+                    .frame(maxWidth: 900)
+                    .padding(.top, 40)
+                    .padding(.bottom, 20)
+                resultsScroll
             }
             .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Add a show")
-            .searchable(text: $query, prompt: "Show or movie title")
             .navigationDestination(item: $picked) { hit in
                 confirmStep(hit)
             }
@@ -60,6 +44,36 @@ struct AddShowView: View {
         // Debounced TMDB lookup: .task(id:) cancels the in-flight search on
         // every keystroke, so only the pause-after-typing one hits the network.
         .task(id: query) { await search() }
+    }
+
+    private var resultsScroll: some View {
+        ScrollView {
+            if hits.isEmpty {
+                Text(query.trimmingCharacters(in: .whitespaces).count >= 2
+                     ? "No matches for that title."
+                     : "Click the field above and type a show or movie title.")
+                    .font(.system(size: 26))
+                    .foregroundColor(Theme.muted)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 120)
+            } else {
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 50) {
+                    ForEach(hits) { hit in
+                        Button {
+                            errorText = nil
+                            picked = hit
+                        } label: {
+                            ShowCard(title: hit.title,
+                                     subtitle: hit.metaText,
+                                     posterUrl: hit.posterUrl)
+                        }
+                        .buttonStyle(PushButtonStyle())
+                    }
+                }
+                .padding(.horizontal, 60)
+                .padding(.vertical, 40)
+            }
+        }
     }
 
     // Which list gets the picked show. Menu pops back to the results.

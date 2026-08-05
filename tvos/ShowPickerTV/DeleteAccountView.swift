@@ -30,7 +30,10 @@ struct DeleteAccountView: View {
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 900)
 
-                    Button(role: .destructive) {
+                    // Red label, not `role: .destructive` — see AccountView:
+                    // the destructive role tints the fill and the text the
+                    // same red, which leaves an unreadable pill.
+                    Button {
                         Task { await sendCode() }
                     } label: {
                         if working {
@@ -38,6 +41,7 @@ struct DeleteAccountView: View {
                         } else {
                             Text("Email me a deletion code")
                                 .font(.system(size: 26, weight: .semibold))
+                                .foregroundColor(.red)
                         }
                     }
                     .disabled(working)
@@ -53,7 +57,7 @@ struct DeleteAccountView: View {
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 720)
 
-                    Button(role: .destructive) {
+                    Button {
                         Task { await confirmDelete() }
                     } label: {
                         if working {
@@ -61,6 +65,7 @@ struct DeleteAccountView: View {
                         } else {
                             Text("Permanently delete my account")
                                 .font(.system(size: 26, weight: .semibold))
+                                .foregroundColor(.red)
                         }
                     }
                     .disabled(working || code.filter(\.isNumber).count < 6)

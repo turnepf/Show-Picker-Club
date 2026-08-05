@@ -25,8 +25,17 @@ struct AccountView: View {
                     Button("Log out") { Task { await auth.logout() } }
                         .font(.system(size: 26, weight: .semibold))
                         .padding(.top, 12)
-                    Button("Delete account…", role: .destructive) { showingDelete = true }
-                        .font(.system(size: 22))
+                    // Not `role: .destructive`: tvOS fills the capsule red and
+                    // tints the label the same red, so the button reads as a
+                    // blank red pill. Red text on the standard capsule says
+                    // "destructive" just as clearly, and can be read.
+                    Button {
+                        showingDelete = true
+                    } label: {
+                        Text("Delete account…")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundColor(.red)
+                    }
                 }
             }
             .fullScreenCover(isPresented: $showingDelete) {
