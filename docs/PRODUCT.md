@@ -275,6 +275,39 @@ A few intentional omissions:
 
 ## Backlog
 
+- **Retire email-code login, and the third-party services that go with it.**
+  Apple sign-in covers the Apple apps, which is where the product lives, and
+  the apps are what members actually use. Every other sign-in path costs
+  something: Twilio Verify bills per SMS and carries the A2P 10DLC campaign
+  registration, and Resend delivers the email codes. Dropping them removes
+  two vendors, two secrets, two failure modes, and the SMS consent
+  disclosures that are already out of date (see the entry below).
+
+  Sequencing matters, and the data to sequence it is only now being
+  collected. Migration 059 stamps `sessions.auth_method` and
+  `members.last_login_method`, and Reporting shows sign-ins per method over
+  7/30/90 days plus how every account was created (`enrolled_via`). Read the
+  90-day window — sessions slide, so a member who never signs in again is
+  invisible in a short window — before retiring anything.
+
+  What has to be true first:
+  - Nobody's *only* way in is the channel being removed. `enrolled_via` says
+    how each account was created; a member who enrolled by email and has
+    never signed in with Apple needs a linked Apple identity (or a migration
+    path) before their email code disappears.
+  - The web keeps whatever the Apple apps can't cover. Sign in with Apple on
+    the web is a different integration from the native one; if the web is
+    reduced to a marketing site (see Web app status), this gets easier.
+  - App Review needs a working demo account. `DEMO_LOGIN_EMAIL` /
+    `DEMO_LOGIN_CODE` is an email-code login today, so removing that path
+    means giving Review another way in first.
+
+  What comes out once it's done: Twilio (secrets, Verify service, the 10DLC
+  campaign), Resend for login codes (transactional email may still be wanted
+  elsewhere), `login_otps` / `enroll_otps`, `/auth/request-code`, the SMS
+  half of `/auth/login`, `member_phones`, `public/sms.html`, and the SMS
+  sections of the privacy policy.
+
 - **SMS consent language promises retired notifications.** `public/sms.html`
   and the SMS section of `public/privacy.html` both say members receive texts
   "when another member recommends or shares a show with you". Those features
