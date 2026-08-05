@@ -109,8 +109,14 @@ export async function onRequestGet(context) {
   }
   const redacted = {};
   for (const k of PUBLIC_SHOW_FIELDS) if (k in show) redacted[k] = show[k];
+  // `list` is whose-list-is-it information, so a logged-out visitor doesn't
+  // get the real value — but the field has to be PRESENT. The Apple clients
+  // decode a non-optional `list`, so omitting it failed the whole payload and
+  // a logged-out show card rendered almost nothing: no poster, overview,
+  // ratings, genres, runtime or year, all of which are public catalog facts
+  // this endpoint had already put in the response.
+  redacted.list = session ? show.list : '';
   if (session) {
-    redacted.list = show.list;
     redacted.member_slug = show.member_slug;
   }
   return new Response(JSON.stringify({ show: redacted, ratings, group_watchers, creators }), { headers: corsHeaders() });

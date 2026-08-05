@@ -252,7 +252,7 @@ The complete map:
 | `GET /api/shows/all`                   | `functions/api/shows/all.js`               | GET     | session — your own rows plus those of members you share a group with |
 | `GET /api/shows/check`                 | `functions/api/shows/check.js`             | GET     | session |
 | `POST /api/shows/share`                | `functions/api/shows/share.js`             | POST    | retired 2026-07 — returns 410 Gone |
-| `GET /api/shows/[id]`                  | `functions/api/shows/[id].js`              | GET     | none; catalog fields only unless the session owns the show (notes, watching_with, recommended_by are owner-only). `group_watchers` is session-only and group-scoped — see below |
+| `GET /api/shows/[id]`                  | `functions/api/shows/[id].js`              | GET     | none; catalog fields only unless the session owns the show (notes, watching_with, recommended_by are owner-only). `group_watchers` is session-only and group-scoped — see below. `list` is present-but-empty for a logged-out visitor rather than absent: the Apple clients decode it non-optionally, and omitting it failed the whole payload, blanking a public show card whose catalog fields were all being sent |
 | `PUT /api/shows/[id]`                  | `functions/api/shows/[id].js`              | PUT     | session |
 | `DELETE /api/shows/[id]`               | `functions/api/shows/[id].js`              | DELETE  | session |
 | `PUT /api/shows/[id]/move`             | `functions/api/shows/[id]/move.js`         | PUT     | session |
