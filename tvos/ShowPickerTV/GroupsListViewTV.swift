@@ -2,13 +2,7 @@ import SwiftUI
 import ShowPickerCore
 
 // Pushed onto Home's stack, so links push there — no path binding of its own.
-//
-// SwiftUI declares its own `Group`, so the model can't be named bare here.
-// It's aliased rather than written as `ShowPickerCore.Group` inline: a
-// qualified type inside a property-wrapper generic (`@State private var
-// groups: [ClubGroup]`) is the shape that had the tvOS solver
-// answering "failed to produce diagnostic" instead of type-checking.
-private typealias ClubGroup = ShowPickerCore.Group
+// `ClubGroup` (CoreImports.swift) is the model — SwiftUI has its own `Group`.
 struct GroupsListViewTV: View {
     @State private var groups: [ClubGroup] = []
     @State private var loading = true

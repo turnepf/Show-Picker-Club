@@ -1,10 +1,7 @@
 import SwiftUI
 import ShowPickerCore
 
-// SwiftUI declares its own `Group`, so the model is aliased rather than
-// written as `ShowPickerCore.Group` inline — see GroupsListViewTV.
-private typealias ClubGroup = ShowPickerCore.Group
-
+// `ClubGroup` (CoreImports.swift) is the model — SwiftUI has its own `Group`.
 struct GroupDetailViewTV: View {
     let groupId: Int
     @State private var group: ClubGroup?
@@ -29,10 +26,7 @@ struct GroupDetailViewTV: View {
         .task { await load() }
     }
 
-    // Each state is its own expression. Inlining all three — styled stacks,
-    // a ScrollView and two sections — is what made the tvOS type-checker bail
-    // out with "failed to produce diagnostic", which comes and goes with
-    // build order rather than with the code.
+    // Each state is its own expression rather than one inlined chain.
     private var loadingState: some View {
         VStack(spacing: 30) {
             ProgressView()
