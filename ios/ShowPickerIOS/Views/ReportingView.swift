@@ -30,6 +30,9 @@ struct ReportingView: View {
                 if let rm = r.ratingMembers {
                     Section("People who rated") { windowRows(rm) }
                 }
+                if let rs = r.ratingsSubmitted {
+                    Section("Ratings submitted") { windowRows(rs) }
+                }
                 if let sm = r.signinMethods {
                     Section {
                         methodRows("Last 7 days", sm.week)
@@ -91,7 +94,6 @@ struct ReportingView: View {
                     metric("Awaiting", r.totals.waiting)
                     metric("Loved", r.totals.recommending)
                     metric("Next Up", r.totals.next)
-                    if let submitted = r.ratingsSubmitted { metric("Ratings submitted", submitted) }
                     if let titles = r.ratingsTitles { metric("Titles rated", titles) }
                 }
                 if let g = r.generatedAt, let when = Self.generatedLine(g) {

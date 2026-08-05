@@ -172,7 +172,10 @@ struct Reporting: Codable {
     // Rating activity: people who rated in the window, and the all-time
     // submitted/titles counts.
     let ratingMembers: ReportWindow?
-    let ratingsSubmitted: Int?
+    // Per-window, like the other activity counts — NOT a scalar. Decoding it
+    // as an Int failed the whole payload, which is what "Couldn't load
+    // reporting" was.
+    let ratingsSubmitted: ReportWindow?
     let ratingsTitles: Int?
     let activeMembers: ActiveWindow
     let activeByPlatform: PlatformWindows?
