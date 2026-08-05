@@ -371,6 +371,27 @@ enum API {
         try await get("/api/household")
     }
 
+    // Invite someone into your household by link, the same shape groups use —
+    // you can't add a person to your household from a roster any more than
+    // you can add them to a group.
+    static func householdInvite() async throws -> HouseholdInvite {
+        try await postJSON("/api/household/invite", body: [:])
+    }
+
+    @discardableResult
+    static func joinHousehold(code: String) async throws -> Bool {
+        struct Ack: Decodable { let ok: Bool? }
+        let r: Ack = try await postJSON("/api/household/join", body: ["code": code])
+        return r.ok ?? true
+    }
+
+    @discardableResult
+    static func removeFromHousehold(slug: String) async throws -> Bool {
+        struct Ack: Decodable { let ok: Bool? }
+        let r: Ack = try await postJSON("/api/household/remove", body: ["member_slug": slug])
+        return r.ok ?? true
+    }
+
     @discardableResult
     static func saveHousehold(_ slugs: [String]) async throws -> Bool {
         struct Ack: Decodable {}

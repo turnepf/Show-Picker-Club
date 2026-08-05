@@ -19,6 +19,9 @@ struct HomeView: View {
     // Universal link that arrived before the roster loaded (cold launch);
     // replayed by load().
     @State private var pendingLink: URL?
+    // Set after accepting a household invite from a link, so the app says
+    // something happened rather than silently changing an audit total.
+    @State private var showingHouseholdJoined = false
 
     // The logged-in member, resolved against the loaded member list.
     private var myMember: Member? {
@@ -168,6 +171,11 @@ struct HomeView: View {
             .sheet(isPresented: $showingLogin) {
                 LoginView().environmentObject(auth)
             }
+            .alert("You're in the household", isPresented: $showingHouseholdJoined) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("Your shows and theirs now count together in Subscription audit.")
+            }
             .sheet(isPresented: $showingSearch) {
                 SearchView().environmentObject(auth)
             }
@@ -201,6 +209,16 @@ struct HomeView: View {
     private func route(url: URL) {
         guard let first = url.path.split(separator: "/").first.map({ String($0).lowercased() }) else { return }
         if let show = Route.showLink(url) { path = [show]; return }
+        // A household invite (/household/join?code=…). Same shape as a group
+        // invite: accepting IS the navigation, and it lands on the audit the
+        // household actually affects.
+        if first == "household" {
+            if let code = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "code" })?.value, !code.isEmpty {
+                Task { await joinHousehold(code, link: url) }
+            }
+            return
+        }
         // A group invite (/groups/join?token=…) is the whole point of the
         // share link, so joining IS the navigation: accept the token, then
         // land on the group. Already a member (409) still opens the group.
@@ -239,6 +257,21 @@ struct HomeView: View {
         } catch {
             path = [.groups]
         }
+    }
+
+    // Accept a household invite, then show the audit — the screen where the
+    // pooled shows visibly change. Logged out, the code parks and replays
+    // once the session resolves, same as a group invite.
+    @MainActor
+    private func joinHousehold(_ code: String, link: URL) async {
+        guard let me = myMember else {
+            pendingLink = link
+            if !auth.isLoggedIn { showingLogin = true }
+            return
+        }
+        _ = try? await API.joinHousehold(code: code)
+        path = [.member(me)]
+        showingHouseholdJoined = true
     }
 
     // Easter egg: a shake surfaces a random show from the logged-in member's

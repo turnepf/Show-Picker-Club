@@ -30,14 +30,14 @@ struct SubscriptionAuditView: View {
                             Label(householdLabel(a), systemImage: "person.2")
                                 .lineLimit(2)
                             Spacer()
-                            Text((a.household?.isEmpty ?? true) ? "Add" : "Edit")
+                            Text((a.household?.isEmpty ?? true) ? "Invite" : "Manage")
                                 .foregroundStyle(.secondary)
                         }
                     }
                 } header: {
                     Text("Household")
                 } footer: {
-                    Text("Pool another member's shows into this audit — for services you share, so one someone's watching counts as a keep.")
+                    Text("Invite whoever you share streaming services with. Their shows pool into this audit, so a service one of you is watching counts as a keep.")
                 }
 
                 Section {
@@ -556,79 +556,122 @@ private struct HouseholdPickerView: View {
     let onSaved: () async -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var info: HouseholdInfo?
-    @State private var selected: Set<String> = []
+    @State private var invite: HouseholdInvite?
     @State private var loading = true
-    @State private var saving = false
+    @State private var working = false
     @State private var errorText: String?
+    @State private var confirmingRemoval: HouseholdMember?
 
     var body: some View {
         List {
             if let err = errorText {
                 Section { Text(err).foregroundStyle(.red) }
             }
-            if let info {
-                if info.members.isEmpty {
-                    Section { Text("No other members to add yet.").foregroundStyle(.secondary) }
-                } else {
-                    Section {
-                        ForEach(info.members) { m in
-                            Button {
-                                if selected.contains(m.slug) { selected.remove(m.slug) }
-                                else { selected.insert(m.slug) }
-                            } label: {
-                                HStack {
-                                    Text(m.name).foregroundStyle(.primary)
-                                    Spacer()
-                                    if selected.contains(m.slug) {
-                                        Image(systemName: "checkmark").foregroundStyle(.tint)
-                                    }
-                                }
-                            }
-                        }
-                    } footer: {
-                        Text("Check the members you share streaming services with. The audit pools everyone's shows.")
+
+            Section {
+                if let invite {
+                    ShareLink(item: invite.url) {
+                        Label("Share invite link", systemImage: "square.and.arrow.up")
                     }
+                    Text(invite.url)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                } else {
+                    Button {
+                        Task { await makeInvite() }
+                    } label: {
+                        Label("Invite someone to your household", systemImage: "person.badge.plus")
+                    }
+                    .disabled(working)
                 }
+            } header: {
+                Text("Invite")
+            } footer: {
+                Text("Send the link to whoever you share streaming services with — the audit pools their shows with yours once they accept. The link works for 7 days.")
+            }
+
+            Section {
+                if let members = currentMembers, !members.isEmpty {
+                    ForEach(members) { m in
+                        HStack {
+                            Text(m.name)
+                            Spacer()
+                            Button("Remove", role: .destructive) { confirmingRemoval = m }
+                                .font(.caption)
+                                .disabled(working)
+                        }
+                    }
+                } else if !loading {
+                    Text("Nobody yet — your audit covers only your own shows.")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("In your household")
             }
         }
         .navigationTitle("Household")
         .navigationBarTitleDisplayMode(.inline)
         .overlay { if loading && info == nil { ProgressView() } }
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") { Task { await save() } }.disabled(saving || loading)
+            ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+        }
+        .confirmationDialog(
+            confirmingRemoval.map { "Remove \($0.name) from your household?" } ?? "",
+            isPresented: Binding(get: { confirmingRemoval != nil },
+                                 set: { if !$0 { confirmingRemoval = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) {
+                if let m = confirmingRemoval { Task { await remove(m) } }
             }
+            Button("Cancel", role: .cancel) { confirmingRemoval = nil }
+        } message: {
+            Text("Their shows stop counting toward your audit. Nothing on either of your lists changes.")
         }
         .task { await load() }
+    }
+
+    // The roster entries whose slugs are actually in my household. The
+    // endpoint returns both, and only the intersection belongs on screen now
+    // that membership is invite-driven rather than picked from a list.
+    private var currentMembers: [HouseholdMember]? {
+        guard let info else { return nil }
+        let mine = Set(info.household)
+        return info.members.filter { mine.contains($0.slug) }
     }
 
     private func load() async {
         loading = true
         defer { loading = false }
         do {
-            let i = try await API.household()
-            info = i
-            selected = Set(i.household)
+            info = try await API.household()
         } catch {
-            errorText = "Couldn't load members — try again."
+            errorText = API.failureLine(error, action: "load your household")
         }
     }
 
-    private func save() async {
-        saving = true
-        defer { saving = false }
+    private func makeInvite() async {
+        working = true
+        defer { working = false }
         do {
-            try await API.saveHousehold(Array(selected))
-            await onSaved()
-            dismiss()
+            invite = try await API.householdInvite()
+            errorText = nil
         } catch {
-            errorText = "Couldn't save — try again."
+            errorText = API.failureLine(error, action: "create an invite")
         }
     }
-}
 
-// Format cents as a dollar string.
-private func money(_ cents: Int) -> String {
-    String(format: "$%.2f", Double(cents) / 100)
+    private func remove(_ member: HouseholdMember) async {
+        confirmingRemoval = nil
+        working = true
+        defer { working = false }
+        do {
+            _ = try await API.removeFromHousehold(slug: member.slug)
+            await load()
+            await onSaved()
+        } catch {
+            errorText = API.failureLine(error, action: "remove \(member.name)")
+        }
+    }
 }

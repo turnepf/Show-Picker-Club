@@ -454,6 +454,18 @@ struct HouseholdMember: Codable, Identifiable {
     var id: String { slug }
 }
 
+// A household invite link (POST /api/household/invite), 7-day expiry.
+struct HouseholdInvite: Codable {
+    let code: String
+    let url: String
+    let expiresAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case code, url
+        case expiresAt = "expires_at"
+    }
+}
+
 // Roster + current selection for the household picker (GET /api/household).
 struct HouseholdInfo: Codable {
     let household: [String]
