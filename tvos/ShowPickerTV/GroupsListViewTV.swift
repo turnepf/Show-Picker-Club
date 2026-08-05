@@ -74,8 +74,8 @@ struct GroupsListViewTV: View {
     }
 
     private var grid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 30), count: 3),
-                  spacing: 30) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 24), count: 4),
+                  spacing: 24) {
             ForEach(groups) { group in
                 NavigationLink(value: Route.groupDetail(group.id)) {
                     GroupTileTV(group: group)
@@ -97,27 +97,29 @@ struct GroupsListViewTV: View {
     }
 }
 
+// Two short lines of text, so the tile is sized by them: no Spacer holding it
+// open to a 200pt minimum. A name and a member count don't need a card the
+// size of a poster, and four across reads as a set rather than as four
+// billboards.
 struct GroupTileTV: View {
     let group: ClubGroup
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(group.name)
-                .font(.system(size: 28, weight: .semibold))
+                .font(.system(size: 26, weight: .semibold))
                 .foregroundColor(Theme.text)
-                .lineLimit(2)
+                .lineLimit(1)
 
             Text("\(group.memberCount) member\(group.memberCount == 1 ? "" : "s")")
                 .font(.system(size: 18))
                 .foregroundColor(Theme.muted)
-
-            Spacer()
         }
-        .padding(30)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .frame(minHeight: 200)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.surface)
-        .cornerRadius(16)
+        .cornerRadius(14)
     }
 }
 

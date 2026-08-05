@@ -107,8 +107,8 @@ struct HomeView: View {
                 }
                 .buttonStyle(PushButtonStyle())
             } else {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 30), count: 3),
-                          spacing: 30) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 24), count: 4),
+                          spacing: 24) {
                     ForEach(groups) { group in
                         NavigationLink(value: Route.groupDetail(group.id)) {
                             GroupTileTV(group: group)
