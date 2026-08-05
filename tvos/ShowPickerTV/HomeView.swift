@@ -102,7 +102,7 @@ struct HomeView: View {
                         .foregroundColor(Theme.text)
                         .padding(30)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Theme.cardBackground)
+                        .background(Theme.surface)
                         .cornerRadius(16)
                 }
                 .buttonStyle(PushButtonStyle())
@@ -136,7 +136,7 @@ struct HomeView: View {
         }
         .padding(30)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.cardBackground)
+        .background(Theme.surface)
         .cornerRadius(16)
     }
 

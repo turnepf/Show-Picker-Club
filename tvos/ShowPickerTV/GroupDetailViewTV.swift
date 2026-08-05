@@ -144,7 +144,7 @@ struct GroupDetailViewTV: View {
                 .foregroundColor(Theme.muted)
         }
         .padding(20)
-        .background(Theme.cardBackground)
+        .background(Theme.surface)
         .cornerRadius(12)
         .frame(maxWidth: .infinity, alignment: .leading)
     }

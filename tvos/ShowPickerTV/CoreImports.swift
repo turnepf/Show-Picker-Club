@@ -4,8 +4,6 @@
 
 // SwiftUI declares its own `Group`, so the model can't be written bare in type
 // position anywhere in this target. One internal alias, declared where the
-// re-export happens, rather than a private one per file: GroupTileTV is
-// internal and has a `group` property, so a fileprivate alias made its type
-// less visible than the property — which the compiler reported as "failed to
-// produce diagnostic" rather than as the access-level error it is.
+// re-export happens — a fileprivate one per file would be less visible than the
+// internal properties that use it (GroupTileTV.group), which is an error.
 typealias ClubGroup = ShowPickerCore.Group

@@ -116,7 +116,7 @@ struct GroupTileTV: View {
         .padding(30)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .frame(minHeight: 200)
-        .background(Theme.cardBackground)
+        .background(Theme.surface)
         .cornerRadius(16)
     }
 }
