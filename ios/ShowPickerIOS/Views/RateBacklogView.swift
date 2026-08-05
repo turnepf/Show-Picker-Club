@@ -38,7 +38,7 @@ struct RateBacklogView: View {
                 .listStyle(.plain)
             }
         }
-        .navigationTitle("Rate My Backlog")
+        .navigationTitle("Rate My Shows")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .alert("Couldn’t Save Rating",

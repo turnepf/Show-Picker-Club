@@ -254,7 +254,7 @@
       var discover = iconRow('/groups', 'Groups', 'people', { selected: path === '/groups' || path === '/groups.html' }) +
         iconRow('/?home', 'Trending', 'flame');
       if (authMember) {
-        discover += iconRow('/rate-backlog', 'Rate my backlog', 'star-fill', { selected: path === '/rate-backlog', badgeId: 'shellRateBacklogBadge' });
+        discover += iconRow('/rate-backlog', 'Rate my shows', 'star-fill', { selected: path === '/rate-backlog', badgeId: 'shellRateBacklogBadge' });
         discover += iconRow('/subscriptions', 'Subscription audit', 'creditcard', { selected: path === '/subscriptions' });
         discover += iconRow('/vibe?member=' + encodeURIComponent(authMember), 'Vibe', 'sparkles', { selected: path === '/vibe' });
         // Calendar feeds authenticate with a per-member token and /api/members

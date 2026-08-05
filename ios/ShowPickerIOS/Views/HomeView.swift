@@ -83,7 +83,7 @@ struct HomeView: View {
                             NavigationLink {
                                 RateBacklogView()
                             } label: {
-                                Label("Rate my backlog", systemImage: "star.fill")
+                                Label("Rate my shows", systemImage: "star.fill")
                             }
                             .badge(backlogCount)
                             NavigationLink {

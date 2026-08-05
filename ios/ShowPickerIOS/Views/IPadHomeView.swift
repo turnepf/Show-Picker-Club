@@ -168,7 +168,7 @@ struct IPadHomeView: View {
                 // only appear once you're signed in — matching the web sidebar
                 // and your own MemberView.
                 if myMember != nil {
-                    Label("Rate my backlog", systemImage: "star.fill")
+                    Label("Rate my shows", systemImage: "star.fill")
                         .tag(SidebarItem.rateBacklog)
                         .badge(backlogCount)
                     Label("Subscription audit", systemImage: "creditcard")
