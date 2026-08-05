@@ -208,6 +208,16 @@ struct ShowDetailView: View {
                 Text(clubRatingText)
                     .font(.system(size: 24))
                     .foregroundColor(Theme.text.opacity(0.8))
+                if let mine = ratings.mine {
+                    Text("Your rating — \(mine)/10")
+                        .font(.system(size: 24))
+                        .foregroundColor(Theme.text.opacity(0.8))
+                }
+                if let seasons = clubSeasonRatingsText {
+                    Text("Club seasons — \(seasons)")
+                        .font(.system(size: 24))
+                        .foregroundColor(Theme.text.opacity(0.8))
+                }
                 if let owner = ratings.owner {
                     Text("\(ratings.ownerName ?? "")’s rating — \(owner)/10")
                         .font(.system(size: 24))
@@ -215,6 +225,17 @@ struct ShowDetailView: View {
                 }
             }
         }
+    }
+
+    // "S1 8.2 · S2 7.9" — per-season club averages, the same line the watch
+    // shows. Seasons nobody has rated drop out rather than printing a blank.
+    private var clubSeasonRatingsText: String? {
+        guard let seasons = ratings?.seasons, !seasons.isEmpty else { return nil }
+        let parts = seasons.keys.sorted().compactMap { s -> String? in
+            guard let avg = seasons[s]?.average else { return nil }
+            return String(format: "S%d %.1f", s, avg)
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     private var clubRatingText: String {

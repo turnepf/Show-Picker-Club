@@ -43,6 +43,8 @@ struct HomeView: View {
                         // Groups are for logged-in members only
                         if auth.isLoggedIn {
                             groupsSection
+                        } else {
+                            signedOutPitch
                         }
 
                         // Attribution required by the TMDB API terms; OMDb
@@ -116,6 +118,26 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    // Logged out, Trending above is all there is — say what the app is for and
+    // where to sign in. The Apple TV has no keyboard worth typing on, so this
+    // points at the Account tab rather than pretending sign-in happens here.
+    private var signedOutPitch: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("Keep track of what you're watching")
+            Text("Four lists — Watching, Awaiting, Loved and Next Up — with premiere dates, ratings and where to watch. Make a group on your iPhone or iPad to see what your people are watching.")
+                .font(.system(size: 22))
+                .foregroundColor(Theme.muted)
+                .frame(maxWidth: 1100, alignment: .leading)
+            Text("Sign in from the Account tab to see your lists and your groups.")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundColor(Theme.text)
+        }
+        .padding(30)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.cardBackground)
+        .cornerRadius(16)
     }
 
     private func sectionHeader(_ text: String) -> some View {
