@@ -445,15 +445,22 @@ struct IPadHomeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // Home is the launch screen on every platform
+    // (docs/PRODUCT.md#navigation-standard). On iPad the sidebar is always
+    // visible, so the only part of that rule with anything to decide is what
+    // the detail column opens on: Trending, not the focused member's Watching
+    // list. Your lists are one tap away in the sidebar either way.
     private func applyInitialSelection() {
         if focusedSlug == nil, let me = myMember {
             focusedSlug = me.slug
         }
         guard selection == nil else { return }
-        if focusedSlug != nil {
-            selection = .list(.watching)
-        } else if !popular.isEmpty {
+        if !popular.isEmpty {
             selection = .trending
+        } else if focusedSlug != nil {
+            // Nothing trending yet (cold start, or the fetch failed) — an
+            // empty detail column is worse than landing on your own lists.
+            selection = .list(.watching)
         }
     }
 

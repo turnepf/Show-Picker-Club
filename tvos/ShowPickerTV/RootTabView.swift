@@ -1,10 +1,13 @@
 import SwiftUI
 import UIKit
 
-// Standard tvOS top tab-bar navigation. The roster and Trending are open;
-// member show lists are members-only (the server 401s them without a
-// session). "My Shows" appears once you're signed in, and signing in jumps
-// you straight to it. Account is where you log in / out.
+// Standard tvOS top tab-bar navigation. Trending is open; member show lists
+// are members-only (the server 401s them without a session). "My Shows"
+// appears once you're signed in. Account is where you log in / out.
+//
+// Home leads the bar and is the launch screen — the standard on every
+// platform (see docs/PRODUCT.md#navigation-standard). Signing in still lands
+// you on your lists, but a session restored at launch does not.
 struct RootTabView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var selection = Tab.home
@@ -40,14 +43,14 @@ struct RootTabView: View {
 
     var body: some View {
         TabView(selection: tabSelection) {
+            HomeView(path: $homePath)
+                .tabItem { Label("Home", systemImage: "house") }
+                .tag(Tab.home)
             if auth.isLoggedIn {
                 MyShowsView(path: $minePath)
                     .tabItem { Label("My Shows", systemImage: "play.tv") }
                     .tag(Tab.mine)
             }
-            HomeView(path: $homePath)
-                .tabItem { Label("Home", systemImage: "house") }
-                .tag(Tab.home)
             SearchView(path: $searchPath)
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(Tab.search)
@@ -77,7 +80,17 @@ struct RootTabView: View {
             // Selecting a tab in the same update as that structural change
             // can leave the target tab rendering empty on tvOS — let the
             // TabView commit the change first, then switch.
-            Task { @MainActor in selection = slug != nil ? .mine : .home }
+            if slug != nil {
+                // Only an actual sign-in follows through to My Shows: you're
+                // on the Account tab because you just used it. The same
+                // notification fires when a stored session resolves at
+                // launch, and that must leave you on Home.
+                guard selection == .account else { return }
+                Task { @MainActor in selection = .mine }
+            } else if selection == .mine {
+                // The tab we're sitting on is about to disappear.
+                Task { @MainActor in selection = .home }
+            }
         }
     }
 

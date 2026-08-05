@@ -119,6 +119,11 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
   notes go in the App Store update text instead (retired 2026-08, along with
   `whats-new.json`, `whats-new.html` and `WhatsNewView`).
 
+- **Home leads and Home is the launch screen, on every platform.** Home is the
+  first tab / first nav item, My Shows second, and the app opens on Home even
+  when a session is already stored. Signing in mid-session still jumps to My
+  Shows. See `docs/PRODUCT.md#navigation-standard`.
+
 - **Never put `#` comments in terminal commands meant for the user to paste.**
   Pasted into their zsh, comment lines execute as garbage commands and break
   the sequence. Give bare commands in separate code blocks and explain them

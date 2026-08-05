@@ -120,6 +120,12 @@ that's the signal to revisit.
 
 The native iOS, tvOS and watchOS clients are where the product actually lives (see Web app status above; the PWA itself was retired in 2026-08). The watchOS app (paired to the iPhone) shows the four lists → shows → detail; its session is handed off from the phone, and member reads depend on that handed-off session (they are not public). There is deliberately no watch-face complication (one shipped briefly in 2026-07 and was retired — it rendered unreliably on device).
 
+### Navigation standard
+
+**Home leads, and Home is the launch screen — on every platform.** Wherever the app has a tab bar or a top-level nav list, Home is the first item, followed by My Shows; the app opens on Home whether or not a session is already stored. Signing in *during* a session still takes you straight to your lists (you asked for them), but restoring a session at launch does not.
+
+iPhone and iPad satisfy this by construction — both are rooted at Home, with My Shows the first row of its nav list. On tvOS it's the tab order plus a launch rule: the sign-in jump to My Shows only fires from the Account tab, so a stored session resolving at launch leaves you on Home.
+
 The iOS app ships **home-screen widgets** on iPhone, iPad, and Mac (the Mac Catalyst build): **Trending** (public, the club's rolling top adds; small/medium/large + extra-large on iPad/Mac) and **Upcoming Premieres** (the signed-in member's next premieres by date; small/medium/large + iPhone Lock Screen). Tapping a show opens its card in the app via `showpicker.club/show/<id>` universal links. tvOS and watchOS have no widget equivalent.
 
 ## Sort and toggle controls

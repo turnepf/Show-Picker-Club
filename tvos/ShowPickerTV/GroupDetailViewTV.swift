@@ -62,11 +62,13 @@ struct GroupDetailViewTV: View {
                 }
                 .padding(.top, 20)
 
-                // Stacked sections rather than a tab picker: the same shape as
-                // a member's screen, and the focus engine always has something
-                // to land on.
-                trendingSection
+                // Stacked sections rather than a tab picker: the focus engine
+                // always has something to land on. Members come first —
+                // they're the answer to "whose group is this", and a short
+                // horizontal row of them costs one band of screen instead of
+                // pushing Trending below the fold.
                 membersSection
+                trendingSection
             }
             .padding(.horizontal, 60)
             .padding(.bottom, 60)
@@ -100,22 +102,30 @@ struct GroupDetailViewTV: View {
         }
     }
 
+    // A horizontal band of member cards, the same shelf shape as Trending
+    // rather than a column of full-width rows: a group is a handful of people,
+    // and stacking them vertically spent the whole screen saying so.
     private var membersSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             sectionHeader("Members")
-            LazyVStack(alignment: .leading, spacing: 20) {
-                ForEach(members) { member in
-                    if let rosterMember = roster[member.slug] {
-                        NavigationLink(value: Route.member(rosterMember)) {
-                            memberRow(member, name: rosterMember.label)
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .top, spacing: 30) {
+                    ForEach(members) { member in
+                        if let rosterMember = roster[member.slug] {
+                            NavigationLink(value: Route.member(rosterMember)) {
+                                memberCard(member, name: rosterMember.label)
+                            }
+                            .buttonStyle(PushButtonStyle())
+                        } else {
+                            // Roster miss: still listed, just not focusable —
+                            // their lists wouldn't load anyway.
+                            memberCard(member, name: member.displayName)
                         }
-                        .buttonStyle(PushButtonStyle())
-                    } else {
-                        // Roster miss: still listed, just not focusable —
-                        // their lists wouldn't load anyway.
-                        memberRow(member, name: member.displayName)
                     }
                 }
+                // Room for the focus lift, which otherwise clips at the edges.
+                .padding(.horizontal, 14)
+                .padding(.vertical, 20)
             }
         }
     }
@@ -133,20 +143,26 @@ struct GroupDetailViewTV: View {
         return names.joined(separator: ", ")
     }
 
+    // Fixed width so the shelf reads as a row of equal cards; the counts wrap
+    // onto their own line instead of the row's single "12 shows • 3 watching".
     @ViewBuilder
-    private func memberRow(_ member: GroupMember, name: String) -> some View {
+    private func memberCard(_ member: GroupMember, name: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(name)
-                .font(.system(size: 24, weight: .semibold))
+                .font(.system(size: 26, weight: .semibold))
                 .foregroundColor(Theme.text)
-            Text("\(member.showCount) show\(member.showCount == 1 ? "" : "s") • \(member.watchingCount) watching")
+                .lineLimit(2)
+            Text("\(member.showCount) show\(member.showCount == 1 ? "" : "s")")
+                .font(.system(size: 18))
+                .foregroundColor(Theme.muted)
+            Text("\(member.watchingCount) watching")
                 .font(.system(size: 18))
                 .foregroundColor(Theme.muted)
         }
-        .padding(20)
+        .padding(24)
+        .frame(width: 300, height: 170, alignment: .topLeading)
         .background(Theme.surface)
-        .cornerRadius(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .cornerRadius(16)
     }
 
     private func load() async {
