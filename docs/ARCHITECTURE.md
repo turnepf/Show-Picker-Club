@@ -249,7 +249,7 @@ The complete map:
 | `GET /api/shows`                       | `functions/api/shows.js`                   | GET     | session |
 | `GET /api/export`                      | `functions/api/export.js`                  | GET     | session (exports the caller's OWN lists only; plain-text download) |
 | `POST /api/shows`                      | `functions/api/shows.js`                   | POST    | session |
-| `GET /api/shows/all`                   | `functions/api/shows/all.js`               | GET     | session |
+| `GET /api/shows/all`                   | `functions/api/shows/all.js`               | GET     | session — your own rows plus those of members you share a group with |
 | `GET /api/shows/check`                 | `functions/api/shows/check.js`             | GET     | session |
 | `POST /api/shows/share`                | `functions/api/shows/share.js`             | POST    | retired 2026-07 — returns 410 Gone |
 | `GET /api/shows/[id]`                  | `functions/api/shows/[id].js`              | GET     | none; catalog fields only unless the session owns the show (notes, watching_with, recommended_by are owner-only). `group_watchers` is session-only and group-scoped — see below |

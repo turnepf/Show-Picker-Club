@@ -35,8 +35,16 @@ export async function onRequestGet(context) {
      FROM shows s
      JOIN members m ON m.slug = s.member_slug
      WHERE s.archived = 0
+       -- Your libraries: yours, plus the members you share a group with.
+       -- Searching every library meant results labelled with the name of
+       -- someone you have no relationship with — the same reason the roster
+       -- came off the home screens and Vibe is group-scoped.
+       AND (s.member_slug = ?1 OR s.member_slug IN (
+             SELECT gm.member_slug FROM group_members gm
+              WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE member_slug = ?1)
+           ))
      ORDER BY s.title COLLATE NOCASE`
-  ).all();
+  ).bind(session.member_slug).all();
 
   // First-name display, disambiguated with a last initial only on collision
   // (same policy as /api/members).
