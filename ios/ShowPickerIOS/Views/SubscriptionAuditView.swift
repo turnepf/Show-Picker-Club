@@ -675,3 +675,10 @@ private struct HouseholdPickerView: View {
         }
     }
 }
+
+// "$12.99" — prices are stored in cents everywhere, so every screen that
+// shows one formats it here. (Lost when the household picker was rewritten;
+// the four call sites above are the only users.)
+private func money(_ cents: Int) -> String {
+    String(format: "$%.2f", Double(cents) / 100)
+}
