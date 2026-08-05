@@ -88,6 +88,16 @@ struct HomeView: View {
                             } label: {
                                 Label("Create your free account", systemImage: "person.crop.circle.badge.plus")
                             }
+                            // Same sheet — it's identifier-first, so it works
+                            // out whether you're new or returning. But a
+                            // returning member shouldn't have to read "create
+                            // an account" and guess that it also signs them in.
+                            Button {
+                                showingLogin = true
+                            } label: {
+                                Label("Already a member? Log in",
+                                      systemImage: "rectangle.portrait.and.arrow.forward")
+                            }
                             Text("Browse what the club is watching below — no account needed.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
