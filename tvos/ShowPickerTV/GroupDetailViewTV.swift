@@ -1,10 +1,13 @@
 import SwiftUI
 import ShowPickerCore
 
-// SwiftUI has its own `Group`, so the model needs qualifying in type position.
+// SwiftUI declares its own `Group`, so the model is aliased rather than
+// written as `ShowPickerCore.Group` inline — see GroupsListViewTV.
+private typealias ClubGroup = ShowPickerCore.Group
+
 struct GroupDetailViewTV: View {
     let groupId: Int
-    @State private var group: ShowPickerCore.Group?
+    @State private var group: ClubGroup?
     @State private var members: [GroupMember] = []
     // The club roster, by slug: the group payload carries first names only, so
     // this supplies the display name and the Member value a row navigates with.
@@ -52,7 +55,7 @@ struct GroupDetailViewTV: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func content(_ group: ShowPickerCore.Group) -> some View {
+    private func content(_ group: ClubGroup) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 40) {
                 VStack(alignment: .leading, spacing: 12) {

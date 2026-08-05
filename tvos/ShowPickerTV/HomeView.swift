@@ -6,11 +6,14 @@ import ShowPickerCore
 // purpose — a group is people you chose, and the roster wasn't something
 // most members could put names to. Auth and your own lists live in their
 // own tabs.
+// Same aliasing as the group screens — see GroupsListViewTV.
+private typealias ClubGroupHome = ShowPickerCore.Group
+
 struct HomeView: View {
     @Binding var path: NavigationPath
     @EnvironmentObject private var auth: AuthStore
     @State private var members: [Member] = []
-    @State private var groups: [ShowPickerCore.Group] = []
+    @State private var groups: [ClubGroupHome] = []
     @State private var popular: [PopularShow] = []
     @State private var loading = true
     @State private var errorText: String?
