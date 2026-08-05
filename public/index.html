@@ -8,8 +8,20 @@
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-CP9N26NG19"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-CP9N26NG19');</script>
   <!-- Native Smart App Banner: iPhone/iPad Safari's one prompt for the app
-       (OPEN when installed, GET when not). app-banner.js bows out there. -->
-  <meta name="apple-itunes-app" content="app-id=6780282764">
+       (OPEN when installed, GET when not). app-banner.js bows out there.
+       app-argument carries the URL that was tapped, so OPEN lands on the same
+       show rather than the app's home screen. It only matters once the app is
+       installed — Apple has no deferred deep linking, so a first-time install
+       from GET always starts at Home and the link has to be tapped again. -->
+  <meta name="apple-itunes-app" content="app-id=6780282764" id="smartBanner">
+  <script>
+    // Set before Safari reads the tag: the banner is parsed at load, so this
+    // has to run inline rather than from a deferred script.
+    (function () {
+      var el = document.getElementById('smartBanner');
+      if (el) el.setAttribute('content', 'app-id=6780282764, app-argument=' + location.href);
+    })();
+  </script>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="apple-touch-icon" href="/favicon.svg">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
