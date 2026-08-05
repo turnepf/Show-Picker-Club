@@ -16,49 +16,65 @@ struct GroupDetailViewTV: View {
     var body: some View {
         ZStack {
             if loading {
-                VStack(spacing: 30) {
-                    ProgressView()
-                        .scaleEffect(2)
-                    Text("Loading…")
-                        .font(.system(size: 28))
-                        .foregroundColor(Theme.muted)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let errorText = errorText {
-                VStack(spacing: 24) {
-                    Text(errorText)
-                        .font(.system(size: 28))
-                        .foregroundColor(Theme.muted)
-                    Button("Try again") { Task { await load() } }
-                        .font(.system(size: 24, weight: .semibold))
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let group = group {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 40) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text(group.name)
-                                .font(.system(size: 56, weight: .bold))
-                                .foregroundColor(Theme.text)
-                            Text("\(members.count) member\(members.count == 1 ? "" : "s")")
-                                .font(.system(size: 24))
-                                .foregroundColor(Theme.muted)
-                        }
-                        .padding(.top, 20)
-
-                        // Stacked sections rather than a tab picker: the same
-                        // shape as a member's screen, and the focus engine
-                        // always has something to land on.
-                        trendingSection
-                        membersSection
-                    }
-                    .padding(.horizontal, 60)
-                    .padding(.bottom, 60)
-                }
-                .background(Theme.background.ignoresSafeArea())
+                loadingState
+            } else if let errorText {
+                errorState(errorText)
+            } else if let group {
+                content(group)
             }
         }
         .task { await load() }
+    }
+
+    // Each state is its own expression. Inlining all three — styled stacks,
+    // a ScrollView and two sections — is what made the tvOS type-checker bail
+    // out with "failed to produce diagnostic", which comes and goes with
+    // build order rather than with the code.
+    private var loadingState: some View {
+        VStack(spacing: 30) {
+            ProgressView()
+                .scaleEffect(2)
+            Text("Loading…")
+                .font(.system(size: 28))
+                .foregroundColor(Theme.muted)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func errorState(_ message: String) -> some View {
+        VStack(spacing: 24) {
+            Text(message)
+                .font(.system(size: 28))
+                .foregroundColor(Theme.muted)
+            Button("Try again") { Task { await load() } }
+                .font(.system(size: 24, weight: .semibold))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func content(_ group: ShowPickerCore.Group) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 40) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(group.name)
+                        .font(.system(size: 56, weight: .bold))
+                        .foregroundColor(Theme.text)
+                    Text("\(members.count) member\(members.count == 1 ? "" : "s")")
+                        .font(.system(size: 24))
+                        .foregroundColor(Theme.muted)
+                }
+                .padding(.top, 20)
+
+                // Stacked sections rather than a tab picker: the same shape as
+                // a member's screen, and the focus engine always has something
+                // to land on.
+                trendingSection
+                membersSection
+            }
+            .padding(.horizontal, 60)
+            .padding(.bottom, 60)
+        }
+        .background(Theme.background.ignoresSafeArea())
     }
 
     private var trendingSection: some View {

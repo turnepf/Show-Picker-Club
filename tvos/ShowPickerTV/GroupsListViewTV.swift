@@ -16,42 +16,7 @@ struct GroupsListViewTV: View {
                     .foregroundColor(Theme.text)
                     .padding(.top, 20)
 
-                if loading {
-                    ProgressView()
-                        .padding(.top, 80)
-                        .frame(maxWidth: .infinity)
-                } else if let errorText = errorText {
-                    VStack(spacing: 24) {
-                        Text(errorText)
-                            .font(.system(size: 28))
-                            .foregroundColor(Theme.muted)
-                        Button("Try again") { Task { await load() } }
-                            .font(.system(size: 24, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 40)
-                } else if groups.isEmpty {
-                    VStack(spacing: 24) {
-                        Text("No groups yet")
-                            .font(.system(size: 28))
-                            .foregroundColor(Theme.muted)
-                        Text("Use your iPhone or the web app to create or join a group")
-                            .font(.system(size: 20))
-                            .foregroundColor(Theme.muted)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 40)
-                } else {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 30), count: 3),
-                              spacing: 30) {
-                        ForEach(groups) { group in
-                            NavigationLink(value: Route.groupDetail(group.id)) {
-                                GroupTileTV(group: group)
-                            }
-                            .buttonStyle(PushButtonStyle())
-                        }
-                    }
-                }
+                content
 
                 Text("Ratings and metadata from IMDb (via OMDb) and TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.")
                     .font(.system(size: 18))
@@ -63,6 +28,61 @@ struct GroupsListViewTV: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .task { if groups.isEmpty { await load() } }
+    }
+
+    // Split out of `body` deliberately. Four branches of styled stacks in one
+    // expression is what made the tvOS type-checker give up with "failed to
+    // produce diagnostic" — an error that comes and goes with build order
+    // rather than with the code.
+    @ViewBuilder private var content: some View {
+        if loading {
+            ProgressView()
+                .padding(.top, 80)
+                .frame(maxWidth: .infinity)
+        } else if let errorText {
+            errorState(errorText)
+        } else if groups.isEmpty {
+            emptyState
+        } else {
+            grid
+        }
+    }
+
+    private func errorState(_ message: String) -> some View {
+        VStack(spacing: 24) {
+            Text(message)
+                .font(.system(size: 28))
+                .foregroundColor(Theme.muted)
+            Button("Try again") { Task { await load() } }
+                .font(.system(size: 24, weight: .semibold))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 40)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 24) {
+            Text("No groups yet")
+                .font(.system(size: 28))
+                .foregroundColor(Theme.muted)
+            Text("Use your iPhone or the web app to create or join a group")
+                .font(.system(size: 20))
+                .foregroundColor(Theme.muted)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.top, 40)
+    }
+
+    private var grid: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 30), count: 3),
+                  spacing: 30) {
+            ForEach(groups) { group in
+                NavigationLink(value: Route.groupDetail(group.id)) {
+                    GroupTileTV(group: group)
+                }
+                .buttonStyle(PushButtonStyle())
+            }
+        }
     }
 
     private func load() async {
