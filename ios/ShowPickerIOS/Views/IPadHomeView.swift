@@ -38,6 +38,10 @@ struct IPadHomeView: View {
     // Roster fetch threw — shown only when there's nothing to display, so an
     // empty roster reads as a load failure, not an empty club.
     @State private var loadFailed = false
+    // Slugs of members I share at least one group with. Empty until the
+    // groups load (or for a member in no groups), which is the honest answer:
+    // no groups, nobody else's lists to browse.
+    @State private var groupMemberSlugs: Set<String> = []
     @State private var selection: SidebarItem?
     // Whose lists the sidebar's list entries show. Defaults to the logged-in
     // member once auth resolves; tapping a member row moves focus to them.
@@ -51,6 +55,7 @@ struct IPadHomeView: View {
     @State private var showingLogin = false
     @State private var showingDeleteAccount = false
     @State private var showingSearch = false
+    @State private var showingExport = false
     // Same "NEW" badge as iPhone Home, cleared by opening Groups once.
     @AppStorage("seenGroups") private var seenGroups = false
 
@@ -60,6 +65,12 @@ struct IPadHomeView: View {
     private var myMember: Member? {
         guard let slug = auth.memberSlug else { return nil }
         return members.first { $0.slug == slug }
+    }
+
+    // The roster, filtered to people I'm in a group with — plus me, since the
+    // window is also how I get back to my own lists.
+    private var groupMembers: [Member] {
+        members.filter { $0.slug == auth.memberSlug || groupMemberSlugs.contains($0.slug) }
     }
 
     private var focusedMember: Member? {
@@ -99,6 +110,7 @@ struct IPadHomeView: View {
         .sheet(isPresented: $showingLogin) { LoginView().environmentObject(auth) }
         .sheet(isPresented: $showingDeleteAccount) { DeleteAccountView().environmentObject(auth) }
         .sheet(isPresented: $showingSearch) { SearchView().environmentObject(auth) }
+        .sheet(isPresented: $showingExport) { ExportListsView().environmentObject(auth) }
         // Auth may resolve after the member list loads; land on your Watching
         // list once it does (unless the user has already picked something).
         .onChange(of: auth.memberSlug) { _, _ in applyInitialSelection() }
@@ -146,8 +158,24 @@ struct IPadHomeView: View {
                 }
             } else if !auth.isLoggedIn && !loading {
                 Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Keep track of what you're watching")
+                            .font(.headline)
+                        Text("Four lists — Watching, Awaiting, Loved and Next Up — with premiere dates, ratings and where to watch. Make a group to see what your people are watching, and audit what you're paying for.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.vertical, 4)
                     Button { showingLogin = true } label: {
-                        Label("Log in to see your shows", systemImage: "person.crop.circle.badge.plus")
+                        Label("Create your free account", systemImage: "person.crop.circle.badge.plus")
+                    }
+                    // Same sheet — identifier-first, so it handles both — but
+                    // a returning member shouldn't have to read "create an
+                    // account" and guess it signs them in too.
+                    Button { showingLogin = true } label: {
+                        Label("Already a member? Log in",
+                              systemImage: "rectangle.portrait.and.arrow.forward")
                     }
                 }
             }
@@ -186,19 +214,14 @@ struct IPadHomeView: View {
                     Label("Calendar", systemImage: "calendar")
                         .tag(SidebarItem.calendar)
                 }
-                if auth.isAdmin {
-                    Label("Reporting", systemImage: "chart.bar.xaxis")
-                        .tag(SidebarItem.adminReporting)
-                    Label("Manage members", systemImage: "person.2.badge.gearshape")
-                        .tag(SidebarItem.adminManageMembers)
-                    Label("Show Cleanup", systemImage: "link.badge.plus")
-                        .tag(SidebarItem.adminUrlCleanup)
-                    Label("Vibe trait scoring", systemImage: "sparkles")
-                        .tag(SidebarItem.adminVibe)
-                }
             }
-            if !members.isEmpty {
-                Section("Members") {
+            // People, not the club: the members you share a group with. The
+            // iPhone dropped its roster outright, but here the list IS the
+            // control that picks whose lists the detail column shows, so it
+            // gets scoped rather than removed — same boundary as Trending,
+            // search and Vibe.
+            if !groupMembers.isEmpty {
+                Section("Your groups") {
                     membersWindow
                         .listRowInsets(EdgeInsets())
                 }
@@ -248,15 +271,16 @@ struct IPadHomeView: View {
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 8)
                 }
-                ForEach(members) { m in memberRow(m) }
+                ForEach(groupMembers) { m in memberRow(m) }
             }
         }
         .frame(height: memberWindowHeight)
     }
 
     private var memberWindowHeight: CGFloat {
-        let visible = min(CGFloat(members.count), CGFloat(memberWindowRows))
-        let peek: CGFloat = members.count > memberWindowRows ? memberRowHeight / 2 : 0
+        let count = groupMembers.count
+        let visible = min(CGFloat(count), CGFloat(memberWindowRows))
+        let peek: CGFloat = count > memberWindowRows ? memberRowHeight / 2 : 0
         return visible * memberRowHeight + peek
     }
 
@@ -288,6 +312,31 @@ struct IPadHomeView: View {
         Group {
             if auth.isLoggedIn {
                 Menu {
+                    Button {
+                        showingExport = true
+                    } label: {
+                        Label("Export My Lists…", systemImage: "square.and.arrow.up")
+                    }
+                    // Operator tools behind the account icon, same as iPhone,
+                    // so the sidebar reads the same for an admin as for
+                    // everyone else. Selecting rather than pushing: the iPad's
+                    // detail column is driven by the sidebar selection.
+                    if auth.isAdmin {
+                        Section("Admin") {
+                            Button { selection = .adminReporting } label: {
+                                Label("Reporting", systemImage: "chart.bar.xaxis")
+                            }
+                            Button { selection = .adminManageMembers } label: {
+                                Label("Manage members", systemImage: "person.2.badge.gearshape")
+                            }
+                            Button { selection = .adminUrlCleanup } label: {
+                                Label("Show Cleanup", systemImage: "link.badge.plus")
+                            }
+                            Button { selection = .adminVibe } label: {
+                                Label("Vibe trait scoring", systemImage: "sparkles")
+                            }
+                        }
+                    }
                     Button(role: .destructive) {
                         Task { await auth.logout() }
                     } label: {
@@ -408,6 +457,22 @@ struct IPadHomeView: View {
         }
     }
 
+    // Who I share a group with. /api/groups gives my groups; each group's
+    // detail gives its members. Non-fatal by design: on failure the window
+    // shows just me, which is wrong-but-safe, where falling back to the full
+    // roster would be exactly the thing we removed.
+    private func loadGroupMembers() async {
+        guard auth.isLoggedIn else { groupMemberSlugs = []; return }
+        guard let groups = try? await API.groups().groups else { return }
+        var slugs: Set<String> = []
+        for group in groups {
+            if let detail = try? await API.groupDetail(id: group.id) {
+                for member in detail.members { slugs.insert(member.slug) }
+            }
+        }
+        groupMemberSlugs = slugs
+    }
+
     private func load() async {
         loading = true
         defer { loading = false }
@@ -426,6 +491,7 @@ struct IPadHomeView: View {
         }
         popular = pr ?? popular
         backlogCount = auth.isLoggedIn ? ((try? await API.rateBacklogCount()) ?? 0) : 0
+        await loadGroupMembers()
         if let link = pendingLink {
             pendingLink = nil
             route(url: link)
@@ -446,6 +512,19 @@ struct IPadHomeView: View {
         // Group invite: joining is the navigation. Selecting Groups first
         // means a failed join (expired token, already a member) still lands
         // somewhere useful.
+        // Household invite: accept it and land on the audit the household
+        // actually changes. iPhone has done this since the invite flow
+        // shipped; the iPad silently ignored the link.
+        if first == "household" {
+            if let code = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "code" })?.value, !code.isEmpty {
+                Task {
+                    _ = try? await API.joinHousehold(code: code)
+                    selection = .subscriptionAudit
+                }
+            }
+            return
+        }
         if first == "groups" {
             selection = .groups
             if let token = URLComponents(url: url, resolvingAgainstBaseURL: false)?
