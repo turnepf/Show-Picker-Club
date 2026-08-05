@@ -245,7 +245,7 @@ The complete map:
 | `GET /api/rate-backlog`                | `functions/api/rate-backlog.js`            | GET     | session — backs `/rate-backlog`, the bulk-rate flow |
 | `GET /api/rate-backlog-count`          | `functions/api/rate-backlog-count.js`      | GET     | session — the unrated count alone, for the nav badge |
 | `GET /api/recommendations`             | `functions/api/recommendations.js`         | GET     | session (legacy — no longer called by any client) |
-| `GET /api/vibe`                        | `functions/api/vibe.js`                    | GET     | session |
+| `GET /api/vibe`                        | `functions/api/vibe.js`                    | GET     | session — you and members of your groups only; any other slug is 403 |
 | `GET /api/shows`                       | `functions/api/shows.js`                   | GET     | session |
 | `GET /api/export`                      | `functions/api/export.js`                  | GET     | session (exports the caller's OWN lists only; plain-text download) |
 | `POST /api/shows`                      | `functions/api/shows.js`                   | POST    | session |

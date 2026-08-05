@@ -26,19 +26,28 @@ function disambiguatedNames(rows) {
   });
 }
 
-async function listEligibleMembers(env) {
+// Whose vibe you can look at: yourself, plus anyone you share a group with.
+// The club roster used to be the answer, which meant the picker listed people
+// a member had no relationship with — the same reason the roster came off the
+// home screens. Group membership is the relationship the member actually
+// chose, so it's the boundary here too.
+async function listEligibleMembers(env, viewerSlug) {
   const { results } = await env.DB.prepare(
     `SELECT m.slug, m.name, m.first_name, m.last_initial,
        (SELECT COUNT(*) FROM shows s WHERE s.member_slug = m.slug AND s.archived = 0) AS active_count
      FROM members m
      WHERE m.slug NOT IN (${EXCLUDED_SQL})
+       AND (m.slug = ?1 OR m.slug IN (
+             SELECT gm.member_slug FROM group_members gm
+              WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE member_slug = ?1)
+           ))
        AND EXISTS (
          SELECT 1 FROM shows s
          WHERE s.member_slug = m.slug
            AND (COALESCE(s.added_by, '') != 'seed' OR s.archived = 1 OR s.updated_at IS NOT NULL)
        )
      ORDER BY m.first_name COLLATE NOCASE`
-  ).all();
+  ).bind(viewerSlug).all();
   const named = disambiguatedNames(results);
   return named.map(m => ({ slug: m.slug, name: m.display, active_count: m.active_count }));
 }
@@ -240,7 +249,14 @@ export async function onRequestGet(context) {
   const url = new URL(request.url);
   const memberSlug = url.searchParams.get('member');
 
-  const members = await listEligibleMembers(env);
+  const members = await listEligibleMembers(env, session.member_slug);
+
+  // The picker is scoped, so the endpoint is too — otherwise the list is a
+  // suggestion and a hand-typed slug still returns a stranger's taste.
+  if (memberSlug && memberSlug !== session.member_slug
+      && !members.some(m => m.slug === memberSlug)) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders() });
+  }
 
   if (!memberSlug) {
     return new Response(JSON.stringify({ members, member: null }), { headers: corsHeaders() });
