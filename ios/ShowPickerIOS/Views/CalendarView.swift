@@ -120,11 +120,19 @@ struct CalendarView: View {
         var out: [DatedRelease] = []
         for show in shows where !show.isArchived {
             guard show.list == ShowList.watching.rawValue || show.list == ShowList.waiting.rawValue else { continue }
+            // One row per show — whichever date comes first. A show with both
+            // a premiere and a finale ahead of it appeared twice, which reads
+            // as a duplicate rather than as two facts, and pushed everything
+            // else down the list twice over.
+            var candidates: [DatedRelease] = []
             if let d = show.nextSeasonDate, let date = parseDay(d), date >= today {
-                out.append(DatedRelease(show: show, date: date, day: d, kind: .premiere))
+                candidates.append(DatedRelease(show: show, date: date, day: d, kind: .premiere))
             }
             if let d = show.seasonEndDate, let date = parseDay(d), date >= today {
-                out.append(DatedRelease(show: show, date: date, day: d, kind: .finale))
+                candidates.append(DatedRelease(show: show, date: date, day: d, kind: .finale))
+            }
+            if let soonest = candidates.min(by: { $0.date < $1.date }) {
+                out.append(soonest)
             }
         }
         return out.sorted { $0.date == $1.date ? $0.show.title < $1.show.title : $0.date < $1.date }
