@@ -2,7 +2,7 @@ import SwiftUI
 
 // Add a brand-new show from the TV. Picking a result pushes the list choice;
 // the pick pins the TMDB entry so server-side enrichment (genres, cast, dates,
-// network URL) can't mismatch. Notes / recommender stay phone-and-web edits.
+// network URL) can't mismatch. Notes / recommender stay phone and iPad edits.
 //
 // Typing is a TextField into tvOS's full-screen keyboard, not `.searchable`:
 // searchable kept the keyboard and the results grid on screen together, which

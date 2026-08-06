@@ -1,9 +1,12 @@
 import SwiftUI
 import ShowPickerCore
 
-// The Groups tab's root, and also pushed onto Home's stack from the Groups
-// shelf there — no path binding of its own either way, so links push onto
-// whichever stack is hosting it.
+// The Groups tab's root. No path binding of its own, so links push onto the
+// stack hosting it.
+//
+// View-only, like the rest of tvOS: creating, joining, renaming, inviting and
+// leaving all happen on the phone, iPad or Mac. That isn't discoverable from
+// a screen that only lists things, so both states say where to go.
 // `ClubGroup` (CoreImports.swift) is the model — SwiftUI has its own `Group`.
 struct GroupsListViewTV: View {
     @State private var groups: [ClubGroup] = []
@@ -63,7 +66,9 @@ struct GroupsListViewTV: View {
             Text("No groups yet")
                 .font(.system(size: 28))
                 .foregroundColor(Theme.muted)
-            Text("Use your iPhone or the web app to create or join a group")
+            // Was "or the web app" — the web member app was retired in
+            // 2026-08 and there's nothing there to send anyone to.
+            Text("Create or join a group on your iPhone, iPad or Mac, and it'll show up here.")
                 .font(.system(size: 20))
                 .foregroundColor(Theme.muted)
         }
@@ -71,15 +76,26 @@ struct GroupsListViewTV: View {
         .padding(.top, 40)
     }
 
+    // The same fact for someone who already has groups: nothing on this screen
+    // manages them, and the reason is that the TV doesn't do it at all.
+    private var manageNote: some View {
+        Text("Create groups, invite people, and rename or leave them on your iPhone, iPad or Mac.")
+            .font(.system(size: 20))
+            .foregroundColor(Theme.muted)
+    }
+
     private var grid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 24), count: 4),
-                  spacing: 24) {
-            ForEach(groups) { group in
-                NavigationLink(value: Route.groupDetail(group.id)) {
-                    GroupTileTV(group: group)
+        VStack(alignment: .leading, spacing: 24) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 24), count: 4),
+                      spacing: 24) {
+                ForEach(groups) { group in
+                    NavigationLink(value: Route.groupDetail(group.id)) {
+                        GroupTileTV(group: group)
+                    }
+                    .buttonStyle(PushButtonStyle())
                 }
-                .buttonStyle(PushButtonStyle())
             }
+            manageNote
         }
     }
 
