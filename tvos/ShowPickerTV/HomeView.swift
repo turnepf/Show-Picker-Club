@@ -1,16 +1,14 @@
 import SwiftUI
 import ShowPickerCore
 
-// The "Home" tab: Trending, plus your groups as the way into other members'
-// lists. It used to list the whole club roster; groups replaced that on
-// purpose — a group is people you chose, and the roster wasn't something
-// most members could put names to. Auth and your own lists live in their
-// own tabs.
+// The "Home" tab: Trending, and that's the point of it. This used to list the
+// whole club roster, then a shelf of your groups; the roster went because a
+// group is people you chose and the roster wasn't, and the shelf went once
+// Groups became a tab of its own. Your lists, your groups and auth all live
+// in their own tabs.
 struct HomeView: View {
     @Binding var path: NavigationPath
     @EnvironmentObject private var auth: AuthStore
-    @State private var members: [Member] = []
-    @State private var groups: [ClubGroup] = []
     @State private var popular: [PopularShow] = []
     @State private var loading = true
     @State private var errorText: String?
@@ -40,10 +38,8 @@ struct HomeView: View {
                         .padding(.top, 40)
                     } else {
                         popularShelf
-                        // Groups are for logged-in members only
-                        if auth.isLoggedIn {
-                            groupsSection
-                        } else {
+                        // Groups have their own tab now; Home is Trending.
+                        if !auth.isLoggedIn {
                             signedOutPitch
                         }
 
@@ -64,7 +60,7 @@ struct HomeView: View {
         // Re-runs on every visit to the tab: keep retrying until content
         // lands, so one failed launch-time load (cold Wi-Fi, network blip)
         // doesn't brick Home for the whole session.
-        .task { if members.isEmpty { await load() } }
+        .task { if popular.isEmpty { await load() } }
     }
 
     @ViewBuilder private var popularShelf: some View {
@@ -84,37 +80,6 @@ struct HomeView: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 30)
-                }
-            }
-        }
-    }
-
-    // Your groups, as the way into other people's lists — the club roster used
-    // to sit here, and most members don't know half of it. A group you're in
-    // is a set of people you actually chose.
-    private var groupsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader("Groups")
-            if groups.isEmpty {
-                NavigationLink(value: Route.groupsList) {
-                    Text("Browse your groups")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundColor(Theme.text)
-                        .padding(30)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Theme.surface)
-                        .cornerRadius(16)
-                }
-                .buttonStyle(PushButtonStyle())
-            } else {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 24), count: 4),
-                          spacing: 24) {
-                    ForEach(groups) { group in
-                        NavigationLink(value: Route.groupDetail(group.id)) {
-                            GroupTileTV(group: group)
-                        }
-                        .buttonStyle(PushButtonStyle())
-                    }
                 }
             }
         }
@@ -150,20 +115,7 @@ struct HomeView: View {
         loading = true
         defer { loading = false }
         do {
-            async let m = API.members()
-            async let p = API.popular()
-            // Most recently active first, then most active (Watching + Next
-            // Up + Loved) as the tiebreaker — the same roster order as
-            // iPhone, iPad, and web.
-            members = try await m.sorted {
-                let la = $0.lastActivityAt ?? "", lb = $1.lastActivityAt ?? ""
-                if la != lb { return la > lb }
-                return $0.activeCount > $1.activeCount
-            }
-            popular = try await p
-            // Session-gated and non-fatal: logged out (or no groups) just
-            // means the section falls back to its browse link.
-            groups = (try? await API.groups().groups) ?? []
+            popular = try await API.popular()
         } catch {
             errorText = "Couldn't load. Check the connection and try again."
         }
