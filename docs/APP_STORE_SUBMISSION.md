@@ -163,7 +163,7 @@ broken — but clear them in the first build after the apps have shipped.
       code comments mention OMDb.)
 - [ ] **Strip the inert approval queue from the iPhone/iPad app.** The
       endpoints it calls are gone, so it renders empty and degrades cleanly
-      (see the note in `docs/ARCHITECTURE.md` under `members.html`). To
+      (see the note in `docs/ARCHITECTURE.md` under [Frontend pages](ARCHITECTURE.md#frontend-pages)). To
       remove: the queue sections in `ManageMembersView.swift`,
       `SignupRequest`/`CreateMemberResult` in `Models.swift`,
       `signupRequests()`/`actOnSignupRequest()`/`approveMember()` in
@@ -190,35 +190,29 @@ broken — but clear them in the first build after the apps have shipped.
 - [ ] Verify the demo sign-in once on the **Mac** build too — Review opens
       every platform on the listing.
 
-## 7. The web app's "get the app" banner
+## 7. The marketing site's App Store link
 
-The web app promotes the App Store listing two ways, split by browser so no
-one ever sees more than one prompt:
+The web member app was removed in 2026-08, so there is no longer a banner
+riding on top of it — `showpicker.club` **is** the App Store pitch. Two things
+still point at the listing, and both live in `public/index.html`:
 
-- **iPhone/iPad Safari** gets Apple's native Smart App Banner via
-  `<meta name="apple-itunes-app">` in the head of `index.html`, `vibe.html`,
-  `subscriptions.html`, and `whats-new.html`. Safari renders OPEN when the
-  app is installed and GET when it isn't, and this never stacks with the
-  universal-link "Open in app" bar. `app-banner.js` detects iOS Safari and
-  skips itself there.
-- **Everything else on Apple hardware** (Chrome/Firefox on iOS, Safari on
-  the Mac) gets the custom dismissible bar from `public/app-banner.js`,
-  keyed to `APP_STORE_ID` at the top of that file. One universal listing
-  covers iPhone / iPad / Mac / Apple TV, so a single ID is all it needs —
-  it tailors the copy per device itself.
+- The **call-to-action button**, hard-coded to
+  `https://apps.apple.com/app/id6780282764`. Its wording adapts per device
+  (iPhone / iPad / Mac); the destination never does, because one universal
+  listing covers iPhone, iPad, Mac and Apple TV.
+- The native **Smart App Banner** via `<meta name="apple-itunes-app">`, which
+  iPhone/iPad Safari renders as OPEN when the app is installed and GET when it
+  isn't. This is the only "is it installed" signal a browser gets, and Apple
+  renders it — there is no JS API for it, and the custom-URL-scheme probe trick
+  fires an OS dialog and fails silently in Safari.
+
+`public/app-banner.js` — the custom dismissible bar for Chrome/Firefox on Apple
+hardware — was archived to `archive/web/` with the rest of the member app. It
+existed to promote the app *from inside* the web app; with no web app left, the
+page it would have sat on is already the promotion.
 
 - [ ] If the listing is ever re-created under a new Apple ID (App Store
-      Connect → the app → App Information → "Apple ID"), update
-      `APP_STORE_ID` in `app-banner.js` **and** the `apple-itunes-app` meta
-      tag on the four pages above (currently `6780282764`, the July 2026
-      listing). Setting `APP_STORE_ID` to the empty string turns the custom
-      bar off entirely; removing the meta tags turns off the native one.
+      Connect → the app → App Information → "Apple ID"), update **both** the
+      CTA `href` and the `apple-itunes-app` meta tag in `public/index.html`
+      (currently `6780282764`, the July 2026 listing).
 
----
-
-### Why these two keep coming up
-
-Both stem from the club model: a reviewer arrives as a stranger with an empty
-account, so anything that assumes an established user (a populated library, the
-"we collect Name" label) needs an explicit accommodation. Steps 1 and 2 are that
-accommodation.

@@ -1,0 +1,3846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Show Picker Club</title>
+  <meta name="description" content="Track the TV shows and movies you watch with friends. Four simple lists, automatic show info, and premiere dates — free on the web, iPhone, and Apple TV.">
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CP9N26NG19"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-CP9N26NG19');</script>
+  <!-- Native Smart App Banner: iPhone/iPad Safari's one prompt for the app
+       (OPEN when installed, GET when not). app-banner.js bows out there.
+       app-argument carries the URL that was tapped, so OPEN lands on the same
+       show rather than the app's home screen. It only matters once the app is
+       installed — Apple has no deferred deep linking, so a first-time install
+       from GET always starts at Home and the link has to be tapped again. -->
+  <meta name="apple-itunes-app" content="app-id=6780282764" id="smartBanner">
+  <script>
+    // Set before Safari reads the tag: the banner is parsed at load, so this
+    // has to run inline rather than from a deferred script.
+    (function () {
+      var el = document.getElementById('smartBanner');
+      if (el) el.setAttribute('content', 'app-id=6780282764, app-argument=' + location.href);
+    })();
+  </script>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/favicon.svg">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
+  <link rel="stylesheet" href="/styles.css?v=6">
+  <style>
+    header {
+      background: var(--header-bg);
+      color: #fff;
+      padding: 20px 20px 0;
+      padding-top: calc(20px + env(safe-area-inset-top, 0px));
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-title {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      color: #fff;
+      text-align: center;
+      margin: 8px 0 4px;
+      /* Hard one-line; if a name really won't fit the screen the
+         ellipsis kicks in rather than wrapping into the controls. */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    /* Search modal sits anchored to the top so the box doesn't jump as result count changes. */
+    #searchOverlay { align-items: flex-start; padding-top: 6vh; padding-bottom: 6vh; }
+    #searchOverlay .modal { max-height: 88vh; display: flex; flex-direction: column; }
+    .search-results { flex: 1 1 auto; min-height: 220px; max-height: 60vh; overflow-y: auto; margin-top: 12px; border-top: 1px solid var(--surface-2); padding-top: 8px; }
+    .search-results .show-row { padding: 8px 4px; }
+    .search-meta { font-size: 12px; color: var(--ink-muted); margin-bottom: 8px; }
+    .search-list-label { color: var(--ink-muted); font-size: 12px; margin-left: 6px; }
+    .search-empty { text-align: center; color: var(--ink-muted); padding: 24px 0; font-size: 13px; }
+
+    .btn-small { padding: 4px 8px; font-size: 11px; border-radius: 4px; }
+
+    .tabs { display: flex; gap: 0; overflow-x: auto; scrollbar-width: none; }
+    .tabs::-webkit-scrollbar { display: none; }
+
+    .tab {
+      flex: 1;
+      padding: 8px 4px;
+      color: rgba(255,255,255,0.6);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      transition: all 0.2s;
+      text-align: center;
+      background: transparent;
+    }
+    .tab:hover { color: rgba(255,255,255,0.85); border-color: rgba(255,255,255,0.4); }
+    .tab.active { color: #fff; font-weight: 600; }
+    .tab.active[data-list="watching"] { background: var(--tab-watching); border-color: var(--tab-watching); }
+    .tab.active[data-list="waiting"] { background: var(--tab-waiting); border-color: var(--tab-waiting); }
+    .tab.active[data-list="recommending"] { background: var(--tab-recommending); border-color: var(--tab-recommending); }
+    .tab.active[data-list="next"] { background: var(--tab-up-next); border-color: var(--tab-up-next); }
+
+    .section-desc {
+      text-align: center;
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      font-style: italic;
+      padding: 6px 20px 10px;
+    }
+
+    main {
+      max-width: 720px;
+      margin: 24px auto 56px;
+      padding: 24px 28px 28px;
+      background: var(--surface);
+      border-radius: 18px;
+      box-shadow: 0 1px 2px oklch(0.18 0.03 50 / 0.06),
+                  0 14px 44px oklch(0.18 0.03 50 / 0.07);
+    }
+    @media (max-width: 600px) {
+      main { margin: 16px 12px 40px; padding: 18px 18px 22px; border-radius: 14px; }
+    }
+
+    /* On wide screens keep the member page's header controls and list tabs
+       aligned to the content column below (same 720px, centered) instead of
+       spanning the full width — so the back button lines up with the column's
+       left edge, Log out with its right, and the tabs contract to fit. */
+    #showPage header > .header-top,
+    #showPage header > .header-title-row,
+    #showPage header > .tabs,
+    #showPage header > .section-desc {
+      max-width: 720px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .show-list { display: flex; flex-direction: column; gap: 0; }
+
+    .show-row {
+      display: flex;
+      align-items: baseline;
+      padding: 7px 0;
+      font-size: 14px;
+      gap: 8px;
+    }
+
+    /* Each show's title row, meta line ("Next episode: 6/1") and the
+       expandable details all live inside a single .show wrapper so the
+       divider sits between shows, not between title and meta. */
+    .show {
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .show:last-child { border-bottom: none; }
+
+    .show-info { flex: 1; min-width: 0; line-height: 1.4; }
+
+    .show-title { font-weight: 600; color: var(--ink); }
+    .show-title.clickable {
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-decoration-color: var(--ink-faint);
+      text-underline-offset: 3px;
+    }
+    .show-title .chev {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      margin-left: 6px;
+      vertical-align: -3px;
+      text-decoration: none;
+    }
+    .show-title .chev svg {
+      width: 100%;
+      height: 100%;
+      fill: none;
+      stroke: var(--ink-muted);
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: transform 0.18s ease-out;
+      transform-origin: center;
+    }
+    .show-row.expanded .show-title .chev svg {
+      transform: rotate(180deg);
+      stroke: var(--accent);
+    }
+    .show-title.clickable:hover { color: var(--accent); text-decoration-color: var(--accent); }
+    .show-title.clickable:hover .chev svg { stroke: var(--accent); }
+
+
+
+
+    .show-network { color: var(--info); text-decoration: none; font-size: 13px; white-space: nowrap; }
+    .show-network:hover { text-decoration: underline; }
+
+    .show-network-plain { color: var(--ink-muted); font-size: 13px; white-space: nowrap; }
+
+
+    .show-next-date { color: var(--accent); font-size: 12px; font-weight: 500; white-space: nowrap; }
+
+    .show-from { color: var(--ink-quiet); font-size: 13px; white-space: nowrap; }
+    .show-detail-line { font-size: 12px; color: var(--ink-muted); padding: 2px 0; }
+    .show-meta { font-size: 12px; color: var(--ink-muted); padding: 0 0 6px 16px; }
+
+    .show-via { color: var(--list-recommending); font-size: 12px; font-style: italic; white-space: nowrap; }
+    .show-on { color: var(--ink-quiet); font-size: 13px; }
+    .show-watching-with { color: var(--ink-muted); font-size: 13px; white-space: nowrap; }
+    .show-notes-inline { color: var(--ink-faint); font-size: 12px; font-style: italic; white-space: nowrap; }
+
+    /* Primary inline action on each row (own page, logged in) — outlined pill
+       in the destination list color. Tap to perform the most-frequent move. */
+    .btn-row-action {
+      background: transparent;
+      color: var(--action-color, var(--ink));
+      border: 1px solid currentColor;
+      padding: 6px 14px;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-row-action:hover {
+      background: color-mix(in oklch, var(--action-color, var(--ink)) 14%, transparent);
+    }
+
+    /* Secondary actions sit at the TOP of the expand panel, above the show
+       detail lines, so they're the first thing the user sees when they tap
+       a row. Tinted pills so they stand off the main surface. */
+    .show-actions-expanded {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .show-actors:empty,
+    .show-actors > .show-actions-expanded:only-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+    .btn-row-secondary {
+      background: var(--surface-2);
+      color: var(--ink);
+      border: 1px solid var(--border-soft);
+      padding: 6px 14px;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .btn-row-secondary:hover {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent-hover);
+    }
+    .btn-row-secondary.danger {
+      background: var(--danger-soft);
+      color: var(--danger-deep);
+      border-color: color-mix(in oklch, var(--danger) 28%, transparent);
+    }
+    .btn-row-secondary.danger:hover {
+      background: color-mix(in oklch, var(--danger-soft) 70%, var(--danger) 18%);
+      border-color: var(--danger);
+    }
+
+    .show-actors { padding: 4px 0 8px 16px; display: none; font-size: 13px; color: var(--ink-muted); }
+    .show-actors.visible { display: block; }
+    /* Negative margin compensates for the actor-tag's own 8px horizontal
+       padding so the first name visually aligns with the other detail
+       lines above ("Western, Drama", "Next episode: ...") instead of looking
+       indented. */
+    .actor-list { display: flex; flex-wrap: wrap; gap: 4px; margin-left: -8px; }
+    .actor-tag { background: var(--surface); border: 1px solid transparent; padding: 2px 8px; border-radius: 10px; font-size: 12px; text-decoration: none; color: var(--ink-muted); }
+    /* Linked actors open their IMDB page. Make the affordance obvious so it
+       reads as tappable rather than a plain label: accent tint, accent text,
+       a pointer cursor, and a small "opens externally" arrow. Plain (un-linked)
+       actors keep the muted look above so the difference is meaningful. */
+    a.actor-tag { background: var(--accent-soft); border-color: color-mix(in oklch, var(--accent) 35%, transparent); color: var(--accent-hover); cursor: pointer; }
+    a.actor-tag::after { content: "\2197"; margin-left: 3px; font-size: 10px; opacity: 0.7; }
+    a.actor-tag:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+    a.actor-tag:hover::after { opacity: 1; }
+
+    /* "+" add-to-my-list button on club-wide search result rows. */
+    .search-add-btn {
+      background: none;
+      border: none;
+      color: var(--ink-quiet);
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0 6px;
+      line-height: 1;
+      font-family: inherit;
+      transition: color 0.2s;
+    }
+    .search-add-btn:hover { color: var(--accent); }
+
+
+    /* "My Order" drag-to-reorder */
+
+    /* Sort + future filter controls above the list. Right-aligned utility row. */
+    .list-controls {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0 10px;
+    }
+
+    /* Title + add-show share one centered line. The sort control lives in
+       this row too: on phones it wraps to its own right-aligned line below
+       the title; on the split view it pins to the right of the same line
+       (inside the sticky header, so it can't hide behind it). */
+    .header-title-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      position: relative;
+    }
+    .header-title-row .header-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .header-title-row .list-controls { flex: 1 1 100%; padding: 2px 0 8px; }
+    .sort-select {
+      padding: 6px 10px;
+      font-size: 12px;
+      font-family: inherit;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--surface);
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    .hidden { display: none !important; }
+
+    /* ── iOS-style Home ────────────────────────────────────────────
+       Small screens mirror the iPhone HomeView: a bold large-title
+       bar over an inset-grouped list (My Shows / What's New,
+       Trending, Members). At ≥1024px the same sections become the
+       iPad sidebar (IPadHomeView) and Trending moves into a detail
+       column beside it. */
+    .home-shell { max-width: 680px; margin: 0 auto; padding: 4px 16px 48px; }
+    .home-titlebar {
+      display: flex; align-items: center; gap: 4px;
+      padding: 14px 0 12px;
+      padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    }
+    .home-title {
+      flex: 1; min-width: 0;
+      font-family: var(--font-sans);
+      font-size: clamp(26px, 6vw, 34px);
+      font-weight: 700; letter-spacing: -0.01em;
+      color: var(--ink);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .home-title a { color: inherit; text-decoration: none; }
+    .home-detail { display: none; }
+    /* The Trending row only belongs to the desktop split view; on the iPhone
+       layout Trending is the inline section below. It sits under Groups, so
+       the row beneath it carries always-sep and keeps its hairline whether or
+       not Trending is rendered. */
+    .ios-item.home-side-trending { display: none; }
+    /* Desktop-only affordances (four-list group header + rows). */
+    .ios-item.home-list-row, #homeListsHeader { display: none; }
+
+    /* Detail-column title bar (desktop split view) */
+    .detail-bar {
+      position: sticky; top: 0; z-index: 5;
+      background: color-mix(in srgb, var(--surface-2) 86%, transparent);
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-soft);
+      padding: 13px 0; margin: 0 -24px 18px; text-align: center;
+    }
+    .detail-bar h2 { font-family: var(--font-sans); font-size: 17px; font-weight: 600; color: var(--ink); }
+
+    @media (min-width: 1024px) {
+      .home-shell {
+        display: grid; grid-template-columns: 300px minmax(0, 1fr);
+        margin: 0 auto; padding: 0;
+        height: 100vh; height: 100dvh; overflow: hidden;
+        /* Letterboxed shell, matching the member page's split view. */
+        max-width: var(--shell-max, 1180px);
+        background: var(--surface-2);
+        border-left: 1px solid var(--border-soft);
+        border-right: 1px solid var(--border-soft);
+      }
+      .home-side {
+        overflow-y: auto;
+        padding: 0 14px 24px;
+        border-right: 1px solid var(--border-soft);
+      }
+      .home-side .home-titlebar { padding-top: 12px; }
+      .home-side .home-title { font-size: 20px; }
+      .home-detail { display: block; overflow-y: auto; padding: 0 24px 48px; }
+      .home-detail-inner { max-width: 720px; margin: 0 auto; }
+      /* Trending is a sidebar entry with a detail column on wide screens
+         (iPad); an inline section on small ones (iPhone). It appears directly
+         under Groups once its data has loaded. */
+      .ios-item.home-side-trending:not(.hidden) { display: flex; }
+      #popularSection { display: none !important; }
+      /* The single My Shows row expands into the four lists (iPad). */
+      .ios-item.home-list-row:not(.hidden) { display: flex; }
+      #homeListsHeader:not(.hidden) { display: block; }
+      #myShowsLink { display: none !important; }
+      #myShowsLink + .home-list-row::after { display: none; }
+    }
+
+    /* ── Inset-grouped list vocabulary (Home + sidebars + extras) ── */
+    .ic { width: 20px; height: 20px; flex: 0 0 auto; }
+    .ios-group {
+      background: var(--surface);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 22px;
+      box-shadow: 0 1px 3px oklch(0.18 0.03 50 / 0.06);
+    }
+    .ios-group-header {
+      font-size: 13px; font-weight: 400;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--ink-quiet);
+      padding: 0 16px 7px; margin-top: 2px;
+    }
+    .ios-item {
+      position: relative;
+      display: flex; align-items: center; gap: 12px;
+      width: 100%; min-height: 44px;
+      padding: 10px 14px;
+      background: none; border: none;
+      font-family: inherit; font-size: 16px; line-height: 1.3; text-align: left;
+      color: var(--ink); text-decoration: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+    .ios-item:active { background: var(--surface-2); }
+    .ios-item + .ios-item::after {
+      content: ""; position: absolute; left: 48px; right: 0; top: 0;
+      height: 1px; background: var(--border-soft);
+    }
+    .ios-item.no-icon + .ios-item.no-icon::after { left: 14px; }
+    /* No stray hairline on the first *visible* row when the row above it
+       is hidden (the My Shows / Log in swap)… */
+    .ios-item.hidden + .ios-item::after { display: none; }
+    /* …but rows that always have a visible row somewhere above keep theirs. */
+    .ios-item + .ios-item.always-sep::after { display: block; }
+    .ios-item-icon { display: inline-flex; color: var(--tint); }
+
+    /* Nav spacer for visual grouping */
+    .nav-spacer { height: 12px; }
+
+    /* Badge for unrated count */
+    .nav-badge {
+      display: inline-block;
+      background: var(--tint);
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 10px;
+      margin-left: 4px;
+      line-height: 1;
+      white-space: nowrap;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+    /* No count (zero unrated, or shows not loaded yet) — otherwise the padding
+       and tint background paint a stray pill after the label. */
+    .nav-badge:empty { display: none; }
+    .ios-item-label { display: flex; align-items: center; gap: 4px; }
+    .ios-item-icon .ic { width: 22px; height: 22px; }
+    .ios-item-label { flex: 1; min-width: 0; }
+    .ios-item-detail { color: var(--ink-quiet); font-size: 13px; white-space: nowrap; }
+    .ios-item-chev { width: 15px; height: 15px; color: var(--ink-faint); }
+    .ios-item.selected { background: color-mix(in srgb, var(--tint) 13%, transparent); }
+    .side-list-row.selected { background: var(--tint); color: #fff; }
+    .side-list-row.selected .ios-item-icon { color: #fff; }
+    .ios-footnote { font-size: 12px; color: var(--ink-quiet); line-height: 1.5; padding: 0 16px; margin: -10px 0 22px; }
+    .ios-footnote a { color: inherit; }
+    /* Brief nav callout for a newly-shipped feature (currently: ratings). */
+    .nav-announce { font-size: 12.5px; color: var(--tint); line-height: 1.4; padding: 0 16px; margin: 2px 0 16px; }
+    /* Same idea, above the show list itself — only ever shown on Watching,
+       where a member lands first after logging in. */
+
+    /* Orange star rating, matching the iOS rows' .orange Label */
+
+    /* Round tint icon buttons (nav bars / title bars) */
+    .icon-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px; flex: 0 0 auto;
+      background: none; border: none; padding: 0;
+      color: var(--tint); cursor: pointer; border-radius: 50%;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .icon-btn:hover { background: color-mix(in srgb, var(--tint) 10%, transparent); }
+    .icon-btn .ic { width: 23px; height: 23px; }
+    .btn-nav-text {
+      background: none; border: none;
+      color: var(--tint); font: inherit; font-size: 16px;
+      cursor: pointer; padding: 4px 8px;
+    }
+    .back-link {
+      display: inline-flex; align-items: center;
+      color: var(--tint); text-decoration: none;
+      font-size: 16px; padding: 4px 8px 4px 0; margin-left: -6px;
+    }
+    .back-link .ic { width: 21px; height: 21px; }
+
+    /* Account popover (Log out) — mirrors the iOS account Menu */
+    .account-menu {
+      position: fixed; z-index: 500;
+      min-width: 180px;
+      background: var(--surface);
+      border-radius: 13px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.22), 0 1px 3px rgba(0,0,0,0.12);
+      padding: 4px 0;
+      overflow: hidden;
+    }
+    .account-menu button {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      width: 100%; padding: 11px 16px;
+      background: none; border: none;
+      font: inherit; font-size: 16px;
+      color: var(--danger); cursor: pointer;
+    }
+    .account-menu button:hover { background: var(--surface-2); }
+    .account-menu .ic { width: 19px; height: 19px; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    .modal {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 24px;
+      width: 90%;
+      max-width: 440px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+
+    /* Add Show grows while typing (title type-ahead results), and a
+       centered modal grows upward too — shoving the title field off-screen
+       above an unscrollable overlay. Anchor it to the top like the search
+       modal, so results only extend downward, and let the modal itself
+       scroll when it outgrows the viewport. */
+    #modalOverlay {
+      align-items: flex-start;
+      padding-top: 6vh;
+      padding-bottom: 6vh;
+    }
+    #modalOverlay .modal {
+      max-height: 88vh;
+      overflow-y: auto;
+    }
+
+    /* Join pitch card shown to logged-out landing visitors while
+       self-enrollment is open. */
+    .join-cta {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 18px;
+    }
+    .join-cta-pitch {
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--ink);
+      margin: 0 0 12px;
+    }
+    .join-cta-btn { width: 100%; }
+
+    /* Log in / sign up chooser: a narrow centered column of pill buttons.
+       Google's GIS button is an iframe capped at 400px that can't inherit our
+       styles — constraining the whole stack to its width and matching its
+       pill shape makes everything read as one set. */
+    .login-choose-stack {
+      max-width: 340px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .login-choose-stack .btn {
+      width: 100%;
+      height: 44px;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: 0;
+      padding: 0 18px;
+    }
+    .login-choose-btn {
+      background: var(--surface);
+      color: var(--ink);
+      border: 1px solid var(--border);
+    }
+    .login-choose-btn:hover { background: var(--surface-2); }
+    #googleBtnWrap { display: flex; justify-content: center; min-height: 44px; align-items: center; }
+    #googleBtnWrap.hidden { display: none; }
+
+    .modal h2 {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin-bottom: 16px;
+      color: var(--ink);
+    }
+
+    .modal label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-muted);
+      margin-bottom: 4px;
+      margin-top: 12px;
+    }
+    .modal label:first-of-type { margin-top: 0; }
+
+    .modal input, .modal select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    .modal input:focus, .modal select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: var(--focus-ring);
+    }
+
+
+    .checkbox-label {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 14px; color: var(--ink-muted); margin-top: 12px; cursor: pointer;
+    }
+    .checkbox-label input { width: auto; margin: 0; }
+
+    .modal-actions { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
+    .btn-cancel { background: var(--surface-2); color: var(--ink); }
+    .btn-cancel:hover { background: var(--surface); }
+    .btn-save { background: var(--accent); color: var(--ink); font-weight: 700; }
+    .btn-save:hover { background: var(--accent-hover); }
+
+    .loading { text-align: center; padding: 40px; color: var(--ink-quiet); font-size: 15px; }
+    .empty {
+      text-align: center;
+      padding: 48px 20px 36px;
+      color: var(--ink-muted);
+    }
+    .empty .empty-headline {
+      font-family: var(--font-display);
+      font-size: var(--text-md);
+      font-weight: 600;
+      color: var(--ink);
+      margin: 0 0 8px;
+    }
+    .empty .empty-help {
+      font-size: var(--text-sm);
+      color: var(--ink-muted);
+      line-height: 1.55;
+      max-width: 360px;
+      margin: 0 auto 18px;
+    }
+    .empty .btn-empty-cta {
+      background: var(--accent);
+      color: var(--ink);
+      border: none;
+      padding: 8px 22px;
+      border-radius: 999px;
+      font-size: var(--text-sm);
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    .empty .btn-empty-cta:hover { background: var(--accent-hover); }
+
+    .picks-empty {
+      text-align: center;
+      color: var(--ink-muted);
+      font-size: var(--text-sm);
+      font-style: italic;
+      padding: 6px 0 0;
+    }
+
+    @media (max-width: 480px) {
+      .header-title { font-size: 18px; }
+      .tab { padding: 10px 0; font-size: 12px; }
+      .show-row { font-size: 13px; }
+    }
+
+    /* Toast notifications — bottom-center stack. Used for action feedback
+       (move, archive, save) and undo on archive. */
+    .toast-stack {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: max(16px, env(safe-area-inset-bottom, 16px));
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 0 16px;
+      pointer-events: none;
+      z-index: 300;
+    }
+    .toast {
+      display: inline-flex;
+      align-items: center;
+      gap: 16px;
+      max-width: 480px;
+      background: oklch(0.22 0.025 50);
+      color: var(--surface);
+      padding: 10px 14px 10px 18px;
+      border-radius: 999px;
+      font-size: var(--text-sm);
+      font-weight: 500;
+      box-shadow: 0 4px 12px oklch(0.18 0.03 50 / 0.18),
+                  0 14px 32px oklch(0.18 0.03 50 / 0.22);
+      pointer-events: auto;
+      animation: toast-in 0.22s ease-out;
+    }
+    .toast.error { background: var(--danger-deep); }
+    .toast button {
+      background: transparent;
+      color: var(--accent);
+      border: none;
+      padding: 4px 10px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      border-radius: 999px;
+    }
+    .toast button:hover { color: #fff; background: oklch(0.32 0.04 50); }
+    @keyframes toast-in {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .toast { animation: none; }
+      .show-title .chev svg { transition: none; }
+      .show-actors { transition: none; }
+    }
+
+    .recs-section { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border-soft); }
+    .recs-heading {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      font-weight: 500;
+      letter-spacing: -0.005em;
+      color: var(--ink);
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .recs-explainer { font-size: 12px; color: var(--ink-muted); text-align: center; margin-bottom: 12px; font-style: italic; padding: 0 16px; }
+    .recs-explainer:empty { display: none; }
+    .rec-row .rec-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+    .rec-reason { font-size: 11px; color: var(--ink-quiet); margin-top: 2px; }
+  </style>
+  <!-- ===========================================================
+       iOS-style theme. Mirrors the native app: nav-bar header,
+       segmented list control, inset-grouped cards, a pushed show
+       detail screen, and bottom-sheet modals. Layered after the
+       base styles so it overrides them without touching the JS or
+       element ids the app relies on.
+       =========================================================== -->
+  <style id="ios-theme">
+    /* The native app's tint (AccentColor asset) and toolbars, so web
+       chrome uses the same accent, icons and fonts as iOS. */
+    :root {
+      --tint: #6D63EB;          /* iOS AccentColor, light */
+      --ios-orange: #FF9500;    /* SwiftUI .orange — star ratings */
+      --seg-track: color-mix(in srgb, var(--ink) 9%, transparent);
+      --seg-active: #ffffff;
+      /* Bars share the page's recessed tone (iOS nav material over a
+         grouped background) so chrome and content read as one surface. */
+      --nav-bg: color-mix(in srgb, var(--surface-2) 86%, transparent);
+      /* Width of the letterboxed split-view shell on desktop. */
+      --shell-max: 1180px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --tint: #8D87F5;        /* iOS AccentColor, dark */
+        --ios-orange: #FF9F0A;
+        --seg-active: oklch(0.40 0.012 50);
+      }
+    }
+
+    body { background: var(--surface-2); }
+
+    /* Nav-bar header — light iOS bar (blurred material + hairline),
+       replacing the old dark header band. ---------------------------- */
+    header {
+      background: var(--nav-bg);
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      color: var(--ink);
+      border-bottom: 1px solid var(--border-soft);
+      padding: 8px 12px 10px;
+      padding-top: calc(8px + env(safe-area-inset-top, 0px));
+    }
+    .header-top { min-height: 34px; }
+    .header-title { font-family: var(--font-sans); letter-spacing: 0; font-size: 17px; font-weight: 600; margin: 6px 0 10px; color: var(--ink); }
+    .btn { border-radius: 9px; }
+
+    /* Segmented control (the four lists) — iOS gray track on the light
+       bar, white (elevated in dark mode) sliding pill. ---------------- */
+    .tabs {
+      gap: 2px;
+      background: var(--seg-track);
+      padding: 2px;
+      border-radius: 9px;
+    }
+    .tab {
+      border: none !important;
+      border-radius: 7px;
+      padding: 7px 4px;
+      font-weight: 500;
+      font-size: 13px;
+      color: var(--ink);
+      background: transparent;
+    }
+    .tab:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); color: var(--ink); }
+    .tab.active,
+    .tab.active[data-list="watching"],
+    .tab.active[data-list="waiting"],
+    .tab.active[data-list="recommending"],
+    .tab.active[data-list="next"] {
+      background: var(--seg-active) !important;
+      color: var(--ink) !important;
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.16), 0 0 0 0.5px rgba(0,0,0,0.04);
+    }
+
+    /* List help caption under the picker — leading-aligned like iOS */
+    .section-desc {
+      text-align: center;
+      color: var(--ink-muted);
+      font-style: normal;
+      padding: 8px 2px 2px;
+    }
+
+    /* Sheet titles + empty states use the system face, matching iOS */
+    .modal h2, .empty .empty-headline, .recs-heading {
+      font-family: var(--font-sans);
+      letter-spacing: 0;
+    }
+    .modal h2 { font-size: 17px; text-align: center; }
+
+    /* Inset-grouped content ---------------------------------------- */
+    main {
+      background: transparent;
+      box-shadow: none;
+      border-radius: 0;
+      padding: 14px 14px 44px;
+    }
+    @media (max-width: 600px) { main { margin: 8px auto 32px; padding: 12px 12px 32px; } }
+
+
+    /* Row title becomes a tappable disclosure into the detail screen. */
+    .show-title.clickable { text-decoration: none; }
+    .show-title.clickable .chev { display: none; }
+    .show-title.clickable::after {
+      content: "\203A";
+      color: var(--ink-faint);
+      margin-left: 6px;
+      font-weight: 600;
+    }
+    .show-meta { padding-left: 14px; }
+    .show-actors { padding-left: 14px; }
+
+    /* Recs + popular read as their own grouped cards. */
+    .recs-section {
+      background: var(--surface);
+      border-radius: 14px;
+      border-bottom: none;
+      padding: 14px 14px 12px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 3px oklch(0.18 0.03 50 / 0.06);
+    }
+    #popularList.show-list, #recsList.show-list { box-shadow: none; }
+
+    /* Show detail screen (pushed over everything) ------------------- */
+    /* Type-ahead results under the title input in Add Show. */
+    .title-suggest {
+      margin-top: 6px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      max-height: 264px;
+      overflow-y: auto;
+    }
+    .title-suggest.hidden { display: none; }
+    .title-suggest-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .title-suggest-item:last-child { border-bottom: none; }
+    .title-suggest-item:hover, .title-suggest-item:active { background: var(--surface-2); }
+    .title-suggest-item img, .title-suggest-empty-poster {
+      width: 32px; height: 48px; flex-shrink: 0;
+      border-radius: 4px; object-fit: cover;
+      background: var(--surface-2);
+    }
+    .title-suggest-empty-poster {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; opacity: 0.5;
+    }
+    .title-suggest-name { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+    .title-suggest-meta { font-size: 12px; color: var(--ink-muted); margin-top: 1px; }
+
+    #detailPage {
+      position: fixed; inset: 0;
+      background: var(--surface-2);
+      z-index: 250;
+      overflow-y: auto;
+      display: none;
+    }
+    #detailPage.open { display: block; animation: detail-in 0.24s ease-out; }
+    @keyframes detail-in { from { transform: translateX(14px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .detail-nav {
+      position: sticky; top: 0;
+      background: var(--nav-bg); color: var(--ink);
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-soft);
+      padding: 10px 0;
+      padding-top: calc(10px + env(safe-area-inset-top, 0px));
+      z-index: 1;
+    }
+    /* Inner column matches .detail-body's width/padding so Back and the title
+       align with the centered content column rather than the viewport edge. */
+    .detail-nav-inner {
+      max-width: 640px; margin: 0 auto; padding: 0 14px;
+      display: flex; align-items: center; gap: 6px;
+      position: relative;
+    }
+    .detail-nav button {
+      background: none; border: none; color: var(--tint);
+      font: inherit; font-size: 16px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 4px 6px; margin-left: -6px;
+      position: relative; z-index: 1;
+    }
+    /* Centered title, iOS-style: Back stays at the left, title centers in the
+       bar and truncates before it would collide with the button. */
+    .detail-nav .detail-nav-title {
+      position: absolute;
+      left: 50%; transform: translateX(-50%);
+      max-width: 68%;
+      text-align: center;
+      font-weight: 700; font-size: 20px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .detail-body { max-width: 640px; margin: 16px auto 60px; padding: 0 14px; }
+    /* Click the detail poster to view it full screen; click again to close. */
+    .poster-lightbox {
+      position: fixed; inset: 0; z-index: 400;
+      background: rgba(0, 0, 0, 0.92);
+      display: flex; align-items: center; justify-content: center;
+      cursor: zoom-out;
+    }
+    .poster-lightbox img {
+      max-width: 94vw; max-height: 94vh;
+      border-radius: 12px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    /* Bottom-sheet modals ------------------------------------------ */
+    .modal-overlay { align-items: flex-end; }
+    .modal {
+      width: 100%;
+      max-width: 540px;
+      border-radius: 18px 18px 0 0;
+      padding-bottom: max(24px, env(safe-area-inset-bottom, 24px));
+    }
+    @media (min-width: 600px) {
+      .modal-overlay { align-items: center; }
+      .modal { border-radius: 16px; }
+    }
+
+    /* Insights + calendar groups under the list (mirrors the iOS
+       MemberView's grouped sections). */
+    .member-extras { max-width: 720px; margin: 4px auto 0; padding: 0 14px; }
+
+    /* ── iPad-style split view for the member page (≥1024px) ────────
+       A persistent sidebar (lists for this member, What's New,
+       Trending, Members) beside the detail column, mirroring
+       IPadHomeView. Below the breakpoint the page keeps the iPhone
+       single-stack layout and the sidebar stays hidden. */
+    .split-side { display: none; }
+    @media (min-width: 1024px) {
+      /* Letterbox the split view: the sidebar + detail form one centered
+         app shell (like the iPad app in a window), with the warm taupe
+         page showing in the leftover space on either side — so the detail
+         content sits tucked against the nav instead of floating. */
+      body { background: var(--body); }
+      #showPage:not(.hidden) {
+        display: grid; grid-template-columns: 300px minmax(0, 1fr);
+        height: 100vh; height: 100dvh; overflow: hidden;
+        max-width: var(--shell-max, 1180px);
+        margin: 0 auto;
+        background: var(--surface-2);
+        border-left: 1px solid var(--border-soft);
+        border-right: 1px solid var(--border-soft);
+      }
+      .split-side {
+        display: block;
+        overflow-y: auto;
+        padding: 0 14px 24px;
+        border-right: 1px solid var(--border-soft);
+      }
+      .split-side .home-titlebar { padding-top: 12px; }
+      .split-side .home-title { font-size: 20px; }
+      .side-members { max-height: 250px; overflow-y: auto; flex: 0 0 auto; }
+      .split-detail { overflow-y: auto; min-width: 0; }
+      /* The sidebar owns navigation: list switching moves there and the
+         sidebar title links Home, so the mobile back link and segmented
+         control disappear from the detail bar. */
+      #showPage .back-link { display: none; }
+      #showPage .tabs { display: none; }
+      /* Search + account also live in the sidebar titlebar on the split
+         view — the header copies hide (their logged-in/out state kept
+         drifting out of sync with the sidebar's), and the emptied top row
+         collapses so the content pulls up. The + (add show) stays: it's
+         page-specific and has no sidebar counterpart. */
+      #showPage #searchBtn, #showPage #loginBtn, #showPage #logoutBtn { display: none; }
+      #showPage .header-top { min-height: 0; }
+      /* One consolidated top line: title (+ add-show) centered over the
+         content column, sort pinned to the right of the same line. Absolute
+         inside the row keeps the title's centering unaffected, and the row
+         is capped to the 720px column so right:0 lines up with the list. */
+      #showPage .header-title-row #listControls {
+        position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+        flex: none; padding: 0;
+      }
+      /* Subscription audit lives in the sidebar on the split view, so the
+         duplicate under-list row hides (Vibe + Calendar live in the nav on
+         every layout now). */
+      #showPage .member-extras #subscriptionsLink { display: none; }
+      #showPage .member-extras #rateBacklogLink { display: none; }
+      /* Pushed show detail covers the detail column, not the sidebar —
+         offset by the letterbox margin plus the sidebar width. */
+      #detailPage {
+        left: calc((100vw - min(100vw, var(--shell-max, 1180px))) / 2 + 300px);
+        right: calc((100vw - min(100vw, var(--shell-max, 1180px))) / 2);
+      }
+      #detailPage .detail-nav { border-left: 1px solid var(--border-soft); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SF Symbol-style icon sprite — the same glyph vocabulary the iOS
+       app uses (person.crop.circle, sparkles, flame, play.circle, …). -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.6"/><path d="M15.7 15.7 20.6 20.6"/></g></symbol>
+    <symbol id="i-person" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9.2"/><circle cx="12" cy="9.6" r="3.1"/><path d="M5.9 18.9C7.3 15.9 9.4 14.7 12 14.7s4.7 1.2 6.1 4.2" stroke-linecap="round"/></g></symbol>
+    <symbol id="i-person-plus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M20.8 13.2A8.7 8.7 0 1 1 12.6 3.3"/><circle cx="11.7" cy="10" r="3"/><path d="M5.9 18.7c1.3-2.7 3.3-3.8 5.8-3.8 2.4 0 4.4 1.1 5.7 3.7"/><path d="M18.6 3.4v5M16.1 5.9h5"/></g></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><g fill="currentColor"><path d="M9.5 6.5 11.1 11 15.5 12.6 11.1 14.2 9.5 18.7 7.9 14.2 3.5 12.6 7.9 11Z"/><path d="M17.5 3 18.4 5.6 21 6.5 18.4 7.4 17.5 10 16.6 7.4 14 6.5 16.6 5.6Z"/><path d="M17.8 13.6 18.5 15.5 20.4 16.2 18.5 16.9 17.8 18.8 17.1 16.9 15.2 16.2 17.1 15.5Z"/></g></symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M12 3c.8 2.6 2.6 4.3 3.9 6.2 1.2 1.8 1.8 3.5 1.8 5.2 0 3.5-2.5 6.1-5.7 6.1s-5.7-2.6-5.7-6.1c0-2.2 1-4 2.3-5.5.4 1.1 1.1 2 2.1 2.4-.3-2.8.3-5.9 1.3-8.3z"/></symbol>
+    <symbol id="i-play-circle" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><circle cx="12" cy="12" r="9.2"/><path d="M10.1 8.6 15.4 12 10.1 15.4Z"/></g></symbol>
+    <symbol id="i-hourglass" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M7.2 3.5h9.6M7.2 20.5h9.6M8.4 3.5v2.6c0 2.4 3.6 3.5 3.6 5.9 0-2.4 3.6-3.5 3.6-5.9V3.5M8.4 20.5v-2.6c0-2.4 3.6-3.5 3.6-5.9 0 2.4 3.6 3.5 3.6 5.9v2.6"/></symbol>
+    <symbol id="i-thumbsup" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></symbol>
+    <symbol id="i-text-plus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6.5h9M3.5 12h13M3.5 17.5h13"/><path d="M18.5 3.9v5M16 6.4h5"/></g></symbol>
+    <symbol id="i-star-fill" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3.2 14.6 8.6 20.5 9.4 16.2 13.5 17.3 19.4 12 16.5 6.7 19.4 7.8 13.5 3.5 9.4 9.4 8.6Z"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M9 5.5 15.7 12 9 18.5"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M15 5.5 8.3 12 15 18.5"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5.5 9 12 15.7 18.5 9"/></symbol>
+    <symbol id="i-chevron-up" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5.5 15 12 8.3 18.5 15"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5H7.8A1.8 1.8 0 0 0 6 6.3v11.4a1.8 1.8 0 0 0 1.8 1.8h5.7M10.5 12h10M17 8.5 20.5 12 17 15.5"/></symbol>
+    <symbol id="i-export" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 15V3.5M8.5 7 12 3.5 15.5 7M5 13v5.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V13"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5.2v13.6M5.2 12h13.6"/></symbol>
+    <symbol id="i-creditcard" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.8" y="5.5" width="18.4" height="13" rx="2.2"/><path d="M2.8 9.8h18.4" stroke-width="2.2"/></g></symbol>
+    <symbol id="i-people" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="9.2" cy="9" r="3.2"/><path d="M3.4 19.2c.9-3 3-4.4 5.8-4.4s4.9 1.4 5.8 4.4"/><path d="M16.4 6.3a3.2 3.2 0 0 1 0 6.1"/><path d="M17.6 14.9c2.1.3 3.4 1.7 4 4.3"/></g></symbol>
+    <symbol id="i-calendar-plus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.4"/><path d="M3.5 9.7h17M8 2.8v4M16 2.8v4M12 12.3v5.4M9.3 15h5.4"/></g></symbol>
+  </svg>
+
+  <!-- Landing Page — mirrors the iOS HomeView: large-title bar with
+       search + account, then an inset-grouped list (My Shows / What's
+       New, Trending, Members). At desktop widths the sections become
+       the iPad sidebar and Trending renders in the detail column. -->
+  <div id="landingPage" class="hidden">
+    <div class="home-shell">
+      <aside class="home-side">
+        <div class="home-titlebar">
+          <h1 class="home-title">Show Picker Club</h1>
+          <button class="icon-btn" title="Search all libraries" aria-label="Search all libraries" onclick="openLandingSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
+          <button class="icon-btn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
+        </div>
+
+        <!-- Join pitch for logged-out visitors. Toggled by
+             maybeShowJoinCta(). -->
+        <div class="join-cta hidden" id="joinCta">
+          <p class="join-cta-pitch">Track the shows and movies you're watching, see when seasons come back, and share picks with friends.</p>
+          <button class="btn btn-save join-cta-btn" onclick="login()">Create your free account</button>
+        </div>
+
+        <p class="nav-announce">★ New: rate any show and see the club's average.</p>
+
+        <!-- iPhone home shows a single "My Shows" row; the desktop split
+             view expands it into the four lists, exactly like the iPad
+             sidebar (the rows deep-link to your page with the list open). -->
+        <h3 class="ios-group-header hidden" id="homeListsHeader">My Shows</h3>
+        <nav class="ios-group">
+          <a id="myShowsLink" class="ios-item hidden" href="#" style="font-weight: 600;">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-person"/></svg></span>
+            <span class="ios-item-label">My Shows</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden home-list-row" data-list="watching" href="#">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-play-circle"/></svg></span>
+            <span class="ios-item-label">Watching</span>
+          </a>
+          <a class="ios-item hidden home-list-row" data-list="waiting" href="#">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-hourglass"/></svg></span>
+            <span class="ios-item-label">Awaiting</span>
+          </a>
+          <a class="ios-item hidden home-list-row" data-list="recommending" href="#">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-thumbsup"/></svg></span>
+            <span class="ios-item-label">Loved</span>
+          </a>
+          <a class="ios-item hidden home-list-row" data-list="next" href="#">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-text-plus"/></svg></span>
+            <span class="ios-item-label">Next Up</span>
+          </a>
+          <button id="homeLoginRow" class="ios-item" onclick="login()">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-person-plus"/></svg></span>
+            <span class="ios-item-label">Log in to see your shows</span>
+          </button>
+        </nav>
+
+        <!-- Discovery + account group, reordered per new nav structure -->
+        <nav class="ios-group">
+          <a class="ios-item" href="/groups">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-people"/></svg></span>
+            <span class="ios-item-label">Groups</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <span class="ios-item side-list-row selected home-side-trending hidden" id="trendingSideGroup">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-flame"/></svg></span>
+            <span class="ios-item-label">Trending</span>
+          </span>
+          <a class="ios-item hidden always-sep home-ratebacklog-row" href="/rate-backlog">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-star-fill"/></svg></span>
+            <span class="ios-item-label">Rate my shows<span class="nav-badge" id="rateBacklogBadge"></span></span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden home-subs-row" href="/subscriptions">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
+            <span class="ios-item-label">Subscription audit</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden vibe-row" href="/vibe">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
+            <span class="ios-item-label">Vibe</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden calendar-feed-row" href="#" title="Subscribe in Calendar to keep upcoming season dates on your phone">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-calendar-plus"/></svg></span>
+            <span class="ios-item-label">Calendar</span>
+          </a>
+          <div class="nav-spacer"></div>
+          <a class="ios-item hidden side-admin-reporting" href="/reporting">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-text-plus"/></svg></span>
+            <span class="ios-item-label">Reporting</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden side-admin-members" href="/members">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-person-plus"/></svg></span>
+            <span class="ios-item-label">Manage members</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden side-admin-cleanup" href="/url-cleanup">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-wrench"/></svg></span>
+            <span class="ios-item-label">Show Cleanup</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden side-admin-vibe" href="/vibe-admin">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
+            <span class="ios-item-label">Vibe trait scoring</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+        </nav>
+
+        <!-- Small screens: Trending inline, iPhone-style. -->
+        <div id="popularSection" style="display: none;">
+          <h3 class="ios-group-header">Trending</h3>
+          <div id="popularList" class="show-list" style="margin-bottom: 22px;"></div>
+        </div>
+
+        <p class="ios-footnote">Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+
+        <footer class="ios-footnote" style="margin-top: 26px;">
+          &copy; 2025 Patrick Turner.
+        </footer>
+      </aside>
+
+      <section class="home-detail">
+        <div class="detail-bar"><h2>Trending</h2></div>
+        <div class="home-detail-inner">
+          <div id="popularDetailList" class="show-list"></div>
+          <div id="popularDetailStatus" class="loading">Loading&hellip;</div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Member Show Page — iPhone-style single stack on small screens;
+       at ≥1024px an iPad-style sidebar (this member's lists, What's
+       New, Trending, Members) appears beside the detail column. -->
+  <div id="showPage" class="hidden">
+    <aside class="split-side" id="memberSideNav">
+      <div class="home-titlebar">
+        <h1 class="home-title"><a href="/?home">Show Picker Club</a></h1>
+        <button class="icon-btn" title="Search all libraries" aria-label="Search all libraries" onclick="openLandingSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
+        <button class="icon-btn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
+      </div>
+      <p class="nav-announce">★ New: rate any show and see the club's average.</p>
+      <!-- One-tap way home while browsing someone else's lists — the lists
+           group below belongs to whoever's page this is, so without this
+           there's no visible route back to your own shows. Toggled by
+           updateSideListsHeader(); keeps the open list via location.hash. -->
+      <nav class="ios-group hidden" id="sideBackHome">
+        <a class="ios-item" id="sideBackHomeLink" href="/" onclick="if (authMember) this.href = '/' + authMember + location.hash">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-person"/></svg></span>
+          <span class="ios-item-label">Back to My Shows</span>
+        </a>
+      </nav>
+      <h3 class="ios-group-header" id="sideListsHeader">Shows</h3>
+      <nav class="ios-group">
+        <button class="ios-item side-list-row selected" data-list="watching" onclick="switchTab('watching')">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-play-circle"/></svg></span>
+          <span class="ios-item-label">Watching</span>
+        </button>
+        <button class="ios-item side-list-row" data-list="waiting" onclick="switchTab('waiting')">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-hourglass"/></svg></span>
+          <span class="ios-item-label">Awaiting</span>
+        </button>
+        <button class="ios-item side-list-row" data-list="recommending" onclick="switchTab('recommending')">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-thumbsup"/></svg></span>
+          <span class="ios-item-label">Loved</span>
+        </button>
+        <button class="ios-item side-list-row" data-list="next" onclick="switchTab('next')">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-text-plus"/></svg></span>
+          <span class="ios-item-label">Next Up</span>
+        </button>
+      </nav>
+      <!-- Discovery + account group, reordered to match home nav -->
+      <nav class="ios-group">
+        <a class="ios-item" href="/groups">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-people"/></svg></span>
+          <span class="ios-item-label">Groups</span>
+        </a>
+        <a class="ios-item hidden member-ratebacklog-row" href="/rate-backlog">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-star-fill"/></svg></span>
+          <span class="ios-item-label">Rate my shows<span class="nav-badge" id="memberRateBacklogBadge"></span></span>
+        </a>
+        <a class="ios-item hidden member-subs-row" href="/subscriptions">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
+          <span class="ios-item-label">Subscription audit</span>
+        </a>
+        <a class="ios-item hidden vibe-row" href="/vibe">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
+          <span class="ios-item-label">Vibe</span>
+        </a>
+        <a class="ios-item hidden calendar-feed-row" href="#" title="Subscribe in Calendar to keep upcoming season dates on your phone">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-calendar-plus"/></svg></span>
+          <span class="ios-item-label">Calendar</span>
+        </a>
+        <div class="nav-spacer"></div>
+        <a class="ios-item hidden side-admin-reporting" href="/reporting">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-text-plus"/></svg></span>
+          <span class="ios-item-label">Reporting</span>
+        </a>
+        <a class="ios-item hidden side-admin-members" href="/members">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-person-plus"/></svg></span>
+          <span class="ios-item-label">Manage members</span>
+        </a>
+        <a class="ios-item hidden side-admin-cleanup" href="/url-cleanup">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-wrench"/></svg></span>
+          <span class="ios-item-label">Show Cleanup</span>
+        </a>
+        <a class="ios-item hidden side-admin-vibe" href="/vibe-admin">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
+          <span class="ios-item-label">Vibe trait scoring</span>
+        </a>
+        <a class="ios-item" href="/?home">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-flame"/></svg></span>
+          <span class="ios-item-label">Trending</span>
+        </a>
+      </nav>
+      <h3 class="ios-group-header">Members</h3>
+      <nav class="ios-group side-members" id="sideMembersList"></nav>
+      <p class="ios-footnote">Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+    </aside>
+
+    <div class="split-detail">
+      <header>
+        <div class="header-top">
+          <div class="header-actions">
+            <a href="/?home" class="back-link" title="All members" aria-label="Back to all members"><svg class="ic"><use href="#i-chevron-left"/></svg>Home</a>
+          </div>
+          <div class="header-actions">
+            <button class="icon-btn" id="searchBtn" title="Search this member's shows" aria-label="Search this member's shows" onclick="openSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
+            <button class="btn-nav-text" id="loginBtn" title="Log in to edit your shows" onclick="login()">Log in</button>
+            <button class="icon-btn hidden" id="logoutBtn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
+          </div>
+        </div>
+        <div class="header-title-row">
+          <h1 class="header-title" id="appTitle"></h1>
+          <button class="icon-btn hidden" id="addBtn" title="Add a new show" aria-label="Add a new show" onclick="openAddModal()"><svg class="ic"><use href="#i-plus"/></svg></button>
+          <div class="list-controls hidden" id="listControls"></div>
+        </div>
+        <div class="tabs" id="tabs">
+          <div class="tab active" data-list="watching" onclick="switchTab('watching')">Watching</div>
+          <div class="tab" data-list="waiting" onclick="switchTab('waiting')">Awaiting</div>
+          <div class="tab" data-list="recommending" onclick="switchTab('recommending')">Loved</div>
+          <div class="tab" data-list="next" onclick="switchTab('next')">Next Up</div>
+        </div>
+        <div class="section-desc" id="sectionDesc"></div>
+      </header>
+
+      <main>
+        <div class="loading" id="loading">Loading shows...</div>
+        <div class="show-list" id="showList"></div>
+        <div class="empty hidden" id="empty">No shows in this list yet.</div>
+      </main>
+
+      <!-- Subscription audit under the list on the iPhone layout. (Vibe and
+           Calendar moved to the home nav / split-view sidebar.) -->
+      <div class="member-extras">
+        <nav class="ios-group">
+          <a class="ios-item hidden" id="rateBacklogLink" href="/rate-backlog" title="Rate everything you've already watched, one page at a time">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-star-fill"/></svg></span>
+            <span class="ios-item-label">Rate my shows</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden" id="subscriptionsLink" href="/subscriptions" title="See which streaming subscriptions you actually need right now">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
+            <span class="ios-item-label">Subscription audit</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+        </nav>
+      </div>
+
+      <footer style="text-align: center; padding: 24px 16px 32px; font-size: 12px; color: var(--ink-quiet);">
+        &copy; 2025 Patrick Turner.
+      </footer>
+    </div>
+  </div>
+
+  <!-- Show detail screen — iOS-style pushed view, opened by tapping a show. -->
+  <div id="detailPage">
+    <div class="detail-nav">
+      <div class="detail-nav-inner">
+        <button onclick="detailBack()" aria-label="Back">&#8249; Back</button>
+        <span class="detail-nav-title" id="detailNavTitle"></span>
+      </div>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div class="modal-overlay hidden" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2 id="modalTitle">Add Show</h2>
+      <label for="inputTitle">Show Title</label>
+      <input type="text" id="inputTitle" placeholder="e.g. The Night Agent" autocomplete="off">
+      <div class="title-suggest hidden" id="inputTitleSuggest"></div>
+
+      <label for="inputNetwork">Network</label>
+      <select id="inputNetwork">
+        <option value="">Select…</option>
+        <option value="AMC+">AMC+ (including AMC, BBC America, IFC, Sundance, Shudder)</option>
+        <option value="Amazon Prime Video">Amazon Prime Video (including MGM+, Freevee)</option>
+        <option value="Apple TV+">Apple TV+</option>
+        <option value="BritBox">BritBox (British TV from the BBC and ITV)</option>
+        <option value="Disney+">Disney+ (including Marvel, Star Wars, Pixar, Nat Geo)</option>
+        <option value="Food Network">Food Network</option>
+        <option value="Fox">Fox</option>
+        <option value="Hulu">Hulu (including FX, FXX, ABC, Nat Geo, Freeform)</option>
+        <option value="HBO Max">HBO Max (including Discovery, CNN, TNT, TBS, Cartoon Network)</option>
+        <option value="Netflix">Netflix</option>
+        <option value="Paramount+">Paramount+ (including CBS, MTV, Comedy Central, Nickelodeon, BET, Showtime)</option>
+        <option value="Peacock">Peacock (including NBC, Bravo, USA, Syfy, Oxygen, E!)</option>
+        <option value="Starz">Starz</option>
+        <option value="YouTube">YouTube</option>
+        <option value="__other">Network not listed</option>
+      </select>
+      <input type="text" id="inputNetworkOther" placeholder="Enter network name" style="display:none; margin-top: 6px;">
+
+      <label for="inputRecommended">Recommended By</label>
+      <input type="text" id="inputRecommended" placeholder="e.g. Dorothy, TC">
+
+      <label for="inputNotes">Notes</label>
+      <input type="text" id="inputNotes" placeholder="e.g. Movie, Harlan Coben">
+
+      <label for="inputWatchingWith">Watching With</label>
+      <input type="text" id="inputWatchingWith" placeholder="e.g. Ali, the whole family">
+
+      <label class="checkbox-label"><input type="checkbox" id="inputMovie"> Movie</label>
+      <label class="checkbox-label"><input type="checkbox" id="inputFullSeries"> Series Complete</label>
+
+      <label>List</label>
+      <div class="list-chips" id="inputListChips">
+        <div class="list-chip selected" data-value="watching" style="--chip-color: var(--list-watching);" onclick="selectListChip(this)">Watching</div>
+        <div class="list-chip" data-value="waiting" style="--chip-color: var(--list-waiting);" onclick="selectListChip(this)">Awaiting</div>
+        <div class="list-chip" data-value="recommending" style="--chip-color: var(--list-recommending);" onclick="selectListChip(this)">Loved</div>
+        <div class="list-chip" data-value="next" style="--chip-color: var(--accent);" onclick="selectListChip(this)">Next Up</div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-save" id="modalSave" onclick="saveShow()">Add Show</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add to My List Modal -->
+  <div class="modal-overlay hidden" id="addMyListOverlay" onclick="closeAddMyList(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2>Add to My List</h2>
+
+      <label for="addMyTitle">Show</label>
+      <input type="text" id="addMyTitle" readonly style="background: var(--surface); color: var(--ink-muted);">
+
+      <label for="addMyList">Add to</label>
+      <select id="addMyList">
+        <option value="watching">Watching</option>
+        <option value="waiting">Awaiting Next Season</option>
+        <option value="recommending">Loved</option>
+        <option value="next">Next Up</option>
+      </select>
+
+      <label for="addMyNotes">Notes</label>
+      <input type="text" id="addMyNotes" placeholder="e.g. Great thriller">
+
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeAddMyList()">Cancel</button>
+        <button class="btn btn-save" onclick="submitAddMyList()">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="searchOverlay" onclick="closeSearchModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2 id="searchModalTitle">Search Shows</h2>
+      <label for="searchTitleInput">Title</label>
+      <input type="text" id="searchTitleInput" placeholder="e.g. Fargo" oninput="renderSearchResults()" autocomplete="off">
+
+      <label for="searchActorInput">Actor</label>
+      <input type="text" id="searchActorInput" placeholder="e.g. Billy Bob Thornton" oninput="renderSearchResults()" autocomplete="off">
+
+      <div id="searchResults" class="search-results"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeSearchModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete account — immediate hard delete, re-verified with an emailed
+       code so a stolen session cookie alone can't destroy an account. -->
+  <div class="modal-overlay hidden" id="deleteAccountOverlay" onclick="closeDeleteAccountModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div id="deleteStepIntro">
+        <h2 style="color:var(--danger-deep);">Delete your account?</h2>
+        <p style="font-size:14px; line-height:1.55; margin-bottom:10px;">
+          This permanently deletes your account, all four lists, your
+          subscriptions, and your calendar feed. <strong>It cannot be undone.</strong>
+        </p>
+        <p style="font-size:13px; color:var(--ink-muted);">
+          To confirm it's really you, we'll email a code to your address on file.
+        </p>
+        <button type="button" class="btn" id="deleteSendBtn" style="margin-top:12px; width:100%; background:var(--danger-deep); color:#fff;" onclick="sendDeleteCode()">Email me a deletion code</button>
+      </div>
+      <div id="deleteStepCode" class="hidden">
+        <h2 style="color:var(--danger-deep);">Enter the deletion code</h2>
+        <p id="deleteCodeSent" style="font-size:13px; color:var(--ink-muted); margin-bottom:10px;"></p>
+        <label for="deleteCode">Code</label>
+        <input type="text" id="deleteCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" placeholder="••••••">
+        <button type="button" class="btn" id="deleteConfirmBtn" style="margin-top:12px; width:100%; background:var(--danger-deep); color:#fff;" onclick="confirmDeleteAccount()">Permanently delete my account</button>
+      </div>
+      <div id="deleteErr" style="display:none; margin-top:14px; padding:10px; background:var(--danger-soft); color:var(--danger-deep); border-radius:6px; font-size:13px;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeDeleteAccountModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log in / sign up — identifier-first, one decision per screen. Step 1
+       picks a channel (Apple / Google / email / phone), step 2 takes the
+       identifier, step 3 the code, and step 4 (new signups only) a name.
+       Which buttons render is driven by GET /auth/config. -->
+  <div class="modal-overlay hidden" id="loginOverlay" onclick="closeLoginModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+
+      <div class="login-step" id="loginStepChoose">
+        <h2 id="loginTitle" style="text-align:center;">Log in</h2>
+        <div class="login-choose-stack">
+        <button type="button" class="btn" id="appleSignInBtn" onclick="signInWithApple()"
+                style="background:#000; color:#fff;">
+          <svg width="13" height="16" viewBox="0 0 170 170" fill="#fff" aria-hidden="true"><path d="M150.4 130.3c-2.5 5.7-5.4 11-8.9 15.8-4.7 6.6-8.6 11.2-11.6 13.7-4.6 4.2-9.5 6.3-14.8 6.5-3.8 0-8.3-1.1-13.6-3.3-5.3-2.2-10.1-3.3-14.6-3.3-4.7 0-9.7 1.1-15 3.3-5.3 2.2-9.6 3.3-12.9 3.4-5.1.2-10.1-2-15-6.7-3.2-2.7-7.3-7.5-12.2-14.4-5.3-7.3-9.6-15.9-13-25.7-3.6-10.6-5.4-20.9-5.4-30.8 0-11.4 2.5-21.2 7.4-29.4 3.9-6.6 9-11.8 15.4-15.6 6.4-3.8 13.3-5.8 20.8-5.9 4 0 9.3 1.3 15.9 3.7 6.6 2.5 10.9 3.7 12.7 3.7 1.4 0 6.1-1.5 14.1-4.4 7.6-2.7 14-3.8 19.3-3.4 14.3 1.2 25 6.8 32.1 16.9-12.8 7.8-19.1 18.6-19 32.6.1 10.9 4.1 20 11.9 27.2 3.5 3.4 7.5 6 11.9 7.8-1 2.8-2 5.4-3.1 7.9zM119.9 7.3c0 8.5-3.1 16.4-9.3 23.8-7.5 8.8-16.5 13.8-26.3 13-.1-1-.2-2.1-.2-3.2 0-8.1 3.6-16.8 9.9-23.9 3.2-3.6 7.2-6.6 12.1-9 4.9-2.3 9.5-3.6 13.9-3.9.1 1.1.2 2.2.2 3.2z"/></svg>
+          Continue with Apple
+        </button>
+        <div id="googleBtnWrap" class="hidden"></div>
+        <button type="button" class="btn login-choose-btn" onclick="loginChoose('email')">Continue with email</button>
+        <button type="button" class="btn login-choose-btn" onclick="loginChoose('phone')">Continue with phone</button>
+        </div>
+        <p id="loginTermsLine" class="hidden" style="margin-top:16px; font-size:12px; color:var(--ink-muted); text-align:center; line-height:1.5;">
+          By continuing, you agree to the <a href="/terms" target="_blank" style="color:var(--accent);">Terms</a> and acknowledge the <a href="/privacy" target="_blank" style="color:var(--accent);">Privacy Policy</a>.
+        </p>
+      </div>
+
+      <div class="login-step hidden" id="loginStepEmail">
+        <h2>What's your email?</h2>
+        <label for="loginEmail">Email</label>
+        <input type="email" id="loginEmail" autocomplete="email" placeholder="you@example.com"
+               onkeydown="if(event.key==='Enter')continueWithEmail()">
+        <div id="turnstileWrap" style="margin-top:10px;"></div>
+        <button type="button" class="btn btn-save" id="loginEmailBtn" style="margin-top:12px; width:100%;" onclick="continueWithEmail()">Continue</button>
+      </div>
+
+      <div class="login-step hidden" id="loginStepPhone">
+        <h2>What's your phone number?</h2>
+        <label for="loginPhone">Phone (US)</label>
+        <input type="tel" id="loginPhone" name="phone" autocomplete="tel" inputmode="tel"
+               placeholder="(336) 555-1234" onkeydown="if(event.key==='Enter')continueWithPhone()">
+        <div style="font-size:12px; color:var(--ink-muted); margin-top:6px;">
+          Phone login is for members with a number on file. New here? Go back and use Apple, Google, or email.
+        </div>
+        <button type="button" class="btn btn-save" id="loginPhoneBtn" style="margin-top:12px; width:100%;" onclick="continueWithPhone()">Text me a code</button>
+      </div>
+
+      <div class="login-step hidden" id="loginStepCode">
+        <h2>Enter your code</h2>
+        <p id="loginCodeSent" style="font-size:13px; color:var(--ink-muted); margin-bottom:10px;"></p>
+        <label for="loginCode">Code</label>
+        <input type="text" id="loginCode" inputmode="numeric" autocomplete="one-time-code"
+               pattern="[0-9]*" maxlength="6" placeholder="••••••">
+        <div id="loginCodeHint" style="font-size:12px; color:var(--ink-muted); margin-top:6px;">
+          Codes are good for 10 minutes. If nothing arrives, check spam — or reach out to the group owner.
+        </div>
+        <button type="button" class="btn btn-save" id="loginSubmitBtn" style="margin-top:12px; width:100%;" onclick="submitLoginCode()">Continue</button>
+      </div>
+
+      <div class="login-step hidden" id="loginStepName">
+        <h2>What's your name?</h2>
+        <p style="font-size:13px; color:var(--ink-muted); margin-bottom:10px;">
+          Other members see your first name (plus a last initial if two members share it).
+        </p>
+        <label for="loginFullName">First and last name</label>
+        <input type="text" id="loginFullName" autocomplete="name" placeholder="e.g. Robin Askins" maxlength="60"
+               onkeydown="if(event.key==='Enter')submitEnrollName()">
+        <button type="button" class="btn btn-save" id="loginNameBtn" style="margin-top:12px; width:100%;" onclick="submitEnrollName()">Create my account</button>
+      </div>
+
+      <div id="loginErr" style="display:none; margin-top: 14px; padding: 10px; background: var(--danger-soft); color: var(--danger-deep); border-radius: 6px; font-size: 13px;"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-cancel hidden" id="loginBackBtn" onclick="loginBack()">Back</button>
+        <button class="btn btn-cancel" onclick="closeLoginModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="text/javascript" src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
+  <script src="/show-renderer.js?v=2"></script>
+  <script>
+    // Set nav context before loading nav.js
+    window.navContext = { page: 'home' };
+  </script>
+  <script src="/nav.js"></script>
+  <script>
+    let shows = [];
+    let currentTab = 'watching';
+    // isEditor removed: per-row actions now always show on own page when logged in.
+    let editingId = null;
+    let memberSlug = null;
+    let memberName = '';
+    let memberLabel = '';
+    let editorName = '';
+    let authMember = null;
+    let searchMode = 'member';
+    let owners = '';
+
+    // Global click handler for show-renderer.js: when a show card is clicked
+    window.__showRendererClickHandler = (showId) => openDetail(showId);
+
+    // Platform usage tracking: tell the server which web form factor this is so
+    // reporting can split web into small- vs large-screen. The breakpoint
+    // matches the layout's mobile/desktop split. Spread into a fetch's headers,
+    // e.g. fetch(url, { headers: clientPlatformHeader() }).
+    function clientPlatformHeader() {
+      const size = window.innerWidth < 768 ? 'web-small' : 'web-large';
+      return { 'X-Client-Platform': size };
+    }
+
+    function parseActors(raw) {
+      if (!raw) return [];
+      try {
+        const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (Array.isArray(arr)) return arr;
+      } catch (_) {}
+      // Legacy plain string fallback
+      return String(raw).split(', ').map(name => ({ name, imdb_id: null }));
+    }
+
+    function renderActors(raw) {
+      const actors = parseActors(raw);
+      if (!actors.length) return '';
+      const tags = actors.map(a => {
+        const label = escapeHtml(a.name);
+        if (a.imdb_id) {
+          return `<a class="actor-tag" href="https://www.imdb.com/name/${encodeURIComponent(a.imdb_id)}/" target="_blank" rel="noopener">${label}</a>`;
+        }
+        return `<span class="actor-tag">${label}</span>`;
+      }).join('');
+      return `<div class="actor-list">${tags}</div>`;
+    }
+
+    function actorNamesText(raw) {
+      return parseActors(raw).map(a => a.name).join(', ');
+    }
+
+    // Show a transient toast at the bottom of the screen.
+    //   showToast("Moved to Loved")
+    //   showToast("Archived \"Foo\"", { action: { label: "Undo", onClick: fn } })
+    //   showToast("Network error", { tone: "error" })
+    // Error toast for a failed write. A 401 is by far the most common real
+    // cause (a session cookie that finally expired), and "Failed to X" sends
+    // members chasing the wrong problem — so it gets named explicitly.
+    function failToast(res, fallback) {
+      showToast(res.status === 401
+        ? 'You’re logged out — refresh the page and log in again.'
+        : fallback, { tone: 'error' });
+    }
+
+    function showToast(message, opts = {}) {
+      let stack = document.getElementById('toastStack');
+      if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'toastStack';
+        stack.className = 'toast-stack';
+        stack.setAttribute('role', 'status');
+        stack.setAttribute('aria-live', 'polite');
+        document.body.appendChild(stack);
+      }
+      const toast = document.createElement('div');
+      toast.className = 'toast' + (opts.tone === 'error' ? ' error' : '');
+      const msg = document.createElement('span');
+      msg.textContent = message;
+      toast.appendChild(msg);
+      let dismissTimer = null;
+      const dismiss = () => {
+        if (dismissTimer) clearTimeout(dismissTimer);
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        toast.style.transition = 'opacity 0.18s, transform 0.18s';
+        setTimeout(() => toast.remove(), 220);
+      };
+      if (opts.action) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = opts.action.label;
+        btn.addEventListener('click', () => {
+          try { opts.action.onClick(); } catch (e) {}
+          dismiss();
+        });
+        toast.appendChild(btn);
+      }
+      stack.appendChild(toast);
+      dismissTimer = setTimeout(dismiss, opts.duration || (opts.action ? 6000 : 3500));
+      return dismiss;
+    }
+
+    const LIST_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved', next: 'Next Up' };
+
+    // A couple's page name ("Jane & Joe", "Patrick and Ali") is a plural
+    // subject, so empty-state verbs agree ("aren't/haven't").
+    const nameIsPlural = (name) => / & | and /i.test(name || '');
+
+    // Empty-state copy. own.* is shown when the viewer owns this page; guest.*
+    // is shown to anyone else (no CTA, just acknowledges the list is empty).
+    const EMPTY_COPY = {
+      own: {
+        watching: {
+          headline: "You're not watching anything yet.",
+          help: "Add a show you're actively watching so the club knows what you're into.",
+          cta: { label: 'Add a show', action: 'openAddModal()' },
+        },
+        waiting: {
+          headline: "Nothing awaiting a next season.",
+          help: "When you finish a season but want to come back, move the show here. Premiere dates show on your calendar feed.",
+        },
+        recommending: {
+          headline: "Nothing loved yet.",
+          help: "Once you've watched something you loved, move it here so the rest of the club sees it.",
+        },
+        next: {
+          headline: "Your Next Up is empty.",
+          help: "Add shows you want to watch later, or wait for picks and suggestions from other members.",
+          cta: { label: 'Add a show', action: 'openAddModal()' },
+        },
+      },
+      guest: {
+        // A couple's name ("Jane & Joe") is a plural subject, so the verb is
+        // "aren't/haven't" instead of "isn't/hasn't".
+        watching:   (name) => `${name} ${nameIsPlural(name) ? "aren't" : "isn't"} watching anything right now.`,
+        waiting:    (name) => `${name} ${nameIsPlural(name) ? "aren't" : "isn't"} awaiting any seasons.`,
+        recommending: (name) => `${name} ${nameIsPlural(name) ? "haven't" : "hasn't"} loved anything yet.`,
+        next:       (name) => `${name}'s Next Up is empty.`,
+      },
+    };
+
+    function renderEmptyState(currentTab, isOwn, ownerName) {
+      if (isOwn) {
+        const c = EMPTY_COPY.own[currentTab] || { headline: 'Nothing here yet.' };
+        const cta = c.cta ? `<button class="btn-empty-cta" onclick="${c.cta.action}">${escapeHtml(c.cta.label)}</button>` : '';
+        const help = c.help ? `<p class="empty-help">${escapeHtml(c.help)}</p>` : '';
+        return `<p class="empty-headline">${escapeHtml(c.headline)}</p>${help}${cta}`;
+      }
+      const guestFn = EMPTY_COPY.guest[currentTab];
+      const headline = guestFn ? guestFn(ownerName) : 'Nothing here yet.';
+      return `<p class="empty-headline">${escapeHtml(headline)}</p>`;
+    }
+
+    function buildDetailLines(show, opts = {}) {
+      const lines = [];
+      if (show.genres) lines.push(escapeHtml(show.genres));
+      if (show.actors) lines.push(renderActors(show.actors));
+      if (opts.aggregate && show.members && show.members.length) {
+        lines.push(`Watching: ${escapeHtml(show.members.join(', '))}`);
+      }
+      if (!opts.aggregate) {
+        if (show.recommended_by && !opts.skipRecommender) lines.push(`Recommended by ${escapeHtml(show.recommended_by)}`);
+        if (show.next_season_date && !opts.skipNextSeason) {
+          const seasons = seasonsText(show);
+          lines.push(`Next episode: ${formatSeasonRange(show)}${seasons ? ` · ${seasons}` : ''}`);
+        } else if (!opts.skipNextSeason && seasonsText(show)) {
+          // No upcoming date but we know the total — still worth showing.
+          lines.push(seasonsText(show));
+        }
+        if (show.watching_with) lines.push(`Watching with ${escapeHtml(show.watching_with)}`);
+        if (show.notes) lines.push(escapeHtml(show.notes));
+      }
+      return lines.map(l => `<div class="show-detail-line">${l}</div>`).join('');
+    }
+
+    // Just the premiere date — the finale date stays off "Next episode" everywhere.
+    function formatSeasonRange(show) {
+      return formatDate(show.next_season_date);
+    }
+
+    // "3 seasons" / "1 season" — total seasons released so far, when known.
+    function seasonsText(show) {
+      const n = show.seasons_released;
+      return (typeof n === 'number' && n > 0) ? `${n} season${n === 1 ? '' : 's'}` : null;
+    }
+
+    document.getElementById('inputNetwork').addEventListener('change', function() {
+      document.getElementById('inputNetworkOther').style.display = this.value === '__other' ? 'block' : 'none';
+    });
+
+    function getNetwork(selectId, otherId) {
+      const val = document.getElementById(selectId).value;
+      if (val === '__other') return document.getElementById(otherId).value.trim() || null;
+      return val || null;
+    }
+
+    function selectListChip(el) {
+      el.parentElement.querySelectorAll('.list-chip').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+    }
+
+    function getSelectedList() {
+      const sel = document.querySelector('#inputListChips .list-chip.selected');
+      return sel ? sel.dataset.value : 'watching';
+    }
+
+    function setSelectedList(value) {
+      document.querySelectorAll('#inputListChips .list-chip').forEach(c => {
+        c.classList.toggle('selected', c.dataset.value === value);
+      });
+    }
+
+    function changeSort(value) {
+      // Per-list so each tab keeps its own sort (Waiting -> Next episode, etc.).
+      localStorage.setItem('sort_order_' + currentTab, value);
+      renderShows();
+    }
+
+    const SECTION_DESCS = {
+      watching: "What we're watching now.",
+      waiting: "Awaiting the next season to drop.",
+      recommending: "We've watched it and we loved it.",
+      next: "Shows that have been recommended but we haven't watched.",
+    };
+
+    // Determine if we're on landing page or member page
+    const path = window.location.pathname.replace(/\/$/, '');
+    const slug = path.substring(1); // remove leading /
+
+    if (!slug) {
+      // Opening the site root: logged-in members go straight to their own
+      // list; logged-out visitors get the landing/discovery page. We check
+      // auth before rendering so there's no flash of the landing page.
+      landingOrMyList();
+    } else {
+      resolveSlug(slug).then(resolved => {
+        if (resolved) {
+          showMember(resolved);
+        } else {
+          // Slug doesn't match any member even after sanitizing. Fall back to
+          // the landing page rather than rendering a confusing blank profile.
+          history.replaceState(null, '', '/');
+          showLanding();
+        }
+      });
+    }
+
+    async function landingOrMyList() {
+      // The "All members" back arrow links to /?home — an explicit request for
+      // the directory. Honor it instead of bouncing a logged-in member back to
+      // their own list, otherwise they can never leave their page.
+      if (new URLSearchParams(location.search).has('home')) { showLanding(); return; }
+      try {
+        const res = await fetch('/auth/check', { headers: clientPlatformHeader() });
+        const data = await res.json();
+        if (data.authenticated && data.member) {
+          // Show home screen first for discovery (Groups, trending, etc),
+          // then users can navigate to their lists from there.
+          showLanding();
+          return;
+        }
+      } catch (e) {}
+      showLanding();
+    }
+
+    async function resolveSlug(raw) {
+      // Slugs are [a-z0-9]+. URL-decode the raw segment, lowercase, then
+      // strip anything that isn't a slug character. Fixes things like
+      // `/annie**` (autolinker grabbed adjacent punctuation), `/Annie`
+      // (case mismatch), or `/annie%20` (encoded trailing space).
+      let decoded;
+      try { decoded = decodeURIComponent(raw); } catch { decoded = raw; }
+      const cleaned = decoded.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!cleaned) return null;
+      try {
+        const res = await fetch('/api/members');
+        const data = await res.json();
+        const hit = (data.members || []).find(m => m.slug === cleaned);
+        if (!hit) return null;
+        if (cleaned !== raw) {
+          history.replaceState(null, '', '/' + cleaned);
+        }
+        return cleaned;
+      } catch {
+        return null;
+      }
+    }
+
+    // ── iOS-style Home rendering ──────────────────────────────────────
+    function memberActiveCount(m) {
+      // "Active" matches the iOS Home rows: Watching + Next Up + Loved.
+      return (m.watching_count || 0) + (m.recommending_count || 0) + (m.next_count || 0);
+    }
+
+    // Trending row, mirroring the iOS popularRow: poster, title, network
+    // caption, orange star rating, disclosure chevron into the detail.
+    // Trending rows are ordinary show cards — same renderer as every list,
+    // so the poster, title, caption and rating never drift from them.
+    function trendingRowHtml(show) {
+      return renderShowCard(show, { onClickId: openDetail, showRating: true, showChevron: true });
+    }
+
+    // Member row for Home and the sidebar roster. keepHash carries the open
+    // list across to the next member's page, like the iPad's member refocus.
+    function memberRowHtml(m, opts = {}) {
+      const label = m.display_name || m.first_name || (m.name || '').split(' ')[0];
+      const active = memberActiveCount(m);
+      const detail = active > 0 ? `<span class="ios-item-detail">${active} active</span>` : '';
+      const hashJs = opts.keepHash ? ` onclick="this.href='/'+this.dataset.slug+location.hash"` : '';
+      return `<a class="ios-item no-icon${opts.selected ? ' selected' : ''}" href="/${escapeHtml(m.slug)}" data-slug="${escapeHtml(m.slug)}"${hashJs}>
+        <span class="ios-item-label">${escapeHtml(label)}</span>${detail}
+        <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+      </a>`;
+    }
+
+    // Nav rows for YOUR calendar feed (home nav + member-page sidebar).
+    // Feeds authenticate with a per-member token and the API only returns
+    // your own, so whichever row has one is yours; logged out, none do and
+    // the rows stay hidden.
+    function setupCalendarLinks(members) {
+      const mine = (members || []).find(m => m.calendar_token);
+      if (!mine) return;
+      const href = `webcal://showpicker.club/calendar/${encodeURIComponent(mine.slug)}.ics?key=${encodeURIComponent(mine.calendar_token)}`;
+      document.querySelectorAll('.calendar-feed-row').forEach(a => {
+        a.href = href;
+        a.classList.remove('hidden');
+      });
+    }
+
+    async function showLanding() {
+      document.getElementById('landingPage').classList.remove('hidden');
+      document.title = 'Show Picker Club';
+      try {
+        // The home page no longer lists members; this is here for the
+        // calendar-feed rows, which need the caller's own calendar_token.
+        const res = await fetch('/api/members');
+        const data = await res.json();
+        setupCalendarLinks(data.members);
+        // If logged in, fetch my shows to populate the rate backlog badge
+        if (authMember) {
+          try {
+            const showsRes = await fetch(`/api/shows?member=${authMember}`);
+            if (showsRes.ok) {
+              const showsData = await showsRes.json();
+              shows = showsData.shows || [];
+              updateRateBacklogBadge();
+            }
+          } catch (e) {}
+        }
+
+      } catch (e) {}
+
+      // Trending renders twice: inline for the iPhone layout, and into the
+      // detail column the iPad-style split view shows beside the sidebar.
+      const detailStatus = document.getElementById('popularDetailStatus');
+      try {
+        const popRes = await fetch('/api/popular');
+        const popData = await popRes.json();
+        const rows = (popData.shows || []).map(trendingRowHtml).join('');
+        if (rows) {
+          document.getElementById('popularList').innerHTML = rows;
+          document.getElementById('popularDetailList').innerHTML = rows;
+          document.getElementById('popularSection').style.display = 'block';
+          document.getElementById('trendingSideGroup').classList.remove('hidden');
+          detailStatus.remove();
+        } else {
+          detailStatus.textContent = 'Nothing trending yet.';
+        }
+      } catch (e) {
+        detailStatus.textContent = 'Failed to load trending shows.';
+      }
+      checkAuth().then(maybeShowJoinCta);
+    }
+
+    async function showMember(slug) {
+      memberSlug = slug;
+      document.getElementById('showPage').classList.remove('hidden');
+
+      // Get member name (and fill the iPad-style sidebar roster)
+      try {
+        const res = await fetch('/api/members');
+        const data = await res.json();
+        const h = data.members.find(h => h.slug === slug);
+        setupCalendarLinks(data.members);
+        if (h) {
+          owners = h.first_name || h.name.split(' ')[0];
+          memberLabel = h.display_name || owners;
+          memberName = `${memberLabel}'s Shows`;
+        } else {
+          memberName = 'Shows';
+          owners = 'the owners';
+        }
+        renderSideMembers(data.members || []);
+      } catch (e) {
+        memberName = 'Shows';
+        owners = 'the owners';
+      }
+
+      document.title = memberName;
+      document.getElementById('appTitle').textContent = memberName;
+      updateSideListsHeader();
+
+      // Check hash for tab
+      const hash = window.location.hash.replace('#', '');
+      if (['watching', 'waiting', 'recommending', 'next'].includes(hash)) {
+        currentTab = hash;
+        syncListSelection(hash);
+      }
+      updateHeaderTitle();
+      updateDesc();
+
+      // Deep link straight into a show's detail screen — used by
+      // rate-backlog.html's "Rate seasons" link (?show=<id>).
+      const showParam = new URLSearchParams(location.search).get('show');
+      if (showParam) {
+        const showId = parseInt(showParam, 10);
+        if (Number.isInteger(showId)) openDetail(showId, true);
+      }
+
+      checkAuth().then(() => {
+        // Enrichment + URL sync mutate the DB, so they're gated to logged-in members only.
+        if (!authMember) return;
+        fetch('/api/enrich', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ member: slug }),
+        }).catch(() => {});
+        // Sync good URLs across members once per day
+        const lastSync = localStorage.getItem('last_url_sync');
+        const now = Date.now();
+        if (!lastSync || now - parseInt(lastSync) > 86400000) {
+          fetch('/api/sync-urls', { method: 'POST' }).then(() => localStorage.setItem('last_url_sync', now)).catch(() => {});
+        }
+      });
+      loadShows();
+      // The PWA is retired (the native apps replaced it). Evict any service
+      // worker and cache left over from when it wasn't. /sw.js is now a
+      // tombstone that unregisters itself; this sweep is the belt to that
+      // braces, clearing browsers on this page without waiting for their
+      // next update check.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations()
+          .then(regs => regs.forEach(reg => reg.unregister()))
+          .catch(() => {});
+      }
+      if (window.caches) {
+        caches.keys().then(keys => keys.forEach(k => caches.delete(k))).catch(() => {});
+      }
+    }
+
+    // ── iPad-style sidebar sync (≥1024px split view) ─────────────────
+    // Selection state lives in two places: the segmented control (iPhone
+    // layout) and the sidebar list rows (iPad layout). Keep both in step.
+    function syncListSelection(list) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.list === list));
+      document.querySelectorAll('.side-list-row').forEach(r => r.classList.toggle('selected', r.dataset.list === list));
+    }
+
+    const desktopSplit = window.matchMedia('(min-width: 1024px)');
+    // On the split layout the detail bar titles the open list, like iOS
+    // ("Watching", or "Pat · Watching" on someone else's page); on mobile
+    // it stays "{Name}'s Shows".
+    function updateHeaderTitle() {
+      const el = document.getElementById('appTitle');
+      if (!el || !memberSlug) return;
+      if (desktopSplit.matches) {
+        const mine = authMember && authMember === memberSlug;
+        const listTitle = TAB_LABELS[currentTab] || '';
+        el.textContent = mine ? listTitle : `${memberLabel || memberName} · ${listTitle}`;
+      } else {
+        el.textContent = memberName;
+      }
+    }
+    desktopSplit.addEventListener('change', updateHeaderTitle);
+
+    function updateSideListsHeader() {
+      const el = document.getElementById('sideListsHeader');
+      if (!el || !memberSlug) return;
+      const mine = !!(authMember && authMember === memberSlug);
+      el.textContent = mine
+        ? 'My Shows'
+        : (memberLabel ? `${memberLabel}'s Shows` : 'Shows');
+      // Pinned "Back to My Shows" at the top of the sidebar while browsing
+      // another member's page (logged-in only); hidden on your own page.
+      const back = document.getElementById('sideBackHome');
+      if (back) {
+        back.classList.toggle('hidden', !authMember || mine);
+        const link = document.getElementById('sideBackHomeLink');
+        if (link && authMember) link.href = '/' + authMember;
+      }
+    }
+
+    function renderSideMembers(members) {
+      const list = document.getElementById('sideMembersList');
+      if (!list) return;
+      // Most recently active first — the iPad sidebar's roster order.
+      const sorted = members.slice().sort((a, b) => {
+        const la = a.last_activity_at || '', lb = b.last_activity_at || '';
+        if (la !== lb) return lb.localeCompare(la);
+        return memberActiveCount(b) - memberActiveCount(a);
+      });
+      list.innerHTML = sorted.map(m =>
+        memberRowHtml(m, { selected: m.slug === memberSlug, keepHash: true })
+      ).join('');
+    }
+
+    // ── Account control ──────────────────────────────────────────────
+    // One person-circle button everywhere, like iOS: logged out it opens
+    // the login sheet; logged in it opens a small menu with Log out.
+    let accountMenuEl = null;
+    function accountTapped(e) {
+      const btn = e.currentTarget || e.target;
+      if (authMember) toggleAccountMenu(btn);
+      else login();
+    }
+    function toggleAccountMenu(btn) {
+      if (accountMenuEl) { closeAccountMenu(); return; }
+      const menu = document.createElement('div');
+      menu.className = 'account-menu';
+      const exp = document.createElement('button');
+      exp.type = 'button';
+      exp.innerHTML = 'Export my lists <svg class="ic"><use href="#i-export"/></svg>';
+      // /api/export responds with Content-Disposition: attachment, so a plain
+      // anchor click downloads the .txt file instead of navigating the SPA.
+      exp.addEventListener('click', () => {
+        closeAccountMenu();
+        const a = document.createElement('a');
+        a.href = '/api/export';
+        a.download = '';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
+      menu.appendChild(exp);
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.innerHTML = 'Log out <svg class="ic"><use href="#i-logout"/></svg>';
+      item.addEventListener('click', () => { closeAccountMenu(); logout(); });
+      menu.appendChild(item);
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.style.color = 'var(--danger-deep)';
+      del.textContent = 'Delete account…';
+      del.addEventListener('click', () => { closeAccountMenu(); openDeleteAccountModal(); });
+      menu.appendChild(del);
+      document.body.appendChild(menu);
+      const r = btn.getBoundingClientRect();
+      menu.style.top = (r.bottom + 6) + 'px';
+      // Hang from the button's right edge, but keep the menu on-screen for
+      // buttons near the left (sidebar) edge.
+      menu.style.right = Math.max(8, Math.min(window.innerWidth - r.right, window.innerWidth - 190)) + 'px';
+      accountMenuEl = menu;
+      setTimeout(() => document.addEventListener('click', accountMenuOutside), 0);
+    }
+    function accountMenuOutside(e) {
+      if (accountMenuEl && !accountMenuEl.contains(e.target)) closeAccountMenu();
+    }
+    function closeAccountMenu() {
+      if (accountMenuEl) accountMenuEl.remove();
+      accountMenuEl = null;
+      document.removeEventListener('click', accountMenuOutside);
+    }
+
+    // Keyboard shortcuts (member page only):
+    //   /    focus search
+    //   1-4  switch tabs in order (Watching, Waiting, Loved, Next Up)
+    //   n    open Add Show modal (own page, logged in)
+    //   Esc  close any open modal
+    document.addEventListener('keydown', (e) => {
+      // Esc works even from inside inputs — that's the universal "get me out" key.
+      if (e.key === 'Escape') {
+        const open = document.querySelectorAll('.modal-overlay:not(.hidden)');
+        if (open.length > 0) {
+          open.forEach(o => o.classList.add('hidden'));
+          e.preventDefault();
+        }
+        return;
+      }
+      // Skip the rest while typing in a field.
+      const tag = (e.target.tagName || '').toLowerCase();
+      const isTyping = tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable;
+      if (isTyping) return;
+      // Don't hijack browser/system shortcuts.
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Only meaningful on a member page (showPage visible).
+      const showPage = document.getElementById('showPage');
+      if (!showPage || showPage.classList.contains('hidden')) return;
+      // Don't fire when any modal is open.
+      if (document.querySelector('.modal-overlay:not(.hidden)')) return;
+
+      if (e.key === '/') {
+        openSearchModal();
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'n' || e.key === 'N') {
+        if (authMember && authMember === memberSlug) {
+          openAddModal();
+          e.preventDefault();
+        }
+        return;
+      }
+      if (['1', '2', '3', '4'].includes(e.key)) {
+        const tab = ['watching', 'waiting', 'recommending', 'next'][parseInt(e.key, 10) - 1];
+        switchTab(tab);
+        e.preventDefault();
+      }
+    });
+
+    // Header login button: visible only when logged out. Once logged in, the
+    // Log out button takes over; per-row actions show inline on your own page
+    // (no edit-mode toggle needed).
+    // Landing join pitch: shown to every logged-out visitor. Signing up is
+    // the only way to become a member, so it is always the right offer.
+    function maybeShowJoinCta() {
+      const cta = document.getElementById('joinCta');
+      if (!cta) return;
+      if (authMember) { cta.classList.add('hidden'); return; }
+      cta.classList.remove('hidden');
+      const loginRowLabel = document.querySelector('#homeLoginRow .ios-item-label');
+      if (loginRowLabel) loginRowLabel.textContent = 'Log in or sign up';
+    }
+
+    function updateLoginBtnLabel() {
+      const btn = document.getElementById('loginBtn');
+      if (!btn) return;
+      if (!authMember) {
+        btn.textContent = 'Log in';
+        btn.title = 'Log in to edit your shows';
+        btn.classList.remove('hidden', 'active');
+      } else {
+        btn.classList.add('hidden');
+        btn.classList.remove('active');
+      }
+    }
+
+    async function checkAuth() {
+      try {
+        const res = await fetch('/auth/check', { headers: clientPlatformHeader() });
+        const data = await res.json();
+        if (data.authenticated) {
+          editorName = data.email || '';
+          authMember = data.member;
+          // Vibe nav rows are personal: only for logged-in members, opening
+          // their own vibe (the page's picker still reaches everyone else's).
+          if (authMember) {
+            document.querySelectorAll('.vibe-row').forEach(a => {
+              a.href = '/vibe?member=' + encodeURIComponent(authMember);
+              a.classList.remove('hidden');
+            });
+          }
+          // Surface the Admin rows in the Home list and sidebar only
+          // when this session belongs to the operator. /auth/check sets
+          // is_admin server-side, so we don't have to hardcode the slug here.
+          if (data.is_admin) {
+            document.querySelectorAll('.side-admin-reporting, .side-admin-members, .side-admin-cleanup, .side-admin-vibe').forEach(el => el.classList.remove('hidden'));
+          }
+          // Home: swap the login row for My Shows — a single row on small
+          // screens, the four lists (iPad sidebar) on the split view.
+          const myShowsLink = document.getElementById('myShowsLink');
+          if (myShowsLink && authMember) {
+            myShowsLink.href = `/${authMember}`;
+            myShowsLink.classList.remove('hidden');
+          }
+          if (authMember) {
+            const listsHeader = document.getElementById('homeListsHeader');
+            if (listsHeader) listsHeader.classList.remove('hidden');
+            document.querySelectorAll('.home-list-row').forEach(r => {
+              r.href = `/${authMember}#${r.dataset.list}`;
+              r.classList.remove('hidden');
+            });
+            // Subscription audit and Rate my backlog are personal —
+            // surfaced in the Home sidebar once you're logged in.
+            document.querySelectorAll('.home-subs-row').forEach(r => r.classList.remove('hidden'));
+            document.querySelectorAll('.home-ratebacklog-row').forEach(r => r.classList.remove('hidden'));
+          }
+          const homeLoginRow = document.getElementById('homeLoginRow');
+          if (homeLoginRow && authMember) homeLoginRow.classList.add('hidden');
+          // On the user's own member page, expose the Add button immediately —
+          // no need to enter edit mode just to add a show.
+          if (authMember && typeof memberSlug !== 'undefined' && authMember === memberSlug) {
+            const addBtn = document.getElementById('addBtn');
+            if (addBtn) addBtn.classList.remove('hidden');
+            // Subscription audit and Rate my backlog are personal — only on
+            // your own page. Shown both under the list (mobile) and in the
+            // sidebar (split view).
+            const subsLink = document.getElementById('subscriptionsLink');
+            if (subsLink) subsLink.classList.remove('hidden');
+            document.querySelectorAll('.member-subs-row').forEach(r => r.classList.remove('hidden'));
+            const rateBacklogLink = document.getElementById('rateBacklogLink');
+            if (rateBacklogLink) rateBacklogLink.classList.remove('hidden');
+            document.querySelectorAll('.member-ratebacklog-row').forEach(r => r.classList.remove('hidden'));
+          }
+          const logoutBtn = document.getElementById('logoutBtn');
+          if (logoutBtn) logoutBtn.classList.remove('hidden');
+        }
+      } catch (e) {}
+      updateLoginBtnLabel();
+      updateSideListsHeader();
+      updateHeaderTitle();
+    }
+
+    function login() {
+      // Already logged in and clicked Log in from the landing page → go
+      // straight to their own member page.
+      if (authMember && !memberSlug) {
+        window.location.href = '/' + authMember;
+        return;
+      }
+      // Logged-in users on a member page never see the login button (it
+      // hides), so this only fires for truly logged-out clicks.
+      openLoginModal();
+    }
+
+    async function logout() {
+      try {
+        // POST /auth/logout deletes the session row and 302s back; we don't
+        // follow the redirect, we just refresh state in place so the user
+        // stays on the page they were viewing. (POST, not GET, so a cross-site
+        // link can't log members out.)
+        await fetch('/auth/logout', { method: 'POST', redirect: 'manual' });
+      } catch {}
+      authMember = null;
+      editorName = '';
+      closeAccountMenu();
+      const logoutBtn = document.getElementById('logoutBtn');
+      if (logoutBtn) logoutBtn.classList.add('hidden');
+      const addBtn = document.getElementById('addBtn');
+      if (addBtn) addBtn.classList.add('hidden');
+      const myShowsLink = document.getElementById('myShowsLink');
+      if (myShowsLink) myShowsLink.classList.add('hidden');
+      const listsHeader = document.getElementById('homeListsHeader');
+      if (listsHeader) listsHeader.classList.add('hidden');
+      document.querySelectorAll('.home-list-row').forEach(r => r.classList.add('hidden'));
+      const homeLoginRow = document.getElementById('homeLoginRow');
+      if (homeLoginRow) homeLoginRow.classList.remove('hidden');
+      const subsLink = document.getElementById('subscriptionsLink');
+      if (subsLink) subsLink.classList.add('hidden');
+      document.querySelectorAll('.home-subs-row, .member-subs-row').forEach(r => r.classList.add('hidden'));
+      const rateBacklogLink = document.getElementById('rateBacklogLink');
+      if (rateBacklogLink) rateBacklogLink.classList.add('hidden');
+      document.querySelectorAll('.home-ratebacklog-row, .member-ratebacklog-row').forEach(r => r.classList.add('hidden'));
+      document.querySelectorAll('.vibe-row, .calendar-feed-row').forEach(r => r.classList.add('hidden'));
+      document.querySelectorAll('.side-admin-reporting, .side-admin-members, .side-admin-cleanup, .side-admin-vibe').forEach(el => el.classList.add('hidden'));
+      updateLoginBtnLabel();
+      updateSideListsHeader();
+      updateHeaderTitle();
+      maybeShowJoinCta();
+      if (typeof renderShows === 'function' && typeof shows !== 'undefined') renderShows();
+    }
+
+    // ---- Log in / sign up flow ----
+    // Identifier-first, one decision per screen. State machine over the
+    // .login-step divs; /auth/config decides which buttons exist (Google,
+    // signup wording, Turnstile).
+    let loginState = { step: 'choose', channel: null, email: '', phone: '', appleToken: null, googleCredential: null };
+    let authConfig = null;
+    let turnstileWidget = null;
+
+    async function loadAuthConfig() {
+      if (authConfig) return authConfig;
+      try {
+        const res = await fetch('/auth/config');
+        authConfig = await res.json();
+      } catch { authConfig = { google_client_id: null, turnstile_site_key: null }; }
+      return authConfig;
+    }
+
+    // GA4 sign_up conversion, fired only when the server says the login
+    // actually created an account (enrolled: true). Beacon transport so the
+    // hit survives finishLogin's immediate navigation to the member page.
+    function trackSignup(method) {
+      try {
+        if (typeof gtag === 'function') gtag('event', 'sign_up', { method, transport_type: 'beacon' });
+      } catch {}
+    }
+
+    function loginShowStep(step) {
+      loginState.step = step;
+      document.querySelectorAll('#loginOverlay .login-step').forEach(el => el.classList.add('hidden'));
+      const stepEl = document.getElementById('loginStep' + step.charAt(0).toUpperCase() + step.slice(1));
+      if (stepEl) stepEl.classList.remove('hidden');
+      document.getElementById('loginErr').style.display = 'none';
+      document.getElementById('loginBackBtn').classList.toggle('hidden', step === 'choose');
+      const focusTarget = { email: 'loginEmail', phone: 'loginPhone', code: 'loginCode', name: 'loginFullName' }[step];
+      if (focusTarget) setTimeout(() => document.getElementById(focusTarget).focus(), 50);
+    }
+
+    function loginBack() {
+      // From the code screen, go back to whichever identifier screen sent it;
+      // from anywhere else, back to the channel chooser.
+      if (loginState.step === 'code' && (loginState.channel === 'email' || loginState.channel === 'phone')) {
+        loginShowStep(loginState.channel);
+      } else {
+        loginShowStep('choose');
+      }
+    }
+
+    function loginChoose(channel) {
+      loginState.channel = channel;
+      loginShowStep(channel);
+      if (channel === 'email') mountTurnstile();
+    }
+
+    async function openLoginModal() {
+      document.getElementById('loginOverlay').classList.remove('hidden');
+      loginState = { step: 'choose', channel: null, email: '', phone: '', appleToken: null, googleCredential: null };
+      ['loginCode', 'loginEmail', 'loginPhone', 'loginFullName'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      loginShowStep('choose');
+      const cfg = await loadAuthConfig();
+      // Every visitor can sign up, so the modal always says so and always
+      // carries the terms line.
+      document.getElementById('loginTitle').textContent = 'Log in or sign up';
+      document.getElementById('loginTermsLine').classList.remove('hidden');
+      mountGoogleButton(cfg);
+    }
+
+    function closeLoginModal(e) {
+      if (e && e.target !== e.currentTarget) return;
+      document.getElementById('loginOverlay').classList.add('hidden');
+    }
+
+    function showLoginError(msg) {
+      const el = document.getElementById('loginErr');
+      el.textContent = msg;
+      el.style.display = '';
+    }
+
+    // ---- Google (web only; needs GOOGLE_CLIENT_ID configured) ----
+    let googleScriptLoading = false;
+    function mountGoogleButton(cfg) {
+      const wrap = document.getElementById('googleBtnWrap');
+      if (!cfg.google_client_id) { wrap.classList.add('hidden'); return; }
+      wrap.classList.remove('hidden');
+      const render = () => {
+        if (!window.google || !google.accounts || wrap.dataset.rendered) return;
+        google.accounts.id.initialize({
+          client_id: cfg.google_client_id,
+          callback: onGoogleCredential,
+        });
+        // Pill + width matched to the stack so the iframe button lines up
+        // with the custom ones (GIS caps width at 400).
+        const w = Math.min(340, Math.max(200, wrap.clientWidth || 340));
+        google.accounts.id.renderButton(wrap, { theme: 'outline', size: 'large', text: 'continue_with', shape: 'pill', width: w });
+        wrap.dataset.rendered = '1';
+      };
+      if (window.google && google.accounts) { render(); return; }
+      if (!googleScriptLoading) {
+        googleScriptLoading = true;
+        const sc = document.createElement('script');
+        sc.src = 'https://accounts.google.com/gsi/client';
+        sc.async = true;
+        sc.onload = render;
+        document.head.appendChild(sc);
+      }
+    }
+
+    async function onGoogleCredential(resp) {
+      if (!resp || !resp.credential) return;
+      loginState.channel = 'google';
+      loginState.googleCredential = resp.credential;
+      try {
+        const res = await fetch('/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: resp.credential }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) {
+          if (data.enrolled) trackSignup('google');
+          await finishLogin(!!data.enrolled);
+          return;
+        }
+        if (res.ok && data.needs_name) { loginShowStep('name'); return; }
+        if (res.status === 400) {
+          // Google's account name was only one word (rare) — the server
+          // needs a first and last name, so collect it like a fresh signup.
+          loginShowStep('name');
+          showLoginError('Add your first and last name to finish creating your account.');
+          return;
+        }
+        if (res.status === 401) {
+          showLoginError("That Google account isn't linked to a member. Use the email the group owner has on file, or ask them to add you.");
+        } else {
+          showLoginError('Google sign-in failed. Try email instead.');
+        }
+      } catch { showLoginError('Network error. Try again.'); }
+    }
+
+    // ---- Turnstile (email login + signups; only when TURNSTILE_SITE_KEY is
+    // set). Mounts for any email login now, not just self-enroll signups, so
+    // the server can require a challenge on the request-code form and stop
+    // scripted login-code spam. Native apps can't produce a token, so the
+    // server only enforces it for web (Origin-gated). ----
+    let turnstileScriptLoading = false;
+    function mountTurnstile() {
+      const cfg = authConfig || {};
+      const wrap = document.getElementById('turnstileWrap');
+      if (!cfg.turnstile_site_key || wrap.dataset.rendered) return;
+      const render = () => {
+        if (!window.turnstile || wrap.dataset.rendered) return;
+        turnstileWidget = turnstile.render(wrap, { sitekey: cfg.turnstile_site_key });
+        wrap.dataset.rendered = '1';
+      };
+      if (window.turnstile) { render(); return; }
+      if (!turnstileScriptLoading) {
+        turnstileScriptLoading = true;
+        const sc = document.createElement('script');
+        sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        sc.async = true;
+        sc.onload = render;
+        document.head.appendChild(sc);
+      }
+    }
+
+    // ---- Identifier steps ----
+    async function continueWithEmail() {
+      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showLoginError('Enter a valid email first.');
+        return;
+      }
+      loginState.email = email;
+      const btn = document.getElementById('loginEmailBtn');
+      btn.disabled = true; btn.textContent = 'Sending…';
+      const body = { email };
+      if (turnstileWidget !== null && window.turnstile) {
+        body.turnstile_token = turnstile.getResponse(turnstileWidget) || '';
+      }
+      try {
+        const res = await fetch('/auth/request-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (res.status === 429) { showLoginError('Too many requests. Try again in an hour.'); return; }
+        if (res.status === 403) { showLoginError('Please complete the “I’m human” check and try again.'); return; }
+        if (!res.ok) { showLoginError('Could not send. Try again in a minute.'); return; }
+        document.getElementById('loginCodeSent').textContent = 'We sent a code to ' + email + '.';
+        loginShowStep('code');
+      } catch { showLoginError('Network error. Try again.'); }
+      finally {
+        btn.disabled = false; btn.textContent = 'Continue';
+        if (turnstileWidget !== null && window.turnstile) turnstile.reset(turnstileWidget);
+      }
+    }
+
+    async function continueWithPhone() {
+      const phone = document.getElementById('loginPhone').value.trim();
+      if (!phone || phone.replace(/\D/g, '').length < 7) {
+        showLoginError('Enter your phone number first.');
+        return;
+      }
+      loginState.phone = phone;
+      const btn = document.getElementById('loginPhoneBtn');
+      btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        const res = await fetch('/auth/request-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, channel: 'sms' }),
+        });
+        if (res.status === 429) { showLoginError('Too many requests. Try again in an hour.'); return; }
+        if (res.status === 400) { showLoginError('That doesn’t look like a valid phone number. Check it and try again.'); return; }
+        if (!res.ok) { showLoginError('Could not send. Try again, or contact the group owner.'); return; }
+        document.getElementById('loginCodeSent').textContent = 'We texted a code to ' + phone + '.';
+        loginShowStep('code');
+      } catch { showLoginError('Network error. Try again.'); }
+      finally { btn.disabled = false; btn.textContent = 'Text me a code'; }
+    }
+
+    // ---- Code + (signup) name steps ----
+    async function submitLoginCode() {
+      const code = document.getElementById('loginCode').value.trim();
+      if (code.length < 6) { showLoginError('Enter the 6-digit code.'); return; }
+      const btn = document.getElementById('loginSubmitBtn');
+      btn.disabled = true; btn.textContent = 'Checking…';
+      const body = loginState.channel === 'phone'
+        ? { code, phone: loginState.phone }
+        : { code, email: loginState.email };
+      try {
+        const res = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) { await finishLogin(); return; }
+        // New signup: the code checked out but there's no account yet —
+        // collect a name, then /auth/enroll completes it.
+        if (res.ok && data.needs_name) { loginShowStep('name'); return; }
+        if (res.status === 429) { showLoginError('Too many attempts. Try again in 15 minutes.'); return; }
+        showLoginError('Invalid or expired code.');
+      } catch { showLoginError('Network error. Try again.'); }
+      finally { btn.disabled = false; btn.textContent = 'Continue'; }
+    }
+
+    async function submitEnrollName() {
+      const fullName = document.getElementById('loginFullName').value.trim();
+      if (fullName.split(/\s+/).filter(Boolean).length < 2) { showLoginError('Enter your first and last name.'); return; }
+      const btn = document.getElementById('loginNameBtn');
+      btn.disabled = true; btn.textContent = 'Creating…';
+      let url, body;
+      if (loginState.channel === 'apple') {
+        url = '/auth/apple';
+        body = { identity_token: loginState.appleToken, full_name: fullName };
+      } else if (loginState.channel === 'google') {
+        url = '/auth/google';
+        body = { credential: loginState.googleCredential, full_name: fullName };
+      } else {
+        url = '/auth/enroll';
+        body = { email: loginState.email, code: document.getElementById('loginCode').value.trim(), full_name: fullName };
+      }
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) {
+          if (data.enrolled) trackSignup(loginState.channel || 'email');
+          await finishLogin(!!data.enrolled);
+          return;
+        }
+        if (res.status === 429) { showLoginError('Signups are paused right now. Try again tomorrow.'); return; }
+        showLoginError(data.error === 'already_member'
+          ? 'That email already belongs to a member — go back and log in.'
+          : (typeof data.error === 'string' && data.error.length > 20 ? data.error : 'Could not create your account. Try again.'));
+      } catch { showLoginError('Network error. Try again.'); }
+      finally { btn.disabled = false; btn.textContent = 'Create my account'; }
+    }
+
+    // Auto-submit the moment 6 digits are in, like the iOS app.
+    document.addEventListener('DOMContentLoaded', () => {
+      const codeEl = document.getElementById('loginCode');
+      if (codeEl) codeEl.addEventListener('input', () => {
+        if (codeEl.value.trim().length === 6 && loginState.step === 'code') submitLoginCode();
+      });
+    });
+
+    // ---- Delete account ----
+    function openDeleteAccountModal() {
+      document.getElementById('deleteAccountOverlay').classList.remove('hidden');
+      document.getElementById('deleteStepIntro').classList.remove('hidden');
+      document.getElementById('deleteStepCode').classList.add('hidden');
+      document.getElementById('deleteErr').style.display = 'none';
+      document.getElementById('deleteCode').value = '';
+    }
+    function closeDeleteAccountModal(e) {
+      if (e && e.target !== e.currentTarget) return;
+      document.getElementById('deleteAccountOverlay').classList.add('hidden');
+    }
+    function showDeleteError(msg) {
+      const el = document.getElementById('deleteErr');
+      el.textContent = msg;
+      el.style.display = '';
+    }
+    async function sendDeleteCode() {
+      const btn = document.getElementById('deleteSendBtn');
+      btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        const res = await fetch('/api/account-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.sent) {
+          document.getElementById('deleteStepIntro').classList.add('hidden');
+          document.getElementById('deleteStepCode').classList.remove('hidden');
+          document.getElementById('deleteCodeSent').textContent = 'We emailed a 6-digit code to your address on file.';
+          document.getElementById('deleteErr').style.display = 'none';
+          setTimeout(() => document.getElementById('deleteCode').focus(), 50);
+        } else if (data.error === 'no_email') {
+          showDeleteError('Your account has no email on file — contact the group owner to delete it.');
+        } else if (data.error === 'admin_must_demote_first') {
+          showDeleteError("Admins can't self-delete — hand off admin first.");
+        } else if (res.status === 429) {
+          showDeleteError('Too many codes requested. Try again in an hour.');
+        } else {
+          showDeleteError('Could not send the code. Try again.');
+        }
+      } catch { showDeleteError('Network error. Try again.'); }
+      finally { btn.disabled = false; btn.textContent = 'Email me a deletion code'; }
+    }
+    async function confirmDeleteAccount() {
+      const code = document.getElementById('deleteCode').value.trim();
+      if (code.length < 6) { showDeleteError('Enter the 6-digit code from the email.'); return; }
+      const btn = document.getElementById('deleteConfirmBtn');
+      btn.disabled = true; btn.textContent = 'Deleting…';
+      try {
+        const res = await fetch('/api/account-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.deleted) {
+          window.location.href = '/';
+          return;
+        }
+        showDeleteError(res.status === 429 ? 'Too many attempts. Try again later.' : 'Invalid or expired code.');
+      } catch { showDeleteError('Network error. Try again.'); }
+      finally { btn.disabled = false; btn.textContent = 'Permanently delete my account'; }
+    }
+
+    async function finishLogin(enrolled = false) {
+      closeLoginModal();
+      await checkAuth();
+      // Fresh signups land on /welcome — a stable confirmation URL that
+      // Google Ads' page-based conversion tracking watches (member pages are
+      // per-slug, so they can't serve that role). It forwards to their page.
+      if (enrolled) {
+        window.location.href = '/welcome';
+        return;
+      }
+      // From the landing page (memberSlug is null until we navigate to a
+      // member route), drop the user on their own page so the login feels
+      // like "go to my shows" rather than just "you're now authenticated".
+      if (!memberSlug && authMember) {
+        window.location.href = '/' + authMember;
+        return;
+      }
+      updateLoginBtnLabel();
+      // Re-fetch, not just re-render: the pre-login fetch got a 401, so the
+      // page is holding the members-only prompt with no data.
+      loadShows();
+    }
+
+    // Sign in with Apple (web). Uses a Services ID — NOT the iOS bundle id —
+    // which must be created in the Apple Developer portal with the showpicker.club
+    // domain verified and "https://showpicker.club/" registered as a Return URL,
+    // and added to the APPLE_CLIENT_ID Pages env var. Change this to whatever
+    // Services ID you register.
+    const APPLE_WEB_CLIENT_ID = 'club.showpicker.web';
+    let appleInited = false;
+    function initApple() {
+      if (appleInited || !window.AppleID) return;
+      AppleID.auth.init({
+        clientId: APPLE_WEB_CLIENT_ID,
+        scope: 'name email',
+        redirectURI: window.location.origin + '/',
+        usePopup: true,
+      });
+      appleInited = true;
+    }
+    async function signInWithApple() {
+      initApple();
+      if (!window.AppleID) { showLoginError('Apple sign-in is unavailable right now — use email instead.'); return; }
+      try {
+        const data = await AppleID.auth.signIn();
+        const idToken = data && data.authorization && data.authorization.id_token;
+        if (!idToken) { showLoginError("Apple didn't return a sign-in token. Try again."); return; }
+        loginState.channel = 'apple';
+        loginState.appleToken = idToken;
+        // First-ever authorization is the only time Apple shares the name —
+        // pass it along so new signups skip the name screen.
+        const nm = data.user && data.user.name
+          ? ((data.user.name.firstName || '') + ' ' + (data.user.name.lastName || '')).trim()
+          : '';
+        const body = { identity_token: idToken };
+        if (nm) body.full_name = nm;
+        const res = await fetch('/auth/apple', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (res.ok && payload.success) {
+          if (payload.enrolled) trackSignup('apple');
+          await finishLogin(!!payload.enrolled);
+        } else if (res.ok && payload.needs_name) {
+          loginShowStep('name');
+        } else if (res.status === 400) {
+          // Apple shared only one name component (rare) — fall to the name
+          // screen with what we have pre-filled instead of a dead-end error.
+          loginShowStep('name');
+          document.getElementById('loginFullName').value = nm;
+          showLoginError('Apple only shared part of your name — add your last name too.');
+        } else if (res.status === 401) {
+          showLoginError('That Apple ID isn\'t linked to a member. Choose "Share My Email" with the address the owner has on file, or use email.');
+        } else if (res.status === 429) {
+          showLoginError('Signups are paused right now. Try again tomorrow.');
+        } else {
+          showLoginError('Apple sign-in failed. Try email instead.');
+        }
+      } catch (e) {
+        // Popup closed / user cancelled — stay quiet; surface only real errors.
+        const code = e && e.error;
+        if (code && code !== 'popup_closed_by_user' && code !== 'user_cancelled_authorize' && code !== 'user_trigger_new_signin_flow') {
+          showLoginError('Apple sign-in failed. Try email instead.');
+        }
+      }
+    }
+
+    async function loadShows() {
+      try {
+        const res = await fetch(`/api/shows?member=${memberSlug}`);
+        // Member lists are members-only. Logged out → invite to log in instead
+        // of an empty page.
+        if (res.status === 401) {
+          renderMembersOnly();
+          return;
+        }
+        const data = await res.json();
+        shows = data.shows || [];
+        updateRateBacklogBadge();
+        renderShows();
+      } catch (e) {
+        document.getElementById('loading').textContent = 'Failed to load shows.';
+      }
+    }
+
+    // Logged-out visitor on a member page: show lists need a login.
+    function renderMembersOnly() {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('showList').innerHTML = '';
+      const lc = document.getElementById('listControls');
+      if (lc) lc.classList.add('hidden');
+      const empty = document.getElementById('empty');
+      empty.innerHTML = `<p>Show lists are for club members.</p>
+        <button class="btn btn-save" onclick="login()">Log in</button>`;
+      empty.classList.remove('hidden');
+    }
+
+    // Update "Rate my backlog" badge with count of unrated shows
+    function updateRateBacklogBadge() {
+      if (!shows || !shows.length) return;
+      const unratedCount = shows.filter(s =>
+        ['watching', 'waiting', 'recommending'].includes(s.list) && !s.user_rating
+      ).length;
+
+      const homeBadge = document.getElementById('rateBacklogBadge');
+      const memberBadge = document.getElementById('memberRateBacklogBadge');
+
+      if (unratedCount > 0) {
+        if (homeBadge) homeBadge.textContent = unratedCount;
+        if (memberBadge) memberBadge.textContent = unratedCount;
+      } else {
+        if (homeBadge) homeBadge.textContent = '';
+        if (memberBadge) memberBadge.textContent = '';
+      }
+    }
+
+    const TAB_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved', next: 'Next Up' };
+
+    function updateDesc() {
+      const count = shows.filter(s => s.list === currentTab).length;
+      const desc = SECTION_DESCS[currentTab] + ` (${count} show${count !== 1 ? 's' : ''})`;
+      document.getElementById('sectionDesc').textContent = desc;
+    }
+
+    function updateTabCounts() {
+      document.querySelectorAll('.tab').forEach(t => {
+        t.textContent = TAB_LABELS[t.dataset.list];
+      });
+    }
+
+    function switchTab(list) {
+      // If a show's detail is open, picking a list should jump straight to that
+      // list — otherwise the detail overlay stays on top (it only covers the
+      // detail column on the split view, so the sidebar is still clickable) and
+      // the list change happens invisibly behind it.
+      if (document.getElementById('detailPage').classList.contains('open')) closeDetail();
+      currentTab = list;
+      window.location.hash = list;
+      syncListSelection(list);
+      updateHeaderTitle();
+      updateDesc();
+      renderShows();
+    }
+
+    function renderShows() {
+      updateDesc();
+      updateTabCounts();
+      const container = document.getElementById('showList');
+      const loading = document.getElementById('loading');
+      const empty = document.getElementById('empty');
+      loading.classList.add('hidden');
+
+      // Each list remembers its own sort. Watching and Waiting default to the
+      // "Next episode" premiere date (soonest first); the others default to rating.
+      const savedSort = localStorage.getItem('sort_order_' + currentTab);
+      const dateDefaultTab = currentTab === 'waiting' || currentTab === 'watching';
+      // "My Order" works on any page: on your own it's drag-to-sort; on
+      // someone else's it sorts by THEIR saved arrangement, read-only.
+      const isOwnPage = !!authMember && authMember === memberSlug;
+      const sortOrder = savedSort || (dateDefaultTab ? 'nextup' : 'rating');
+      const manualMode = sortOrder === 'manual';
+      // Drag handles (and saving) only on your own rows.
+      const canDrag = manualMode && isOwnPage;
+      const filtered = shows.filter(s => s.list === currentTab)
+        .sort((a, b) => {
+          if (sortOrder === 'manual') {
+            // My saved drag order; never-placed rows (added since the last
+            // drag) sink to the bottom, rating-sorted.
+            const pa = a.sort_order == null ? Infinity : a.sort_order;
+            const pb = b.sort_order == null ? Infinity : b.sort_order;
+            if (pa !== pb) return pa - pb;
+            return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
+          }
+          if (sortOrder === 'alpha') return (a.title || '').localeCompare(b.title || '');
+          if (sortOrder === 'added') return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+          if (sortOrder === 'nextup') {
+            // next_season_date is ISO (YYYY-MM-DD), so a string compare is
+            // chronological; undated shows sink to the bottom, then rating.
+            const da = a.next_season_date || '9999-12-31';
+            const db = b.next_season_date || '9999-12-31';
+            if (da !== db) return da < db ? -1 : 1;
+            return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
+          }
+          return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
+        });
+      if (filtered.length === 0) {
+        container.innerHTML = '';
+        const isOwn = authMember && authMember === memberSlug;
+        empty.innerHTML = renderEmptyState(currentTab, isOwn, owners);
+        empty.classList.remove('hidden');
+        const lc = document.getElementById('listControls');
+        if (lc) lc.classList.add('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      // Use shared show-renderer.js to render the list for consistency across the app
+      container.innerHTML = renderShowList(filtered, {
+        onClickId: (showId) => openDetail(showId),
+        showRating: true,
+        showChevron: !canDrag,
+        showDragHandle: canDrag,
+        currentTab,
+        showFooter: true,
+        canDrag,
+        owners
+      });
+
+      // Last DOM write is done — now it's safe to wire the ☰ drag handles.
+      if (canDrag) attachDragHandles(container);
+
+      const nextUpOption = dateDefaultTab
+        ? `<option value="nextup"${sortOrder === 'nextup' ? ' selected' : ''}>Sort by Next episode</option>`
+        : '';
+      const sortHtml = `<select class="sort-select" onchange="changeSort(this.value)" aria-label="Sort shows">
+        ${nextUpOption}
+        <option value="rating"${sortOrder === 'rating' ? ' selected' : ''}>Sort by Rating</option>
+        <option value="alpha"${sortOrder === 'alpha' ? ' selected' : ''}>Sort A–Z</option>
+        <option value="added"${sortOrder === 'added' ? ' selected' : ''}>Sort by Date Added</option>
+        <option value="manual"${sortOrder === 'manual' ? ' selected' : ''}>${isOwnPage ? 'My Order (drag to sort)' : `${escapeHtml(owners)}'s Order`}</option>
+      </select>`;
+      const listControls = document.getElementById('listControls');
+      if (listControls) {
+        listControls.innerHTML = sortHtml;
+        listControls.classList.remove('hidden');
+      }
+    }
+
+    // ── "My Order" drag-to-reorder ────────────────────────────────────────
+    // Pointer events (not HTML5 DnD) so the same code works for mouse and
+    // touch. Only the ☰ handle starts a drag — preventDefault there kills
+    // the row's synthetic click, so taps elsewhere still open the detail.
+    function attachDragHandles(container) {
+      container.querySelectorAll('.drag-handle').forEach(h => {
+        // For a real mouse (Safari on Mac especially), canceling pointerdown
+        // does NOT cancel the native mousedown — mouse events aren't
+        // "compatibility" events the way they are for touch — so the
+        // browser's text-selection drag still starts and swallows the
+        // gesture. Cancel the mouse-side events directly.
+        h.addEventListener('mousedown', e => e.preventDefault());
+        h.addEventListener('dragstart', e => e.preventDefault());
+        h.addEventListener('pointerdown', e => startRowDrag(e, container));
+      });
+    }
+
+    // Swallow the single click that a mouse fires after pointerup — without
+    // this, dropping a row on desktop also opens that row's detail screen.
+    function squelchClick(ev) { ev.stopPropagation(); ev.preventDefault(); }
+
+    function startRowDrag(e, container) {
+      e.preventDefault();
+      e.stopPropagation();
+      const row = e.target.closest('.ios-row');
+      if (!row) return;
+      row.classList.add('dragging');
+      // Belt and braces against the browser starting a text selection
+      // mid-drag (the symptom when this goes wrong is selecting titles
+      // instead of moving the row).
+      document.body.classList.add('no-select');
+      const sel = window.getSelection();
+      if (sel) sel.removeAllRanges();
+      const move = ev => {
+        ev.preventDefault();
+        const el = document.elementFromPoint(ev.clientX, ev.clientY);
+        const over = el && el.closest ? el.closest('.ios-row') : null;
+        if (over && over !== row && over.parentElement === row.parentElement) {
+          const r = over.getBoundingClientRect();
+          const before = ev.clientY < r.top + r.height / 2;
+          row.parentElement.insertBefore(row, before ? over : over.nextSibling);
+        }
+        // Keep long lists draggable: creep the page when the pointer rides
+        // the top or bottom edge.
+        if (ev.clientY < 70) window.scrollBy(0, -12);
+        else if (ev.clientY > window.innerHeight - 70) window.scrollBy(0, 12);
+      };
+      const finish = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointercancel', finish);
+        row.classList.remove('dragging');
+        document.body.classList.remove('no-select');
+        // The mouse's post-pointerup click would open the dropped row's
+        // detail; swallow it. The timeout clears the guard on gestures
+        // that end without a click (touch, pointercancel).
+        window.addEventListener('click', squelchClick, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener('click', squelchClick, { capture: true }), 250);
+        saveManualOrder(container);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', finish, { once: true });
+      window.addEventListener('pointercancel', finish, { once: true });
+    }
+
+    async function saveManualOrder(container) {
+      const ids = [...container.querySelectorAll('.ios-row')]
+        .map(r => parseInt((r.id || '').replace('row-', ''), 10))
+        .filter(Number.isInteger);
+      if (!ids.length) return;
+      // Restamp local copies so any re-render keeps this order immediately.
+      ids.forEach((id, pos) => {
+        const s = shows.find(x => x.id === id);
+        if (s) s.sort_order = pos;
+      });
+      try {
+        const res = await fetch('/api/shows/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ list: currentTab, ids }),
+        });
+        if (!res.ok) { failToast(res, 'Couldn’t save your order. Try again.'); return; }
+      } catch (e) {
+        showToast('Couldn’t save your order — check your connection', { tone: 'error' });
+      }
+    }
+
+    function toggleExpand(showId) {
+      const panel = document.getElementById(`actors-${showId}`);
+      const row = document.getElementById(`row-${showId}`);
+      if (!panel) return;
+      const wasOpen = panel.classList.contains('visible');
+      // Collapse any other open row.
+      document.querySelectorAll('.show-actors.visible').forEach(el => el.classList.remove('visible'));
+      document.querySelectorAll('.show-row.expanded').forEach(el => el.classList.remove('expanded'));
+      if (!wasOpen) {
+        panel.classList.add('visible');
+        if (row) row.classList.add('expanded');
+      }
+    }
+
+    // ── Title type-ahead ────────────────────────────────────────────────
+    // As the member types a title, search TMDB (via /api/title-search, which
+    // keeps the token server-side) and let them pick the exact show. The pick
+    // fills the canonical name, sets the Movie flag from TMDB's media type,
+    // and rides along on submit as tmdb_id/tmdb_type so enrichment hits the
+    // exact entry — no after-the-fact title fixing. Free text still works:
+    // no pick simply means the old title-search enrichment path.
+    const titlePickers = {};
+    function attachTitlePicker(inputId, boxId, movieCheckboxId) {
+      const input = document.getElementById(inputId);
+      const box = document.getElementById(boxId);
+      const state = { pick: null, timer: null, seq: 0 };
+      titlePickers[inputId] = state;
+
+      function hide() { box.classList.add('hidden'); box.innerHTML = ''; }
+      state.clear = () => { state.pick = null; clearTimeout(state.timer); hide(); };
+
+      input.addEventListener('input', () => {
+        state.pick = null; // typing again invalidates a previous pick
+        clearTimeout(state.timer);
+        const q = input.value.trim();
+        if (q.length < 2) { hide(); return; }
+        state.timer = setTimeout(() => search(q), 300);
+      });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+
+      async function search(q) {
+        const seq = ++state.seq;
+        try {
+          const res = await fetch(`/api/title-search?q=${encodeURIComponent(q)}`);
+          if (!res.ok) { hide(); return; }
+          const data = await res.json();
+          // Stale response (member kept typing) — a newer search owns the box.
+          if (seq !== state.seq) return;
+          render(data.results || []);
+        } catch { hide(); }
+      }
+
+      function render(results) {
+        if (!results.length) { hide(); return; }
+        box.innerHTML = results.map((r, i) => `
+          <div class="title-suggest-item" data-i="${i}">
+            ${r.poster_url ? `<img src="${safeUrl(r.poster_url)}" alt="" loading="lazy">` : '<div class="title-suggest-empty-poster">🎬</div>'}
+            <div>
+              <div class="title-suggest-name">${escapeHtml(r.title)}</div>
+              <div class="title-suggest-meta">${r.year ? `${r.year} · ` : ''}${r.media_type === 'movie' ? 'Movie' : 'TV series'}</div>
+            </div>
+          </div>`).join('');
+        box.classList.remove('hidden');
+        box.querySelectorAll('.title-suggest-item').forEach(el => {
+          el.addEventListener('click', () => {
+            const r = results[parseInt(el.dataset.i, 10)];
+            state.pick = { tmdb_id: r.tmdb_id, tmdb_type: r.media_type };
+            input.value = r.title;
+            const movieBox = document.getElementById(movieCheckboxId);
+            if (movieBox) movieBox.checked = r.media_type === 'movie';
+            hide();
+          });
+        });
+      }
+    }
+    attachTitlePicker('inputTitle', 'inputTitleSuggest', 'inputMovie');
+
+    function openAddModal() {
+      editingId = null;
+      titlePickers.inputTitle.clear();
+      document.getElementById('modalTitle').textContent = 'Add Show';
+      document.getElementById('modalSave').textContent = 'Add Show';
+      document.getElementById('inputTitle').value = '';
+      document.getElementById('inputNetwork').value = '';
+      document.getElementById('inputNetworkOther').value = '';
+      document.getElementById('inputNetworkOther').style.display = 'none';
+      document.getElementById('inputRecommended').value = '';
+      document.getElementById('inputNotes').value = '';
+      document.getElementById('inputWatchingWith').value = '';
+      document.getElementById('inputMovie').checked = false;
+      document.getElementById('inputFullSeries').checked = false;
+      setSelectedList(currentTab);
+      document.getElementById('modalOverlay').classList.remove('hidden');
+      document.getElementById('inputTitle').focus();
+    }
+
+    function openEditModal(showId) {
+      const show = shows.find(s => s.id === showId);
+      if (!show) return;
+      editingId = showId;
+      titlePickers.inputTitle.clear();
+      document.getElementById('modalTitle').textContent = 'Edit Show';
+      document.getElementById('modalSave').textContent = 'Save Changes';
+      document.getElementById('inputTitle').value = show.title;
+      const networkSelect = document.getElementById('inputNetwork');
+      const networkOther = document.getElementById('inputNetworkOther');
+      if (show.network && !Array.from(networkSelect.options).some(o => o.value === show.network)) {
+        networkSelect.value = '__other';
+        networkOther.value = show.network;
+        networkOther.style.display = 'block';
+      } else {
+        networkSelect.value = show.network || '';
+        networkOther.value = '';
+        networkOther.style.display = 'none';
+      }
+      document.getElementById('inputRecommended').value = show.recommended_by || '';
+      document.getElementById('inputNotes').value = show.notes || '';
+      document.getElementById('inputWatchingWith').value = show.watching_with || '';
+      document.getElementById('inputMovie').checked = !!show.movie;
+      document.getElementById('inputFullSeries').checked = !!show.full_series;
+      setSelectedList(show.list);
+      document.getElementById('modalOverlay').classList.remove('hidden');
+      document.getElementById('inputTitle').focus();
+    }
+
+    function closeModal(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('modalOverlay').classList.add('hidden');
+    }
+
+
+    async function saveShow() {
+      const title = document.getElementById('inputTitle').value.trim();
+      if (!title) { showToast('Title is required', { tone: 'error' }); return; }
+      const wasEditing = !!editingId;
+
+      const body = {
+        title,
+        network: getNetwork('inputNetwork', 'inputNetworkOther'),
+        recommended_by: document.getElementById('inputRecommended').value.trim() || null,
+        notes: document.getElementById('inputNotes').value.trim() || null,
+        watching_with: document.getElementById('inputWatchingWith').value.trim() || null,
+        movie: document.getElementById('inputMovie').checked ? 1 : 0,
+        full_series: document.getElementById('inputFullSeries').checked ? 1 : 0,
+        list: getSelectedList(),
+      };
+      // Member picked the show from type-ahead — enrich that exact entry.
+      const titlePick = titlePickers.inputTitle.pick;
+      if (titlePick) {
+        body.tmdb_id = titlePick.tmdb_id;
+        body.tmdb_type = titlePick.tmdb_type;
+      }
+
+      try {
+        let res;
+        if (editingId) {
+          res = await fetch(`/api/shows/${editingId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+        } else {
+          const checkRes = await fetch(`/api/shows/check?title=${encodeURIComponent(title)}&member=${memberSlug}`);
+          const check = await checkRes.json();
+          if (check.exists) {
+            if (check.archived) {
+              const restore = confirm(`"${title}" is already in the database but not on any list. Add it to ${body.list}?`);
+              if (!restore) return;
+              res = await fetch(`/api/shows/${check.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...body, archived: 0 }),
+              });
+            } else {
+              showToast(`"${title}" is already on the ${LIST_LABELS[check.list] || check.list} list.`, { tone: 'error' });
+              return;
+            }
+          } else {
+            res = await fetch('/api/shows', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            });
+          }
+        }
+        if (!res.ok) {
+          const err = await res.json();
+          if (err.error === 'exists_archived') {
+            const restore = confirm(`IMDB knows this as "${err.title}" and it's already in the database but not on any list. Add it to ${body.list}?`);
+            if (restore) {
+              res = await fetch(`/api/shows/${err.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...body, title: err.title, archived: 0 }),
+              });
+              if (!res.ok) { failToast(res, 'Failed to restore'); return; }
+            } else { return; }
+          } else if (err.error === 'exists_active') {
+            showToast(`IMDB knows this as "${err.title}". Already on the ${LIST_LABELS[err.list] || err.list} list.`, { tone: 'error' });
+            return;
+          } else {
+            // Translate server codes; never show a raw one like "rate_limited".
+            failToast(res, err.error === 'rate_limited'
+              ? 'Daily add limit reached. Try again tomorrow.'
+              : 'Failed to save. Try again.');
+            return;
+          }
+        }
+        const saved = await res.json();
+        closeModal();
+        if (editingId) {
+          const idx = shows.findIndex(s => s.id === editingId);
+          if (idx !== -1) shows[idx] = saved.show;
+        } else {
+          shows.push(saved.show);
+        }
+        renderShows();
+        showToast(wasEditing ? 'Saved changes' : `Added "${saved.show.title}"`);
+      } catch (e) {
+        showToast('Network error. Try again.', { tone: 'error' });
+      }
+    }
+
+    async function moveShow(showId, newList, opts = {}) {
+      if (!newList) return;
+      const show = shows.find(s => s.id === showId);
+      if (!show) return;
+      const oldList = show.list;
+      try {
+        const res = await fetch(`/api/shows/${showId}/move`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ list: newList }),
+        });
+        if (res.ok) {
+          show.list = newList;
+          renderShows();
+          if (!opts.silent) {
+            showToast(`Moved to ${LIST_LABELS[newList] || newList}`, {
+              action: { label: 'Undo', onClick: () => moveShow(showId, oldList, { silent: true }) },
+            });
+          }
+        } else {
+          failToast(res, 'Failed to move show');
+        }
+      } catch (e) {
+        showToast('Network error. Try again.', { tone: 'error' });
+      }
+    }
+
+    async function archiveShow(showId) {
+      const show = shows.find(s => s.id === showId);
+      if (!show) return;
+      const savedShow = { ...show };
+      try {
+        const res = await fetch(`/api/shows/${showId}/archive`, { method: 'PUT' });
+        if (res.ok) {
+          shows = shows.filter(s => s.id !== showId);
+          renderShows();
+          showToast(`Archived "${show.title}"`, {
+            action: { label: 'Undo', onClick: () => unarchiveShow(showId, savedShow) },
+          });
+        } else {
+          failToast(res, 'Failed to archive show');
+        }
+      } catch (e) {
+        showToast('Network error. Try again.', { tone: 'error' });
+      }
+    }
+
+    async function unarchiveShow(showId, savedShow) {
+      try {
+        const res = await fetch(`/api/shows/${showId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ archived: 0 }),
+        });
+        if (res.ok) {
+          shows.push(savedShow);
+          renderShows();
+          showToast(`Restored "${savedShow.title}"`);
+        } else {
+          failToast(res, 'Failed to restore show');
+        }
+      } catch (e) {
+        showToast('Network error. Try again.', { tone: 'error' });
+      }
+    }
+
+    let searchableShows = [];
+
+    async function openSearchModal() {
+      searchMode = 'member';
+      const overlay = document.getElementById('searchOverlay');
+      document.getElementById('searchTitleInput').value = '';
+      document.getElementById('searchActorInput').value = '';
+      document.getElementById('searchModalTitle').textContent = `Search ${memberName || 'these shows'}`;
+      document.getElementById('searchResults').innerHTML = '<div class="search-empty">Loading…</div>';
+      overlay.classList.remove('hidden');
+
+      try {
+        const res = await fetch(`/api/shows?member=${encodeURIComponent(memberSlug)}&include_archived=1`);
+        if (res.status === 401) {
+          document.getElementById('searchResults').innerHTML = '<div class="search-empty">Log in to search show lists.</div>';
+          return;
+        }
+        const data = await res.json();
+        searchableShows = data.shows || [];
+        renderSearchResults();
+      } catch (e) {
+        document.getElementById('searchResults').innerHTML = '<div class="search-empty" style="color:var(--danger);">Failed to load shows.</div>';
+      }
+      setTimeout(() => document.getElementById('searchTitleInput').focus(), 50);
+    }
+
+    async function openLandingSearchModal() {
+      searchMode = 'all';
+      const overlay = document.getElementById('searchOverlay');
+      document.getElementById('searchTitleInput').value = '';
+      document.getElementById('searchActorInput').value = '';
+      document.getElementById('searchModalTitle').textContent = 'Search all libraries';
+      document.getElementById('searchResults').innerHTML = '<div class="search-empty">Loading…</div>';
+      overlay.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/shows/all');
+        if (res.status === 401) {
+          document.getElementById('searchResults').innerHTML = '<div class="search-empty">Log in to search show lists.</div>';
+          return;
+        }
+        const data = await res.json();
+        searchableShows = data.shows || [];
+        renderSearchResults();
+      } catch (e) {
+        document.getElementById('searchResults').innerHTML = '<div class="search-empty" style="color:var(--danger);">Failed to load shows.</div>';
+      }
+      setTimeout(() => document.getElementById('searchTitleInput').focus(), 50);
+    }
+
+    function closeSearchModal(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('searchOverlay').classList.add('hidden');
+    }
+
+    function renderSearchResults() {
+      const titleQ = document.getElementById('searchTitleInput').value.trim().toLowerCase();
+      const actorQ = document.getElementById('searchActorInput').value.trim().toLowerCase();
+      const container = document.getElementById('searchResults');
+
+      if (!titleQ && !actorQ) {
+        container.innerHTML = '<div class="search-empty">Type to search.</div>';
+        return;
+      }
+
+      const matches = searchableShows.filter(show => {
+        const titleHit = !titleQ || (show.title || '').toLowerCase().includes(titleQ);
+        const actorHit = !actorQ || actorNamesText(show.actors).toLowerCase().includes(actorQ);
+        return titleHit && actorHit;
+      });
+
+      if (matches.length === 0) {
+        const where = searchMode === 'all' ? 'across club libraries' : 'in this library';
+        container.innerHTML = `<div class="search-empty">No matches ${where}.</div>`;
+        return;
+      }
+
+      const labelFor = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved', next: 'Next Up' };
+
+      const meta = `<div class="search-meta">${matches.length} match${matches.length === 1 ? '' : 'es'}</div>`;
+      container.innerHTML = meta + matches.map(show => {
+        const list = show.archived ? 'Archived' : (labelFor[show.list] || show.list);
+        const memberTag = searchMode === 'all'
+          ? ` · ${escapeHtml(show.member_first_name || (show.member_name || '').split(' ')[0] || show.member_slug)}`
+          : '';
+        // The caption carries what search adds over a plain list row: which
+        // list the copy is on, and (in all-libraries mode) whose it is.
+        const captionParts = [];
+        if (show.network) captionParts.push(escapeHtml(show.network));
+        captionParts.push(`${escapeHtml(list)}${memberTag}`);
+        const addBtn = searchMode === 'all'
+          ? `<button class="search-add-btn" data-add-idx="${show.id}" title="Add to my list">+</button>`
+          : '';
+        return renderShowCard(show, {
+          onClickId: openDetail,
+          showRating: true,
+          showChevron: false,
+          caption: captionParts.join(' · '),
+          prefixHtml: addBtn,
+        });
+      }).join('');
+
+      if (searchMode === 'all') {
+        container.querySelectorAll('button[data-add-idx]').forEach(btn => {
+          const id = parseInt(btn.dataset.addIdx, 10);
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!authMember) {
+              showToast('Log in on your member page first to add shows', { tone: 'error' });
+              return;
+            }
+            const s = searchableShows.find(x => x.id === id);
+            if (!s) return;
+            closeSearchModal();
+            openAddMyList(s.title, s.network || '', s.network_url || '', s.movie || 0);
+          });
+        });
+      }
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const [y, m, d] = dateStr.split('-');
+      return `${parseInt(m)}/${parseInt(d)}`;
+    }
+
+    let addMyListData = null;
+
+    async function openAddMyList(title, network, networkUrl, movie) {
+      addMyListData = { title, network, network_url: networkUrl, movie };
+      document.getElementById('addMyTitle').value = title;
+      document.getElementById('addMyList').value = 'watching';
+      document.getElementById('addMyNotes').value = '';
+
+      // Try to get TMDB suggestion if no network was provided
+      if (!network && title) {
+        try {
+          const res = await fetch('/api/shows/suggest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, movie: !!movie }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.suggestedNetwork) {
+              addMyListData.network = data.suggestedNetwork;
+              addMyListData.tmdb_id = data.tmdbId;
+              addMyListData.tmdb_type = data.tmdbType;
+            }
+          }
+        } catch (e) {
+          // Silently fail — the form still works without the suggestion
+        }
+      }
+
+      // Update network dropdown with suggestion
+      const networkSelect = document.getElementById('inputNetwork');
+      const networkOther = document.getElementById('inputNetworkOther');
+      if (addMyListData.network && !Array.from(networkSelect.options).some(o => o.value === addMyListData.network)) {
+        networkSelect.value = '__other';
+        networkOther.value = addMyListData.network;
+        networkOther.style.display = 'block';
+      } else {
+        networkSelect.value = addMyListData.network || '';
+        networkOther.value = '';
+        networkOther.style.display = 'none';
+      }
+
+      document.getElementById('addMyListOverlay').classList.remove('hidden');
+    }
+
+    function closeAddMyList(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('addMyListOverlay').classList.add('hidden');
+    }
+
+    async function submitAddMyList() {
+      if (!authMember || !addMyListData) return;
+      const list = document.getElementById('addMyList').value;
+      const notes = document.getElementById('addMyNotes').value.trim() || null;
+      const networkSelect = document.getElementById('inputNetwork');
+      const networkOther = document.getElementById('inputNetworkOther');
+      const selectedNetwork = getNetwork('inputNetwork', 'inputNetworkOther');
+
+      try {
+        const res = await fetch('/api/shows', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: addMyListData.title,
+            network: selectedNetwork || null,
+            network_url: addMyListData.network_url || null,
+            notes,
+            movie: addMyListData.movie || 0,
+            full_series: 0,
+            list,
+            tmdb_id: addMyListData.tmdb_id || null,
+            tmdb_type: addMyListData.tmdb_type || null,
+          }),
+        });
+        const data = await res.json();
+        if (res.status === 409) {
+          closeAddMyList();
+          showToast(
+            data.error === 'exists_archived'
+              ? 'You had this one but archived it.'
+              : `Already on your ${LIST_LABELS[data.list] || data.list} list.`,
+            { tone: 'error' }
+          );
+        } else if (data.show) {
+          closeAddMyList();
+          showToast(`Added to your ${LIST_LABELS[list] || list} list`);
+        } else {
+          failToast(res, data.error === 'rate_limited'
+            ? 'Daily add limit reached. Try again tomorrow.'
+            : 'Failed to add. Try again.');
+        }
+      } catch (e) {
+        showToast('Network error. Try again.', { tone: 'error' });
+      }
+    }
+
+
+    function timeAgo(dateStr) {
+      const now = new Date();
+      const then = new Date(dateStr + 'Z');
+      const mins = Math.floor((now - then) / 60000);
+      if (mins < 1) return 'just now';
+      if (mins < 60) return `${mins}m ago`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return `${hrs}h ago`;
+      const days = Math.floor(hrs / 24);
+      if (days === 1) return 'yesterday';
+      if (days < 7) return `${days}d ago`;
+      return `${Math.floor(days / 7)}w ago`;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      // Encode quotes too — output is interpolated into HTML *attribute*
+      // values (href, title, data-*), where unescaped " or ' breaks out.
+      return String(str).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    // Allow only http(s) URLs into href/src attributes. Blocks javascript:,
+    // data:, and other script-bearing schemes from member-supplied
+    // network_url. Output is HTML-escaped because every call site
+    // interpolates it into an attribute value — a stored quote must not
+    // close the attribute and start an inline event handler.
+    function safeUrl(url) {
+      if (!url || typeof url !== 'string') return '#';
+      const t = url.trim();
+      return /^https?:\/\//i.test(t) ? escapeHtml(t) : '#';
+    }
+
+    // Click the detail poster to view it full screen; click anywhere (or hit
+    // Escape) to send it back to the thumbnail.
+    function togglePosterLightbox(img) {
+      const existing = document.querySelector('.poster-lightbox');
+      if (existing) { existing.remove(); return; }
+      const box = document.createElement('div');
+      box.className = 'poster-lightbox';
+      const big = document.createElement('img');
+      big.src = img.src;
+      big.alt = '';
+      box.appendChild(big);
+      box.addEventListener('click', () => box.remove());
+      document.body.appendChild(box);
+    }
+    function closePosterLightbox() {
+      const box = document.querySelector('.poster-lightbox');
+      if (box) box.remove();
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { closeModal(); closeAddMyList(); closePosterLightbox(); }
+    });
+  </script>
+
+  <!-- ===========================================================
+       iOS-style show detail screen. Tapping any show (member list,
+       popular, or picks) pushes this view instead of expanding the
+       row inline, mirroring the native ShowDetailView. Reuses the
+       existing globals (shows, authMember, moveShow, archiveShow,
+       openEditModal, showToast, safeUrl, …).
+       =========================================================== -->
+  <script>
+    let detailShow = null;
+    let detailActors = [];
+    // My own row for the open show (active or archived), so the detail's
+    // actions manage MY copy — not whatever copy opened the screen.
+    let detailMyCopy = null;
+    // { average, count, seasons, mine, mineSeasons, owner, ownerSeasons,
+    //   ownerName } from GET /api/shows/:id — see functions/_shared/ratings.js.
+    let detailRatings = null;
+    // True when the open show was reached via a ?show=<id> deep link (e.g.
+    // from rate-backlog.html) rather than a click within this page — so
+    // there's no "list underneath" the overlay actually came from. Set
+    // fresh on every openDetail() call; see detailBack().
+    let detailFromDeepLink = false;
+    const ALL_LISTS = ['watching', 'waiting', 'recommending', 'next'];
+
+    // Repoint the old inline-expand entry point at the detail screen so every
+    // existing onclick="toggleExpand(id)" now opens the pushed view.
+    function toggleExpand(id) { openDetail(id); }
+
+    // 10-segment tap-row for entering a 1-10 rating — not a slider or numeric
+    // field, tap a position and it saves instantly (see detailRate below).
+    // `season` is null for the overall rating, or a season number.
+    // Minutes → "1h 52m" / "45m".
+    function detailPromotions(list) {
+      if (list === 'watching') return [{ label: 'Watched it → Loved', target: 'recommending' }, { label: 'Season done → Awaiting', target: 'waiting' }];
+      if (list === 'waiting') return [{ label: "It's back → Watching", target: 'watching' }];
+      if (list === 'recommending') return [{ label: 'Watch again → Watching', target: 'watching' }];
+      if (list === 'next') return [{ label: 'Start watching', target: 'watching' }];
+      return [];
+    }
+
+    async function openDetail(id, fromDeepLink) {
+      detailFromDeepLink = !!fromDeepLink;
+      const page = document.getElementById('detailPage');
+      const body = document.getElementById('detailBody');
+      document.getElementById('detailNavTitle').textContent = '';
+      body.innerHTML = '<div class="loading">Loading…</div>';
+      page.classList.add('open');
+      document.body.style.overflow = 'hidden';
+
+      let show = (typeof shows !== 'undefined' && shows.find) ? shows.find(s => s.id === id) : null;
+      let ratings = null;
+      try {
+        const res = await fetch('/api/shows/' + id);
+        if (res.ok) { const d = await res.json(); if (d.show) show = d.show; ratings = d.ratings || null; }
+      } catch {}
+      if (!show) { body.innerHTML = '<div class="loading">Couldn’t load this show.</div>'; return; }
+
+      let actors = [];
+      try {
+        const ar = await fetch('/api/shows/' + id + '/actors');
+        if (ar.ok) { const ad = await ar.json(); actors = ad.actors || []; }
+      } catch {}
+      detailShow = show;
+      await resolveMyCopy();
+      renderDetail(show, actors, ratings);
+    }
+
+    // Find my own row for the open title (active or archived) so the detail
+    // reflects — and acts on — MY copy regardless of whose copy opened it.
+    async function resolveMyCopy() {
+      detailMyCopy = null;
+      if (!authMember || !detailShow) return;
+      try {
+        const res = await fetch(`/api/shows?member=${encodeURIComponent(authMember)}&include_archived=1`);
+        if (!res.ok) return;
+        const d = await res.json();
+        const t = (detailShow.title || '').toLowerCase();
+        detailMyCopy = (d.shows || []).find(s => (s.title || '').toLowerCase() === t) || null;
+      } catch {}
+    }
+
+    function renderDetail(show, actors, ratings) {
+      detailShow = show;
+      detailActors = actors || [];
+      // Render from the persisted value below, not just this call's argument —
+      // reRenderDetail() (called after every list move/add/archive) re-renders
+      // without a fresh ratings fetch, and without this the whole Ratings
+      // section would vanish on every such re-render.
+      if (ratings !== undefined) detailRatings = ratings;
+      document.getElementById('detailNavTitle').textContent = show.title;
+      // The body itself is shared with the groups page (show-renderer.js) so
+      // the two detail screens can't drift apart. Edit/Archive are ours only:
+      // they open this page's edit modal.
+      document.getElementById('detailBody').innerHTML = renderShowDetailBody(show, {
+        actors: detailActors,
+        loggedIn: !!authMember,
+        myCopy: detailMyCopy,
+        ratings: detailRatings,
+        listLabels: LIST_LABELS,
+        allLists: ALL_LISTS,
+        showActions: true,
+      });
+    }
+
+    function closeDetail() {
+      document.getElementById('detailPage').classList.remove('open');
+      document.body.style.overflow = '';
+      detailShow = null;
+    }
+
+    // The visible Back control (and Escape): if this show was reached via a
+    // ?show=<id> deep link, there's no list "underneath" the overlay to
+    // reveal — the page was loaded fresh just to show this one card — so go
+    // to the actual previous page (e.g. rate-backlog.html) instead of
+    // uncovering a list the member never chose to look at.
+    function detailBack() {
+      if (detailFromDeepLink) { history.back(); return; }
+      closeDetail();
+    }
+
+    function detailEdit(id) { closeDetail(); openEditModal(id); }
+
+    // Re-resolve my copy and re-render, so the detail's actions reflect the
+    // new state (e.g. after archiving it offers "Add back to").
+    async function reRenderDetail() {
+      await resolveMyCopy();
+      if (detailShow) renderDetail(detailShow, detailActors);
+    }
+
+    // The list chips on the detail screen double as the move/add control:
+    // move an active copy, restore an archived one, or add the show if I don't
+    // have it yet. Tapping the chip for the list it's already on is a no-op.
+    async function detailChip(list) {
+      const mine = detailMyCopy;
+      if (mine && !mine.archived) {
+        if (mine.list === list) return;
+        await detailMoveMine(mine.id, list);
+      } else if (mine && mine.archived) {
+        await detailRestore(mine.id, list);
+      } else {
+        await detailAdd(list);
+      }
+    }
+
+    async function detailMoveMine(id, list) {
+      try {
+        const res = await fetch(`/api/shows/${id}/move`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ list }),
+        });
+        if (!res.ok) { failToast(res, 'Couldn’t move'); return; }
+        showToast(`Moved to ${LIST_LABELS[list] || list}`);
+        if (typeof loadShows === 'function') loadShows();
+        await reRenderDetail();
+      } catch { showToast('Network error', { tone: 'error' }); }
+    }
+
+    // Tap-row entry: instant save, no confirm step. The endpoint returns the
+    // freshly recomputed summary, so re-render straight from that instead of
+    // a separate re-fetch.
+    async function detailRate(value, season) {
+      if (!detailMyCopy) return;
+      try {
+        const res = await fetch(`/api/shows/${detailMyCopy.id}/rating`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(season === null ? { rating: value } : { rating: value, season }),
+        });
+        if (!res.ok) { failToast(res, 'Couldn’t save rating'); return; }
+        const data = await res.json();
+        if (detailShow) renderDetail(detailShow, detailActors, data.ratings);
+      } catch { showToast('Network error', { tone: 'error' }); }
+    }
+
+    async function detailArchive(id) {
+      try {
+        const res = await fetch(`/api/shows/${id}/archive`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{}',
+        });
+        if (!res.ok) { failToast(res, 'Couldn’t archive'); return; }
+        showToast('Archived');
+        if (typeof loadShows === 'function') loadShows();
+        await reRenderDetail();
+      } catch { showToast('Network error', { tone: 'error' }); }
+    }
+
+    async function detailRestore(id, list) {
+      try {
+        const res = await fetch(`/api/shows/${id}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ archived: 0, list }),
+        });
+        if (!res.ok) { failToast(res, 'Couldn’t restore'); return; }
+        showToast(`Added back to ${LIST_LABELS[list] || list}`);
+        if (typeof loadShows === 'function') loadShows();
+        await reRenderDetail();
+      } catch { showToast('Network error', { tone: 'error' }); }
+    }
+
+    async function detailAdd(list) {
+      if (!detailShow || !authMember) return;
+      const s = detailShow;
+      try {
+        const res = await fetch('/api/shows', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: s.title, network: s.network || null, network_url: s.network_url || null,
+                                 list, movie: s.movie || 0, full_series: s.full_series || 0 }),
+        });
+        if (res.status === 409) {
+          await reRenderDetail();
+          showToast(detailMyCopy && detailMyCopy.archived
+            ? 'It’s archived — tap a list above to add it back' : 'Already on one of your lists');
+          return;
+        }
+        if (!res.ok) { failToast(res, 'Couldn’t add'); return; }
+        showToast(`Added to ${LIST_LABELS[list] || list}`);
+        if (typeof loadShows === 'function') loadShows();
+        await reRenderDetail();
+      } catch { showToast('Network error', { tone: 'error' }); }
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('detailPage').classList.contains('open')) detailBack();
+    });
+  </script>
+  <script src="/app-banner.js?v=4" defer></script>
+</body>
+</html>

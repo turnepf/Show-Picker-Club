@@ -28,24 +28,25 @@ There are native iOS, tvOS, and watchOS apps. They share a `ShowPickerCore` Swif
 - **Database:** Cloudflare D1 (SQLite at the edge).
 - **Enrichment:** TMDB API (sole source — OMDB retired 2026-07).
 - **Vibe trait scoring:** Claude API (Sonnet 4.6 with prompt caching), admin-triggered batch only.
-- **Auth:** One-time codes (SMS via Twilio Verify, email via Resend) plus Sign in with Apple and Sign in with Google (web); HttpOnly session cookies, 30-day expiry. Open self-enrollment (rate-limited, no approval step), with self-service account deletion.
+- **Auth:** One-time codes (SMS via Twilio Verify, email via Resend) plus Sign in with Apple and Sign in with Google; HttpOnly session cookies, 30-day expiry. Open self-enrollment (rate-limited, no approval step), with self-service account deletion. Sign-in happens in the Apple apps — the web has had no login UI since the 2026-08 teardown, though every `/auth/*` endpoint is unchanged.
 
 ## Project structure
 
 Only `public/` (static assets) and `functions/` (Pages Functions) are deployed. Everything else — `schema.sql`, `docs/`, workflow files, backups — stays out of the build output dir so it can't be served.
 
 ```
-├── public/                     Deployed static assets
-│   ├── index.html              Landing + per-member SPA
-│   ├── vibe.html               Member taste profiles
-│   ├── reporting.html          Admin metrics (auth-gated)
-│   ├── setup.html              Admin: create new member (secret-gated)
-│   ├── url-cleanup.html        Admin: fix missing network URLs (secret-gated)
-│   ├── vibe-admin.html         Admin: batch-score trait vectors (secret-gated)
-│   ├── app-banner.js           Dismissible "get the app" App Store banner (Apple devices)
+├── public/                     Deployed static assets (marketing only)
+│   ├── index.html              Marketing page: pitch, Trending shelf, App Store link
+│   ├── privacy.html            Privacy policy (linked from the App Store listing)
+│   ├── terms.html              Terms
+│   ├── sms.html                SMS messaging & consent
+│   ├── styles.css              Design tokens + shared baseline
 │   ├── sw.js                   Service-worker tombstone (unregisters the retired PWA)
 │   ├── _headers                Security headers (CSP, HSTS, etc.)
-│   └── _redirects              SPA fallback + legacy slug rewrites
+│   └── _redirects              Retired paths → /, plus the marketing-page catch-all
+├── archive/web/                The retired web member app + admin tools. Moved
+│                               here in 2026-08, not deleted, and outside the
+│                               Pages build output so none of it deploys.
 ├── functions/
 │   ├── api/                    All /api/* endpoints
 │   ├── auth/                   Login, logout, session check

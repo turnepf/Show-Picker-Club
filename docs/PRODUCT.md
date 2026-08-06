@@ -89,32 +89,34 @@ Logged in as yourself, every row gets Edit and Archive buttons inline. Editing r
 
 ## Web app status
 
-**Frozen as of 2026-08. Likely to be replaced by a marketing site.**
+**The web member app was removed in 2026-08.** `showpicker.club` is now a
+marketing site: a pitch, the club's public Trending shelf, and an App Store
+link. Every retired path 301s to it.
 
-The web member app has no users. Every member is on the iPhone/iPad app, and
-the cost of keeping two frontends in step was real: a full day of work in
-2026-08 went into fixing drift *between* web surfaces (five different show-row
-implementations, two show-detail implementations, two different sidebar navs)
-and then porting the same fixes to Swift. That work is done — `show-renderer.js`
-and `ShowRow.swift` are now the single renderers on each side — which is the
-cheapest moment to stop, not a reason to keep going.
+The reasoning didn't change, it just finished. The web app had no users — every
+member is on the iPhone/iPad app — and keeping two frontends in step was costing
+real time: a full day in 2026-08 went into fixing drift *between* web surfaces
+(five show-row implementations, two show-detail implementations, two sidebar
+navs) and then porting the same fixes to Swift.
 
 What this means in practice:
 
-- **No new member-facing features on the web.** They go to iOS/iPad.
-- **The web still gets** security fixes, repairs when something breaks, and any
-  change to `functions/api/*` — the apps run on those endpoints, so the backend
-  is not frozen in any sense.
-- **The landing and auth surface stays working**, because a shared
-  `showpicker.club` link is how someone finds the app in the first place.
-- **The `public/` admin tools are redundant**, not load-bearing: Reporting,
-  Manage members, Show Cleanup and Vibe trait scoring all exist in the iOS app.
+- **All member-facing work goes to iOS/iPad.** tvOS is view-only, watchOS is
+  read-only, and there is no web target any more.
+- **The backend is not frozen in any sense.** `functions/api/*` is what the apps
+  run on, and it gets the same attention it always did.
+- **There is no web sign-in.** The login UI lived in the SPA and went with it.
+  The `/auth/*` endpoints are untouched, so restoring the page would restore the
+  flow — but today the only way into an account is an Apple device.
+- **The admin tools are iOS-only.** Reporting, Manage members, Show Cleanup and
+  Vibe trait scoring are all in the app; the `public/` copies are archived.
+- **Nothing was deleted.** The old pages live in `archive/web/` at the repo root,
+  outside the Pages build output. Reverting is a `git mv` and a `_redirects`
+  edit.
 
-The expected end state is `showpicker.club` as a marketing page pointing at the
-App Store, with the member app removed. Until that's decided, nothing is being
-deleted — freezing is reversible in a way that ripping it out isn't. If a member
-ever asks for web access (an Android user, or someone who won't install an app),
-that's the signal to revisit.
+If a member ever asks for web access — an Android user, or someone who won't
+install an app — that's the signal to revisit, and the code is still there to
+revisit with.
 
 ## Native apps
 
@@ -125,6 +127,8 @@ The native iOS, tvOS and watchOS clients are where the product actually lives (s
 **Home leads, and Home is the launch screen — on every platform.** Wherever the app has a tab bar or a top-level nav list, Home is the first item, followed by My Shows; the app opens on Home whether or not a session is already stored. Signing in *during* a session still takes you straight to your lists (you asked for them), but restoring a session at launch does not.
 
 iPhone and iPad satisfy this by construction — both are rooted at Home, with My Shows the first row of its nav list. On tvOS it's the tab order plus a launch rule: the sign-in jump to My Shows only fires from the Account tab, so a stored session resolving at launch leaves you on Home.
+
+The **Groups** nav row carries a `NEW` flag on iPhone Home and in the iPad sidebar until the member opens Groups once (`seenGroups`, `@AppStorage`), after which it never comes back. It sits immediately after the word "Groups" as an accent-filled capsule rather than in SwiftUI's trailing `.badge()` slot — at the far right, in secondary grey, it read as a count and got lost against the row. A badge that never clears is decoration; this one has a job and then goes away.
 
 The iOS app ships **home-screen widgets** on iPhone, iPad, and Mac (the Mac Catalyst build): **Trending** (public, the club's rolling top adds; small/medium/large + extra-large on iPad/Mac) and **Upcoming Premieres** (the signed-in member's next premieres by date; small/medium/large + iPhone Lock Screen). Tapping a show opens its card in the app via `showpicker.club/show/<id>` universal links. tvOS and watchOS have no widget equivalent.
 
@@ -464,7 +468,7 @@ A few intentional omissions:
   legacy backlog that has now fully drained (the bad-titles and `title_ok`
   queues were verified empty in production before removal). Removed: the
   bad-titles queue + its auto-fix pass and the `title_ok` dismiss control
-  (`admin-url-cleanup.js`, `url-cleanup.html`, iOS `UrlCleanupView`);
+  (`admin-url-cleanup.js`, iOS `UrlCleanupView`; the `url-cleanup.html` web UI was archived in 2026-08);
   `titleFromUrl` og:title recovery (`_shared/title-fix.js` and its callers
   in `enrich.js` and the cleanup endpoint); the title-variant spelling
   retries and cross-type flip searches in `enrich.js`'s poster passes; and

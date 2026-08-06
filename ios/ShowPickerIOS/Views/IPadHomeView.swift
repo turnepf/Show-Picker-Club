@@ -185,9 +185,11 @@ struct IPadHomeView: View {
             // Subscription Audit, Vibe, then Calendar.
             Group {
                 if myMember != nil {
-                    Label("Groups", systemImage: "person.2.fill")
-                        .badge(seenGroups ? nil : Text("NEW"))
-                        .tag(SidebarItem.groups)
+                    HStack(spacing: 8) {
+                        Label("Groups", systemImage: "person.2.fill")
+                        if !seenGroups { NewFlag() }
+                    }
+                    .tag(SidebarItem.groups)
                 }
                 if !popular.isEmpty {
                     Label("Trending", systemImage: "flame")

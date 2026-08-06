@@ -104,9 +104,11 @@ struct HomeView: View {
                         }
                         if myMember != nil {
                             NavigationLink(value: Route.groups) {
-                                Label("Groups", systemImage: "person.2.fill")
+                                HStack(spacing: 8) {
+                                    Label("Groups", systemImage: "person.2.fill")
+                                    if !seenGroups { NewFlag() }
+                                }
                             }
-                            .badge(seenGroups ? nil : Text("NEW"))
                             // What's coming up on your own lists, with the
                             // subscribe button on it. This used to fire
                             // webcal:// straight at the OS, which was a dead
@@ -415,6 +417,25 @@ struct HomeView: View {
             pendingLink = nil
             route(url: link)
         }
+    }
+}
+
+// "NEW" set against the label it flags rather than the row's trailing edge.
+// `.badge()` parks it at the far right in secondary grey, where it reads as a
+// count and disappears into the row; this sits it right after the word and
+// gives it the accent so it actually catches the eye. Shared by the iPhone
+// Home list and the iPad sidebar, and still governed by `seenGroups` —
+// opening Groups once retires it for good.
+struct NewFlag: View {
+    var body: some View {
+        Text("NEW")
+            .font(.caption2.weight(.black))
+            .kerning(0.4)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2.5)
+            .background(Capsule().fill(Color.accentColor))
+            .accessibilityLabel("New")
     }
 }
 

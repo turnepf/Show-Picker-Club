@@ -26,10 +26,14 @@ When you change behavior that these docs describe, update the docs in the same P
 Only `public/` (static assets) and `functions/` (Pages Functions) are deployed — `pages_build_output_dir = "public"` in `wrangler.toml`. Everything else (`schema.sql`, `migrations/`, `docs/`, workflows) stays out of the served output. **Never pass `.` as a deploy directory.**
 
 ```
-public/            Deployed static pages: index.html (SPA), vibe, subscriptions,
-                   members/reporting/url-cleanup/vibe-admin (admin tools; /admin 301s to /members),
+public/            Deployed static pages — marketing only since the 2026-08
+                   teardown: index.html (pitch + Trending + App Store link),
+                   privacy/terms/sms, styles.css, favicon.svg,
                    sw.js (tombstone — the PWA was retired 2026-08; don't delete
                    the file, see ARCHITECTURE.md), _headers (CSP), _redirects
+archive/web/       The retired web member app + admin tools. Moved here, NOT
+                   deleted, and outside the Pages build output so none of it
+                   deploys. See ARCHITECTURE.md#frontend-pages.
 functions/
 ├── api/           /api/* endpoints (one file per route; [param].js for dynamic segments)
 ├── auth/          login, logout, request-code, apple, google, enroll, check, config
@@ -100,16 +104,16 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 
 ## Working preferences
 
-- **The web member app is frozen (2026-08). Build features for the Apple apps.**
-  Nobody uses the web client, and keeping it at parity was costing more than it
-  returned. New member-facing features go to iOS/iPad; do **not** build them for
-  the web, and don't offer to. The web app is expected to be reduced to a
-  marketing site pointing at the App Store — see `docs/PRODUCT.md#web-app-status`
-  before doing anything substantial to `public/`. What still gets worked on
-  there: security fixes, anything actually broken, the `/api/*` endpoints (the
-  apps depend on them), and the landing/auth surface. The admin tools in
-  `public/` (Reporting, Manage members, Show Cleanup, Vibe trait scoring) are
-  already in the iOS app, so they don't need web work either.
+- **The web member app is gone (2026-08). Build features for the Apple apps.**
+  `showpicker.club` is a marketing site now — pitch, Trending shelf, App Store
+  link — and every retired path 301s to it. New member-facing features go to
+  iOS/iPad; do **not** build them for the web, and don't offer to. What still
+  gets worked on there: security fixes, anything actually broken, the `/api/*`
+  endpoints (the apps depend on them), and the marketing page itself. The old
+  SPA and the four admin tools live in `archive/web/` — moved, not deleted, so
+  restoring any of it is a `git mv` plus a `_redirects` edit. There is no web
+  sign-in any more; the login UI was part of the SPA. See
+  `docs/PRODUCT.md#web-app-status` and `docs/ARCHITECTURE.md#frontend-pages`.
 
 - **Feature requests still name their platforms.** The product ships on
   iOS/iPad, tvOS, and watchOS. When a feature is requested, state which get it

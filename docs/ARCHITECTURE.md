@@ -113,7 +113,7 @@ Member ratings (docs/PRODUCT.md backlog: "Member ratings"). Migration 053. Keyed
 
 Entry is gated to shows on any list except Next Up (`list !== 'next'`), enforced server-side in `PUT /api/shows/:id/rating`; a show with no `tmdb_id` yet (not enriched) can't be rated either. The average/count show on every card regardless of login state — a deliberate, scoped exception to the otherwise-tiny public surface (`GET /api/shows/:id` returns the summary in its public/redacted branch too, never member names or individual scores beyond the specific owner being viewed).
 
-`GET /api/rate-backlog` (session required) backs `/rate-backlog`, the one-page bulk-rate flow: every active show the member has except Next Up and archived rows, left-joined to `show_ratings` for the member's existing overall (`season_number = 0`) rating, unrated shows first. Overall-only by design — each row links to `/<slug>?show=<id>` (the show's detail page, which `showMember()` opens directly via a `show` query param) for season-level rating. `GET /api/rate-backlog-count` returns `{ count }` for the same set of rows — the "Rate my backlog" nav badge, which the main app derives from the library it already has loaded but `shell.js` has no library for. The two share an eligibility clause; change one and change the other, or the badge disagrees with the page it links to.
+`GET /api/rate-backlog` (session required) backs the bulk-rate flow (the web page was archived in the 2026-08 teardown — see [Frontend pages](#frontend-pages) — and the iOS `RateBacklogView` is the live client): every active show the member has except Next Up and archived rows, left-joined to `show_ratings` for the member's existing overall (`season_number = 0`) rating, unrated shows first. Overall-only by design — each row links to `/<slug>?show=<id>` (the show's detail page, which `showMember()` opens directly via a `show` query param) for season-level rating. `GET /api/rate-backlog-count` returns `{ count }` for the same set of rows — the "Rate my backlog" nav badge, which the main app derives from the library it already has loaded but `shell.js` has no library for. The two share an eligibility clause; change one and change the other, or the badge disagrees with the page it links to.
 
 `GET /api/reporting` (admin-only, backs `/reporting`) reports rating activity alongside the other show metrics: a "People who rated" card (distinct `member_slug`s with an insert/update to `show_ratings` in the same day/week/month/all-time windows as new/edited/archived shows, keyed off `updated_at` so re-rating counts as activity) plus all-time submitted-ratings and distinct-titles-rated totals. Defensive like the other migration-gated reporting fields: falls back to zeros rather than 500ing the dashboard if `show_ratings` isn't there.
 
@@ -179,7 +179,7 @@ Members a person shares streaming services with, so the audit pools everyone's s
 
 ## Subscription audit
 
-`GET/PUT /api/subscriptions` (`functions/api/subscriptions.js`), page at `public/subscriptions.html`, linked from the member page nav (own page only). Both verbs require a session and operate on the logged-in member.
+`GET/PUT /api/subscriptions` (`functions/api/subscriptions.js`), the web page (`subscriptions.html`) was archived in the 2026-08 teardown; the iOS Subscription audit is the live client. Both verbs require a session and operate on the logged-in member.
 
 - **Household pooling.** Before grouping, the GET reads the member's `household_members` and pools active shows across the member + those members. The same title appearing on more than one household member's list is deduped per network, keeping the most-active list (watching > waiting > next up > loved) so the verdict reflects whoever's furthest along. The response includes `household` (the pooled members' slugs + display names) for the "including …" line. Household is invite-based on iOS, the same shape as groups: `POST /api/household/invite` mints a 7-day link (`/household/join?code=…`), the recipient's app accepts it via `POST /api/household/join`, and `POST /api/household/remove` drops someone. You can't add a person to your household from a roster any more than you can add them to a group. `GET /api/household` still returns the current set; `PUT` (whole-set replace) remains for the web modal.
 - **GET** groups the (pooled) active shows by canonical network and assigns each service a **verdict**:
@@ -336,7 +336,7 @@ Signing up is the only way a member row is created — there is no operator-crea
 
 **Registration name capture.** `_shared/enroll.js#validFullName()` requires a first *and* last name (at least two whitespace-separated tokens, 2–60 characters total, ≥1 Unicode letter, no control chars/angle brackets) — a single-word name is rejected with `'Enter your first and last name.'` before any member row is created. Self-enrollment is the only registration path, so every member is guaranteed a `last_name` at creation time. (Manual-add, retired 2026-07, was the one path where `last_name` was always optional; its removal plus this check is what closed the gap that let one member register with no last name.)
 
-Enrollment responses include `enrolled: true` alongside the usual `{success, slug}` session payload (`issueSession`'s `extra` param); plain logins omit it. The web frontend uses the flag to fire a GA4 `sign_up` event (with `method: email|apple|google`, beacon transport) — mark that event as a conversion in GA4/Google Ads to optimize ad campaigns toward signups. Native clients ignore the extra key. The landing page shows a join-pitch card (`#joinCta`) to every logged-out visitor and relabels the home login row "Log in or sign up". Fresh web signups land on `/welcome` (`welcome.html`), a stable confirmation URL registered with Google Ads' page-based conversion tracking — keep that URL stable, and keep the Google tag on the page. It forwards to the new member's page; sessionless visits bounce to `/`.
+Enrollment responses include `enrolled: true` alongside the usual `{success, slug}` session payload (`issueSession`'s `extra` param); plain logins omit it. Native clients ignore the extra key. The flag existed for the web frontend's GA4 `sign_up` conversion event, and `/welcome` (`welcome.html`) was the stable confirmation URL registered with Google Ads' page-based conversion tracking — **both went away with the web app in 2026-08.** There is no web signup any more, so that conversion can never fire; `/welcome` 301s to `/`, and the Google Ads Smart campaign's conversion setting is pointing at a dead URL until someone re-points it. The `enrolled` flag itself is harmless and still returned.
 
 ### Demo account
 
@@ -356,35 +356,72 @@ Durable login tracking is separate: `members.last_login_at` (stamped by `_shared
 
 ## Frontend pages
 
-### `index.html` (1939 lines)
+**The web member app was removed in 2026-08.** `showpicker.club` is a marketing
+site: a pitch, the public Trending shelf, and an App Store link. What still
+deploys from `public/` is `index.html` (the marketing page), `privacy.html`,
+`terms.html`, `sms.html` (all three are linked from the App Store listing and
+from each other), `styles.css`, `favicon.svg`, the `sw.js` tombstone, `_headers`,
+`_redirects`, and `.well-known/`. Nothing else.
 
-Single-page app. Detects whether `window.location.pathname` is empty (landing) or a slug (member page) and renders accordingly. Major UI surfaces:
+The retired pages were **moved, not deleted**, to `archive/web/` at the repo root
+— outside `pages_build_output_dir`, so they no longer deploy but are one
+`git mv` from coming back. That set is: the member SPA (`archive/web/member-app.html`,
+formerly `public/index.html`), `groups.html`, `rate-backlog.html`,
+`subscriptions.html`, `vibe.html`, the four admin tools (`members.html`,
+`reporting.html`, `url-cleanup.html`, `vibe-admin.html`), `welcome.html`, and the
+shared front-end scripts they depended on (`shell.js`, `nav.js`,
+`show-renderer.js`, `app-banner.js`).
 
-- **Landing:** `My Shows` link (logged in), Trending shows shelf, `Search all libraries` button. The home page does not list members, and there is no What's New page — release notes live in the App Store update text (retired 2026-08). Logged-out visitors get a join-pitch card with a "Create your free account" button (see [Self-enrollment](#self-enrollment-migration-031-approval-retired-in-migration-058)).
-- **Member page:** title + tabs (Watching, Awaiting, Loved, Next Up), search button, `+ Add` button (when logged in), per-tab list of show rows with always-visible meta (Next episode on every list when a premiere date exists, Recommended by on Next Up), sort + toggle pills at the bottom, footer with `Curious?` / `Vibe` / `📅 Calendar feed` links.
-- **Modals:** Add/Edit Show, Add to My List (used from Popular and from cross-library search), Search. (Share-to-member and Suggest-a-Show were retired 2026-07.)
+Consequences worth knowing before you go looking for them:
 
-State lives in a handful of top-level `let` vars (`shows`, `currentTab`, `isEditor`, `memberSlug`, `authMember`, `searchMode`, etc.). No framework. All API I/O is `fetch()` to relative paths.
+- **There is no web sign-in any more.** The SPA carried the entire login UI, so
+  archiving it removed email-code, Sign in with Apple, and Sign in with Google
+  from the browser. The `/auth/*` endpoints themselves are untouched — the Apple
+  apps run on them — and restoring the page restores the flow.
+- **The four admin tools are iOS-only now.** Reporting, Manage members, Show
+  Cleanup and Vibe trait scoring all exist in the iPhone/iPad app, which is why
+  they were safe to pull.
+- **`welcome.html` was the Google Ads conversion URL.** With no web signup it can
+  never fire again; the Smart campaign's conversion setting is now pointing at a
+  page that 301s to `/`.
+- **CSP got tighter with the teardown** (`public/_headers`): the Apple, Google
+  and Turnstile script/frame/form-action sources existed only for web sign-in and
+  are gone. What remains covers Google Analytics, Cloudflare Insights, and TMDB
+  poster art.
 
-### `vibe.html`
+### `index.html` — the marketing page
 
-Member taste profile UI. Calls `/api/vibe?member=<slug>` and renders the cluster identity, trait bars, blend bars, balance reads, and aligned shows.
+Self-contained: hero, four feature cards, the Trending shelf, and a footer.
+Trending comes from the public `GET /api/popular` (logged out it names no
+members — see [Public surface](#public-surface)), rendered by ~60 lines of
+inline JS with skeleton placeholders and an explicit failure message rather than
+skeletons that pulse forever. It also carries the retired-PWA sweep that used to
+live in the SPA: unregister any surviving service worker and drop its caches, so
+old home-screen installs don't keep serving a member app that no longer exists.
 
-### `reporting.html`
+The App Store call-to-action tailors only its **wording** per device (iPhone /
+iPad / Mac), never its behavior. A browser cannot detect whether the app is
+installed — there is no API, and the custom-URL-scheme probe fires an OS dialog
+and fails silently in Safari. Apple's own machinery covers it instead: the
+`apple-itunes-app` meta tag renders OPEN vs GET in iOS Safari, Safari on every
+Apple platform offers "Open in app" for the universal-link domain, links arriving
+from outside a browser (Mail, Messages) route straight to the app, and the App
+Store page itself shows Open when the app is already installed.
 
-Auth-gated dashboard for the operator. Calls `/api/reporting`; displays metric cards and a few tables.
+### Redirects
 
-### `welcome.html`
+`public/_redirects` 301s every retired path to `/`: `/join`, `/setup`,
+`/requests`, `/admin`, `/welcome`, `/groups`, `/rate-backlog`, `/subscriptions`,
+`/vibe`, `/members`, `/reporting`, `/url-cleanup`, `/vibe-admin`.
 
-Post-signup confirmation at `/welcome`. Every fresh enrollment is routed here by `finishLogin(enrolled)`; the page carries the Google tag so Google Ads' page-visit conversion tracking can count it (see [Self-enrollment](#self-enrollment-migration-031-approval-retired-in-migration-058)). Logged-in members get a "Go to my shows" button pointed at their slug; anyone without a session is redirected to `/`.
-
-### `members.html`, `url-cleanup.html`, `vibe-admin.html`
-
-Admin tools. Each requires an admin session; they show a "log in first" hint otherwise. Not linked from the navigation.
-
-`members.html` is the member-administration hub: the Possible-duplicates panel, then the roster. There is no new-members queue — members create their own accounts and are live immediately (the queue, its welcome-intro copy/text panel, and the approve/reject/hide actions were retired in migration 058). The old standalone `/admin` page was folded in here; `/admin`, `/setup`, and `/requests` all 301 to `/members` (`public/_redirects`). The iPhone/iPad app's **Manage members** screen (`ios/ShowPickerIOS/Views/ManageMembersView.swift`) mirrors this page's Possible-duplicates panel (merge + ignore via the same endpoints), per-list activity pills, and roster editor.
-
-**App-side cleanup is deliberately deferred until after the App Store launch.** The Swift still contains the queue, the `SignupRequest`/`CreateMemberResult` models, `API.signupRequests()`/`actOnSignupRequest()`/`approveMember()`, `WelcomeIntroPanel.swift`, and the Admin-row waiting badge — all now inert, and none of it is reachable by a member. It degrades cleanly rather than erroring: `/api/admin-signup-requests` and `/api/admin-member-approve` no longer exist, so they fall through `_redirects` to the SPA shell and the decode fails, but every call site wraps them in `try?` with a `?? []` fallback; and `AdminMember.approved` is `Bool?`, so the key's absence reads as `nil` — `nil == false` is false, which hides the Held-members section, the PENDING badge, and the Approve button, while `member.approved ?? true` keeps the detail screen's approve control hidden. The waiting badge computes 0, which SwiftUI renders as no badge. Strip all of it in the first build after launch.
+Member slugs are deliberately **not** in that list. They keep falling through the
+SPA-era catch-all (`/*  /index.html  200`), which is a rewrite rather than a
+redirect, so `showpicker.club/patrick` keeps its URL and renders the marketing
+page. That is what lets iOS and macOS match it against
+`.well-known/apple-app-site-association` and open the app instead of ever
+fetching the page. A 301 would still work on Apple devices — the OS resolves the
+link before any request goes out — but it would throw away the member context on
+every other device, and on a shared link that context is the whole point.
 
 ## Universal links
 
@@ -398,7 +435,7 @@ A native **Roku** channel (`roku/`, SceneGraph/BrightScript) hits the same endpo
 
 ## Service worker + PWA (retired 2026-08)
 
-The web app is no longer installable. `public/manifest.json` is gone, along with the `<link rel="manifest">` and `apple-mobile-web-app-*` tags on `index.html` and `groups.html`, and the CSP's `manifest-src` directive. The native Apple apps cover the install-to-home-screen case; the web is a browser page again, with no offline caching.
+The web app is no longer installable. `public/manifest.json` is gone, along with the `<link rel="manifest">` and `apple-mobile-web-app-*` tags those pages carried, and the CSP's `manifest-src` directive. The native Apple apps cover the install-to-home-screen case; the web is a browser page again, with no offline caching.
 
 **`public/sw.js` is retained deliberately, as a tombstone** — do not delete it yet. It now registers no `fetch` handler and does one thing on `activate`: clear every Cache Storage bucket, then `self.registration.unregister()`. This is the only way to evict the workers already installed on members' devices. Deleting the file would not do it: `_redirects` maps `/*` to the SPA shell, so `/sw.js` would return index.html as `text/html` with a 200. A 404 unregisters a worker; an HTML 200 fails the update check on a MIME mismatch and leaves the old worker and its stale cache installed indefinitely. `index.html` also runs a `getRegistrations().unregister()` + `caches.delete()` sweep on load, so members who reach a member page are cleaned up immediately rather than on the browser's next update check.
 
@@ -585,10 +622,10 @@ Refuses to merge an admin source (`cannot_merge_admin` — demote first), the de
 Backs the "Ignore this match" buttons on that panel — the heuristics false-positive (e.g. the demo account sharing a first name with a real member, which the merge guard rightly refuses), so dismissals must persist. Rows live in `dupe_ignores` (migration 034) as sorted slug pairs; a self-pair means "stop flagging this account as hidden-email-only". GET lists them; POST takes `{action: 'ignore'|'unignore', pairs: [[a,b], ...]}`. The POST creates the table on demand (identical `CREATE TABLE IF NOT EXISTS` as the migration) so deploy order doesn't matter, and rejects ignores naming unknown members. A successful merge deletes any ignore rows referencing the merged-away slug; the panel hides (but keeps) rows whose members have otherwise disappeared. Dismissed matches reappear via the panel's "ignored matches" disclosure → Un-ignore.
 
 ### `POST /api/admin-vibe-fill`
-Body: `{secret, count}`. Runs the vibe trait-backfill loop described above. The `vibe-admin.html` UI calls it in a loop until the operator stops or every show is scored.
+Body: `{secret, count}`. Runs the vibe trait-backfill loop described above. The iOS Vibe trait scoring screen calls it in a loop until the operator stops or every show is scored (the `vibe-admin.html` web UI was archived in 2026-08).
 
 ### `POST /api/admin-url-cleanup`
-Body: `{secret}`. Before listing, runs `propagateGoodUrls` to push every known good URL out to any sibling row still on a placeholder (so the queue never surfaces a title that someone has already fixed). Then returns the residual queue: titles where *no* copy has a good URL yet. The companion `url-cleanup.html` UI lets the operator paste a real deep link, then push it to every member's copy of that title in one go.
+Body: `{secret}`. Before listing, runs `propagateGoodUrls` to push every known good URL out to any sibling row still on a placeholder (so the queue never surfaces a title that someone has already fixed). Then returns the residual queue: titles where *no* copy has a good URL yet. The companion Show Cleanup screen in the iOS app lets the operator paste a real deep link, then push it to every member's copy of that title in one go (the `url-cleanup.html` web UI was archived in 2026-08).
 
 Some titles genuinely have no direct link to paste (too ambiguous to resolve to one show, not indexed by any service search). The `dismiss` action (`{action: 'dismiss', title}`, the row's "No good link — dismiss" button) permanently removes a title from the queue — recorded case-insensitively in `url_cleanup_ignores` (migration 048), which `QUEUE_FILTER` excludes. Same pattern as `dupe_ignores`: the endpoint creates the table on demand (identical statement to the migration) so deploy order doesn't matter. There's no un-dismiss action or UI — a title comes back into the queue only if its `network_url` regresses to a placeholder again, at which point it'd need re-dismissing by hand (`DELETE FROM url_cleanup_ignores WHERE ltitle = ...`).
 
@@ -596,7 +633,7 @@ The page's tools row also has a "Run enrichment passes" button — it loops `POS
 
 The `inherit_networks` action (the "Adopt networks from club copies" button on the page) rescues rows that have no `network` at all — URL propagation can't reach them because it is scoped to `(title, network)`. Any active row whose title has exactly one distinct network across the rest of the club adopts that network, then a propagation pass fills its URL from the siblings. Titles whose copies disagree on the service are deliberately skipped; those belong to the conflict queue. Returns `{networks_set, urls_filled}`.
 
-The list response also carries a `needsPoster` section (`fetchNeedsPoster`): titles where *no* active copy has a poster, grouped by title. A missing poster is the observable symptom of a title TMDB can't match — a typo that stuck ("Marshalls" for *Marshals*), a descriptive member-entered name, or a title only indexed under the opposite media type. The row's URL may be perfectly good, which is exactly why the URL queue misses these. The companion "Missing posters" section on `url-cleanup.html` offers two fixes per title: **Re-enrich** (the `re_enrich` action — a fresh `fetchEnrichment` lookup for the title as-is, which flips media types, writing any poster/logo/rating/cast onto every copy) and **Rename** (the shared `fix_title` action, for when the stored title itself is wrong).
+The list response also carries a `needsPoster` section (`fetchNeedsPoster`): titles where *no* active copy has a poster, grouped by title. A missing poster is the observable symptom of a title TMDB can't match — a typo that stuck ("Marshalls" for *Marshals*), a descriptive member-entered name, or a title only indexed under the opposite media type. The row's URL may be perfectly good, which is exactly why the URL queue misses these. The companion "Missing posters" section (iOS Show Cleanup; the `url-cleanup.html` web UI was archived in 2026-08) offers two fixes per title: **Re-enrich** (the `re_enrich` action — a fresh `fetchEnrichment` lookup for the title as-is, which flips media types, writing any poster/logo/rating/cast onto every copy) and **Rename** (the shared `fix_title` action, for when the stored title itself is wrong).
 
 The automatic title-healing that used to back this queue was retired in July 2026 (`b1ecd34`) once TMDB type-ahead pinning made new in-app rows arrive canonical: the old `bad_titles`/`title_ok` queue, `og:title` recovery from deep links (`title-fix.js`), title-variant and cross-media-type retries in `/api/enrich`'s poster passes, and the OMDB title-guessing fallback are all gone. Kept: the manual `fix_title` rename and the artwork sync/propagation passes. Bulk off-platform imports (e.g. migration 032) bypass type-ahead, so hand-typed titles and movie flags can still miss — the `needsPoster` queue and per-title fix migrations are the operator's net for exactly that.
 
@@ -640,5 +677,5 @@ The moment a member edits a seeded row (changes list, notes, etc.), archives one
 - **Network URLs that look like `/search`, `/s?`, or `/?q=` are placeholders.** The frontend renders these as plain text instead of links; sync-urls and calendar feed treat them as missing.
 - **Member display names disambiguate dynamically.** `/api/members` counts first-name collisions and appends `last_initial` only when it would otherwise be ambiguous.
 - **Slug `dorothy` was renamed to `whitt`.** A permanent 301 in `_redirects` covers the old URL. She has since gone back to displaying as Dorothy (migration 025 updated her name and login email) — the slug stays `whitt`.
-- **Every show row and show detail on the web comes from `public/show-renderer.js`.** `renderShowCard()` / `renderShowList()` draw every row (member lists, Trending, cross-library search, group lists, Rate my backlog) and `renderShowDetailBody()` draws the whole detail body on both pages that have one (`index.html`'s pushed detail view and `groups.html`'s in-page stack). Their CSS vocabulary — `.show-list` / `.ios-row*` / `.detail-card` / `.detail-row` / `.list-chip` / `.rating-*` — lives in `public/styles.css`, not in either page's `<style>`, so a card can't look different depending on which page rendered it. Adding a show row anywhere means calling the shared renderer, not hand-rolling markup: use the `prefixHtml` / `extraHtml` / `caption` options for whatever that context adds (search's "+", Rate my backlog's tap-row). That includes `vibe.html`'s picks: `enrichPick()` in `functions/api/vibe.js` attaches an `id`, `poster_url` and the season fields to every pick so they render as ordinary cards, and tapping one opens the shared detail screen at `/<slug>?show=<id>` rather than expanding a second, thinner detail inline.
+- **Show rows are a Swift-only concern now.** `public/show-renderer.js` was the single web renderer for every row and detail body; it went to `archive/web/` with the member app in 2026-08. `ShowRow.swift` is the one renderer left, and the convention it enforced — one renderer, never hand-rolled markup per screen — still applies on the Swift side.
 - **Always clean up branches when a chunk of work is done.** After the work is merged to `main` and pushed live, delete the feature branch — local and remote. Caveat: in the Claude-Code-on-the-web remote environment the git proxy rejects remote-branch deletion (HTTP 403) and the GitHub MCP server has no delete-branch tool, so the remote branch may have to be deleted from GitHub's UI/API outside that environment. The local branch can always be deleted.
