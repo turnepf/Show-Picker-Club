@@ -1,7 +1,9 @@
 import SwiftUI
 import ShowPickerCore
 
-// Pushed onto Home's stack, so links push there — no path binding of its own.
+// The Groups tab's root, and also pushed onto Home's stack from the Groups
+// shelf there — no path binding of its own either way, so links push onto
+// whichever stack is hosting it.
 // `ClubGroup` (CoreImports.swift) is the model — SwiftUI has its own `Group`.
 struct GroupsListViewTV: View {
     @State private var groups: [ClubGroup] = []
@@ -30,10 +32,6 @@ struct GroupsListViewTV: View {
         .task { if groups.isEmpty { await load() } }
     }
 
-    // Split out of `body` deliberately. Four branches of styled stacks in one
-    // expression is what made the tvOS type-checker give up with "failed to
-    // produce diagnostic" — an error that comes and goes with build order
-    // rather than with the code.
     @ViewBuilder private var content: some View {
         if loading {
             ProgressView()

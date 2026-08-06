@@ -2,8 +2,8 @@ import SwiftUI
 import UIKit
 
 // Standard tvOS top tab-bar navigation. Trending is open; member show lists
-// are members-only (the server 401s them without a session). "My Shows"
-// appears once you're signed in. Account is where you log in / out.
+// are members-only (the server 401s them without a session). "My Shows" and
+// "Groups" appear once you're signed in. Account is where you log in / out.
 //
 // Home leads the bar and is the launch screen — the standard on every
 // platform (see docs/PRODUCT.md#navigation-standard). Signing in still lands
@@ -17,9 +17,10 @@ struct RootTabView: View {
     // the tab bar, and there's no way back to the section's full list.
     @State private var minePath = NavigationPath()
     @State private var homePath = NavigationPath()
+    @State private var groupsPath = NavigationPath()
     @State private var searchPath = NavigationPath()
 
-    enum Tab: Hashable { case mine, home, search, account }
+    enum Tab: Hashable { case mine, home, groups, search, account }
 
     // Switching tabs pops any show detail open in the target tab, so you
     // always land on the section's full grid of cards. Note this only covers
@@ -33,6 +34,7 @@ struct RootTabView: View {
                 switch newValue {
                 case .mine: minePath = NavigationPath()
                 case .home: homePath = NavigationPath()
+                case .groups: groupsPath = NavigationPath()
                 case .search: searchPath = NavigationPath()
                 case .account: break
                 }
@@ -50,6 +52,12 @@ struct RootTabView: View {
                 MyShowsView(path: $minePath)
                     .tabItem { Label("My Shows", systemImage: "play.tv") }
                     .tag(Tab.mine)
+                // Second nav item after My Shows, same as iPhone and iPad.
+                // Home keeps its Groups shelf — that's the browse surface;
+                // this is the way in when you know where you're going.
+                GroupsTabView(path: $groupsPath)
+                    .tabItem { Label("Groups", systemImage: "person.2.fill") }
+                    .tag(Tab.groups)
             }
             SearchView(path: $searchPath)
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
@@ -72,11 +80,13 @@ struct RootTabView: View {
             // clicked tab is always the selected one: just pop the stacks.
             if !minePath.isEmpty { minePath = NavigationPath() }
             if !homePath.isEmpty { homePath = NavigationPath() }
+            if !groupsPath.isEmpty { groupsPath = NavigationPath() }
             if !searchPath.isEmpty { searchPath = NavigationPath() }
         })
         // Land on My Shows right after signing in; fall back to Home on logout.
         .onChange(of: auth.memberSlug) { _, slug in
-            // Signing in INSERTS the My Shows tab and signing out REMOVES it.
+            // Signing in INSERTS the My Shows and Groups tabs, and signing
+            // out REMOVES them.
             // Selecting a tab in the same update as that structural change
             // can leave the target tab rendering empty on tvOS — let the
             // TabView commit the change first, then switch.
@@ -87,7 +97,7 @@ struct RootTabView: View {
                 // launch, and that must leave you on Home.
                 guard selection == .account else { return }
                 Task { @MainActor in selection = .mine }
-            } else if selection == .mine {
+            } else if selection == .mine || selection == .groups {
                 // The tab we're sitting on is about to disappear.
                 Task { @MainActor in selection = .home }
             }
@@ -148,6 +158,19 @@ private struct TabBarClickCatcher: UIViewRepresentable {
                 if let bar = findTabBar(in: sub) { return bar }
             }
             return nil
+        }
+    }
+}
+
+// Groups as a tab root. GroupsListViewTV owns no stack of its own — it's also
+// pushed from Home's Groups shelf — so the tab supplies one.
+struct GroupsTabView: View {
+    @Binding var path: NavigationPath
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            GroupsListViewTV()
+                .showDestinations()
         }
     }
 }
