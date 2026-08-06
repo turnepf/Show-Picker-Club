@@ -285,6 +285,14 @@ A few intentional omissions:
 
 ## Backlog
 
+- **Give each group an icon.** Groups are identified by name alone everywhere
+  they appear — the Groups list and group detail on iPhone and iPad, the
+  Groups tab and group tiles on Apple TV. A per-group icon (an SF Symbol the
+  creator picks, or a color, or both) would make them recognizable at a
+  glance and give the tiles something to be. Needs a column on `groups`, a
+  picker in create/rename, and the icon rendered in every place a group name
+  is shown. **Deferred until after the 1.2 build ships.**
+
 - **Retire email-code login, and the third-party services that go with it.**
   Apple sign-in covers the Apple apps, which is where the product lives, and
   the apps are what members actually use. Every other sign-in path costs
