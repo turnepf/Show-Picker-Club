@@ -199,12 +199,14 @@ struct IPadHomeView: View {
                 // only appear once you're signed in — matching the web sidebar
                 // and your own MemberView.
                 if myMember != nil {
-                    // .badge before .tag, like Groups above: a modifier applied
-                    // after the tag wraps it, the List stops seeing a
-                    // selection value on the row, and the row goes dead.
-                    Label("Rate My Shows", systemImage: "star.fill")
-                        .badge(backlogCount)
-                        .tag(SidebarItem.rateBacklog)
+                    // The count sits against the label, like the NEW flag on
+                    // Groups — and .tag stays last, since a modifier applied
+                    // after it wraps the tag and the row stops selecting.
+                    HStack(spacing: 8) {
+                        Label("Rate My Shows", systemImage: "star.fill")
+                        if backlogCount > 0 { CountFlag(count: backlogCount) }
+                    }
+                    .tag(SidebarItem.rateBacklog)
                     Label("Subscription Audit", systemImage: "creditcard")
                         .tag(SidebarItem.subscriptionAudit)
                     // Vibe is personal too: opens the member's own vibe.

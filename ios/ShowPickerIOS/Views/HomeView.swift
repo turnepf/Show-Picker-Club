@@ -119,9 +119,11 @@ struct HomeView: View {
                             NavigationLink {
                                 RateBacklogView()
                             } label: {
-                                Label("Rate My Shows", systemImage: "star.fill")
+                                HStack(spacing: 8) {
+                                    Label("Rate My Shows", systemImage: "star.fill")
+                                    if backlogCount > 0 { CountFlag(count: backlogCount) }
+                                }
                             }
-                            .badge(backlogCount)
                             NavigationLink {
                                 SubscriptionAuditView()
                             } label: {
@@ -436,6 +438,25 @@ struct NewFlag: View {
             .padding(.vertical, 2.5)
             .background(Capsule().fill(Color.accentColor))
             .accessibilityLabel("New")
+    }
+}
+
+// How many of your shows still have no rating — the whole reason to tap that
+// row. Same treatment as NewFlag and for the same reason: `.badge()` put it
+// at the far right in secondary grey, alongside the chevron, where it read as
+// an ornament rather than as the number you're being asked to work down.
+struct CountFlag: View {
+    let count: Int
+
+    var body: some View {
+        Text("\(count)")
+            .font(.caption.weight(.bold))
+            .monospacedDigit()
+            .foregroundStyle(.white)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2.5)
+            .background(Capsule().fill(Color.accentColor))
+            .accessibilityLabel("\(count) unrated")
     }
 }
 
