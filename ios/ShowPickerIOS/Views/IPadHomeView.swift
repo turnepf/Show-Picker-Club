@@ -113,7 +113,11 @@ struct IPadHomeView: View {
         .sheet(isPresented: $showingExport) { ExportListsView().environmentObject(auth) }
         // Auth may resolve after the member list loads; land on your Watching
         // list once it does (unless the user has already picked something).
-        .onChange(of: auth.memberSlug) { _, _ in applyInitialSelection() }
+        // Logging out is the mirror image and needs its own teardown — see
+        // resetForLoggedOut().
+        .onChange(of: auth.memberSlug) { _, slug in
+            if slug == nil { resetForLoggedOut() } else { applyInitialSelection() }
+        }
         // Universal links: focus the linked member in the sidebar. The web
         // keeps the open tab in the URL fragment (#recommending etc.), so a
         // shared link can land on the exact list.
@@ -456,6 +460,28 @@ struct IPadHomeView: View {
     // visible, so the only part of that rule with anything to decide is what
     // the detail column opens on: Trending, not the focused member's Watching
     // list. Your lists are one tap away in the sidebar either way.
+    // Logging out clears the session, but the sidebar is drawn from @State
+    // that AuthStore can't reach — so without this the signed-in nav simply
+    // stays on screen. `focusedSlug` still names a member, so the four lists
+    // keep rendering under "<name>'s Shows"; `groupMemberSlugs` still holds a
+    // roster, so the members window keeps listing people and their counts;
+    // and `selection` still points at a list. Every one of those rows then
+    // 401s on tap, which is what surfaces as "couldn't load".
+    //
+    // Tear the signed-in state down and reload the public view. Trending is
+    // the honest landing spot: it's the one section a logged-out visitor is
+    // entitled to, and `load()` clears `groupMemberSlugs` on its own once
+    // `auth.isLoggedIn` is false.
+    @MainActor
+    private func resetForLoggedOut() {
+        focusedSlug = nil
+        groupMemberSlugs = []
+        backlogCount = 0
+        detailPath = []
+        selection = popular.isEmpty ? nil : .trending
+        Task { await load() }
+    }
+
     private func applyInitialSelection() {
         if focusedSlug == nil, let me = myMember {
             focusedSlug = me.slug

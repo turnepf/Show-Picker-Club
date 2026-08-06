@@ -222,9 +222,20 @@ struct HomeView: View {
             // A link that needed a session (a group invite) waits for one
             // rather than being dropped when the login sheet takes over.
             .onChange(of: auth.memberSlug) { _, slug in
-                guard slug != nil, let link = pendingLink else { return }
-                pendingLink = nil
-                route(url: link)
+                // Logging out from a pushed screen — a member's lists, the
+                // calendar, an admin tool — would otherwise leave it on screen
+                // 401-ing, the same stale-nav problem the iPad sidebar had.
+                // The nav rows themselves are gated on `myMember`, so they
+                // clear on their own; the stack and the badge don't.
+                if slug == nil {
+                    path = []
+                    backlogCount = 0
+                    return
+                }
+                if let link = pendingLink {
+                    pendingLink = nil
+                    route(url: link)
+                }
             }
             // Universal links (a shared showpicker.club/<member> URL tapped in
             // Messages, Mail, etc.) arrive one of two ways depending on launch
