@@ -570,8 +570,16 @@ private struct HouseholdPickerView: View {
 
             Section {
                 if let invite {
-                    ShareLink(item: invite.url) {
-                        Label("Share invite link", systemImage: "square.and.arrow.up")
+                    // ShareLink gets a URL, not the String the API hands back.
+                    // A String is offered to the system as plain text, which
+                    // drops Messages, Mail and AirDrop from the sheet — the
+                    // targets that matter for an invite.
+                    if let url = URL(string: invite.url) {
+                        ShareLink(item: url,
+                                  subject: Text("Join my household on Show Picker"),
+                                  message: Text("Join my household — the subscription audit pools our shows so we're not counted twice for the same service.")) {
+                            Label("Share invite link", systemImage: "square.and.arrow.up")
+                        }
                     }
                     Text(invite.url)
                         .font(.caption)

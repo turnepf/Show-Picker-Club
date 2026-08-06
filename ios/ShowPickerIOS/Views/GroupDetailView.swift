@@ -216,8 +216,14 @@ struct GroupDetailView: View {
                                 .truncationMode(.middle)
                                 .lineLimit(1)
                             Spacer()
-                            ShareLink(item: url) {
-                                Image(systemName: "square.and.arrow.up")
+                            // A URL, not the String — plain text loses
+                            // Messages, Mail and AirDrop from the share sheet.
+                            if let link = URL(string: url) {
+                                ShareLink(item: link,
+                                          subject: Text("Join my group on Show Picker"),
+                                          message: Text("Join my group on Show Picker and we'll see what each other is watching.")) {
+                                    Image(systemName: "square.and.arrow.up")
+                                }
                             }
                             Button {
                                 UIPasteboard.general.string = url
