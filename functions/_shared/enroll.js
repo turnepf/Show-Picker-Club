@@ -125,20 +125,29 @@ async function notifySignup(env, { full_name, email, via, slug }) {
   const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
+  // The button has to be the member page, not /members: member pages are
+  // claimed by the app's associated domains, so tapping this on iPhone/iPad
+  // opens Show Picker on the new member. /members is excluded from the AASA
+  // file (it's the web admin tool), so a button pointing there could only
+  // ever land in Safari — which is what this email used to do.
   const subject = `Show Picker Club: ${full_name} just joined (via ${via})`;
   const text = `New member.
 
 Name:  ${full_name}
 Email: ${email || '(none — external identity only)'}
 Via:   ${via}
-Page:  https://showpicker.club/${slug}
 
-Roster: https://showpicker.club/members
+Open their page (opens in the app on iPhone/iPad):
+https://showpicker.club/${slug}
+
+Roster (web admin): https://showpicker.club/members
 `;
   const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#2C2C2C;">
     <h2 style="color:#2C3E50;margin:0 0 12px;">New member: ${esc(full_name)}</h2>
     <p style="font-size:14px;">Joined via <strong>${esc(via)}</strong>${email ? ` (${esc(email)})` : ''} — <a href="https://showpicker.club/${esc(slug)}" style="color:#E67E22;">/${esc(slug)}</a></p>
-    <p style="margin-top:18px;"><a href="https://showpicker.club/members" style="display:inline-block;background:#E67E22;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600;">View roster</a></p>
+    <p style="margin-top:18px;"><a href="https://showpicker.club/${esc(slug)}" style="display:inline-block;background:#E67E22;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600;">Open ${esc(full_name.split(' ')[0])}'s page</a></p>
+    <p style="font-size:12px;color:#888;margin-top:10px;">Opens in Show Picker on iPhone or iPad; in the browser everywhere else.</p>
+    <p style="font-size:13px;margin-top:18px;"><a href="https://showpicker.club/members" style="color:#888;">Roster (web admin)</a></p>
   </div>`;
   await sendEmail(env, { to: OPERATOR_EMAIL, subject, text, html });
 }
