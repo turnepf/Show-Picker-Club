@@ -232,7 +232,7 @@ private struct NeedsPosterItemView: View {
                 Section { Text(b).foregroundStyle(b.hasPrefix("✓") ? .green : .red) }
             }
         }
-        .navigationTitle("Missing poster")
+        .navigationTitle("Missing Poster")
         .navigationBarTitleDisplayMode(.inline)
         .overlay { if working { ProgressView().controlSize(.large) } }
     }

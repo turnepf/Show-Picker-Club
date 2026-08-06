@@ -22,7 +22,7 @@ struct AccountView: View {
                             .font(.system(size: 22))
                             .foregroundColor(Theme.muted)
                     }
-                    Button("Log out") { Task { await auth.logout() } }
+                    Button("Log Out") { Task { await auth.logout() } }
                         .font(.system(size: 26, weight: .semibold))
                         .padding(.top, 12)
                     // Not `role: .destructive`: tvOS fills the capsule red and
@@ -32,7 +32,7 @@ struct AccountView: View {
                     Button {
                         showingDelete = true
                     } label: {
-                        Text("Delete account…")
+                        Text("Delete Account…")
                             .font(.system(size: 22, weight: .semibold))
                             .foregroundColor(.red)
                     }

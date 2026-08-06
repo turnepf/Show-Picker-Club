@@ -32,7 +32,7 @@ struct IPadHomeView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
-    // Unrated count for the "Rate my backlog" badge. 0 draws no badge.
+    // Unrated count for the "Rate My Shows" badge. 0 draws no badge.
     @State private var backlogCount = 0
     @State private var loading = true
     // Roster fetch threw — shown only when there's nothing to display, so an
@@ -181,9 +181,8 @@ struct IPadHomeView: View {
             }
             // Same group as the lists above rather than a separate one —
             // the gap read as a divide the nav doesn't actually have. Order
-            // matches the web sidebar and iPhone Home: Groups, Trending,
-            // Rate my backlog, Subscription audit, Vibe, Calendar, What's
-            // New, then Admin.
+            // matches iPhone Home: Groups, Trending, Rate My Shows,
+            // Subscription Audit, Vibe, then Calendar.
             Group {
                 if myMember != nil {
                     Label("Groups", systemImage: "person.2.fill")
@@ -194,17 +193,17 @@ struct IPadHomeView: View {
                     Label("Trending", systemImage: "flame")
                         .tag(SidebarItem.trending)
                 }
-                // Subscription audit and Rate my backlog are personal, so they
+                // Subscription Audit and Rate My Shows are personal, so they
                 // only appear once you're signed in — matching the web sidebar
                 // and your own MemberView.
                 if myMember != nil {
                     // .badge before .tag, like Groups above: a modifier applied
                     // after the tag wraps it, the List stops seeing a
                     // selection value on the row, and the row goes dead.
-                    Label("Rate my shows", systemImage: "star.fill")
+                    Label("Rate My Shows", systemImage: "star.fill")
                         .badge(backlogCount)
                         .tag(SidebarItem.rateBacklog)
-                    Label("Subscription audit", systemImage: "creditcard")
+                    Label("Subscription Audit", systemImage: "creditcard")
                         .tag(SidebarItem.subscriptionAudit)
                     // Vibe is personal too: opens the member's own vibe.
                     Label("Vibe", systemImage: "sparkles")
@@ -330,20 +329,20 @@ struct IPadHomeView: View {
                                 Label("Reporting", systemImage: "chart.bar.xaxis")
                             }
                             Button { selection = .adminManageMembers } label: {
-                                Label("Manage members", systemImage: "person.2.badge.gearshape")
+                                Label("Manage Members", systemImage: "person.2.badge.gearshape")
                             }
                             Button { selection = .adminUrlCleanup } label: {
                                 Label("Show Cleanup", systemImage: "link.badge.plus")
                             }
                             Button { selection = .adminVibe } label: {
-                                Label("Vibe trait scoring", systemImage: "sparkles")
+                                Label("Vibe Trait Scoring", systemImage: "sparkles")
                             }
                         }
                     }
                     Button(role: .destructive) {
                         Task { await auth.logout() }
                     } label: {
-                        Label("Log out", systemImage: "rectangle.portrait.and.arrow.right")
+                        Label("Log Out", systemImage: "rectangle.portrait.and.arrow.right")
                     }
                     Button(role: .destructive) {
                         showingDeleteAccount = true

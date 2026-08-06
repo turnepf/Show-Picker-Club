@@ -21,7 +21,7 @@ struct MemberView: View {
                     if canAdd {
                         Spacer()
                         Button { showingAdd = true } label: {
-                            Label("Add a show", systemImage: "plus")
+                            Label("Add a Show", systemImage: "plus")
                                 .font(.system(size: 24, weight: .semibold))
                         }
                     }

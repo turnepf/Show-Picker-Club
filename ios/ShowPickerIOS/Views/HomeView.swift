@@ -4,7 +4,7 @@ struct HomeView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
-    // Unrated count for the "Rate my backlog" badge. 0 draws no badge.
+    // Unrated count for the "Rate My Shows" badge. 0 draws no badge.
     @State private var backlogCount = 0
     @State private var loading = true
     // Roster fetch threw — shown only when there's nothing to display, so an
@@ -58,7 +58,7 @@ struct HomeView: View {
                 List {
                     // One nav group: My Shows leads, then the rest in the
                     // same order as the web nav and the iPad sidebar —
-                    // Groups, Rate my backlog, Subscription audit, Vibe,
+                    // Groups, Rate My Shows, Subscription Audit, Vibe,
                     // Calendar. Trending is the content section
                     // below rather than a row, same as the web at phone
                     // width. (Admin lives behind the account icon.)
@@ -117,13 +117,13 @@ struct HomeView: View {
                             NavigationLink {
                                 RateBacklogView()
                             } label: {
-                                Label("Rate my shows", systemImage: "star.fill")
+                                Label("Rate My Shows", systemImage: "star.fill")
                             }
                             .badge(backlogCount)
                             NavigationLink {
                                 SubscriptionAuditView()
                             } label: {
-                                Label("Subscription audit", systemImage: "creditcard")
+                                Label("Subscription Audit", systemImage: "creditcard")
                             }
                         }
                         // Vibe is personal: logged-in members only, opening
@@ -342,7 +342,7 @@ struct HomeView: View {
                             Button {
                                 path.append(.adminMembers)
                             } label: {
-                                Label("Manage members", systemImage: "person.2.badge.gearshape")
+                                Label("Manage Members", systemImage: "person.2.badge.gearshape")
                             }
                             Button {
                                 path.append(.adminUrlCleanup)
@@ -352,14 +352,14 @@ struct HomeView: View {
                             Button {
                                 path.append(.adminVibe)
                             } label: {
-                                Label("Vibe trait scoring", systemImage: "sparkles")
+                                Label("Vibe Trait Scoring", systemImage: "sparkles")
                             }
                         }
                     }
                     Button(role: .destructive) {
                         Task { await auth.logout() }
                     } label: {
-                        Label("Log out", systemImage: "rectangle.portrait.and.arrow.right")
+                        Label("Log Out", systemImage: "rectangle.portrait.and.arrow.right")
                     }
                     Button(role: .destructive) {
                         showingDeleteAccount = true

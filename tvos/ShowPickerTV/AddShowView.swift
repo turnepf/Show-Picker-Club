@@ -36,7 +36,7 @@ struct AddShowView: View {
                 resultsScroll
             }
             .background(Theme.background.ignoresSafeArea())
-            .navigationTitle("Add a show")
+            .navigationTitle("Add a Show")
             .navigationDestination(item: $picked) { hit in
                 confirmStep(hit)
             }
