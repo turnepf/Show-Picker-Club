@@ -4,8 +4,10 @@ struct HomeView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
-    // Unrated count for the "Rate My Shows" badge. 0 draws no badge.
-    @State private var backlogCount = 0
+    // Session-derived state (here just the unrated count behind the "Rate My
+    // Shows" badge) in one value that clears itself on logout — the same type
+    // the iPad/Mac sidebar uses. See ShowPickerCore/SessionScope.swift.
+    @State private var session = SessionScope()
     @State private var loading = true
     // Roster fetch threw — shown only when there's nothing to display, so an
     // empty Members section reads as a load failure, not an empty club.
@@ -121,7 +123,7 @@ struct HomeView: View {
                             } label: {
                                 HStack(spacing: 8) {
                                     Label("Rate My Shows", systemImage: "star.fill")
-                                    if backlogCount > 0 { CountFlag(count: backlogCount) }
+                                    if session.backlogCount > 0 { CountFlag(count: session.backlogCount) }
                                 }
                             }
                             NavigationLink {
@@ -229,7 +231,7 @@ struct HomeView: View {
                 // clear on their own; the stack and the badge don't.
                 if slug == nil {
                     path = []
-                    backlogCount = 0
+                    session.clear()
                     return
                 }
                 if let link = pendingLink {
@@ -425,7 +427,7 @@ struct HomeView: View {
             return $0.activeCount > $1.activeCount
         }
         popular = pr ?? popular
-        backlogCount = auth.isLoggedIn ? ((try? await API.rateBacklogCount()) ?? 0) : 0
+        session.backlogCount = auth.isLoggedIn ? ((try? await API.rateBacklogCount()) ?? 0) : 0
         if let link = pendingLink {
             pendingLink = nil
             route(url: link)

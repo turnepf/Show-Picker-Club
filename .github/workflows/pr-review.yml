@@ -1,0 +1,59 @@
+name: Invariants review
+
+# Reviews each PR diff against docs/INVARIANTS.md and comments what it finds.
+#
+# This is the judgement half of the safety net, and it is deliberately NOT a
+# gate: it posts a comment and always exits 0. The deterministic checks in
+# pr-checks.yml are what block a merge. A reviewer that can be wrong should not
+# be able to stop work — but it can notice what an assertion cannot express,
+# like "this new @State is derived from the session and nothing clears it on
+# logout", which is exactly how the 2026-08 Mac bug shipped.
+#
+# Required repo secret:
+#   ANTHROPIC_API_KEY — Settings → Secrets and variables → Actions.
+#   Without it the review script no-ops, so this is safe to merge before the
+#   secret exists.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: pr-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Review the diff against docs/INVARIANTS.md
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python3 scripts/invariants-review.py \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}" \
+            review.md
+
+      - name: Comment findings
+        if: hashFiles('review.md') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ ! -s review.md ]; then
+            echo "No invariant findings."
+            exit 0
+          fi
+          python3 scripts/post-pr-comment.py "$REPO" "$PR" review.md

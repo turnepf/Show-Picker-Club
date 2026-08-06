@@ -15,5 +15,8 @@ let package = Package(
     ],
     targets: [
         .target(name: "ShowPickerCore"),
+        // Runs on Linux CI (`swift test`), which is why everything in this
+        // package stays Foundation-only and UI-free. See SessionScope.swift.
+        .testTarget(name: "ShowPickerCoreTests", dependencies: ["ShowPickerCore"]),
     ]
 )

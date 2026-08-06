@@ -649,11 +649,27 @@ The moment a member edits a seeded row (changes list, notes, etc.), archives one
 ### `.github/workflows/deploy.yml`
 - Trigger: push to `main`, or manual dispatch.
 - Steps: checkout, install Node 22 + wrangler, **apply pending D1 migrations** (`bash scripts/apply-migrations.sh` — self-tracked via `schema_migrations`, runs *before* the deploy so new columns/tables exist before the code that depends on them goes live), `wrangler pages deploy public --project-name=shows --branch=main --commit-dirty=true`.
-- **Post-deploy smoke test** (15s settle + checks):
-  - `/.env` probe — must return > 10KB (i.e. the SPA shell, not the actual file).
-  - Security headers — CSP, HSTS, X-Frame-Options, Permissions-Policy must be present on `/`.
-  - Auth gates — `POST /api/shows/share`, `GET /api/reporting`, `POST /api/enrich`, `POST /api/sync-urls` must each return 401.
+- **Post-deploy smoke test**: 15s settle, then `bash scripts/smoke.sh https://showpicker.club` — the same script the nightly run uses, so there is one copy of the assertions.
 - Required secrets: `CLOUDFLARE_API_TOKEN` (Pages:Edit + D1:Edit), `CLOUDFLARE_ACCOUNT_ID`.
+
+### `.github/workflows/pr-checks.yml` ("PR checks") — the merge gate
+
+Runs on every PR to `main`. Two deterministic jobs, both on Linux:
+
+- **static** — `bash scripts/check-static.sh`, repo-shape invariants against the working tree. Every file under `functions/api/` is gated (`getSession` / `getAdminSession` / `isAdmin` / `CRON_SECRET`, or a 410 stub) unless it is named in that script's `PUBLIC_ENDPOINTS`; every retired path has a redirect; the catch-all is still a 200 rewrite; the AASA file claims `/*`, excludes API/auth/calendar, and carries the app ID; no archived web page is back under `public/`; `_headers` has no indented comment (Pages parses one as a header); the App Store id matches between the CTA and the Smart App Banner.
+- **swift** — `swift test` in `ShowPickerCore` inside the `swift:5.9` container. The package is Foundation-only and UI-free precisely so this needs no macOS runner; macOS minutes bill at 10× on a private repo. `SessionScopeTests` is the regression net for the 2026-08 logout bug.
+
+### `.github/workflows/pr-review.yml` ("Invariants review") — advisory
+
+Reads `docs/INVARIANTS.md`, sends it with the PR diff to the Claude API (`scripts/invariants-review.py`), and comments any findings (`scripts/post-pr-comment.py`). **Never blocks a merge** — it always exits 0, because a reviewer that can be wrong shouldn't be able to stop work. It covers the judgement class the assertions can't express, e.g. "this new `@State` is derived from the session and nothing clears it on logout". Needs an `ANTHROPIC_API_KEY` **Actions** secret (the vibe-scoring key is a Pages secret and is not visible here); without it the script no-ops.
+
+### `.github/workflows/security-nightly.yml` ("Nightly security + smoke")
+
+09:20 UTC daily. Runs `scripts/smoke.sh` against production plus a TLS-expiry check, and **opens a GitHub issue** when anything fails. Deploys already run the same script, but that only covers the moment of deploy — this catches drift that arrives without one (an expired secret, a Cloudflare-side change, a migration applied out of band).
+
+### `scripts/smoke.sh` and `scripts/check-static.sh`
+
+`smoke.sh <base-url>` makes live assertions: the catch-all serves the marketing page (`/.env` probe), no sign-in UI has returned to the landing page, security headers and CSP directives are present, the CSP no longer allows the retired Apple/Google/Turnstile sources, session-gated endpoints 401, admin endpoints 403, retired endpoints 410, calendar feeds 404 without their key, `/api/popular` names no members and hides `member_slugs` for an anonymous caller, every retired path 301s, and the AASA file is valid JSON served as `application/json` with its `/*` claim intact. `check-static.sh` needs no network and is the PR gate. Both print every failure rather than stopping at the first, and both run fine from a laptop.
 
 ### `.github/workflows/migrate.yml` ("Apply D1 migration")
 - Trigger: manual dispatch only, with a `file` input (bare `NNN_*.sql` resolves under `migrations/`).

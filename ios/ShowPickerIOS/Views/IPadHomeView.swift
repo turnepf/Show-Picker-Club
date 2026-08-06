@@ -32,20 +32,16 @@ struct IPadHomeView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
-    // Unrated count for the "Rate My Shows" badge. 0 draws no badge.
-    @State private var backlogCount = 0
     @State private var loading = true
     // Roster fetch threw — shown only when there's nothing to display, so an
     // empty roster reads as a load failure, not an empty club.
     @State private var loadFailed = false
-    // Slugs of members I share at least one group with. Empty until the
-    // groups load (or for a member in no groups), which is the honest answer:
-    // no groups, nobody else's lists to browse.
-    @State private var groupMemberSlugs: Set<String> = []
     @State private var selection: SidebarItem?
-    // Whose lists the sidebar's list entries show. Defaults to the logged-in
-    // member once auth resolves; tapping a member row moves focus to them.
-    @State private var focusedSlug: String?
+    // Everything derived from the signed-in session — focused member, the
+    // group roster, the unrated count — in one value that clears itself on
+    // logout. See ShowPickerCore/SessionScope.swift for why it isn't three
+    // separate @State properties any more.
+    @State private var session = SessionScope()
     // Universal link that arrived before the roster loaded; replayed by load().
     @State private var pendingLink: URL?
     // Pushes on the detail column's stack. Owned here (not by the
@@ -70,11 +66,12 @@ struct IPadHomeView: View {
     // The roster, filtered to people I'm in a group with — plus me, since the
     // window is also how I get back to my own lists.
     private var groupMembers: [Member] {
-        members.filter { $0.slug == auth.memberSlug || groupMemberSlugs.contains($0.slug) }
+        let visible = session.visibleMemberSlugs(mySlug: auth.memberSlug)
+        return members.filter { visible.contains($0.slug) }
     }
 
     private var focusedMember: Member? {
-        guard let slug = focusedSlug else { return nil }
+        guard let slug = session.focusedSlug else { return nil }
         return members.first { $0.slug == slug }
     }
 
@@ -131,7 +128,7 @@ struct IPadHomeView: View {
     // Distinguishes both "which section" and "whose lists" so switching members
     // rebuilds the detail stack even when the same list stays selected.
     private var detailKey: String {
-        "\(String(describing: selection))|\(focusedSlug ?? "")"
+        "\(String(describing: selection))|\(session.focusedSlug ?? "")"
     }
 
     // MARK: Sidebar
@@ -142,10 +139,10 @@ struct IPadHomeView: View {
             // section below re-points at whoever is focused, so without this
             // there's no visible route back to your own shows (your row in the
             // Members window may even be scrolled out of view).
-            if let me = myMember, focusedSlug != me.slug {
+            if let me = myMember, session.focusedSlug != me.slug {
                 Section {
                     Button {
-                        focusedSlug = me.slug
+                        session.focusedSlug = me.slug
                         // Keep the open list open, matching the member rows.
                         if case .list = selection {} else { selection = .list(.watching) }
                     } label: {
@@ -208,7 +205,7 @@ struct IPadHomeView: View {
                     // after it wraps the tag and the row stops selecting.
                     HStack(spacing: 8) {
                         Label("Rate My Shows", systemImage: "star.fill")
-                        if backlogCount > 0 { CountFlag(count: backlogCount) }
+                        if session.backlogCount > 0 { CountFlag(count: session.backlogCount) }
                     }
                     .tag(SidebarItem.rateBacklog)
                     Label("Subscription Audit", systemImage: "creditcard")
@@ -296,7 +293,7 @@ struct IPadHomeView: View {
 
     private func memberRow(_ m: Member) -> some View {
         Button {
-            focusedSlug = m.slug
+            session.focusedSlug = m.slug
             // Keep the open list open when refocusing; otherwise land on Watching.
             if case .list = selection {} else { selection = .list(.watching) }
         } label: {
@@ -313,7 +310,7 @@ struct IPadHomeView: View {
         }
         .buttonStyle(.plain)
         .background(
-            focusedSlug == m.slug ? Color.accentColor.opacity(0.15) : Color.clear,
+            session.focusedSlug == m.slug ? Color.accentColor.opacity(0.15) : Color.clear,
             in: RoundedRectangle(cornerRadius: 8)
         )
     }
@@ -455,41 +452,38 @@ struct IPadHomeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // Home is the launch screen on every platform
-    // (docs/PRODUCT.md#navigation-standard). On iPad the sidebar is always
-    // visible, so the only part of that rule with anything to decide is what
-    // the detail column opens on: Trending, not the focused member's Watching
-    // list. Your lists are one tap away in the sidebar either way.
     // Logging out clears the session, but the sidebar is drawn from @State
     // that AuthStore can't reach — so without this the signed-in nav simply
-    // stays on screen. `focusedSlug` still names a member, so the four lists
-    // keep rendering under "<name>'s Shows"; `groupMemberSlugs` still holds a
-    // roster, so the members window keeps listing people and their counts;
-    // and `selection` still points at a list. Every one of those rows then
-    // 401s on tap, which is what surfaces as "couldn't load".
+    // stays on screen: a focused member above their four lists, the roster
+    // below with everyone's show counts, and `selection` still pointing at a
+    // list. Every one of those rows then 401s on tap, which is what surfaced
+    // as "couldn't load".
     //
-    // Tear the signed-in state down and reload the public view. Trending is
-    // the honest landing spot: it's the one section a logged-out visitor is
-    // entitled to, and `load()` clears `groupMemberSlugs` on its own once
-    // `auth.isLoggedIn` is false.
+    // `session.clear()` is the teardown; `SessionScope` also refuses to name
+    // any visible member while signed out, so the roster stays hidden even if
+    // this never runs. Trending is the honest landing spot — the one section a
+    // logged-out visitor is entitled to.
     @MainActor
     private func resetForLoggedOut() {
-        focusedSlug = nil
-        groupMemberSlugs = []
-        backlogCount = 0
+        session.clear()
         detailPath = []
         selection = popular.isEmpty ? nil : .trending
         Task { await load() }
     }
 
+    // Home is the launch screen on every platform
+    // (docs/PRODUCT.md#navigation-standard). On iPad the sidebar is always
+    // visible, so the only part of that rule with anything to decide is what
+    // the detail column opens on: Trending, not the focused member's Watching
+    // list. Your lists are one tap away in the sidebar either way.
     private func applyInitialSelection() {
-        if focusedSlug == nil, let me = myMember {
-            focusedSlug = me.slug
+        if session.focusedSlug == nil, let me = myMember {
+            session.focusedSlug = me.slug
         }
         guard selection == nil else { return }
         if !popular.isEmpty {
             selection = .trending
-        } else if focusedSlug != nil {
+        } else if session.focusedSlug != nil {
             // Nothing trending yet (cold start, or the fetch failed) — an
             // empty detail column is worse than landing on your own lists.
             selection = .list(.watching)
@@ -501,7 +495,7 @@ struct IPadHomeView: View {
     // shows just me, which is wrong-but-safe, where falling back to the full
     // roster would be exactly the thing we removed.
     private func loadGroupMembers() async {
-        guard auth.isLoggedIn else { groupMemberSlugs = []; return }
+        guard auth.isLoggedIn else { session.groupMemberSlugs = []; return }
         guard let groups = try? await API.groups().groups else { return }
         var slugs: Set<String> = []
         for group in groups {
@@ -509,7 +503,7 @@ struct IPadHomeView: View {
                 for member in detail.members { slugs.insert(member.slug) }
             }
         }
-        groupMemberSlugs = slugs
+        session.groupMemberSlugs = slugs
     }
 
     private func load() async {
@@ -529,7 +523,7 @@ struct IPadHomeView: View {
             return $0.activeCount > $1.activeCount
         }
         popular = pr ?? popular
-        backlogCount = auth.isLoggedIn ? ((try? await API.rateBacklogCount()) ?? 0) : 0
+        session.backlogCount = auth.isLoggedIn ? ((try? await API.rateBacklogCount()) ?? 0) : 0
         await loadGroupMembers()
         if let link = pendingLink {
             pendingLink = nil
@@ -578,7 +572,7 @@ struct IPadHomeView: View {
         }
         let slug = first == "dorothy" ? "whitt" : first // mirror the web's 301
         if members.contains(where: { $0.slug == slug }) {
-            focusedSlug = slug
+            session.focusedSlug = slug
             let frag = (url.fragment ?? "").lowercased()
             selection = .list(ShowList(rawValue: frag) ?? .watching)
         } else if members.isEmpty {

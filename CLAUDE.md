@@ -14,6 +14,7 @@ Read these before making non-trivial changes — they are detailed and current:
 
 - **`docs/ARCHITECTURE.md`** — the implementation source of truth: full DB schema, complete route/auth table, enrichment pipeline, vibe system, calendar feed, CI workflows, and a "Conventions that aren't obvious" section.
 - **`docs/PRODUCT.md`** — product behavior and user-facing rules (the four lists, quick actions, auth flows).
+- **`docs/INVARIANTS.md`** — the rules that must hold across the product, each with the enforcer that checks it. Read before adding an endpoint or session-derived UI state.
 - **`docs/APP_STORE_SUBMISSION.md`** — Apple review/submission checklist.
 - **`README.md`** — setup from scratch, secrets list, deploy/backup overview.
 - **`ios/README.md`** / **`tvos/README.md`** — building, TestFlight, share extension, offline support.
@@ -48,7 +49,27 @@ scripts/           apply-migrations.sh, member-engagement.sh (operator tools)
 
 ## Commands
 
-There is **no package.json, linter, or JS test suite** — the web side has no build step. Verification is by reading, local preview, and the post-deploy smoke test.
+There is **no package.json or linter** — the web side has no build step. Verification is by reading, local preview, and three checks that run in CI and also run fine from a laptop:
+
+```bash
+bash scripts/check-static.sh
+```
+
+Repo-shape invariants, no network — the PR gate. Every API endpoint gated, redirects present, AASA well-formed, no archived web page back under `public/`.
+
+```bash
+bash scripts/smoke.sh https://showpicker.club
+```
+
+Live assertions against a running site: auth gates, security headers, public-surface leakage, redirects, universal links. Runs after every deploy and nightly.
+
+```bash
+cd ShowPickerCore && swift test
+```
+
+Unit tests for the shared core (macOS, or Linux with a Swift toolchain — the package is deliberately Foundation-only so CI needs no macOS runner). `SessionScopeTests` guards the rule that session-derived UI state dies with the session.
+
+The rules all three enforce are written down in `docs/INVARIANTS.md`; adding a rule there also extends the advisory PR review.
 
 Local preview of the site + Functions (uses a local D1 unless you point it at remote):
 

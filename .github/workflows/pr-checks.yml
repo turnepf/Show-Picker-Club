@@ -1,0 +1,43 @@
+name: PR checks
+
+# The gate that runs BEFORE a change ships — which the post-deploy smoke test,
+# by definition, cannot. Two deterministic jobs:
+#
+#   static — repo-shape invariants (scripts/check-static.sh): every API
+#            endpoint gated, redirects present, AASA well-formed, no retired
+#            web pages back under public/.
+#   swift  — ShowPickerCore unit tests on Linux. The package is deliberately
+#            Foundation-only and UI-free so this needs no macOS runner (macOS
+#            minutes bill at 10x on a private repo). SessionScope's teardown
+#            tests are the regression net for the 2026-08 logout bug.
+#
+# The judgement half lives in pr-review.yml.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# A new push supersedes the old run rather than queuing behind it.
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Static invariants
+        run: bash scripts/check-static.sh
+
+  swift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: swift:5.9
+    steps:
+      - uses: actions/checkout@v6
+      - name: ShowPickerCore tests
+        working-directory: ShowPickerCore
+        run: swift test
