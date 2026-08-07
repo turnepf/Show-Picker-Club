@@ -137,9 +137,16 @@ struct LoginView: View {
                 await sendPhoneCode()
             }
         } header: {
-            Text("What's your phone number?")
+            Text("Log in with a number already on your account")
         } footer: {
-            Text("Phone login is for members with a number on file. New here? Go back and use Apple or email.")
+            // This warning used to sit quietly under the field, and people
+            // walked straight past it: /auth/request-code deliberately answers
+            // "success" for an unknown number (so nobody can discover which
+            // numbers belong to members), the app took that at face value, and
+            // the next screen promised a text that was never sent. Someone
+            // waited for a code that could not arrive. The endpoint's silence
+            // is correct; saying this before they tap is the fix.
+            Text("**Texting only works if you've already added this number to your account.** If you're new, or you've never added a number, go back and use Apple or email instead.")
         }
     }
 
@@ -159,8 +166,12 @@ struct LoginView: View {
         } header: {
             Text("Enter your code")
         } footer: {
+            // Phrased as "if" for the phone, not "we texted": the server won't
+            // tell us whether that number is on file, so claiming we sent one
+            // is a claim we can't back. The second sentence is the way out for
+            // the person staring at a code that is never going to arrive.
             Text(channel == .phone
-                 ? "We texted a code to \(phone). It logs you in automatically."
+                 ? "If \(phone) is on your account, a code is on its way — it logs you in automatically. No text? That number isn't on file. Go back and use Apple or email."
                  : "We sent a code to \(email). It logs you in automatically.")
         }
     }

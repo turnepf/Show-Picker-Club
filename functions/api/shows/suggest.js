@@ -1,4 +1,5 @@
 import { fetchEnrichment, fetchEnrichmentById } from '../../_shared/enrichment.js';
+import { getSession } from '../../_shared/auth.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -6,6 +7,17 @@ function corsHeaders() {
 
 export async function onRequestPost(context) {
   const { request, env } = context;
+
+  // Session required (added 2026-08). This returns no member data, which is
+  // why it went unguarded for so long — but it proxies TMDB and OMDB, so an
+  // anonymous caller spends our upstream quota, unthrottled, for free. Every
+  // caller that needs it is adding a show, which needs a session anyway. The
+  // only client that ever called it without one was the web member app, and
+  // that was archived in the 2026-08 teardown.
+  const session = await getSession(request, env);
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: corsHeaders() });
+  }
 
   try {
     const body = await request.json();

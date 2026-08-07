@@ -24,12 +24,9 @@ note() { echo; echo "== $1"; }
 # session and are not 410 stubs. Adding a file here is a conscious decision to
 # publish it — that is the entire point of the list.
 #
-#   shows/suggest.js — catalog lookup for the Add-a-Show flow. Returns no
-#     member data, but it does proxy TMDB/OMDB unauthenticated, so it spends
-#     our upstream quota for anyone who calls it. Known; see docs/INVARIANTS.md.
 #   shows/[id]/actors.js — cast list for a title. Catalog data, and it reveals
 #     nothing about whose row the id belongs to.
-PUBLIC_ENDPOINTS="shows/suggest.js shows/[id]/actors.js"
+PUBLIC_ENDPOINTS="shows/[id]/actors.js"
 
 note "Deployed output contains only the marketing site"
 

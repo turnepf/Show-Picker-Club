@@ -112,6 +112,7 @@ expect_status GET  /api/recommendations 401 "picks for you"
 expect_status GET  /api/subscriptions   401 "subscription audit"
 expect_status GET  /api/groups          401 "groups"
 expect_status GET  /api/rate-backlog    401 "unrated shows"
+expect_status POST /api/shows/suggest   401 "catalog lookup (gated 2026-08: it proxies TMDB/OMDB)"
 expect_status GET  /api/passkeys        401 "registered passkeys"
 # Adding a passkey is what turns a device into a way back in, so this endpoint
 # being open would let anyone attach their own credential to any account.

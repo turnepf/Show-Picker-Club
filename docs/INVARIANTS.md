@@ -32,10 +32,11 @@ requires a session.
   example: it returns titles to anyone, but only fills in `members` for people
   in the caller's own groups, because "added by" needs a relationship a stranger
   doesn't have.
-- **Known exception, unresolved:** `functions/api/shows/suggest.js` takes an
-  unauthenticated POST and proxies TMDB/OMDB. It returns no member data, but it
-  spends our upstream quota for any caller. Rate-limiting or gating it is open
-  work.
+- *Closed 2026-08:* `functions/api/shows/suggest.js` used to take an
+  unauthenticated POST and proxy TMDB/OMDB — no member data, but an open tap on
+  our upstream quota. It requires a session now. It was found by
+  `check-static.sh` on the day that check was written, which is the argument
+  for the check.
 
 ## 2. Session-derived UI state dies with the session
 
