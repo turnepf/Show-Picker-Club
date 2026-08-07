@@ -50,6 +50,7 @@ struct IPadHomeView: View {
     @State private var detailPath: [Route] = []
     @State private var showingLogin = false
     @State private var showingDeleteAccount = false
+    @State private var showingPasskeys = false
     @State private var showingSearch = false
     @State private var showingExport = false
     // Same "NEW" badge as iPhone Home, cleared by opening Groups once.
@@ -107,6 +108,7 @@ struct IPadHomeView: View {
         .sheet(isPresented: $showingLogin) { LoginView().environmentObject(auth) }
         .sheet(isPresented: $showingDeleteAccount) { DeleteAccountView().environmentObject(auth) }
         .sheet(isPresented: $showingSearch) { SearchView().environmentObject(auth) }
+        .sheet(isPresented: $showingPasskeys) { PasskeysView().environmentObject(auth) }
         .sheet(isPresented: $showingExport) { ExportListsView().environmentObject(auth) }
         // Auth may resolve after the member list loads; land on your Watching
         // list once it does (unless the user has already picked something).
@@ -319,6 +321,11 @@ struct IPadHomeView: View {
         Group {
             if auth.isLoggedIn {
                 Menu {
+                    Button {
+                        showingPasskeys = true
+                    } label: {
+                        Label("Passkeys…", systemImage: "person.badge.key")
+                    }
                     Button {
                         showingExport = true
                     } label: {

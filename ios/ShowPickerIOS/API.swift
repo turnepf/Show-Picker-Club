@@ -612,6 +612,72 @@ enum API {
         _ = try? await URLSession.shared.data(for: URLRequest(url: url))
     }
 
+    // MARK: Passkeys
+    //
+    // Two round trips each way: the server mints a single-use challenge, the
+    // device signs it, the server verifies. Sign-in sends no identifier at
+    // all — the credential itself says who the member is.
+
+    static func passkeyRegisterBegin() async throws -> PasskeyRegistrationOptions {
+        try await postJSON("/auth/passkey-register-begin", body: [:])
+    }
+
+    // `label` is the device name the member sees in their passkey list.
+    @discardableResult
+    static func passkeyRegisterFinish(challenge: String, credentialID: String,
+                                      attestationObject: String, clientDataJSON: String,
+                                      label: String?) async throws -> Bool {
+        struct Ack: Decodable { let success: Bool? }
+        let r: Ack = try await postJSON("/auth/passkey-register-finish", body: [
+            "challenge": challenge,
+            "credential_id": credentialID,
+            "attestation_object": attestationObject,
+            "client_data_json": clientDataJSON,
+            "label": label,
+        ])
+        return r.success == true
+    }
+
+    static func passkeyBegin() async throws -> PasskeyAssertionOptions {
+        try await postJSON("/auth/passkey-begin", body: [:])
+    }
+
+    static func passkeyFinish(challenge: String, credentialID: String,
+                              authenticatorData: String, clientDataJSON: String,
+                              signature: String) async throws -> LoginResponse {
+        try await postJSON("/auth/passkey-finish", body: [
+            "challenge": challenge,
+            "credential_id": credentialID,
+            "authenticator_data": authenticatorData,
+            "client_data_json": clientDataJSON,
+            "signature": signature,
+        ])
+    }
+
+    static func passkeys() async throws -> [Passkey] {
+        struct Wrapper: Decodable { let passkeys: [Passkey] }
+        let r: Wrapper = try await get("/api/passkeys")
+        return r.passkeys
+    }
+
+    @discardableResult
+    static func deletePasskey(credentialID: String) async throws -> Bool {
+        // Credential ids are base64url, which is URL-safe, but percent-encode
+        // anyway so the path can't be shaped by the id.
+        let encoded = credentialID.addingPercentEncoding(
+            withAllowedCharacters: .alphanumerics) ?? credentialID
+        guard let url = URL(string: baseString + "/api/passkeys/" + encoded) else {
+            throw APIError.badURL
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        let (_, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw APIError.badResponse((resp as? HTTPURLResponse)?.statusCode ?? -1)
+        }
+        return true
+    }
+
     // MARK: Account deletion (App Store 5.1.1(v))
     //
     // Two-step hard delete, decoded regardless of HTTP status so the UI can

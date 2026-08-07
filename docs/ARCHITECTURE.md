@@ -43,11 +43,13 @@ database_id = "..."
 | `enroll_ip`    | TEXT             | Migration 058. Origin IP of the signup, backing the per-IP enrollment cap. Deleted with the member. |
 
 ### Login identity tables
-Login is by one-time code or Sign in with Apple — there are no stored passwords. The relevant tables are included in `schema.sql` and were introduced over time by migrations:
+Login is by passkey, one-time code, or Sign in with Apple — there are no stored passwords. The relevant tables are included in `schema.sql` and were introduced over time by migrations:
 
 - `member_emails` / `member_phones` — map an email or phone to a member; the address a login code is sent to and matched against.
 - `login_otps` — short-lived, single-use email codes (`member_slug`, `code`, `channel`, `expires_at`, `used_at`, and `ip`/`user_agent` of the requester — migration 046). SMS codes are held by Twilio Verify, not stored here, but a marker row with `code=''` still records the request (and its IP) for rate-limiting. The IP columns exist so unrequested codes (someone submitting a member's email/phone) can be traced to a source and blocked at the Cloudflare edge.
 - `member_apple_ids` — links an Apple user id (`apple_sub`) to a member, populated on first Apple sign-in by email match so later sign-ins work even behind a private-relay address.
+- `member_passkeys` (migration 062) — one row per registered passkey: `credential_id` (base64url, the primary key — globally unique, which is what lets sign-in resolve a member from the credential alone), `member_slug`, `public_key` (base64url COSE, re-imported into WebCrypto on each verification), `sign_count`, `aaguid`, a member-facing `label`, `created_at`, `last_used_at`. See [Passkeys](#passkeys).
+- `webauthn_challenges` (migration 062) — single-use challenges (`purpose` = `register` | `authenticate`, `member_slug` set for registration only, `ip`, `expires_at`). Rows are deleted as they're consumed and swept when they expire, so the table stays near-empty.
 
 ### `shows`
 | Column              | Type | Notes |
@@ -128,7 +130,7 @@ Native support: `ShowPickerCore/Sources/ShowPickerCore/Ratings.swift` defines `R
 | `expires_at`    | TEXT NOT NULL | 30 days, sliding. `/auth/check` extends it to a fresh 30 days (and re-sends the cookie with the new `Expires`) whenever the session is more than a day into its window, so an active member is never logged out for being active. Both halves have to move together — the row decides authorization, the cookie's own `Expires` decides whether the client still sends it. |
 | `created_at`    | TEXT | |
 | `last_seen_at`  | TEXT | Bumped by `/auth/check`, throttled to once per hour per session. Drives DAU/WAU/MAU in reporting. |
-| `auth_method`   | TEXT | Migration 059. How this session was authenticated: `apple` | `google` | `email` | `sms` | `demo`. NULL for sessions minted before the column existed. Counted by `/api/reporting`'s `signin_methods` (7/30/90-day windows) — the number that says whether an auth channel still earns what it costs to run. |
+| `auth_method`   | TEXT | Migration 059. How this session was authenticated: `apple` | `google` | `passkey` | `email` | `sms` | `demo`. NULL for sessions minted before the column existed. Counted by `/api/reporting`'s `signin_methods` (7/30/90-day windows) — the number that says whether an auth channel still earns what it costs to run. |
 | `platform`      | TEXT | Migration 016. One of `_shared/platform.js#KNOWN_PLATFORMS` (`iphone`, `ipad`, `mac`, `watchos`, `tvos`, `roku`, `web-small`, `web-large`), self-reported via the `X-Client-Platform` header and stamped by `/auth/check`. Deleted with the session on logout/disable — it's a live snapshot, not history; see `member_platforms` for durable per-member tracking. |
 
 ### `member_platforms`
@@ -276,6 +278,12 @@ The complete map:
 | `POST /auth/enroll`                    | `functions/auth/enroll.js`                 | POST    | signup code from `enroll_otps` |
 | `POST /auth/google`                    | `functions/auth/google.js`                 | POST    | Google ID token (inert unless `GOOGLE_CLIENT_ID` set) |
 | `GET /auth/config`                     | `functions/auth/config.js`                 | GET     | none — public flags/keys for the login UI |
+| `POST /auth/passkey-begin`             | `functions/auth/passkey-begin.js`          | POST    | none — mints a sign-in challenge; takes no identifier |
+| `POST /auth/passkey-finish`            | `functions/auth/passkey-finish.js`         | POST    | WebAuthn assertion — verifies and issues the session |
+| `POST /auth/passkey-register-begin`    | `functions/auth/passkey-register-begin.js` | POST    | session — challenge + creation options for adding a passkey |
+| `POST /auth/passkey-register-finish`   | `functions/auth/passkey-register-finish.js`| POST    | session — verifies the attestation and stores the credential |
+| `GET /api/passkeys`                    | `functions/api/passkeys.js`                | GET     | session — the caller's own registered passkeys |
+| `DELETE /api/passkeys/:id`             | `functions/api/passkeys/[id].js`           | DELETE  | session — removes one of the caller's own passkeys |
 | `POST /api/admin-member-disable`       | `functions/api/admin-member-disable.js`    | POST    | admin session |
 | `POST /api/admin-member-role`          | `functions/api/admin-member-role.js`       | POST    | admin session — promote/demote `members.is_admin`; refuses to demote the last admin |
 | `POST /api/admin-member-merge`         | `functions/api/admin-member-merge.js`      | POST    | admin session — merge a duplicate member account into the kept one, then delete the duplicate |
@@ -327,6 +335,37 @@ Admin endpoints are gated by `_shared/admin.js#isAdmin()` — a valid session wh
 Rate limits on `POST /auth/login`: 5 failed attempts per IP **and** 10 failed attempts per member account per 15 minutes → 429 with `Retry-After`. The per-member cap stops a distributed guesser who knows a member's email/phone from brute-forcing a 6-digit code across many IPs.
 
 Scheduled-job endpoints accept an `X-Cron-Secret` header compared in constant time (`_shared/secrets.js#cronAuthorized`).
+
+### Passkeys (migration 062)
+
+WebAuthn sign-in, added 2026-08. A passkey is the only login path with no third party in it: no SMS, no email delivery, no identity provider — the device signs a challenge and the server checks it against a stored public key.
+
+**A passkey never creates an account.** Registration requires a session, so a credential can only ever be added by someone who has already proved the account is theirs; an unrecognized credential at sign-in is refused, not enrolled. Enrollment stays with Apple/Google/email (see Self-enrollment below). That also means removing every passkey can't lock anybody out — the account's original method still works — which is why `DELETE /api/passkeys/:id` has no "last credential" guard.
+
+Four endpoints, challenge-then-verify in both directions:
+
+| Endpoint | Session | What it does |
+| --- | --- | --- |
+| `POST /auth/passkey-register-begin` | required | Mints a `register` challenge bound to the session's member and returns the creation options (rp, user handle, `excludeCredentials`, `residentKey: required`, `userVerification: required`). |
+| `POST /auth/passkey-register-finish` | required | Verifies the attestation and stores the credential. Capped at 10 passkeys per member. |
+| `POST /auth/passkey-begin` | none | Mints an `authenticate` challenge. Takes **no identifier** — the credentials are discoverable, so asking for an email first would leak whether an address is a member and buy nothing. The response is identical for everyone. |
+| `POST /auth/passkey-finish` | none | Verifies the assertion, resolves the member from `credential_id`, issues the session (`auth_method = 'passkey'`). |
+
+**The relying party is the site, not the app** — `showpicker.club`, overridable via `PASSKEY_RP_ID` / `PASSKEY_ORIGINS` for local preview. That's what makes one credential work across iPhone, iPad and Mac through the iCloud Keychain, and it's why the app needs the `webcredentials:showpicker.club` Associated Domains entitlement (both entitlement files) *plus* the `webcredentials` block in the AASA file. Miss either half and iOS refuses to hand the app a credential, with nothing in the logs to say why — `scripts/check-static.sh` asserts both.
+
+**Verification is hand-rolled** in `functions/_shared/webauthn.js`, because this stack has no npm and no build step (see CLAUDE.md). It contains a minimal CBOR decoder, COSE→`CryptoKey` import for ES256 (what Apple's platform authenticator uses) and RS256 (hardware-key fallback), DER→raw ECDSA signature conversion, and the RP-ID-hash / origin / challenge / flag checks. `functions/_shared/passkeys.js` holds the policy around it: relying-party config, the single-use challenge store, and a ceiling of 20 outstanding challenges per IP (starting a sign-in is unauthenticated, so the table needs a bound).
+
+Things that are deliberate rather than accidental:
+
+- **Attestation is not verified.** Registration accepts `fmt: "none"` and self-attestation. We trust the device because the member was signed in when they enrolled it, not because a manufacturer certificate says so — and verifying a chain would mean shipping root certificates we have no way to keep current.
+- **User verification is required, both ways.** The options ask for it and the server refuses any authenticator data without the UV flag, so the two can't drift apart.
+- **The signature counter check only fires when both sides are non-zero.** Apple's passkeys always report 0 and never increment; treating that as a rollback would lock out every Apple device. It still catches a cloned hardware key.
+- **Challenges are deleted on every lookup, hit or miss** — so a challenge offered up to a failed verification doesn't get a second attempt either. That, not the TTL, is what makes a captured assertion worthless.
+- **The user handle is the member slug**, which comes back on an assertion, but `credential_id` is what actually resolves the member. The handle is attacker-controlled on the wire; the credential id is matched against a row we wrote.
+
+Tests: `scripts/webauthn-test.mjs` (the cryptography — valid credentials verify, forged/replayed/wrong-origin/wrong-RP/counter-rollback ones don't) and `scripts/passkey-flow-test.mjs` (the endpoints, driven against a real SQLite database built from `schema.sql` — replay, purpose separation, cross-member isolation, disabled members). Both run in `pr-checks.yml`.
+
+Clients: iOS/iPad only. `PasskeyAuthenticator.swift` wraps `ASAuthorizationController`, `PasskeysView.swift` is the management screen (account menu on iPhone, sidebar account menu on iPad), and `LoginView` gets a "Sign in with a passkey" button above Sign in with Apple. tvOS and watchOS are unchanged — see docs/PRODUCT.md#passkeys for why.
 
 ### Self-enrollment (migration 031; approval retired in migration 058)
 
@@ -425,7 +464,7 @@ every other device, and on a shared link that context is the whole point.
 
 ## Universal links
 
-`public/.well-known/apple-app-site-association` (served as `application/json` via a `_headers` rule — it has no extension) claims showpicker.club URLs for the iOS app (`NQ6AJVVBBJ.net.patrickturner.showpickerios`): member pages and `/` open in-app when tapped from another app; API/auth/calendar/admin paths and web-only pages (`/vibe`, `/subscriptions`, legal pages) are excluded and stay in the browser. The app side is the `applinks:showpicker.club` Associated Domains entitlement (iOS + Catalyst) plus `route(url:)` handlers in `HomeView` (iPhone: pushes the member) and `IPadHomeView` (focuses the member in the sidebar, honoring the `#list` fragment web URLs carry). Cold-launch links park in `pendingLink` until the roster loads; the `dorothy` → `whitt` slug redirect is mirrored. Apple's CDN caches the AASA file (~hours), so entitlement/AASA changes take a re-install or a day to propagate to devices.
+`public/.well-known/apple-app-site-association` (served as `application/json` via a `_headers` rule — it has no extension) claims showpicker.club URLs for the iOS app (`NQ6AJVVBBJ.net.patrickturner.showpickerios`): member pages and `/` open in-app when tapped from another app; API/auth/calendar/admin paths and web-only pages (`/vibe`, `/subscriptions`, legal pages) are excluded and stay in the browser. The same file's `webcredentials` block is what authorizes the app to use passkeys scoped to the domain — see [Passkeys](#passkeys-migration-062). The app side is the `applinks:showpicker.club` and `webcredentials:showpicker.club` Associated Domains entitlements (iOS + Catalyst) plus `route(url:)` handlers in `HomeView` (iPhone: pushes the member) and `IPadHomeView` (focuses the member in the sidebar, honoring the `#list` fragment web URLs carry). Cold-launch links park in `pendingLink` until the roster loads; the `dorothy` → `whitt` slug redirect is mirrored. Apple's CDN caches the AASA file (~hours), so entitlement/AASA changes take a re-install or a day to propagate to devices.
 
 ## Native clients
 
@@ -654,9 +693,10 @@ The moment a member edits a seeded row (changes list, notes, etc.), archives one
 
 ### `.github/workflows/pr-checks.yml` ("PR checks") — the merge gate
 
-Runs on every PR to `main`. Two deterministic jobs, both on Linux:
+Runs on every PR to `main`. Three deterministic jobs, all on Linux:
 
-- **static** — `bash scripts/check-static.sh`, repo-shape invariants against the working tree. Every file under `functions/api/` is gated (`getSession` / `getAdminSession` / `isAdmin` / `CRON_SECRET`, or a 410 stub) unless it is named in that script's `PUBLIC_ENDPOINTS`; every retired path has a redirect; the catch-all is still a 200 rewrite; the AASA file claims `/*`, excludes API/auth/calendar, and carries the app ID; no archived web page is back under `public/`; `_headers` has no indented comment (Pages parses one as a header); the App Store id matches between the CTA and the Smart App Banner.
+- **static** — `bash scripts/check-static.sh`, repo-shape invariants against the working tree. Every file under `functions/api/` is gated (`getSession` / `getAdminSession` / `isAdmin` / `CRON_SECRET`, or a 410 stub) unless it is named in that script's `PUBLIC_ENDPOINTS`; every retired path has a redirect; the catch-all is still a 200 rewrite; the AASA file claims `/*`, excludes API/auth/calendar, carries the app ID, and keeps the `webcredentials` block passkeys need (with both entitlement files carrying the matching association); no archived web page is back under `public/`; `_headers` has no indented comment (Pages parses one as a header); the App Store id matches between the CTA and the Smart App Banner.
+- **webauthn** — `node scripts/webauthn-test.mjs` and `node scripts/passkey-flow-test.mjs` on Node 22. Passkey verification is hand-rolled (no npm in this stack) and decides who gets a session, so both the cryptography and the endpoint flows are asserted rather than reviewed. No network; the flow test builds a real SQLite database from `schema.sql`.
 - **swift** — `swift test` in `ShowPickerCore` inside the `swift:5.9` container. The package is Foundation-only and UI-free precisely so this needs no macOS runner; macOS minutes bill at 10× on a private repo. `SessionScopeTests` is the regression net for the 2026-08 logout bug.
 
 ### `.github/workflows/pr-review.yml` ("Invariants review") — advisory
@@ -669,7 +709,7 @@ Reads `docs/INVARIANTS.md`, sends it with the PR diff to the Claude API (`script
 
 ### `scripts/smoke.sh` and `scripts/check-static.sh`
 
-`smoke.sh <base-url>` makes live assertions: the catch-all serves the marketing page (`/.env` probe), no sign-in UI has returned to the landing page, security headers and CSP directives are present, the CSP no longer allows the retired Apple/Google/Turnstile sources, session-gated endpoints 401, admin endpoints 403, retired endpoints 410, calendar feeds 404 without their key, `/api/popular` names no members and hides `member_slugs` for an anonymous caller, every retired path 301s, and the AASA file is valid JSON served as `application/json` with its `/*` claim intact. `check-static.sh` needs no network and is the PR gate. Both print every failure rather than stopping at the first, and both run fine from a laptop.
+`smoke.sh <base-url>` makes live assertions: the catch-all serves the marketing page (`/.env` probe), no sign-in UI has returned to the landing page, security headers and CSP directives are present, the CSP no longer allows the retired Apple/Google/Turnstile sources, session-gated endpoints 401, admin endpoints 403, retired endpoints 410, calendar feeds 404 without their key, `/api/popular` names no members and hides `member_slugs` for an anonymous caller, every retired path 301s, and the AASA file is valid JSON served as `application/json` with its `/*` claim intact. `check-static.sh` needs no network and is the PR gate. Both print every failure rather than stopping at the first, and both run fine from a laptop. `scripts/webauthn-test.mjs` and `scripts/passkey-flow-test.mjs` (Node 22, no network, no dependencies) round out the gate — see [Passkeys](#passkeys-migration-062).
 
 ### `.github/workflows/migrate.yml` ("Apply D1 migration")
 - Trigger: manual dispatch only, with a `file` input (bare `NNN_*.sql` resolves under `migrations/`).

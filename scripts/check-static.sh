@@ -139,6 +139,13 @@ if not [c for c in comps if c.get("/") == "/*" and not c.get("exclude")]:
     print(f"::error::{path} no longer claims /* — member-page links would stop opening the app")
     sys.exit(1)
 
+# Passkeys are scoped to the domain, not the app: without this block iOS
+# refuses to hand the app a credential for showpicker.club, and passkey
+# sign-in fails with nothing in the logs to say why.
+if "NQ6AJVVBBJ.net.patrickturner.showpickerios" not in d.get("webcredentials", {}).get("apps", []):
+    print(f"::error::{path} is missing the webcredentials block — passkey sign-in would break")
+    sys.exit(1)
+
 # Anything the app can't render must stay excluded, or iOS swallows the URL and
 # shows the user nothing.
 required = ["/api/*", "/auth/*", "/calendar/*", "/.well-known/*"]
@@ -148,7 +155,17 @@ if missing:
     print(f"::error::{path} must exclude {', '.join(missing)}")
     sys.exit(1)
 print("  ok  AASA claims /*, excludes API/auth/calendar, carries the app ID")
+print("  ok  AASA carries the webcredentials block passkeys need")
 PY
+
+# The other half of the same association. Both entitlement files, because the
+# Catalyst build has its own and they have drifted before.
+for ent in ios/ShowPickerIOS/ShowPickerIOS.entitlements \
+           ios/ShowPickerIOS/ShowPickerIOS-Catalyst.entitlements; do
+  grep -q 'webcredentials:showpicker.club' "$ent" \
+    || err "$ent is missing webcredentials:showpicker.club — passkey sign-in needs it (docs/ARCHITECTURE.md#passkeys)"
+done
+ok "both entitlement files carry the webcredentials association"
 
 # _headers must serve it as JSON or iOS ignores the file entirely.
 grep -A2 '^/\.well-known/apple-app-site-association' public/_headers | grep -qi 'application/json' \

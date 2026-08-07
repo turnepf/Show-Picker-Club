@@ -50,7 +50,19 @@ Platforms: iPhone/iPad show it above Network on the show card; Apple TV shows th
 
 ## Authentication
 
-A member logs in with a one-time code sent to their phone (SMS via Twilio Verify) or email (via Resend, validated against `login_otps`), or with Sign in with Apple (web, iOS, and tvOS). All paths resolve to an existing member and set a 30-day HttpOnly session cookie. There are no static per-member passwords.
+A member logs in with a passkey (iPhone/iPad), a one-time code sent to their phone (SMS via Twilio Verify) or email (via Resend, validated against `login_otps`), or with Sign in with Apple (iOS and tvOS). All paths resolve to an existing member and set a 30-day HttpOnly session cookie. There are no static per-member passwords.
+
+### Passkeys
+
+Face ID or Touch ID instead of waiting for a code. Shipped 2026-08.
+
+**Adding one is a deliberate step, taken while signed in** — account menu → Passkeys → "Add a passkey for this iPhone". That ordering is the security model, not an inconvenience: a passkey is added by someone who has already proved the account is theirs, and only then becomes a way back in. It is never a way to sign up, and an unknown passkey at the sign-in screen is refused rather than turned into an account.
+
+Once added, the login screen's "Sign in with a passkey" is one tap and a biometric — no email address, no code, nothing to type. The passkey lives in the iCloud Keychain, so adding it on an iPhone covers that member's iPad and Mac too.
+
+The Passkeys screen lists what's registered (label, last used) and removes any of them. Removing all of them is allowed and can't lock anyone out: the account's original sign-in method — Apple, Google, or an email code — never goes away.
+
+**Platforms:** iPhone and iPad (including Mac Catalyst) get both sign-in and management. **tvOS doesn't** — passkey sign-in on a TV means a cross-device QR handshake with a phone, which is a worse experience than the code the Apple TV already asks for; it keeps Sign in with Apple and one-time codes. **watchOS doesn't** — it has no login of its own, taking its session from the iPhone over WatchConnectivity. **The web doesn't** — there is no web sign-in any more (see Web app status). The server-side relying party is the domain rather than the app, so a web client could be added later without members re-enrolling anything.
 
 Failed logins are rate-limited: 5 attempts per IP in any 15-minute window returns a 429 with `Retry-After`. Failed-login rows are pruned daily.
 
@@ -308,11 +320,20 @@ A few intentional omissions:
   90-day window — sessions slide, so a member who never signs in again is
   invisible in a short window — before retiring anything.
 
+  **Passkeys (shipped 2026-08) are the migration path this entry was
+  missing.** A member who enrolled by email and won't use Sign in with Apple
+  no longer has to — they can add a passkey from inside a session and never
+  need a code again, and `sessions.auth_method = 'passkey'` in Reporting says
+  how many have. Retiring the code channels now means getting members onto
+  passkeys first, not getting them onto Apple. Note the ordering constraint
+  it does *not* solve: a passkey can only be added from a signed-in session,
+  so the code channels have to outlive the last member who hasn't added one.
+
   What has to be true first:
   - Nobody's *only* way in is the channel being removed. `enrolled_via` says
     how each account was created; a member who enrolled by email and has
-    never signed in with Apple needs a linked Apple identity (or a migration
-    path) before their email code disappears.
+    never signed in with Apple needs a linked Apple identity, a passkey, or
+    some other migration path before their email code disappears.
   - The web keeps whatever the Apple apps can't cover. Sign in with Apple on
     the web is a different integration from the native one; if the web is
     reduced to a marketing site (see Web app status), this gets easier.

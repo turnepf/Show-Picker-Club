@@ -49,7 +49,7 @@ scripts/           apply-migrations.sh, member-engagement.sh (operator tools)
 
 ## Commands
 
-There is **no package.json or linter** — the web side has no build step. Verification is by reading, local preview, and three checks that run in CI and also run fine from a laptop:
+There is **no package.json or linter** — the web side has no build step. Verification is by reading, local preview, and four checks that run in CI and also run fine from a laptop:
 
 ```bash
 bash scripts/check-static.sh
@@ -62,6 +62,15 @@ bash scripts/smoke.sh https://showpicker.club
 ```
 
 Live assertions against a running site: auth gates, security headers, public-surface leakage, redirects, universal links. Runs after every deploy and nightly.
+
+```bash
+node scripts/webauthn-test.mjs && node scripts/passkey-flow-test.mjs
+```
+
+Passkeys, in two suites: the hand-rolled WebAuthn verification (no npm in this
+stack, so `_shared/webauthn.js` implements CBOR/COSE/ECDSA itself), and the
+endpoint flows driven against a real SQLite database built from `schema.sql`.
+No network, no dependencies — Node 22 for `node:sqlite`.
 
 ```bash
 cd ShowPickerCore && swift test
@@ -102,7 +111,7 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 ## Architecture essentials
 
 - **Routing** is Pages Functions file routing (`functions/api/shows/[id].js` → `/api/shows/:id`) layered over `public/_redirects` (SPA fallback `/*` → `/index.html`). The full route/method/auth table is in `docs/ARCHITECTURE.md#routing`.
-- **Auth:** one-time codes (SMS via Twilio Verify, email via Resend), Sign in with Apple, Sign in with Google (web). Sessions are 30-day HttpOnly cookies; `_shared/auth.js#getSession(request, env)` is the gate every session-protected endpoint calls first. Admin = a session whose member row has `members.is_admin = 1`, checked via `_shared/admin.js#isAdmin()` — admin rights live in the DB, not in code or a secret.
+- **Auth:** passkeys (WebAuthn, iOS/iPad — added from inside a session, never a way to sign up), one-time codes (SMS via Twilio Verify, email via Resend), Sign in with Apple, Sign in with Google (web). Sessions are 30-day HttpOnly cookies; `_shared/auth.js#getSession(request, env)` is the gate every session-protected endpoint calls first. Admin = a session whose member row has `members.is_admin = 1`, checked via `_shared/admin.js#isAdmin()` — admin rights live in the DB, not in code or a secret.
 - **Everyone self-enrolls.** Signing up (email code / Apple / Google) is the only way a member row is created, and a new member is immediately a full member. Retired 2026-08 (migration 058): `members.approved` and the held state, the `signup_requests` table, the `/join` form, the operator approval queue, `admin-member-approve`, manual member creation, `SELF_ENROLL`, and `DEMO_APPLE_FALLBACK`. `createMember()` lives in `functions/_shared/create-member.js` and only `_shared/enroll.js` calls it. **The matching Swift cleanup is deferred until after the App Store launch** — the iOS app keeps its (now inert, gracefully-degrading) approval queue, signup models, and `WelcomeIntroPanel.swift` so the launch archive stays on known-good code. Don't touch the Apple targets for this until those apps have shipped.
 - **Public surface is deliberately tiny** (roster first names, Trending, catalog-level show detail, auth endpoints). Everything derived from members' libraries requires a session. Keep it that way.
 - **Enrichment:** synchronous on insert (`_shared/enrichment.js`, TMDB preferred, OMDB fallback), plus background `POST /api/enrich` fired from member pages. New rows inherit a sibling copy's real `network_url` when one exists.

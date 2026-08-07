@@ -3,13 +3,19 @@ name: PR checks
 # The gate that runs BEFORE a change ships — which the post-deploy smoke test,
 # by definition, cannot. Two deterministic jobs:
 #
-#   static — repo-shape invariants (scripts/check-static.sh): every API
-#            endpoint gated, redirects present, AASA well-formed, no retired
-#            web pages back under public/.
-#   swift  — ShowPickerCore unit tests on Linux. The package is deliberately
-#            Foundation-only and UI-free so this needs no macOS runner (macOS
-#            minutes bill at 10x on a private repo). SessionScope's teardown
-#            tests are the regression net for the 2026-08 logout bug.
+#   static   — repo-shape invariants (scripts/check-static.sh): every API
+#              endpoint gated, redirects present, AASA well-formed, no retired
+#              web pages back under public/.
+#   swift    — ShowPickerCore unit tests on Linux. The package is deliberately
+#              Foundation-only and UI-free so this needs no macOS runner (macOS
+#              minutes bill at 10x on a private repo). SessionScope's teardown
+#              tests are the regression net for the 2026-08 logout bug.
+#   webauthn — passkeys, two suites. webauthn-test.mjs covers the signature
+#              verification (hand-rolled, because this stack has no npm);
+#              passkey-flow-test.mjs drives the real endpoint handlers against
+#              a real SQLite database for replay and cross-member isolation.
+#              Both decide who gets a session, so a forged assertion being
+#              accepted has to fail a test, not a code review.
 #
 # The judgement half lives in pr-review.yml.
 
@@ -31,6 +37,19 @@ jobs:
       - uses: actions/checkout@v6
       - name: Static invariants
         run: bash scripts/check-static.sh
+
+  webauthn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Passkey signature verification
+        run: node scripts/webauthn-test.mjs
+      - name: Passkey endpoint flows
+        run: node scripts/passkey-flow-test.mjs
 
   swift:
     runs-on: ubuntu-latest

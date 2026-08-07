@@ -14,6 +14,7 @@ struct HomeView: View {
     @State private var loadFailed = false
     @State private var showingLogin = false
     @State private var showingDeleteAccount = false
+    @State private var showingPasskeys = false
     @State private var showingExport = false
     @State private var showingSearch = false
     @State private var shakePick: Show?
@@ -203,6 +204,9 @@ struct HomeView: View {
             .sheet(isPresented: $showingDeleteAccount) {
                 DeleteAccountView().environmentObject(auth)
             }
+            .sheet(isPresented: $showingPasskeys) {
+                PasskeysView().environmentObject(auth)
+            }
             .sheet(isPresented: $showingExport) {
                 ExportListsView().environmentObject(auth)
             }
@@ -342,6 +346,11 @@ struct HomeView: View {
         Group {
             if auth.isLoggedIn {
                 Menu {
+                    Button {
+                        showingPasskeys = true
+                    } label: {
+                        Label("Passkeys…", systemImage: "person.badge.key")
+                    }
                     Button {
                         showingExport = true
                     } label: {

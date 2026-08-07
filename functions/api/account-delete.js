@@ -115,11 +115,14 @@ export async function onRequestPost(context) {
     // separate audit table to scrub any more (migration 058).
     env.DB.prepare('DELETE FROM members WHERE slug = ?').bind(slug),
   ];
-  // member_google_ids only exists from migration 031 — include it, retry
-  // without on older databases (batch is all-or-nothing).
+  // member_google_ids (migration 031) and member_passkeys (062) postdate the
+  // original delete path — include them, and retry without on a database
+  // that hasn't taken those migrations yet (batch is all-or-nothing).
   try {
     await env.DB.batch([
       env.DB.prepare('DELETE FROM member_google_ids WHERE member_slug = ?').bind(slug),
+      env.DB.prepare('DELETE FROM member_passkeys WHERE member_slug = ?').bind(slug),
+      env.DB.prepare('DELETE FROM webauthn_challenges WHERE member_slug = ?').bind(slug),
       ...statements,
     ]);
   } catch (e) {

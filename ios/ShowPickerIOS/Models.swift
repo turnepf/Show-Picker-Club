@@ -836,6 +836,50 @@ struct LoginResponse: Codable {
     }
 }
 
+// MARK: Passkeys
+//
+// The WebAuthn options the server hands back. Only the fields the native
+// client actually uses are decoded — AuthenticationServices builds the rest
+// of the request itself, so pubKeyCredParams / authenticatorSelection (which
+// the web would need) are ignored here on purpose.
+
+// /auth/passkey-register-begin
+struct PasskeyRegistrationOptions: Decodable {
+    let challenge: String
+    let user: PasskeyUser
+
+    struct PasskeyUser: Decodable {
+        /// base64url member slug — the WebAuthn user handle.
+        let id: String
+        let name: String
+        let displayName: String
+    }
+}
+
+// /auth/passkey-begin. No credential list: the passkeys are discoverable, so
+// the device already knows which ones it holds for showpicker.club.
+struct PasskeyAssertionOptions: Decodable {
+    let challenge: String
+    let rpId: String
+}
+
+// One registered passkey, as /api/passkeys lists them.
+struct Passkey: Decodable, Identifiable {
+    let credentialId: String
+    let label: String?
+    let createdAt: String?
+    let lastUsedAt: String?
+
+    var id: String { credentialId }
+
+    enum CodingKeys: String, CodingKey {
+        case credentialId = "credential_id"
+        case label
+        case createdAt = "created_at"
+        case lastUsedAt = "last_used_at"
+    }
+}
+
 // /api/account-delete response — `sent` for the send-a-code step, `deleted`
 // for the confirm step; `error` carries no_email / admin_must_demote_first /
 // invalid / rate_limited on failure.

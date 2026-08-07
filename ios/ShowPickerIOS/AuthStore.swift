@@ -65,6 +65,42 @@ final class AuthStore: ObservableObject {
         throw API.APIError.badResponse(401)
     }
 
+    // Sign in with a passkey: fetch a challenge, let the device sign it, hand
+    // the assertion back. No email or phone number is involved at any point —
+    // the credential itself identifies the member.
+    //
+    // Throws PasskeyAuthenticator.Failure.canceled when the member dismisses
+    // the system sheet, which callers treat as "nothing happened".
+    @MainActor
+    func loginWithPasskey() async throws {
+        let options = try await API.passkeyBegin()
+        let assertion = try await PasskeyAuthenticator().assert(challenge: options.challenge)
+        let r = try await API.passkeyFinish(challenge: options.challenge,
+                                            credentialID: assertion.credentialID,
+                                            authenticatorData: assertion.authenticatorData,
+                                            clientDataJSON: assertion.clientDataJSON,
+                                            signature: assertion.signature)
+        guard r.success == true else { throw API.APIError.badResponse(401) }
+        await refresh()
+    }
+
+    // Add a passkey to the account this session already belongs to. A passkey
+    // is never a way to sign up — it's added from inside a session, by someone
+    // who has already proved the account is theirs.
+    @MainActor
+    func registerPasskey(label: String) async throws {
+        let options = try await API.passkeyRegisterBegin()
+        let credential = try await PasskeyAuthenticator().register(
+            challenge: options.challenge,
+            userName: options.user.name,
+            userID: options.user.id)
+        _ = try await API.passkeyRegisterFinish(challenge: options.challenge,
+                                                credentialID: credential.credentialID,
+                                                attestationObject: credential.attestationObject,
+                                                clientDataJSON: credential.clientDataJSON,
+                                                label: label)
+    }
+
     // Finish an email self-enrollment (the /auth/login step answered
     // needsName). Creates the account and signs it in.
     @MainActor

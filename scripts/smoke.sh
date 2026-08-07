@@ -112,6 +112,11 @@ expect_status GET  /api/recommendations 401 "picks for you"
 expect_status GET  /api/subscriptions   401 "subscription audit"
 expect_status GET  /api/groups          401 "groups"
 expect_status GET  /api/rate-backlog    401 "unrated shows"
+expect_status GET  /api/passkeys        401 "registered passkeys"
+# Adding a passkey is what turns a device into a way back in, so this endpoint
+# being open would let anyone attach their own credential to any account.
+expect_status POST /auth/passkey-register-begin  401 "passkey enrollment"
+expect_status POST /auth/passkey-register-finish 401 "passkey enrollment (finish)"
 
 note "Admin gate (no session → 403)"
 

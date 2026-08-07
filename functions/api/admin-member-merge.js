@@ -150,12 +150,17 @@ export async function onRequestPost(context) {
     env.DB.prepare('DELETE FROM members WHERE slug = ?1').bind(source),
   ];
 
-  // member_google_ids only exists from migration 031 — include it, retry
-  // without on older databases (batch is all-or-nothing).
+  // member_google_ids (migration 031) and member_passkeys (062) postdate the
+  // original merge — repoint them too, and retry without on a database that
+  // hasn't taken those migrations (batch is all-or-nothing). Credential ids
+  // are globally unique, so moving them can't collide with the target's own.
   try {
     await env.DB.batch([
       env.DB.prepare(
         'UPDATE member_google_ids SET member_slug = ?2 WHERE member_slug = ?1'
+      ).bind(source, target),
+      env.DB.prepare(
+        'UPDATE member_passkeys SET member_slug = ?2 WHERE member_slug = ?1'
       ).bind(source, target),
       ...statements,
     ]);

@@ -149,6 +149,15 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    printf "0x4AAA..."    | wrangler pages secret put TURNSTILE_SITE_KEY   --project-name shows
    printf "0x4AAB..."    | wrangler pages secret put TURNSTILE_SECRET_KEY --project-name shows
    ```
+   **Passkeys.** No configuration and no vendor — the relying party is the
+   domain itself, so this works as soon as `.well-known/apple-app-site-association`
+   is served (it already carries the `webcredentials` block) and the app has
+   the `webcredentials:showpicker.club` entitlement. Members add a passkey
+   from inside a signed-in session (account menu → Passkeys); a passkey can
+   never create an account. The non-secret `PASSKEY_RP_ID` / `PASSKEY_ORIGINS`
+   vars exist only to point a local `wrangler pages dev` preview at its own
+   origin. See `docs/ARCHITECTURE.md#passkeys-migration-062`.
+
    Members can also permanently delete their own account (account menu →
    "Delete account…", confirmed with an emailed code).
 

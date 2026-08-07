@@ -20,9 +20,9 @@ CREATE TABLE IF NOT EXISTS members (
   enroll_ip TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   last_login_at TEXT,
-  -- How they last got in: 'apple' | 'google' | 'email' | 'sms' | 'demo'.
-  -- Durable for the same reason last_login_at is — session rows are deleted
-  -- on logout, disable and deletion.
+  -- How they last got in: 'apple' | 'google' | 'passkey' | 'email' | 'sms' |
+  -- 'demo'. Durable for the same reason last_login_at is — session rows are
+  -- deleted on logout, disable and deletion.
   last_login_method TEXT,
   -- Calendar feed usage (migration 061): a subscribed client polls on its own
   -- schedule, so these say whether the feed is actually in use.
@@ -63,6 +63,35 @@ CREATE TABLE IF NOT EXISTS member_google_ids (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS member_passkeys (
+  -- base64url credential id from the authenticator; globally unique, which is
+  -- what lets sign-in resolve a member from the credential alone.
+  credential_id TEXT PRIMARY KEY,
+  member_slug TEXT NOT NULL REFERENCES members(slug),
+  -- base64url COSE public key exactly as the authenticator produced it.
+  public_key TEXT NOT NULL,
+  -- Apple's platform authenticator always reports 0, so the clone check only
+  -- applies when both the stored and incoming counters are non-zero.
+  sign_count INTEGER NOT NULL DEFAULT 0,
+  aaguid TEXT,
+  label TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  last_used_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_member_passkeys_member ON member_passkeys(member_slug);
+
+-- Single-use WebAuthn challenges, deleted as they're consumed and swept when
+-- they expire. Near-empty in steady state.
+CREATE TABLE IF NOT EXISTS webauthn_challenges (
+  challenge TEXT PRIMARY KEY,
+  purpose TEXT NOT NULL,          -- 'register' | 'authenticate'
+  member_slug TEXT,               -- set for registration only
+  ip TEXT,
+  expires_at TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_webauthn_challenges_expiry ON webauthn_challenges(expires_at);
+
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL,
@@ -71,9 +100,9 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at TEXT,
   last_seen_at TEXT,
   platform TEXT,
-  -- How this session was authenticated: 'apple' | 'google' | 'email' | 'sms'
-  -- | 'demo'. members.enrolled_via covers account creation; this covers the
-  -- ongoing cost of each channel.
+  -- How this session was authenticated: 'apple' | 'google' | 'passkey' |
+  -- 'email' | 'sms' | 'demo'. members.enrolled_via covers account creation;
+  -- this covers the ongoing cost of each channel.
   auth_method TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_auth_method ON sessions(auth_method, created_at);

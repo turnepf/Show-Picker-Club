@@ -8,8 +8,9 @@ catch different classes of mistake:
 |---|---|---|
 | `scripts/check-static.sh` | every PR | Repo-shape facts: gates present, redirects present, AASA well-formed |
 | `ShowPickerCore` tests (`swift test`) | every PR | Logic in the shared core, including session teardown |
+| Passkey tests (`scripts/webauthn-test.mjs`, `scripts/passkey-flow-test.mjs`) | every PR | Passkey signature verification and the endpoint flows around it |
 | `scripts/smoke.sh` | after deploy, and nightly | Live behavior: auth gates, headers, leakage, redirects |
-| Invariants review (`.github/workflows/pr-review.yml`) | every PR | Judgement calls the three above can't express |
+| Invariants review (`.github/workflows/pr-review.yml`) | every PR | Judgement calls the four above can't express |
 
 The review workflow reads *this file* and checks the diff against it, so adding
 a rule here is how you extend it. Write rules as things that must be true, and
@@ -71,6 +72,27 @@ about on every device that doesn't have the app.
   slow to undo.
 - The new-signup operator email depends on all of this: its button is a member
   page precisely so it opens the app.
+- The file's `webcredentials` block, and the matching
+  `webcredentials:showpicker.club` in **both** entitlement files, are what let
+  the app use a passkey scoped to the domain. Lose either half and passkey
+  sign-in fails with nothing in the logs to explain it.
+
+## 3a. A passkey is added from a session, never in place of one
+
+Registering a passkey requires an existing session; signing in with an
+unrecognized credential is refused, not enrolled. A passkey is therefore always
+an *addition* to an account someone already proved was theirs — which is also
+why removing every passkey is safe, and why `DELETE /api/passkeys/:id` needs no
+"last credential" guard.
+
+- Challenges are single-use and typed. A `register` challenge cannot authorize
+  a sign-in, an `authenticate` challenge cannot enroll a credential, and a
+  registration challenge minted for one member cannot be completed by another.
+- A credential id already registered is never re-pointed at a second account.
+- `/auth/passkey-begin` takes no identifier and answers identically for
+  everyone — it must not become a way to probe who is a member.
+- Enforced by `scripts/passkey-flow-test.mjs` (endpoint flows) and
+  `scripts/webauthn-test.mjs` (signature verification), both in `pr-checks.yml`.
 
 ## 4. The web is a marketing site
 

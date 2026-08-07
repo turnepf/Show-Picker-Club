@@ -54,6 +54,17 @@ struct LoginView: View {
 
     private var chooseSection: some View {
         Section {
+            // First, because for a returning member it's one tap and Face ID —
+            // no code to wait for and nothing to type. It only works once a
+            // passkey has been added from inside a session, so everything
+            // below it stays exactly as it was for anyone who hasn't.
+            Button {
+                Task { await signInWithPasskey() }
+            } label: {
+                Label("Sign in with a passkey", systemImage: "person.badge.key")
+            }
+            .disabled(submitting)
+
             SignInWithAppleButton(.continue) { request in
                 request.requestedScopes = [.email, .fullName]
             } onCompletion: { result in
@@ -189,6 +200,29 @@ struct LoginView: View {
     }
 
     // MARK: Actions
+
+    private func signInWithPasskey() async {
+        errorText = nil
+        submitting = true
+        defer { submitting = false }
+        do {
+            try await auth.loginWithPasskey()
+            dismiss()
+        } catch PasskeyAuthenticator.Failure.canceled {
+            // Dismissed the sheet, or had no passkey to offer. Either way
+            // they're still looking at the other options — say nothing.
+        } catch PasskeyAuthenticator.Failure.noCredentials {
+            errorText = "No passkey for Show Picker on this device. Sign in another way, then add one from the account menu."
+        } catch let e as API.APIError where e.status == 401 {
+            // Verified locally but the server didn't know the credential —
+            // the passkey outlived the account, or it was removed.
+            errorText = "That passkey isn't registered any more. Sign in another way and add a new one."
+        } catch let e as API.APIError where e.status == 429 {
+            errorText = "Too many attempts. Try again in 15 minutes."
+        } catch {
+            errorText = "Couldn't reach sign-in. Check your connection, or continue with email."
+        }
+    }
 
     private func handleApple(_ result: Result<ASAuthorization, Error>) async {
         errorText = nil

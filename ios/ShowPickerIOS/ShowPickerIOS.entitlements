@@ -9,6 +9,7 @@
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:showpicker.club</string>
+		<string>webcredentials:showpicker.club</string>
 	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
