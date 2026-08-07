@@ -1,5 +1,6 @@
 import SwiftUI
 import AuthenticationServices
+import UIKit
 
 // Log in / sign up: identifier-first, one decision per screen. Step 1 picks a
 // channel (Apple / email / phone), step 2 takes the identifier, step 3 the
@@ -8,8 +9,17 @@ import AuthenticationServices
 // With self-enroll off server-side, unknown identities simply get the old
 // "not linked to a member" error and nothing else changes.
 struct LoginView: View {
-    private enum Step { case choose, email, phone, code, name }
+    private enum Step { case choose, email, phone, code, name, passkeyOffer }
     private enum Channel { case email, phone, apple }
+
+    // "Not now" on the passkey offer, as a reference-date timestamp. Declining
+    // has to survive the session — the guidance on passkey upgrade prompts is
+    // that a decline is answered, not re-asked on the next sign-in. Re-offered
+    // after this long, because getting members onto passkeys is what makes
+    // retiring the code channels possible (docs/PRODUCT.md#backlog); a decline
+    // that lasts forever quietly gives that up.
+    @AppStorage("passkeyOfferDeclinedAt") private var passkeyOfferDeclinedAt = 0.0
+    private static let reofferAfter: TimeInterval = 30 * 24 * 60 * 60
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
@@ -33,17 +43,25 @@ struct LoginView: View {
                 case .phone: phoneSection
                 case .code: codeSection
                 case .name: nameSection
+                case .passkeyOffer: passkeyOfferSection
                 }
                 if let err = errorText {
                     Section { Text(err).foregroundStyle(.red).font(.callout) }
                 }
             }
-            .navigationTitle("Log in or sign up")
+            .navigationTitle(step == .passkeyOffer ? "You're in" : "Log in or sign up")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                if step != .choose {
-                    ToolbarItem(placement: .topBarLeading) { Button("Back") { goBack() } }
+                // On the passkey offer they're already signed in, so there is
+                // nothing to cancel and nowhere to go back to — the only exits
+                // are "Add a passkey" and "Not now", both of which close the
+                // sheet. Anything else here would read as a way to undo the
+                // login it just completed.
+                if step != .passkeyOffer {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                    if step != .choose {
+                        ToolbarItem(placement: .topBarLeading) { Button("Back") { goBack() } }
+                    }
                 }
             }
             .overlay { if submitting { ProgressView().controlSize(.large) } }
@@ -170,6 +188,24 @@ struct LoginView: View {
         }
     }
 
+    // Offered once a code sign-in has already succeeded — the moment the
+    // member has just proved who they are and just felt the friction this
+    // removes. Never a gate: they're signed in either way, and both buttons
+    // close the sheet.
+    private var passkeyOfferSection: some View {
+        Section {
+            continueButton(title: "Add a passkey", disabled: false) {
+                await acceptPasskeyOffer()
+            }
+            Button("Not now") { declinePasskeyOffer() }
+                .disabled(sending || submitting)
+        } header: {
+            Text("Skip the code next time")
+        } footer: {
+            Text("A passkey signs you in with Face ID or Touch ID — no code to wait for. It's stored in your iCloud Keychain, so this covers your iPhone, iPad and Mac. You can add or remove one later from the account menu.")
+        }
+    }
+
     @ViewBuilder
     private func continueButton(title: String, disabled: Bool,
                                 action: @escaping () async -> Void) -> some View {
@@ -197,6 +233,63 @@ struct LoginView: View {
         case .code where channel == .phone: step = .phone
         default: step = .choose
         }
+    }
+
+    // MARK: Finishing a sign-in
+
+    /// Every successful non-passkey sign-in ends here. Offers a passkey when
+    /// the member has none and hasn't recently said no; otherwise closes the
+    /// sheet exactly as before.
+    private func finishLogin() async {
+        guard await shouldOfferPasskey() else {
+            dismiss()
+            return
+        }
+        errorText = nil
+        step = .passkeyOffer
+    }
+
+    private func shouldOfferPasskey() async -> Bool {
+        // Not after Sign in with Apple. That's already one tap and Face ID —
+        // a passkey would save them nothing, so the offer would be a screen
+        // added to an instant flow. The codes are what a passkey replaces, and
+        // an Apple member who later falls back to a code gets asked then.
+        if channel == .apple { return false }
+
+        let declined = Date(timeIntervalSinceReferenceDate: passkeyOfferDeclinedAt)
+        if passkeyOfferDeclinedAt > 0, Date().timeIntervalSince(declined) < Self.reofferAfter {
+            return false
+        }
+        // Passkeys sync through the iCloud Keychain, so one added on the
+        // member's iPhone already covers their iPad — "does this account have
+        // any" is the question worth asking, not "does this device".
+        // A failure here (offline, older server) means don't interrupt.
+        guard let existing = try? await API.passkeys() else { return false }
+        return existing.isEmpty
+    }
+
+    private func acceptPasskeyOffer() async {
+        errorText = nil
+        sending = true
+        defer { sending = false }
+        do {
+            try await auth.registerPasskey(label: UIDevice.current.name)
+            dismiss()
+        } catch PasskeyAuthenticator.Failure.canceled {
+            // Backing out of the system sheet is an answer. Record it and let
+            // them go — they're signed in, and re-asking here would be the
+            // nagging this prompt is supposed to avoid.
+            declinePasskeyOffer()
+        } catch {
+            // Keep them on the step so "Not now" is still there, but say what
+            // happened rather than closing on a silent failure.
+            errorText = API.failureLine(error, action: "add the passkey")
+        }
+    }
+
+    private func declinePasskeyOffer() {
+        passkeyOfferDeclinedAt = Date().timeIntervalSinceReferenceDate
+        dismiss()
     }
 
     // MARK: Actions
@@ -245,7 +338,7 @@ struct LoginView: View {
             do {
                 switch try await auth.loginWithApple(identityToken: token,
                                                      fullName: name.isEmpty ? nil : name) {
-                case .success: dismiss()
+                case .success: await finishLogin()
                 case .needsName: show(.name)
                 }
             } catch let e as API.APIError where e.status == 400 {
@@ -318,11 +411,11 @@ struct LoginView: View {
             if channel == .phone {
                 try await auth.loginWithPhone(phone: phone.trimmingCharacters(in: .whitespaces),
                                               code: trimmedCode)
-                dismiss()
+                await finishLogin()
             } else {
                 switch try await auth.loginWithEmail(email: email.trimmingCharacters(in: .whitespaces),
                                                      code: trimmedCode) {
-                case .success: dismiss()
+                case .success: await finishLogin()
                 case .needsName: show(.name)   // valid signup code, no account yet
                 }
             }
@@ -349,14 +442,14 @@ struct LoginView: View {
         do {
             if channel == .apple, let token = appleToken {
                 switch try await auth.loginWithApple(identityToken: token, fullName: name) {
-                case .success: dismiss()
+                case .success: await finishLogin()
                 case .needsName: errorText = "Something went wrong — try Apple sign-in again."
                 }
             } else {
                 try await auth.enroll(email: email.trimmingCharacters(in: .whitespaces),
                                       code: code.trimmingCharacters(in: .whitespaces),
                                       fullName: name)
-                dismiss()
+                await finishLogin()
             }
         } catch let e as API.APIError where e.status == 400 {
             errorText = "Enter your first and last name."

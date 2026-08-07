@@ -60,6 +60,14 @@ Face ID or Touch ID instead of waiting for a code. Shipped 2026-08.
 
 Once added, the login screen's "Sign in with a passkey" is one tap and a biometric — no email address, no code, nothing to type. The passkey lives in the iCloud Keychain, so adding it on an iPhone covers that member's iPad and Mac too.
 
+**The offer comes after a code sign-in, not before one.** A member who signs in with an email or phone code — or who creates an account that way — lands on a final "Skip the code next time" step inside the same sheet, offering to add a passkey then and there. That moment is the whole design: they have just proved who they are (so registration is allowed) and just felt the friction the passkey removes. It is never a gate — they are signed in either way, and both buttons close the sheet.
+
+Four rules keep it an offer rather than a nag:
+- **Only when they have none.** Passkeys sync through the iCloud Keychain, so one added on an iPhone already covers that member's iPad — the check is "does this account have any passkey", not "does this device". If the check can't run (offline), the sheet just closes as it always did.
+- **Not after Sign in with Apple.** That is already one tap and Face ID, so a passkey would save those members nothing and the offer would just be a screen bolted onto an instant flow. Codes are what a passkey replaces. An Apple member who later falls back to a code gets asked then.
+- **"Not now" sticks**, including backing out of the system sheet, which is also an answer. It's re-offered after 30 days rather than never: getting members onto passkeys is what makes retiring the code channels possible (see Backlog), so a permanent decline would quietly give that up.
+- **Passkey sign-ins skip it entirely**, and the account menu is always there for anyone who said no.
+
 The Passkeys screen lists what's registered (label, last used) and removes any of them. Removing all of them is allowed and can't lock anyone out: the account's original sign-in method — Apple, Google, or an email code — never goes away.
 
 **Platforms:** iPhone and iPad (including Mac Catalyst) get both sign-in and management. **tvOS doesn't** — passkey sign-in on a TV means a cross-device QR handshake with a phone, which is a worse experience than the code the Apple TV already asks for; it keeps Sign in with Apple and one-time codes. **watchOS doesn't** — it has no login of its own, taking its session from the iPhone over WatchConnectivity. **The web doesn't** — there is no web sign-in any more (see Web app status). The server-side relying party is the domain rather than the app, so a web client could be added later without members re-enrolling anything.
@@ -72,7 +80,7 @@ The member roster and Trending are public, but browsing a member's lists require
 
 The landing page (`/`) shows:
 
-1. **My Shows link** — appears for logged-in members, jumps to their own page. Logged-out visitors instead get a join-pitch card ("Create your free account") when self-enrollment is open, and the login row reads "Log in or sign up".
+1. **My Shows link** — appears for logged-in members, jumps to their own page. Logged-out visitors instead get a join-pitch card explaining what an account adds, under **one** button reading "Log in or sign up". One, not a "Create your free account" / "Already a member?" pair: both opened the same sheet, and the sheet is identifier-first — it works out whether you're new or returning from what you type. Two buttons to one destination only asked people to classify themselves before anything had happened. The button's label matches the sheet's own title on purpose, so a returning member taps it and lands on a screen that says the same words.
 2. **Trending** — top 10 shows by how many members added them in the last 30 days. Tap + to add to your own list. Seed-only members are excluded from this calculation.
 3. **Members** — the six members with the longest Watching lists are featured at the top (Awaiting count is the tiebreaker). A "Browse all members ▾" disclosure underneath reveals the rest of the roster, alphabetized, so anyone is reachable. The point of the featured row is to lead with members who actually have something on their list worth looking at.
 4. **Search all libraries** — opens a modal that searches every active show across every member by title or actor. Each result shows the owning member and the list it's on; logged-in users can tap + to add to their own list.

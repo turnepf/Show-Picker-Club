@@ -170,14 +170,12 @@ struct IPadHomeView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.vertical, 4)
+                    // One button — the sheet is identifier-first and sorts new
+                    // from returning itself, so a second row to the same
+                    // destination was only a decision to make. Matches iPhone
+                    // Home and the sheet's own title.
                     Button { showingLogin = true } label: {
-                        Label("Create your free account", systemImage: "person.crop.circle.badge.plus")
-                    }
-                    // Same sheet — identifier-first, so it handles both — but
-                    // a returning member shouldn't have to read "create an
-                    // account" and guess it signs them in too.
-                    Button { showingLogin = true } label: {
-                        Label("Already a member? Log in",
+                        Label("Log in or sign up",
                               systemImage: "rectangle.portrait.and.arrow.forward")
                     }
                 }

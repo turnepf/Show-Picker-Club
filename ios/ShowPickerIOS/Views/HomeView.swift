@@ -86,19 +86,18 @@ struct HomeView: View {
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                             .padding(.vertical, 4)
+                            // One button, because the sheet is identifier-first
+                            // and works out whether you're new or returning on
+                            // its own. Two buttons to the same destination only
+                            // asked people to classify themselves before
+                            // anything had happened. The label matches the
+                            // sheet's own title, so a returning member taps
+                            // "Log in or sign up" and lands on a screen that
+                            // says the same thing.
                             Button {
                                 showingLogin = true
                             } label: {
-                                Label("Create your free account", systemImage: "person.crop.circle.badge.plus")
-                            }
-                            // Same sheet — it's identifier-first, so it works
-                            // out whether you're new or returning. But a
-                            // returning member shouldn't have to read "create
-                            // an account" and guess that it also signs them in.
-                            Button {
-                                showingLogin = true
-                            } label: {
-                                Label("Already a member? Log in",
+                                Label("Log in or sign up",
                                       systemImage: "rectangle.portrait.and.arrow.forward")
                             }
                             Text("Browse what the club is watching below — no account needed.")
