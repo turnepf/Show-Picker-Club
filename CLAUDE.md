@@ -113,7 +113,7 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 
 ## Deploys, migrations, and CI
 
-- **Push to `main` deploys production automatically** (`.github/workflows/deploy.yml`), then smoke-tests: `/.env` must serve the SPA shell, security headers must be present, and auth-gated endpoints must 401.
+- **Push to `main` deploys production automatically** (`.github/workflows/deploy.yml`), then smoke-tests: an unknown path must serve the marketing page, `/.env` must expose no environment content, security headers must be present, and auth-gated endpoints must 401. The smoke step retries for ~2 minutes — the edge keeps answering from the previous bundle for a while after `wrangler` returns, so a first-attempt failure means "not propagated yet", not "broken".
 - **`deploy.yml` applies pending D1 migrations automatically**, in the same run, before the Pages deploy step (`scripts/apply-migrations.sh`, self-tracked via `schema_migrations`). Merging a migration in the same PR as the code that depends on it is the normal path and needs no extra operator step. The manual "Apply D1 migration" workflow (Actions tab → pick the file) is only for applying a migration *ahead of* merging its code, or running one against prod outside of a `main` push.
 - Other workflows: daily D1 backup to Google Drive (`backup.yml`), daily demo reset, and scheduled enrichment/vibe/watch-URL fills — the scheduled ones call admin endpoints with an `X-Cron-Secret` header.
 

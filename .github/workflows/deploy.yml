@@ -15,7 +15,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Was 5, which the smoke retries above can now come close to on a slow run.
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v6
 
@@ -45,7 +46,23 @@ jobs:
             --branch=main \
             --commit-dirty=true
 
+      # Cloudflare's edge is not serving the new deploy the instant wrangler
+      # returns, and a single probe 15 seconds later reported failures that
+      # were really just the previous bundle still answering — a route added
+      # by this very deploy 405'd where the new code answers 401. So retry:
+      # only a site that is still wrong after a couple of minutes is a failing
+      # deploy. A genuine break still reports, just two minutes later.
       - name: Post-deploy smoke test
         run: |
           sleep 15  # let the deploy propagate
-          bash scripts/smoke.sh https://showpicker.club
+          for attempt in 1 2 3 4; do
+            if bash scripts/smoke.sh https://showpicker.club; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 4 ]; then
+              echo "Attempt $attempt failed — the edge may still be serving the previous deploy. Retrying in 30s."
+              sleep 30
+            fi
+          done
+          echo "Smoke test still failing after 4 attempts over ~2 minutes."
+          exit 1

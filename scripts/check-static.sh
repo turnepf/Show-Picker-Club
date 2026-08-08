@@ -51,11 +51,12 @@ ok "expected marketing files present"
 
 note "Marketing page"
 
-# The smoke test's leaked-path probe greps for this marker. If the page loses
-# it, that probe silently stops proving anything.
+# The smoke test's catch-all probe greps for this marker to prove an unknown
+# path rendered the marketing page. If the page loses it, that probe silently
+# stops proving anything.
 grep -q 'id="shelf"' public/index.html \
   && ok "index.html keeps the id=\"shelf\" smoke marker" \
-  || err "index.html lost id=\"shelf\" — scripts/smoke.sh's /.env probe depends on it"
+  || err "index.html lost id=\"shelf\" — scripts/smoke.sh's catch-all probe depends on it"
 
 # The CTA link and the Smart App Banner must name the same listing; they drifted
 # apart once already when the listing was re-created.

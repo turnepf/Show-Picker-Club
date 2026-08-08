@@ -38,8 +38,16 @@ note() { echo; echo "== $1"; }
 # copy of the previous deploy and make a broken one look fine.
 cb() { echo "$1?nocache=$RANDOM$RANDOM"; }
 
+# Every request goes out looking like a browser. Bare curl asking a production
+# domain for paths like /.env is indistinguishable from a vulnerability
+# scanner, and Cloudflare will sometimes answer it with a block page instead of
+# the site — correct behavior at the edge, but it used to fail this suite for a
+# reason that had nothing to do with the deploy.
+UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
+get() { curl -sS -A "$UA" "$@"; }
+
 status() { # method path -> http code
-  curl -sS -o /dev/null -w "%{http_code}" -X "$1" \
+  get -o /dev/null -w "%{http_code}" -X "$1" \
     -H "Content-Type: application/json" -d '{}' "$(cb "${BASE}$2")"
 }
 
@@ -55,19 +63,46 @@ expect_status() { # method path expected label
 
 note "Marketing page + catch-all"
 
-# Leaked-path probe: the catch-all must serve the marketing page, not a real
-# dotfile. Asserted by content, not byte count — the page went from 177KB (the
-# old SPA) to ~15KB in the 2026-08 teardown, and a size floor would eventually
-# trip for the wrong reason.
-if curl -sS "$(cb "$BASE/.env")" | grep -q 'id="shelf"'; then
-  ok "/.env serves the marketing page"
+# The catch-all must serve the marketing page for any path that isn't a real
+# file — that's what lets a shared /patrick link and every stale bookmark land
+# somewhere sensible. Asserted by content, not byte count: the page went from
+# 177KB (the old SPA) to ~15KB in the 2026-08 teardown, and a size floor would
+# eventually trip for the wrong reason.
+#
+# This used to probe /.env and fold two questions into one assertion, which is
+# why it failed on deploys that were fine: the edge sometimes answers a
+# scanner-shaped request with a block page. The leak question is asked
+# separately below, on terms that don't depend on what Cloudflare decides to do
+# with it. Retried because one dropped response shouldn't fail a deploy.
+catchall=""
+for attempt in 1 2 3; do
+  catchall=$(get "$(cb "$BASE/no-such-page-$RANDOM")")
+  printf '%s' "$catchall" | grep -q 'id="shelf"' && break
+  [ "$attempt" -lt 3 ] && sleep 5
+done
+if printf '%s' "$catchall" | grep -q 'id="shelf"'; then
+  ok "catch-all serves the marketing page"
 else
-  err "/.env probe did not return the marketing page — secrets may be leaking"
+  err "an unknown path did not return the marketing page — see public/_redirects"
+fi
+
+# Leaked-path probe, asked the way it actually matters. Nothing under public/
+# is a dotfile, so /.env should never resolve — but what would make it a real
+# incident is env content coming back, not which non-answer the edge chose.
+# The marketing page and a Cloudflare block page are both fine; KEY=value is
+# not. Named secrets are listed in README.md#secrets.
+dotenv=$(get "$(cb "$BASE/.env")")
+if printf '%s' "$dotenv" | grep -qE '^[A-Z][A-Z0-9_]{2,}=.'; then
+  err "/.env returned environment-variable assignments — secrets are leaking"
+elif printf '%s' "$dotenv" | grep -qE 'CLOUDFLARE_API_TOKEN|TWILIO_|RESEND_API_KEY|ANTHROPIC_API_KEY|OMDB_API_KEY|TMDB_API_KEY|CRON_SECRET'; then
+  err "/.env named a known secret — secrets are leaking"
+else
+  ok "/.env exposes no environment content"
 fi
 
 # The web member app is gone. If any of these strings come back, a build has
 # resurrected the SPA or its login UI.
-home=$(curl -sS "$(cb "$BASE/")")
+home=$(get "$(cb "$BASE/")")
 for banned in "Sign in with Apple" "id=\"loginModal\"" "shell.js" "show-renderer.js"; do
   if printf '%s' "$home" | grep -qF "$banned"; then
     err "landing page contains \"$banned\" — the retired web app is back (docs/PRODUCT.md#web-app-status)"
@@ -79,7 +114,7 @@ printf '%s' "$home" | grep -qF 'apps.apple.com/app/id' \
 
 note "Security headers"
 
-headers=$(curl -sSI "$(cb "$BASE/")")
+headers=$(get -I "$(cb "$BASE/")")
 for h in content-security-policy strict-transport-security x-frame-options \
          x-content-type-options permissions-policy; do
   if echo "$headers" | grep -qi "^$h:"; then ok "$h present"; else err "missing header $h"; fi
@@ -139,7 +174,7 @@ note "Public surface leaks nothing member-derived"
 # Trending is public on purpose — the titles are the club's taste. But logged
 # out it must name nobody: "added by" needs a relationship a stranger doesn't
 # have. This is the endpoint behind the marketing page's shelf.
-popular=$(curl -sS "$(cb "$BASE/api/popular")")
+popular=$(get "$(cb "$BASE/api/popular")")
 if printf '%s' "$popular" | grep -q '"shows"'; then
   ok "/api/popular responds"
 else
@@ -162,7 +197,7 @@ note "Retired paths redirect to the marketing page"
 
 for path in /join /setup /requests /admin /welcome /groups /rate-backlog \
             /subscriptions /vibe /members /reporting /url-cleanup /vibe-admin; do
-  code=$(curl -sS -o /dev/null -w "%{http_code}" "$(cb "${BASE}${path}")")
+  code=$(get -o /dev/null -w "%{http_code}" "$(cb "${BASE}${path}")")
   if [ "$code" = "301" ] || [ "$code" = "308" ]; then
     ok "$path → $code"
   else
@@ -174,12 +209,12 @@ note "Universal links (apple-app-site-association)"
 
 # A broken AASA silently breaks every universal link on every device, and
 # Apple's CDN caches it for hours — so a bad deploy is expensive to undo.
-aasa_headers=$(curl -sSI "$(cb "$BASE/.well-known/apple-app-site-association")")
+aasa_headers=$(get -I "$(cb "$BASE/.well-known/apple-app-site-association")")
 echo "$aasa_headers" | grep -qi '^content-type: *application/json' \
   && ok "AASA served as application/json" \
   || err "AASA is not application/json — iOS will ignore it (see public/_headers)"
 
-aasa=$(curl -sS "$(cb "$BASE/.well-known/apple-app-site-association")")
+aasa=$(get "$(cb "$BASE/.well-known/apple-app-site-association")")
 if printf '%s' "$aasa" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; then
   ok "AASA is valid JSON"
 else
