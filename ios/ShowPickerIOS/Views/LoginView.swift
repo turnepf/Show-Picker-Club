@@ -407,9 +407,13 @@ struct LoginView: View {
             show(.code)
         } catch let e as API.APIError where e.status == 429 {
             errorText = "Too many codes requested. Try again in an hour."
+        } catch let e as API.APIError where e.status == 502 {
+            // The server was reached and the mail provider refused the address
+            // — distinct from no network, and not something retrying fixes.
+            errorText = "We couldn't send an email to that address. Try a different one, or go back and continue with Apple."
         } catch {
             // Unknown addresses return success on purpose, so a failure here
-            // is delivery or connectivity — never the address.
+            // is delivery or connectivity — never the address being unknown.
             errorText = "Couldn't send the code. Check your connection and try again."
         }
     }

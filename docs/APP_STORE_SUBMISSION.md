@@ -31,6 +31,11 @@ pre-populated, and it is what the Review notes point at.
       ```
       - `DEMO_LOGIN_EMAIL` + `DEMO_LOGIN_CODE` → the email/code reviewer login
         (`functions/auth/login.js`).
+      - The demo address never receives mail: `request-code` short-circuits it
+        and the fixed code is what signs in, so `demo@example.com` is fine even
+        though Resend refuses to deliver to it. (Before 2026-08 it didn't
+        short-circuit, the refusal surfaced as "Couldn't send the code", and
+        that rejected tvOS 1.2 — see `docs/ARCHITECTURE.md#demo-account`.)
       - There is no `DEMO_APPLE_FALLBACK` any more (removed 2026-08). Signup is
         open, so an unrecognized Apple ID becomes a real member instead of
         landing in the demo (`functions/auth/apple.js`).

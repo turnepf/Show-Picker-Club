@@ -16,6 +16,10 @@ name: PR checks
 #              a real SQLite database for replay and cross-member isolation.
 #              Both decide who gets a session, so a forged assertion being
 #              accepted has to fail a test, not a code review.
+#   authcodes — the email login/signup code flow, same harness, with a fake
+#              Resend that refuses reserved domains the way the real one does.
+#              App Review rejected tvOS 1.2 over a code that never arrived;
+#              that failure now has a test.
 #
 # The judgement half lives in pr-review.yml.
 
@@ -50,6 +54,17 @@ jobs:
         run: node scripts/webauthn-test.mjs
       - name: Passkey endpoint flows
         run: node scripts/passkey-flow-test.mjs
+
+  authcodes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Email login and signup code flows
+        run: node scripts/auth-code-flow-test.mjs
 
   swift:
     runs-on: ubuntu-latest

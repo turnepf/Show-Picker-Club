@@ -120,6 +120,8 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    The bypass (in `functions/auth/login.js`) only ever unlocks the configured
    email and only when both secrets are set; leave them unset to disable it.
    Put the same email + code in App Store Connect → App Review Information.
+   The address never has to receive mail — `/auth/request-code` short-circuits
+   it and sends nothing, because the fixed code above is what signs in.
 
    The demo member's data resets itself: each demo sign-in snapshots the
    account as a baseline and anything a visitor changes is wiped back to it

@@ -9,6 +9,7 @@ catch different classes of mistake:
 | `scripts/check-static.sh` | every PR | Repo-shape facts: gates present, redirects present, AASA well-formed |
 | `ShowPickerCore` tests (`swift test`) | every PR | Logic in the shared core, including session teardown |
 | Passkey tests (`scripts/webauthn-test.mjs`, `scripts/passkey-flow-test.mjs`) | every PR | Passkey signature verification and the endpoint flows around it |
+| Auth code tests (`scripts/auth-code-flow-test.mjs`) | every PR | The email login/signup code flow: codes that arrive, and failures that are reported |
 | `scripts/smoke.sh` | after deploy, and nightly | Live behavior: auth gates, headers, leakage, redirects |
 | Invariants review (`.github/workflows/pr-review.yml`) | every PR | Judgement calls the four above can't express |
 
@@ -121,6 +122,29 @@ signature.
 `createMember()` is called from one place, `functions/_shared/enroll.js`. There
 is no operator-created path and no approval step. Anything that needs a member
 to exist goes through enrollment.
+
+## 6a. A requested code arrives, or the caller is told why
+
+*Broke in 2026-08.* App Review rejected tvOS 1.2 under 2.1(a): "unable to
+receive the OTP code to sign in with email (no code received even when using
+any other email)". Two separate faults, both invisible from the code:
+`request-code` mailed a login code to `DEMO_LOGIN_EMAIL` — a reserved domain
+Resend refuses with a 422, surfaced as a 502 one screen before the fixed demo
+code would have worked — and the signup-code branch re-checked a Turnstile
+token, which fails closed for native clients and dropped every signup code the
+apps asked for behind `{success: true}`.
+
+- The demo login never depends on a mailbox. `request-code` sends nothing for
+  `DEMO_LOGIN_EMAIL`; `DEMO_LOGIN_CODE` is what signs in.
+- Turnstile is a web-only gate, checked once, at the front door. Nothing
+  downstream re-checks the token: it is single-use, and native clients have
+  none.
+- A guard that stops abuse may fail silently. A failed *delivery* may not — it
+  says nothing about who is a member, so it returns `502 send_failed` for
+  members and strangers alike, and the apps say so instead of blaming the
+  network.
+- Enforced by `scripts/auth-code-flow-test.mjs`, whose fake Resend refuses
+  reserved domains the way the real one does.
 
 ## 7. Platform parity is stated, not assumed
 

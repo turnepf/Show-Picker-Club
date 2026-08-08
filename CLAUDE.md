@@ -73,6 +73,15 @@ endpoint flows driven against a real SQLite database built from `schema.sql`.
 No network, no dependencies — Node 22 for `node:sqlite`.
 
 ```bash
+node scripts/auth-code-flow-test.mjs
+```
+
+The email login/signup code flow on the same harness, with a fake Resend that
+refuses reserved domains the way the real one does — the demo account sending
+no mail, native signup codes not being gated on a captcha no app can pass, and
+a delivery failure surfacing instead of hiding behind `{success: true}`.
+
+```bash
 cd ShowPickerCore && swift test
 ```
 

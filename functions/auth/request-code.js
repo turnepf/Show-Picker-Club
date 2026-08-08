@@ -100,12 +100,27 @@ export async function onRequestPost(context) {
   // a failed/missing challenge returns the same 403 whether or not the email
   // belongs to a member (checking it later would leak membership: unknown =>
   // success, known => captcha-error). Native requests (no Origin) skip this.
-  let captchaVerified = false;
-  if (requireCaptcha) {
-    if (!(await turnstileOk(env, body.turnstile_token, ip))) {
-      return json({ error: 'captcha' }, 403);
-    }
-    captchaVerified = true;
+  // This is the ONLY Turnstile check on the email path — the token is
+  // single-use, and the branches downstream must not re-check it.
+  if (requireCaptcha && !(await turnstileOk(env, body.turnstile_token, ip))) {
+    return json({ error: 'captcha' }, 403);
+  }
+
+  // ---- Reviewer / demo account: nothing to send ----
+  // The demo login signs in with a fixed code (DEMO_LOGIN_CODE, checked in
+  // /auth/login), so there is no code to mail — and mailing one is actively
+  // harmful: DEMO_LOGIN_EMAIL is a throwaway address, and Resend rejects
+  // reserved domains like example.com outright (422). That 422 became a 502
+  // here, the apps showed "Couldn't send the code", and App Review never
+  // reached the screen where the fixed code would have worked — which is
+  // exactly how tvOS 1.2 was rejected on 2026-08-08. Answering success with
+  // an empty mailbox is the honest reply: the code the reviewer already has
+  // is the code that works. Gated on both secrets AND a real member row, the
+  // same three conditions /auth/login requires, so a half-configured demo
+  // falls through to the normal flow instead of dead-ending here.
+  const demoEmail = demoLoginAddress(env);
+  if (emailInput && emailInput === demoEmail && await hasMemberEmail(env, demoEmail)) {
+    return json({ success: true });
   }
 
   let memberSlug;
@@ -117,9 +132,12 @@ export async function onRequestPost(context) {
     if (!row) {
       // Unknown email — this is a signup: send a signup code instead. Either
       // way the response is the same { success: true }, so callers can't
-      // probe which emails belong to members.
-      await maybeSendSignupCode(context, emailInput, ip, body.turnstile_token, captchaVerified);
-      return json({ success: true });
+      // probe which emails belong to members. A delivery failure is the one
+      // thing worth reporting, and it's safe to: whether Resend accepts an
+      // address doesn't depend on whether it's a member, so both branches
+      // 502 alike.
+      const sent = await maybeSendSignupCode(context, emailInput, ip);
+      return sent === 'send_failed' ? json({ error: 'send_failed' }, 502) : json({ success: true });
     }
     memberSlug = row.member_slug;
     recipients = [emailInput];
@@ -128,7 +146,11 @@ export async function onRequestPost(context) {
     const { results } = await env.DB.prepare(
       'SELECT email FROM member_emails WHERE member_slug = ? ORDER BY is_primary DESC'
     ).bind(memberSlug).all();
-    recipients = (results || []).map(r => r.email);
+    // Same rule as the email branch above, for the by-slug caller: the demo
+    // address is never mailed. A demo member with a second, real address
+    // still gets a code there.
+    recipients = (results || []).map(r => r.email)
+      .filter(e => String(e).trim().toLowerCase() !== demoEmail);
     if (recipients.length === 0) {
       return json({ success: true });
     }
@@ -152,16 +174,39 @@ export async function onRequestPost(context) {
   return json({ success: true });
 }
 
-// Signup-code path for unknown emails. All failures are
-// silent — the caller already returned { success: true } shape regardless,
-// and every guard here (Turnstile, global circuit breaker, per-IP and
-// per-email caps) exists to stop abuse, not to inform the abuser.
-async function maybeSendSignupCode(context, email, ip, turnstileToken, captchaVerified = false) {
+// The demo/reviewer address, or null when the demo login isn't fully
+// configured — mirroring /auth/login, which needs BOTH secrets before it will
+// honor the fixed code. With one of them missing there is no fixed code to
+// sign in with, so the address has to keep receiving real ones.
+function demoLoginAddress(env) {
+  const email = (env.DEMO_LOGIN_EMAIL || '').trim().toLowerCase();
+  return email && env.DEMO_LOGIN_CODE ? email : null;
+}
+
+// /auth/login's demo branch also falls through when the address belongs to no
+// member (it has no session to issue), so the short-circuit here checks the
+// same thing rather than dead-ending a misconfigured demo.
+async function hasMemberEmail(env, email) {
+  const row = await env.DB.prepare(
+    'SELECT member_slug FROM member_emails WHERE LOWER(email) = ? LIMIT 1'
+  ).bind(email).first();
+  return !!row;
+}
+
+// Signup-code path for unknown emails. The abuse guards here (global circuit
+// breaker, per-IP and per-email caps) fail silently — they exist to stop an
+// abuser, not to inform one, and the caller returns { success: true }
+// regardless. A failed *delivery* is different: it says nothing about who is
+// a member, and swallowing it is what leaves someone staring at a code screen
+// that will never fill. Returns 'send_failed' in that one case.
+async function maybeSendSignupCode(context, email, ip) {
   const { env } = context;
-  // The web caller already verified the (single-use) token upstream; re-checking
-  // here would consume it a second time and always fail. Native callers (no
-  // Origin, captchaVerified=false) still get their own check.
-  if (!captchaVerified && !(await turnstileOk(env, turnstileToken, ip))) return;
+  // No Turnstile check here. It belongs to the WEB form, and the caller has
+  // already resolved it (verified, or 403 before we ever got here). Repeating
+  // it fails closed for every native client — iOS and tvOS can't mint a token
+  // — which silently dropped every signup code the apps asked for until
+  // 2026-08. Enumeration is unaffected: a caller that got past the front door
+  // gets the same reply for a member and a stranger.
   if (await enrollmentThrottled(env, ip)) return;
   // Per-email cap: 3 signup codes per hour.
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -176,7 +221,8 @@ async function maybeSendSignupCode(context, email, ip, turnstileToken, captchaVe
     'INSERT INTO enroll_otps (email, code, ip, expires_at) VALUES (?, ?, ?, ?)'
   ).bind(email, code, ip, expiresAt).run();
   const { subject, text, html } = signupCodeEmail(code);
-  await sendEmail(env, { to: [email], subject, text, html });
+  const result = await sendEmail(env, { to: [email], subject, text, html });
+  return result.ok ? undefined : 'send_failed';
 }
 
 async function overRateLimit(env, memberSlug) {
