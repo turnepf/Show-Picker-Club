@@ -46,10 +46,13 @@ export async function onRequestGet(context) {
   const householdSlugs = (hhRows || []).map((r) => r.other_slug);
   const auditSlugs = [slug, ...householdSlugs];
   const slugPlaceholders = auditSlugs.map(() => '?').join(',');
+  // Only a real household (someone besides you) makes "who's watching this?"
+  // a question worth answering — solo audits stay unchanged.
+  const hasHousehold = householdSlugs.length > 0;
 
-  const [{ results: shows }, { results: saved }] = await Promise.all([
+  const [{ results: shows }, { results: saved }, { results: memberRows }] = await Promise.all([
     env.DB.prepare(
-      `SELECT title, network, list, next_season_date, full_series
+      `SELECT member_slug, title, network, list, next_season_date, full_series
        FROM shows
        WHERE member_slug IN (${slugPlaceholders}) AND archived = 0 AND network IS NOT NULL AND network != ''`
     ).bind(...auditSlugs).all(),
@@ -57,12 +60,33 @@ export async function onRequestGet(context) {
       `SELECT network, status, monthly_price_cents, resubscribe_date, is_manual
        FROM member_subscriptions WHERE member_slug = ?`
     ).bind(slug).all(),
+    env.DB.prepare(
+      `SELECT slug, name, first_name, last_initial FROM members WHERE slug IN (${slugPlaceholders})`
+    ).bind(...auditSlugs).all().catch(() => ({ results: [] })),
   ]);
+
+  // First-name labels for everyone pooled into this audit, disambiguated by a
+  // last initial when two of them share a first name — same rule as
+  // /api/members and /api/household, so a name means the same person
+  // everywhere. You are always "You".
+  const nameCounts = {};
+  for (const m of memberRows || []) {
+    const fn = m.first_name || (m.name || '').split(' ')[0];
+    nameCounts[fn] = (nameCounts[fn] || 0) + 1;
+  }
+  const labelBySlug = new Map();
+  for (const m of memberRows || []) {
+    const fn = m.first_name || (m.name || '').split(' ')[0];
+    labelBySlug.set(m.slug, nameCounts[fn] > 1 && m.last_initial ? `${fn} ${m.last_initial}` : fn);
+  }
+  const viewerName = (s) => (s === slug ? 'You' : labelBySlug.get(s) || s);
 
   // Group shows under their canonical network. Household pooling can surface
   // the same title from more than one member, so dedupe per network by title,
   // keeping the most-active list (watching > waiting > next up > loved) so the
-  // verdict reflects whoever in the household is furthest along.
+  // verdict reflects whoever in the household is furthest along. Each deduped
+  // title also remembers who it came from and what list it sits on for them,
+  // so a shared audit can name the person behind the verdict.
   const LIST_PRIORITY = { watching: 4, waiting: 3, next: 2, recommending: 1 };
   const byNetwork = new Map();
   for (const sh of shows) {
@@ -79,14 +103,22 @@ export async function onRequestGet(context) {
     }
     const g = byNetwork.get(net);
     const key = (sh.title || '').toLowerCase();
-    const prev = g.titles.get(key);
-    if (!prev || (LIST_PRIORITY[sh.list] || 0) > (LIST_PRIORITY[prev.list] || 0)) {
-      g.titles.set(key, {
-        title: sh.title,
-        list: sh.list,
-        next_season_date: sh.next_season_date || null,
-        full_series: sh.full_series ? 1 : 0,
-      });
+    let entry = g.titles.get(key);
+    if (!entry) {
+      entry = { title: sh.title, list: null, next_season_date: null, full_series: 0, viewers: new Map() };
+      g.titles.set(key, entry);
+    }
+    if (entry.list == null || (LIST_PRIORITY[sh.list] || 0) > (LIST_PRIORITY[entry.list] || 0)) {
+      entry.title = sh.title;
+      entry.list = sh.list;
+      entry.next_season_date = sh.next_season_date || null;
+      entry.full_series = sh.full_series ? 1 : 0;
+    }
+    // Per-person list, so "watching" next to one name and "next up" next to
+    // another is preserved rather than flattened into the headline list.
+    const prevList = entry.viewers.get(sh.member_slug);
+    if (prevList == null || (LIST_PRIORITY[sh.list] || 0) > (LIST_PRIORITY[prevList] || 0)) {
+      entry.viewers.set(sh.member_slug, sh.list);
     }
     // Soonest future premiere among "waiting" shows → the resubscribe target.
     if (sh.list === 'waiting' && sh.next_season_date && sh.next_season_date >= today) {
@@ -99,9 +131,24 @@ export async function onRequestGet(context) {
   const savedByNet = new Map();
   for (const r of saved) savedByNet.set(r.network, r);
 
+  // Turn the per-title viewer map into an ordered list (you first, then the
+  // rest alphabetically). Emitted only for a real household — on a solo audit
+  // every show is yours and naming a viewer says nothing.
+  function viewersFor(entry) {
+    return [...entry.viewers.entries()]
+      .map(([s, list]) => ({ slug: s, name: viewerName(s), list }))
+      .sort((a, b) => (a.slug === slug ? -1 : b.slug === slug ? 1 : a.name.localeCompare(b.name)));
+  }
+
   const services = [];
   for (const g of byNetwork.values()) {
-    const showsArr = [...g.titles.values()];
+    const showsArr = [...g.titles.values()].map((entry) => ({
+      title: entry.title,
+      list: entry.list,
+      next_season_date: entry.next_season_date,
+      full_series: entry.full_series,
+      ...(hasHousehold ? { viewers: viewersFor(entry) } : {}),
+    }));
     const counts = { watching: 0, waiting: 0, recommending: 0, next: 0 };
     for (const s of showsArr) if (counts[s.list] != null) counts[s.list]++;
     const { verdict, resubscribe_date } = computeVerdict({ ...counts, soonest_upcoming: g.soonest_upcoming });
@@ -164,20 +211,11 @@ export async function onRequestGet(context) {
     'SELECT calendar_token FROM members WHERE slug = ?'
   ).bind(slug).first().catch(() => null);
 
-  // Household member labels, for the "including …" line on the audit.
-  let household = [];
-  if (householdSlugs.length) {
-    const ph = householdSlugs.map(() => '?').join(',');
-    const { results: hm } = await env.DB.prepare(
-      `SELECT slug, name, first_name, last_initial FROM members WHERE slug IN (${ph})`
-    ).bind(...householdSlugs).all().catch(() => ({ results: [] }));
-    const fnCounts = {};
-    for (const m of hm || []) { const fn = m.first_name || (m.name || '').split(' ')[0]; fnCounts[fn] = (fnCounts[fn] || 0) + 1; }
-    household = (hm || []).map((m) => {
-      const fn = m.first_name || (m.name || '').split(' ')[0];
-      return { slug: m.slug, name: fnCounts[fn] > 1 && m.last_initial ? `${fn} ${m.last_initial}` : fn };
-    });
-  }
+  // Household member labels, for the "including …" line on the audit. Same
+  // labels the per-show viewers use, from the one members lookup above.
+  const household = householdSlugs
+    .filter((s) => labelBySlug.has(s))
+    .map((s) => ({ slug: s, name: labelBySlug.get(s) }));
 
   return new Response(JSON.stringify({
     member: slug,

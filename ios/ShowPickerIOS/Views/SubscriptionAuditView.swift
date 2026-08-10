@@ -37,7 +37,7 @@ struct SubscriptionAuditView: View {
                 } header: {
                     Text("Household")
                 } footer: {
-                    Text("Invite whoever you share streaming services with. Their shows pool into this audit, so a service one of you is watching counts as a keep.")
+                    Text("Invite whoever you share streaming services with. Their shows pool into this audit, so a service one of you is watching counts as a keep — and every show says who it belongs to.")
                 }
 
                 Section {
@@ -201,18 +201,29 @@ struct SubscriptionAuditView: View {
             if !svc.shows.isEmpty {
                 DisclosureGroup("Why? (\(svc.shows.count) show\(svc.shows.count == 1 ? "" : "s"))") {
                     ForEach(svc.shows) { sh in
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(ShowList(rawValue: sh.list)?.title ?? sh.list.capitalized)
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 64, alignment: .leading)
-                            Text(sh.title + ((sh.fullSeries ?? 0) == 1 ? " (ended)" : ""))
-                                .font(.caption)
-                            Spacer()
-                            if let d = sh.nextSeasonDate, !d.isEmpty {
-                                Text("returns \(Self.longDay(d))")
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(ShowList(rawValue: sh.list)?.title ?? sh.list.capitalized)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 64, alignment: .leading)
+                                Text(sh.title + ((sh.fullSeries ?? 0) == 1 ? " (ended)" : ""))
+                                    .font(.caption)
+                                Spacer()
+                                if let d = sh.nextSeasonDate, !d.isEmpty {
+                                    Text("returns \(Self.longDay(d))")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            // Whose show this is. Only present once a
+                            // household is pooling more than one person's
+                            // lists — a solo audit sends no viewers at all.
+                            if let line = Self.viewerLine(sh) {
+                                Text(line)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
+                                    .padding(.leading, 64)
                             }
                         }
                     }
@@ -235,8 +246,13 @@ struct SubscriptionAuditView: View {
     private func reason(_ svc: SubscriptionService) -> String {
         switch svc.verdict {
         case "keep":
-            let watching = svc.shows.filter { $0.list == "watching" }.map(\.title)
-            let head = watching.prefix(3).joined(separator: ", ")
+            // In a household, the verdict can rest on somebody else's show —
+            // so name whoever is actually watching, not just the title.
+            let watching = svc.shows.filter { $0.list == "watching" }
+            let head = watching.prefix(3).map { sh -> String in
+                let names = sh.watchers.map(\.name)
+                return names.isEmpty ? sh.title : "\(sh.title) (\(Self.sentenceList(names)))"
+            }.joined(separator: ", ")
             return "Active now: \(head)\(watching.count > 3 ? "…" : "")."
         case "pause":
             let returning = svc.shows.first { $0.list == "waiting" && $0.nextSeasonDate == svc.suggestedResubscribeDate }
@@ -273,6 +289,27 @@ struct SubscriptionAuditView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
+    }
+
+    // "You · Dorothy (Next Up)" — who has this title, annotated with their own
+    // list when it differs from the headline list the verdict was computed
+    // from (pooling keeps the most-active list, so those can disagree).
+    // Returns nil when the audit isn't pooling a household.
+    static func viewerLine(_ sh: SubscriptionShow) -> String? {
+        guard let viewers = sh.viewers, !viewers.isEmpty else { return nil }
+        return viewers.map { v in
+            v.list == sh.list
+                ? v.name
+                : "\(v.name) (\(ShowList(rawValue: v.list)?.title ?? v.list.capitalized))"
+        }.joined(separator: " · ")
+    }
+
+    // "You", "You and Dorothy", "You, Dorothy and Sam" — for prose, where the
+    // interpunct list above would read as noise.
+    static func sentenceList(_ names: [String]) -> String {
+        guard let last = names.last else { return "" }
+        if names.count == 1 { return last }
+        return names.dropLast().joined(separator: ", ") + " and " + last
     }
 
     private func countsSummary(_ c: SubscriptionCounts) -> String {
@@ -463,7 +500,12 @@ private struct SubscriptionServiceEditView: View {
                 Section("Why") {
                     ForEach(service.shows) { sh in
                         HStack {
-                            Text(sh.title)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(sh.title)
+                                if let line = SubscriptionAuditView.viewerLine(sh) {
+                                    Text(line).font(.caption2).foregroundStyle(.secondary)
+                                }
+                            }
                             Spacer()
                             Text(ShowList(rawValue: sh.list)?.title ?? sh.list.capitalized)
                                 .font(.caption).foregroundStyle(.secondary)

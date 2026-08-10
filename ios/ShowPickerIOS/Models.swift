@@ -522,13 +522,28 @@ struct SubscriptionShow: Codable, Identifiable {
     let list: String
     let nextSeasonDate: String?
     let fullSeries: Int?
+    // Who in the household has this title, and what list it's on for them.
+    // Sent only when the audit pools a real household — nil for a solo audit,
+    // where every show is yours and naming a viewer says nothing.
+    let viewers: [SubscriptionViewer]?
     var id: String { title }
 
     enum CodingKeys: String, CodingKey {
-        case title, list
+        case title, list, viewers
         case nextSeasonDate = "next_season_date"
         case fullSeries = "full_series"
     }
+
+    // Household members actively watching this title ("You" sorts first).
+    var watchers: [SubscriptionViewer] { (viewers ?? []).filter { $0.list == "watching" } }
+}
+
+// One person behind a pooled show. `name` is their first name, or "You".
+struct SubscriptionViewer: Codable, Identifiable {
+    let slug: String
+    let name: String
+    let list: String
+    var id: String { slug }
 }
 
 // MARK: - Vibe (/api/vibe)

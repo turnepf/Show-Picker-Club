@@ -207,6 +207,8 @@ The page reads the shows already on your lists, groups them by streaming service
 
 The top of the page sums it up: services tracked, estimated monthly spend, and roughly how much you could save right now. Each service shows a "Why?" expander listing the exact shows behind its verdict, so the recommendation is never a black box.
 
+**With a household, every show says whose it is.** Once you've invited someone to your household, the audit pools their lists with yours — so a service can be a "keep" on the strength of a show you've never started. Each row in the "Why?" list names the people who have that title, annotated with their own list when it differs from yours ("You · Dorothy (Next Up)"), and the keep verdict names the watcher outright: "Active now: Severance (Dorothy)." On a solo audit nothing changes — with only your own lists pooled, naming the viewer would say nothing.
+
 You stay in control: every service has a **Subscribed / Paused / Cancelled** toggle (the verdict is only a suggestion), an editable monthly price (pre-filled with a sensible default per service), and — for paused services — a **resubscribe date**. Setting that date drops a "Resubscribe to <Service>" reminder onto your [calendar feed](#calendar-feed), right next to your premiere and finale dates. You can also **add a service** you pay for that has no tracked shows (a sports or music package) so the monthly total reflects everything.
 
 Prices are editable defaults — approximate US standard-plan rates that each member can correct to what they actually pay. Implementation in [`ARCHITECTURE.md`](ARCHITECTURE.md#subscription-audit).
