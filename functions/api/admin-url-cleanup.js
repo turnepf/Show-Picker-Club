@@ -1,5 +1,5 @@
 import { canonicalNetwork, networkFromUrl } from '../_shared/networks.js';
-import { extractUrl } from '../_shared/url-utils.js';
+import { extractUrl, safeNetworkUrl } from '../_shared/url-utils.js';
 import { isAdmin } from '../_shared/admin.js';
 import { fetchEnrichment } from '../_shared/enrichment.js';
 import { renameShowCopies } from '../_shared/title-fix.js';
@@ -395,9 +395,26 @@ export async function onRequestPost(context) {
       return json({ error: 'That still looks like a search URL — paste the direct show URL.' }, 400);
     }
 
+    // network_url gets rendered into hrefs and handed to openURL() on the
+    // Apple targets, so hold it to the same http(s)-only bar every other
+    // write path uses. extractUrl() already pulled the URL out of a share
+    // blob; this rejects what's left when the paste had no real URL in it.
+    if (!safeNetworkUrl(url)) {
+      return json({ error: 'That needs to be a full http(s) URL — paste the link from the address bar.' }, 400);
+    }
+
     // URL trumps the dropdown pick. If the pasted URL is a Netflix link but
     // the operator left the dropdown on Hulu, store Netflix.
-    const network = networkFromUrl(url) || canonicalNetwork(submittedNetwork);
+    //
+    // Apple is the exception: tv.apple.com is a storefront, not a service.
+    // It carries Apple TV+ originals *and* rent/buy titles that stream on
+    // someone else's subscription, so an Apple link says nothing about who
+    // carries the show. Letting it overrule the dropdown relabels rentals as
+    // Apple TV+ and inflates the Subscription Audit. Operator's pick wins.
+    const derived = networkFromUrl(url);
+    const network = (derived && derived !== 'Apple TV+')
+      ? derived
+      : canonicalNetwork(submittedNetwork);
 
     const titleRow = await env.DB.prepare('SELECT title FROM shows WHERE id = ?').bind(id).first();
     if (!titleRow) return json({ error: 'Show not found' }, 404);
@@ -407,11 +424,35 @@ export async function onRequestPost(context) {
     // have a different specific network — the same title can legitimately
     // be carried by multiple services (e.g. All Her Fault on Peacock for
     // one member, Amazon for another).
+    //
+    // "No network yet" has to cover the empty string as well as NULL:
+    // fetchQueue() treats '' as missing and surfaces those rows, so matching
+    // only NULL here left them unsaveable with no way to tell from the UI.
     const result = await env.DB.prepare(
       `UPDATE shows SET network = ?, network_url = ?, enriched_at = datetime('now')
        WHERE LOWER(title) = LOWER(?) AND archived = 0
-         AND (network = ? OR network IS NULL)`
+         AND (network = ? OR network IS NULL OR network = '')`
     ).bind(network, url, titleRow.title, network).run();
+
+    // Zero changed rows means every copy of this title is on some other
+    // service, so the guard above skipped all of them. That used to return
+    // ok:true with updated:0, which the operator UI rendered as a check mark
+    // and "Updated 0 copies" — indistinguishable from a save at a glance, and
+    // the reason saves looked like they landed intermittently. Say so instead,
+    // and name the services standing in the way.
+    if (result.meta.changes === 0) {
+      const { results: conflicts } = await env.DB.prepare(
+        `SELECT DISTINCT network FROM shows
+          WHERE LOWER(title) = LOWER(?) AND archived = 0
+            AND network IS NOT NULL AND network != ''`
+      ).bind(titleRow.title).all();
+      const names = (conflicts || []).map(c => c.network).join(', ');
+      return json({
+        error: `Nothing saved — every copy of "${titleRow.title}" is on ${names || 'another service'}, not ${network}. `
+             + `Change the network dropdown to match the copies, or fix the network first.`,
+        updated: 0,
+      }, 409);
+    }
 
     return json({ ok: true, updated: result.meta.changes });
   }

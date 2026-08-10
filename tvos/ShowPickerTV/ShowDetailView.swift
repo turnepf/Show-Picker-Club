@@ -111,7 +111,6 @@ struct ShowDetailView: View {
                         // this screen names the network.
                         groupWatchingLine
                         watchButton
-                        trailerButton
 
                         // The list controls live right under the buttons so the
                         // whole screen fits without scrolling on the TV.
@@ -504,35 +503,13 @@ struct ShowDetailView: View {
         }
     }
 
-    @ViewBuilder private var trailerButton: some View {
-        if let key = show?.trailerKey, !key.isEmpty {
-            Button { openTrailer(key: key) } label: {
-                Label("Trailer", systemImage: "play.rectangle.fill")
-                    .font(.system(size: 26, weight: .semibold))
-                    .padding(.vertical, 8)
-            }
-        }
-    }
-
-    // tvOS has no web browser, so a trailer can only open in the YouTube app.
-    // Try the app's URL scheme first (lands right on the video), then the https
-    // universal link. Both require YouTube to be installed on the Apple TV — if
-    // it isn't, neither opens (openURL just reports not-accepted and nothing
-    // happens), which is why the button looked dead without it.
-    private func openTrailer(key: String) {
-        let candidates = [
-            "youtube://watch?v=\(key)",
-            "https://www.youtube.com/watch?v=\(key)",
-        ].compactMap { URL(string: $0) }
-        openFirstAvailable(candidates)
-    }
-
-    private func openFirstAvailable(_ urls: [URL]) {
-        guard let first = urls.first else { return }
-        openURL(first) { accepted in
-            if !accepted { openFirstAvailable(Array(urls.dropFirst())) }
-        }
-    }
+    // No trailer button on tvOS. A trailer could only ever open in the YouTube
+    // app — tvOS has no browser to fall back on — so on an Apple TV without
+    // YouTube installed, neither youtube:// nor the https universal link is
+    // accepted and the button silently did nothing. There's no way to detect
+    // the app's absence beforehand, so the control can't be honest about when
+    // it will work. iOS keeps its trailer button: Safari is always there.
+    // (`trailer_key` still rides along on the model — the iPhone app uses it.)
 
     // Networks where the streaming service's tvOS app honors deep links to
     // a specific show via the plain https URL we already have.

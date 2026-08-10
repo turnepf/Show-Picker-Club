@@ -480,12 +480,18 @@ A few intentional omissions:
   deliberate call on scope (per-episode threads? spoiler-safety by episode
   progress?) before building.
 
-- **Trailer link broken on Apple TV.** (Patrick — 7/23-7/24/2026.) The
-  YouTube trailer link (`shows.trailer_key`) opens the YouTube app on tvOS
-  but not to that show's specific trailer video — confirmed working
-  correctly (deep-links to the right video) on web and iOS. Patrick wants a
-  broader links pass (deep links generally, especially Apple TV) after the
-  ratings feature ships — not just this one bug.
+- **Deep-link pass, especially Apple TV.** (Patrick — 7/23/2026, reopened
+  8/10/2026.) Patrick wants streaming deep links to work consistently across
+  services, not one bug at a time. Current state on tvOS: only HBO Max and
+  Apple TV+ land on the actual show page from their https URL
+  (`deepLinksToShow` in `ShowDetailView.swift`); Amazon, Paramount+, Peacock,
+  Hulu and Disney+ only get their app launched via a bare custom scheme; the
+  rest have no mapping. Netflix is *not* in the working set despite being the
+  largest network — worth an on-device retest. The agreed direction is to
+  store an Apple TV (`tv.apple.com`) link as the reliable fallback while
+  keeping `network` set to the service that actually carries the title, so
+  the Subscription Audit stays honest. See "Apple links vs. stored network"
+  in ARCHITECTURE.md.
 
 - **Tag member friends.** (Patrick — 7/26/2026.) Let a member tag other
   members on a show — captured for later; scope (what a tag means, where it
