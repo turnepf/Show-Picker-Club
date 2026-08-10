@@ -58,6 +58,27 @@ cleared the session; it could not reach the views' `@State`.
 - A new view holding session-derived state adopts `SessionScope` and clears it
   when `auth.memberSlug` goes nil.
 
+## 2a. A session arriving refreshes what was loaded without one
+
+*Broke in 2026-08, shipped in 1.2 (build 21).* Home resolves the signed-in
+member as `members.first { $0.slug == auth.memberSlug }`, and the roster is
+fetched once, on first appearance. Someone who **signed up** inside that
+session was not in the copy the app already held, so `myMember` stayed nil and
+Home silently lost My Shows, Groups, Calendar, Rate My Shows, Subscription
+Audit and Vibe — leaving Trending and nothing else. Adding a show still worked
+from cross-library search (it posts against `auth.memberSlug` directly), which
+is exactly how it was reported: *"couldn't add shows except from other people's
+lists; force-quitting fixed it."*
+
+- `HomeView` and `IPadHomeView` refetch on `auth.memberSlug` becoming non-nil,
+  not only on becoming nil. Logout teardown (invariant 2) is half the rule.
+- `load()` owns the replay of a parked universal link, so a link that waited
+  for a session is routed against the fresh roster rather than the stale one.
+- Anything else keyed off the roster — a new view resolving "me", or a count —
+  inherits the same requirement: a fetch that predates the session is stale the
+  moment the session exists.
+- Enforced by `scripts/check-static.sh` ("signing in refetches the roster").
+
 ## 3. Member-page URLs stay universal links
 
 `showpicker.club/<slug>` must keep falling through `_redirects` as a **200

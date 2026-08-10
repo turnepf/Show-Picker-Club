@@ -237,10 +237,15 @@ struct HomeView: View {
                     session.clear()
                     return
                 }
-                if let link = pendingLink {
-                    pendingLink = nil
-                    route(url: link)
-                }
+                // Signing in has to refetch the roster, because `myMember` is
+                // resolved out of it. Someone who just signed up wasn't in the
+                // copy we loaded before they had an account, so My Shows,
+                // Groups, Calendar, Rate My Shows, Subscription Audit and Vibe
+                // all stay hidden until the next cold launch — Home looks like
+                // Trending and nothing else. load() replays any parked link
+                // once the fresh roster lands, so the pendingLink handling
+                // moves inside it rather than racing the stale copy.
+                Task { await load() }
             }
             // Universal links (a shared showpicker.club/<member> URL tapped in
             // Messages, Mail, etc.) arrive one of two ways depending on launch

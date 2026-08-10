@@ -115,7 +115,19 @@ struct IPadHomeView: View {
         // Logging out is the mirror image and needs its own teardown — see
         // resetForLoggedOut().
         .onChange(of: auth.memberSlug) { _, slug in
-            if slug == nil { resetForLoggedOut() } else { applyInitialSelection() }
+            if slug == nil {
+                resetForLoggedOut()
+            } else {
+                // Select against the roster we already have (a returning member
+                // is in it, and shouldn't wait on the network to land on their
+                // lists), then refetch — someone who just signed up is not in a
+                // roster loaded before they had an account, so `myMember` and
+                // every sidebar row gated on it would stay empty until the next
+                // cold launch. load() calls applyInitialSelection() again once
+                // the fresh roster arrives.
+                applyInitialSelection()
+                Task { await load() }
+            }
         }
         // Universal links: focus the linked member in the sidebar. The web
         // keeps the open tab in the URL fragment (#recommending etc.), so a

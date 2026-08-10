@@ -201,6 +201,17 @@ grep -q 'session.clear()' ios/ShowPickerIOS/Views/IPadHomeView.swift \
   || err "IPadHomeView must call session.clear() on logout"
 ok "iPhone and iPad views route session state through SessionScope"
 
+# The mirror of the same bug, shipped in 1.2 (build 21): a brand-new member is
+# not in the roster the app fetched before they had an account, so `myMember`
+# resolved to nil and Home lost My Shows, Groups, Calendar, Rate My Shows,
+# Subscription Audit and Vibe until the app was force-quit. Signing in has to
+# refetch what was loaded without a session.
+for v in ios/ShowPickerIOS/Views/HomeView.swift ios/ShowPickerIOS/Views/IPadHomeView.swift; do
+  awk '/onChange\(of: auth\.memberSlug\)/{n=20} n&&n--' "$v" | grep -q 'await load()' \
+    || err "$v must refetch the roster when auth.memberSlug becomes non-nil (docs/INVARIANTS.md)"
+done
+ok "signing in refetches the roster myMember is resolved from"
+
 echo
 if [ "$fail" -eq 0 ]; then echo "PASS — static invariants hold"; else echo "FAILED"; fi
 exit $fail
