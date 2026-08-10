@@ -72,8 +72,12 @@ lists; force-quitting fixed it."*
 
 - `HomeView` and `IPadHomeView` refetch on `auth.memberSlug` becoming non-nil,
   not only on becoming nil. Logout teardown (invariant 2) is half the rule.
-- `load()` owns the replay of a parked universal link, so a link that waited
-  for a session is routed against the fresh roster rather than the stale one.
+- `HomeView.load()` owns the replay of a parked universal link: it clears
+  `pendingLink` and routes it *after* the roster lands. That has been true
+  since link-parking shipped — the sign-in handler leans on it rather than
+  re-implementing it, which is why a diff that changes sign-in behavior won't
+  show it. A link that waited for a session is therefore routed against the
+  fresh roster, not the stale one.
 - Anything else keyed off the roster — a new view resolving "me", or a count —
   inherits the same requirement: a fetch that predates the session is stale the
   moment the session exists.
