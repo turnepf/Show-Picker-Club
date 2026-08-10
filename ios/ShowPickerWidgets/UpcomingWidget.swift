@@ -203,11 +203,14 @@ struct UpcomingView: View {
         .containerBackground(.fill.tertiary, for: .widget)
     }
 
-    // Lock screen: one line…
+    // Lock screen: one line… which still has to say what the date is. The
+    // line is short, so the kind goes next to the date rather than as its own
+    // clause: "Slow Horses · Finale Aug 20". Unlabelled, a finale reads as a
+    // premiere.
     private var inline: some View {
         Label {
             if let d = next.eventDate {
-                Text("\(next.title) · \(WidgetData.dayLabel(d))")
+                Text("\(next.title) · \(next.eventKind.map { "\($0.noun) " } ?? "")\(WidgetData.dayLabel(d))")
             } else {
                 Text(next.title)
             }
