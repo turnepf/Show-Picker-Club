@@ -87,11 +87,17 @@ The `ShowPickerWidgetsExtension` target ships two WidgetKit widgets:
 - **Trending** — what the club is picking up right now (`/api/popular`, public,
   so it works signed out). Small (top show as a poster card), medium (top 3),
   large (top 5), and extra-large on iPad/Mac (top 8).
-- **Upcoming Premieres** — your next premieres from Watching + Awaiting sorted
-  by date. Small/medium/large plus the
-  iPhone Lock Screen (`accessoryRectangular`/`accessoryInline`) families. Needs
-  the session the app parks in the App Group — signed out it shows a sign-in
-  nudge.
+- **Up Next** — the next dates on your calendar from Watching + Awaiting,
+  soonest first: season premieres *and* season finales, one row per show
+  (whichever of its dates lands first), each row labelled "Premieres" or
+  "Finale". Same events as the in-app Calendar screen and the `.ics` feed —
+  they all read `ShowCalendar.upcoming` in `ShowPickerCore`, so "next" can't
+  drift between them. Small/medium/large plus the iPhone Lock Screen
+  (`accessoryRectangular`/`accessoryInline`) families. Needs the session the
+  app parks in the App Group — signed out it shows a sign-in nudge.
+  (Its WidgetKit `kind` is still `ShowPickerUpcoming`, from when it was called
+  Upcoming Premieres — renaming that would blank out widgets already placed on
+  a home screen.)
 
 Mechanics, for reference:
 

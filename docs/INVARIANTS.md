@@ -146,6 +146,26 @@ apps asked for behind `{success: true}`.
 - Enforced by `scripts/auth-code-flow-test.mjs`, whose fake Resend refuses
   reserved domains the way the real one does.
 
+## 6b. One definition of "what's on the calendar"
+
+*Broke in 2026-08.* The Up Next widget read `next_season_date` alone while the
+Calendar screen and the `.ics` feed also carried season finales, so the widget
+sat empty for weeks whenever nothing on the member's lists had an announced
+premiere — a home-screen widget that shows nothing most of the time.
+
+- The dated-events rule lives once, in
+  `ShowPickerCore/Sources/ShowPickerCore/ShowCalendar.swift`. Anything on Apple
+  that answers "what's next" calls `ShowCalendar.upcoming`/`next` rather than
+  filtering `nextSeasonDate` itself.
+- Both dates count. A show contributes its premiere *and* its finale as
+  candidates; the sooner one represents it, so no show appears twice.
+- A row says which date it is showing ("Premieres Aug 20" / "Finale Aug 14").
+  An undifferentiated date reads as a premiere and is wrong half the time.
+- `yyyy-MM-dd` values are calendar days: parse them in the device time zone and
+  compare against `Calendar.current.startOfDay`. A UTC parse loses today's date
+  and displays every row a day early for anyone west of UTC.
+- Enforced by `ShowCalendarTests` in `ShowPickerCore`.
+
 ## 7. Platform parity is stated, not assumed
 
 iOS/iPad get features; tvOS is view-only; watchOS is read-only. When a feature

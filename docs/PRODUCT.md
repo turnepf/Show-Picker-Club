@@ -150,7 +150,9 @@ iPhone and iPad satisfy this by construction — both are rooted at Home, with M
 
 The **Groups** nav row carries a `NEW` flag on iPhone Home and in the iPad sidebar until the member opens Groups once (`seenGroups`, `@AppStorage`), after which it never comes back. It sits immediately after the word "Groups" as an accent-filled capsule rather than in SwiftUI's trailing `.badge()` slot — at the far right, in secondary grey, it read as a count and got lost against the row. A badge that never clears is decoration; this one has a job and then goes away.
 
-The iOS app ships **home-screen widgets** on iPhone, iPad, and Mac (the Mac Catalyst build): **Trending** (public, the club's rolling top adds; small/medium/large + extra-large on iPad/Mac) and **Upcoming Premieres** (the signed-in member's next premieres by date; small/medium/large + iPhone Lock Screen). Tapping a show opens its card in the app via `showpicker.club/show/<id>` universal links. tvOS and watchOS have no widget equivalent.
+The iOS app ships **home-screen widgets** on iPhone, iPad, and Mac (the Mac Catalyst build): **Trending** (public, the club's rolling top adds; small/medium/large + extra-large on iPad/Mac) and **Up Next** (the signed-in member's calendar by date; small/medium/large + iPhone Lock Screen). Tapping a show opens its card in the app via `showpicker.club/show/<id>` universal links. tvOS and watchOS have no widget equivalent.
+
+**Up Next shows the next thing on your calendar, not the next premiere.** It carries exactly what the Calendar screen and the `.ics` feed carry — season premieres *and* season finales from Watching and Awaiting, one row per show (whichever of its two dates comes first), each row saying which it is ("Premieres Aug 20" / "Finale Aug 14"). Premieres alone left the widget empty for weeks at a stretch, since only a fraction of tracked shows have an announced return date at any moment. Empty now means genuinely nothing dated ahead.
 
 ## Sort and toggle controls
 

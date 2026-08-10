@@ -7,12 +7,13 @@ import SwiftUI
 //
 // Two widgets:
 //  - Trending      — what the club is picking up right now (/api/popular, public)
-//  - Upcoming      — your next premieres from Watching + Awaiting (needs the
-//                    session the app parks in the shared App Group)
+//  - Up Next       — the next dates on your calendar, premieres and finales
+//                    from Watching + Awaiting (needs the session the app parks
+//                    in the shared App Group)
 @main
 struct ShowPickerWidgetsBundle: WidgetBundle {
     var body: some Widget {
         TrendingWidget()
-        UpcomingPremieresWidget()
+        UpNextWidget()
     }
 }

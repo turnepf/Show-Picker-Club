@@ -5,6 +5,9 @@ import SwiftUI
 // /calendar/<slug>.ics feed carries, readable without subscribing to anything:
 // the Home row used to fire webcal:// straight at the OS, which is a dead end
 // for anyone who doesn't want a subscription calendar.
+//
+// The dates themselves come from `ShowCalendar` in ShowPickerCore, so this
+// screen and the Up Next widget can't drift apart on what "next" means.
 struct CalendarView: View {
     let member: Member
 
@@ -13,18 +16,7 @@ struct CalendarView: View {
     @State private var loadFailed = false
     @Environment(\.openURL) private var openURL
 
-    // One dated thing on the calendar. A show can contribute both a premiere
-    // and a finale, so the id carries the kind as well as the row.
-    struct DatedRelease: Identifiable {
-        enum Kind { case premiere, finale }
-        let show: Show
-        let date: Date
-        let day: String          // the raw YYYY-MM-DD, for grouping
-        let kind: Kind
-
-        var id: String { "\(show.id)-\(kind == .premiere ? "p" : "f")" }
-        var label: String { kind == .premiere ? "Premieres" : "Finale" }
-    }
+    typealias DatedRelease = ShowCalendar.DatedShow
 
     var body: some View {
         List {
@@ -112,45 +104,10 @@ struct CalendarView: View {
         }
     }
 
-    // Every dated thing from today forward, soonest first. Archived rows and
-    // the two undated lists (Loved, Next Up) carry no dates worth showing —
-    // a premiere only matters for something you're watching or waiting on.
+    // Every dated thing from today forward, soonest first — one row per show,
+    // whichever of its dates lands first. Shared with the widget.
     static func upcoming(from shows: [Show]) -> [DatedRelease] {
-        let today = Calendar.current.startOfDay(for: Date())
-        var out: [DatedRelease] = []
-        for show in shows where !show.isArchived {
-            guard show.list == ShowList.watching.rawValue || show.list == ShowList.waiting.rawValue else { continue }
-            // One row per show — whichever date comes first. A show with both
-            // a premiere and a finale ahead of it appeared twice, which reads
-            // as a duplicate rather than as two facts, and pushed everything
-            // else down the list twice over.
-            var candidates: [DatedRelease] = []
-            if let d = show.nextSeasonDate, let date = parseDay(d), date >= today {
-                candidates.append(DatedRelease(show: show, date: date, day: d, kind: .premiere))
-            }
-            if let d = show.seasonEndDate, let date = parseDay(d), date >= today {
-                candidates.append(DatedRelease(show: show, date: date, day: d, kind: .finale))
-            }
-            if let soonest = candidates.min(by: { $0.date < $1.date }) {
-                out.append(soonest)
-            }
-        }
-        return out.sorted { $0.date == $1.date ? $0.show.title < $1.show.title : $0.date < $1.date }
-    }
-
-    // Dates arrive as plain "YYYY-MM-DD" days, not timestamps.
-    private static let dayParser: DateFormatter = {
-        let f = DateFormatter()
-        f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(identifier: "UTC")
-        f.dateFormat = "yyyy-MM-dd"
-        return f
-    }()
-
-    private static func parseDay(_ s: String) -> Date? {
-        guard !s.isEmpty else { return nil }
-        return dayParser.date(from: s)
+        ShowCalendar.upcoming(from: shows)
     }
 
     private static let display: DateFormatter = {

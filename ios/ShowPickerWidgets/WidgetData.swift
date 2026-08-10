@@ -19,9 +19,14 @@ struct WidgetShow: Identifiable, Hashable {
     let rating: String?
     // Trending: "Watching: Patrick, Whitt". Upcoming: unused.
     let membersText: String?
-    // Upcoming: premiere day of the next season. Trending: unused.
-    let premiereDate: Date?
+    // Upcoming: the show's next calendar day — a season premiere or a season
+    // finale, whichever lands first. Trending: unused.
+    let eventDate: Date?
+    let eventKind: ShowCalendar.Kind?
     let posterData: Data?
+
+    // "Premieres" / "Finale" — what the date on this row actually is.
+    var eventLabel: String? { eventKind?.label }
 
     // Tapping any widget row opens this show's card in the app — the app's
     // universal-link routing recognizes /show/<id> (title rides along so the
@@ -57,17 +62,19 @@ enum WidgetData {
             let members = row.members.flatMap { $0.isEmpty ? nil : "Watching: " + $0.joined(separator: ", ") }
             out.append(WidgetShow(id: row.id, title: row.title, network: row.network,
                                   rating: row.rating, membersText: members,
-                                  premiereDate: nil,
+                                  eventDate: nil, eventKind: nil,
                                   posterData: await poster(row.posterUrl)))
         }
         return out
     }
 
-    // MARK: Upcoming premieres (member's Watching + Awaiting; session required)
+    // MARK: Upcoming calendar dates (member's Watching + Awaiting; session required)
 
-    // Sorted soonest-first, today onwards. Empty when logged out, when nothing
-    // is scheduled, or when the fetch fails — the views tell those states
-    // apart via `isSignedIn`.
+    // The member's calendar, soonest first, today onwards — the same premieres
+    // *and* season finales the in-app Calendar screen and the .ics feed carry
+    // (`ShowCalendar.upcoming`), not premieres alone. Empty when logged out,
+    // when nothing is dated, or when the fetch fails — the views tell those
+    // states apart via `isSignedIn`.
     static func upcoming(limit: Int, on day: Date) async -> [WidgetShow] {
         guard let slug = SharedSession.memberSlug,
               let enc = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
@@ -75,25 +82,12 @@ enum WidgetData {
                                                       cookie: SharedSession.cookieHeader)
         else { return [] }
 
-        let cal = Calendar.current
-        let today = cal.startOfDay(for: day)
-        let scheduled = rows.shows.compactMap { s -> (Show, Date)? in
-            guard !s.isArchived,
-                  s.list == ShowList.watching.rawValue || s.list == ShowList.waiting.rawValue,
-                  let d = s.nextSeasonDay, cal.startOfDay(for: d) >= today
-            else { return nil }
-            return (s, cal.startOfDay(for: d))
-        }.sorted { a, b in
-            if a.1 != b.1 { return a.1 < b.1 }
-            return (Double(a.0.rating ?? "0") ?? 0) > (Double(b.0.rating ?? "0") ?? 0)
-        }
-
         var out: [WidgetShow] = []
-        for (show, date) in scheduled.prefix(limit) {
-            out.append(WidgetShow(id: show.id, title: show.title, network: show.network,
-                                  rating: show.rating, membersText: nil,
-                                  premiereDate: date,
-                                  posterData: await poster(show.posterUrl)))
+        for item in ShowCalendar.upcoming(from: rows.shows, on: day).prefix(limit) {
+            out.append(WidgetShow(id: item.show.id, title: item.show.title, network: item.show.network,
+                                  rating: item.show.rating, membersText: nil,
+                                  eventDate: item.date, eventKind: item.kind,
+                                  posterData: await poster(item.show.posterUrl)))
         }
         return out
     }
@@ -148,13 +142,13 @@ enum WidgetData {
     }
 
     // "Today" / "Tomorrow" / "in 3 days" relative to the entry's day.
-    static func relative(_ premiere: Date, from now: Date) -> String {
+    static func relative(_ date: Date, from now: Date) -> String {
         let cal = Calendar.current
         let days = cal.dateComponents([.day],
                                       from: cal.startOfDay(for: now),
-                                      to: cal.startOfDay(for: premiere)).day ?? 0
+                                      to: cal.startOfDay(for: date)).day ?? 0
         switch days {
-        case ..<0:  return "premiered"
+        case ..<0:  return "aired"
         case 0:     return "Today"
         case 1:     return "Tomorrow"
         default:    return "in \(days) days"
