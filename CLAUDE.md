@@ -103,7 +103,7 @@ wrangler d1 execute shows-db --remote --file=migrations/NNN_name.sql
 
 `scripts/apply-migrations.sh` applies all pending migrations, tracked in a self-owned `schema_migrations` table (first run baselines without executing).
 
-The only automated tests are Swift (`ShareTitleParser` for the iOS share extension), runnable on a Mac only:
+The one suite that needs Xcode and a simulator, rather than just a Swift toolchain (`ShareTitleParser` for the iOS share extension) — everything above this point runs from a laptop with Node or Swift alone:
 
 ```bash
 xcodebuild test -project ios/ShowPickerIOS.xcodeproj -scheme ShowPickerShareExtensionTests -destination 'platform=iOS Simulator,name=iPhone 16'
@@ -187,7 +187,35 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
   goes: commit → push → open the PR → squash-merge it → tell the user it's on
   `main` and ready to pull into Xcode. No "want me to merge?" round trip, and
   no reminders that the user has to compile the Apple targets — they know.
-  (This environment has no Swift toolchain; just never imply a build was run.)
+
+- **Whether you can build the Apple targets depends on where you're running.**
+  Claude Code on the web has no Swift toolchain: never imply a build was run
+  there. A local session on Patrick's Mac does have one — Xcode is installed,
+  `cd ShowPickerCore && swift test` works, and `xcodebuild` against the
+  `ShowPickerIOS` scheme works. Check before assuming (`which xcodebuild`).
+  When the toolchain is there, **compile Swift changes rather than shipping
+  them unverified**, and say plainly which it was. A green
+  `** BUILD SUCCEEDED **` is evidence; SourceKit's silence in the editor is
+  not — see the SourceKit note below.
+
+- **Patrick's iPhone can be installed to directly from a local session.** His
+  iPhone 16 Pro is paired (`xcrun devicectl list devices`), so the loop is
+  `xcodebuild build -workspace ShowPickerClub.xcworkspace -scheme ShowPickerIOS
+  -destination 'id=<device-id>' -allowProvisioningUpdates`, then `xcrun
+  devicectl device install app`, then `... process launch`. Omit
+  `-derivedDataPath` so it reuses the existing Xcode cache, and run the build
+  in the background — even warm it outlasts a foreground timeout. Signing needs
+  no keychain setup. **Ask first** — it's his physical device — and be clear
+  that this is a debug install to his phone only: it is NOT TestFlight, it
+  doesn't reach Whitt, and it touches nothing Apple reviews.
+
+- **SourceKit "Cannot find type 'Show' / 'Theme' / 'AuthStore' in scope" on
+  files under `ios/` or `tvos/` is noise, not a real error.** The tell is that
+  the whole module fails to resolve at once — app-local types, ShowPickerCore
+  types and SwiftUI helpers all go missing together — because the file is being
+  analyzed without the Xcode project's module graph. A real error from an edit
+  is localized to what was edited. Don't chase these, and never "fix" correct
+  code to satisfy them; compile instead.
 - **End every completed task with an explicit close-out.** When the work is
   done, don't wait to be asked — state plainly: what shipped, anything still
   pending on the user (merges, migrations, secrets, verifications), whether
