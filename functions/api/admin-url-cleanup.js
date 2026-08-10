@@ -1,4 +1,4 @@
-import { canonicalNetwork, networkFromUrl } from '../_shared/networks.js';
+import { canonicalNetwork, networkFromUrl, storefrontFromUrl } from '../_shared/networks.js';
 import { extractUrl, safeNetworkUrl } from '../_shared/url-utils.js';
 import { isAdmin } from '../_shared/admin.js';
 import { fetchEnrichment, fetchAvailability } from '../_shared/enrichment.js';
@@ -144,9 +144,20 @@ async function reclassifyStorefronts(env, body) {
     if (info.availability === 'subscription' && info.providerNetwork) {
       target = info.providerNetwork;
     } else if (info.availability === 'rent_buy') {
-      // Prefer the storefront whose link we're probably already storing;
-      // otherwise the first one TMDB lists.
-      target = info.storefronts[0] || null;
+      // Prefer the storefront that matches the link the row already carries.
+      // TMDB lists rent/buy providers in its own order, so taking the first
+      // one put Apple-linked rows on Fandango at Home — both storefronts, so
+      // the audit was right either way, but the label contradicted the link
+      // sitting next to it.
+      const linked = await env.DB.prepare(
+        `SELECT network_url FROM shows
+          WHERE archived = 0 AND network = ? AND tmdb_id = ? AND network_url IS NOT NULL
+          LIMIT 1`
+      ).bind(network, row.tmdb_id).first();
+      const fromLink = linked ? storefrontFromUrl(linked.network_url) : null;
+      target = (fromLink && info.storefronts.includes(fromLink))
+        ? fromLink
+        : (info.storefronts[0] || null);
     }
 
     if (!target) {

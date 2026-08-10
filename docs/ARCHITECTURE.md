@@ -568,7 +568,7 @@ Source of truth: `functions/_shared/networks.js`. Each entry has:
 - `display` — what appears in the Add / Suggest dropdowns; includes the sub-brand hint in parens so members find their way ("Paramount+ (including CBS, MTV, …)").
 - `aliases` — older / sub-brand names that get folded into this canonical when matching user input or migrating data.
 - `search` — `{ base, param?, extra? }` template for the network's search page. Used as the fallback `network_url` when the member picks a network but doesn't paste a deep link.
-- `kind` — omitted for subscriptions (the default). `'storefront'` marks a rent/buy shop: **Apple TV Store** and **Fandango at Home**. `isStorefront(network)` is the test.
+- `kind` — omitted for subscriptions (the default). `'storefront'` marks a pay-per-title source: **Apple TV Store**, **Fandango at Home** (rent/buy), and **Fandango** (theatre tickets, for a film still in its theatrical window). `isStorefront(network)` is the test.
 
 ### Storefronts vs. subscriptions
 
@@ -579,7 +579,9 @@ Two traps this exists to avoid, both of which had already happened:
 1. **`tv.apple.com` serves Apple TV+ originals and $3.99 rentals from the same URL shape.** So the Apple TV Store entry deliberately declares **no domains** — a link can't decide which of the two a row belongs to. Only TMDB's flatrate-vs-rent/buy split can. `POST /api/admin-url-cleanup`'s `save` action likewise refuses to let an Apple link set `network` (see "Apple links vs. stored network").
 2. **TMDB names its Apple rent/buy provider "Apple TV"**, which the alias index folds into `Apple TV+`. Rent/buy provider names therefore resolve through `storefrontFromProvider()` and never through `knownNetwork()`. That one collision is how rentals came to be labeled as Apple originals in the first place.
 
-`Apple TV Store` is stored under that name rather than the bare `Apple TV` because `Apple TV` is already an alias of `Apple TV+`; reusing it would silently re-point every member who types it meaning the subscription. Members see `display` ("Apple TV (rent or buy)") regardless.
+`Apple TV Store` is stored under that name rather than the bare `Apple TV` because `Apple TV` is already an alias of `Apple TV+`; reusing it would silently re-point every member who types it meaning the subscription. Members see `display` ("Apple TV (rent or buy)") regardless. The same reasoning keeps the bare `Fandango` alias off `Fandango at Home` — it belongs to the ticket site, a different service.
+
+`storefrontFromUrl(url)` maps a link to its storefront and is deliberately separate from `networkFromUrl()`: `tv.apple.com` resolves to the Apple TV+ *subscription* there and to the Apple *storefront* here. `reclassify_storefronts` uses it so a row's new label agrees with the link already sitting on it — without it, TMDB's own rent/buy ordering put Apple-linked rows on Fandango at Home.
 
 `canonicalNetwork(name)` (from the same module) returns the canonical `stored` for any alias-or-stored name (case-insensitive). `POST /api/shows` and `PUT /api/shows/[id]` both run incoming `network` values through it so an alias submitted via API or pasted in the "other" field still ends up consistent in the DB.
 

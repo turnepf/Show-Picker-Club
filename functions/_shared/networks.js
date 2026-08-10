@@ -150,9 +150,24 @@ export const NETWORKS = [
   {
     stored: 'Fandango at Home',
     display: 'Fandango at Home (rent or buy)',
-    aliases: ['Vudu', 'Fandango', 'FandangoNow'],
+    // No bare 'Fandango' alias — that name belongs to the ticket site below,
+    // and letting one entry claim it would repeat the Apple TV / Apple TV+
+    // collision.
+    aliases: ['Vudu', 'FandangoNow'],
     domains: ['athome.fandango.com', 'vudu.com'],
     search: { base: 'https://athome.fandango.com/content/browse/search', param: 'q' },
+    kind: 'storefront',
+  },
+  {
+    // Theatre tickets, for a film still in its theatrical window — the gap
+    // where a title is real, members want it on a list, and no streaming
+    // service carries it yet. Distinct from Fandango at Home, which is the
+    // rent/buy shop for titles that have left theatres.
+    stored: 'Fandango',
+    display: 'Fandango (theatre tickets)',
+    aliases: ['Fandango Tickets', 'In theatres', 'In theaters'],
+    domains: ['fandango.com'],
+    search: { base: 'https://www.fandango.com/search', param: 'q' },
     kind: 'storefront',
   },
 ];
@@ -185,6 +200,36 @@ const STOREFRONT_PROVIDERS = new Map([
 export function storefrontFromProvider(name) {
   if (!name) return null;
   return STOREFRONT_PROVIDERS.get(name.trim().toLowerCase()) || null;
+}
+
+// Which storefront a stored link points at. Separate from networkFromUrl()
+// because tv.apple.com resolves to the Apple TV+ *subscription* there by
+// design; here the same host means the Apple storefront. Used to keep a
+// reclassified row's label agreeing with the link already sitting on it.
+// Most specific host wins, so athome.fandango.com beats fandango.com.
+const STOREFRONT_DOMAINS = new Map([
+  ['tv.apple.com', 'Apple TV Store'],
+  ['apple.co', 'Apple TV Store'],
+  ['athome.fandango.com', 'Fandango at Home'],
+  ['vudu.com', 'Fandango at Home'],
+  ['fandango.com', 'Fandango'],
+]);
+
+export function storefrontFromUrl(url) {
+  if (!url) return null;
+  let host;
+  try {
+    host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+  let candidate = host;
+  while (candidate.includes('.')) {
+    const hit = STOREFRONT_DOMAINS.get(candidate);
+    if (hit) return hit;
+    candidate = candidate.substring(candidate.indexOf('.') + 1);
+  }
+  return null;
 }
 
 // Map alias-or-stored name (case-insensitive) to canonical stored value.

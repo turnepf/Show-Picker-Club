@@ -934,4 +934,5 @@ let CANONICAL_NETWORKS: [String] = [
     "YouTube",
     "Apple TV Store",
     "Fandango at Home",
+    "Fandango",
 ]
