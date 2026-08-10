@@ -1,5 +1,5 @@
 import { getSession } from '../_shared/auth.js';
-import { canonicalNetwork, defaultPriceCents } from '../_shared/networks.js';
+import { canonicalNetwork, defaultPriceCents, isStorefront } from '../_shared/networks.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -68,6 +68,12 @@ export async function onRequestGet(context) {
   for (const sh of shows) {
     const net = canonicalNetwork(sh.network);
     if (!net) continue;
+    // Storefronts (Apple TV Store, Fandango at Home) are rent/buy shops, not
+    // monthly services. A title bought there is never an argument for keeping
+    // or starting a subscription, so it must not become a card in the audit —
+    // that is exactly how Apple rentals stored as "Apple TV+" overstated what
+    // members needed to pay for.
+    if (isStorefront(net)) continue;
     if (!byNetwork.has(net)) {
       byNetwork.set(net, { network: net, titles: new Map(), soonest_upcoming: null });
     }

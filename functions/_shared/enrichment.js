@@ -5,7 +5,7 @@
 // fallback had already been dropped when TMDB type-ahead pinning made new rows
 // arrive canonical — see docs/PRODUCT.md.)
 
-import { knownNetwork } from './networks.js';
+import { knownNetwork, storefrontFromProvider } from './networks.js';
 import { knownByPersonIds, rememberPeople } from './people.js';
 
 // How many cast members we store per title. Clients show the top few;
@@ -83,6 +83,15 @@ export function extractTmdbDetailFields(detail, mediaType) {
   // page (never a deep link), stored separately in `watch_link`.
   let providerNetwork = null;
   let watchLink = null;
+  // Storefronts that sell the title outright, and the availability verdict:
+  // 'subscription' when some service streams it on a plan, 'rent_buy' when the
+  // only way to watch is to pay per view, null when TMDB knows of neither.
+  //
+  // The rent/buy arrays used to be read and dropped on the floor, which is why
+  // nothing could tell an Apple TV+ original from an Apple rental — both
+  // arrived on the same payload, only one was looked at.
+  let storefronts = [];
+  let availability = null;
   const wp = detail['watch/providers']?.results?.US || null;
   if (wp) {
     watchLink = wp.link || null;
@@ -93,11 +102,18 @@ export function extractTmdbDetailFields(detail, mediaType) {
       const n = knownNetwork(p.provider_name);
       if (n) { providerNetwork = n; break; }
     }
+    const rentBuy = [...(wp.rent || []), ...(wp.buy || [])];
+    storefronts = [...new Set(
+      rentBuy.map((p) => storefrontFromProvider(p.provider_name)).filter(Boolean)
+    )];
+    if ((wp.flatrate || []).length) availability = 'subscription';
+    else if (rentBuy.length) availability = 'rent_buy';
   }
 
   return {
     overview, backdropUrl, tmdbRating, contentRating, trailerKey,
     director, directorPersonId, runtime, releaseYear, providerNetwork, watchLink,
+    storefronts, availability,
   };
 }
 
@@ -106,6 +122,7 @@ const EMPTY_DETAIL = {
   overview: null, backdropUrl: null, tmdbRating: null, contentRating: null,
   trailerKey: null, director: null, directorPersonId: null, runtime: null,
   releaseYear: null, providerNetwork: null, watchLink: null,
+  storefronts: [], availability: null,
 };
 
 // Retries on 429 (rate limit) with backoff — otherwise a burst of many
@@ -222,6 +239,28 @@ export async function fetchEnrichmentById(tmdbId, mediaType, env) {
   if (!env.TMDB_TOKEN || !tmdbId) return empty;
   try {
     return await enrichFromTmdbId(tmdbId, mediaType === 'movie' ? 'movie' : 'tv', env);
+  } catch (_) {
+    return empty;
+  }
+}
+
+// Just the US availability picture for a known TMDB id: which subscription
+// service streams it (if any), which storefronts sell it, and the verdict of
+// the two. One subrequest — the details call with only watch/providers
+// appended, no credits or videos — so an operator pass can walk many titles
+// inside the subrequest budget. Never throws; returns the empty shape on any
+// failure so callers can treat "unknown" and "not carried" distinctly.
+export async function fetchAvailability(tmdbId, mediaType, env) {
+  const empty = { providerNetwork: null, storefronts: [], availability: null };
+  if (!env.TMDB_TOKEN || !tmdbId) return empty;
+  const type = mediaType === 'movie' ? 'movie' : 'tv';
+  try {
+    const detail = await tmdbFetch(
+      `/${type}/${tmdbId}?append_to_response=watch/providers&language=en-US`,
+      env.TMDB_TOKEN
+    );
+    const { providerNetwork, storefronts, availability } = extractTmdbDetailFields(detail, type);
+    return { providerNetwork, storefronts, availability };
   } catch (_) {
     return empty;
   }

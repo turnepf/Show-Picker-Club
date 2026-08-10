@@ -568,6 +568,18 @@ Source of truth: `functions/_shared/networks.js`. Each entry has:
 - `display` — what appears in the Add / Suggest dropdowns; includes the sub-brand hint in parens so members find their way ("Paramount+ (including CBS, MTV, …)").
 - `aliases` — older / sub-brand names that get folded into this canonical when matching user input or migrating data.
 - `search` — `{ base, param?, extra? }` template for the network's search page. Used as the fallback `network_url` when the member picks a network but doesn't paste a deep link.
+- `kind` — omitted for subscriptions (the default). `'storefront'` marks a rent/buy shop: **Apple TV Store** and **Fandango at Home**. `isStorefront(network)` is the test.
+
+### Storefronts vs. subscriptions
+
+A storefront sells a title per view, so it is never an argument for keeping or starting a monthly service, and `/api/subscriptions` skips those rows entirely when building the audit. They exist as networks anyway because they cover the long tail nothing streams — catalog films, and new releases in the window between theatres and streaming.
+
+Two traps this exists to avoid, both of which had already happened:
+
+1. **`tv.apple.com` serves Apple TV+ originals and $3.99 rentals from the same URL shape.** So the Apple TV Store entry deliberately declares **no domains** — a link can't decide which of the two a row belongs to. Only TMDB's flatrate-vs-rent/buy split can. `POST /api/admin-url-cleanup`'s `save` action likewise refuses to let an Apple link set `network` (see "Apple links vs. stored network").
+2. **TMDB names its Apple rent/buy provider "Apple TV"**, which the alias index folds into `Apple TV+`. Rent/buy provider names therefore resolve through `storefrontFromProvider()` and never through `knownNetwork()`. That one collision is how rentals came to be labeled as Apple originals in the first place.
+
+`Apple TV Store` is stored under that name rather than the bare `Apple TV` because `Apple TV` is already an alias of `Apple TV+`; reusing it would silently re-point every member who types it meaning the subscription. Members see `display` ("Apple TV (rent or buy)") regardless.
 
 `canonicalNetwork(name)` (from the same module) returns the canonical `stored` for any alias-or-stored name (case-insensitive). `POST /api/shows` and `PUT /api/shows/[id]` both run incoming `network` values through it so an alias submitted via API or pasted in the "other" field still ends up consistent in the DB.
 
@@ -677,6 +689,8 @@ The `save` action writes to every active copy of the title that is either on the
 Some titles genuinely have no direct link to paste (too ambiguous to resolve to one show, not indexed by any service search). The `dismiss` action (`{action: 'dismiss', title}`, the row's "No good link — dismiss" button) permanently removes a title from the queue — recorded case-insensitively in `url_cleanup_ignores` (migration 048), which `QUEUE_FILTER` excludes. Same pattern as `dupe_ignores`: the endpoint creates the table on demand (identical statement to the migration) so deploy order doesn't matter. There's no un-dismiss action or UI — a title comes back into the queue only if its `network_url` regresses to a placeholder again, at which point it'd need re-dismissing by hand (`DELETE FROM url_cleanup_ignores WHERE ltitle = ...`).
 
 The page's tools row also has a "Run enrichment passes" button — it loops `POST /api/enrich` (TMDB posters/dates/ratings/detail fields + actor-IMDB-id backfill) up to five times with the operator's session, stopping early once a pass returns all zeroes.
+
+The `reclassify_storefronts` action (the "Re-check Apple TV+ rentals" button in iOS Show Cleanup) walks rows sitting on a subscription network that TMDB says doesn't stream the title. Per distinct `tmdb_id`: a service in `flatrate` becomes the network, `rent`/`buy`-only moves the row to the storefront (`Apple TV Store`, `Fandango at Home`), and a title TMDB knows nothing about is left alone rather than guessed at. `network_url` is never touched — the link still works whatever the label says. One subrequest per title via `fetchAvailability()` (a details call with only `watch/providers` appended), capped at `max_titles` (default 40, hard max 100) and ordered oldest-`enriched_at`-first; every processed row is stamped so it rotates to the back and repeated calls walk the whole backlog. Returns `{checked, kept, unknown, rows_changed, moved, remaining}`. Defaults to `Apple TV+` but takes any `network`.
 
 The `inherit_networks` action (the "Adopt networks from club copies" button on the page) rescues rows that have no `network` at all — URL propagation can't reach them because it is scoped to `(title, network)`. Any active row whose title has exactly one distinct network across the rest of the club adopts that network, then a propagation pass fills its URL from the siblings. Titles whose copies disagree on the service are deliberately skipped; those belong to the conflict queue. Returns `{networks_set, urls_filled}`.
 

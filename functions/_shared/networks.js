@@ -124,7 +124,68 @@ export const NETWORKS = [
     domains: ['mgmplus.com'],
     search: { base: 'https://www.mgmplus.com/search', param: 'q' },
   },
+
+  // --- Storefronts (kind: 'storefront') ---
+  // Rent/buy shops, not subscriptions. A title here costs money per view, so
+  // it is never a reason to keep or start a monthly service and the
+  // Subscription Audit skips it entirely (see isStorefront). They still earn a
+  // place in the list: they carry the long tail nothing streams — catalog
+  // films, and new releases in the window between theatres and streaming.
+  {
+    // Stored as "Apple TV Store", not "Apple TV": the bare name is already an
+    // alias of Apple TV+ above, and reusing it would silently re-point every
+    // member who types "Apple TV" meaning the subscription. Members see the
+    // friendlier `display` either way.
+    stored: 'Apple TV Store',
+    display: 'Apple TV (rent or buy)',
+    aliases: ['iTunes', 'iTunes Store', 'Apple TV Rental'],
+    // No domains: tv.apple.com is claimed by Apple TV+ above, and one host
+    // can't decide between them — the same URL shape serves an Apple original
+    // and a $3.99 rental. Which one a row belongs to comes from TMDB's
+    // flatrate-vs-rent/buy split, not from the link.
+    domains: [],
+    search: { base: 'https://tv.apple.com/us/search', param: 'term' },
+    kind: 'storefront',
+  },
+  {
+    stored: 'Fandango at Home',
+    display: 'Fandango at Home (rent or buy)',
+    aliases: ['Vudu', 'Fandango', 'FandangoNow'],
+    domains: ['athome.fandango.com', 'vudu.com'],
+    search: { base: 'https://athome.fandango.com/content/browse/search', param: 'q' },
+    kind: 'storefront',
+  },
 ];
+
+// Storefronts are rent/buy shops rather than monthly services. Everything
+// without an explicit kind is a subscription.
+export function isStorefront(network) {
+  const stored = canonicalNetwork(network);
+  const hit = NETWORKS.find(n => n.stored === stored);
+  return hit ? hit.kind === 'storefront' : false;
+}
+
+// TMDB provider names as they appear in a title's `rent` / `buy` arrays,
+// mapped to the storefront that sells it.
+//
+// This deliberately does NOT go through knownNetwork(). TMDB calls its Apple
+// rent/buy provider "Apple TV", which the alias index folds into "Apple TV+"
+// — the subscription. That single collision is how a $3.99 rental of a 1995
+// costume drama ended up labeled as an Apple TV+ original and counted toward
+// what a member supposedly needs to pay Apple every month. Rent/buy provider
+// names resolve here instead, and only here.
+const STOREFRONT_PROVIDERS = new Map([
+  ['apple tv', 'Apple TV Store'],
+  ['apple itunes', 'Apple TV Store'],
+  ['itunes', 'Apple TV Store'],
+  ['fandango at home', 'Fandango at Home'],
+  ['vudu', 'Fandango at Home'],
+]);
+
+export function storefrontFromProvider(name) {
+  if (!name) return null;
+  return STOREFRONT_PROVIDERS.get(name.trim().toLowerCase()) || null;
+}
 
 // Map alias-or-stored name (case-insensitive) to canonical stored value.
 const _aliasIndex = (() => {

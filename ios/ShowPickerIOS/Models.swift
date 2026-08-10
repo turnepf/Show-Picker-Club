@@ -809,6 +809,24 @@ struct VibeFillRow: Codable, Identifiable {
 }
 
 // Generic admin action result (save URL / fix title).
+// Result of the "Re-check Apple TV+ rentals" pass. `remaining` is how many
+// distinct titles the server hasn't looked at yet this cycle, so the client
+// knows whether another batch is worth requesting.
+struct StorefrontReclassifyResult: Codable {
+    let ok: Bool?
+    let error: String?
+    let checked: Int?
+    let kept: Int?
+    let unknown: Int?
+    let rowsChanged: Int?
+    let remaining: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case ok, error, checked, kept, unknown, remaining
+        case rowsChanged = "rows_changed"
+    }
+}
+
 struct AdminActionResult: Codable {
     let ok: Bool?
     let updated: Int?
@@ -893,6 +911,11 @@ struct AccountDeleteResponse: Codable {
 
 // Canonical networks for the picker. Keep in sync with
 // functions/_shared/networks.js on the backend.
+// Mirrors NETWORKS[].stored in functions/_shared/networks.js. The last two are
+// storefronts (rent/buy) rather than subscriptions — they're offered here
+// because plenty of titles have no streaming home, but the Subscription Audit
+// skips them so they never read as a monthly bill. MGM+ had drifted out of
+// this list while the server knew about it.
 let CANONICAL_NETWORKS: [String] = [
     "AMC+",
     "Amazon Prime Video",
@@ -903,9 +926,12 @@ let CANONICAL_NETWORKS: [String] = [
     "Fox",
     "HBO Max",
     "Hulu",
+    "MGM+",
     "Netflix",
     "Paramount+",
     "Peacock",
     "Starz",
     "YouTube",
+    "Apple TV Store",
+    "Fandango at Home",
 ]

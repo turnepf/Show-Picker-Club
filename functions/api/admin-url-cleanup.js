@@ -1,7 +1,7 @@
 import { canonicalNetwork, networkFromUrl } from '../_shared/networks.js';
 import { extractUrl, safeNetworkUrl } from '../_shared/url-utils.js';
 import { isAdmin } from '../_shared/admin.js';
-import { fetchEnrichment } from '../_shared/enrichment.js';
+import { fetchEnrichment, fetchAvailability } from '../_shared/enrichment.js';
 import { renameShowCopies } from '../_shared/title-fix.js';
 
 function json(data, status = 200) {
@@ -99,6 +99,92 @@ async function inheritNetworks(env) {
                AND s.network IS NOT NULL AND s.network != '') = 1
   `).run();
   return result.meta.changes;
+}
+
+// Re-decide the network for rows sitting on a subscription service that TMDB
+// says doesn't actually stream the title. Built for the Apple TV+ backlog:
+// tv.apple.com serves Apple originals and $3.99 rentals from the same URL
+// shape, so every pasted Apple link used to land on "Apple TV+" and inflate
+// what the Subscription Audit claimed members needed to pay for.
+//
+// Three outcomes per title, from TMDB's US watch/providers:
+//   flatrate names a service  → that service is the real carrier; move there
+//                               (a no-op when the row was already right)
+//   only rent/buy             → nothing streams it; move to the storefront
+//   TMDB knows neither        → leave it alone rather than guess
+//
+// network_url is never touched — the link still works whatever the label says.
+//
+// One subrequest per distinct TMDB id, capped per invocation and ordered
+// oldest-enriched-first, so repeated calls walk the whole backlog. Every
+// processed row gets its enriched_at stamped (including the ones left as-is)
+// so it rotates to the back and the next call sees fresh work.
+async function reclassifyStorefronts(env, body) {
+  if (!env.TMDB_TOKEN) return json({ error: 'TMDB_TOKEN not configured' }, 500);
+
+  const network = canonicalNetwork(String(body.network || 'Apple TV+').trim());
+  const maxTitles = Math.min(parseInt(body.max_titles ?? '40', 10), 100);
+
+  const { results: rows } = await env.DB.prepare(
+    `SELECT tmdb_id, tmdb_type, MIN(title) AS title, COUNT(*) AS copies
+       FROM shows
+      WHERE archived = 0 AND network = ? AND tmdb_id IS NOT NULL
+      GROUP BY tmdb_id
+      ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC
+      LIMIT ?`
+  ).bind(network, maxTitles).all();
+
+  const moved = [];
+  let kept = 0, unknown = 0, rowsChanged = 0;
+
+  for (const row of rows) {
+    const info = await fetchAvailability(row.tmdb_id, row.tmdb_type, env);
+
+    let target = null;
+    if (info.availability === 'subscription' && info.providerNetwork) {
+      target = info.providerNetwork;
+    } else if (info.availability === 'rent_buy') {
+      // Prefer the storefront whose link we're probably already storing;
+      // otherwise the first one TMDB lists.
+      target = info.storefronts[0] || null;
+    }
+
+    if (!target) {
+      unknown++;
+    } else if (target === network) {
+      kept++;
+    } else {
+      const res = await env.DB.prepare(
+        `UPDATE shows SET network = ?, enriched_at = datetime('now')
+          WHERE archived = 0 AND network = ? AND tmdb_id = ?`
+      ).bind(target, network, row.tmdb_id).run();
+      rowsChanged += res.meta.changes;
+      moved.push({ title: row.title, to: target, copies: res.meta.changes });
+      continue;
+    }
+
+    // Left where it was — still stamp it so it rotates out of the queue.
+    await env.DB.prepare(
+      `UPDATE shows SET enriched_at = datetime('now')
+        WHERE archived = 0 AND network = ? AND tmdb_id = ?`
+    ).bind(network, row.tmdb_id).run();
+  }
+
+  const remaining = await env.DB.prepare(
+    `SELECT COUNT(DISTINCT tmdb_id) AS n FROM shows
+      WHERE archived = 0 AND network = ? AND tmdb_id IS NOT NULL
+        AND COALESCE(enriched_at, '1970-01-01') < datetime('now', '-1 hour')`
+  ).bind(network).first();
+
+  return json({
+    ok: true,
+    checked: rows.length,
+    kept,
+    unknown,
+    rows_changed: rowsChanged,
+    moved,
+    remaining: remaining ? remaining.n : 0,
+  });
 }
 
 async function propagateGoodUrls(env) {
@@ -326,6 +412,11 @@ async function fetchMismatches(env) {
     const derived = networkFromUrl(r.network_url);
     if (!derived) continue;                       // unknown domain — can't classify
     if (derived === r.network) continue;          // matches; skip
+    // An Apple link on a row labeled something else is the intended shape,
+    // not a mismatch: tv.apple.com is a storefront that also sells titles
+    // streaming elsewhere, so the link and the carrier legitimately disagree.
+    // Without this, every reclassified rental would report itself as broken.
+    if (derived === 'Apple TV+') continue;
     const label = (r.first_name || r.member_slug) + (r.last_initial ? ' ' + r.last_initial : '');
     mismatches.push({
       id: r.id,
@@ -461,6 +552,10 @@ export async function onRequestPost(context) {
     const networksSet = await inheritNetworks(env);
     const urlsFilled = await propagateGoodUrls(env);
     return json({ ok: true, networks_set: networksSet, urls_filled: urlsFilled });
+  }
+
+  if (action === 'reclassify_storefronts') {
+    return await reclassifyStorefronts(env, body);
   }
 
   if (action === 'resolve_conflict') {

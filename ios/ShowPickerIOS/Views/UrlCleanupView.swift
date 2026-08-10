@@ -32,11 +32,17 @@ struct UrlCleanupView: View {
                     Label("Run enrichment passes", systemImage: "sparkles")
                 }
                 .disabled(working)
+                Button {
+                    Task { await runReclassify() }
+                } label: {
+                    Label("Re-check Apple TV+ rentals", systemImage: "tag.slash")
+                }
+                .disabled(working)
                 if let b = banner {
                     Text(b).font(.caption).foregroundStyle(b.hasPrefix("✓") ? .green : .red)
                 }
             } footer: {
-                Text("Adopting copies the real link a sibling copy already has onto rows stuck on a placeholder. Enrichment runs up to five club-wide passes for posters, logos, seasons and dates.")
+                Text("Adopting copies the real link a sibling copy already has onto rows stuck on a placeholder. Enrichment runs up to five club-wide passes for posters, logos, seasons and dates. Re-checking asks TMDB which titles labeled Apple TV+ are really rentals and moves them off the subscription — links are left alone.")
             }
 
             Section {
@@ -152,6 +158,29 @@ struct UrlCleanupView: View {
         } catch {
             banner = "⚠︎ " + API.failureLine(error, action: "adopt networks")
         }
+        await load()
+    }
+
+    // Walk the Apple TV+ backlog in batches until the server reports nothing
+    // left to check. Capped at five calls per tap for the same reason the
+    // enrichment button is: each one costs a TMDB request per title, and the
+    // operator can always tap again.
+    private func runReclassify() async {
+        working = true
+        defer { working = false }
+        var movedRows = 0, checked = 0, calls = 0
+        for _ in 0..<5 {
+            guard let r = try? await API.reclassifyStorefronts() else { break }
+            if let e = r.error { banner = "⚠︎ " + e; await load(); return }
+            calls += 1
+            movedRows += r.rowsChanged ?? 0
+            checked += r.checked ?? 0
+            banner = "Re-checking… \(checked) titles, \(movedRows) rows moved"
+            if (r.remaining ?? 0) == 0 { break }
+        }
+        banner = calls > 0
+            ? "✓ Checked \(checked) titles — moved \(movedRows) row\(movedRows == 1 ? "" : "s") off Apple TV+."
+            : "⚠︎ Re-check didn't run — try again."
         await load()
     }
 
