@@ -70,11 +70,21 @@ struct ShowDetailView: View {
                 }
             }
 
-            // Overview (plot synopsis) sits right under the title/image, with
-            // no section header.
-            if let ov = show?.overview, !ov.isEmpty {
+            // Tagline then overview, right under the title/image with no
+            // section header. The tagline leads because it's the one line of
+            // copy written to make you want the thing — it reads as a pull
+            // quote above the synopsis, not as another fact. Italic and tinted
+            // so it's never mistaken for the first sentence of the plot.
+            if hasBlurb {
                 Section {
-                    Text(ov).font(.callout).foregroundStyle(.secondary)
+                    if let tl = show?.tagline, !tl.isEmpty {
+                        Text(tl)
+                            .font(.callout.italic())
+                            .foregroundStyle(.tertiary)
+                    }
+                    if let ov = show?.overview, !ov.isEmpty {
+                        Text(ov).font(.callout).foregroundStyle(.secondary)
+                    }
                 }
             }
 
@@ -232,6 +242,11 @@ struct ShowDetailView: View {
                         if let y = s.releaseYear {
                             LabeledContent("Year", value: String(y))
                         }
+                        // Only ever non-nil for non-English titles — see
+                        // Show.originalLanguageText.
+                        if let lang = s.originalLanguageText {
+                            LabeledContent("Language", value: lang)
+                        }
                     }
                 }
             }
@@ -294,6 +309,15 @@ struct ShowDetailView: View {
         return s.isMovie || s.seriesText != nil || !s.genreList.isEmpty
             || s.seasonDatesText != nil || (s.contentRating.map { !$0.isEmpty } ?? false)
             || s.releaseYear != nil || s.runtimeText != nil
+            || s.originalLanguageText != nil
+    }
+
+    // Whether the tagline/overview block has anything in it. Either alone is
+    // enough — a title can have a tagline and no synopsis, or the reverse.
+    private var hasBlurb: Bool {
+        guard let s = show else { return false }
+        return (s.tagline.map { !$0.isEmpty } ?? false)
+            || (s.overview.map { !$0.isEmpty } ?? false)
     }
 
     // Eligible to enter a rating: I have this show on one of my own lists,

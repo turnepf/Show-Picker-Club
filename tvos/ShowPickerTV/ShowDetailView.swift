@@ -61,6 +61,15 @@ struct ShowDetailView: View {
                         // Description + cast under the image, filling the space the
                         // tall info column would otherwise leave blank on the left,
                         // so the whole screen fits without scrolling.
+                        // Tagline above the synopsis, as on iOS — the pull
+                        // quote, then the plot. Dimmer than the overview so the
+                        // eye lands on the synopsis first at ten feet.
+                        if let tl = show?.tagline, !tl.isEmpty {
+                            Text(tl)
+                                .font(.system(size: 24).italic())
+                                .foregroundColor(Theme.muted.opacity(0.75))
+                                .frame(maxWidth: 720, alignment: .leading)
+                        }
                         if let ov = show?.overview, !ov.isEmpty {
                             Text(ov)
                                 .font(.system(size: 24))
@@ -431,13 +440,16 @@ struct ShowDetailView: View {
         .font(.system(size: 24))
     }
 
-    // "2026 · 1h 52m · TV-MA" — the catalog facts on one line. The audience
-    // score isn't repeated here; the star Label by the title already shows it.
+    // "2026 · 1h 52m · TV-MA · Japanese" — the catalog facts on one line. The
+    // audience score isn't repeated here; the star Label by the title already
+    // shows it. Language appears only for non-English titles (see
+    // Show.originalLanguageText), so the line stays short for most of the club.
     private func extraMetaLine(_ s: Show) -> String? {
         var parts: [String] = []
         if let y = s.releaseYear { parts.append(String(y)) }
         if let rt = s.runtimeText { parts.append(rt) }
         if let cr = s.contentRating, !cr.isEmpty { parts.append(cr) }
+        if let lang = s.originalLanguageText { parts.append(lang) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 

@@ -173,7 +173,15 @@ CREATE TABLE IF NOT EXISTS shows (
   release_year INTEGER,
   watch_link TEXT,
   tmdb_id INTEGER,
-  tmdb_type TEXT
+  tmdb_type TEXT,
+  -- Migration 063. `studio` is the originating studio/broadcaster and is
+  -- deliberately not called anything network-shaped — `network` above means
+  -- the streaming service.
+  episodes_released INTEGER,
+  vote_count INTEGER,
+  tagline TEXT,
+  original_language TEXT,
+  studio TEXT
 );
 
 CREATE TABLE IF NOT EXISTS actors (

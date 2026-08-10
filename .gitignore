@@ -7,5 +7,7 @@ node_modules/
 infrastructure/
 *.xcuserstate
 xcuserdata/
+.build/
+.swiftpm/
 __pycache__/
 *.pyc

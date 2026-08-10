@@ -110,10 +110,35 @@ export function extractTmdbDetailFields(detail, mediaType) {
     else if (rentBuy.length) availability = 'rent_buy';
   }
 
+  // Episode count across aired seasons. The companion to seasons_released,
+  // which on its own says nothing about size: four seasons of Severance is 19
+  // episodes, four of Grey's Anatomy is 90. Movies have neither.
+  const episodesReleased = mediaType === 'movie'
+    ? null
+    : (typeof detail.number_of_episodes === 'number' ? detail.number_of_episodes : null);
+
+  // Sample size behind tmdbRating, so a 9.1 from eleven people can later be
+  // told apart from an 8.9 from forty thousand.
+  const voteCount = typeof detail.vote_count === 'number' ? detail.vote_count : null;
+
+  const tagline = (detail.tagline || '').trim() || null;
+  const originalLanguage = (detail.original_language || '').trim().toLowerCase() || null;
+
+  // Originating studio (movie) or broadcaster (series). TMDB orders
+  // production_companies by its own internal id rather than prominence, so the
+  // first entry is as often a financing shell as it is A24 — which is why this
+  // is stored but not displayed yet. The TV side is cleaner: `networks` is
+  // short and accurate. Named `studio`, never anything network-shaped, because
+  // shows.network already means the streaming service.
+  const studio = mediaType === 'movie'
+    ? ((detail.production_companies || [])[0]?.name || null)
+    : ((detail.networks || [])[0]?.name || null);
+
   return {
     overview, backdropUrl, tmdbRating, contentRating, trailerKey,
     director, directorPersonId, runtime, releaseYear, providerNetwork, watchLink,
     storefronts, availability,
+    episodesReleased, voteCount, tagline, originalLanguage, studio,
   };
 }
 
@@ -123,6 +148,8 @@ const EMPTY_DETAIL = {
   trailerKey: null, director: null, directorPersonId: null, runtime: null,
   releaseYear: null, providerNetwork: null, watchLink: null,
   storefronts: [], availability: null,
+  episodesReleased: null, voteCount: null, tagline: null,
+  originalLanguage: null, studio: null,
 };
 
 // Retries on 429 (rate limit) with backoff — otherwise a burst of many

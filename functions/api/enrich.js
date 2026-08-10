@@ -287,10 +287,19 @@ export async function onRequestPost(context) {
               trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director), director_imdb_id = COALESCE(?, director_imdb_id),
               runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
               network = COALESCE(network, ?), watch_link = COALESCE(?, watch_link),
+              -- New-value-wins, same shape as seasons_released: a running
+              -- series gains episodes and collects votes, so these have to
+              -- converge rather than freeze at whatever the first pass saw.
+              episodes_released = COALESCE(?, episodes_released),
+              vote_count = COALESCE(?, vote_count),
+              tagline = COALESCE(?, tagline),
+              original_language = COALESCE(?, original_language),
+              studio = COALESCE(?, studio),
               enriched_at = datetime('now') WHERE id = ?`
         ).bind(newDate, endDate, isComplete, genres, seasonsReleased, posterUrl, networkLogoUrl,
           df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey, df.director, directorImdbId,
-          df.runtime, df.releaseYear, df.providerNetwork, df.watchLink, show.id).run();
+          df.runtime, df.releaseYear, df.providerNetwork, df.watchLink,
+          df.episodesReleased, df.voteCount, df.tagline, df.originalLanguage, df.studio, show.id).run();
         // Catalog fields (artwork + the new detail fields) are the same for
         // every member's copy of a title, so push them to all copies in one
         // go rather than making each copy wait its own turn in the rotation.
@@ -302,11 +311,21 @@ export async function onRequestPost(context) {
               tmdb_rating = COALESCE(tmdb_rating, ?), rating = COALESCE(?, rating), content_rating = COALESCE(content_rating, ?),
               trailer_key = COALESCE(trailer_key, ?), director = COALESCE(director, ?), director_imdb_id = COALESCE(director_imdb_id, ?),
               runtime = COALESCE(runtime, ?), release_year = COALESCE(release_year, ?),
-              genres = COALESCE(genres, ?), watch_link = COALESCE(watch_link, ?)
+              genres = COALESCE(genres, ?), watch_link = COALESCE(watch_link, ?),
+              -- Migration 063's fields are catalog-level like everything else
+              -- here, so they propagate too. Without this a sibling copy would
+              -- sit NULL until its own turn in the rotation came up, which for
+              -- a title only one member is actively watching may be never.
+              episodes_released = COALESCE(episodes_released, ?),
+              vote_count = COALESCE(vote_count, ?),
+              tagline = COALESCE(tagline, ?),
+              original_language = COALESCE(original_language, ?),
+              studio = COALESCE(studio, ?)
             WHERE archived = 0
               AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
         ).bind(posterUrl, networkLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating,
-          df.trailerKey, df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.watchLink, show.id).run();
+          df.trailerKey, df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.watchLink,
+          df.episodesReleased, df.voteCount, df.tagline, df.originalLanguage, df.studio, show.id).run();
 
         // Cast comes free with the detail call we just made — this pass used
         // to ignore it entirely, which is why a title enriched here kept
@@ -372,11 +391,20 @@ export async function onRequestPost(context) {
               trailer_key = COALESCE(trailer_key, ?), director = COALESCE(director, ?), director_imdb_id = COALESCE(director_imdb_id, ?),
               runtime = COALESCE(runtime, ?), release_year = COALESCE(release_year, ?),
               genres = COALESCE(genres, ?), network = COALESCE(network, ?),
-              watch_link = COALESCE(watch_link, ?), enriched_at = datetime('now')
+              watch_link = COALESCE(watch_link, ?),
+              -- vote_count converges like rating does (a film keeps collecting
+              -- votes); the rest are fill-only, matching this statement's
+              -- prevailing shape. A movie has no episode count.
+              vote_count = COALESCE(?, vote_count),
+              tagline = COALESCE(tagline, ?),
+              original_language = COALESCE(original_language, ?),
+              studio = COALESCE(studio, ?),
+              enriched_at = datetime('now')
             WHERE archived = 0
               AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
         ).bind(posterUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey,
-          df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.providerNetwork, df.watchLink, show.id).run();
+          df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.providerNetwork, df.watchLink,
+          df.voteCount, df.tagline, df.originalLanguage, df.studio, show.id).run();
         if (posterUrl) tmdbUpdated++;
       } catch (e) {
         movieErrors++;

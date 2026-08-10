@@ -59,6 +59,18 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
     public let releaseYear: Int?
     public let watchLink: String?       // fallback "where to watch" page; used only when there's no real deep link
 
+    // Migration 063. episodesReleased is the companion to seasonsReleased —
+    // "4 seasons" says nothing about size on its own — and rides along on
+    // seriesText. tagline renders above the overview; originalLanguage is shown
+    // only when it isn't English, since an "English" row on nearly every card
+    // is noise. voteCount and studio are stored but deliberately not displayed;
+    // ARCHITECTURE.md's shows table says why for each.
+    public let episodesReleased: Int?
+    public let voteCount: Int?
+    public let tagline: String?
+    public let originalLanguage: String?   // ISO code: "ja", "ko", …
+    public let studio: String?             // originating studio/broadcaster, NOT the streaming service
+
     // Explicit public init so other modules (the apps, their offline queues)
     // can construct a Show — the synthesized memberwise init is internal.
     // Parameter order matches the fields as they were declared in the apps'
@@ -96,7 +108,12 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         runtime: Int? = nil,
         releaseYear: Int? = nil,
         watchLink: String? = nil,
-        directorImdbId: String? = nil
+        directorImdbId: String? = nil,
+        episodesReleased: Int? = nil,
+        voteCount: Int? = nil,
+        tagline: String? = nil,
+        originalLanguage: String? = nil,
+        studio: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -130,6 +147,11 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         self.runtime = runtime
         self.releaseYear = releaseYear
         self.watchLink = watchLink
+        self.episodesReleased = episodesReleased
+        self.voteCount = voteCount
+        self.tagline = tagline
+        self.originalLanguage = originalLanguage
+        self.studio = studio
     }
 
     enum CodingKeys: String, CodingKey {
@@ -156,6 +178,11 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         case runtime
         case releaseYear = "release_year"
         case watchLink = "watch_link"
+        case episodesReleased = "episodes_released"
+        case voteCount = "vote_count"
+        case tagline
+        case originalLanguage = "original_language"
+        case studio
     }
 
     // Tolerant decoding. The API varies what it sends by context — `list` and
@@ -204,6 +231,11 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         runtime = try? c.decode(Int.self, forKey: .runtime)
         releaseYear = try? c.decode(Int.self, forKey: .releaseYear)
         watchLink = try? c.decode(String.self, forKey: .watchLink)
+        episodesReleased = try? c.decode(Int.self, forKey: .episodesReleased)
+        voteCount = try? c.decode(Int.self, forKey: .voteCount)
+        tagline = try? c.decode(String.self, forKey: .tagline)
+        originalLanguage = try? c.decode(String.self, forKey: .originalLanguage)
+        studio = try? c.decode(String.self, forKey: .studio)
     }
 
     public var isMovie: Bool { (movie ?? 0) == 1 }
@@ -220,14 +252,37 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         return "\(n) season\(n == 1 ? "" : "s")"
     }
 
-    // Combined series line for the detail screen: "4 Seasons, Complete" while
-    // ended, "2 Seasons" while running, or just "Complete" when the count is
-    // unknown. nil when neither a count nor the ended flag is set.
+    // Combined series line for the detail screen: "4 Seasons · 19 Episodes,
+    // Complete" while ended, "2 Seasons" while running, or just "Complete" when
+    // the count is unknown. nil when neither a count nor the ended flag is set.
+    //
+    // The episode count rides on the season count with a middot rather than
+    // taking its own row: the question it answers ("how much am I signing up
+    // for") is the same question, and "4 Seasons" alone is what makes it
+    // unanswerable. Dropped when we don't have it, and for movies, which have
+    // no episode count at all.
     public var seriesText: String? {
         var parts: [String] = []
-        if let n = seasonsReleased, n > 0 { parts.append("\(n) Season\(n == 1 ? "" : "s")") }
+        if let n = seasonsReleased, n > 0 {
+            var count = "\(n) Season\(n == 1 ? "" : "s")"
+            if let e = episodesReleased, e > 0 {
+                count += " · \(e) Episode\(e == 1 ? "" : "s")"
+            }
+            parts.append(count)
+        }
         if isFullSeries { parts.append("Complete") }
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
+
+    // Production language, spelled out ("Japanese", "Korean") — but only when
+    // it isn't English. A "Language: English" row would appear on nearly every
+    // card in the club and tell nobody anything; the field earns its place
+    // precisely when it's a surprise. nil when the code is missing, English, or
+    // one Locale can't name.
+    public var originalLanguageText: String? {
+        guard let code = originalLanguage?.lowercased(), !code.isEmpty, code != "en" else { return nil }
+        guard let name = Locale.current.localizedString(forLanguageCode: code) else { return nil }
+        return name.prefix(1).uppercased() + name.dropFirst()
     }
 
     // Format an ISO "YYYY-MM-DD" as "M/D", matching the web's formatDate.
