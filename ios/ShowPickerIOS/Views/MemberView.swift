@@ -118,16 +118,9 @@ struct MemberView: View {
             if !isReordering { mediaChips }
 
             List {
-                // Admin-only, and only on someone else's page — the signup
-                // notification email lands here, and "who is this and are they
-                // using it?" is the question it raises. Gated on auth.isAdmin
-                // at the call site, so a logout takes the whole strip (and the
-                // contact details it loaded) out of the hierarchy with it.
-                if auth.isAdmin && !isMine {
-                    MemberAdminStrip(slug: member.slug, label: member.label,
-                                     listCounts: loadedListCounts)
-                }
-
+                // Nothing admin-only here on purpose. This page shows an
+                // operator exactly what the member sees; the operator's view
+                // of them is Admin ▸ Manage members ▸ that member.
                 let items = sortedItems()
                 if items.isEmpty {
                     Group {
@@ -336,18 +329,6 @@ struct MemberView: View {
         } label: {
             Image(systemName: "line.3.horizontal.decrease.circle")
         }
-    }
-
-    // All four lists counted from the rows this page already has, for the admin
-    // strip's "lists:" row. Counting here rather than asking the server keeps
-    // the header honest: it can only ever report what the lists below it show.
-    // nil until the fetch lands, so the strip doesn't flash four zeros.
-    private var loadedListCounts: MemberActivity? {
-        guard !shows.isEmpty else { return nil }
-        let active = shows.filter { !$0.isArchived }
-        let count = { (l: ShowList) in active.filter { $0.list == l.rawValue }.count }
-        return MemberActivity(watching: count(.watching), waiting: count(.waiting),
-                              recommending: count(.recommending), next: count(.next))
     }
 
     // Everything on the open list, before the media filter — the chips count

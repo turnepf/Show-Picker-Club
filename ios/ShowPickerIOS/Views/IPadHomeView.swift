@@ -48,6 +48,9 @@ struct IPadHomeView: View {
     // NavigationStack) so widget deep links can push a show card directly;
     // cleared whenever detailKey resets the stack, matching the old behavior.
     @State private var detailPath: [Route] = []
+    // A push that has to survive the selection change it arrives with. See
+    // `show(_:under:)` and the detailKey onChange.
+    @State private var pendingDetailPush: Route?
     @State private var showingLogin = false
     @State private var showingDeleteAccount = false
     @State private var showingPasskeys = false
@@ -104,7 +107,13 @@ struct IPadHomeView: View {
             .id(detailKey)
         }
         .task { if loading { await load() } }
-        .onChange(of: detailKey) { _, _ in detailPath = [] }
+        // Changing what the sidebar points at empties the detail stack —
+        // except when the selection change was made in order to push
+        // something, in which case that push is what replaces it.
+        .onChange(of: detailKey) { _, _ in
+            detailPath = pendingDetailPush.map { [$0] } ?? []
+            pendingDetailPush = nil
+        }
         .sheet(isPresented: $showingLogin) { LoginView().environmentObject(auth) }
         .sheet(isPresented: $showingDeleteAccount) { DeleteAccountView().environmentObject(auth) }
         .sheet(isPresented: $showingSearch) { SearchView().environmentObject(auth) }
@@ -432,6 +441,8 @@ struct IPadHomeView: View {
         switch route {
         case .member(let m):
             MemberView(member: m)
+        case .adminMemberDetail(let slug):
+            MemberAdminDetailLoader(slug: slug)
         case .detail(let id, let title, let network, let rating):
             ShowDetailView(id: id, initialTitle: title, initialNetwork: network, initialRating: rating)
         case .pick(let title, let network, let rating, let posterUrl, let networkUrl):
@@ -484,6 +495,7 @@ struct IPadHomeView: View {
     private func resetForLoggedOut() {
         session.clear()
         detailPath = []
+        pendingDetailPush = nil
         selection = popular.isEmpty ? nil : .trending
         Task { await load() }
     }
@@ -558,6 +570,20 @@ struct IPadHomeView: View {
     //
     // `allowRefetch` bounds the roster refresh to one attempt — load() replays
     // with it false, so an unresolvable slug gives up rather than looping.
+    // Point the sidebar at `item` and open `route` in the detail column, so
+    // Back lands somewhere that makes sense rather than on a placeholder.
+    // Already on that item, the push is all that's needed; otherwise it rides
+    // along with the selection change, which would otherwise clear it.
+    @MainActor
+    private func show(_ route: Route, under item: SidebarItem) {
+        if selection == item {
+            detailPath = [route]
+        } else {
+            pendingDetailPush = route
+            selection = item
+        }
+    }
+
     @MainActor
     private func route(url: URL, allowRefetch: Bool = true) {
         guard let first = url.path.split(separator: "/").first.map({ String($0).lowercased() }) else { return }
@@ -593,6 +619,14 @@ struct IPadHomeView: View {
             return
         }
         let slug = first == "dorothy" ? "whitt" : first // mirror the web's 301
+        // Same rule as iPhone: an admin following a link to someone else gets
+        // that member's admin screen. The sidebar goes to Manage members so
+        // Back lands somewhere that makes sense, and the screen itself opens
+        // in the detail column.
+        if auth.isAdmin && !auth.isMe(slug) && members.contains(where: { $0.slug == slug }) {
+            show(.adminMemberDetail(slug: slug), under: .adminManageMembers)
+            return
+        }
         if members.contains(where: { $0.slug == slug }) {
             session.focusedSlug = slug
             let frag = (url.fragment ?? "").lowercased()

@@ -290,7 +290,7 @@ The complete map:
 | `POST /auth/passkey-register-finish`   | `functions/auth/passkey-register-finish.js`| POST    | session — verifies the attestation and stores the credential |
 | `GET /api/passkeys`                    | `functions/api/passkeys.js`                | GET     | session — the caller's own registered passkeys |
 | `DELETE /api/passkeys/:id`             | `functions/api/passkeys/[id].js`           | DELETE  | session — removes one of the caller's own passkeys |
-| `GET/POST /api/admin-member-emails`    | `functions/api/admin-member-emails.js`     | GET, POST | admin session — GET is the roster with contacts, platforms, last login and 30-day activity; `?member=<slug>` narrows it to one row (the member page's admin strip). POST edits one member's name/emails/phones |
+| `GET/POST /api/admin-member-emails`    | `functions/api/admin-member-emails.js`     | GET, POST | admin session — GET is the roster with contacts, platforms, last login, current per-list totals and 30-day activity; `?member=<slug>` narrows it to one row (the admin member screen). `list_counts` and `show_count` share the active-non-seed filter, so the four sum to the one. POST edits one member's name/emails/phones |
 | `POST /api/admin-member-disable`       | `functions/api/admin-member-disable.js`    | POST    | admin session |
 | `POST /api/admin-member-role`          | `functions/api/admin-member-role.js`       | POST    | admin session — promote/demote `members.is_admin`; refuses to demote the last admin |
 | `POST /api/admin-member-merge`         | `functions/api/admin-member-merge.js`      | POST    | admin session — merge a duplicate member account into the kept one, then delete the duplicate |

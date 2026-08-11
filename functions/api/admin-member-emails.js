@@ -84,6 +84,21 @@ export async function onRequestGet(context) {
            (SELECT COUNT(*) FROM shows
              WHERE member_slug = m.slug AND archived = 1
                AND COALESCE(added_by,'') != 'seed') AS archived_count,
+           -- All-time totals per list, on exactly the terms show_count uses
+           -- (active, non-seed) so the four of them sum to it. The admin
+           -- member page draws both lines; they must not disagree.
+           (SELECT COUNT(*) FROM shows
+             WHERE member_slug = m.slug AND archived = 0 AND list = 'watching'
+               AND COALESCE(added_by,'') != 'seed') AS cur_watching,
+           (SELECT COUNT(*) FROM shows
+             WHERE member_slug = m.slug AND archived = 0 AND list = 'waiting'
+               AND COALESCE(added_by,'') != 'seed') AS cur_waiting,
+           (SELECT COUNT(*) FROM shows
+             WHERE member_slug = m.slug AND archived = 0 AND list = 'recommending'
+               AND COALESCE(added_by,'') != 'seed') AS cur_recommending,
+           (SELECT COUNT(*) FROM shows
+             WHERE member_slug = m.slug AND archived = 0 AND list = 'next'
+               AND COALESCE(added_by,'') != 'seed') AS cur_next,
            (SELECT COUNT(*) FROM shows
              WHERE member_slug = m.slug AND archived = 0 AND list = 'watching'
                AND COALESCE(added_by,'') != 'seed'
@@ -127,6 +142,12 @@ export async function onRequestGet(context) {
     joined_at: r.joined_at || null,
     last_activity_at: r.last_activity_at || null,
     platforms: r.platforms ? r.platforms.split(',').filter(Boolean) : [],
+    list_counts: {
+      watching: r.cur_watching || 0,
+      waiting: r.cur_waiting || 0,
+      recommending: r.cur_recommending || 0,
+      next: r.cur_next || 0,
+    },
     activity_30d: {
       watching: r.act_watching || 0,
       waiting: r.act_waiting || 0,

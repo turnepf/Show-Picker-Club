@@ -178,6 +178,8 @@ struct HomeView: View {
                 switch route {
                 case .member(let m):
                     MemberView(member: m)
+                case .adminMemberDetail(let slug):
+                    MemberAdminDetailLoader(slug: slug)
                 case .detail(let id, let title, let network, let rating):
                     ShowDetailView(id: id, initialTitle: title, initialNetwork: network, initialRating: rating)
                 case .pick(let title, let network, let rating, let posterUrl, let networkUrl):
@@ -293,6 +295,15 @@ struct HomeView: View {
             return
         }
         let slug = first == "dorothy" ? "whitt" : first // mirror the web's 301
+        // An admin following a link to someone else lands on that member's
+        // admin screen, not their lists. The link that matters is the signup
+        // notification email's, and the question it raises — who is this, and
+        // are they using it? — is answered there. Your own slug is still just
+        // your page, and a non-admin only ever gets the member page.
+        if auth.isAdmin && !auth.isMe(slug) && members.contains(where: { $0.slug == slug }) {
+            path = [.adminMemberDetail(slug: slug)]
+            return
+        }
         if let m = members.first(where: { $0.slug == slug }) {
             path = [.member(m)]
         } else if members.isEmpty {
@@ -513,6 +524,10 @@ enum Route: Hashable {
     }
 
     case member(Member)
+    // One member's admin screen, addressed by slug because the only thing
+    // that pushes it from outside Manage Members — the signup notification
+    // email's link to /<slug> — has a slug and nothing else.
+    case adminMemberDetail(slug: String)
     case detail(id: Int, title: String, network: String?, rating: String?)
     // A recommendation ("Picks for you") has no backing show row yet — open the
     // detail from its title so the user chooses a list, rather than adding it

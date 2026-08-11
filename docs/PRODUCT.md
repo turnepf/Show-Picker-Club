@@ -95,28 +95,29 @@ Two pieces of metadata are **always visible** under the row (not collapsed):
 - **Every list shows the premiere date when one exists** (since 2026-07): Loved and Next Up rows carry the same "📅 Next episode" line — a show you thought was done can drop a surprise season, and the date is the nudge to move it back to Watching.
 - **Next Up list:** "Recommended by Dorothy" — surfaces attribution without an expand.
 
-### Admin strip (iPhone, iPad and Mac — admin sessions only)
+### The admin member screen (iPhone, iPad and Mac — admin sessions only)
 
-The member page is visible to any signed-in member, as it always has been. Signed in as an **admin**, someone else's page additionally carries two sections above their lists:
+**The member page carries nothing admin-only.** Opening someone's page as an admin shows exactly what that member sees — the point of going there is to see their view, and a header full of their phone numbers isn't part of it. The operator's view of a member is its own screen: **Admin → Manage members → that member**, which leads with who they are and follows with the controls that act on them.
 
-- **Admin** — collapsed, one line: their name, any ADMIN/DISABLED tag, and `joined 2d ago via apple`. Expanded (the default):
+That screen opens with:
+
+- **Admin** — their name, any ADMIN/DISABLED tag, and `joined 2d ago via apple`, then:
   - slug, every login email and phone on file (selectable, so you can copy one)
   - last login, with the method they used — `last login 3d ago via Apple`
   - last activity
-  - **`lists:`** — the four lists across with their current totals, including zeros, counted from the same rows drawn below so the header can never disagree with the list under it
+  - **`lists:`** — the four lists across with their current totals, including zeros
   - total shows and how many they've archived
   - **`30d:`** — adds per list in the last 30 days
   - every platform they've ever used the app from (iPhone, iPad, Apple Watch, Mac, Apple TV, web), lit when used and dim when not
-  - **Manage member** — pushes the same editor the Manage Members roster opens (rename, edit contacts, make admin, disable)
 - **Recent adds** — their eight most recent additions, newest first, with a relative timestamp. Bulk imports collapse to one line per list. Seeded starter rows never appear: a new member who has added nothing reads as having added nothing.
+- **Open member page** — their four lists, exactly as they see them.
+- then the editing controls (rename, emails, phones, make admin, disable).
 
-The strip collapses to its one-line summary and remembers that choice, because the iPad and Mac split view draws the member page once per list — four copies of a tall header otherwise sit between you and the shows.
+The `lists:` totals and the "N shows" line under them come from the same query on the same terms (active, non-seed), so the four always sum to the one. `scripts/admin-member-detail-test.mjs` asserts it.
 
-This exists for the signup notification email. That email deep-links to the new member's page, so the question it raises — who is this, and are they using it? — is answered where it gets asked rather than several taps away in Manage Members. It is never shown on your own page, to a non-admin, or after logging out.
+**The signup notification email lands here.** That email deep-links to `/<slug>`, and the question it raises — who is this, and are they using it? — is this screen's whole content, so for an **admin session opening someone else's slug** the link resolves to the admin member screen rather than the member page. Your own slug still opens your page, and a non-admin following any slug only ever gets the member page. On iPad and Mac the sidebar moves to Manage members underneath it, so Back lands somewhere useful.
 
-**Getting there without the email.** Admin → Manage members → any member opens the editor, and its first row, **Open member page**, pushes that member's page — strip, recent adds, and their four lists. Before this the email was the only way to reach another member's page from the phone (iPhone Home deliberately doesn't list members; the iPad and Mac sidebar roster always could). The link is one-directional: the editor omits the row when the strip's own **Manage member** pushed it, so the two screens can't bounce back and forth.
-
-**Mac** gets it in full: Catalyst runs the same split view as iPad, and both entitlement files claim `applinks:showpicker.club`, so tapping the email's button in Mail on the Mac opens the app on that member exactly as it does on the phone. tvOS and watchOS don't have it (view-only and read-only respectively), and there is no web member app to put it on.
+**Mac** gets all of it: Catalyst runs the same split view as iPad, and both entitlement files claim `applinks:showpicker.club`, so tapping the email's button in Mail on the Mac opens the same screen it opens on the phone. tvOS and watchOS have no admin tools (view-only and read-only respectively), and there is no web member app to put them on.
 
 ### Suggest a show
 

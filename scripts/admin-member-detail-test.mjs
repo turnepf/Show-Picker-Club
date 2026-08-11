@@ -173,6 +173,15 @@ console.log('\n== what the admin strip reads');
   check('archived shows are counted separately', m.archived_count === 1, `got ${m.archived_count}`);
   check('and the 30-day rollup is per list', m.activity_30d && typeof m.activity_30d.watching === 'number',
         JSON.stringify(m.activity_30d));
+  // The admin member screen draws list_counts and show_count one above the
+  // other, so a disagreement between them is visible. Same filters on both:
+  // active, non-seed. The seeded row and the archived one are in neither.
+  const lc = m.list_counts || {};
+  check('current list totals ride along', lc.watching === 1 && lc.next === 1
+        && lc.waiting === 0 && lc.recommending === 0, JSON.stringify(lc));
+  check('and they sum to show_count',
+        lc.watching + lc.waiting + lc.recommending + lc.next === m.show_count,
+        `${JSON.stringify(lc)} vs ${m.show_count}`);
 }
 
 console.log(`\n${failed ? 'FAIL' : 'PASS'} — ${passed} passed, ${failed} failed\n`);

@@ -594,9 +594,9 @@ struct ManageMembersView: View {
     }
 
     // The badge order, the badges themselves and the activity pills live in
-    // MemberAdminStrip.swift — the member page's admin strip draws the same
-    // three things, and two copies would drift the first time a platform is
-    // added.
+    // MemberAdminDetail.swift — the roster rows and the member's own admin
+    // screen draw the same three things, and two copies would drift the first
+    // time a platform is added.
     private static let platformBadgeOrder = adminPlatformBadgeOrder
 
     // Same badges, same layout, but tappable: picks which platform
@@ -766,9 +766,6 @@ func loginMethodLabel(_ key: String) -> String {
 struct MemberDetailAdminView: View {
     let member: AdminMember
     let onChange: () async -> Void
-    /// False when the member page pushed this screen — the link back to it
-    /// would just be a loop from there.
-    let showsMemberPageLink: Bool
 
     @Environment(\.dismiss) private var dismiss
     @State private var firstName: String
@@ -783,10 +780,8 @@ struct MemberDetailAdminView: View {
     @State private var confirmDisable = false
     @State private var confirmAdmin = false
 
-    init(member: AdminMember, showsMemberPageLink: Bool = true,
-         onChange: @escaping () async -> Void) {
+    init(member: AdminMember, onChange: @escaping () async -> Void) {
         self.member = member
-        self.showsMemberPageLink = showsMemberPageLink
         self.onChange = onChange
         _firstName = State(initialValue: member.firstName ?? "")
         _lastName = State(initialValue: member.lastName ?? "")
@@ -799,20 +794,19 @@ struct MemberDetailAdminView: View {
 
     var body: some View {
         Form {
-            // The way out to the member's own page, which is where the admin
-            // strip's fuller picture lives — logins, platforms, list totals,
-            // recent adds, and the four lists themselves. Suppressed when this
-            // screen was pushed from that page, so the two can't loop.
-            if showsMemberPageLink {
-                Section {
-                    NavigationLink {
-                        MemberView(member: member.asMember)
-                    } label: {
-                        Label("Open member page", systemImage: "person.crop.rectangle.stack")
-                    }
-                } footer: {
-                    Text("Their profile and four lists, with the admin detail on top.")
+            // Who this is and whether they're using it, above the controls
+            // that act on them. This is the operator's view of the member;
+            // the link below is the member's own view of themselves.
+            MemberAdminDetail(member: member)
+
+            Section {
+                NavigationLink {
+                    MemberView(member: member.asMember)
+                } label: {
+                    Label("Open member page", systemImage: "person.crop.rectangle.stack")
                 }
+            } footer: {
+                Text("Their four lists, exactly as they see them.")
             }
 
             Section {

@@ -707,6 +707,9 @@ struct AdminMember: Codable, Identifiable {
     let lastLoginMethod: String?
     let lastActivityAt: String?
     let activity30d: MemberActivity?
+    // Current per-list totals, active and non-seed — the same terms as
+    // showCount, so the four sum to it. Absent on an older server.
+    let listCounts: MemberActivity?
     // When the account was created (members.created_at). Absent on an older
     // server; nil for the hand-seeded rows that predate the column.
     let joinedAt: String?
@@ -736,6 +739,7 @@ struct AdminMember: Codable, Identifiable {
         case lastLoginMethod = "last_login_method"
         case lastActivityAt = "last_activity_at"
         case activity30d = "activity_30d"
+        case listCounts = "list_counts"
         case joinedAt = "joined_at"
         case showCount = "show_count"
         case archivedCount = "archived_count"
