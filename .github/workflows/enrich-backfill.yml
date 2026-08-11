@@ -32,6 +32,10 @@ on:
         description: 'Pause between rounds, in seconds.'
         required: false
         default: '3'
+      max_retries:
+        description: 'Retries per round before giving up on a failing round.'
+        required: false
+        default: '4'
 
 jobs:
   backfill:
@@ -47,6 +51,7 @@ jobs:
           ROUNDS: ${{ github.event.inputs.rounds || '40' }}
           MAX_TMDB: ${{ github.event.inputs.max_tmdb || '' }}
           SLEEP_SECONDS: ${{ github.event.inputs.sleep_seconds || '3' }}
+          MAX_RETRIES: ${{ github.event.inputs.max_retries || '4' }}
         run: |
           if [ -z "$CRON_SECRET" ]; then
             echo "::error::CRON_SECRET repo secret is not set"
@@ -60,11 +65,14 @@ jobs:
           trending=$(curl -sS "https://showpicker.club/api/popular" \
             | python3 -c "import sys,json; print(json.dumps([s['title'] for s in json.load(sys.stdin).get('shows',[])]))" 2>/dev/null || echo '[]')
           if [ "$trending" != "[]" ] && [ -n "$trending" ]; then
-            tresp=$(curl -sS -X POST "$URL" \
+            # `|| true`: the step runs under `bash -e`, where a curl that fails
+            # to connect would abort the whole job from inside the command
+            # substitution. The status check below is what decides.
+            tresp=$(curl -sS --max-time 240 -X POST "$URL" \
               -H "Content-Type: application/json" \
               -H "X-Cron-Secret: ${CRON_SECRET}" \
               -d "{\"titles\":${trending},\"max_tmdb\":6}" \
-              -w $'\n%{http_code}')
+              -w $'\n%{http_code}' || true)
             thttp=$(printf '%s' "$tresp" | tail -n1)
             tbody=$(printf '%s' "$tresp" | sed '$d')
             tup=$(printf '%s' "$tbody" | python3 -c "import sys,json;print(json.load(sys.stdin).get('tmdbUpdated',0))" 2>/dev/null || echo 0)
@@ -89,16 +97,52 @@ jobs:
           fi
           echo "Running $ROUNDS rounds, body ${BODY}, ${SLEEP_SECONDS}s between rounds."
 
+          stopped_early=''
           for i in $(seq 1 "$ROUNDS"); do
-            resp=$(curl -sS -X POST "$URL" \
-              -H "Content-Type: application/json" \
-              -H "X-Cron-Secret: ${CRON_SECRET}" \
-              -d "$BODY" \
-              -w $'\n%{http_code}')
-            http=$(printf '%s' "$resp" | tail -n1)
-            body=$(printf '%s' "$resp" | sed '$d')
+            # A round is retried, not fatal. The endpoint sits behind Cloudflare
+            # and a long slow pass is exactly the shape of run that eventually
+            # meets an edge blip — a single 503 (`error code: 1102`, the worker
+            # hitting its resource ceiling) used to throw away every completed
+            # round before it. Each round's work is already committed to D1 and
+            # the rotation is oldest-enriched-first, so a retried or even a
+            # skipped round costs nothing but time.
+            attempt=0
+            while :; do
+              # `|| true` for the same reason as the trending pass above: under
+              # `bash -e` a connection failure inside $(...) exits the job
+              # before we can look at the status.
+              resp=$(curl -sS --max-time 240 -X POST "$URL" \
+                -H "Content-Type: application/json" \
+                -H "X-Cron-Secret: ${CRON_SECRET}" \
+                -d "$BODY" \
+                -w $'\n%{http_code}' || true)
+              http=$(printf '%s' "$resp" | tail -n1)
+              body=$(printf '%s' "$resp" | sed '$d')
+              [ "$http" = "200" ] && break
+              # Auth is the one failure retrying cannot fix, and the one worth
+              # failing loudly on: the secret is wrong or missing, so every
+              # remaining round would fail identically.
+              if [ "$http" = "401" ] || [ "$http" = "403" ]; then
+                echo "::error::round $i returned HTTP $http — CRON_SECRET is missing or does not match the Pages secret: $body"
+                exit 1
+              fi
+              attempt=$((attempt + 1))
+              [ "$attempt" -gt "$MAX_RETRIES" ] && break
+              wait=$((15 * attempt))
+              echo "::warning::round $i returned HTTP ${http:-none} (attempt $attempt/$MAX_RETRIES) — retrying in ${wait}s: $body"
+              sleep "$wait"
+            done
+
             if [ "$http" != "200" ]; then
-              echo "::error::round $i returned HTTP $http (CRON_SECRET rejected, or endpoint error): $body"
+              # Out of retries. If the run has already applied updates, the edge
+              # is unwell rather than the job misconfigured: keep the work, say
+              # so, and let the next run pick the rotation back up.
+              if [ "$total" -gt 0 ]; then
+                echo "::warning::round $i still failing after $MAX_RETRIES retries (HTTP ${http:-none}): $body"
+                stopped_early="round $i (HTTP ${http:-none}) after $MAX_RETRIES retries"
+                break
+              fi
+              echo "::error::round $i returned HTTP ${http:-none} and no round has succeeded this run: $body"
               exit 1
             fi
             # Report what the pass actually saw, not just its success count: a
@@ -123,4 +167,8 @@ jobs:
             fi
             sleep "$SLEEP_SECONDS"
           done
-          echo "Backfill complete. Total TMDB updates: $total"
+          if [ -n "$stopped_early" ]; then
+            echo "Backfill stopped early at $stopped_early. Total TMDB updates: $total (all applied — re-run to continue the rotation)."
+          else
+            echo "Backfill complete. Total TMDB updates: $total"
+          fi

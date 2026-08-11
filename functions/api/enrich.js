@@ -471,9 +471,28 @@ export async function onRequestPost(context) {
   // that still has null-id actors and refresh its cast. We propagate by title
   // so a single lookup fixes every member's copy at once — including the oldest
   // copy the home page surfaces via /api/popular's MIN(id). Gated on TMDB_TOKEN.
+  //
+  // Every title here is a full fetchEnrichment — a fresh search + detail plus
+  // a person lookup for each cast member we haven't resolved before, so up to
+  // CAST_DEPTH + 2 subrequests each. That is as heavy as the TV pass above,
+  // and it used to run its fixed 8 titles on top of whatever that pass had
+  // already spent, charged to nothing: a round told to stay small (max_tmdb:6,
+  // which is what the slow backfill workflow sends) was never actually small,
+  // and a default round blew straight through SUBREQUEST_BUDGET into the real
+  // Cloudflare ceiling — where the fetches throw, the empty catch below hides
+  // it, and a long run of such rounds is what eventually comes back as a 503
+  // (`error code: 1102`, the worker hitting its resource limit). So charge it
+  // to the same budget and let it take only the titles that fit. The pass is
+  // self-healing and rotates most-recently-touched first, so a round it sits
+  // out costs nothing but a later turn — and the free cache pass above, which
+  // takes the easy half of the same backlog, still runs on every call.
+  const ACTOR_TITLE_COST = CAST_DEPTH + 2;
   let actorImdbFilled = 0;
   if (env.TMDB_TOKEN && !skipActors) {
-    const maxActorImdb = parseInt(body.max_actor_imdb ?? '8', 10);
+    // Scale with the batch size the caller asked for, so shrinking a round
+    // shrinks all of it rather than just its first half.
+    const actorDefault = Number.isFinite(maxTmdb) ? Math.min(8, Math.max(1, maxTmdb)) : 8;
+    const maxActorImdb = parseInt(body.max_actor_imdb ?? String(actorDefault), 10);
     const backfillBase = `SELECT s.title, MAX(s.movie) AS movie
        FROM shows s
        WHERE s.archived = 0
@@ -483,7 +502,13 @@ export async function onRequestPost(context) {
       : env.DB.prepare(`${backfillBase} GROUP BY LOWER(s.title) ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(maxActorImdb);
     const { results: backfillShows } = await backfillStmt.all();
 
+    // fetchEnrichment does its own fetching and doesn't touch `spent`, so
+    // charge it here as an upper bound rather than mutating the true
+    // subrequest count the response reports.
+    let actorSpend = 0;
     for (const show of backfillShows) {
+      if (budgetLeft() - actorSpend < ACTOR_TITLE_COST) { budgetExhausted = true; break; }
+      actorSpend += ACTOR_TITLE_COST;
       try {
         const result = await fetchEnrichment(show.title, env, !!show.movie);
         const actors = result.actors || [];

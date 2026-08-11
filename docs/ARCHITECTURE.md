@@ -561,6 +561,7 @@ A logged-in member's page calls this fire-and-forget on load. TMDB-only since OM
 
 - A TV pass over active non-movie shows (ordered by `COALESCE(enriched_at, '1970-01-01') ASC` so the stalest refresh first) plus a separate movie pass. Writes `next_season_date`, `season_end_date`, `full_series`, `genres`, poster/logo, and the detail fields — `overview`, `tmdb_rating`, `rating` (converges to the fresh TMDB score), `director`/`director_imdb_id`, etc. Most are coalesced (never overwrite an existing value); `rating` is refreshed from TMDB so old OMDB values migrate over time. Then propagates the catalog fields to every member's copy of the title and bumps `enriched_at`. `director_imdb_id` costs one extra `/person/{id}/external_ids` call per matched show.
 - An actor-IMDB-id backfill re-runs TMDB enrichment for any title whose cast rows still lack ids. `mode: 'posters'` (alias `skip_omdb`) runs only the small poster catch-up batch so an artwork backfill fits within the subrequest budget. The response's `enriched` counter is retained but always 0 now (the OMDB ratings/actors pass it counted is gone).
+- **The actor backfill is charged to the same subrequest budget as the passes above** (2026-08). Each of its titles is a full `fetchEnrichment` — search + detail + a person lookup per unresolved cast member, up to `CAST_DEPTH + 2` subrequests — and it used to run a fixed 8 of them *on top of* whatever the TV/movie passes had already spent, counted against nothing. So `max_tmdb` only ever shrank the first half of a round, and a default round ran far past `SUBREQUEST_BUDGET`; the resulting failures were swallowed by the pass's own empty catch, and the oversized invocations are what surfaced as intermittent 503s (`error code: 1102` — the worker hitting its resource ceiling) during long backfill runs. It now takes only the titles the remaining budget covers, and its default size scales with `max_tmdb`. A round where the budget is already gone skips it entirely; the pass rotates and self-heals, and the free `fillActorIdsFromKnownPeople()` cache pass still runs on every call.
 
 `updated_at` is **not** touched by enrichment — only by member-initiated writes. This is what lets `updated_at != created_at` cleanly distinguish "the member touched it" from "we auto-enriched it."
 
@@ -753,6 +754,16 @@ Two things in `smoke.sh` look like fussiness and are not. Every request carries 
 - Trigger: daily at 03:00 UTC, or manual dispatch.
 - Steps: install rclone, install Node + wrangler, `wrangler d1 export shows-db --remote --output /tmp/...`, upload to Google Drive (`gdrive:Shows-Backups/`), prune drive backups older than 30 days, prune `failed_logins` rows older than 7 days.
 - Required secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RCLONE_CONF` (full rclone config including drive token).
+
+### `.github/workflows/enrich-backfill.yml` ("Enrich backfill")
+- Trigger: manual dispatch only. Inputs: `rounds`, `max_tmdb` (TV rows per round), `sleep_seconds` (pause between rounds), `max_retries`.
+- Loops `POST /api/enrich` with `X-Cron-Secret`, after one prioritised pass over the Trending titles. Full passes, never `mode: posters` — see the comment at the top of the file for why. Stops early once a round reports no candidates.
+- **A failing round is retried, not fatal** (2026-08). The endpoint sits behind Cloudflare, and a deliberately slow pass — many small rounds with a real pause between them — is exactly the shape of run that eventually meets an edge blip. A single 503 used to abort the job and throw away every completed round with it; one run lost 439 applied updates to a round-74 `error code: 1102`. Each round now retries up to `max_retries` times with growing backoff. Three outcomes, deliberately distinct:
+  - **401/403 → immediate hard fail, no retries.** The secret is wrong or missing, so every remaining round would fail identically. Retrying just delays the report.
+  - **Any other failure, after retries, with updates already applied → warn, stop, exit 0.** The work is committed to D1 and the rotation is oldest-enriched-first, so the next run resumes where this one stopped. The log says which round stopped it and what the running total was.
+  - **Any other failure, after retries, with nothing yet applied → hard fail.** Nothing worked, so this is a broken endpoint rather than a blip, and it should page.
+- Both `curl` calls end in `|| true`: the step runs under `bash -e`, where a connection failure inside `$(...)` would exit the job before the status check could classify it. Don't remove them — the check on `$http` is what decides.
+- Required secret: `CRON_SECRET` (Actions), matching the Pages secret of the same name.
 
 ## Excluded members
 
