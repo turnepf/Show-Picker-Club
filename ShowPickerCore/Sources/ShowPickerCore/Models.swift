@@ -538,10 +538,14 @@ public struct GroupDetail: Codable, Sendable {
     }
 }
 
-public struct GroupInvite: Codable, Sendable {
+// Identifiable so an invite can drive `.sheet(item:)` directly — presenting the
+// invite sheet off a separate Bool renders it before the invite lands.
+public struct GroupInvite: Codable, Identifiable, Sendable {
     public let token: String
     public let expiresAt: String
     public let url: String
+
+    public var id: String { token }
 
     public init(token: String, expiresAt: String, url: String) {
         self.token = token

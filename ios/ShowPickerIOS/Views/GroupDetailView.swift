@@ -16,13 +16,14 @@ struct GroupDetailView: View {
     @State private var loading = true
     @State private var errorText: String?
     @State private var selectedTab: Tab = .trending
-    @State private var showingInvite = false
     @State private var confirmingLeave = false
     @State private var confirmingDelete = false
     @State private var renaming = false
     @State private var renameText = ""
-    @State private var inviteUrl: String?
-    @State private var inviteExpiry: String?
+    // The invite itself is the presentation state. Held apart from a Bool flag
+    // on purpose: see the `.sheet(item:)` note below.
+    @State private var invite: GroupInvite?
+    @State private var generatingInvite = false
     @Environment(\.dismiss) private var dismiss
 
     enum Tab {
@@ -119,6 +120,7 @@ struct GroupDetailView: View {
                         } label: {
                             Label("Invite members", systemImage: "person.badge.plus")
                         }
+                        .disabled(generatingInvite)
                         Button {
                             confirmingLeave = true
                         } label: {
@@ -158,8 +160,13 @@ struct GroupDetailView: View {
             Button("Save") { Task { await rename() } }
             Button("Cancel", role: .cancel) { }
         }
-        .sheet(isPresented: $showingInvite) {
-            inviteSheet
+        // `item:`, never `isPresented:`. The invite arrives and the sheet opens
+        // in the same state update, and a Bool-driven sheet presents the body
+        // captured *before* that update — which is how the first "Invite
+        // members" tap showed an empty sheet and the second one showed the
+        // link. Passing the invite in means the sheet can't render without it.
+        .sheet(item: $invite) { invite in
+            inviteSheet(invite)
         }
         .task {
             await load()
@@ -202,54 +209,52 @@ struct GroupDetailView: View {
     }
 
     @ViewBuilder
-    private var inviteSheet: some View {
+    private func inviteSheet(_ invite: GroupInvite) -> some View {
         NavigationStack {
             VStack(spacing: 16) {
-                if let url = inviteUrl {
-                    VStack(spacing: 12) {
-                        Text("Share this link to invite people")
+                VStack(spacing: 12) {
+                    Text("Share this link to invite people")
+                        .foregroundStyle(.secondary)
+                    HStack {
+                        Text(invite.url)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
-                        HStack {
-                            Text(url)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .truncationMode(.middle)
-                                .lineLimit(1)
-                            Spacer()
-                            // A URL, not the String — plain text loses
-                            // Messages, Mail and AirDrop from the share sheet.
-                            if let link = URL(string: url) {
-                                ShareLink(item: link,
-                                          subject: Text("Join my group on Show Picker"),
-                                          message: Text("Join my group on Show Picker and we'll see what each other is watching.")) {
-                                    Image(systemName: "square.and.arrow.up")
-                                }
-                            }
-                            Button {
-                                UIPasteboard.general.string = url
-                            } label: {
-                                Image(systemName: "doc.on.doc")
+                            .truncationMode(.middle)
+                            .lineLimit(1)
+                        Spacer()
+                        // A URL, not the String — plain text loses
+                        // Messages, Mail and AirDrop from the share sheet.
+                        if let link = URL(string: invite.url) {
+                            ShareLink(item: link,
+                                      subject: Text("Join my group on Show Picker"),
+                                      message: Text("Join my group on Show Picker and we'll see what each other is watching.")) {
+                                Image(systemName: "square.and.arrow.up")
                             }
                         }
-                        .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                        if let expiry = inviteExpiry {
-                            Text("Expires on \(expiry)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        Button {
+                            UIPasteboard.general.string = invite.url
+                        } label: {
+                            Image(systemName: "doc.on.doc")
                         }
                     }
                     .padding()
-                    Spacer()
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    if let expiry = Self.expiryLine(invite.expiresAt) {
+                        Text("Expires on \(expiry)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .padding()
+                Spacer()
             }
             .navigationTitle("Invite to Group")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { showingInvite = false }
+                    Button("Done") { self.invite = nil }
                 }
             }
         }
@@ -292,11 +297,13 @@ struct GroupDetailView: View {
 
     @MainActor
     private func generateInvite() async {
+        // Every call mints a new invite row server-side, so don't let a second
+        // tap during the round trip mint a second one.
+        guard !generatingInvite else { return }
+        generatingInvite = true
+        defer { generatingInvite = false }
         do {
-            let invite = try await API.generateGroupInvite(groupId: groupId)
-            inviteUrl = invite.url
-            inviteExpiry = Self.expiryLine(invite.expiresAt)
-            showingInvite = true
+            invite = try await API.generateGroupInvite(groupId: groupId)
         } catch {
             self.errorText = API.failureLine(error, action: "generate invite")
         }
