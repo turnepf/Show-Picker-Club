@@ -22,6 +22,8 @@ import urllib.request
 MODEL = "claude-opus-5"
 # Keep the request bounded — a huge diff is truncated rather than failing.
 DIFF_LIMIT = 180_000
+# The docs ride along as context, not as the subject of the review.
+DOCS_DIFF_LIMIT = 40_000
 
 PROMPT = """You are reviewing a pull request for Show Picker Club against the project's written invariants.
 
@@ -36,6 +38,12 @@ Here is the diff{truncated_note}:
 <diff>
 {diff}
 </diff>
+
+The same PR's changes to docs/PRODUCT.md, docs/ARCHITECTURE.md and docs/INVARIANTS.md follow. They are context, not the subject of the review — several invariants (platform parity above all) are satisfied by what the docs say, so check them here before calling one unmet:
+
+<docs_diff>
+{docs_diff}
+</docs_diff>
 
 Report ONLY concrete violations of the invariants above, or changes that make one materially easier to violate later. For each finding give the file, which rule it breaks, and the specific failure it would cause in production.
 
@@ -61,7 +69,7 @@ def main() -> int:
     head = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else "HEAD"
 
     # The invariants describe Functions, the deployed static files, and the
-    # Apple targets. Archived pages and docs aren't worth the tokens.
+    # Apple targets. Archived pages aren't worth the tokens.
     diff = subprocess.run(
         [
             "git", "diff", f"{base}...{head}", "--",
@@ -76,6 +84,19 @@ def main() -> int:
         print("No reviewable changes.")
         return 0
 
+    # Rule 7 (platform parity) is satisfied in the docs, not in the code, so a
+    # code-only diff made every member-facing PR look like a violation. These
+    # two files come along as context — a docs-only PR still isn't reviewed,
+    # because the gate above is the code diff.
+    docs_diff = subprocess.run(
+        [
+            "git", "diff", f"{base}...{head}", "--",
+            "docs/PRODUCT.md", "docs/ARCHITECTURE.md", "docs/INVARIANTS.md",
+        ],
+        capture_output=True,
+        text=True,
+    ).stdout[:DOCS_DIFF_LIMIT].strip() or "(no documentation changes in this PR)"
+
     truncated = len(diff) > DIFF_LIMIT
     if truncated:
         diff = diff[:DIFF_LIMIT]
@@ -83,6 +104,7 @@ def main() -> int:
     prompt = PROMPT.format(
         invariants=open("docs/INVARIANTS.md").read(),
         diff=diff,
+        docs_diff=docs_diff,
         truncated_note=" (TRUNCATED — say so if it matters)" if truncated else "",
     )
 

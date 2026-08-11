@@ -213,6 +213,8 @@ You stay in control: every service has a **Subscribed / Paused / Cancelled** tog
 
 Prices are editable defaults — approximate US standard-plan rates that each member can correct to what they actually pay. Implementation in [`ARCHITECTURE.md`](ARCHITECTURE.md#subscription-audit).
 
+Platforms: iPhone and iPad only, the whole audit and the household viewer names with it. **Apple TV doesn't** — it's view-only, and cancelling a subscription isn't something you do from the couch with a remote. **The watch doesn't** — it's read-only, and a spend audit needs the toggles and price fields it has no room for. **The web doesn't** — `subscriptions.html` went to `archive/web/` in the 2026-08 teardown (see [Web app status](#web-app-status)); the API still returns everything the page used, so restoring it is a `git mv`.
+
 ## Vibe (`/vibe`)
 
 A taste-profile view. Pick any member from the dropdown to see:

@@ -197,6 +197,17 @@ iOS/iPad get features; tvOS is view-only; watchOS is read-only. When a feature
 lands, say which platforms it reaches. Home leads and Home is the launch screen
 on every platform (`docs/PRODUCT.md#navigation-standard`).
 
+The statement lives in the repo, not in a pull request description: a
+`Platforms:` line in the feature's `docs/PRODUCT.md` section (see Passkeys and
+"Also watching" for the shape), naming the targets that don't get it and why.
+A PR body is not the record — it isn't checked out, isn't greppable a year
+later, and isn't what the next person reads.
+
+- Enforced by the invariants review, which is shown this PR's `docs/PRODUCT.md`
+  and `docs/ARCHITECTURE.md` diff alongside the code for exactly this rule.
+  Silence in the docs is the violation; a client that deliberately skips a
+  feature is not.
+
 ---
 
 ## Adding an invariant
