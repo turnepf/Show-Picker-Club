@@ -209,6 +209,29 @@ Calendar apps re-fetch the feed on their own schedule (Apple Calendar typically 
 
 A "📅 Calendar feed" link in each member-page footer opens the `webcal://` URL, which Apple Calendar recognizes as a one-tap subscribe.
 
+## Import a list
+
+The other side of Export: a member arriving with a list they already keep somewhere else — Notes, a text file, an old spreadsheet, a message thread — can paste it in and have it sorted onto the four lists instead of typing it out one show at a time.
+
+- **iPhone / iPad:** shipped. Reached two ways, both of which retire themselves once the member has a library: a card on **Home** while their library is empty (Home is the launch screen, so a new member sees it before they ever reach My Shows), and a slim row above their own list while they have five shows or fewer across all four lists. The empty state on their own Watching / Next Up list also offers it.
+- **Apple TV / Apple Watch:** not offered (view-only / read-only surfaces).
+- **Web:** not offered — the member app is retired.
+
+How it goes:
+
+1. **Paste.** A plain text box. Headings like "Currently watching" or "Favourites" are read as section markers and applied to the titles under them; a note next to a single title stays with that title.
+2. **Read.** The paste is sent up and comes back as a list of titles, each matched against TMDB for its canonical spelling, year and poster. A long paste shows real progress rather than an indefinite spinner. **Nothing is written at this point.**
+3. **Review.** Every title, with the list it landed on, editable. Tap the circle to leave one out, or change its list. The row says when a title was spelled differently from what was typed ("You wrote *Severence*"), when TMDB had no match (it's still offered, and goes in as typed), and when the member already has it.
+4. **Add.** Only then are rows written, and only ever to the caller's own lists.
+
+Details that matter in use:
+
+- **Notes and people come along.** "Whitt told me about this", "with Dorothy", "s4 in September" and the streaming service are pulled out into the same fields the add form fills in — not left glued to the title.
+- **Titles you already have are greyed out** and can't be ticked back on, archived ones included, so the screen never promises an add that silently doesn't happen.
+- **No length limit.** A very long paste takes longer; it isn't truncated or capped. There is a per-day ceiling of 300 rows across imports and hand-adds together.
+- **Artwork and cast fill in shortly after**, not at import time — the rows appear immediately with a poster and land fully enriched a little later.
+- **The default list is Watching** when a paste has no structure to place a title. That means an unstructured import lands in the calendar feed too (which draws from Watching + Awaiting), which is the main reason the review step exists.
+
 ## Export your lists
 
 So members never feel locked in, the account menu has an **Export my lists** action (logged-in members only) backed by `GET /api/export`. It returns a plain-text file of the caller's **own** lists — a section per list (`Watching`, `Awaiting`, `Loved`, `Next Up`), each show rendered as `Title on Network` (network dropped when absent), shows sorted alphabetically within each list. Private notes are not included.

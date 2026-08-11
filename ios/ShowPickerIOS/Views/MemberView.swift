@@ -54,6 +54,7 @@ struct MemberView: View {
     @State private var loading = true
     @State private var showingLogin = false
     @State private var showingAdd = false
+    @State private var showingImport = false
     @State private var showingSearch = false
     @State private var editingShow: Show?
     // Programmatic push for taps while reordering: edit mode swallows
@@ -116,6 +117,8 @@ struct MemberView: View {
             // one kind. Not shown while reordering — the help line there is
             // the drag how-to, and the list is deliberately unfiltered.
             if !isReordering { mediaChips }
+
+            importPrompt
 
             List {
                 // Nothing admin-only here on purpose. This page shows an
@@ -305,6 +308,11 @@ struct MemberView: View {
         }
         .sheet(item: $editingShow) { show in
             AddEditShowView(memberSlug: member.slug, existing: show) { await load() }
+        }
+        .sheet(isPresented: $showingImport) {
+            if isMine {
+                ImportListView { await load() }
+            }
         }
     }
 
@@ -524,6 +532,36 @@ struct MemberView: View {
         }
     }
 
+    // A quiet nudge for a member who has barely started, sitting above the
+    // list rather than inside it so it shows on whichever of the four lists
+    // they happen to be looking at. The count is across all four lists, not
+    // the current one — someone with four shows on Loved isn't new.
+    //
+    // It retires itself once they're past a handful, so there is no dismiss
+    // button and no stored flag: nothing to reset on logout, and nothing that
+    // could outlive the session it was shown in.
+    @ViewBuilder private var importPrompt: some View {
+        if isMine && !isReordering && !shows.isEmpty && shows.count <= 5 {
+            Button {
+                showingImport = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "doc.on.clipboard")
+                    Text("Have a list somewhere else? Paste it in.")
+                        .font(.subheadline)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 10)
+            }
+            .buttonStyle(.plain)
+            .background(Color(.secondarySystemBackground))
+        }
+    }
+
     @ViewBuilder private var loadFailedState: some View {
         VStack(spacing: 8) {
             Text("Couldn't load \(isMine ? "your" : "\(member.label)'s") shows.")
@@ -553,6 +591,15 @@ struct MemberView: View {
                 Button("Add a show") { showingAdd = true }
                     .buttonStyle(.borderedProminent)
                     .padding(.top, 4)
+            }
+            // A member with nothing anywhere is almost always new, and a list
+            // they keep somewhere else is the fastest way to a full library.
+            // Once they have a few shows this stops being the useful thing to
+            // say, so it goes away on its own (see importPrompt).
+            if isMine && shows.isEmpty {
+                Button("Paste a list from somewhere else") { showingImport = true }
+                    .font(.callout)
+                    .padding(.top, 2)
             }
         }
         .padding(.vertical, 24)

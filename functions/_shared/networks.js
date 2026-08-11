@@ -294,6 +294,22 @@ export const NETWORK_SEARCH = Object.fromEntries(
   NETWORKS.map(n => [n.stored, n.search])
 );
 
+// The service's own search page for a title — the fallback a row gets when
+// nobody has pasted a real deep link and Watchmode hasn't resolved one yet.
+// These come back with `/search`, `?q=` and friends in them, which is exactly
+// the placeholder shape the frontend, sync-urls and the calendar feed treat as
+// "no URL". Returns null for a service we have no search template for.
+export function networkSearchUrl(network, title) {
+  if (!network) return null;
+  const cfg = NETWORK_SEARCH[network];
+  if (!cfg) return null;
+  if (!cfg.param) return cfg.base;
+  const params = new URLSearchParams();
+  if (cfg.extra) cfg.extra.split('&').forEach(p => { const [k, v] = p.split('='); params.set(k, v); });
+  params.set(cfg.param, title);
+  return cfg.base + '?' + params.toString();
+}
+
 // Editable default monthly prices (US, cents) for the Subscription Audit, so
 // the "save $X/mo" figures are real without forcing data entry. These are
 // approximate standard-plan rates and drift over time — every member can

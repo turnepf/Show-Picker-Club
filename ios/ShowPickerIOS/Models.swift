@@ -1008,3 +1008,79 @@ let CANONICAL_NETWORKS: [String] = [
     "Fandango at Home",
     "Fandango",
 ]
+
+// MARK: - List import (paste a list, /api/import/*)
+
+// One title the parser pulled out of a pasted list, on its way to the review
+// screen. Mutable because the review screen is where the member fixes what the
+// parse got wrong — the list picker and the include toggle both write here —
+// and Encodable because the same rows go straight back to /api/import/commit.
+struct ImportItem: Codable, Identifiable {
+    // Client-side only: rows aren't persisted yet, so there's no server id to
+    // key the review list on.
+    let id = UUID()
+
+    var title: String
+    // What the member actually typed, when TMDB corrected it. The review row
+    // shows this so a silent "correction" of a title we matched wrong is
+    // visible rather than buried.
+    var rawTitle: String?
+    var list: String
+    var notes: String?
+    var network: String?
+    var recommendedBy: String?
+    var watchingWith: String?
+    var movie: Int?
+    var year: Int?
+    var tmdbId: Int?
+    var tmdbType: String?
+    var posterUrl: String?
+    // TMDB had no match. The row is still offered — TMDB misses real things —
+    // but it goes in without artwork or an id.
+    var matched: Bool?
+    // Already on one of the member's lists. Set means the row is excluded by
+    // default and the review screen says why.
+    var existingList: String?
+    var existingArchived: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case title, list, notes, network, movie, year, matched
+        case rawTitle = "raw_title"
+        case recommendedBy = "recommended_by"
+        case watchingWith = "watching_with"
+        case tmdbId = "tmdb_id"
+        case tmdbType = "tmdb_type"
+        case posterUrl = "poster_url"
+        case existingList = "existing_list"
+        case existingArchived = "existing_archived"
+    }
+
+    var showList: ShowList { ShowList(rawValue: list) ?? .watching }
+    var isDuplicate: Bool { existingList != nil || existingArchived == true }
+    var isMovie: Bool { (movie ?? 0) == 1 }
+}
+
+struct ImportParseResponse: Codable {
+    let items: [ImportItem]
+    let nextCursor: Int?
+    let section: String?
+    let totalChars: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case items, section
+        case nextCursor = "next_cursor"
+        case totalChars = "total_chars"
+    }
+}
+
+struct ImportCommitResult: Codable {
+    let added: Int
+    let skipped: Int
+    let titles: [String]
+    let skippedTitles: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case added, skipped, titles
+        case skippedTitles = "skipped_titles"
+    }
+}

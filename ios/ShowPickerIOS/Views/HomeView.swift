@@ -28,6 +28,7 @@ struct HomeView: View {
     // Set after accepting a household invite from a link, so the app says
     // something happened rather than silently changing an audit total.
     @State private var showingHouseholdJoined = false
+    @State private var showingImport = false
 
     // The logged-in member, resolved against the loaded member list.
     private var myMember: Member? {
@@ -142,6 +143,30 @@ struct HomeView: View {
                             }
                         }
                     }
+                    // Home is the launch screen, so a member who just signed
+                    // up sees this before they ever reach My Shows. An empty
+                    // library is the one moment where importing a list they
+                    // already keep is the most useful thing on offer; the
+                    // card goes away as soon as they have anything.
+                    // nil (logged out, or a roster without counts) means no card.
+                    if (myMember?.showCount ?? 1) == 0 {
+                        Section {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Start with a list you already have")
+                                    .font(.headline)
+                                Text("Notes, a text file, an old spreadsheet — paste it in and we'll sort the titles onto your four lists.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .padding(.vertical, 4)
+                            Button {
+                                showingImport = true
+                            } label: {
+                                Label("Paste a list", systemImage: "doc.on.clipboard")
+                            }
+                        }
+                    }
                     // Say why the shelf is bare instead of hiding it: a
                     // failed fetch and a genuinely quiet month look identical
                     // when the section just disappears.
@@ -213,6 +238,11 @@ struct HomeView: View {
             }
             .sheet(isPresented: $showingLogin) {
                 LoginView().environmentObject(auth)
+            }
+            // Reload on dismiss so the roster's show counts (and this card's
+            // own visibility) reflect what was just imported.
+            .sheet(isPresented: $showingImport, onDismiss: { Task { await load() } }) {
+                ImportListView { await load() }
             }
             .alert("You're in the household", isPresented: $showingHouseholdJoined) {
                 Button("OK", role: .cancel) { }

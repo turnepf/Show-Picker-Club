@@ -94,6 +94,17 @@ no mail, native signup codes not being gated on a captcha no app can pass, and
 a delivery failure surfacing instead of hiding behind `{success: true}`.
 
 ```bash
+node scripts/import-list-test.mjs
+```
+
+The paste-a-list import on the same harness, with a deliberately badly-behaved
+fake Claude — a hallucinated TMDB id and a title TMDB has never heard of. Pins
+the rule that makes a model safe on a write path: Claude supplies titles, TMDB
+supplies identity, and commit re-validates everything. Also covers paging (a
+section heading surviving the seam between slices), duplicate handling, and the
+import's own daily ceiling.
+
+```bash
 cd ShowPickerCore && swift test
 ```
 

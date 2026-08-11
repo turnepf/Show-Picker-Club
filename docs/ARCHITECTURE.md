@@ -257,6 +257,8 @@ The complete map:
 | `GET /api/shows`                       | `functions/api/shows.js`                   | GET     | session |
 | `GET /api/export`                      | `functions/api/export.js`                  | GET     | session (exports the caller's OWN lists only; plain-text download) |
 | `POST /api/shows`                      | `functions/api/shows.js`                   | POST    | session |
+| `POST /api/import/parse`               | `functions/api/import/parse.js`            | POST    | session |
+| `POST /api/import/commit`              | `functions/api/import/commit.js`           | POST    | session |
 | `GET /api/shows/all`                   | `functions/api/shows/all.js`               | GET     | session — your own rows plus those of members you share a group with |
 | `GET /api/shows/check`                 | `functions/api/shows/check.js`             | GET     | session |
 | `POST /api/shows/share`                | `functions/api/shows/share.js`             | POST    | retired 2026-07 — returns 410 Gone |
@@ -513,10 +515,10 @@ The deploy smoke test verifies these headers are present after each push.
 
 ### Anthropic Claude
 - Env: `ANTHROPIC_API_KEY`.
-- Only used by `/api/admin-vibe-fill`.
-- Model: `claude-sonnet-4-6`. Max tokens: 1024 per show.
-- System prompt: ~1000 tokens of calibration instructions for the 27-trait rubric, cached `ephemeral` so repeated batch calls hit the prompt cache.
-- Handles 429 with the API's `Retry-After`, capped at 60s backoff.
+- Two callers: `/api/admin-vibe-fill` (vibe trait scoring) and `/api/import/parse` (list import).
+- **Vibe fill** — model `claude-sonnet-4-6`, max tokens 1024 per show. System prompt: ~1000 tokens of calibration instructions for the 27-trait rubric, cached `ephemeral` so repeated batch calls hit the prompt cache. Handles 429 with the API's `Retry-After`, capped at 60s backoff.
+- **List import** — model `claude-opus-5`, max tokens 16000 per slice, `output_config.effort: "low"` (a scoped, latency-sensitive extraction; the member is waiting). Uses **structured outputs** (`output_config.format` with a JSON schema) rather than prose parsing, so the response is valid JSON in the expected shape or the request fails — there is no fenced-code stripping or regex extraction anywhere in the path. The system prompt is byte-identical across every slice of every import and is cached `ephemeral`. Same 429 retry shape as the vibe filler.
+- The import prompt asks for **titles, never TMDB ids**. Ids come only from TMDB (see List import below). A model asked for ids will produce plausible ones, so it is never asked.
 
 ### Twilio
 - Env: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`.
@@ -567,6 +569,47 @@ A logged-in member's page calls this fire-and-forget on load. TMDB-only since OM
 `updated_at` is **not** touched by enrichment — only by member-initiated writes. This is what lets `updated_at != created_at` cleanly distinguish "the member touched it" from "we auto-enriched it."
 
 `POST /api/sync-urls` is a separate maintenance call also triggered from the member page (throttled to 1/day per browser via `localStorage`). It finds shows where one member has a real `network_url` for a title and another member's copy has only a search-URL placeholder, and copies the good URL over.
+
+## List import
+
+Paste a list from somewhere else — Notes, a text file, an old spreadsheet — and have it sorted onto the four lists. iOS/iPad only (`ios/ShowPickerIOS/Views/ImportListView.swift`); tvOS is view-only and watchOS is read-only, so neither ships it. Not on the web — the member app is retired.
+
+Two endpoints and a shared module, and **no schema change**: imported rows are ordinary `shows` rows.
+
+| Piece | What it does |
+|---|---|
+| `functions/_shared/list-parse.js` | Slice the paste at a line boundary, one Claude call per slice, then one TMDB search per extracted title. Also the dupe-check query and the four-list constants. |
+| `POST /api/import/parse` | Session-gated. Body `{ text, cursor?, section? }` → `{ items, next_cursor, section, total_chars }`. **Writes nothing.** |
+| `POST /api/import/commit` | Session-gated. Body `{ items }` → `{ added, skipped, titles, skipped_titles }`. Inserts into `shows`, always for the caller's own `member_slug`. |
+
+### Why it pages
+
+Both halves of the work are bounded per Worker invocation: one Claude call per slice, and one TMDB search per extracted title. A 300-title paste in a single request would exhaust the subrequest budget and time out. So `parse` takes a `cursor` into the pasted text and returns the next one; the client loops until it comes back `null`. A paste under `CHUNK_CHARS` (12k) finishes on the first call, so the loop is invisible for a normal list — and there is no cap on how long a list can be.
+
+Slices are cut on a **line boundary**, and each response carries the section heading in effect at its end (`section`), which the client threads back into the next call. Without that, a slice starting mid-list loses its "Currently watching:" heading and everything in it is misclassified. `scripts/import-list-test.mjs` pins both.
+
+### Why parse and commit are separate
+
+`/api/shows` enriches synchronously — TMDB detail, credits, person and Watchmode lookups per row. Dozens of those in one invocation blows the subrequest budget. So `commit` inserts with only what `parse` already resolved (`tmdb_id`, canonical title, `poster_url`, `release_year`) plus a `networkSearchUrl()` placeholder, and the existing background `/api/enrich` rotation fills in overview, cast, trailer and a real deep link. The client fires `/api/enrich` once after a successful import so that happens promptly rather than on the next scheduled pass.
+
+The split also gives the review screen for free: `parse` returns rows, the member fixes the list assignments, `commit` writes. Nothing is written without that confirmation.
+
+### Claude extracts, TMDB identifies
+
+This division is the whole design. Claude reads the paste and returns a **title** plus the personal fields around it (`list`, `notes`, `network`, `recommended_by`, `watching_with`, `movie`, `year`). TMDB is the only thing that says a title exists, and supplies the id, canonical spelling, poster and year. A hallucinated `tmdb_id` in the model's output is ignored at parse (it isn't in the schema) and again at commit (non-integers are dropped).
+
+Unmatched titles are **kept, not dropped** — TMDB misses real things — and flagged `matched: false` so the review row says so.
+
+### Rate limits and validation
+
+- `commit` re-validates every field: list must be one of the four, `poster_url` must be on `https://image.tmdb.org/`, `tmdb_id` must be an integer, strings are trimmed and length-capped. Not a trust boundary (a member can only write to their own lists either way), but it keeps a mangled payload out of the list columns and an off-domain URL out of an `<img src>`.
+- Own ceiling: **300 rows per member per rolling day**, counting imports and hand-adds together, and **200 rows per call**. `/api/shows`'s 50/day cap is human-pace for one-at-a-time adds and an import would trip it instantly — so imports get their own (much higher) limit rather than a bypass.
+- Titles the member already has — **archived ones included** — are skipped, and the review screen greys them out and won't let them be ticked back on, so the client never promises an add that silently doesn't happen.
+- `parse` caps one request's `text` at 400k characters and returns `503 import_unavailable` when `ANTHROPIC_API_KEY` isn't set.
+
+### Default list
+
+An extracted title with nothing to place it goes to **Watching**. Note this feeds the calendar (`functions/calendar/[slug].js` selects `watching` + `waiting`), so an unstructured import does land in a subscribed feed — the review screen is what keeps that honest.
 
 ## Networks
 

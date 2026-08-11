@@ -1,0 +1,150 @@
+// POST /api/import/commit — add the reviewed items to the caller's own lists.
+//
+// Body: { items: [ { title, list, notes?, network?, recommended_by?,
+//                    watching_with?, movie?, year?, tmdb_id?, tmdb_type?,
+//                    poster_url? }, ... ] }
+// Returns: { added, skipped, titles: [...], skipped_titles: [...] }
+//
+// Deliberately does NOT enrich inline. /api/shows fans out to TMDB detail,
+// credits, person and Watchmode lookups per row; a few dozen of those in one
+// invocation blows the subrequest budget and times out. The rows here go in
+// with what /api/import/parse already resolved (tmdb id, canonical title,
+// poster, year) and the existing background enrichment rotation fills in
+// overview, cast, trailer and a real deep link on its next pass.
+//
+// The items come back from the client, so everything is re-validated here.
+// That is not a trust boundary in the usual sense — a member can only write to
+// their own lists either way — but it does keep a mangled payload from putting
+// junk in the four list columns or an off-domain URL in an <img src>.
+
+import { getSession } from '../../_shared/auth.js';
+import { LIST_KEYS } from '../../_shared/list-parse.js';
+import { canonicalNetwork, networkSearchUrl } from '../../_shared/networks.js';
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Rows accepted in one commit call. The client posts a long import in batches.
+const MAX_ITEMS_PER_CALL = 200;
+
+// Per-member rows created per rolling day, counting imports and hand-adds
+// together. /api/shows caps at 50 because that is far above human pace for
+// one-at-a-time adds; an import is a different shape of write and would trip
+// that instantly, so it gets its own (much higher) ceiling rather than a
+// bypass.
+const MAX_ROWS_PER_DAY = 300;
+
+// Posters are rendered into an <img src> in the apps. Only ever our own
+// enrichment's TMDB image host.
+function safePosterUrl(url) {
+  return typeof url === 'string' && url.startsWith('https://image.tmdb.org/') ? url : null;
+}
+
+function str(v, max) {
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  if (!t) return null;
+  return t.slice(0, max);
+}
+
+export async function onRequestPost(context) {
+  const { request, env } = context;
+  const session = await getSession(request, env);
+  if (!session) return json({ error: 'Unauthorized' }, 401);
+
+  let body;
+  try { body = await request.json(); }
+  catch { return json({ error: 'Invalid JSON' }, 400); }
+
+  const raw = Array.isArray(body.items) ? body.items : null;
+  if (!raw) return json({ error: 'items required' }, 400);
+  if (raw.length === 0) return json({ added: 0, skipped: 0, titles: [], skipped_titles: [] });
+  if (raw.length > MAX_ITEMS_PER_CALL) return json({ error: 'too_many_items' }, 400);
+
+  const slug = session.member_slug;
+
+  const { cnt: addedToday } = (await env.DB.prepare(
+    "SELECT COUNT(*) AS cnt FROM shows WHERE member_slug = ? AND created_at > datetime('now', '-1 day')"
+  ).bind(slug).first()) || { cnt: 0 };
+  if (addedToday + raw.length > MAX_ROWS_PER_DAY) {
+    return json({ error: 'rate_limited', added_today: addedToday, limit: MAX_ROWS_PER_DAY }, 429);
+  }
+
+  // One dupe query for the whole batch. Archived rows count as existing —
+  // silently resurrecting something the member archived on purpose would be
+  // worse than skipping it and telling them.
+  const { results: existingRows } = await env.DB.prepare(
+    'SELECT LOWER(title) AS ltitle FROM shows WHERE member_slug = ?'
+  ).bind(slug).all();
+  const taken = new Set((existingRows || []).map(r => r.ltitle));
+
+  const inserts = [];
+  const added = [];
+  const skipped = [];
+
+  for (const item of raw) {
+    const title = str(item.title, 200);
+    if (!title) continue;
+    const key = title.toLowerCase();
+    // `taken` grows as we go, so a payload that lists the same title twice
+    // inserts it once.
+    if (taken.has(key)) { skipped.push(title); continue; }
+    taken.add(key);
+
+    const list = LIST_KEYS.includes(item.list) ? item.list : null;
+    if (!list) { skipped.push(title); continue; }
+
+    const rawNetwork = str(item.network, 60);
+    const network = rawNetwork ? canonicalNetwork(rawNetwork) : null;
+    const tmdbId = Number.isInteger(item.tmdb_id) ? item.tmdb_id : null;
+    const tmdbType = item.tmdb_type === 'movie' || item.tmdb_type === 'tv' ? item.tmdb_type : null;
+    const year = Number.isInteger(item.year) && item.year > 1870 && item.year < 2200 ? item.year : null;
+
+    inserts.push([
+      title,
+      network,
+      networkSearchUrl(network, title),
+      str(item.recommended_by, 80),
+      list,
+      str(item.notes, 500),
+      item.movie ? 1 : 0,
+      str(item.watching_with, 80),
+      safePosterUrl(item.poster_url),
+      slug,
+      session.email,
+      tmdbId,
+      tmdbType,
+      year,
+    ]);
+    added.push(title);
+  }
+
+  if (inserts.length) {
+    const stmt = env.DB.prepare(
+      `INSERT INTO shows (title, network, network_url, recommended_by, list, notes, movie,
+         watching_with, poster_url, member_slug, added_by, tmdb_id, tmdb_type, release_year)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    // D1 batches are one round trip but not unbounded; chunk so a 200-row
+    // import doesn't hand the driver a single oversized statement list.
+    for (let i = 0; i < inserts.length; i += 50) {
+      await env.DB.batch(inserts.slice(i, i + 50).map(args => stmt.bind(...args)));
+    }
+  }
+
+  // Imported rows land with the id, poster and year the parse step resolved,
+  // but no cast, overview or real deep link. The client fires the existing
+  // background /api/enrich pass once the import lands; the scheduled job is
+  // the backstop if it doesn't.
+
+  return json({
+    added: added.length,
+    skipped: skipped.length,
+    titles: added,
+    skipped_titles: skipped,
+  });
+}

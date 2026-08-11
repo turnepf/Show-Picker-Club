@@ -12,6 +12,7 @@ catch different classes of mistake:
 | Auth code tests (`scripts/auth-code-flow-test.mjs`) | every PR | The email login/signup code flow: codes that arrive, and failures that are reported |
 | Activity feed tests (`scripts/activity-feed-test.mjs`) | every PR | `/api/activity` stays session-gated, `?member=` shows only what that member chose, bulk adds collapse per list |
 | Admin member detail tests (`scripts/admin-member-detail-test.mjs`) | every PR | `/api/admin-member-emails` stays admin-only, and `?member=` returns that member and nobody else |
+| List import tests (`scripts/import-list-test.mjs`) | every PR | The paste-a-list path: what a model may and may not put in the database, paging, and the commit-side validation |
 | `scripts/smoke.sh` | after deploy, and nightly | Live behavior: auth gates, headers, leakage, redirects |
 | Invariants review (`.github/workflows/pr-review.yml`) | every PR | Judgement calls the four above can't express |
 
@@ -231,6 +232,47 @@ later, and isn't what the next person reads.
   feature is not.
 
 ---
+
+## 8. A model's output is content, never an identifier
+
+Claude is on a write path now (`/api/import/parse` → `/api/import/commit`), and
+the rule that makes that safe is that the model supplies **text** and the
+existing sources of truth supply **identity**.
+
+- A title comes from the model. The `tmdb_id`, canonical spelling, poster and
+  year come from TMDB, which is the only thing that says a title exists.
+- The model is never asked for an id, and the extraction schema has no field
+  for one. A model asked for an id will produce a plausible one.
+- Nothing a model produced reaches the database without passing the same
+  validation a hand-typed value would: the list must be one of the four,
+  `poster_url` must be on `https://image.tmdb.org/`, `tmdb_id` must be an
+  integer, strings are trimmed and length-capped.
+- Nothing a model produced is written without a member confirming it. Parse
+  writes nothing; commit writes what the member reviewed.
+
+This generalises past the importer: if a second model-backed write path appears,
+these four points are the bar it has to clear.
+
+Enforcer: `scripts/import-list-test.mjs` (a deliberately badly-behaved fake
+Claude returns a hallucinated id and an unknown title, and asserts neither
+reaches the database), plus this file for the general rule.
+
+## 9. An import is bounded, and says so when it stops
+
+A paste has no length limit, but every request it turns into does.
+
+- `/api/import/parse` processes one slice per call and returns the cursor for
+  the next, because a Claude call and a TMDB search per title are both bounded
+  per Worker invocation.
+- Slices cut on line boundaries and carry the section heading forward. A slice
+  that starts mid-list without its heading misclassifies everything under it.
+- `/api/import/commit` has its own daily ceiling (300 rows/member, imports and
+  hand-adds together) rather than borrowing or bypassing the 50/day human-pace
+  cap on `/api/shows`.
+- A failure surfaces. A Claude outage returns 502, not an empty list — an empty
+  list means "no titles in that text", and the two must never look alike.
+
+Enforcer: `scripts/import-list-test.mjs`.
 
 ## Adding an invariant
 

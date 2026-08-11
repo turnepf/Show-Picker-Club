@@ -1,19 +1,9 @@
 import { fetchEnrichment, fetchEnrichmentById } from '../_shared/enrichment.js';
 import { getSession } from '../_shared/auth.js';
-import { NETWORK_SEARCH, canonicalNetwork, networkFromUrl } from '../_shared/networks.js';
+import { canonicalNetwork, networkFromUrl, networkSearchUrl } from '../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../_shared/watch-providers.js';
 import { safeNetworkUrl } from '../_shared/url-utils.js';
 
-function generateNetworkUrl(network, title) {
-  if (!network) return null;
-  const cfg = NETWORK_SEARCH[network];
-  if (!cfg) return null;
-  if (!cfg.param) return cfg.base;
-  const params = new URLSearchParams();
-  if (cfg.extra) cfg.extra.split('&').forEach(p => { const [k,v] = p.split('='); params.set(k,v); });
-  params.set(cfg.param, title);
-  return cfg.base + '?' + params.toString();
-}
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -169,7 +159,7 @@ export async function onRequestPost(context) {
   const finalUrl =
     userUrl ||
     goodCopyUrl ||
-    generateNetworkUrl(finalNetwork, finalTitle);
+    networkSearchUrl(finalNetwork, finalTitle);
 
   const result = await env.DB.prepare(
     `INSERT INTO shows (title, network, network_url, recommended_by, rating, list, notes, movie, full_series, watching_with, poster_url, network_logo_url, member_slug, added_by,

@@ -313,8 +313,21 @@ function pickBestMatch(results, mediaType, title) {
 // between finishing the batch and silently running out of budget partway
 // through it.
 export async function searchTmdbId(title, env, isMovie) {
+  const { tmdbId, tmdbType, reason } = await searchTmdbTitle(title, env, isMovie);
+  return { tmdbId, tmdbType, reason };
+}
+
+// Same one-subrequest search as searchTmdbId, but keeps the fields the search
+// hit already carried: the canonical title, the poster, and the year. The list
+// importer needs those to draw a review row per title without spending a
+// detail call on rows the member may well drop — searchTmdbId throws them away.
+export async function searchTmdbTitle(title, env, isMovie) {
+  const empty = {
+    tmdbId: null, tmdbType: null, canonicalTitle: null,
+    posterUrl: null, releaseYear: null,
+  };
   const token = env.TMDB_TOKEN;
-  if (!token) return { tmdbId: null, tmdbType: null, reason: 'no_tmdb_token' };
+  if (!token) return { ...empty, reason: 'no_tmdb_token' };
   const mediaTypes = isMovie ? ['movie', 'tv'] : ['tv', 'movie'];
   let reason = 'no_results';
   try {
@@ -325,14 +338,22 @@ export async function searchTmdbId(title, env, isMovie) {
       );
       if (s.results?.length) {
         const pick = pickBestMatch(s.results, t, title);
-        return { tmdbId: pick.id, tmdbType: t };
+        const date = (t === 'movie' ? pick.release_date : pick.first_air_date) || '';
+        const year = parseInt(date.slice(0, 4), 10);
+        return {
+          tmdbId: pick.id,
+          tmdbType: t,
+          canonicalTitle: (t === 'movie' ? pick.title : pick.name) || null,
+          posterUrl: tmdbPosterUrl(pick.poster_path),
+          releaseYear: Number.isInteger(year) ? year : null,
+        };
       }
       if (s.success === false) reason = s.status_message || 'tmdb_error';
     }
   } catch (e) {
     reason = `exception: ${e.message}`;
   }
-  return { tmdbId: null, tmdbType: null, reason };
+  return { ...empty, reason };
 }
 
 export async function fetchEnrichment(title, env, isMovie) {

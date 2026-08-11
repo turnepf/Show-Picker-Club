@@ -930,6 +930,44 @@ enum API {
     private static func putJSON<T: Decodable>(_ path: String, body: [String: Any?]) async throws -> T {
         try await sendJSON(method: "PUT", path: path, body: body)
     }
+    // MARK: - List import
+
+    // Read one slice of a pasted list. The caller loops, threading `cursor`
+    // and `section` back in, until `nextCursor` comes back nil — a normal
+    // paste finishes on the first call, so the loop is usually invisible.
+    // Writes nothing; the rows come back for the member to review.
+    static func importParse(text: String, cursor: Int, section: String) async throws -> ImportParseResponse {
+        let body: [String: Any?] = ["text": text, "cursor": cursor, "section": section]
+        return try await postJSON("/api/import/parse", body: body)
+    }
+
+    // Add the reviewed rows to the caller's own lists. Batched by the caller;
+    // the server caps one call at 200 rows.
+    static func importCommit(items: [ImportItem]) async throws -> ImportCommitResult {
+        struct Body: Encodable { let items: [ImportItem] }
+        return try await postEncodable("/api/import/commit", body: Body(items: items))
+    }
+
+    // POST for bodies that are Encodable structs rather than a loose
+    // dictionary — sendJSON's [String: Any?] can't carry an array of items.
+    private static func postEncodable<B: Encodable, T: Decodable>(_ path: String, body: B) async throws -> T {
+        guard let url = URL(string: baseString + path) else { throw APIError.badURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(currentPlatform, forHTTPHeaderField: "X-Client-Platform")
+        req.httpBody = try JSONEncoder().encode(body)
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
+            if let b = try? JSONDecoder().decode(ErrBody.self, from: data), let code = b.error {
+                throw APIError.rejected(ServerRejection(status: status, code: code, id: b.id, list: b.list, title: b.title))
+            }
+            throw APIError.badResponse(status)
+        }
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
     private static func sendJSON<T: Decodable>(method: String, path: String, body: [String: Any?]) async throws -> T {
         guard let url = URL(string: baseString + path) else { throw APIError.badURL }
         var req = URLRequest(url: url)
