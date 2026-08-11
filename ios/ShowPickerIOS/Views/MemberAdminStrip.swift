@@ -51,7 +51,9 @@ struct MemberAdminStrip: View {
                     DisclosureGroup(isExpanded: $expanded) {
                         identityBlock(d)
                         NavigationLink {
-                            MemberDetailAdminView(member: d) { await load(force: true) }
+                            MemberDetailAdminView(member: d, showsMemberPageLink: false) {
+                                await load(force: true)
+                            }
                         } label: {
                             Label("Manage member", systemImage: "person.text.rectangle")
                         }

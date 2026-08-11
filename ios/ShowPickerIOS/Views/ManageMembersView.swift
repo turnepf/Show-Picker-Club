@@ -766,6 +766,9 @@ func loginMethodLabel(_ key: String) -> String {
 struct MemberDetailAdminView: View {
     let member: AdminMember
     let onChange: () async -> Void
+    /// False when the member page pushed this screen — the link back to it
+    /// would just be a loop from there.
+    let showsMemberPageLink: Bool
 
     @Environment(\.dismiss) private var dismiss
     @State private var firstName: String
@@ -780,8 +783,10 @@ struct MemberDetailAdminView: View {
     @State private var confirmDisable = false
     @State private var confirmAdmin = false
 
-    init(member: AdminMember, onChange: @escaping () async -> Void) {
+    init(member: AdminMember, showsMemberPageLink: Bool = true,
+         onChange: @escaping () async -> Void) {
         self.member = member
+        self.showsMemberPageLink = showsMemberPageLink
         self.onChange = onChange
         _firstName = State(initialValue: member.firstName ?? "")
         _lastName = State(initialValue: member.lastName ?? "")
@@ -794,6 +799,22 @@ struct MemberDetailAdminView: View {
 
     var body: some View {
         Form {
+            // The way out to the member's own page, which is where the admin
+            // strip's fuller picture lives — logins, platforms, list totals,
+            // recent adds, and the four lists themselves. Suppressed when this
+            // screen was pushed from that page, so the two can't loop.
+            if showsMemberPageLink {
+                Section {
+                    NavigationLink {
+                        MemberView(member: member.asMember)
+                    } label: {
+                        Label("Open member page", systemImage: "person.crop.rectangle.stack")
+                    }
+                } footer: {
+                    Text("Their profile and four lists, with the admin detail on top.")
+                }
+            }
+
             Section {
                 TextField("Alice — or Paula & Brad for a shared list", text: $firstName)
                     .textInputAutocapitalization(.words)

@@ -114,6 +114,8 @@ The strip collapses to its one-line summary and remembers that choice, because t
 
 This exists for the signup notification email. That email deep-links to the new member's page, so the question it raises — who is this, and are they using it? — is answered where it gets asked rather than several taps away in Manage Members. It is never shown on your own page, to a non-admin, or after logging out.
 
+**Getting there without the email.** Admin → Manage members → any member opens the editor, and its first row, **Open member page**, pushes that member's page — strip, recent adds, and their four lists. Before this the email was the only way to reach another member's page from the phone (iPhone Home deliberately doesn't list members; the iPad and Mac sidebar roster always could). The link is one-directional: the editor omits the row when the strip's own **Manage member** pushed it, so the two screens can't bounce back and forth.
+
 **Mac** gets it in full: Catalyst runs the same split view as iPad, and both entitlement files claim `applinks:showpicker.club`, so tapping the email's button in Mail on the Mac opens the app on that member exactly as it does on the phone. tvOS and watchOS don't have it (view-only and read-only respectively), and there is no web member app to put it on.
 
 ### Suggest a show

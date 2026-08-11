@@ -750,6 +750,21 @@ struct AdminMember: Codable, Identifiable {
         let full = [firstName, lastName].compactMap { $0 }.joined(separator: " ")
         return full.trimmingCharacters(in: .whitespaces).isEmpty ? (name ?? slug) : full
     }
+
+    // The roster shape, so an admin screen can open this person's member page
+    // without a second trip to /api/members. Synthesized rather than looked up
+    // on purpose: a just-signed-up member is in the admin list before anything
+    // else, and the roster is the one place they might not be yet.
+    //
+    // Only slug and label survive the trip — MemberView reads nothing else off
+    // Member, and the counts it would find here are the admin list's
+    // non-seed totals, which aren't the same number the roster reports.
+    var asMember: Member {
+        Member(slug: slug, name: name ?? personName, firstName: firstName,
+               displayName: nil, showCount: nil, watchingCount: nil,
+               waitingCount: nil, recommendingCount: nil, nextCount: nil,
+               lastActivityAt: lastActivityAt, calendarToken: nil)
+    }
 }
 
 struct MemberActivity: Codable {
