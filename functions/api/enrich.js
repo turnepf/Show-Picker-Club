@@ -316,11 +316,20 @@ export async function onRequestPost(context) {
               tagline = COALESCE(?, tagline),
               original_language = COALESCE(?, original_language),
               studio = COALESCE(?, studio),
+              -- We just resolved this id to fetch the detail above, so persist
+              -- it. Only shows.js (on insert) and the separate
+              -- /api/admin-tmdb-backfill pass used to write tmdb_id, which left
+              -- seeded rows NULL until someone remembered to run that endpoint;
+              -- this pass had the answer in hand every time and dropped it.
+              -- Fill-only: an id already stored (possibly a hand-corrected one)
+              -- outranks whatever a title search turns up today.
+              tmdb_id = COALESCE(tmdb_id, ?), tmdb_type = COALESCE(tmdb_type, 'tv'),
               enriched_at = datetime('now') WHERE id = ?`
         ).bind(newDate, endDate, isComplete, genres, seasonsReleased, posterUrl, networkLogoUrl,
           df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey, df.director, directorImdbId,
           df.runtime, df.releaseYear, df.providerNetwork, df.watchLink,
-          df.episodesReleased, df.voteCount, df.tagline, df.originalLanguage, df.studio, show.id).run();
+          df.episodesReleased, df.voteCount, df.tagline, df.originalLanguage, df.studio,
+          tmdbId, show.id).run();
         // Catalog fields (artwork + the new detail fields) are the same for
         // every member's copy of a title, so push them to all copies in one
         // go rather than making each copy wait its own turn in the rotation.
@@ -341,12 +350,21 @@ export async function onRequestPost(context) {
               vote_count = COALESCE(vote_count, ?),
               tagline = COALESCE(tagline, ?),
               original_language = COALESCE(original_language, ?),
-              studio = COALESCE(studio, ?)
+              studio = COALESCE(studio, ?),
+              -- The id is the most catalog-level thing here: every member's
+              -- copy of a title is the same TMDB entry. This is the half that
+              -- reaches seeded rows — they're rarely the copy the rotation
+              -- picks, so without it a seeded row keeps waiting for its own
+              -- turn. (tmdb_id, tmdb_type) is the join key the cross-member
+              -- rating pool uses, so a NULL here costs a member their share of
+              -- the club's ratings on that title.
+              tmdb_id = COALESCE(tmdb_id, ?), tmdb_type = COALESCE(tmdb_type, 'tv')
             WHERE archived = 0
               AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
         ).bind(posterUrl, networkLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating,
           df.trailerKey, df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.watchLink,
-          df.episodesReleased, df.voteCount, df.tagline, df.originalLanguage, df.studio, show.id).run();
+          df.episodesReleased, df.voteCount, df.tagline, df.originalLanguage, df.studio,
+          tmdbId, show.id).run();
 
         // Cast comes free with the detail call we just made — this pass used
         // to ignore it entirely, which is why a title enriched here kept
@@ -420,12 +438,17 @@ export async function onRequestPost(context) {
               tagline = COALESCE(tagline, ?),
               original_language = COALESCE(original_language, ?),
               studio = COALESCE(studio, ?),
+              -- Same as the TV pass: the id we just searched for is worth
+              -- keeping, and this statement is already title-scoped so every
+              -- copy gets it. Fill-only, so a corrected id is never clobbered.
+              tmdb_id = COALESCE(tmdb_id, ?), tmdb_type = COALESCE(tmdb_type, 'movie'),
               enriched_at = datetime('now')
             WHERE archived = 0
               AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
         ).bind(posterUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey,
           df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.providerNetwork, df.watchLink,
-          df.voteCount, df.tagline, df.originalLanguage, df.studio, show.id).run();
+          df.voteCount, df.tagline, df.originalLanguage, df.studio,
+          first.id, show.id).run();
         if (posterUrl) tmdbUpdated++;
       } catch (e) {
         movieErrors++;
