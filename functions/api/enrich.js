@@ -17,17 +17,37 @@ const SUBREQUEST_BUDGET = 45;
 let spent = 0;
 function budgetLeft() { return SUBREQUEST_BUDGET - spent; }
 
-async function tmdbGet(path, env) {
+// Retries on 429 and throws on any other failure, mirroring
+// _shared/enrichment.js#tmdbFetch. Both halves matter here.
+//
+// This used to `return res.json()` whatever the status. A rate-limited search
+// therefore came back as TMDB's error body, which has no `.results`, so
+// tmdbSearchFirst read it as "TMDB has no such title" — and the caller did the
+// right thing for a hopeless title: stamped enriched_at on every copy and moved
+// on. During a long backfill that quietly burned real titles (Breaking Bad,
+// Deadwood) into the already-tried pile with no data, and because the stamp is
+// fresh, the oldest-first queue then sent them to the *back*, so a re-run
+// retried everything else first. Throwing instead lands the failure in the
+// per-show catch, which counts it and leaves enriched_at alone — so the row
+// stays near the front and gets a real retry.
+//
+// Each attempt is a genuine subrequest, so each one counts against the budget.
+async function tmdbGet(path, env, attempt = 0) {
   spent++;
   const token = env.TMDB_TOKEN;
   const sep = path.includes('?') ? '&' : '?';
-  if (token) {
-    const res = await fetch(`https://api.themoviedb.org/3${path}`, {
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    });
-    return res.json();
+  const res = token
+    ? await fetch(`https://api.themoviedb.org/3${path}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      })
+    : await fetch(`https://api.themoviedb.org/3${path}${sep}api_key=${env.TMDB_API_KEY}`);
+  if (res.status === 429 && attempt < 3) {
+    const retryAfter = parseInt(res.headers.get('Retry-After'), 10);
+    const waitMs = Number.isFinite(retryAfter) ? retryAfter * 1000 : 500 * (attempt + 1);
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+    return tmdbGet(path, env, attempt + 1);
   }
-  const res = await fetch(`https://api.themoviedb.org/3${path}${sep}api_key=${env.TMDB_API_KEY}`);
+  if (!res.ok) throw new Error(`TMDB ${res.status} for ${path}`);
   return res.json();
 }
 
@@ -42,16 +62,17 @@ async function tmdbGet(path, env) {
 function tmdbResultTitle(r, type) {
   return ((type === 'movie' ? r.title : r.name) || '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
+// null means one thing only: TMDB answered, and has no such title. Errors are
+// deliberately NOT caught here — the callers treat null as "hopeless, stamp it
+// and move on", so swallowing a transient failure into null is what silently
+// retired real titles. Let it throw; the per-show catch counts it as an error
+// and leaves enriched_at untouched for a genuine retry.
 async function tmdbSearchFirst(title, type, env) {
-  try {
-    const data = await tmdbGet(`/search/${type}?query=${encodeURIComponent(title)}`, env);
-    const results = (data && data.results) || [];
-    if (!results.length) return null;
-    const want = title.replace(/\s+/g, ' ').trim().toLowerCase();
-    return results.find((r) => tmdbResultTitle(r, type) === want) || results[0];
-  } catch (e) {
-    return null;
-  }
+  const data = await tmdbGet(`/search/${type}?query=${encodeURIComponent(title)}`, env);
+  const results = (data && data.results) || [];
+  if (!results.length) return null;
+  const want = title.replace(/\s+/g, ' ').trim().toLowerCase();
+  return results.find((r) => tmdbResultTitle(r, type) === want) || results[0];
 }
 
 // Store the cast TMDB just handed us, CAST_DEPTH deep and in billing order,
