@@ -73,13 +73,16 @@ endpoint flows driven against a real SQLite database built from `schema.sql`.
 No network, no dependencies — Node 22 for `node:sqlite`.
 
 ```bash
-node scripts/activity-feed-test.mjs
+node scripts/activity-feed-test.mjs && node scripts/admin-member-detail-test.mjs
 ```
 
-`/api/activity` on the same harness: it stays session-gated, `?member=<slug>`
-returns only what that member actually chose (no seeded starter rows), and a
-bulk import collapses into one line **per list** rather than one line for the
-whole burst.
+The two endpoints behind the member page's admin strip, on the same harness.
+`/api/activity` stays session-gated, `?member=<slug>` returns only what that
+member actually chose (no seeded starter rows), and a bulk import collapses
+into one line **per list** rather than one line for the whole burst.
+`/api/admin-member-emails` hands out login emails and phone numbers, so it
+stays admin-only — a logged-in non-admin gets 403, not their own row — and
+`?member=<slug>` returns that member and nobody else.
 
 ```bash
 node scripts/auth-code-flow-test.mjs

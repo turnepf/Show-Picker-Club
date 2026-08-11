@@ -74,9 +74,16 @@ export async function onRequestGet(context) {
               FROM shows
              WHERE member_slug = m.slug
                AND (COALESCE(added_by,'') != 'seed' OR updated_at IS NOT NULL)) AS last_activity_at,
+           strftime('%Y-%m-%dT%H:%M:%SZ', m.created_at) AS joined_at,
            (SELECT COUNT(*) FROM shows
              WHERE member_slug = m.slug AND archived = 0
                AND COALESCE(added_by,'') != 'seed') AS show_count,
+           -- Archiving is a member-initiated act, so a non-zero count here is
+           -- engagement the active lists don't show: someone who finished
+           -- things and put them away, not someone who added and left.
+           (SELECT COUNT(*) FROM shows
+             WHERE member_slug = m.slug AND archived = 1
+               AND COALESCE(added_by,'') != 'seed') AS archived_count,
            (SELECT COUNT(*) FROM shows
              WHERE member_slug = m.slug AND archived = 0 AND list = 'watching'
                AND COALESCE(added_by,'') != 'seed'
@@ -116,6 +123,8 @@ export async function onRequestGet(context) {
     last_login: r.last_login || null,
     last_login_method: r.last_login_method || null,
     show_count: r.show_count || 0,
+    archived_count: r.archived_count || 0,
+    joined_at: r.joined_at || null,
     last_activity_at: r.last_activity_at || null,
     platforms: r.platforms ? r.platforms.split(',').filter(Boolean) : [],
     activity_30d: {

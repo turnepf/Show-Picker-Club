@@ -19,8 +19,14 @@ struct MemberAdminStrip: View {
     let slug: String
     /// The member's display name, for the "Recent adds" empty state.
     let label: String
+    /// Per-list totals counted from the rows the page already loaded, so the
+    /// header and the list under it can't disagree. nil until they land.
+    let listCounts: MemberActivity?
 
     @EnvironmentObject private var auth: AuthStore
+    // Collapsed/expanded persists across members and launches — see the
+    // DisclosureGroup below for why it's collapsible at all.
+    @AppStorage("adminStripExpanded") private var expanded = true
     @State private var detail: AdminMember?
     @State private var activity: [ActivityItem] = []
     @State private var loading = true
@@ -37,11 +43,20 @@ struct MemberAdminStrip: View {
             // before (or without) a successful fetch.
             Section {
                 if let d = detail {
-                    identityBlock(d)
-                    NavigationLink {
-                        MemberDetailAdminView(member: d) { await load(force: true) }
+                    // Collapsible because the iPad and Mac split view draws
+                    // this above each of the four lists in turn — four copies
+                    // of a tall header between you and the shows. Expanded by
+                    // default (arriving from the notification email, the detail
+                    // is the point) and the choice sticks.
+                    DisclosureGroup(isExpanded: $expanded) {
+                        identityBlock(d)
+                        NavigationLink {
+                            MemberDetailAdminView(member: d) { await load(force: true) }
+                        } label: {
+                            Label("Manage member", systemImage: "person.text.rectangle")
+                        }
                     } label: {
-                        Label("Manage member", systemImage: "person.text.rectangle")
+                        summaryLine(d)
                     }
                 } else {
                     Text(loading ? "Loading…" : "Couldn't load admin detail.")
@@ -51,7 +66,7 @@ struct MemberAdminStrip: View {
                 Text("Admin")
             }
 
-            if detail != nil {
+            if detail != nil && expanded {
                 Section {
                     if activity.isEmpty {
                         Text(loading ? "Loading…" : "\(label) hasn't added anything yet.")
@@ -78,14 +93,22 @@ struct MemberAdminStrip: View {
         .task { await load() }
     }
 
-    @ViewBuilder private func identityBlock(_ d: AdminMember) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+    // The collapsed state still has to be worth reading: who, and whether
+    // they're actually using it.
+    @ViewBuilder private func summaryLine(_ d: AdminMember) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
                 Text(d.personName).font(.body)
-                Text("@\(d.slug)").font(.caption).foregroundStyle(.secondary)
                 if d.isAdmin == true { tag("ADMIN", .blue) }
                 if d.disabled == true { tag("DISABLED", .red) }
             }
+            Text(joinedText(d)).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private func identityBlock(_ d: AdminMember) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("@\(d.slug)").font(.caption).foregroundStyle(.secondary)
             ForEach(d.emails, id: \.self) { e in
                 Text(e).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
             }
@@ -96,23 +119,41 @@ struct MemberAdminStrip: View {
                 Text("no email or phone on file — external identity only")
                     .font(.caption).italic().foregroundStyle(.secondary)
             }
-            Text(signupLine(d)).font(.caption).foregroundStyle(.secondary)
+            Text(lastLoginText(d.lastLogin, method: d.lastLoginMethod))
+                .font(.caption).foregroundStyle(.secondary)
             Text(lastActivityText(d.lastActivityAt)).font(.caption).foregroundStyle(.secondary)
+            // The four lists across, counted from the same rows drawn below —
+            // so the header can't disagree with the list under it.
+            AdminActivityPills(activity: listCounts, prefix: "lists:", showZeros: true)
+            Text(libraryLine(d)).font(.caption).foregroundStyle(.secondary)
             AdminActivityPills(activity: d.activity30d)
             AdminPlatformBadges(platforms: d.platforms ?? [])
         }
         .padding(.vertical, 2)
     }
 
-    // "joined via apple · last login 3d ago via Apple". enrolled_via is how the
-    // account was created (which is what the notification email announced);
-    // last_login_method is how they get in now, and the two diverge as soon as
-    // someone adds a passkey.
-    private func signupLine(_ d: AdminMember) -> String {
-        var parts: [String] = []
-        if let via = d.enrolledVia, !via.isEmpty { parts.append("joined via \(via)") }
-        parts.append(lastLoginText(d.lastLogin, method: d.lastLoginMethod))
-        return parts.joined(separator: " · ")
+    // "joined 3d ago via apple" — what the notification email announced, in the
+    // form that answers "is this the person who just signed up?". Either half
+    // can be missing: `enrolled_via` is NULL for members who predate
+    // self-enrollment, and an old server doesn't send `joined_at` at all.
+    private func joinedText(_ d: AdminMember) -> String {
+        let via = d.enrolledVia.flatMap { $0.isEmpty ? nil : $0 }
+        switch (relativeServerTime(d.joinedAt), via) {
+        case let (when?, via?): return "joined \(when) via \(via)"
+        case let (when?, nil): return "joined \(when)"
+        case let (nil, via?): return "joined via \(via)"
+        default: return "join date unknown"
+        }
+    }
+
+    private func libraryLine(_ d: AdminMember) -> String {
+        let total = listCounts.map { $0.watching + $0.waiting + $0.recommending + $0.next }
+            ?? (d.showCount ?? 0)
+        var line = "\(total) show\(total == 1 ? "" : "s")"
+        if let archived = d.archivedCount, archived > 0 {
+            line += " · \(archived) archived"
+        }
+        return line
     }
 
     private func tag(_ text: String, _ color: Color) -> some View {
@@ -175,10 +216,17 @@ struct AdminPlatformBadges: View {
     }
 }
 
-// Per-list 30-day adds, colour-coded to the list like the web roster's pills;
-// a quiet italic line when there's been nothing.
+// Per-list counts, colour-coded to the list like the web roster's pills; a
+// quiet italic line when there's been nothing.
+//
+// Two callers, two readings of the same shape: the roster rows and the admin
+// strip both show 30-day *adds* (zeros dropped, because a list nobody touched
+// isn't news), and the strip also shows all-time list *totals* — where a zero
+// is the news, so `showZeros` keeps them.
 struct AdminActivityPills: View {
     let activity: MemberActivity?
+    var prefix: String = "30d:"
+    var showZeros = false
 
     var body: some View {
         if let a = activity {
@@ -187,13 +235,13 @@ struct AdminActivityPills: View {
                 ("Awaiting", a.waiting, .blue),
                 ("Loved", a.recommending, .purple),
                 ("Next Up", a.next, .orange),
-            ].filter { $0.1 > 0 }
+            ].filter { showZeros || $0.1 > 0 }
             if items.isEmpty {
                 Text("no list activity in the last 30 days")
                     .font(.caption2).italic().foregroundStyle(.secondary)
             } else {
                 HStack(spacing: 4) {
-                    Text("30d:").font(.caption2).foregroundStyle(.secondary)
+                    Text(prefix).font(.caption2).foregroundStyle(.secondary)
                     ForEach(items, id: \.0) { item in
                         Text("\(item.0) \(item.1)")
                             .font(.caption2.weight(.medium))

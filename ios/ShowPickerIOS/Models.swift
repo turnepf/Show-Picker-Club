@@ -707,9 +707,15 @@ struct AdminMember: Codable, Identifiable {
     let lastLoginMethod: String?
     let lastActivityAt: String?
     let activity30d: MemberActivity?
+    // When the account was created (members.created_at). Absent on an older
+    // server; nil for the hand-seeded rows that predate the column.
+    let joinedAt: String?
     // Non-seed active shows — the duplicates panel ranks the default keeper
     // by library size.
     let showCount: Int?
+    // Non-seed archived shows. Archiving is member-initiated, so this is
+    // engagement the active lists don't show.
+    let archivedCount: Int?
     // Status flags (optional so decoding survives an older server).
     let isAdmin: Bool?
     let disabled: Bool?
@@ -730,7 +736,9 @@ struct AdminMember: Codable, Identifiable {
         case lastLoginMethod = "last_login_method"
         case lastActivityAt = "last_activity_at"
         case activity30d = "activity_30d"
+        case joinedAt = "joined_at"
         case showCount = "show_count"
+        case archivedCount = "archived_count"
         case isAdmin = "is_admin"
         case enrolledVia = "enrolled_via"
     }

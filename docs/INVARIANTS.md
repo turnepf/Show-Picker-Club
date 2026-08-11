@@ -11,6 +11,7 @@ catch different classes of mistake:
 | Passkey tests (`scripts/webauthn-test.mjs`, `scripts/passkey-flow-test.mjs`) | every PR | Passkey signature verification and the endpoint flows around it |
 | Auth code tests (`scripts/auth-code-flow-test.mjs`) | every PR | The email login/signup code flow: codes that arrive, and failures that are reported |
 | Activity feed tests (`scripts/activity-feed-test.mjs`) | every PR | `/api/activity` stays session-gated, `?member=` shows only what that member chose, bulk adds collapse per list |
+| Admin member detail tests (`scripts/admin-member-detail-test.mjs`) | every PR | `/api/admin-member-emails` stays admin-only, and `?member=` returns that member and nobody else |
 | `scripts/smoke.sh` | after deploy, and nightly | Live behavior: auth gates, headers, leakage, redirects |
 | Invariants review (`.github/workflows/pr-review.yml`) | every PR | Judgement calls the four above can't express |
 

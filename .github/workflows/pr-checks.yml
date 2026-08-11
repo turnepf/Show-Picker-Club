@@ -67,6 +67,8 @@ jobs:
         run: node scripts/auth-code-flow-test.mjs
       - name: Activity feed scoping and gating
         run: node scripts/activity-feed-test.mjs
+      - name: Admin member detail gating and scoping
+        run: node scripts/admin-member-detail-test.mjs
 
   swift:
     runs-on: ubuntu-latest

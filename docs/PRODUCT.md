@@ -95,14 +95,26 @@ Two pieces of metadata are **always visible** under the row (not collapsed):
 - **Every list shows the premiere date when one exists** (since 2026-07): Loved and Next Up rows carry the same "📅 Next episode" line — a show you thought was done can drop a surprise season, and the date is the nudge to move it back to Watching.
 - **Next Up list:** "Recommended by Dorothy" — surfaces attribution without an expand.
 
-### Admin strip (iOS/iPad, admin sessions only)
+### Admin strip (iPhone, iPad and Mac — admin sessions only)
 
-Signed in as an admin, someone **else's** member page carries two extra sections above their lists:
+The member page is visible to any signed-in member, as it always has been. Signed in as an **admin**, someone else's page additionally carries two sections above their lists:
 
-- **Admin** — their name and slug, the emails and phones on file, how they joined (`joined via apple`), when they last logged in and by which method, last activity, per-list adds in the last 30 days, and every platform they've ever used the app from. A **Manage member** row pushes the same editor the Manage Members roster opens (rename, edit contacts, make admin, disable).
-- **Recent adds** — their eight most recent additions, newest first, with a relative timestamp. Bulk imports collapse to one line per list. Seeded starter rows never appear here: a new member who has added nothing reads as having added nothing.
+- **Admin** — collapsed, one line: their name, any ADMIN/DISABLED tag, and `joined 2d ago via apple`. Expanded (the default):
+  - slug, every login email and phone on file (selectable, so you can copy one)
+  - last login, with the method they used — `last login 3d ago via Apple`
+  - last activity
+  - **`lists:`** — the four lists across with their current totals, including zeros, counted from the same rows drawn below so the header can never disagree with the list under it
+  - total shows and how many they've archived
+  - **`30d:`** — adds per list in the last 30 days
+  - every platform they've ever used the app from (iPhone, iPad, Apple Watch, Mac, Apple TV, web), lit when used and dim when not
+  - **Manage member** — pushes the same editor the Manage Members roster opens (rename, edit contacts, make admin, disable)
+- **Recent adds** — their eight most recent additions, newest first, with a relative timestamp. Bulk imports collapse to one line per list. Seeded starter rows never appear: a new member who has added nothing reads as having added nothing.
 
-This exists for the signup notification email. That email deep-links to the new member's page, so the question it raises — who is this, and are they using it? — is answered where it gets asked rather than several taps away in Manage Members. It is never shown on your own page, to a non-admin, or after logging out. tvOS and watchOS don't have it (view-only and read-only respectively), and there is no web member app to put it on.
+The strip collapses to its one-line summary and remembers that choice, because the iPad and Mac split view draws the member page once per list — four copies of a tall header otherwise sit between you and the shows.
+
+This exists for the signup notification email. That email deep-links to the new member's page, so the question it raises — who is this, and are they using it? — is answered where it gets asked rather than several taps away in Manage Members. It is never shown on your own page, to a non-admin, or after logging out.
+
+**Mac** gets it in full: Catalyst runs the same split view as iPad, and both entitlement files claim `applinks:showpicker.club`, so tapping the email's button in Mail on the Mac opens the app on that member exactly as it does on the phone. tvOS and watchOS don't have it (view-only and read-only respectively), and there is no web member app to put it on.
 
 ### Suggest a show
 
