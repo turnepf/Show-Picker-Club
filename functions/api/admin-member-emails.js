@@ -35,10 +35,23 @@ export async function onRequestGet(context) {
   // because updated_at only ever moves on member intent. Normalised inside MAX so the mixed
   // storage formats (datetime('now') vs JS toISOString) compare correctly.
   const since = "datetime('now', '-30 days')";
+  // ?member=<slug> narrows the roster to one row. The iOS member page's admin
+  // strip wants exactly one member's contact/platform/activity detail, and
+  // pulling every member's emails and phones to render one header is a lot of
+  // payload for a header.
+  const onlySlug = (new URL(request.url).searchParams.get('member') || '').trim().toLowerCase();
+  const whereSlug = onlySlug ? 'WHERE m.slug = ?' : '';
+  const binds = onlySlug ? [onlySlug] : [];
   // disabled (migration 030) / enrolled_via (migration 031) /
   // member_platforms (migration 047) with column-less retries so the page
   // keeps working mid-rollout.
-  const memberQuery = (extras) => env.DB.prepare(`
+  const prepared = (sql) => {
+    const stmt = env.DB.prepare(sql);
+    // bind() with an empty list isn't universally a no-op — only bind when
+    // there's actually a placeholder to fill.
+    return binds.length ? stmt.bind(...binds) : stmt;
+  };
+  const memberQuery = (extras) => prepared(`
     SELECT m.slug, m.name, m.first_name, m.last_initial, m.last_name,
            ${extras >= 1 ? 'm.is_admin, m.disabled,' : '0 AS is_admin, 0 AS disabled,'}
            ${extras >= 2 ? 'm.enrolled_via,' : 'NULL AS enrolled_via,'}
@@ -81,6 +94,7 @@ export async function onRequestGet(context) {
                AND COALESCE(added_by,'') != 'seed'
                AND COALESCE(updated_at, created_at) >= ${since}) AS act_next
       FROM members m
+     ${whereSlug}
      ORDER BY m.first_name COLLATE NOCASE
   `);
   const { results } = await memberQuery(4).all()

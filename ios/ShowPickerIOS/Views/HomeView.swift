@@ -262,8 +262,12 @@ struct HomeView: View {
     // anything else stays on Home. On a cold
     // launch the roster may not be loaded yet — park member URLs and replay
     // them when load() lands (show links need no roster at all).
+    //
+    // `allowRefetch` bounds that replay to one attempt: load() replays with it
+    // false, so a slug that still doesn't resolve against a freshly fetched
+    // roster (a stale bookmark, a typo) gives up instead of looping.
     @MainActor
-    private func route(url: URL) {
+    private func route(url: URL, allowRefetch: Bool = true) {
         guard let first = url.path.split(separator: "/").first.map({ String($0).lowercased() }) else { return }
         if let show = Route.showLink(url) { path = [show]; return }
         // A household invite (/household/join?code=…). Same shape as a group
@@ -292,7 +296,16 @@ struct HomeView: View {
         if let m = members.first(where: { $0.slug == slug }) {
             path = [.member(m)]
         } else if members.isEmpty {
+            // Cold launch: load() is already in flight and replays this.
             pendingLink = url
+        } else if allowRefetch {
+            // The roster we hold predates this member. That is the normal case
+            // for the link that matters most — the signup notification email
+            // points at someone who by definition didn't exist when this copy
+            // was fetched — and dropping it here is why that button appeared to
+            // do nothing but leave you on Home. Refetch once, then replay.
+            pendingLink = url
+            Task { await load() }
         }
     }
 
@@ -443,7 +456,7 @@ struct HomeView: View {
         session.backlogCount = auth.isLoggedIn ? ((try? await API.rateBacklogCount()) ?? 0) : 0
         if let link = pendingLink {
             pendingLink = nil
-            route(url: link)
+            route(url: link, allowRefetch: false)
         }
     }
 }

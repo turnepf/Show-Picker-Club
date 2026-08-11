@@ -95,6 +95,15 @@ Two pieces of metadata are **always visible** under the row (not collapsed):
 - **Every list shows the premiere date when one exists** (since 2026-07): Loved and Next Up rows carry the same "📅 Next episode" line — a show you thought was done can drop a surprise season, and the date is the nudge to move it back to Watching.
 - **Next Up list:** "Recommended by Dorothy" — surfaces attribution without an expand.
 
+### Admin strip (iOS/iPad, admin sessions only)
+
+Signed in as an admin, someone **else's** member page carries two extra sections above their lists:
+
+- **Admin** — their name and slug, the emails and phones on file, how they joined (`joined via apple`), when they last logged in and by which method, last activity, per-list adds in the last 30 days, and every platform they've ever used the app from. A **Manage member** row pushes the same editor the Manage Members roster opens (rename, edit contacts, make admin, disable).
+- **Recent adds** — their eight most recent additions, newest first, with a relative timestamp. Bulk imports collapse to one line per list. Seeded starter rows never appear here: a new member who has added nothing reads as having added nothing.
+
+This exists for the signup notification email. That email deep-links to the new member's page, so the question it raises — who is this, and are they using it? — is answered where it gets asked rather than several taps away in Manage Members. It is never shown on your own page, to a non-admin, or after logging out. tvOS and watchOS don't have it (view-only and read-only respectively), and there is no web member app to put it on.
+
 ### Suggest a show
 
 Any logged-in member can suggest a show to any other member via the **Suggest a Show for ...** button at the bottom of any list. The suggestion lands on that member's Next Up list with the recommender attribution pre-filled and "Suggested · &lt;your notes&gt;" prepended to the notes.

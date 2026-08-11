@@ -249,7 +249,7 @@ The complete map:
 | `GET/POST /auth/logout`                | `functions/auth/logout.js`                 | GET, POST | none (POST is canonical; GET kept for shipped app builds) |
 | `GET /api/members`                     | `functions/api/members.js`                 | GET     | none (full names + calendar tokens only with a session) |
 | `GET /api/popular`                     | `functions/api/popular.js`                 | GET     | none |
-| `GET /api/activity`                    | `functions/api/activity.js`                | GET     | session |
+| `GET /api/activity`                    | `functions/api/activity.js`                | GET     | session — `?member=<slug>` scopes it to one person, `?limit=` (1–50, default 10) |
 | `GET /api/rate-backlog`                | `functions/api/rate-backlog.js`            | GET     | session — backs `/rate-backlog`, the bulk-rate flow |
 | `GET /api/rate-backlog-count`          | `functions/api/rate-backlog-count.js`      | GET     | session — the unrated count alone, for the nav badge |
 | `GET /api/recommendations`             | `functions/api/recommendations.js`         | GET     | session (legacy — no longer called by any client) |
@@ -290,6 +290,7 @@ The complete map:
 | `POST /auth/passkey-register-finish`   | `functions/auth/passkey-register-finish.js`| POST    | session — verifies the attestation and stores the credential |
 | `GET /api/passkeys`                    | `functions/api/passkeys.js`                | GET     | session — the caller's own registered passkeys |
 | `DELETE /api/passkeys/:id`             | `functions/api/passkeys/[id].js`           | DELETE  | session — removes one of the caller's own passkeys |
+| `GET/POST /api/admin-member-emails`    | `functions/api/admin-member-emails.js`     | GET, POST | admin session — GET is the roster with contacts, platforms, last login and 30-day activity; `?member=<slug>` narrows it to one row (the member page's admin strip). POST edits one member's name/emails/phones |
 | `POST /api/admin-member-disable`       | `functions/api/admin-member-disable.js`    | POST    | admin session |
 | `POST /api/admin-member-role`          | `functions/api/admin-member-role.js`       | POST    | admin session — promote/demote `members.is_admin`; refuses to demote the last admin |
 | `POST /api/admin-member-merge`         | `functions/api/admin-member-merge.js`      | POST    | admin session — merge a duplicate member account into the kept one, then delete the duplicate |

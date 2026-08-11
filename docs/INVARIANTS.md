@@ -10,6 +10,7 @@ catch different classes of mistake:
 | `ShowPickerCore` tests (`swift test`) | every PR | Logic in the shared core, including session teardown |
 | Passkey tests (`scripts/webauthn-test.mjs`, `scripts/passkey-flow-test.mjs`) | every PR | Passkey signature verification and the endpoint flows around it |
 | Auth code tests (`scripts/auth-code-flow-test.mjs`) | every PR | The email login/signup code flow: codes that arrive, and failures that are reported |
+| Activity feed tests (`scripts/activity-feed-test.mjs`) | every PR | `/api/activity` stays session-gated, `?member=` shows only what that member chose, bulk adds collapse per list |
 | `scripts/smoke.sh` | after deploy, and nightly | Live behavior: auth gates, headers, leakage, redirects |
 | Invariants review (`.github/workflows/pr-review.yml`) | every PR | Judgement calls the four above can't express |
 
@@ -82,6 +83,26 @@ lists; force-quitting fixed it."*
   inherits the same requirement: a fetch that predates the session is stale the
   moment the session exists.
 - Enforced by `scripts/check-static.sh` ("signing in refetches the roster").
+
+## 2b. A universal link resolves against a roster new enough to contain it
+
+*Broke in 2026-08, found from the signup notification email.* `route(url:)`
+matched the slug against the roster already in memory and, on a miss, did
+nothing unless the roster was empty. Empty meant cold launch, which was parked
+and replayed correctly — so the failure only appeared on a **warm** app, where
+the roster is non-empty and predates the member being linked to. That is
+precisely the case the operator's "new member joined" email produces: tapping
+*Open Stacy's page* opened the app, matched nothing, and left you on Home
+looking at a link that appeared to do nothing.
+
+- A member slug that misses the loaded roster refetches once and replays,
+  rather than being dropped. Both `HomeView` and `IPadHomeView` — the iPad
+  ignored the link just as silently.
+- The replay is bounded: `load()` re-routes with `allowRefetch: false`, so an
+  unresolvable slug gives up instead of refetching forever.
+- Generally: a roster miss is "my copy is old" until a fresh fetch says
+  otherwise. The roster is not a closed world — anyone can sign up at any
+  moment, and the links that matter most point at whoever just did.
 
 ## 3. Member-page URLs stay universal links
 

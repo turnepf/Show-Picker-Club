@@ -751,6 +751,36 @@ struct MemberActivity: Codable {
     let next: Int
 }
 
+// /api/activity — recent adds, newest first, club-wide or (?member=) scoped to
+// one person. `text` is the server's rendered line; the fields beside it exist
+// so a client can lay the same event out its own way.
+struct ActivityResponse: Codable { let feed: [ActivityItem] }
+
+struct ActivityItem: Codable, Identifiable {
+    let text: String
+    let time: String?
+    // A collapsed bulk add carries the first title and how many there were.
+    let title: String?
+    let count: Int?
+    let list: String?
+    let listLabel: String?
+    let memberSlug: String?
+    let memberFirstName: String?
+
+    // Time alone isn't unique across a bulk add that spans two lists, so the
+    // list is part of the identity.
+    var id: String { "\(time ?? "")|\(list ?? "")|\(title ?? "")" }
+
+    var isBatch: Bool { (count ?? 1) > 1 }
+
+    enum CodingKeys: String, CodingKey {
+        case text, time, title, count, list
+        case listLabel = "list_label"
+        case memberSlug = "member_slug"
+        case memberFirstName = "member_first_name"
+    }
+}
+
 // /api/admin-dupe-ignores — operator-dismissed duplicate matches. Pairs are
 // stored sorted (slug_a <= slug_b); a self-pair silences the hidden-email-
 // only flag for that account.

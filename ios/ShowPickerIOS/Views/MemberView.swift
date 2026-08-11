@@ -118,6 +118,15 @@ struct MemberView: View {
             if !isReordering { mediaChips }
 
             List {
+                // Admin-only, and only on someone else's page — the signup
+                // notification email lands here, and "who is this and are they
+                // using it?" is the question it raises. Gated on auth.isAdmin
+                // at the call site, so a logout takes the whole strip (and the
+                // contact details it loaded) out of the hierarchy with it.
+                if auth.isAdmin && !isMine {
+                    MemberAdminStrip(slug: member.slug, label: member.label)
+                }
+
                 let items = sortedItems()
                 if items.isEmpty {
                     Group {

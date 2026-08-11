@@ -593,18 +593,11 @@ struct ManageMembersView: View {
         .opacity(m.disabled == true ? 0.6 : 1)
     }
 
-    // Every platform the member has ever used, side by side like the
-    // activity pills above them — dim when unused, filled when earned.
-    // "Ever used" (not a recent window): once lit, a badge stays lit.
-    private static let platformBadgeOrder: [(String, String)] = [
-        ("iphone", "iPhone"),
-        ("ipad", "iPad"),
-        ("watchos", "Apple Watch"),
-        ("mac", "Mac"),
-        ("tvos", "Apple TV"),
-        ("web-small", "Small Web"),
-        ("web-large", "Large Web"),
-    ]
+    // The badge order, the badges themselves and the activity pills live in
+    // MemberAdminStrip.swift — the member page's admin strip draws the same
+    // three things, and two copies would drift the first time a platform is
+    // added.
+    private static let platformBadgeOrder = adminPlatformBadgeOrder
 
     // Same badges, same layout, but tappable: picks which platform
     // `sortedMembers` filters the roster down to.
@@ -630,50 +623,12 @@ struct ManageMembersView: View {
         }
     }
 
-    @ViewBuilder private func platformBadges(_ m: AdminMember) -> some View {
-        let used = Set(m.platforms ?? [])
-        FlowLayout(spacing: 4) {
-            ForEach(Self.platformBadgeOrder, id: \.0) { key, label in
-                Text(label)
-                    .font(.caption2.weight(.medium))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(
-                        used.contains(key) ? Color.accentColor.opacity(0.15) : Color.clear,
-                        in: Capsule())
-                    .overlay(Capsule().stroke(Color.secondary.opacity(0.25), lineWidth: used.contains(key) ? 0 : 1))
-                    .foregroundStyle(used.contains(key) ? Color.accentColor : Color.secondary.opacity(0.45))
-            }
-        }
+    private func platformBadges(_ m: AdminMember) -> some View {
+        AdminPlatformBadges(platforms: m.platforms ?? [])
     }
 
-    // Per-list 30-day adds, colour-coded to the list like the web roster's
-    // pills; a quiet italic line when there's been nothing.
-    @ViewBuilder private func activityPills(_ m: AdminMember) -> some View {
-        if let a = m.activity30d {
-            let items: [(String, Int, Color)] = [
-                ("Watching", a.watching, .green),
-                ("Awaiting", a.waiting, .blue),
-                ("Loved", a.recommending, .purple),
-                ("Next Up", a.next, .orange),
-            ].filter { $0.1 > 0 }
-            if items.isEmpty {
-                Text("no list activity in the last 30 days")
-                    .font(.caption2).italic().foregroundStyle(.secondary)
-            } else {
-                HStack(spacing: 4) {
-                    Text("30d:").font(.caption2).foregroundStyle(.secondary)
-                    ForEach(items, id: \.0) { item in
-                        Text("\(item.0) \(item.1)")
-                            .font(.caption2.weight(.medium))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .background(item.2.opacity(0.15), in: Capsule())
-                            .foregroundStyle(item.2)
-                    }
-                }
-            }
-        }
+    private func activityPills(_ m: AdminMember) -> some View {
+        AdminActivityPills(activity: m.activity30d)
     }
 
     private func statusTag(_ text: String, _ color: Color) -> some View {
@@ -777,6 +732,15 @@ func lastActivityText(_ iso: String?) -> String {
     return "last activity \(relTime(d))"
 }
 
+// The bare relative stamp ("today", "3d ago") for callers that bring their own
+// wording — the member page's recent-adds rows, which put the time under the
+// line rather than inside it. Nil for a missing or unparseable timestamp, so
+// the caller can leave the row's second line off entirely.
+func relativeServerTime(_ iso: String?) -> String? {
+    guard let iso, let d = parseServerDate(iso) else { return nil }
+    return relTime(d)
+}
+
 // "last login 3d ago via Apple" — the method is what says whether a login
 // channel is still earning its keep, per member rather than in aggregate.
 func lastLoginText(_ iso: String?, method: String? = nil) -> String {
@@ -797,7 +761,9 @@ func loginMethodLabel(_ key: String) -> String {
     }
 }
 
-private struct MemberDetailAdminView: View {
+// Internal so the member page's admin strip can push the same editor rather
+// than growing a second one.
+struct MemberDetailAdminView: View {
     let member: AdminMember
     let onChange: () async -> Void
 
@@ -979,7 +945,9 @@ private struct MemberDetailAdminView: View {
 
 // Wraps subviews onto new rows instead of overflowing or scrolling —
 // mirrors the web roster's `flex-wrap` platform badges on narrow widths.
-private struct FlowLayout: Layout {
+// Internal rather than file-private because the member page's admin strip
+// lays out the same platform badges.
+struct FlowLayout: Layout {
     var spacing: CGFloat = 4
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {

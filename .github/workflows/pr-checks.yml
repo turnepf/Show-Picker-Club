@@ -65,6 +65,8 @@ jobs:
           node-version: '22'
       - name: Email login and signup code flows
         run: node scripts/auth-code-flow-test.mjs
+      - name: Activity feed scoping and gating
+        run: node scripts/activity-feed-test.mjs
 
   swift:
     runs-on: ubuntu-latest

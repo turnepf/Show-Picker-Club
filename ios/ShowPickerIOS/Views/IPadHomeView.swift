@@ -544,17 +544,22 @@ struct IPadHomeView: View {
         await loadGroupMembers()
         if let link = pendingLink {
             pendingLink = nil
-            route(url: link)
-        } else {
-            applyInitialSelection()
+            route(url: link, allowRefetch: false)
         }
+        // Unconditional, because a replayed link that still doesn't resolve
+        // would otherwise leave the detail column with nothing selected.
+        // applyInitialSelection() no-ops when the link did land.
+        applyInitialSelection()
     }
 
     // Route a showpicker.club URL: /<slug> focuses that member (honoring the
     // #list fragment the web puts in shared URLs)
     // changelog. Cold-launch links wait for the roster via pendingLink.
+    //
+    // `allowRefetch` bounds the roster refresh to one attempt — load() replays
+    // with it false, so an unresolvable slug gives up rather than looping.
     @MainActor
-    private func route(url: URL) {
+    private func route(url: URL, allowRefetch: Bool = true) {
         guard let first = url.path.split(separator: "/").first.map({ String($0).lowercased() }) else { return }
         // Widget taps: push the show's card onto the detail column. Needs no
         // roster, and leaves the sidebar selection alone.
@@ -593,7 +598,15 @@ struct IPadHomeView: View {
             let frag = (url.fragment ?? "").lowercased()
             selection = .list(ShowList(rawValue: frag) ?? .watching)
         } else if members.isEmpty {
+            // Cold launch: load() is already in flight and replays this.
             pendingLink = url
+        } else if allowRefetch {
+            // Roster older than the member being linked to — the signup
+            // notification email is exactly that case, and silently dropping
+            // the link left the iPad wherever it already was. Refetch once,
+            // then replay. Same fix as iPhone Home.
+            pendingLink = url
+            Task { await load() }
         }
     }
 }

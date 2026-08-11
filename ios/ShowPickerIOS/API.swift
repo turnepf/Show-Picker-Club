@@ -429,6 +429,28 @@ enum API {
         return r.members
     }
 
+    // One member's admin detail — what the member page's admin strip needs,
+    // without pulling every member's emails and phones to draw one header.
+    // nil when the slug isn't a member (rather than throwing, since the strip
+    // is decoration and its absence shouldn't read as a failure).
+    static func adminMember(slug: String) async throws -> AdminMember? {
+        let enc = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? slug
+        let r: AdminMembersResponse = try await get("/api/admin-member-emails?member=\(enc)")
+        return r.members.first
+    }
+
+    // Recent adds, newest first. Bulk adds arrive pre-collapsed into one
+    // "added N shows to <list>" entry by the server.
+    static func activity(member: String? = nil, limit: Int = 10) async throws -> [ActivityItem] {
+        var path = "/api/activity?limit=\(limit)"
+        if let member {
+            let enc = member.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? member
+            path += "&member=\(enc)"
+        }
+        let r: ActivityResponse = try await get(path)
+        return r.feed
+    }
+
     // Replace a member's email and/or phone set, and/or rename them (renames
     // keep the slug/URL). First/last name travel separately so a shared list
     // can carry a multi-word first name ("Paula & Brad") — a combined string

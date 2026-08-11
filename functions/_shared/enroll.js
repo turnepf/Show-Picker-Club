@@ -125,11 +125,13 @@ async function notifySignup(env, { full_name, email, via, slug }) {
   const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
-  // The button has to be the member page, not /members: member pages are
-  // claimed by the app's associated domains, so tapping this on iPhone/iPad
-  // opens Show Picker on the new member. /members is excluded from the AASA
-  // file (it's the web admin tool), so a button pointing there could only
-  // ever land in Safari — which is what this email used to do.
+  // The button has to be the member page: member slugs are claimed by the
+  // app's associated domains (and left as a 200 rewrite in _redirects so the
+  // path survives), so tapping this on iPhone/iPad opens Show Picker on the
+  // new member. Nothing else here may link to /members — the web admin tools
+  // were retired in 2026-08 and that path now 301s to the marketing page, so
+  // the "roster" link this email used to carry was a dead end on every
+  // device.
   const subject = `Show Picker Club: ${full_name} just joined (via ${via})`;
   const text = `New member.
 
@@ -137,17 +139,18 @@ Name:  ${full_name}
 Email: ${email || '(none — external identity only)'}
 Via:   ${via}
 
-Open their page (opens in the app on iPhone/iPad):
+Open their page (opens in the app on iPhone/iPad, with their contact
+details, platforms and recent adds on it when you're signed in as admin):
 https://showpicker.club/${slug}
 
-Roster (web admin): https://showpicker.club/members
+The full roster lives in the app: account menu → Manage members.
 `;
   const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#2C2C2C;">
     <h2 style="color:#2C3E50;margin:0 0 12px;">New member: ${esc(full_name)}</h2>
     <p style="font-size:14px;">Joined via <strong>${esc(via)}</strong>${email ? ` (${esc(email)})` : ''} — <a href="https://showpicker.club/${esc(slug)}" style="color:#E67E22;">/${esc(slug)}</a></p>
     <p style="margin-top:18px;"><a href="https://showpicker.club/${esc(slug)}" style="display:inline-block;background:#E67E22;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600;">Open ${esc(full_name.split(' ')[0])}'s page</a></p>
-    <p style="font-size:12px;color:#888;margin-top:10px;">Opens in Show Picker on iPhone or iPad; in the browser everywhere else.</p>
-    <p style="font-size:13px;margin-top:18px;"><a href="https://showpicker.club/members" style="color:#888;">Roster (web admin)</a></p>
+    <p style="font-size:12px;color:#888;margin-top:10px;">Opens in Show Picker on iPhone or iPad — signed in as admin, their contact details, platforms and recent adds sit at the top of the page. Opens the marketing site everywhere else.</p>
+    <p style="font-size:12px;color:#888;margin-top:14px;">The full roster lives in the app: account menu → Manage members.</p>
   </div>`;
   await sendEmail(env, { to: OPERATOR_EMAIL, subject, text, html });
 }
