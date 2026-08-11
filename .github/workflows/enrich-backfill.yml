@@ -21,19 +21,32 @@ on:
   workflow_dispatch:
     inputs:
       rounds:
-        description: 'How many batches to run (each ≈ 10 TV + 10 movies)'
+        description: 'How many batches to run'
         required: false
         default: '40'
+      max_tmdb:
+        description: 'TV rows per round. Blank uses the endpoint default (50).'
+        required: false
+        default: ''
+      sleep_seconds:
+        description: 'Pause between rounds, in seconds.'
+        required: false
+        default: '3'
 
 jobs:
   backfill:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Long enough for a deliberately slow pass: many small rounds with a real
+    # pause between them takes far longer in wall-clock than a few big ones,
+    # even though it asks less of TMDB per minute.
+    timeout-minutes: 60
     steps:
       - name: Backfill enrichment
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           ROUNDS: ${{ github.event.inputs.rounds || '40' }}
+          MAX_TMDB: ${{ github.event.inputs.max_tmdb || '' }}
+          SLEEP_SECONDS: ${{ github.event.inputs.sleep_seconds || '3' }}
         run: |
           if [ -z "$CRON_SECRET" ]; then
             echo "::error::CRON_SECRET repo secret is not set"
@@ -65,11 +78,22 @@ jobs:
           # library whose artwork is already complete every round reported 0
           # and nothing else — runtime, cast depth, season data — was ever
           # refreshed. The full pass rotates oldest-enriched-first.
+          # Body for the full passes. Empty object keeps the endpoint's own
+          # default batch size; max_tmdb shrinks it, which is what you want when
+          # the goal is to stay well under TMDB's rate limit rather than to
+          # finish fast.
+          if [ -n "$MAX_TMDB" ]; then
+            BODY="{\"max_tmdb\":${MAX_TMDB}}"
+          else
+            BODY='{}'
+          fi
+          echo "Running $ROUNDS rounds, body ${BODY}, ${SLEEP_SECONDS}s between rounds."
+
           for i in $(seq 1 "$ROUNDS"); do
             resp=$(curl -sS -X POST "$URL" \
               -H "Content-Type: application/json" \
               -H "X-Cron-Secret: ${CRON_SECRET}" \
-              -d '{}' \
+              -d "$BODY" \
               -w $'\n%{http_code}')
             http=$(printf '%s' "$resp" | tail -n1)
             body=$(printf '%s' "$resp" | sed '$d')
@@ -91,6 +115,12 @@ jobs:
             if [ "$errs" != "0" ] && [ "$err" != "-" ]; then
               echo "  first error: $err"
             fi
-            sleep 3
+            # Stop early once the rotation reports nothing left to do, rather
+            # than burning the remaining rounds on empty passes.
+            if [ "$cands" = "0" ]; then
+              echo "No candidates left — stopping after round $i."
+              break
+            fi
+            sleep "$SLEEP_SECONDS"
           done
           echo "Backfill complete. Total TMDB updates: $total"
