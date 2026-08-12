@@ -145,6 +145,7 @@ enum ShareTitleParser {
         if lower.contains("prime video") || lower.contains("amazon") { return "Amazon Prime Video"  }
         if lower.contains("starz")                                   { return "Starz"               }
         if lower.contains("britbox")                                 { return "BritBox"             }
+        if lower.contains("pbs") || lower.contains("masterpiece")    { return "PBS"                 }
         return nil
     }
 
@@ -175,6 +176,7 @@ enum ShareTitleParser {
         if host.contains("starz")                              { return "Starz"               }
         if host.contains("amc.")                               { return "AMC+"                }
         if host.contains("britbox")                            { return "BritBox"             }
+        if host.contains("pbs.org") || host.contains("pbskids") { return "PBS"                }
         return nil
     }
 

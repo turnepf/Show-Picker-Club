@@ -1001,6 +1001,7 @@ let CANONICAL_NETWORKS: [String] = [
     "MGM+",
     "Netflix",
     "Paramount+",
+    "PBS",
     "Peacock",
     "Starz",
     "YouTube",

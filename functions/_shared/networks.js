@@ -111,6 +111,17 @@ export const NETWORKS = [
     search: { base: 'https://www.britbox.com/us/search' },
   },
   {
+    // Stored as the bare broadcaster name rather than "PBS Passport": most of
+    // what members watch here is free on pbs.org, and Passport is a membership
+    // tier on top of the same catalogue, not a separate service. Masterpiece
+    // is a PBS strand, so it folds in the way FX folds into Hulu.
+    stored: 'PBS',
+    display: 'PBS (including PBS Passport, Masterpiece, PBS Kids)',
+    aliases: ['PBS Passport', 'PBS Kids', 'PBS Masterpiece', 'Masterpiece', 'Masterpiece Theatre'],
+    domains: ['pbs.org', 'pbskids.org'],
+    search: { base: 'https://www.pbs.org/search/', param: 'q' },
+  },
+  {
     stored: 'YouTube',
     display: 'YouTube',
     aliases: ['YouTube Premium'],
@@ -330,6 +341,10 @@ export const DEFAULT_PRICE_CENTS = {
   'Fox': 799,
   'BritBox': 899,
   'MGM+': 899,
+  // PBS Passport, the $60/year member benefit, at its monthly equivalent. Much
+  // of PBS streams free without it, so this is the one default a member is
+  // likeliest to zero out.
+  'PBS': 500,
 };
 
 export function defaultPriceCents(network) {

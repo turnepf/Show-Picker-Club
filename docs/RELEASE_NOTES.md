@@ -34,6 +34,9 @@ Bringing over a list you already keep somewhere else is much easier now.
   and tidy up, so you can check yours against it.
 
 Importing is also on iPad and Mac now, where it wasn't offered before.
+
+PBS is also in the network list now, so Masterpiece, PBS Kids and everything
+else you watch there can be filed where it belongs.
 ```
 
 ### What this covers
@@ -41,6 +44,8 @@ Importing is also on iPad and Mac now, where it wasn't offered before.
 - Permanent import entry points — account menu and the My Shows toolbar; iPad
   and Mac previously had no way in at all (#362).
 - Paste button and the worked example card on the import screen (#363).
+- PBS added as a canonical network, with Passport, Masterpiece and PBS Kids
+  folded in as aliases.
 
 Earlier merged work is not listed here — this file starts at 2026-08-11, so
 anything user-facing that shipped before that and has not yet reached the App
