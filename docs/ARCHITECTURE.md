@@ -485,7 +485,7 @@ Native SwiftUI apps for iOS, tvOS, and watchOS call the same public `/api/*` end
 
 ### tvOS Watch button
 
-Audited on device 2026-08-12 across every network the club carries. `ShowDetailView.swift` builds an **ordered list of candidate URLs** (`openTargets`) and `openWatch` walks it, using `openURL`'s completion to fall through to the next candidate whenever the device refuses one. Nothing is looked up at tap time.
+Audited on device 2026-08-12 across every network the club carries. `ShowDetailView.swift` builds an **ordered list of candidate URLs** (`openTargets`) and `openWatch` walks it, using `openURL`'s completion to fall through to the next candidate whenever the device refuses one. Nothing is looked up at tap time. The per-service scheme table (and the `deepLinksToShow` flag) lives in `StreamingApps.swift`, not in the view, because the Streaming Link Check below reads the same table — a diagnostic that probes schemes production no longer tries is worse than none.
 
 - **HBO Max and Apple TV+** are the only services whose tvOS apps honor the plain https URL, so they get it directly and land on the real show (`deepLinksToShow`). The HBO Max `/search?` fallback URL also goes direct — it opens HBO Max with the title pre-filled. Everything else opens its app to the home screen; the button says "Open X" rather than "Watch on X" to stay honest about that (`canDeepLink`).
 - **Everything else** gets its custom URL schemes first, then the https URL as a backstop. On tvOS the https universal link doesn't open most streaming apps at all — `openURL` reports accepted=false — while the app's own scheme launches it.
@@ -493,6 +493,18 @@ Audited on device 2026-08-12 across every network the club carries. `ShowDetailV
 - No `LSApplicationQueriesSchemes` declaration is needed or present — that gates `canOpenURL`, not `openURL`.
 
 **Do not reintroduce a title-based Apple catalog lookup.** Until 2026-08-12 the button called iTunes Search with `media=tvShow`, whose default entity is **tvEpisode**: it matched episode titles across Apple's entire catalog and any hit took priority over the service's own scheme. "The Bear" resolved to a *Bones* episode, "Boiling Point" to a *1000-lb Sisters* episode, "Stranger Things" to a *Nightwatch* episode — and because a non-nil match won, `hulu://` and `aiv://` were never reached. Modern streaming originals aren't in Apple's purchasable catalog at all, so the lookup's upside was near zero and its false-positive rate was high. If an Apple TV fallback link is wanted, resolve it server-side against a real id and store it (see PRODUCT.md's deep-link backlog entry).
+
+**Streaming Link Check** (`StreamingLinkCheckView.swift`) is the operator-facing
+half of the same problem: Account tab → Streaming Link Check, admin sessions
+only, one button per candidate scheme, result recorded per scheme. It calls
+`openURL` rather than `canOpenURL` — `canOpenURL` would answer without leaving
+the app but only for schemes declared in `LSApplicationQueriesSchemes`, and this
+target's `Info.plist` is generated (`GENERATE_INFOPLIST_FILE`) so it can't carry
+that array; `openURL` needs no declaration and a success lands you in the app,
+which is the thing being tested. Because a pass backgrounds the app, results are
+written to `UserDefaults` (`streamingLinkCheck.results`) inside the completion
+handler rather than held in view state. Product behavior and the platform call
+are in [PRODUCT.md](PRODUCT.md#streaming-link-check-apple-tv-admin-sessions-only).
 
 A native **Roku** channel (`roku/`, SceneGraph/BrightScript) hits the same endpoints and behaves like the tvOS app, built from standard Roku controls. It self-identifies as `X-Client-Platform: roku` (added to `KNOWN_PLATFORMS`). Because Roku has no cookie jar, the channel captures the `session=<uuid>` cookie from `/auth/login`'s `Set-Cookie`, persists it in the Roku registry, and replays it as a manual `Cookie` header on every request (`roku/components/tasks/ApiTask.brs`). Like the other native clients it sends no `Origin` header, so `/auth/request-code` never issues a Turnstile challenge. Roku platform limits mean streaming deep links and trailers behave differently than on tvOS (see `roku/README.md`). Not part of the Cloudflare Pages output (`pages_build_output_dir = "public"`), so it doesn't affect the web deploy.
 

@@ -324,6 +324,35 @@ Three secret-protected admin pages (all require the `ADMIN_SECRET` value to be e
 
 There is no admin role in the session model — admin actions are gated purely by knowing the `ADMIN_SECRET`.
 
+### Streaming Link Check (Apple TV, admin sessions only)
+
+A diagnostic, not a member feature: Account tab → **Streaming Link Check…**,
+shown only to an admin session. It lists every candidate URL scheme the tvOS
+Watch button would try, one button each, and pressing one attempts the open on
+*that* Apple TV. Green check means the device opened it, red x means it refused,
+hollow means untried; a pass switches apps, so results are written to
+`UserDefaults` the moment the completion fires and are still on screen when you
+come back. Each service carries what the last audit established (Peacock and
+Disney+ opened 8/12/2026; Netflix's vendor removed deep links in a Sept 2025
+update; Paramount+ reported broken since Nov 2023) so a fresh red x reads as
+"still broken upstream" rather than "new regression."
+
+It exists because streaming services retire their tvOS URL schemes without
+notice and a real device is the only place to find out. Before it, the loop was
+"notice a dead Watch button on some show, guess which leg failed, ship a build
+to find out." The scheme table lives in `StreamingApps.swift` so the check and
+the Watch button read the same source — a diagnostic that reports schemes
+production no longer tries is worse than none.
+
+Platforms: **Apple TV only, and deliberately so** — the thing being tested is
+whether *this* tvOS device opens *this* streaming app, which no other platform
+can answer on its behalf. **iPhone and iPad don't** get it: their Watch button
+opens https deep links through the web, a different mechanism with a different
+failure mode, and the iOS Admin tab is where member management lives, not device
+diagnostics. **The watch doesn't** — read-only, and it opens nothing. **The web
+doesn't** — the member app is frozen (see [Web app status](#web-app-status)).
+This is the one exception to the "no admin screens on tvOS" rule below.
+
 ## Member lifecycle
 
 - **Created** by an operator via `/setup` (or by hand-INSERT during bootstrap). Starts with an empty library — auto-seeding a starter library was retired 2026-07.
@@ -341,8 +370,11 @@ Admin tooling lives on exactly two surfaces, kept at feature parity
 - **The universal iOS app** (Admin tab) — which covers iPhone, iPad, and the
   Mac Catalyst build in one codebase.
 
-**tvOS and watchOS are view-only by design** — no admin screens, ever; the
-TV's account screen shows a cosmetic "Operator" label and nothing more.
+**tvOS and watchOS are view-only by design** — no *member-management* admin
+screens; the TV's account screen shows a cosmetic "Operator" label, plus the
+one operator tool that has to run on the device it's testing
+([Streaming Link Check](#streaming-link-check-apple-tv-admin-sessions-only),
+8/2026). Nothing on the TV reads or writes another member's data.
 That's a deliberate scope call (a 10-foot UI is the wrong place for a ban
 button), not a gap to fill.
 
