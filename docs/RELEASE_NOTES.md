@@ -17,7 +17,23 @@ first two or three lines before "more", so the most useful change goes first.
 
 ## Unreleased — next App Store update
 
-Applies to iPhone, iPad and Mac. Apple TV and Apple Watch are unchanged.
+Applies to iPhone, iPad and Mac, plus a round of Apple TV fixes. Apple Watch is
+unchanged.
+
+```
+On Apple TV, the button that takes you to a show now works again.
+
+• Netflix, Paramount+, MGM+, Hulu and Prime Video all opened to nothing.
+  They open their apps again. Peacock, Disney+, HBO Max and Apple TV+ were
+  already fine and still are — HBO Max and Apple TV+ still land you on the
+  actual show.
+
+• The Watch button and the list buttons are readable now. They used to be
+  dim until you selected them, and the list buttons went pale on pale once
+  you did.
+
+• The Watch button no longer pauses before it will let you press it.
+```
 
 ```
 Bringing over a list you already keep somewhere else is much easier now.

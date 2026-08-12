@@ -554,17 +554,24 @@ A few intentional omissions:
   progress?) before building.
 
 - **Deep-link pass, especially Apple TV.** (Patrick — 7/23/2026, reopened
-  8/10/2026.) Patrick wants streaming deep links to work consistently across
-  services, not one bug at a time. Current state on tvOS: only HBO Max and
-  Apple TV+ land on the actual show page from their https URL
-  (`deepLinksToShow` in `ShowDetailView.swift`); Amazon, Paramount+, Peacock,
-  Hulu and Disney+ only get their app launched via a bare custom scheme; the
-  rest have no mapping. Netflix is *not* in the working set despite being the
-  largest network — worth an on-device retest. The agreed direction is to
-  store an Apple TV (`tv.apple.com`) link as the reliable fallback while
-  keeping `network` set to the service that actually carries the title, so
-  the Subscription Audit stays honest. See "Apple links vs. stored network"
-  in ARCHITECTURE.md.
+  8/10/2026; **on-device audit done 8/12/2026**, see
+  ARCHITECTURE.md#tvos-watch-button.) Patrick wants streaming deep links to
+  work consistently across services, not one bug at a time. The 8/12 pass
+  walked every network the club carries on a real Apple TV and fixed what it
+  found, so all eight now at least launch their app. What remains open is the
+  harder half: only HBO Max and Apple TV+ land on the actual *show*.
+  Everything else opens its app to the home screen, because those services
+  don't publish a show-level entry point tvOS will accept.
+
+  The previously agreed direction — store an Apple TV (`tv.apple.com`) link as
+  a universal fallback while keeping `network` set to the service that
+  actually carries the title — is **not** superseded, but note the 8/12
+  finding that killed the client-side version of it: looking a title up in
+  Apple's catalog from the app (iTunes Search) matched episode titles across
+  the whole catalog and sent members to the wrong show entirely. If this is
+  revisited, the Apple link has to be resolved server-side against a real id
+  and stored, never guessed by title at tap time. See "Apple links vs. stored
+  network" in ARCHITECTURE.md.
 
 - **Tag member friends.** (Patrick — 7/26/2026.) Let a member tag other
   members on a show — captured for later; scope (what a tag means, where it

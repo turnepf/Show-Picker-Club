@@ -19,8 +19,6 @@ struct ShowDetailView: View {
     // search may have opened by id.
     @State private var myCopy: Show?
     @State private var cast: [Actor] = []
-    @State private var appleTVUrl: URL?
-    @State private var lookedUp = false
     @State private var openFailed = false
     @State private var working = false
     @State private var actionMessage: String?
@@ -150,43 +148,46 @@ struct ShowDetailView: View {
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundColor(Theme.text)
                 // Four list chips on one row, each sized to its own label so the
-                // name never wraps. A colored dot + always-white label keeps the
-                // name legible without focus; we don't .tint (that painted the
-                // fill the same color as the text, hiding it until focus).
+                // name never wraps. The colored dot carries the list identity;
+                // the label and checkmark take ChipButtonStyle's foreground so
+                // they invert against the focused plate. Don't re-add an
+                // explicit color to either — that's what made a focused chip
+                // white-on-white.
                 HStack(spacing: 16) {
                     ForEach(ShowList.allCases) { l in
                         Button { Task { await chipTap(l) } } label: {
                             HStack(spacing: 10) {
                                 Circle().fill(Theme.listColor(l.rawValue)).frame(width: 16, height: 16)
-                                Text(l.title).foregroundColor(Theme.text)
+                                Text(l.title)
                                 if cur == l {
                                     Image(systemName: "checkmark")
-                                        .foregroundColor(Theme.listColor(l.rawValue))
                                 }
                             }
                             .font(.system(size: 24, weight: .semibold))
                             .lineLimit(1)
                             .fixedSize()
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(ChipButtonStyle())
                         .disabled(working)
                     }
                 }
                 // Archive on its own row so the list row isn't crowded and the
                 // focused button has room to scale up. Not role:.destructive —
                 // that painted the pill red with red text, unreadable until
-                // focused. A red box icon + white label reads in both states.
+                // focused. The red box icon keeps its color in both states
+                // (red reads on the dark surface and on the focused plate);
+                // the label follows the style's foreground.
                 if let m = mineActive {
                     Button { Task { await archive(m.id) } } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "archivebox").foregroundColor(.red)
-                            Text("Archive").foregroundColor(Theme.text)
+                            Text("Archive")
                         }
                         .font(.system(size: 24, weight: .semibold))
                         .lineLimit(1)
                         .fixedSize()
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(ChipButtonStyle())
                     .disabled(working)
                 }
                 if mineArchived != nil {
@@ -474,23 +475,15 @@ struct ShowDetailView: View {
 
     @ViewBuilder private var watchButton: some View {
         if let s = show, s.hasRealUrl, let urlStr = s.networkUrl, let url = URL(string: urlStr) {
+            // No spinner and never disabled: the button's target is known the
+            // moment the URL is, now that nothing has to be looked up first.
             Button {
                 openWatch(serviceUrl: url)
             } label: {
-                HStack(spacing: 12) {
-                    Label(buttonLabel, systemImage: "play.fill")
-                        .font(.system(size: 30, weight: .semibold))
-                    if !lookedUp {
-                        // While the iTunes Search lookup is in flight we
-                        // don't yet know whether to route through the
-                        // Apple TV app or land on the service. Show a
-                        // spinner so the button is honest about waiting.
-                        ProgressView().scaleEffect(0.9)
-                    }
-                }
-                .padding(.vertical, 8)
+                Label(buttonLabel, systemImage: "play.fill")
+                    .font(.system(size: 30, weight: .semibold))
             }
-            .disabled(!lookedUp)
+            .buttonStyle(ChipButtonStyle())
             .padding(.top, 12)
 
             if openFailed {
@@ -504,8 +497,8 @@ struct ShowDetailView: View {
             Button { openURL(wl) } label: {
                 Label("Where to watch", systemImage: "magnifyingglass")
                     .font(.system(size: 26, weight: .semibold))
-                    .padding(.vertical, 8)
             }
+            .buttonStyle(ChipButtonStyle())
             .padding(.top, 12)
         } else if show != nil {
             Text("No direct link yet")
@@ -524,17 +517,19 @@ struct ShowDetailView: View {
     // (`trailer_key` still rides along on the model — the iPhone app uses it.)
 
     // Networks where the streaming service's tvOS app honors deep links to
-    // a specific show via the plain https URL we already have.
+    // a specific show via the plain https URL we already have. Verified on
+    // device 2026-08-12: both land on the actual show.
     private static let deepLinksToShow: Set<String> = [
         "HBO Max",
         "Apple TV+",
     ]
 
-    // True when we can land the user on the actual show page — either the
-    // service deep-links directly, or we have an Apple TV app URL to route
-    // through (it shows the show page with a "Watch on <Service>" button).
+    // True when we can land the user on the actual show page. Only the two
+    // services above manage it; every other app we can reach opens to its own
+    // home screen, and the button says "Open" rather than "Watch on" to stay
+    // honest about that.
     private var canDeepLink: Bool {
-        Self.deepLinksToShow.contains(network ?? "") || appleTVUrl != nil
+        Self.deepLinksToShow.contains(network ?? "")
     }
 
     private var buttonLabel: String {
@@ -546,68 +541,80 @@ struct ShowDetailView: View {
         return "\(verb) \(n)"
     }
 
-    // Pick the best URL to open:
-    //  1. Direct service URL if the service deep-links from its own https
-    //     URL (HBO Max, Apple TV+) AND we actually have a show-page URL,
-    //     not the HBO Max search fallback.
-    //  2. Otherwise route through the Apple TV app's show page if we found
-    //     one — extra hop, but lands on the show with a one-tap launch.
-    //  3. Otherwise the service URL itself (which for HBO Max search at
-    //     least opens HBO Max with the title pre-filled), or the per-
-    //     service custom-scheme fallback.
-    private func chooseTarget(serviceUrl: URL) -> URL {
+    // The ordered list of URLs to try for this show, best first. openWatch
+    // walks it until the device accepts one.
+    //
+    //  1. The service's own https URL, but only for the two services whose
+    //     tvOS apps actually honor it (HBO Max, Apple TV+) — those land on the
+    //     real show. The HBO Max search fallback goes first too: it opens HBO
+    //     Max with the title pre-filled.
+    //  2. Otherwise the service's custom URL schemes, which launch the app to
+    //     its home screen.
+    //  3. The plain https URL last, as a backstop.
+    private func openTargets(serviceUrl: URL) -> [URL] {
         let isHBOSearch = show?.isHBOMaxSearchFallback == true
-        if Self.deepLinksToShow.contains(network ?? "") && !isHBOSearch {
-            return serviceUrl
+        if Self.deepLinksToShow.contains(network ?? "") || isHBOSearch {
+            return [serviceUrl]
         }
-        if let apple = appleTVUrl {
-            return apple
-        }
-        return isHBOSearch ? serviceUrl : deepLinkURL(for: serviceUrl)
+        return Self.appSchemes(for: serviceUrl) + [serviceUrl]
     }
 
-    // Try the best target; if the device can't open it (custom scheme not
-    // registered, app hand-off declined), fall back to the universal https URL,
-    // which on a real device can still hand off to the installed app.
+    // Walk the candidates in order, stopping at the first the device accepts.
+    // openURL's completion reports acceptance, so a scheme the installed app
+    // doesn't register simply falls through to the next candidate instead of
+    // dead-ending the button.
     private func openWatch(serviceUrl: URL) {
-        let primary = chooseTarget(serviceUrl: serviceUrl)
-        openURL(primary) { ok in
-            if ok { openFailed = false; return }
-            if primary.absoluteString != serviceUrl.absoluteString {
-                openURL(serviceUrl) { ok2 in openFailed = !ok2 }
-            } else {
-                openFailed = true
-            }
+        attempt(openTargets(serviceUrl: serviceUrl), at: 0)
+    }
+
+    private func attempt(_ targets: [URL], at index: Int) {
+        guard index < targets.count else { openFailed = true; return }
+        openURL(targets[index]) { ok in
+            if ok { openFailed = false } else { attempt(targets, at: index + 1) }
         }
     }
 
-    // Per-service URL rewriter. For most services on tvOS, the plain https
-    // universal link doesn't even *open* the streaming app — openURL returns
-    // accepted=false. Their own custom URL scheme launches the app instead
-    // (no show-level deep link, but at least the app is up). Mapped per
-    // service based on on-device tests.
-    private func deepLinkURL(for url: URL) -> URL {
+    // Per-service custom URL schemes. On tvOS the plain https universal link
+    // doesn't even *open* most streaming apps — openURL returns accepted=false
+    // — while the app's own scheme launches it (no show-level deep link, but
+    // the app is up). Verified on device 2026-08-12: peacocktv:// and
+    // disneyplus:// work; paramountplus:// no longer does, and Netflix and MGM+
+    // had no scheme at all, which is why their buttons did nothing.
+    //
+    // Several entries list more than one candidate because these apps get
+    // renamed and the old scheme is what stays registered — Paramount+ still
+    // ships as com.cbsvideo.app and MGM+ as com.epix.epixnow. Ordering is
+    // current-name-first, and openWatch falls through to the next on refusal,
+    // so a service renaming its scheme degrades to the following candidate
+    // rather than to a dead button.
+    private static func appSchemes(for url: URL) -> [URL] {
         let lower = url.absoluteString.lowercased()
+        let names: [String]
 
         if lower.contains("watch.amazon.com") || lower.contains("primevideo.com") || lower.contains("amazon.com/gp/video") {
-            // Bare scheme just launches Prime Video; the "/aiv/landing" path is
-            // unreliable. If even this is declined we fall back to the https URL.
-            if let u = URL(string: "aiv://") { return u }
-        }
-        if lower.contains("paramountplus.com") || lower.contains("paramount.com") {
-            if let u = URL(string: "paramountplus://") { return u }
-        }
-        if lower.contains("peacocktv.com") {
-            if let u = URL(string: "peacocktv://") { return u }
-        }
-        if lower.contains("hulu.com") {
-            if let u = URL(string: "hulu://") { return u }
-        }
-        if lower.contains("disneyplus.com") {
-            if let u = URL(string: "disneyplus://") { return u }
+            // The "/aiv/landing" path is unreliable; the bare scheme just
+            // launches Prime Video. aiv:// matches the app's own bundle id
+            // (com.amazon.aiv.AIVApp), so it stays first.
+            names = ["aiv", "primevideo"]
+        } else if lower.contains("paramountplus.com") || lower.contains("paramount.com") {
+            names = ["paramountplus", "cbsaa"]
+        } else if lower.contains("peacocktv.com") {
+            names = ["peacocktv"]
+        } else if lower.contains("hulu.com") {
+            names = ["hulu"]
+        } else if lower.contains("disneyplus.com") {
+            names = ["disneyplus"]
+        } else if lower.contains("netflix.com") {
+            names = ["nflx"]
+        } else if lower.contains("mgmplus.com") {
+            names = ["mgmplus", "epixnow", "epix"]
+        } else if lower.contains("starz.com") {
+            names = ["starz", "starzplay"]
+        } else {
+            names = []
         }
 
-        return url
+        return names.compactMap { URL(string: "\($0)://") }
     }
 
     private func load() async {
@@ -615,39 +622,17 @@ struct ShowDetailView: View {
             // Opened from a recommendation (no backing row yet) — show the
             // passed-in info and let the user pick a list to add it to.
             await refreshMyCopy()
-            lookedUp = true
             return
         }
-        // HBO Max + Apple TV+ honor direct https URLs in their tvOS apps,
-        // and HBO content rarely lives on Apple TV anyway — iTunes Search
-        // for those just slows the Watch button down for no gain. Skip
-        // the lookup entirely and enable the button immediately.
-        let skipITunes = Self.deepLinksToShow.contains(network ?? "")
-
         async let detail = API.showDetail(id: id)
         async let actors = API.actors(showId: id)
 
-        if skipITunes {
-            if let r = try? await detail {
-                show = r.show
-                ratings = r.ratings
-                groupWatchers = r.groupWatchers ?? []
-            }
-            cast = (try? await actors) ?? []
-            await refreshMyCopy()
-            lookedUp = true
-            return
-        }
-
-        async let appleURL = API.appleTVLookup(title: initialTitle)
         if let r = try? await detail {
             show = r.show
             ratings = r.ratings
             groupWatchers = r.groupWatchers ?? []
         }
         cast = (try? await actors) ?? []
-        appleTVUrl = await appleURL
         await refreshMyCopy()
-        lookedUp = true
     }
 }
