@@ -14,14 +14,14 @@
 // that can drift from the endpoint, and not a guess.
 //
 // It answers, in order:
-//   1. Can she reach her own vibe at all (the 2026-08 exclusion bug)?
+//   1. Can the member reach their own vibe at all (the 2026-08 exclusion bug)?
 //   2. What does the profile actually say — cluster, blend, traits, balance,
 //      aligned picks, outliers?
 //   3. What is it computed from, per list, and what is missing: titles with no
 //      show_traits row (queue backlog, drains itself) versus titles scored
 //      `unknown_show=1` (Claude couldn't identify them — these never drain and
 //      need a rename in Show Cleanup).
-//   4. Is the fix holding both ways — she sees herself, nobody else does?
+//   4. Is the fix holding both ways — they see themselves, nobody else does?
 //
 // Read-only. Every statement is a SELECT; nothing writes to production. Member
 // notes are never fetched, so the snapshot carries no private text.
@@ -67,18 +67,18 @@ const SHOW_COLS = [
   'seasons_released', 'full_series', 'next_season_date', 'genres',
 ].join(', ');
 
-function queries(who) {
-  const q = who.replace(/'/g, "''");
+function queries() {
   return {
     members: `SELECT slug, name, first_name, last_initial, is_admin, disabled,
                      created_at, last_login_at, last_login_method
                 FROM members`,
     groups: 'SELECT id, name, creator_slug FROM groups',
     group_members: 'SELECT group_id, member_slug FROM group_members',
-    // Everyone's active rows (the club-level queries read them), plus this
-    // member's archived rows — the engagement check counts an archive as
-    // intent, so leaving them out would misreport a seed-only verdict.
-    shows: `SELECT ${SHOW_COLS} FROM shows WHERE archived = 0 OR member_slug = '${q}'`,
+    // Every row, archived included. The club-level queries only read active
+    // ones, but the engagement check counts an archive as member intent, and
+    // taking the whole table means one snapshot replays for ANY slug via
+    // --from rather than only the one it was taken for.
+    shows: `SELECT ${SHOW_COLS} FROM shows`,
     show_traits: 'SELECT * FROM show_traits',
     actors: `SELECT a.id, a.show_id, a.name FROM actors a
                JOIN shows s ON s.id = a.show_id WHERE s.archived = 0`,
@@ -115,7 +115,7 @@ function wrangler(sql) {
 
 function takeSnapshot(who) {
   const tables = {};
-  for (const [name, sql] of Object.entries(queries(who))) {
+  for (const [name, sql] of Object.entries(queries())) {
     process.stdout.write(dim(`  reading ${name}… `));
     tables[name] = wrangler(sql);
     process.stdout.write(dim(`${tables[name].length} rows\n`));
@@ -256,12 +256,12 @@ for (const r of perList) {
               `${String(r.scored).padStart(7)} ${String(r.unknown).padStart(8)} ${String(r.unscored).padStart(9)}`);
 }
 
-h1('What the endpoint returns for her own vibe');
+h1('What the endpoint returns for their own vibe');
 const own = await askAs(slug, slug);
 line('HTTP', own.status);
 const m = own.body?.member;
 const inOwnPicker = (own.body?.members || []).some((x) => x.slug === slug);
-line('in her own picker', inOwnPicker ? 'yes' : bold('NO — the fix is not live here'));
+line('in their own picker', inOwnPicker ? 'yes' : bold('NO — the fix is not live here'));
 line('picker also offers', (own.body?.members || []).filter((x) => x.slug !== slug)
   .map((x) => x.name).join(', ') || dim('nobody (no group-mates with libraries)'));
 
@@ -269,10 +269,10 @@ if (!m) {
   console.log(bold('  No member payload — see HTTP status above.'));
 } else if (m.excluded) {
   console.log(bold('  STATE: "This member is excluded from taste analysis."'));
-  console.log('  The exclusion is still being applied to her own slug. Deploy the fix.');
+  console.log('  The exclusion is still being applied to their own slug. Deploy the fix.');
 } else if (m.is_seed_only) {
   console.log(bold('  STATE: "Not enough activity yet to read a vibe."'));
-  console.log('  Nothing in the library she chose herself. Nothing to compute from.');
+  console.log('  Nothing in the library they chose themselves. Nothing to compute from.');
 } else if (m.no_fingerprint) {
   console.log(bold('  STATE: "No scored shows yet."'));
   console.log(`  ${m.active_count} active shows, none with usable traits. See the queue below.`);
@@ -294,7 +294,7 @@ if (!m) {
   console.log(`  ${bold('aligned picks')}`);
   for (const p of m.aligned_picks) line(`  ${p.title}`, dim([p.network, p.genres].filter(Boolean).join(' · ')));
   if (!m.aligned_picks.length) console.log(dim('    none'));
-  console.log(`  ${bold('outliers on her own list')}`);
+  console.log(`  ${bold('outliers on their own list')}`);
   for (const p of m.outlier_picks) line(`  ${p.title}`, dim(p.list || ''));
   if (!m.outlier_picks.length) console.log(dim('    none'));
 }
@@ -321,10 +321,12 @@ const queue = one(db, `
                           AND o.archived = 0 AND o.member_slug != ?1)
         AND s.member_slug = ?1
         GROUP BY LOWER(s.title))) AS hers_alone`, slug);
-line('unscored titles (hers)', `${unscored.length} ${dim('— queue backlog, drains itself')}`);
-line('of those, only she holds', `${queue.hers_alone} ${dim('— only reachable since the fill fix')}`);
-line('club-wide fill queue', `${queue.club_queue} titles`);
-line('scored unknown_show=1 (hers)', `${unknown.length} ${dim('— never drains; needs a rename')}`);
+line('unscored titles (theirs)', `${unscored.length} ${dim('— queue backlog, drains itself')}`);
+line('of those, only they hold', `${queue.hers_alone} ${dim('— unreachable by the old fill filter')}`);
+line('club-wide fill queue', `${queue.club_queue} titles` +
+  (queue.club_queue === unscored.length && unscored.length
+    ? ` ${dim('— i.e. the whole club backlog is theirs')}` : ''));
+line('scored unknown_show=1 (theirs)', `${unknown.length} ${dim('— never drains; needs a rename')}`);
 
 const solo = one(db, `
   SELECT
@@ -336,8 +338,11 @@ const solo = one(db, `
             FROM shows s JOIN show_traits t ON t.title_lower = LOWER(s.title)
            WHERE s.member_slug = ?1 AND s.archived = 0 AND COALESCE(t.unknown_show,0) = 0
            GROUP BY LOWER(s.title))`, slug);
+// Both of these already counted: the fingerprint join asks show_traits for a
+// row, never who else holds the title. What the old fill filter cost is
+// the `hers_alone` unscored line above — titles it would never queue at all.
 line('scored titles the club shares', solo.shared_titles ?? 0);
-line('scored titles hers alone', `${solo.solo_titles ?? 0} ${dim('— would have counted for nothing before the fix')}`);
+line('scored titles only they hold', `${solo.solo_titles ?? 0} ${dim('— scored while a copy was still elsewhere')}`);
 
 if (unscored.length) {
   console.log(`\n  ${bold('Waiting on the scorer')} ${dim('(vibe-fill.yml runs every 15 min)')}`);
@@ -362,24 +367,24 @@ for (const other of others) {
                    && !!forced.body.member.cluster;
   if (listed || readable) {
     leaks++;
-    console.log(`  ${bold('LEAK')} ${other}: ${listed ? 'sees her in the picker' : ''} ` +
-                `${readable ? `reads her profile (HTTP ${forced.status})` : `blocked (HTTP ${forced.status})`}`);
+    console.log(`  ${bold('LEAK')} ${other}: ${listed ? 'sees them in the picker' : ''} ` +
+                `${readable ? `reads the profile (HTTP ${forced.status})` : `blocked (HTTP ${forced.status})`}`);
   }
 }
 line('other members checked', others.length);
-line('who can see her vibe', leaks === 0 ? bold('nobody — correct') : bold(`${leaks} — INVESTIGATE`));
-line('who she can see', (own.body?.members || []).length - (inOwnPicker ? 1 : 0) + ' group-mate(s)');
+line('who can see this vibe', leaks === 0 ? bold('nobody — correct') : bold(`${leaks} — INVESTIGATE`));
+line('who they can see', (own.body?.members || []).length - (inOwnPicker ? 1 : 0) + ' group-mate(s)');
 
 h1('Verdict');
 if (!m) {
   console.log('  The endpoint returned no member payload — start with the HTTP status.');
 } else if (m.excluded) {
-  console.log('  Still blocked. The deployed code is applying the exclusion to her own slug:');
+  console.log('  Still blocked. The deployed code is applying the exclusion to their own slug:');
   console.log('  confirm the fix reached production, then re-run.');
 } else if (m.cluster) {
   const pct = m.active_count ? Math.round((m.scored_count / m.active_count) * 100) : 0;
-  console.log(`  She has a vibe: ${bold(m.cluster.name)}, computed from ${m.scored_count}/${m.active_count}` +
-              ` (${pct}%) of her active shows.`);
+  console.log(`  They have a vibe: ${bold(m.cluster.name)}, computed from ${m.scored_count}/${m.active_count}` +
+              ` (${pct}%) of their active shows.`);
   if (unscored.length) {
     console.log(`  ${unscored.length} titles are still queued for scoring — the read sharpens as they land.`);
   }
@@ -388,6 +393,6 @@ if (!m) {
                 ' until the name is fixed in Show Cleanup.');
   }
 } else {
-  console.log('  She can reach the screen, but there is nothing to compute from yet — see above.');
+  console.log('  They can reach the screen, but there is nothing to compute from yet — see above.');
 }
 console.log('');
