@@ -715,6 +715,8 @@ Compute the **deviation from the club mean** for both the member fingerprint and
 | Other members' vibe pickers, and any read of their vibe by anyone else | `/api/vibe#listEligibleMembers` — an excluded slug typed by another member is 403 |
 | The aligned-picks candidate pool | `/api/vibe` — a title *only* they hold is never offered to someone else |
 
+`scripts/vibe-diagnose.mjs <slug>` is the operator tool for "why does X see no vibe": it snapshots production D1 read-only via `wrangler`, replays the real handler against an in-memory copy, and prints the profile the member's app renders plus what it's missing — unscored titles (queue backlog, drains itself) versus `unknown_show=1` titles (never drain; need a rename in Show Cleanup). It also re-checks the exclusion from every other member's side, so "she sees herself, nobody else does" is verified against real data rather than assumed.
+
 **Not** excluded: their own vibe (they appear in their own picker and get a full profile — `listEligibleMembers` carves the viewer out of the list for their own slug, and the `excluded: true` response is reserved for a club-level read), and the trait-fill queue below. Both carve-outs were the fix for the 2026-08 report that the one member on the list was the one member who couldn't use Vibe: she was missing from her own picker and got "excluded from taste analysis" where her profile belonged. Pinned by `scripts/vibe-scope-test.mjs`.
 
 ### Trait backfill (`/api/admin-vibe-fill`)

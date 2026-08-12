@@ -44,7 +44,8 @@ migrations/        Numbered D1 upgrades (auto-applied on deploy when pending)
 schema.sql         Complete schema for fresh databases
 ShowPickerCore/    Shared Swift package (models) used by all Apple targets
 ios/  tvos/        SwiftUI apps; open ShowPickerClub.xcworkspace at the repo root
-scripts/           apply-migrations.sh, member-engagement.sh (operator tools)
+scripts/           apply-migrations.sh, member-engagement.sh, vibe-diagnose.mjs
+                   (operator tools)
 ```
 
 ## Commands
