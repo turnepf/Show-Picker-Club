@@ -87,6 +87,16 @@ stays admin-only — a logged-in non-admin gets 403, not their own row — and
 `?member=<slug>` returns that member and nobody else.
 
 ```bash
+node scripts/reporting-platform-test.mjs
+```
+
+`/api/reporting`'s admin gate and the unit its platform breakdown is counted
+in. It counts **people, not sessions**: four iPhone sessions across two members
+read as 2, a member on three platforms is 1 on each row (so the rows don't sum
+to Active members), and a member-less tvOS session still counts as one device
+rather than collapsing into a phantom person.
+
+```bash
 node scripts/vibe-scope-test.mjs
 ```
 

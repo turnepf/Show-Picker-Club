@@ -8,19 +8,27 @@ struct ReportingView: View {
     var body: some View {
         List {
             if let r = data {
-                Section("Active members (sessions seen)") {
+                Section {
                     metric("Today", r.activeMembers.day)
                     metric("This week", r.activeMembers.week)
                     metric("This month", r.activeMembers.month)
+                } header: {
+                    Text("Active members")
+                } footer: {
+                    Text("Distinct people whose session checked in during the window, on any platform.")
                 }
                 if let bp = r.activeByPlatform, !platformKeys(bp).isEmpty {
-                    Section("Active by platform (sessions)") {
+                    Section {
                         ForEach(platformKeys(bp), id: \.self) { key in
                             platformRow(label: platformLabel(key),
                                         day: bp.day[key] ?? 0,
                                         week: bp.week[key] ?? 0,
                                         month: bp.month[key] ?? 0)
                         }
+                    } header: {
+                        Text("Active by platform (people)")
+                    } footer: {
+                        Text("Distinct people, today / this week / this month — not sessions, so a reinstall or a second sign-in on the same phone is still one person. Someone using two platforms counts on both rows, so these don't add up to Active members.")
                     }
                 }
                 Section("New shows") { windowRows(r.newShows) }

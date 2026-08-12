@@ -77,10 +77,14 @@ export async function onRequestGet(context) {
       `SELECT COUNT(DISTINCT member_slug) as cnt FROM sessions WHERE last_seen_at >= datetime('now', '-30 days')`),
   };
 
-  // Active sessions broken down by client platform (see
-  // _shared/platform.js#KNOWN_PLATFORMS). Counts distinct sessions, not
-  // members: a member can be active on more than one platform, and
-  // anonymous tvOS devices have no member.
+  // Active *people* broken down by client platform (see
+  // _shared/platform.js#KNOWN_PLATFORMS). Counts distinct members, not
+  // sessions: one member signed in on a phone, a reinstall of that phone and
+  // a browser tab is one person on iPhone and one on the web, not three
+  // iPhones. A member active on two platforms counts once in each, so the
+  // rows deliberately don't sum to Active members. Sessions with no member
+  // (an anonymous tvOS device) have nobody to dedupe by, so each one counts
+  // as its own user rather than collapsing into a single phantom person.
   // Defensive: the platform column arrives in migration 016, so fall back to
   // an empty breakdown rather than 500 the whole dashboard if it's missing.
   const activeByPlatform = { day: {}, week: {}, month: {} };
@@ -88,7 +92,8 @@ export async function onRequestGet(context) {
   try {
     for (const [label, interval] of Object.entries(platWindows)) {
       const { results } = await env.DB.prepare(
-        `SELECT COALESCE(platform, 'unknown') AS platform, COUNT(DISTINCT id) AS cnt
+        `SELECT COALESCE(platform, 'unknown') AS platform,
+                COUNT(DISTINCT COALESCE(member_slug, 'session:' || id)) AS cnt
            FROM sessions
           WHERE last_seen_at >= datetime('now', ?)
           GROUP BY COALESCE(platform, 'unknown')`

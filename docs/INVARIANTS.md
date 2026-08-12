@@ -12,6 +12,7 @@ catch different classes of mistake:
 | Auth code tests (`scripts/auth-code-flow-test.mjs`) | every PR | The email login/signup code flow: codes that arrive, and failures that are reported |
 | Activity feed tests (`scripts/activity-feed-test.mjs`) | every PR | `/api/activity` stays session-gated, `?member=` shows only what that member chose, bulk adds collapse per list |
 | Admin member detail tests (`scripts/admin-member-detail-test.mjs`) | every PR | `/api/admin-member-emails` stays admin-only, and `?member=` returns that member and nobody else |
+| Reporting platform tests (`scripts/reporting-platform-test.mjs`) | every PR | `/api/reporting` stays admin-only, and the platform breakdown counts people rather than sessions |
 | List import tests (`scripts/import-list-test.mjs`) | every PR | The paste-a-list path: what a model may and may not put in the database, paging, and the commit-side validation |
 | `scripts/smoke.sh` | after deploy, and nightly | Live behavior: auth gates, headers, leakage, redirects |
 | Invariants review (`.github/workflows/pr-review.yml`) | every PR | Judgement calls the four above can't express |
@@ -298,6 +299,27 @@ never decide who is allowed to look at something.
   own.
 
 Enforcer: `scripts/vibe-scope-test.mjs`.
+
+## 11. Reporting counts people, not rows
+
+Every activity number on `/api/reporting` answers "how many people", not "how
+many database rows happened to exist". Sessions are the wrong unit and always
+flatter: a reinstall, a re-login, an iPhone plus a browser tab and an Apple TV
+all mint their own `sessions` row, so a two-member club read "13 iPhone / 22 /
+31" on the platform breakdown — thirteen phones' worth of activity from one
+person and a spare device.
+
+- Active-by-platform counts distinct `member_slug` per platform. A member on
+  two platforms counts once on each row, so the rows deliberately don't sum to
+  Active members — say so in the UI rather than letting a reader add them up.
+- A session with no member (an anonymous tvOS device) has nothing to dedupe by
+  and counts as one, rather than collapsing every anonymous device in the club
+  into a single phantom person or dropping out of the breakdown entirely.
+- Counts of *events* — ratings submitted, shows added, sessions minted per
+  sign-in method — stay counts of events. The rule is that the label says which
+  it is: "people who rated" and "ratings submitted" are two rows for a reason.
+
+Enforcer: `scripts/reporting-platform-test.mjs`.
 
 ## Adding an invariant
 
