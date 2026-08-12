@@ -1003,6 +1003,7 @@ let CANONICAL_NETWORKS: [String] = [
     "Paramount+",
     "PBS",
     "Peacock",
+    "Pluto TV",
     "Starz",
     "YouTube",
     "Apple TV Store",

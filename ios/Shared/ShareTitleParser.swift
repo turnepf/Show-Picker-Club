@@ -141,6 +141,9 @@ enum ShareTitleParser {
         if lower.contains("disney")                                  { return "Disney+"             }
         if lower.contains("hbo max") || lower.contains("hbo")        { return "HBO Max"             }
         if lower.contains("peacock")                                 { return "Peacock"             }
+        // Before the Paramount check: Pluto TV is Paramount-owned, and text
+        // naming both ("Pluto TV, from Paramount") means the free service.
+        if lower.contains("pluto")                                   { return "Pluto TV"            }
         if lower.contains("paramount")                               { return "Paramount+"          }
         if lower.contains("prime video") || lower.contains("amazon") { return "Amazon Prime Video"  }
         if lower.contains("starz")                                   { return "Starz"               }
@@ -171,6 +174,7 @@ enum ShareTitleParser {
         if host.contains("disneyplus")                         { return "Disney+"             }
         if host.contains("max.com") || host.contains("hbomax") { return "HBO Max"            }
         if host.contains("peacock")                            { return "Peacock"             }
+        if host.contains("pluto.tv")                           { return "Pluto TV"            }
         if host.contains("paramount")                          { return "Paramount+"          }
         if host.contains("amazon") || host.contains("primevideo") { return "Amazon Prime Video" }
         if host.contains("starz")                              { return "Starz"               }

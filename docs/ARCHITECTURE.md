@@ -621,6 +621,8 @@ Source of truth: `functions/_shared/networks.js`. Each entry has:
 - `search` — `{ base, param?, extra? }` template for the network's search page. Used as the fallback `network_url` when the member picks a network but doesn't paste a deep link.
 - `kind` — omitted for subscriptions (the default). `'storefront'` marks a pay-per-title source: **Apple TV Store**, **Fandango at Home** (rent/buy), and **Fandango** (theatre tickets, for a film still in its theatrical window). `isStorefront(network)` is the test.
 
+**Free ad-supported services.** `Pluto TV` is a subscription-kind network priced at `0` in `DEFAULT_PRICE_CENTS` — a title there is a reason to open an app you already have, not a per-view purchase, so it belongs in the audit rather than being skipped as a storefront; it just can't be cancelled for money. The zero is deliberate rather than an omission: absent means "nobody has priced this yet", `0` means "we know it's free". It is its own entry and not a `Paramount+` alias despite the shared owner — separate app, separate catalogue, and folding it in would put free titles behind a $7.99/mo card.
+
 ### Storefronts vs. subscriptions
 
 A storefront sells a title per view, so it is never an argument for keeping or starting a monthly service, and `/api/subscriptions` skips those rows entirely when building the audit. They exist as networks anyway because they cover the long tail nothing streams — catalog films, and new releases in the window between theatres and streaming.

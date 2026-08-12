@@ -37,6 +37,9 @@ Importing is also on iPad and Mac now, where it wasn't offered before.
 
 PBS is also in the network list now, so Masterpiece, PBS Kids and everything
 else you watch there can be filed where it belongs.
+
+Pluto TV joins the network list too. It's free, so it shows up in the
+Subscription Audit at $0 a month — no bill to cut.
 ```
 
 ### What this covers

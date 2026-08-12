@@ -135,6 +135,20 @@ export const NETWORKS = [
     domains: ['mgmplus.com'],
     search: { base: 'https://www.mgmplus.com/search', param: 'q' },
   },
+  {
+    // Free and ad-supported, not a subscription tier of Paramount+ — same
+    // owner, separate catalogue and separate app — so it gets its own entry
+    // rather than folding in as a Paramount+ alias the way CBS and Showtime
+    // do. It stays a subscription-kind network (a title here is a reason to
+    // open an app you already have, not a per-view purchase); the Subscription
+    // Audit just prices it at zero. No `param` on the search base: Pluto's
+    // search page takes its query from the box, not the URL.
+    stored: 'Pluto TV',
+    display: 'Pluto TV (free, ad-supported)',
+    aliases: ['Pluto', 'PlutoTV', 'Pluto.tv'],
+    domains: ['pluto.tv'],
+    search: { base: 'https://pluto.tv/us/search' },
+  },
 
   // --- Storefronts (kind: 'storefront') ---
   // Rent/buy shops, not subscriptions. A title here costs money per view, so
@@ -341,6 +355,10 @@ export const DEFAULT_PRICE_CENTS = {
   'Fox': 799,
   'BritBox': 899,
   'MGM+': 899,
+  // Free, ad-supported: zero rather than absent, so the audit says "$0/mo"
+  // because we know it costs nothing, not because nobody has priced it yet.
+  // A cancel verdict on Pluto TV saves exactly nothing, and the totals show it.
+  'Pluto TV': 0,
   // PBS Passport, the $60/year member benefit, at its monthly equivalent. Much
   // of PBS streams free without it, so this is the one default a member is
   // likeliest to zero out.
