@@ -38,7 +38,9 @@ writeFileSync(join(sandbox, 'package.json'), '{"type":"module"}');
 const load = (p) => import(join(sandbox, 'functions', p));
 
 const { TRAIT_NAMES } = await load('_shared/vibe-traits.js');
-const { clubBaseline, computeFingerprint, pickCluster } = await load('_shared/vibe-match.js');
+const { CLUSTERS } = await load('_shared/vibe-clusters.js');
+const { MIN_SCORED_FOR_CLUSTER, clubBaseline, computeFingerprint, pickCluster } =
+  await load('_shared/vibe-match.js');
 
 let passed = 0, failed = 0;
 function check(name, cond, detail = '') {
@@ -173,6 +175,58 @@ console.log('\n== too small a club falls back instead of inventing a spread');
         solo.id === 'warm_comfort', solo.name);
   check('and the response says the baseline was empty',
         solo.baseline_members === 0, String(solo.baseline_members));
+}
+
+console.log('\n== a library too thin to read gets no persona at all');
+{
+  const club = [fp({ warmth: 0.4 }), fp({ warmth: 0.55 }), fp({ warmth: 0.7 }), fp({ warmth: 0.5 })];
+  const baseline = clubBaseline(club);
+  const strong = fp({ warmth: 0.9, comfort_coziness: 0.9 });
+
+  check('one scored title names nobody',
+        pickCluster(strong, baseline, { scoredTitles: 1 }) === null);
+  check('four is still too few',
+        pickCluster(strong, baseline, { scoredTitles: 4 }) === null);
+  check(`${MIN_SCORED_FOR_CLUSTER} is the line`,
+        pickCluster(strong, baseline, { scoredTitles: MIN_SCORED_FOR_CLUSTER }) !== null);
+  check('and a caller that says nothing about size still gets an answer',
+        pickCluster(strong, baseline) !== null);
+}
+
+console.log('\n== a photo finish says so instead of picking a side');
+{
+  // Two clusters pulling on the same member: warmth up, cosiness up, but
+  // equally strong empathy and repair. Whichever wins, it wins narrowly.
+  const club = [
+    fp({ warmth: 0.45, empathy: 0.45 }),
+    fp({ warmth: 0.55, empathy: 0.55 }),
+    fp({ warmth: 0.50, empathy: 0.50 }),
+    fp({ warmth: 0.60, empathy: 0.60 }),
+  ];
+  const baseline = clubBaseline(club);
+  // Walk from one archetype to the other; somewhere in between the two
+  // clusters cross, and that member is the one the copy has to be honest to.
+  const cosy = { warmth: 0.85, comfort_coziness: 0.85, community_belonging: 0.8, optimism: 0.8 };
+  const healing = { empathy: 0.85, healing_redemption: 0.85, emotional_repair: 0.85, growth_orientation: 0.8 };
+  let closest = null;
+  for (let i = 0; i <= 40; i++) {
+    const k = i / 40;
+    const blendFp = fp();
+    for (const [t, v] of Object.entries(cosy)) blendFp[t] = 0.5 + (v - 0.5) * (1 - k);
+    for (const [t, v] of Object.entries(healing)) blendFp[t] = 0.5 + (v - 0.5) * k;
+    const got = pickCluster(blendFp, baseline);
+    if (!closest || got.margin < closest.margin) closest = got;
+  }
+  check('somewhere between two archetypes a member is genuinely undecided',
+        closest.undecided, `closest margin ${closest.margin.toFixed(3)}`);
+  check('and the tagline names both clusters rather than asserting one',
+        closest.tagline.includes(closest.name) && closest.tagline.includes(closest.blend[1].name),
+        closest.tagline);
+
+  const decisive = pickCluster(fp({ satire: 0.95, cynicism: 0.9, cruel_humor: 0.85 }), baseline);
+  check('a decisive match keeps the cluster\'s own tagline',
+        !decisive.undecided && decisive.tagline === CLUSTERS.find((c) => c.id === decisive.id).tagline,
+        `${decisive.margin.toFixed(3)} — ${decisive.tagline}`);
 }
 
 console.log('\n== list weights still shape the fingerprint');

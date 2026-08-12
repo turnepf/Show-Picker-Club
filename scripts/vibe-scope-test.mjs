@@ -158,10 +158,17 @@ function club() {
   addTraits(env, 'Severance', { warmth: 0.2, darkness: 0.8, intellectual_curiosity: 0.9 });
 
   // Hers alone, on both weighted lists, so her fingerprint is mostly these.
+  // Five scored titles is the floor for naming a cluster at all
+  // (_shared/vibe-match.js#MIN_SCORED_FOR_CLUSTER), and these tests are about
+  // what she can reach, not about a thin library — so she clears it.
   addShow(env, { slug: EXCLUDED, title: 'Only Paula Watches This', list: 'recommending' });
   addShow(env, { slug: EXCLUDED, title: 'Her Other One', list: 'watching' });
+  addShow(env, { slug: EXCLUDED, title: 'And Another', list: 'recommending' });
+  addShow(env, { slug: EXCLUDED, title: 'One More Of Hers', list: 'waiting' });
   addTraits(env, 'Only Paula Watches This', { warmth: 0.9, comfort_coziness: 0.9, darkness: 0.1 });
   addTraits(env, 'Her Other One', { warmth: 0.8, humor_warmth: 0.9, cynicism: 0.1 });
+  addTraits(env, 'And Another', { warmth: 0.85, community_belonging: 0.8, cynicism: 0.15 });
+  addTraits(env, 'One More Of Hers', { warmth: 0.75, optimism: 0.8, nihilism: 0.1 });
 
   // A title only the stranger holds — a legitimate aligned pick for anyone.
   addShow(env, { slug: 'stranger', title: 'The Bear', list: 'recommending' });
@@ -195,7 +202,7 @@ console.log('\n== an excluded member reads her own vibe');
   check('and the profile is a real read, not the exclusion notice',
         member && member.excluded !== true && !!member.cluster, JSON.stringify(member));
   check('computed from her whole library, not just the shared title',
-        member.scored_count === 3 && member.active_count === 3,
+        member.scored_count === 5 && member.active_count === 5,
         `${member.scored_count}/${member.active_count}`);
 
   // No ?member= at all is the app's first call; the picker must still hold her.
@@ -215,7 +222,7 @@ console.log('\n== and so do her group-mates, symmetrically');
 
   const { member } = await (await call(env, `/api/vibe?member=${EXCLUDED}`, { cookie })).json();
   check('and reads the same profile she does',
-        member && member.excluded !== true && !!member.cluster && member.scored_count === 3,
+        member && member.excluded !== true && !!member.cluster && member.scored_count === 5,
         JSON.stringify(member));
 
   // Symmetry is the point: she could already read theirs.

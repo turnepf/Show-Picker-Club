@@ -306,7 +306,7 @@ export async function onRequestGet(context) {
       name: fnDisplay,
       active_count: rows.length,
       scored_count: scoredRows.length,
-      cluster: pickCluster(fp, baseline),
+      cluster: pickCluster(fp, baseline, { scoredTitles: scoredRows.length }),
       display_traits: displayTraits(fp),
       balance: balanceMetrics(fp),
       aligned_picks: picks,

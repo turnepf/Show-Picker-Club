@@ -707,6 +707,11 @@ Score the member against **the club's own distribution**, not against the trait 
 
 `similarity` is reported as `(cos + 1) / 2` so the clients keep rendering it as a 0–100% match: 50% means no relationship either way.
 
+**Two honesty rules, both delivered through fields the apps already render** (no client change):
+
+- **Fewer than 5 scored titles → no cluster at all.** `pickCluster` returns `null` and the response carries `cluster: null`; `VibeView` renders traits, balance and picks without the persona box. A member with one show sits 3σ from the club on whatever that show happens to be, and the matcher would hand them a confident persona built entirely out of it.
+- **Margin under 0.05 → the tagline says so.** The winner still leads, but its tagline becomes "You sit between X and Y — the blend below is the truer read", and `undecided: true` rides along. On the club's first real run 11 of 41 members were inside that margin.
+
 **Why not self-centering.** Until 2026-08 both sides were centered on their own mean. A fingerprint is an average over dozens of titles, so it sits very close to the average of all television — every member scores highish on `prestige_energy` and `moral_ambiguity` because most of what anyone watches does. Self-centering leaves that shared shape standing, so cosine largely measured "does this look like TV" and the cluster nearest the average show won for nearly everybody: six libraries separated by 0.03 in different directions all came back **Prestige Drama Loyalist**, and the collapse got *worse* the more titles a member had. Pinned by `scripts/vibe-match-test.mjs`; `scripts/vibe-cluster-report.mjs` prints old-vs-new distributions across a production snapshot.
 
 ### Top / bottom traits, balance, aligned shows

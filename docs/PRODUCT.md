@@ -266,7 +266,7 @@ Platforms: iPhone and iPad only, the whole audit and the household viewer names 
 
 A taste-profile view. Pick yourself, or anyone you share a [group](#also-watching-groups) with, to see:
 
-- **Cluster identity** — one of seven personas (Warm Comfort Viewer, Prestige Drama Loyalist, Dark Complexity Seeker, Satirical Cynic, Power Game Watcher, Chaos Goblin, Curious Omnivore) with a one-line tagline.
+- **Cluster identity** — one of eight personas (Warm Comfort Viewer, Prestige Drama Loyalist, Dark Complexity Seeker, Satirical Cynic, Power Game Watcher, Chaos Goblin, Curious Omnivore, Empathy & Healing Viewer) with a one-line tagline. You are matched against **the club** — where you sit relative to other members, not against the trait scale — so a taste everyone in the club shares doesn't decide anyone's persona. Two cases where the screen declines to assert: under five scored titles there is no persona at all (the traits and picks still show), and a member sitting between two clusters is told so instead of being handed the winner by a hair.
 - **Top and bottom trait signals** — the dimensions where they index highest and lowest vs the club mean, with little bars.
 - **Cluster blend** — top three clusters they pattern-match against, with similarity scores.
 - **Balance reads** — warmth vs darkness, cynicism vs optimism, etc.

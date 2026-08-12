@@ -18,6 +18,15 @@ const Z_CAP = 3;
 // Below this many fingerprints the club spread isn't a distribution, it's an
 // anecdote. Fall back to the flat baseline rather than trusting it.
 const MIN_BASELINE_MEMBERS = 3;
+// Below this many scored titles a fingerprint is a rumour. A member with one
+// show sits three standard deviations from the club on whatever that show
+// happens to be, and the matcher will hand them a confident persona built
+// entirely out of it. Better to say nothing: the clients render the traits,
+// balance and picks without a cluster box.
+export const MIN_SCORED_FOR_CLUSTER = 5;
+// Cosine daylight over the runner-up, below which naming one cluster and
+// walking away overstates what the numbers know.
+const UNDECIDED_MARGIN = 0.05;
 
 export function computeFingerprint(rows) {
   const sums = {};
@@ -119,7 +128,11 @@ function clusterDirection(cluster) {
 // onto [0, 1] where 0.5 means "no relationship either way".
 const asMatch = (cos) => (cos + 1) / 2;
 
-export function pickCluster(fp, baseline) {
+// `scoredTitles` is how many of the member's shows actually carried traits.
+// Pass it and a library too thin to read returns null rather than a persona.
+export function pickCluster(fp, baseline, { scoredTitles = null } = {}) {
+  if (scoredTitles !== null && scoredTitles < MIN_SCORED_FOR_CLUSTER) return null;
+
   const z = zScore(fp, baseline);
   const ranked = CLUSTERS.map(c => ({
     cluster: c,
@@ -127,15 +140,22 @@ export function pickCluster(fp, baseline) {
   })).sort((a, b) => b.cos - a.cos);
 
   const best = ranked[0];
+  const margin = best.cos - (ranked[1]?.cos ?? best.cos);
+  // A photo finish is a fact about the member, not a rounding error to hide.
+  // The tagline is the one line of copy the clients render under the cluster
+  // name, so it's where the hedge belongs — no app change required.
+  const tagline = margin < UNDECIDED_MARGIN && ranked[1]
+    ? `You sit between ${best.cluster.name} and ${ranked[1].cluster.name} — the blend below is the truer read.`
+    : best.cluster.tagline;
+
   return {
     id: best.cluster.id,
     name: best.cluster.name,
-    tagline: best.cluster.tagline,
+    tagline,
     similarity: asMatch(best.cos),
-    // How much daylight there is behind the winner. A member sitting between
-    // two clusters gets a near-zero margin, which is a fact about them worth
-    // reporting rather than hiding behind a confident-looking label.
-    margin: best.cos - (ranked[1]?.cos ?? best.cos),
+    // How much daylight there is behind the winner.
+    margin,
+    undecided: margin < UNDECIDED_MARGIN,
     baseline_members: baseline ? baseline.members : 0,
     blend: ranked.slice(0, 3).map(r => ({
       id: r.cluster.id,

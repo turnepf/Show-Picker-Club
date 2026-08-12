@@ -153,7 +153,7 @@ const results = [...fingerprints.entries()].map(([slug, fp]) => ({
 })).sort((a, b) => b.titles - a.titles);
 
 h1('Per member');
-console.log(dim('  member                titles  before                     after                       margin  runner-up'));
+console.log(dim('  member                titles  before                     after                       match  margin  runner-up'));
 const clusterById = new Map(CLUSTERS.map((c) => [c.id, c]));
 for (const r of results) {
   const changed = r.old.name !== r.neu.name;
@@ -162,7 +162,8 @@ for (const r of results) {
   const runnerUp = r.neu.blend[1] ? r.neu.blend[1].name : '';
   console.log(`  ${r.name.slice(0, 20).padEnd(20)} ${String(r.titles).padStart(6)}  ` +
     `${r.old.name.padEnd(26)} ${arrow} ${(changed ? bold(r.neu.name) : dim(r.neu.name)).padEnd(34)} ` +
-    `${r.neu.margin.toFixed(3)}  ${dim(runnerUp)}${thin}`);
+    `${String(Math.round(r.neu.similarity * 100)).padStart(4)}%  ${r.neu.margin.toFixed(3)}  ` +
+    `${dim(runnerUp)}${thin}`);
   if (!explain) continue;
   const top = drivers(r.fp, baseline, clusterById.get(r.neu.id)).slice(0, 3);
   for (const d of top) {
@@ -196,6 +197,8 @@ console.log(`  ${results.filter((r) => r.old.name !== r.neu.name).length} of ${r
   ' members change cluster.');
 console.log(`  ${undecided} sit within 0.05 of a second cluster — genuinely between two vibes,` +
   ' which the blend already shows.');
-console.log(`  ${thin} have fewer than ${THIN_LIBRARY} scored titles, where any label is noise.`);
+console.log(`  ${thin} have fewer than ${THIN_LIBRARY} scored titles, where any label is noise —` +
+  ' the endpoint now returns no cluster for them at all.');
+console.log(`  ${undecided} get the between-two-vibes tagline instead of a flat assertion.`);
 if (!explain) console.log(dim('\n  Re-run with --why to see which traits carried each verdict.'));
 console.log('');
