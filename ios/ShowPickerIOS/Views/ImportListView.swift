@@ -77,6 +77,36 @@ struct ImportListView: View {
                 .padding(.horizontal)
                 .padding(.top, 12)
 
+            // The example sits outside the editor, not inside it as placeholder
+            // text: as ghost text it vanished the moment anything was pasted,
+            // which is exactly when someone wants to compare their list against
+            // it. Here it stays put while they paste, edit and re-read.
+            exampleCard
+                .padding(.horizontal)
+
+            // The list is nearly always already on the clipboard when someone
+            // opens this sheet — they copied it in Notes or Messages to get
+            // here. PasteButton rather than a plain button reading
+            // UIPasteboard: an explicit tap on the system control is its own
+            // consent, so it doesn't raise the "allow paste?" alert.
+            HStack {
+                Spacer()
+                PasteButton(payloadType: String.self) { strings in
+                    guard let pasted = strings.first,
+                          !pasted.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    else { return }
+                    Task { @MainActor in
+                        // Append rather than replace: someone who has already
+                        // typed or pasted a first batch shouldn't lose it to a
+                        // second tap.
+                        text = text.isEmpty ? pasted : text + "\n" + pasted
+                    }
+                }
+                .labelStyle(.titleAndIcon)
+                .buttonBorderShape(.capsule)
+            }
+            .padding(.horizontal)
+
             TextEditor(text: $text)
                 .font(.body)
                 .scrollContentBackground(.hidden)
@@ -98,6 +128,39 @@ struct ImportListView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 12)
         }
+    }
+
+    // A worked example of a paste. Deliberately uses two of the app's own list
+    // names as headings and the "on <service>" form, since those are the two
+    // things the parser reads structure from — a heading is what puts a title
+    // anywhere other than Watching, and "on <service>" is what fills the
+    // network field. Neither is required (an unstructured list works and lands
+    // on Watching), so the last line says so rather than letting the example
+    // read as a format the paste has to match.
+    private var exampleCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("For example")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Watching").fontWeight(.semibold)
+                Text("Severance on Apple TV+")
+                Text("The Bear on Hulu")
+                Text("")
+                Text("Next Up").fontWeight(.semibold)
+                Text("The Diplomat on Netflix")
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            Text("Headings are optional — a plain list of titles works too.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color(.secondarySystemBackground),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Step 2 — reading
