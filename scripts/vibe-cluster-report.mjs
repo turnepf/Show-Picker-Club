@@ -33,6 +33,12 @@ const flagValue = (name) => {
 };
 const snapshotOut = flagValue('--snapshot');
 const snapshotIn = flagValue('--from');
+// --why explains each verdict: which traits carried it, and how far from the
+// club the member sits on them. A label nobody can account for is a label
+// nobody should trust.
+const explain = argv.includes('--why');
+// Below this many scored titles a fingerprint is a rumour, not a taste.
+const THIN_LIBRARY = 5;
 
 const bold = (s) => `\x1b[1m${s}\x1b[0m`;
 const dim = (s) => `\x1b[2m${s}\x1b[0m`;
@@ -44,6 +50,24 @@ const { CLUSTERS } = await load('_shared/vibe-clusters.js');
 const { EXCLUDED_FROM_TASTE } = await load('_shared/excluded-members.js');
 const { clubBaseline, computeFingerprint, cosineSim, centerFp, pickCluster } =
   await load('_shared/vibe-match.js');
+
+// Per-trait share of the winning cosine: how much each trait actually carried
+// the verdict, and in which direction the cluster wanted it.
+function drivers(fp, baseline, cluster) {
+  const z = {}, dir = {};
+  for (const t of TRAIT_NAMES) {
+    z[t] = baseline
+      ? Math.max(-3, Math.min(3, ((fp[t] || 0) - baseline.mean[t]) / baseline.spread[t]))
+      : (fp[t] || 0) - 0.5;
+    dir[t] = (cluster.target[t] ?? 0.5) - 0.5;
+  }
+  const nz = Math.sqrt(TRAIT_NAMES.reduce((a, t) => a + z[t] * z[t], 0));
+  const nd = Math.sqrt(TRAIT_NAMES.reduce((a, t) => a + dir[t] * dir[t], 0));
+  return TRAIT_NAMES
+    .map((t) => ({ trait: t, z: z[t], wants: dir[t], share: (z[t] * dir[t]) / (nz * nd || 1) }))
+    .filter((x) => x.wants !== 0)
+    .sort((a, b) => b.share - a.share);
+}
 
 // The shipped-before-today matcher, kept here so the comparison is real rather
 // than remembered: self-centre both sides, cosine, highest wins.
@@ -123,18 +147,30 @@ const results = [...fingerprints.entries()].map(([slug, fp]) => ({
   slug,
   name: named.get(slug) || slug,
   titles: byMember.get(slug).length,
+  fp,
   old: pickClusterOld(fp),
   neu: pickCluster(fp, baseline),
 })).sort((a, b) => b.titles - a.titles);
 
 h1('Per member');
-console.log(dim('  member                titles  before                     after                      margin'));
+console.log(dim('  member                titles  before                     after                       margin  runner-up'));
+const clusterById = new Map(CLUSTERS.map((c) => [c.id, c]));
 for (const r of results) {
   const changed = r.old.name !== r.neu.name;
   const arrow = changed ? '→' : '=';
+  const thin = r.titles < THIN_LIBRARY ? dim('  ← too few titles to mean anything') : '';
+  const runnerUp = r.neu.blend[1] ? r.neu.blend[1].name : '';
   console.log(`  ${r.name.slice(0, 20).padEnd(20)} ${String(r.titles).padStart(6)}  ` +
-    `${r.old.name.padEnd(26)} ${arrow} ${(changed ? bold(r.neu.name) : dim(r.neu.name)).padEnd(changed ? 34 : 34)} ` +
-    `${r.neu.margin.toFixed(3)}`);
+    `${r.old.name.padEnd(26)} ${arrow} ${(changed ? bold(r.neu.name) : dim(r.neu.name)).padEnd(34)} ` +
+    `${r.neu.margin.toFixed(3)}  ${dim(runnerUp)}${thin}`);
+  if (!explain) continue;
+  const top = drivers(r.fp, baseline, clusterById.get(r.neu.id)).slice(0, 3);
+  for (const d of top) {
+    const side = d.wants > 0 ? 'high' : 'low';
+    const sign = d.z >= 0 ? '+' : '−';
+    console.log(dim(`        ${d.trait.padEnd(22)} member ${sign}${Math.abs(d.z).toFixed(1)}σ` +
+      `   cluster wants ${side.padEnd(4)}   carries ${(d.share * 100).toFixed(0)}%`));
+  }
 }
 
 function histogram(label, pick) {
@@ -154,9 +190,12 @@ histogram('before', (r) => r.old.name);
 histogram('after', (r) => r.neu.name);
 
 const undecided = results.filter((r) => r.neu.margin < 0.05).length;
+const thin = results.filter((r) => r.titles < THIN_LIBRARY).length;
 h1('Read');
 console.log(`  ${results.filter((r) => r.old.name !== r.neu.name).length} of ${results.length}` +
   ' members change cluster.');
 console.log(`  ${undecided} sit within 0.05 of a second cluster — genuinely between two vibes,` +
   ' which the blend already shows.');
+console.log(`  ${thin} have fewer than ${THIN_LIBRARY} scored titles, where any label is noise.`);
+if (!explain) console.log(dim('\n  Re-run with --why to see which traits carried each verdict.'));
 console.log('');
