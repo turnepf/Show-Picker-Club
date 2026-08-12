@@ -17,8 +17,25 @@ first two or three lines before "more", so the most useful change goes first.
 
 ## Unreleased — next App Store update
 
-Applies to iPhone, iPad and Mac, plus a round of Apple TV fixes. Apple Watch is
-unchanged.
+Applies to iPhone, iPad and Mac, plus a round of Apple TV fixes and a much
+faster Apple Watch app.
+
+```
+Your lists open the moment you raise your wrist.
+
+• The Apple Watch app used to sit on a spinner while it fetched everything
+  from scratch — slowest exactly when you'd just raised your wrist and had a
+  second to look. It now shows the lists it already had, instantly, and
+  quietly refreshes them behind you.
+
+• It works with no signal at all. Out of range of your phone, off Wi-Fi, on
+  a plane — your lists are still there, with a note telling you how old they
+  are so you know what you're looking at.
+
+• If your watch ever does lose its sign-in, it now says so right away, and
+  tells you to open Show Picker on your iPhone — instead of thinking about
+  it for five seconds and then giving up.
+```
 
 ```
 On Apple TV, the button that takes you to a show now works again.

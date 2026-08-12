@@ -1,8 +1,11 @@
 import Foundation
 import ShowPickerCore
 
-// Minimal read client for the watch. Reads are public, so all we need is the
-// member slug; the cookie is attached when present for future write support.
+// Minimal read client for the watch. These reads are session-gated — anything
+// derived from a member's library is (see docs/INVARIANTS.md), and
+// /api/shows?member=… 401s without a cookie — so the slug alone is not enough:
+// the cookie handed off by the phone is what makes the call work. A 401 here
+// means the hand-off is stale, not that the watch is offline.
 // Advertises X-Client-Platform: watchos for the reporting dashboard.
 enum WatchAPI {
     static let base = "https://showpicker.club"

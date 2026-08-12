@@ -481,7 +481,20 @@ every other device, and on a shared link that context is the whole point.
 
 ## Native clients
 
-Native SwiftUI apps for iOS, tvOS, and watchOS call the same public `/api/*` endpoints as the web. They share a `ShowPickerCore` Swift package (at the repo root) that holds the `Show` / `Actor` / `ShowList` models and their response wrappers, and are opened together via `ShowPickerClub.xcworkspace`. iOS and tvOS share one bundle id (`net.patrickturner.showpickerios`) and ship as a single universal App Store app (iPhone + Apple TV). The watchOS app (`watch/ShowPickerWatch`) is paired to the iPhone and receives its session via WatchConnectivity; its reads are public. Platform usage tracking now includes a `watchos` platform value.
+Native SwiftUI apps for iOS, tvOS, and watchOS call the same public `/api/*` endpoints as the web. They share a `ShowPickerCore` Swift package (at the repo root) that holds the `Show` / `Actor` / `ShowList` models and their response wrappers, and are opened together via `ShowPickerClub.xcworkspace`. iOS and tvOS share one bundle id (`net.patrickturner.showpickerios`) and ship as a single universal App Store app (iPhone + Apple TV). The watchOS app (`ios/ShowPickerWatch Watch App`) is paired to the iPhone and receives its session via WatchConnectivity. Its reads are **session-gated like every other library read** — `/api/shows?member=…` 401s without a cookie, so the relayed cookie is what makes the watch work, not the slug alone. (An older comment here and in `WatchAPI.swift` claimed these reads were public; they haven't been since the public surface was tightened.) A 401 on the watch therefore means the hand-off is stale, and the fix is on the phone — the watch has no sign-in of its own, so `ListsView` says so instead of offering a Try Again that cannot succeed, and does not burn retries on it. Platform usage tracking now includes a `watchos` platform value.
+
+### watchOS cold launch (stale-while-revalidate)
+
+The watch is slow to launch mostly because it is slow to get a *network* up: watchOS brings the radio (or the phone's Bluetooth proxy) online lazily, so the first request can take seconds or fail outright and need a retry. Blocking the UI on that put a spinner in front of every launch, and the retry ladder (1.5s + 3.0s of sleeping) meant a failure took ~5s to surface.
+
+`WatchCache` (`ShowPickerCore/Sources/ShowPickerCore/WatchCache.swift`) removes the wait: every successful `/api/shows` response is written to disk, and `ListsView.load()` replays it before touching the network, then refreshes in the background. Notes:
+
+- **Application Support, not Caches** — watchOS purges Caches under storage pressure, which would put the spinner back.
+- **One file per member slug**, and a loaded entry whose `slug` doesn't match is treated as a miss, so switching members can never flash the previous member's lists. `WatchAuth.apply()` calls `WatchCache.clear()` on sign-out *and* on a slug change.
+- **Cache hydration only fills a blank screen.** A refresh of already-visible lists skips it, so the UI never flickers back through older data on its way to newer.
+- **`ListsView` keys `.task(id:)` on `WatchAuth.sessionToken`** (slug *and* cookie), because the phone commonly hands off a fresh session a moment after launch; keying on the slug alone left an expired-cookie error on screen until the app was reopened.
+- **Foreground refresh is unconditional.** It used to reload only when the screen was empty — with a cache it never is, so that check would have pinned a wrist-raise to stale lists.
+- Foundation-only, so `swift test` covers it on Linux CI (`WatchCacheTests`).
 
 ### tvOS Watch button
 

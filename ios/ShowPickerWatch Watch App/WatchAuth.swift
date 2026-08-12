@@ -25,15 +25,28 @@ final class WatchAuth: NSObject, ObservableObject, WCSessionDelegate {
 
     var isLoggedIn: Bool { (memberSlug?.isEmpty == false) }
 
+    // Identity of the current session, for `.task(id:)`. The cookie is part of
+    // it on purpose: the phone commonly hands off a fresh session a moment
+    // after launch, and a view keyed on the slug alone would never re-run its
+    // load when only the cookie changed.
+    var sessionToken: String { "\(memberSlug ?? "")|\(cookieHeader ?? "")" }
+
     private func apply(_ ctx: [String: Any]) {
         let slug = ctx["member"] as? String
         let cookie = ctx["cookie"] as? String
         DispatchQueue.main.async {
+            let previousSlug = self.memberSlug
             self.memberSlug = (slug?.isEmpty == false) ? slug : nil
             self.cookieHeader = (cookie?.isEmpty == false) ? cookie : nil
             // Persist for the next cold launch.
             WatchShared.memberSlug = self.memberSlug
             WatchShared.cookieHeader = self.cookieHeader
+            // Signing out — or switching to a different member — has to take
+            // the cached lists with it, or the next cold launch paints
+            // somebody else's shows before the refresh corrects it.
+            if self.memberSlug == nil || self.memberSlug != previousSlug {
+                WatchCache.clear()
+            }
         }
     }
 
