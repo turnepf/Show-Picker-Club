@@ -274,6 +274,29 @@ A paste has no length limit, but every request it turns into does.
 
 Enforcer: `scripts/import-list-test.mjs`.
 
+## 10. A club-level exclusion never excludes a member from themselves
+
+`EXCLUDED_FROM_TASTE` (`functions/_shared/excluded-members.js`) exists so one
+sprawling library can't skew what the *club* computes — Trending, the
+recommendation neighbour pool, other members' vibe pickers, the aligned-picks
+candidate pool. It is a filter on club-level reads, not a status the member
+carries around.
+
+- A member always reads their own data. `/api/vibe` lists the viewer in their
+  own picker and returns their full profile whatever list they're on; the
+  `excluded: true` response is for a club-level read of that library, which no
+  other member can reach anyway (their slug isn't in `members`, so it's 403).
+- Catalog work is club-wide. `/api/admin-vibe-fill` scores every active title,
+  including titles only an excluded member holds — `show_traits` describes a
+  title, it doesn't count anyone's taste. Skipping them is how the exclusion
+  reaches its own member by the back door: a profile computed from the handful
+  of her titles somebody else happens to share.
+- Any new exclusion list gets the same reading. Scope it at the query that
+  computes a shared signal, never at the endpoint that serves a member their
+  own.
+
+Enforcer: `scripts/vibe-scope-test.mjs`.
+
 ## Adding an invariant
 
 Add a section here, then decide which enforcer covers it. Prefer a deterministic

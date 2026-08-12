@@ -31,12 +31,19 @@ function disambiguatedNames(rows) {
 // a member had no relationship with — the same reason the roster came off the
 // home screens. Group membership is the relationship the member actually
 // chose, so it's the boundary here too.
+//
+// The taste exclusion applies to *other* people's slugs only. An excluded
+// member was dropped from their own picker as well, so the one member the
+// exclusion names opened Vibe, found herself missing from the list and
+// "excluded from taste analysis" where her profile should be — the exclusion
+// exists to keep a sprawling library out of club-level signals, not to deny
+// its owner the read.
 async function listEligibleMembers(env, viewerSlug) {
   const { results } = await env.DB.prepare(
     `SELECT m.slug, m.name, m.first_name, m.last_initial,
        (SELECT COUNT(*) FROM shows s WHERE s.member_slug = m.slug AND s.archived = 0) AS active_count
      FROM members m
-     WHERE m.slug NOT IN (${EXCLUDED_SQL})
+     WHERE (m.slug = ?1 OR m.slug NOT IN (${EXCLUDED_SQL}))
        AND (m.slug = ?1 OR m.slug IN (
              SELECT gm.member_slug FROM group_members gm
               WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE member_slug = ?1)
@@ -268,7 +275,10 @@ export async function onRequestGet(context) {
   if (!memberRow) {
     return new Response(JSON.stringify({ members, member: null, error: 'not_found' }), { status: 404, headers: corsHeaders() });
   }
-  if (EXCLUDED_FROM_TASTE.includes(memberSlug)) {
+  // Someone else's excluded slug never reaches here — it isn't in `members`,
+  // so the scope check above already answered 403. This is the belt-and-braces
+  // branch for a club-level read of an excluded library; your own is yours.
+  if (EXCLUDED_FROM_TASTE.includes(memberSlug) && memberSlug !== session.member_slug) {
     return new Response(JSON.stringify({ members, member: { slug: memberSlug, excluded: true, name: memberRow.first_name || memberRow.name } }), { headers: corsHeaders() });
   }
 

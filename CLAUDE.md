@@ -85,6 +85,18 @@ stays admin-only — a logged-in non-admin gets 403, not their own row — and
 `?member=<slug>` returns that member and nobody else.
 
 ```bash
+node scripts/vibe-scope-test.mjs
+```
+
+`/api/vibe`'s scoping, same harness. Who may read whose vibe (session-gated,
+group-scoped, a hand-typed outside slug is 403) and what the taste exclusion in
+`_shared/excluded-members.js` does: it keeps a sprawling library out of every
+club-level signal, but never out of its **owner's** own read — an excluded
+member is in her own picker, gets a full profile, and her titles still reach
+the trait-fill queue so that profile isn't computed from the sliver of her
+library someone else shares.
+
+```bash
 node scripts/auth-code-flow-test.mjs
 ```
 

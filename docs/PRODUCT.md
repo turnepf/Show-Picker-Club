@@ -262,9 +262,9 @@ Prices are editable defaults — approximate US standard-plan rates that each me
 
 Platforms: iPhone and iPad only, the whole audit and the household viewer names with it. **Apple TV doesn't** — it's view-only, and cancelling a subscription isn't something you do from the couch with a remote. **The watch doesn't** — it's read-only, and a spend audit needs the toggles and price fields it has no room for. **The web doesn't** — `subscriptions.html` went to `archive/web/` in the 2026-08 teardown (see [Web app status](#web-app-status)); the API still returns everything the page used, so restoring it is a `git mv`.
 
-## Vibe (`/vibe`)
+## Vibe
 
-A taste-profile view. Pick any member from the dropdown to see:
+A taste-profile view. Pick yourself, or anyone you share a [group](#also-watching-groups) with, to see:
 
 - **Cluster identity** — one of seven personas (Warm Comfort Viewer, Prestige Drama Loyalist, Dark Complexity Seeker, Satirical Cynic, Power Game Watcher, Chaos Goblin, Curious Omnivore) with a one-line tagline.
 - **Top and bottom trait signals** — the dimensions where they index highest and lowest vs the club mean, with little bars.
@@ -274,7 +274,22 @@ A taste-profile view. Pick any member from the dropdown to see:
 
 The cluster algorithm and trait list are detailed in [`ARCHITECTURE.md`](ARCHITECTURE.md#vibe-system).
 
-Vibe profiles require a logged-in session — anyone in the club can view any other member's vibe, but the page prompts a login if you visit it logged-out.
+Vibe profiles require a logged-in session, and the picker is scoped to people
+you actually share a group with — the club roster used to be the answer, which
+listed strangers. A slug outside that set is refused, not shown.
+
+**Members excluded from taste analysis still read their own vibe.** A library
+too sprawling to represent taste is kept out of the club's shared signals —
+Trending, the aligned-picks pool, other members' pickers — but the exclusion
+never applies to its owner: your own vibe is you reading your own library, so
+you appear in your own picker and get the full profile. Nobody else can open
+it, and titles only you hold are never offered to anyone else as picks.
+
+Platforms: **iPhone and iPad**. **Apple TV doesn't** — it's view-only, and the
+picker plus the add-a-pick flow need input the remote doesn't suit. **The watch
+doesn't** — it's read-only and has no room for the trait bars. **The web
+doesn't** — `vibe.html` went to `archive/web/` in the 2026-08 teardown (see
+[Web app status](#web-app-status)); `/api/vibe` still serves the apps.
 
 ## Suggestions to non-members
 

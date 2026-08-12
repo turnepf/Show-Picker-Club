@@ -253,7 +253,7 @@ The complete map:
 | `GET /api/rate-backlog`                | `functions/api/rate-backlog.js`            | GET     | session — backs `/rate-backlog`, the bulk-rate flow |
 | `GET /api/rate-backlog-count`          | `functions/api/rate-backlog-count.js`      | GET     | session — the unrated count alone, for the nav badge |
 | `GET /api/recommendations`             | `functions/api/recommendations.js`         | GET     | session (legacy — no longer called by any client) |
-| `GET /api/vibe`                        | `functions/api/vibe.js`                    | GET     | session — you and members of your groups only; any other slug is 403 |
+| `GET /api/vibe`                        | `functions/api/vibe.js`                    | GET     | session — you and members of your groups only; any other slug is 403. A taste-excluded member still reads their own (see [Taste exclusion](#taste-exclusion-_sharedexcluded-membersjs)) |
 | `GET /api/shows`                       | `functions/api/shows.js`                   | GET     | session |
 | `GET /api/export`                      | `functions/api/export.js`                  | GET     | session (exports the caller's OWN lists only; plain-text download) |
 | `POST /api/shows`                      | `functions/api/shows.js`                   | POST    | session |
@@ -705,8 +705,20 @@ Compute the **deviation from the club mean** for both the member fingerprint and
 - Balance reads: precomputed contrasts (warmth vs darkness, cynicism vs optimism, etc.) extracted from the fingerprint.
 - Aligned shows: rank the member's own active shows by dot-product against their top-N traits, grouped by list.
 
+### Taste exclusion (`_shared/excluded-members.js`)
+`EXCLUDED_FROM_TASTE` names members whose libraries are too sprawling to read as taste. The exclusion is one-directional — it keeps a library out of everything the *club* computes, never out of what its owner sees:
+
+| Excluded from | Where |
+| --- | --- |
+| Trending | `/api/popular` — their adds don't rank titles |
+| Recommendation neighbours | `/api/recommendations` (legacy) |
+| Other members' vibe pickers, and any read of their vibe by anyone else | `/api/vibe#listEligibleMembers` — an excluded slug typed by another member is 403 |
+| The aligned-picks candidate pool | `/api/vibe` — a title *only* they hold is never offered to someone else |
+
+**Not** excluded: their own vibe (they appear in their own picker and get a full profile — `listEligibleMembers` carves the viewer out of the list for their own slug, and the `excluded: true` response is reserved for a club-level read), and the trait-fill queue below. Both carve-outs were the fix for the 2026-08 report that the one member on the list was the one member who couldn't use Vibe: she was missing from her own picker and got "excluded from taste analysis" where her profile belonged. Pinned by `scripts/vibe-scope-test.mjs`.
+
 ### Trait backfill (`/api/admin-vibe-fill`)
-- Picks titles with no `show_traits` row (skipping titles where every copy is archived).
+- Picks titles with no `show_traits` row (skipping titles where every copy is archived). **Club-wide, including titles only a taste-excluded member holds** — `show_traits` is a catalog of what a title is like, not a tally of whose taste counts, and skipping those rows left the excluded member's own fingerprint computed from just the sliver of her library someone else happens to share. Cost: her unique titles join the fill queue, which is batched and cron-drained.
 - Sends each title to Claude with the calibration prompt.
 - Parses the returned JSON; writes the row or marks `unknown_show=1` if Claude can't identify it.
 - 429-aware: respects `Retry-After`, capped at 60s.

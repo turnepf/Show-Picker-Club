@@ -69,6 +69,8 @@ jobs:
         run: node scripts/activity-feed-test.mjs
       - name: Admin member detail gating and scoping
         run: node scripts/admin-member-detail-test.mjs
+      - name: Vibe scoping and the taste exclusion
+        run: node scripts/vibe-scope-test.mjs
 
   listimport:
     runs-on: ubuntu-latest

@@ -1,9 +1,14 @@
 import { TRAIT_NAMES, SYSTEM_PROMPT } from '../_shared/vibe-traits.js';
-import { EXCLUDED_FROM_TASTE } from '../_shared/excluded-members.js';
 import { isAdmin } from '../_shared/admin.js';
 import { cronAuthorized } from '../_shared/secrets.js';
 
-const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
+// The fill queue is every active title in the club, including titles only a
+// taste-excluded member holds (_shared/excluded-members.js). `show_traits` is
+// a catalog: a row says what a title is like, not whose taste it counts
+// towards. Skipping those titles left the excluded member's own vibe computed
+// from the sliver of her library somebody else happens to share — the club
+// signals that must not see her library filter her out where they read it
+// (Trending, the neighbour pool, the aligned-picks candidate pool), not here.
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -118,7 +123,6 @@ export async function onRequestGet(context) {
     SELECT COUNT(*) AS cnt FROM (
       SELECT LOWER(title) AS t FROM shows
       WHERE archived = 0
-        AND member_slug NOT IN (${EXCLUDED_SQL})
         AND LOWER(title) NOT IN (SELECT title_lower FROM show_traits)
       GROUP BY LOWER(title)
     )
@@ -129,7 +133,6 @@ export async function onRequestGet(context) {
       SELECT COUNT(*) AS cnt FROM (
         SELECT LOWER(title) AS t FROM shows
         WHERE archived = 0
-          AND member_slug NOT IN (${EXCLUDED_SQL})
           AND LOWER(title) NOT IN (
             SELECT title_lower FROM show_traits
              WHERE scored_at IS NOT NULL AND scored_at >= ?
@@ -219,7 +222,6 @@ export async function onRequestPost(context) {
               ORDER BY g.id LIMIT 1) AS rating
     FROM shows s
     WHERE s.archived = 0
-      AND s.member_slug NOT IN (${EXCLUDED_SQL})
       ${candidateFilter}
     GROUP BY LOWER(s.title)
     ORDER BY LOWER(s.title)
@@ -230,7 +232,6 @@ export async function onRequestPost(context) {
     SELECT COUNT(*) AS cnt FROM (
       SELECT LOWER(title) AS t FROM shows
       WHERE archived = 0
-        AND member_slug NOT IN (${EXCLUDED_SQL})
         ${remainingFilter}
       GROUP BY LOWER(title)
     )
