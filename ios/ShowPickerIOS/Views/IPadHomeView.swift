@@ -56,6 +56,7 @@ struct IPadHomeView: View {
     @State private var showingPasskeys = false
     @State private var showingSearch = false
     @State private var showingExport = false
+    @State private var showingImport = false
     // Same "NEW" badge as iPhone Home, cleared by opening Groups once.
     @AppStorage("seenGroups") private var seenGroups = false
 
@@ -119,6 +120,10 @@ struct IPadHomeView: View {
         .sheet(isPresented: $showingSearch) { SearchView().environmentObject(auth) }
         .sheet(isPresented: $showingPasskeys) { PasskeysView().environmentObject(auth) }
         .sheet(isPresented: $showingExport) { ExportListsView().environmentObject(auth) }
+        // Reload on dismiss so the sidebar's show counts reflect the import.
+        .sheet(isPresented: $showingImport, onDismiss: { Task { await load() } }) {
+            ImportListView { await load() }
+        }
         // Auth may resolve after the member list loads; land on your Watching
         // list once it does (unless the user has already picked something).
         // Logging out is the mirror image and needs its own teardown — see
@@ -344,6 +349,15 @@ struct IPadHomeView: View {
                         showingPasskeys = true
                     } label: {
                         Label("Passkeys…", systemImage: "person.badge.key")
+                    }
+                    // Same permanent entry point as iPhone Home. The iPad and
+                    // Mac layout had no import route whatsoever before this —
+                    // the onboarding card that carries it on iPhone lives in
+                    // HomeView, which this layout replaces rather than wraps.
+                    Button {
+                        showingImport = true
+                    } label: {
+                        Label("Paste a List…", systemImage: "doc.on.clipboard")
                     }
                     Button {
                         showingExport = true

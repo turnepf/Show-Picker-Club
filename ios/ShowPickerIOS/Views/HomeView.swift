@@ -409,6 +409,16 @@ struct HomeView: View {
                     } label: {
                         Label("Passkeys…", systemImage: "person.badge.key")
                     }
+                    // The permanent way in. The Home card and the My Shows
+                    // nudges are onboarding prompts that retire themselves once
+                    // a library fills up, which left an established member with
+                    // no route to import at all — even though the endpoint's
+                    // ceiling is per-day, i.e. built to be used again.
+                    Button {
+                        showingImport = true
+                    } label: {
+                        Label("Paste a List…", systemImage: "doc.on.clipboard")
+                    }
                     Button {
                         showingExport = true
                     } label: {

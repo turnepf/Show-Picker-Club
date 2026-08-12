@@ -213,7 +213,13 @@ A "📅 Calendar feed" link in each member-page footer opens the `webcal://` URL
 
 The other side of Export: a member arriving with a list they already keep somewhere else — Notes, a text file, an old spreadsheet, a message thread — can paste it in and have it sorted onto the four lists instead of typing it out one show at a time.
 
-- **iPhone / iPad:** shipped. Reached two ways, both of which retire themselves once the member has a library: a card on **Home** while their library is empty (Home is the launch screen, so a new member sees it before they ever reach My Shows), and a slim row above their own list while they have five shows or fewer across all four lists. The empty state on their own Watching / Next Up list also offers it.
+- **iPhone / iPad / Mac:** shipped, reached two ways.
+
+  **Permanently**, at any library size: **Paste a List…** in the account menu (the person icon — on iPhone Home, on the iPad and Mac sidebar), and a clipboard button in the **My Shows** toolbar on your own lists. Both are logged-in members only, and both write to the caller's own lists, so the toolbar button is absent on another member's page.
+
+  **Plus onboarding nudges** that retire themselves once the member has a library: a card on **Home** while their library is empty (Home is the launch screen, so a new member sees it before they ever reach My Shows), and a slim row above their own list while they have five shows or fewer across all four lists. The empty state on their own Watching / Next Up list also offers it.
+
+  The permanent entries were added because the nudges were originally the *only* way in: past five shows the feature became unreachable, even though the per-day ceiling below implies repeat use.
 - **Apple TV / Apple Watch:** not offered (view-only / read-only surfaces).
 - **Web:** not offered — the member app is retired.
 

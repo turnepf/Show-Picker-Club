@@ -242,6 +242,17 @@ struct MemberView: View {
                 Button { showingSearch = true } label: { Image(systemName: "magnifyingglass") }
             }
             ToolbarItem(placement: .topBarTrailing) { sortMenu }
+            // Sits left of the "+" so the one-tap Add stays in the corner it
+            // has always been in. Own lists only — importing writes to the
+            // signed-in member, so it would be a lie on someone else's page.
+            ToolbarItem(placement: .topBarTrailing) {
+                if isMine {
+                    Button { showingImport = true } label: {
+                        Image(systemName: "doc.on.clipboard")
+                    }
+                    .accessibilityLabel("Paste a list")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 if isMine {
                     Button { showingAdd = true } label: { Image(systemName: "plus") }
