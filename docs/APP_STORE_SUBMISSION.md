@@ -192,6 +192,9 @@ broken — but clear them in the first build after the apps have shipped.
       compliance prompt.
 - [ ] Screenshots and metadata current — including the **Mac** and **Apple
       TV** screenshot sets on the same listing.
+- [ ] **What's New text** filled in from `docs/RELEASE_NOTES.md` (the
+      *Unreleased* section). After the version ships, move that section under
+      its version and date and open a fresh *Unreleased*.
 - [ ] Verify the demo sign-in once on the **Mac** build too — Review opens
       every platform on the listing.
 

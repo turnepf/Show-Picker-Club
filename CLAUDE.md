@@ -16,6 +16,7 @@ Read these before making non-trivial changes — they are detailed and current:
 - **`docs/PRODUCT.md`** — product behavior and user-facing rules (the four lists, quick actions, auth flows).
 - **`docs/INVARIANTS.md`** — the rules that must hold across the product, each with the enforcer that checks it. Read before adding an endpoint or session-derived UI state.
 - **`docs/APP_STORE_SUBMISSION.md`** — Apple review/submission checklist.
+- **`docs/RELEASE_NOTES.md`** — the What's New text for the next App Store update. Add user-facing changes to its *Unreleased* section as they merge.
 - **`README.md`** — setup from scratch, secrets list, deploy/backup overview.
 - **`ios/README.md`** / **`tvos/README.md`** — building, TestFlight, share extension, offline support.
 - **`DESIGN.md`** + **`.impeccable/design.json`** — visual design system (OKLCH palette, list colors).
@@ -211,7 +212,9 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
   the Apple targets are still expensive to rediscover. Just don't add "and the
   web" to that list unless asked. There is no in-app What's New — release
   notes go in the App Store update text instead (retired 2026-08, along with
-  `whats-new.json`, `whats-new.html` and `WhatsNewView`).
+  `whats-new.json`, `whats-new.html` and `WhatsNewView`). Collect that text in
+  `docs/RELEASE_NOTES.md` under *Unreleased* as user-facing work merges, so
+  submission day is a copy-paste rather than a `git log` archaeology session.
 
 - **Home leads and Home is the launch screen, on every platform.** Home is the
   first tab / first nav item, My Shows second, and the app opens on Home even
