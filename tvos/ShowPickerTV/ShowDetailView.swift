@@ -556,7 +556,7 @@ struct ShowDetailView: View {
         if Self.deepLinksToShow.contains(network ?? "") || isHBOSearch {
             return [serviceUrl]
         }
-        return Self.appSchemes(for: serviceUrl) + [serviceUrl]
+        return StreamingApps.schemes(for: serviceUrl) + [serviceUrl]
     }
 
     // Walk the candidates in order, stopping at the first the device accepts.
@@ -572,49 +572,6 @@ struct ShowDetailView: View {
         openURL(targets[index]) { ok in
             if ok { openFailed = false } else { attempt(targets, at: index + 1) }
         }
-    }
-
-    // Per-service custom URL schemes. On tvOS the plain https universal link
-    // doesn't even *open* most streaming apps — openURL returns accepted=false
-    // — while the app's own scheme launches it (no show-level deep link, but
-    // the app is up). Verified on device 2026-08-12: peacocktv:// and
-    // disneyplus:// work; paramountplus:// no longer does, and Netflix and MGM+
-    // had no scheme at all, which is why their buttons did nothing.
-    //
-    // Several entries list more than one candidate because these apps get
-    // renamed and the old scheme is what stays registered — Paramount+ still
-    // ships as com.cbsvideo.app and MGM+ as com.epix.epixnow. Ordering is
-    // current-name-first, and openWatch falls through to the next on refusal,
-    // so a service renaming its scheme degrades to the following candidate
-    // rather than to a dead button.
-    private static func appSchemes(for url: URL) -> [URL] {
-        let lower = url.absoluteString.lowercased()
-        let names: [String]
-
-        if lower.contains("watch.amazon.com") || lower.contains("primevideo.com") || lower.contains("amazon.com/gp/video") {
-            // The "/aiv/landing" path is unreliable; the bare scheme just
-            // launches Prime Video. aiv:// matches the app's own bundle id
-            // (com.amazon.aiv.AIVApp), so it stays first.
-            names = ["aiv", "primevideo"]
-        } else if lower.contains("paramountplus.com") || lower.contains("paramount.com") {
-            names = ["paramountplus", "cbsaa"]
-        } else if lower.contains("peacocktv.com") {
-            names = ["peacocktv"]
-        } else if lower.contains("hulu.com") {
-            names = ["hulu"]
-        } else if lower.contains("disneyplus.com") {
-            names = ["disneyplus"]
-        } else if lower.contains("netflix.com") {
-            names = ["nflx"]
-        } else if lower.contains("mgmplus.com") {
-            names = ["mgmplus", "epixnow", "epix"]
-        } else if lower.contains("starz.com") {
-            names = ["starz", "starzplay"]
-        } else {
-            names = []
-        }
-
-        return names.compactMap { URL(string: "\($0)://") }
     }
 
     private func load() async {

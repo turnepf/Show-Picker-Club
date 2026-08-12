@@ -5,6 +5,7 @@ import SwiftUI
 struct AccountView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var showingDelete = false
+    @State private var showingLinkCheck = false
 
     var body: some View {
         if auth.isLoggedIn {
@@ -21,6 +22,12 @@ struct AccountView: View {
                         Text("Operator")
                             .font(.system(size: 22))
                             .foregroundColor(Theme.muted)
+                        // Operator-only: which streaming apps this particular
+                        // Apple TV will actually open. Services retire their
+                        // URL schemes without notice, and a real device is the
+                        // only place to find out.
+                        Button("Streaming Link Check…") { showingLinkCheck = true }
+                            .font(.system(size: 22, weight: .semibold))
                     }
                     Button("Log Out") { Task { await auth.logout() } }
                         .font(.system(size: 26, weight: .semibold))
@@ -40,6 +47,9 @@ struct AccountView: View {
             }
             .fullScreenCover(isPresented: $showingDelete) {
                 DeleteAccountView()
+            }
+            .fullScreenCover(isPresented: $showingLinkCheck) {
+                StreamingLinkCheckView()
             }
         } else {
             LoginView()
