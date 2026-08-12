@@ -40,6 +40,9 @@ else you watch there can be filed where it belongs.
 
 Pluto TV joins the network list too. It's free, so it shows up in the
 Subscription Audit at $0 a month — no bill to cut.
+
+Adding a show now starts on the list you're looking at. Tap + while you're on
+Awaiting and it goes to Awaiting — you can still switch lists before saving.
 ```
 
 ### What this covers
@@ -49,6 +52,8 @@ Subscription Audit at $0 a month — no bill to cut.
 - Paste button and the worked example card on the import screen (#363).
 - PBS added as a canonical network, with Passport, Masterpiece and PBS Kids
   folded in as aliases.
+- Add Show opens on the list you're viewing instead of always Watching —
+  reported by Thayná, who kept landing awaited shows in Watching.
 
 Earlier merged work is not listed here — this file starts at 2026-08-11, so
 anything user-facing that shipped before that and has not yet reached the App

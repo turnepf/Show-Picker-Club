@@ -314,7 +314,9 @@ struct MemberView: View {
         }
         .sheet(isPresented: $showingAdd) {
             if isMine {
-                AddEditShowView(memberSlug: member.slug, existing: nil) { await load() }
+                // Seed the picker with the list being viewed — "+" from
+                // Awaiting adds to Awaiting.
+                AddEditShowView(memberSlug: member.slug, existing: nil, initialList: currentList) { await load() }
             }
         }
         .sheet(item: $editingShow) { show in

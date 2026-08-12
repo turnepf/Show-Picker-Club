@@ -5,6 +5,11 @@ import SwiftUI
 struct AddEditShowView: View {
     let memberSlug: String
     let existing: Show?
+    // Which list a brand-new show lands on before the member touches the
+    // picker. The caller passes the list currently on screen, so tapping "+"
+    // while looking at Awaiting adds to Awaiting — not silently to Watching.
+    // Ignored when editing: an existing row seeds from its own list.
+    var initialList: ShowList = .watching
     let onSave: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -138,7 +143,7 @@ struct AddEditShowView: View {
     }
 
     private func prefill() {
-        guard let s = existing else { return }
+        guard let s = existing else { list = initialList; return }
         title = s.title
         let existingNetwork = s.network ?? ""
         if !existingNetwork.isEmpty && !CANONICAL_NETWORKS.contains(existingNetwork) {
