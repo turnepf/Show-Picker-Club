@@ -707,6 +707,8 @@ Score the member against **the club's own distribution**, not against the trait 
 
 `similarity` is reported as `(cos + 1) / 2` so the clients keep rendering it as a 0–100% match: 50% means no relationship either way.
 
+**Group variety comes before per-member accuracy** (`assignDistinct`). A vibe is a party trick and the trick is the comparison, so nobody in a group shares a persona while there are personas left: take the strongest member/cluster pair going, hand it out, cross both off, repeat. Greedy rather than optimal — at club scale the difference is a rounding error. Ties break on slug then cluster id, so the assignment is stable across requests, and it is computed over the member's **largest group (ties to the oldest)** rather than the viewer's, so everyone sees the same label for the same person. A group bigger than the cluster list runs out and the remainder take their own best match, repeats included. Members below the scored-title floor take no slot. A member moved off their own top match gets `assigned: true` and a tagline saying which closer persona was taken; the blend still leads with the assigned cluster and keeps the rest in true order.
+
 **Two honesty rules, both delivered through fields the apps already render** (no client change):
 
 - **Fewer than 5 scored titles → no cluster at all.** `pickCluster` returns `null` and the response carries `cluster: null`; `VibeView` renders traits, balance and picks without the persona box. A member with one show sits 3σ from the club on whatever that show happens to be, and the matcher would hand them a confident persona built entirely out of it.

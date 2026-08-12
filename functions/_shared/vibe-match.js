@@ -130,23 +130,89 @@ const asMatch = (cos) => (cos + 1) / 2;
 
 // `scoredTitles` is how many of the member's shows actually carried traits.
 // Pass it and a library too thin to read returns null rather than a persona.
-export function pickCluster(fp, baseline, { scoredTitles = null } = {}) {
+// Every cluster scored for this member, best first.
+export function rankClusters(fp, baseline) {
+  const z = zScore(fp, baseline);
+  return CLUSTERS
+    .map(c => ({ cluster: c, cos: cosineSim(z, clusterDirection(c)) }))
+    .sort((a, b) => b.cos - a.cos);
+}
+
+// Hand out distinct clusters across a group.
+//
+// This is a deliberate trade of accuracy for fun. A vibe is a party trick, and
+// the trick stops working when you and the three people you watch television
+// with are all handed the same persona — the whole point is comparing. So
+// within a group nobody shares a label while there are labels left: take the
+// strongest member/cluster pair going, give it out, cross both off, repeat.
+//
+// Greedy rather than optimal (Hungarian) on purpose: with eight clusters and
+// club-sized groups the difference is a rounding error, and greedy is short
+// enough to read. Ties break on slug then cluster id so the same group always
+// produces the same assignment — a persona that shuffles between requests is
+// worse than one that's merely second-best.
+//
+// A group larger than the cluster list runs out; whoever is left takes their
+// own best match and repeats are allowed again. Members too thin to be scored
+// at all don't take a slot.
+export function assignDistinct(entries, baseline) {
+  const ranked = new Map();
+  for (const e of entries || []) {
+    if (!e.fp) continue;
+    if (e.scoredTitles != null && e.scoredTitles < MIN_SCORED_FOR_CLUSTER) continue;
+    ranked.set(e.slug, rankClusters(e.fp, baseline));
+  }
+
+  const pairs = [];
+  for (const [slug, rows] of ranked) {
+    for (const r of rows) pairs.push({ slug, id: r.cluster.id, cos: r.cos });
+  }
+  pairs.sort((a, b) => b.cos - a.cos || a.slug.localeCompare(b.slug) || a.id.localeCompare(b.id));
+
+  const out = new Map();
+  const taken = new Set();
+  for (const p of pairs) {
+    if (out.has(p.slug) || taken.has(p.id)) continue;
+    out.set(p.slug, p.id);
+    taken.add(p.id);
+  }
+  for (const [slug, rows] of ranked) if (!out.has(slug)) out.set(slug, rows[0].cluster.id);
+  return out;
+}
+
+// `preferId` is the cluster this member was assigned by their group. It leads
+// the response; the blend behind it stays in true order, so the honest ranking
+// is always one glance away.
+export function pickCluster(fp, baseline, { scoredTitles = null, preferId = null } = {}) {
   if (scoredTitles !== null && scoredTitles < MIN_SCORED_FOR_CLUSTER) return null;
 
-  const z = zScore(fp, baseline);
-  const ranked = CLUSTERS.map(c => ({
-    cluster: c,
-    cos: cosineSim(z, clusterDirection(c)),
-  })).sort((a, b) => b.cos - a.cos);
+  const trueRanked = rankClusters(fp, baseline);
+  const ranked = preferId
+    ? [
+        ...trueRanked.filter(r => r.cluster.id === preferId),
+        ...trueRanked.filter(r => r.cluster.id !== preferId),
+      ]
+    : trueRanked;
 
   const best = ranked[0];
-  const margin = best.cos - (ranked[1]?.cos ?? best.cos);
+  // Daylight is always measured against the member's own second-best, not
+  // against whatever the group assignment pushed down the list.
+  const margin = trueRanked[0].cos - (trueRanked[1]?.cos ?? trueRanked[0].cos);
+  const assigned = !!preferId && preferId !== trueRanked[0].cluster.id;
   // A photo finish is a fact about the member, not a rounding error to hide.
   // The tagline is the one line of copy the clients render under the cluster
   // name, so it's where the hedge belongs — no app change required.
-  const tagline = margin < UNDECIDED_MARGIN && ranked[1]
-    ? `You sit between ${best.cluster.name} and ${ranked[1].cluster.name} — the blend below is the truer read.`
-    : best.cluster.tagline;
+  // Two reasons the stock tagline would overstate things: the member is
+  // sitting on a fence, or the group handed them their runner-up so nobody
+  // doubled up. Say which, rather than reading like a verdict either way.
+  let tagline = best.cluster.tagline;
+  if (assigned) {
+    tagline = `${best.cluster.tagline} (Closest unclaimed vibe in your group — ` +
+      `${trueRanked[0].cluster.name} was taken.)`;
+  } else if (margin < UNDECIDED_MARGIN && trueRanked[1]) {
+    tagline = `You sit between ${best.cluster.name} and ${trueRanked[1].cluster.name}` +
+      ' — the blend below is the truer read.';
+  }
 
   return {
     id: best.cluster.id,
@@ -156,6 +222,9 @@ export function pickCluster(fp, baseline, { scoredTitles = null } = {}) {
     // How much daylight there is behind the winner.
     margin,
     undecided: margin < UNDECIDED_MARGIN,
+    // True when the group's variety rule moved this member off their own top
+    // match so a group-mate could keep it.
+    assigned,
     baseline_members: baseline ? baseline.members : 0,
     blend: ranked.slice(0, 3).map(r => ({
       id: r.cluster.id,

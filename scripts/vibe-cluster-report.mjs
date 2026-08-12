@@ -48,7 +48,7 @@ const load = functionsSandbox();
 const { TRAIT_NAMES } = await load('_shared/vibe-traits.js');
 const { CLUSTERS } = await load('_shared/vibe-clusters.js');
 const { EXCLUDED_FROM_TASTE } = await load('_shared/excluded-members.js');
-const { clubBaseline, computeFingerprint, cosineSim, centerFp, pickCluster } =
+const { assignDistinct, clubBaseline, computeFingerprint, cosineSim, centerFp, pickCluster } =
   await load('_shared/vibe-match.js');
 
 // Per-trait share of the winning cosine: how much each trait actually carried
@@ -138,6 +138,36 @@ if (baseline) {
   }
 }
 
+// The endpoint hands out distinct personas within a member's largest group
+// (ties to the oldest), so the report has to do the same or it reports a
+// distribution nobody sees.
+const memberships = db.prepare('SELECT group_id, member_slug FROM group_members').all();
+const groupSize = new Map();
+for (const m of memberships) groupSize.set(m.group_id, (groupSize.get(m.group_id) || 0) + 1);
+const primaryGroup = new Map();
+for (const m of memberships) {
+  const held = primaryGroup.get(m.member_slug);
+  if (!held
+      || groupSize.get(m.group_id) > groupSize.get(held)
+      || (groupSize.get(m.group_id) === groupSize.get(held) && m.group_id < held)) {
+    primaryGroup.set(m.member_slug, m.group_id);
+  }
+}
+const groupRoster = new Map();
+for (const [slug, gid] of primaryGroup) {
+  if (!groupRoster.has(gid)) groupRoster.set(gid, []);
+  groupRoster.get(gid).push(slug);
+}
+const assigned = new Map();
+for (const [, slugs] of groupRoster) {
+  const entries = slugs
+    .filter((slug) => fingerprints.has(slug))
+    .map((slug) => ({
+      slug, fp: fingerprints.get(slug), scoredTitles: byMember.get(slug).length,
+    }));
+  for (const [slug, id] of assignDistinct(entries, baseline)) assigned.set(slug, id);
+}
+
 const named = new Map(
   db.prepare('SELECT slug, first_name, name FROM members').all()
     .map((m) => [m.slug, m.first_name || m.name])
@@ -149,7 +179,8 @@ const results = [...fingerprints.entries()].map(([slug, fp]) => ({
   titles: byMember.get(slug).length,
   fp,
   old: pickClusterOld(fp),
-  neu: pickCluster(fp, baseline),
+  neu: pickCluster(fp, baseline, { preferId: assigned.get(slug) || null }),
+  group: primaryGroup.get(slug) ?? null,
 })).sort((a, b) => b.titles - a.titles);
 
 h1('Per member');
@@ -186,6 +217,23 @@ function histogram(label, pick) {
   }
 }
 
+h1('Inside each group');
+console.log(dim('  A repeated persona inside one group is the thing to look for.'));
+const groupName = new Map(db.prepare('SELECT id, name FROM groups').all().map((g) => [g.id, g.name]));
+for (const [gid, slugs] of [...groupRoster].sort((a, b) => b[1].length - a[1].length)) {
+  const members = results.filter((r) => r.group === gid);
+  if (!members.length) continue;
+  const ids = members.map((m) => m.neu.id);
+  const dupes = ids.length - new Set(ids).size;
+  console.log(`\n  ${bold(groupName.get(gid) || `group ${gid}`)} ` +
+    dim(`${members.length} scored member${members.length === 1 ? '' : 's'}` +
+      (dupes ? ` — ${dupes} repeat${dupes === 1 ? '' : 's'}` : ' — all different')));
+  for (const m of members) {
+    console.log(`    ${m.name.slice(0, 18).padEnd(18)} ${m.neu.name.padEnd(26)} ` +
+      `${m.neu.assigned ? dim(`(moved off ${m.neu.blend[1].name}, taken)`) : ''}`);
+  }
+}
+
 h1('Distribution');
 histogram('before', (r) => r.old.name);
 histogram('after', (r) => r.neu.name);
@@ -200,5 +248,7 @@ console.log(`  ${undecided} sit within 0.05 of a second cluster — genuinely be
 console.log(`  ${thin} have fewer than ${THIN_LIBRARY} scored titles, where any label is noise —` +
   ' the endpoint now returns no cluster for them at all.');
 console.log(`  ${undecided} get the between-two-vibes tagline instead of a flat assertion.`);
+console.log(`  ${results.filter((r) => r.neu.assigned).length} were moved off their own top match` +
+  ' so a group-mate could keep it.');
 if (!explain) console.log(dim('\n  Re-run with --why to see which traits carried each verdict.'));
 console.log('');

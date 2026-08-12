@@ -39,7 +39,7 @@ const load = (p) => import(join(sandbox, 'functions', p));
 
 const { TRAIT_NAMES } = await load('_shared/vibe-traits.js');
 const { CLUSTERS } = await load('_shared/vibe-clusters.js');
-const { MIN_SCORED_FOR_CLUSTER, clubBaseline, computeFingerprint, pickCluster } =
+const { MIN_SCORED_FOR_CLUSTER, assignDistinct, clubBaseline, computeFingerprint, pickCluster } =
   await load('_shared/vibe-match.js');
 
 let passed = 0, failed = 0;
@@ -227,6 +227,80 @@ console.log('\n== a photo finish says so instead of picking a side');
   check('a decisive match keeps the cluster\'s own tagline',
         !decisive.undecided && decisive.tagline === CLUSTERS.find((c) => c.id === decisive.id).tagline,
         `${decisive.margin.toFixed(3)} — ${decisive.tagline}`);
+}
+
+console.log('\n== nobody in a group shares a persona');
+{
+  // Four people with near-identical taste — the case that makes a vibe boring.
+  // Under plain best-match they collapse onto one label; the group rule has to
+  // hand out four different ones anyway.
+  const alike = (n) => fp({
+    prestige_energy: 0.66, moral_ambiguity: 0.64, intellectual_curiosity: 0.62,
+    darkness: 0.55 + n * 0.004, warmth: 0.52 - n * 0.003, comfort_coziness: 0.45,
+  });
+  const club = [alike(0), alike(1), alike(2), alike(3), alike(4), alike(5)];
+  const baseline = clubBaseline(club);
+  const group = ['ada', 'bo', 'cy', 'di'].map((slug, i) => ({
+    slug, fp: alike(i), scoredTitles: 20,
+  }));
+
+  const plain = group.map((g) => pickCluster(g.fp, baseline).id);
+  check('left alone they really do collapse onto one label',
+        new Set(plain).size < group.length, JSON.stringify(plain));
+
+  const assignment = assignDistinct(group, baseline);
+  const given = group.map((g) => assignment.get(g.slug));
+  check('the group rule gives all four different ones',
+        new Set(given).size === 4, JSON.stringify(given));
+  check('and every one of them is a real cluster',
+        given.every((id) => CLUSTERS.some((c) => c.id === id)), JSON.stringify(given));
+
+  // Same group, shuffled: a persona that depends on row order would shuffle too.
+  const shuffled = assignDistinct([...group].reverse(), baseline);
+  check('the assignment does not depend on the order members arrive in',
+        group.every((g) => shuffled.get(g.slug) === assignment.get(g.slug)),
+        JSON.stringify([...shuffled]));
+
+  // The member who was moved off their own top pick is told why.
+  const moved = group.find((g) => assignment.get(g.slug) !== pickCluster(g.fp, baseline).id);
+  if (moved) {
+    const got = pickCluster(moved.fp, baseline, { preferId: assignment.get(moved.slug) });
+    check('a moved member leads with the cluster the group left them',
+          got.id === assignment.get(moved.slug), got.id);
+    check('and the tagline says the closer one was taken',
+          got.assigned === true && got.tagline.includes('was taken'), got.tagline);
+    check('while the blend still opens with what they actually lead on',
+          got.blend[0].id === got.id, JSON.stringify(got.blend.map((b) => b.id)));
+  }
+}
+
+console.log('\n== the variety rule knows its limits');
+{
+  const club = [fp({ warmth: 0.4 }), fp({ warmth: 0.5 }), fp({ warmth: 0.6 }), fp({ warmth: 0.7 })];
+  const baseline = clubBaseline(club);
+
+  // More members than clusters: the leftovers take their own best match and
+  // repeats come back rather than anyone going unlabelled.
+  const big = Array.from({ length: CLUSTERS.length + 3 }, (_, i) => ({
+    slug: `m${String(i).padStart(2, '0')}`,
+    fp: fp({ warmth: 0.4 + i * 0.02, satire: 0.4 + i * 0.015 }),
+    scoredTitles: 20,
+  }));
+  const assigned = assignDistinct(big, baseline);
+  check('everyone past the eighth still gets a persona',
+        assigned.size === big.length, `${assigned.size} of ${big.length}`);
+  check('and all eight clusters are in play', new Set(assigned.values()).size === CLUSTERS.length,
+        String(new Set(assigned.values()).size));
+
+  // A member too thin to be scored must not burn a cluster a group-mate could use.
+  const withThin = assignDistinct([
+    { slug: 'thin', fp: fp({ warmth: 0.9 }), scoredTitles: 1 },
+    { slug: 'real', fp: fp({ warmth: 0.9 }), scoredTitles: 20 },
+  ], baseline);
+  check('a one-show member takes no slot', !withThin.has('thin'), JSON.stringify([...withThin]));
+  check('and the scored member keeps their own best',
+        withThin.get('real') === pickCluster(fp({ warmth: 0.9 }), baseline).id,
+        withThin.get('real'));
 }
 
 console.log('\n== list weights still shape the fingerprint');

@@ -2,7 +2,7 @@ import { TRAIT_NAMES } from '../_shared/vibe-traits.js';
 import { EXCLUDED_FROM_TASTE } from '../_shared/excluded-members.js';
 import { getSession } from '../_shared/auth.js';
 import {
-  LIST_WEIGHT, centerFp, clubBaseline, computeFingerprint, cosineSim, pickCluster,
+  LIST_WEIGHT, assignDistinct, centerFp, clubBaseline, computeFingerprint, cosineSim, pickCluster,
 } from '../_shared/vibe-match.js';
 
 const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
@@ -274,22 +274,58 @@ export async function onRequestGet(context) {
        )`
   ).all();
 
-  // Every member's fingerprint, so this one can be read against the club
-  // rather than against the midpoint of the trait scale. Without it the
-  // cluster is decided by what all television has in common and nearly
-  // everybody comes back the same label — see _shared/vibe-match.js.
+  // Every member's fingerprint. Two things need them: the club baseline this
+  // member is read against (without it the cluster is decided by what all
+  // television has in common and nearly everybody comes back the same label),
+  // and the group variety rule below. Everyone is fetched — the taste
+  // exclusion applies to the baseline, which is club arithmetic, not to who
+  // gets a persona.
   const { results: clubRows } = await env.DB.prepare(
     `SELECT s.member_slug, s.list, ${traitCols}
      FROM shows s
      JOIN show_traits t ON LOWER(s.title) = t.title_lower AND (t.unknown_show = 0 OR t.unknown_show IS NULL)
-     WHERE s.archived = 0 AND s.member_slug NOT IN (${EXCLUDED_SQL})`
+     WHERE s.archived = 0`
   ).all();
   const byMember = new Map();
   for (const r of clubRows) {
     if (!byMember.has(r.member_slug)) byMember.set(r.member_slug, []);
     byMember.get(r.member_slug).push(r);
   }
-  const baseline = clubBaseline([...byMember.values()].map(computeFingerprint));
+  const fingerprints = new Map();
+  for (const [slug, rows] of byMember) {
+    const f = computeFingerprint(rows);
+    if (f) fingerprints.set(slug, f);
+  }
+  const baseline = clubBaseline(
+    [...fingerprints.entries()]
+      .filter(([slug]) => !EXCLUDED_FROM_TASTE.includes(slug))
+      .map(([, f]) => f)
+  );
+
+  // Nobody in a group shares a persona while there are personas left — the
+  // comparison is the fun, and it dies if half the group reads the same. The
+  // assignment is computed over the member's largest group (ties to the oldest)
+  // so it doesn't depend on who is looking: everyone sees the same label for
+  // the same person.
+  const { results: groupPeers } = await env.DB.prepare(
+    `SELECT gm.member_slug
+       FROM group_members gm
+      WHERE gm.group_id = (
+        SELECT g.group_id FROM group_members g
+          WHERE g.member_slug = ?1
+          ORDER BY (SELECT COUNT(*) FROM group_members c WHERE c.group_id = g.group_id) DESC,
+                   g.group_id ASC
+          LIMIT 1
+      )`
+  ).bind(memberSlug).all();
+  const assignment = assignDistinct(
+    groupPeers.map(p => ({
+      slug: p.member_slug,
+      fp: fingerprints.get(p.member_slug) || null,
+      scoredTitles: (byMember.get(p.member_slug) || []).length,
+    })),
+    baseline
+  );
 
   const memberTitleSet = new Set(scoredRows.map(r => r.title_lower));
   const picks = alignedPicks(fp, allScored, memberTitleSet);
@@ -306,7 +342,10 @@ export async function onRequestGet(context) {
       name: fnDisplay,
       active_count: rows.length,
       scored_count: scoredRows.length,
-      cluster: pickCluster(fp, baseline, { scoredTitles: scoredRows.length }),
+      cluster: pickCluster(fp, baseline, {
+        scoredTitles: scoredRows.length,
+        preferId: assignment.get(memberSlug) || null,
+      }),
       display_traits: displayTraits(fp),
       balance: balanceMetrics(fp),
       aligned_picks: picks,

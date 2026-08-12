@@ -231,6 +231,47 @@ console.log('\n== and so do her group-mates, symmetrically');
         JSON.stringify(hers.members.map((m) => m.slug)));
 }
 
+console.log('\n== two group-mates with the same taste still read differently');
+{
+  const env = makeEnv();
+  addMember(env, 'ada', 'Ada Lovelace');
+  addMember(env, 'bo', 'Bo Diddley');
+  addMember(env, 'cy', 'Cy Twombly');
+  addGroup(env, 'Twins', ['ada', 'bo']);
+
+  // The same six titles each, so their fingerprints are identical to the last
+  // decimal. Left to a plain best-match they are the same person.
+  const shared = ['One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+  shared.forEach((t, i) => {
+    addTraits(env, t, { prestige_energy: 0.7 + i * 0.01, moral_ambiguity: 0.68, darkness: 0.6 });
+    for (const who of ['ada', 'bo', 'cy']) {
+      addShow(env, { slug: who, title: t, list: i % 2 ? 'watching' : 'recommending' });
+    }
+  });
+
+  const adaCookie = addSession(env, 'ada');
+  const boCookie = addSession(env, 'bo');
+  const adaVibe = await (await call(env, '/api/vibe?member=ada', { cookie: adaCookie })).json();
+  const boVibe = await (await call(env, '/api/vibe?member=bo', { cookie: boCookie })).json();
+  check('both get a persona', !!adaVibe.member.cluster && !!boVibe.member.cluster,
+        JSON.stringify([adaVibe.member.cluster?.id, boVibe.member.cluster?.id]));
+  check('and identical libraries do not produce identical personas',
+        adaVibe.member.cluster.id !== boVibe.member.cluster.id,
+        `${adaVibe.member.cluster.id} vs ${boVibe.member.cluster.id}`);
+
+  // The label must not depend on who is asking — a group-mate looking at Ada
+  // sees what Ada sees.
+  const adaSeenByBo = await (await call(env, '/api/vibe?member=ada', { cookie: boCookie })).json();
+  check('and the same person reads the same to everyone',
+        adaSeenByBo.member.cluster.id === adaVibe.member.cluster.id,
+        `${adaSeenByBo.member.cluster.id} vs ${adaVibe.member.cluster.id}`);
+
+  // Cy is in no group, so nothing was taken from him: he keeps his own best.
+  const cyVibe = await (await call(env, '/api/vibe?member=cy', { cookie: addSession(env, 'cy') })).json();
+  check('a member in no group is untouched by the rule',
+        cyVibe.member.cluster.assigned === false, JSON.stringify(cyVibe.member.cluster.assigned));
+}
+
 console.log('\n== group scoping is untouched');
 {
   const env = club();
