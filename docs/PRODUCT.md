@@ -278,12 +278,13 @@ Vibe profiles require a logged-in session, and the picker is scoped to people
 you actually share a group with — the club roster used to be the answer, which
 listed strangers. A slug outside that set is refused, not shown.
 
-**Members excluded from taste analysis still read their own vibe.** A library
-too sprawling to represent taste is kept out of the club's shared signals —
-Trending, the aligned-picks pool, other members' pickers — but the exclusion
-never applies to its owner: your own vibe is you reading your own library, so
-you appear in your own picker and get the full profile. Nobody else can open
-it, and titles only you hold are never offered to anyone else as picks.
+**Every group-mate's vibe is visible to every other group-mate, always.** A
+library too sprawling to represent taste is kept out of the club's shared
+signals — Trending, recommendation neighbours, the aligned-picks pool — but
+that exclusion is about arithmetic, not privacy: it never hides a profile from
+anyone, including its owner. Everyone in a group can already open everyone
+else's library, so a vibe is no more private than the lists it reads. Titles
+only an excluded member holds are still never offered to anyone else as picks.
 
 Platforms: **iPhone and iPad**. **Apple TV doesn't** — it's view-only, and the
 picker plus the add-a-pick flow need input the remote doesn't suit. **The watch

@@ -91,11 +91,11 @@ node scripts/vibe-scope-test.mjs
 
 `/api/vibe`'s scoping, same harness. Who may read whose vibe (session-gated,
 group-scoped, a hand-typed outside slug is 403) and what the taste exclusion in
-`_shared/excluded-members.js` does: it keeps a sprawling library out of every
-club-level signal, but never out of its **owner's** own read — an excluded
-member is in her own picker, gets a full profile, and her titles still reach
-the trait-fill queue so that profile isn't computed from the sliver of her
-library someone else shares.
+`_shared/excluded-members.js` does: it bounds club-level **math** — Trending,
+neighbour pools, the aligned-picks pool — and never visibility. An excluded
+member reads her own vibe and her group-mates read it too, symmetrically, and
+her titles still reach the trait-fill queue so that profile isn't computed from
+the sliver of her library someone else shares.
 
 ```bash
 node scripts/auth-code-flow-test.mjs

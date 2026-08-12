@@ -274,18 +274,20 @@ A paste has no length limit, but every request it turns into does.
 
 Enforcer: `scripts/import-list-test.mjs`.
 
-## 10. A club-level exclusion never excludes a member from themselves
+## 10. A club-level exclusion bounds math, never visibility
 
 `EXCLUDED_FROM_TASTE` (`functions/_shared/excluded-members.js`) exists so one
 sprawling library can't skew what the *club* computes — Trending, the
-recommendation neighbour pool, other members' vibe pickers, the aligned-picks
-candidate pool. It is a filter on club-level reads, not a status the member
-carries around.
+recommendation neighbour pool, the aligned-picks candidate pool. It is a filter
+on aggregate arithmetic, not a status the member carries around, and it must
+never decide who is allowed to look at something.
 
-- A member always reads their own data. `/api/vibe` lists the viewer in their
-  own picker and returns their full profile whatever list they're on; the
-  `excluded: true` response is for a club-level read of that library, which no
-  other member can reach anyway (their slug isn't in `members`, so it's 403).
+- Visibility has exactly one gate: group membership. `/api/vibe` lists the
+  viewer plus their group-mates and serves the same full profile for all of
+  them, whatever list anyone is on. Using the exclusion as a second gate made
+  one member invisible to the group-mates whose vibes she could read — inside a
+  group whose members can already open each other's libraries.
+- A member always reads their own data, whatever any list says.
 - Catalog work is club-wide. `/api/admin-vibe-fill` scores every active title,
   including titles only an excluded member holds — `show_traits` describes a
   title, it doesn't count anyone's taste. Skipping them is how the exclusion

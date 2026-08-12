@@ -32,19 +32,19 @@ function disambiguatedNames(rows) {
 // home screens. Group membership is the relationship the member actually
 // chose, so it's the boundary here too.
 //
-// The taste exclusion applies to *other* people's slugs only. An excluded
-// member was dropped from their own picker as well, so the one member the
-// exclusion names opened Vibe, found herself missing from the list and
-// "excluded from taste analysis" where her profile should be — the exclusion
-// exists to keep a sprawling library out of club-level signals, not to deny
-// its owner the read.
+// The taste exclusion (_shared/excluded-members.js) is NOT a visibility rule
+// and does not appear in this query. It bounds what the club *computes* from a
+// sprawling library — Trending, neighbour pools, the aligned-picks pool below.
+// Applying it here made one member invisible in her own picker and unreadable
+// to the group-mates she'd chosen, which is a one-way mirror nobody asked for:
+// everyone in a group can already open everyone else's library. Group
+// membership decides who reads a vibe. Nothing else does.
 async function listEligibleMembers(env, viewerSlug) {
   const { results } = await env.DB.prepare(
     `SELECT m.slug, m.name, m.first_name, m.last_initial,
        (SELECT COUNT(*) FROM shows s WHERE s.member_slug = m.slug AND s.archived = 0) AS active_count
      FROM members m
-     WHERE (m.slug = ?1 OR m.slug NOT IN (${EXCLUDED_SQL}))
-       AND (m.slug = ?1 OR m.slug IN (
+     WHERE (m.slug = ?1 OR m.slug IN (
              SELECT gm.member_slug FROM group_members gm
               WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE member_slug = ?1)
            ))
@@ -275,12 +275,6 @@ export async function onRequestGet(context) {
   if (!memberRow) {
     return new Response(JSON.stringify({ members, member: null, error: 'not_found' }), { status: 404, headers: corsHeaders() });
   }
-  // Someone else's excluded slug never reaches here — it isn't in `members`,
-  // so the scope check above already answered 403. This is the belt-and-braces
-  // branch for a club-level read of an excluded library; your own is yours.
-  if (EXCLUDED_FROM_TASTE.includes(memberSlug) && memberSlug !== session.member_slug) {
-    return new Response(JSON.stringify({ members, member: { slug: memberSlug, excluded: true, name: memberRow.first_name || memberRow.name } }), { headers: corsHeaders() });
-  }
 
   const engaged = await env.DB.prepare(
     `SELECT EXISTS(
@@ -338,6 +332,9 @@ export async function onRequestGet(context) {
          SELECT 1 FROM shows ss
          WHERE LOWER(ss.title) = t.title_lower
            AND ss.archived = 0
+           -- The one place the taste exclusion belongs in this file: a
+           -- recommendation is a club-level claim ("someone here rates this"),
+           -- so a title no unexcluded member holds isn't offered to anyone.
            AND ss.member_slug NOT IN (${EXCLUDED_SQL})
        )`
   ).all();

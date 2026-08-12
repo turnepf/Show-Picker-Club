@@ -6,17 +6,19 @@
 //
 // Written for the 2026-08 "Paula doesn't see her vibe" report. The exclusion
 // list keeps a sprawling library out of the club's shared signals; it had also
-// been dropping its member from her *own* vibe picker and answering her own
-// slug with "excluded from taste analysis", so the one person named by the
-// list was the one person who couldn't use the feature. Four things have to
-// hold at once, and none of them is visible in a diff:
+// been deciding who may LOOK at a profile, which dropped its member from her
+// own picker, answered her own slug with "excluded from taste analysis", and
+// hid her from the group-mates whose vibes she could read. Group membership
+// decides visibility; the exclusion decides math. Four things have to hold at
+// once, and none of them is visible in a diff:
 //
 //   1. It stays session-gated. A taste fingerprint is derived from a member's
 //      library, which never belongs on the public surface (docs/INVARIANTS.md).
 //   2. An excluded member reads her own vibe — she is in her own picker and
 //      her own slug returns a real profile.
-//   3. Nobody else can read it. She stays out of other members' pickers, and
-//      a hand-typed slug is 403, not a courtesy view.
+//   3. Her group-mates read it too, symmetrically, exactly like any other
+//      member's. Group scoping is still the wall: a member outside the group
+//      is 403, not a courtesy view.
 //   4. Her library still doesn't leak into anyone else's numbers: a title only
 //      she holds is never an aligned pick for someone else.
 //
@@ -202,19 +204,24 @@ console.log('\n== an excluded member reads her own vibe');
         JSON.stringify(bare.map((m) => m.slug)));
 }
 
-console.log('\n== but nobody else reads it');
+console.log('\n== and so do her group-mates, symmetrically');
 {
   const env = club();
   const cookie = addSession(env, 'patrick');
 
   const { members } = await (await call(env, '/api/vibe', { cookie })).json();
-  check('a group-mate does not see her in the picker', !members.some((m) => m.slug === EXCLUDED),
+  check('a group-mate sees her in the picker', members.some((m) => m.slug === EXCLUDED),
         JSON.stringify(members.map((m) => m.slug)));
 
-  const forced = await call(env, `/api/vibe?member=${EXCLUDED}`, { cookie });
-  check('and a hand-typed slug is 403', forced.status === 403, `got ${forced.status}`);
-  check('with nothing of hers in the body',
-        !(await forced.text()).includes('Only Paula Watches This'));
+  const { member } = await (await call(env, `/api/vibe?member=${EXCLUDED}`, { cookie })).json();
+  check('and reads the same profile she does',
+        member && member.excluded !== true && !!member.cluster && member.scored_count === 3,
+        JSON.stringify(member));
+
+  // Symmetry is the point: she could already read theirs.
+  const hers = await (await call(env, '/api/vibe', { cookie: addSession(env, EXCLUDED) })).json();
+  check('the view is mutual', hers.members.some((m) => m.slug === 'patrick'),
+        JSON.stringify(hers.members.map((m) => m.slug)));
 }
 
 console.log('\n== group scoping is untouched');
@@ -228,6 +235,14 @@ console.log('\n== group scoping is untouched');
   check('and their picker is themselves only',
         members.length === 1 && members[0].slug === 'stranger',
         JSON.stringify(members.map((m) => m.slug)));
+
+  // The excluded member is not a special case here either — she is refused
+  // for the same reason anyone outside the group is.
+  const outsideHers = await call(env, `/api/vibe?member=${EXCLUDED}`, { cookie });
+  check('an excluded member is 403 to a non-group-mate too',
+        outsideHers.status === 403, `got ${outsideHers.status}`);
+  check('with nothing of hers in the body',
+        !(await outsideHers.text()).includes('Only Paula Watches This'));
 }
 
 console.log('\n== her library still stays out of the club pool');
