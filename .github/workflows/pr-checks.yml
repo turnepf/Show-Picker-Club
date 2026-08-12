@@ -71,6 +71,8 @@ jobs:
         run: node scripts/admin-member-detail-test.mjs
       - name: Vibe scoping and the taste exclusion
         run: node scripts/vibe-scope-test.mjs
+      - name: Vibe cluster matching
+        run: node scripts/vibe-match-test.mjs
 
   listimport:
     runs-on: ubuntu-latest

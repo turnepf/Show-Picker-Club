@@ -697,8 +697,17 @@ For each of the member's non-seed shows, look up `show_traits` by `LOWER(title)`
 
 Average across the member's library, weighted, to get a 27-vector.
 
-### Cluster assignment
-Compute the **deviation from the club mean** for both the member fingerprint and each cluster target (so clusters are matched on *pattern*, not absolute level). Take the cosine similarity. Highest match wins; top 3 are returned as a `blend`.
+### Cluster assignment (`_shared/vibe-match.js`)
+Score the member against **the club's own distribution**, not against the trait scale.
+
+1. Build a baseline from every unexcluded member's fingerprint: mean and spread (standard deviation) per trait. Fewer than 3 fingerprints isn't a distribution — fall back to deviation from 0.5.
+2. Express the member as a z-score per trait — how far from the average member, in units of how much members actually vary on that trait. Spread is floored at 0.02 (a trait nobody differs on carries no information and must not be amplified) and z is capped at ±3 (no single trait swings a match).
+3. Turn each cluster target into a direction by subtracting 0.5. Unspecified traits become exactly 0, so a cluster votes only on the traits it names.
+4. Cosine between the two. Highest wins; top 3 return as a `blend`; the winner also carries `margin` (daylight over the runner-up) and `baseline_members`.
+
+`similarity` is reported as `(cos + 1) / 2` so the clients keep rendering it as a 0–100% match: 50% means no relationship either way.
+
+**Why not self-centering.** Until 2026-08 both sides were centered on their own mean. A fingerprint is an average over dozens of titles, so it sits very close to the average of all television — every member scores highish on `prestige_energy` and `moral_ambiguity` because most of what anyone watches does. Self-centering leaves that shared shape standing, so cosine largely measured "does this look like TV" and the cluster nearest the average show won for nearly everybody: six libraries separated by 0.03 in different directions all came back **Prestige Drama Loyalist**, and the collapse got *worse* the more titles a member had. Pinned by `scripts/vibe-match-test.mjs`; `scripts/vibe-cluster-report.mjs` prints old-vs-new distributions across a production snapshot.
 
 ### Top / bottom traits, balance, aligned shows
 - Top / bottom: the dimensions where the member's fingerprint diverges most positively / negatively from the club mean.

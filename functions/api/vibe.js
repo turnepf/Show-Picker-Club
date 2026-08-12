@@ -1,13 +1,11 @@
 import { TRAIT_NAMES } from '../_shared/vibe-traits.js';
-import { CLUSTERS } from '../_shared/vibe-clusters.js';
 import { EXCLUDED_FROM_TASTE } from '../_shared/excluded-members.js';
 import { getSession } from '../_shared/auth.js';
+import {
+  LIST_WEIGHT, centerFp, clubBaseline, computeFingerprint, cosineSim, pickCluster,
+} from '../_shared/vibe-match.js';
 
 const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
-
-// Per-list weights for the fingerprint. Loved = strongest endorsement;
-// Next Up = weakest (curiosity, not commitment). Archived rows are ignored.
-const LIST_WEIGHT = { recommending: 1.0, watching: 0.8, waiting: 0.6, next: 0.3 };
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -57,69 +55,6 @@ async function listEligibleMembers(env, viewerSlug) {
   ).bind(viewerSlug).all();
   const named = disambiguatedNames(results);
   return named.map(m => ({ slug: m.slug, name: m.display, active_count: m.active_count }));
-}
-
-function computeFingerprint(rows) {
-  const sums = {};
-  for (const t of TRAIT_NAMES) sums[t] = 0;
-  let totalWeight = 0;
-  for (const r of rows) {
-    const w = LIST_WEIGHT[r.list] || 0;
-    if (w === 0) continue;
-    for (const t of TRAIT_NAMES) {
-      if (typeof r[t] === 'number') sums[t] += w * r[t];
-    }
-    totalWeight += w;
-  }
-  if (totalWeight === 0) return null;
-  const fp = {};
-  for (const t of TRAIT_NAMES) fp[t] = sums[t] / totalWeight;
-  return fp;
-}
-
-function cosineSim(a, b) {
-  let dot = 0, na = 0, nb = 0;
-  for (const t of TRAIT_NAMES) {
-    const av = a[t] || 0, bv = b[t] || 0;
-    dot += av * bv;
-    na += av * av;
-    nb += bv * bv;
-  }
-  if (na === 0 || nb === 0) return 0;
-  return dot / Math.sqrt(na * nb);
-}
-
-// Center a fingerprint by subtracting its own mean. With centered vectors,
-// cosine similarity becomes Pearson correlation — it measures how each
-// trait *deviates* from the member's average, not absolute direction.
-// This is the right thing for cluster matching: most members' lists have
-// similar absolute shapes, so we need to compare patterns of deviation.
-function centerFp(fp) {
-  const values = TRAIT_NAMES.map(t => fp[t] || 0);
-  const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  const out = {};
-  for (const t of TRAIT_NAMES) out[t] = (fp[t] || 0) - mean;
-  return out;
-}
-
-function pickCluster(fp) {
-  const memberCentered = centerFp(fp);
-  const ranked = CLUSTERS.map(c => ({
-    cluster: c,
-    sim: cosineSim(memberCentered, centerFp(c.target)),
-  })).sort((a, b) => b.sim - a.sim);
-  const best = ranked[0];
-  return {
-    id: best.cluster.id,
-    name: best.cluster.name,
-    tagline: best.cluster.tagline,
-    similarity: best.sim,
-    blend: ranked.slice(0, 3).map(r => ({
-      id: r.cluster.id,
-      name: r.cluster.name,
-      similarity: r.sim,
-    })),
-  };
 }
 
 function avg(...xs) { return xs.reduce((a, b) => a + b, 0) / xs.length; }
@@ -339,6 +274,23 @@ export async function onRequestGet(context) {
        )`
   ).all();
 
+  // Every member's fingerprint, so this one can be read against the club
+  // rather than against the midpoint of the trait scale. Without it the
+  // cluster is decided by what all television has in common and nearly
+  // everybody comes back the same label — see _shared/vibe-match.js.
+  const { results: clubRows } = await env.DB.prepare(
+    `SELECT s.member_slug, s.list, ${traitCols}
+     FROM shows s
+     JOIN show_traits t ON LOWER(s.title) = t.title_lower AND (t.unknown_show = 0 OR t.unknown_show IS NULL)
+     WHERE s.archived = 0 AND s.member_slug NOT IN (${EXCLUDED_SQL})`
+  ).all();
+  const byMember = new Map();
+  for (const r of clubRows) {
+    if (!byMember.has(r.member_slug)) byMember.set(r.member_slug, []);
+    byMember.get(r.member_slug).push(r);
+  }
+  const baseline = clubBaseline([...byMember.values()].map(computeFingerprint));
+
   const memberTitleSet = new Set(scoredRows.map(r => r.title_lower));
   const picks = alignedPicks(fp, allScored, memberTitleSet);
   const outliers = outlierPicks(fp, scoredRows);
@@ -354,7 +306,7 @@ export async function onRequestGet(context) {
       name: fnDisplay,
       active_count: rows.length,
       scored_count: scoredRows.length,
-      cluster: pickCluster(fp),
+      cluster: pickCluster(fp, baseline),
       display_traits: displayTraits(fp),
       balance: balanceMetrics(fp),
       aligned_picks: picks,

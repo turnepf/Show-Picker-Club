@@ -98,6 +98,21 @@ her titles still reach the trait-fill queue so that profile isn't computed from
 the sliver of her library someone else shares.
 
 ```bash
+node scripts/vibe-match-test.mjs
+```
+
+The matcher that turns a fingerprint into a cluster. Pins the properties a
+distribution can't prove: a trait the whole club shares decides nobody, six
+libraries separated by 0.03 land in six clusters rather than all reading
+"Prestige Drama Loyalist", a cluster only votes on traits it names, an average
+member gets ~50% and no daylight, and a club too small to have a distribution
+falls back instead of dividing by an invented spread.
+
+`scripts/vibe-cluster-report.mjs` is the companion operator tool — it scores
+every member in a production snapshot under both the old and new matcher and
+prints the two distributions side by side. Read-only, no deploy.
+
+```bash
 node scripts/auth-code-flow-test.mjs
 ```
 
