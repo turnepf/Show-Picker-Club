@@ -208,6 +208,14 @@ struct GroupDetailView: View {
         .padding(.vertical, 4)
     }
 
+    // The group's own name for the invite share. The fallback only applies
+    // while the group is still loading — by the time an invite sheet is open
+    // it has been fetched.
+    private var shareGroupName: String {
+        let name = (group?.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "my group" : name
+    }
+
     @ViewBuilder
     private func inviteSheet(_ invite: GroupInvite) -> some View {
         NavigationStack {
@@ -224,10 +232,18 @@ struct GroupDetailView: View {
                         Spacer()
                         // A URL, not the String — plain text loses
                         // Messages, Mail and AirDrop from the share sheet.
+                        //
+                        // The group is named rather than called "my group":
+                        // the recipient is deciding whether to tap, and
+                        // "Join Thursday Night Club" tells them what this is.
+                        // The card they actually see is built by
+                        // functions/groups/join.js, which resolves the same
+                        // name from the token — nothing set here reaches it.
                         if let link = URL(string: invite.url) {
                             ShareLink(item: link,
-                                      subject: Text("Join my group on Show Picker"),
-                                      message: Text("Join my group on Show Picker and we'll see what each other is watching.")) {
+                                      subject: Text("Join \(shareGroupName) on Show Picker Club"),
+                                      message: Text("Join \(shareGroupName) on Show Picker Club and we'll see what each other is watching."),
+                                      preview: SharePreview("Join \(shareGroupName) on Show Picker Club")) {
                                 Image(systemName: "square.and.arrow.up")
                             }
                         }

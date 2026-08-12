@@ -475,6 +475,29 @@ fetching the page. A 301 would still work on Apple devices — the OS resolves t
 link before any request goes out — but it would throw away the member context on
 every other device, and on a shared link that context is the whole point.
 
+## Link previews (Open Graph)
+
+The apps share three kinds of link — a show, a group invite, a household invite. All three are universal links that iOS already routes into the app; **this is not about the tap.** When a link is sent in Messages (or Slack, or WhatsApp), the device makes a plain server-side GET to build the preview bubble: no app is involved, and it happens whether or not the recipient has the app installed. The bubble is rendered entirely from the Open Graph tags in the HTML that GET returns.
+
+Before 2026-08 there were no such tags. Every shared link fell through `_redirects`' catch-all to the marketing page, whose `og:title` is the constant "Show Picker Club" and which carried **no `og:image` at all** — so every share of every show arrived looking identical, with no artwork. Note the consequence for the Swift side: nothing passed to `ShareLink(subject:message:)` reaches that bubble. `subject`/`message`/`SharePreview` style the *share sheet* and the message body; the card comes from the page.
+
+| Route | og:title | Image |
+|---|---|---|
+| `functions/show/[id].js` | `<Title> on Show Picker Club` | backdrop, else poster, upscaled to `w1280` |
+| `functions/groups/join.js` | `Join <Group> on Show Picker Club` | site default |
+| `functions/household/join.js` | `Join <First>'s household on Show Picker Club` | site default |
+
+`functions/_shared/og-page.js` renders all three, plus `public/og-default.png` (1200×630) as the fallback and the marketing page's `og:image`.
+
+These are Pages Functions, so they take precedence over the `_redirects` catch-all for their paths; `/groups/join` does not collide with the `/groups` 301, which is an exact match. They are **preview metadata plus a card for whoever opens one without the app — not a return of the web member app** (see [PRODUCT.md#web-app-status](PRODUCT.md#web-app-status)).
+
+Because they are public and session-free, the constraints are all negative ones, and `scripts/og-preview-test.mjs` pins them:
+
+- The show route selects **catalog columns explicitly** rather than `SELECT *`, so a personal column added to `shows` later cannot quietly start appearing on a page anyone can fetch. No note, recommender, watching-with, or whose-list-is-it ever renders.
+- Titles come from TMDB *and* from members' typing, so everything is HTML-escaped — `"` and `'` included, since these land inside `content="…"` attributes.
+- `og:image` only ever emits a URL under `image.tmdb.org` or `showpicker.club`; anything else falls back to the default.
+- An unknown invite token renders the identical card to an expired one, so a dead link never confirms a token existed. Only a live invite gets a group name or a first name.
+
 ## Universal links
 
 `public/.well-known/apple-app-site-association` (served as `application/json` via a `_headers` rule — it has no extension) claims showpicker.club URLs for the iOS app (`NQ6AJVVBBJ.net.patrickturner.showpickerios`): member pages and `/` open in-app when tapped from another app; API/auth/calendar/admin paths and web-only pages (`/vibe`, `/subscriptions`, legal pages) are excluded and stay in the browser. The same file's `webcredentials` block is what authorizes the app to use passkeys scoped to the domain — see [Passkeys](#passkeys-migration-062). The app side is the `applinks:showpicker.club` and `webcredentials:showpicker.club` Associated Domains entitlements (iOS + Catalyst) plus `route(url:)` handlers in `HomeView` (iPhone: pushes the member) and `IPadHomeView` (focuses the member in the sidebar, honoring the `#list` fragment web URLs carry). Cold-launch links park in `pendingLink` until the roster loads; the `dorothy` → `whitt` slug redirect is mirrored. Apple's CDN caches the AASA file (~hours), so entitlement/AASA changes take a re-install or a day to propagate to devices.

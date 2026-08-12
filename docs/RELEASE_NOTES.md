@@ -21,6 +21,23 @@ Applies to iPhone, iPad and Mac, plus a round of Apple TV fixes and a much
 faster Apple Watch app.
 
 ```
+Links you share now say what you're sharing.
+
+• Send someone a show and it arrives as "Severance on Show Picker Club",
+  with the artwork — instead of the same blank "Show Picker Club" card
+  every time, no matter what you sent.
+
+• Group invites say which group. "Join Thursday Night Club on Show Picker
+  Club" rather than a link they have to take on faith.
+
+• Household invites do the same, naming whoever sent it.
+
+Tapping any of them still opens straight to the right place in the app, and
+if they don't have it yet, it takes them to the App Store — then the same
+link works.
+```
+
+```
 Your lists open the moment you raise your wrist.
 
 • The Apple Watch app used to sit on a spinner while it fetched everything

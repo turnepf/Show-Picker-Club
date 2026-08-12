@@ -256,10 +256,18 @@ struct ShowDetailView: View {
         .toolbar {
             // Standard iOS share sheet — text, mail, AirDrop, anything the
             // user has. Shares a watch link (or the club page) plus a blurb.
+            //
+            // `preview` names the show in the share sheet itself. The card the
+            // *recipient* sees is built somewhere else entirely: their device
+            // fetches shareURL and reads the Open Graph tags served by
+            // functions/show/[id].js. Nothing set here can change that bubble,
+            // which is why every share used to look identical no matter what
+            // this subject said.
             ToolbarItem(placement: .topBarTrailing) {
                 ShareLink(item: shareURL,
-                          subject: Text(title),
-                          message: Text(shareText)) {
+                          subject: Text(shareTitle),
+                          message: Text(shareText),
+                          preview: SharePreview(shareTitle)) {
                     Image(systemName: "square.and.arrow.up")
                 }
             }
@@ -431,6 +439,10 @@ struct ShowDetailView: View {
         return URL(string: "https://showpicker.club/\(slug)")
             ?? URL(string: "https://showpicker.club")!
     }
+
+    // Matches the og:title functions/show/[id].js serves for the same link, so
+    // the share sheet and the recipient's card say the same thing.
+    private var shareTitle: String { "\(title) on Show Picker Club" }
 
     private var shareText: String {
         let place = (network.map { " on \($0)" }) ?? ""

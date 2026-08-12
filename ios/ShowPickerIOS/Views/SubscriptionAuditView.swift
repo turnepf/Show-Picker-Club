@@ -616,10 +616,16 @@ private struct HouseholdPickerView: View {
                     // A String is offered to the system as plain text, which
                     // drops Messages, Mail and AirDrop from the sheet — the
                     // targets that matter for an invite.
+                    // The recipient's preview card is built by
+                    // functions/household/join.js, which names the household
+                    // after whoever sent the invite ("Join Patrick's household
+                    // on Show Picker Club"). It reads "my household" here
+                    // because this side is the sender's own screen.
                     if let url = URL(string: invite.url) {
                         ShareLink(item: url,
-                                  subject: Text("Join my household on Show Picker"),
-                                  message: Text("Join my household — the subscription audit pools our shows so we're not counted twice for the same service.")) {
+                                  subject: Text("Join my household on Show Picker Club"),
+                                  message: Text("Join my household on Show Picker Club — the subscription audit pools our shows so we're not counted twice for the same service."),
+                                  preview: SharePreview("Join my household on Show Picker Club")) {
                             Label("Share invite link", systemImage: "square.and.arrow.up")
                         }
                     }

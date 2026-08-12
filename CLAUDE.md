@@ -144,6 +144,21 @@ section heading surviving the seam between slices), duplicate handling, and the
 import's own daily ceiling.
 
 ```bash
+node scripts/og-preview-test.mjs
+```
+
+The three link-preview pages — `/show/:id`, `/groups/join`, `/household/join` —
+on the same harness. These are the only pages that render member-adjacent rows
+with **no session**, so the properties worth pinning are the negative ones: the
+show card names the show but leaks no note, recommender or watching-with and
+never says whose list it's on; a title full of quotes and markup can't break out
+of a `content="…"` attribute; a non-TMDB image URL is dropped rather than
+emitted into an `og:image` other people's clients fetch; and an unknown invite
+token renders the same card as an expired one, so a dead link never confirms it
+existed. Also guards the `og:image` on the marketing page, whose absence is why
+every share used to arrive with no artwork.
+
+```bash
 cd ShowPickerCore && swift test
 ```
 
