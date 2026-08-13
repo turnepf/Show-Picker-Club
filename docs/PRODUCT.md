@@ -642,6 +642,45 @@ A few intentional omissions:
   existing `is_movie` flag on `shows`. Scope — which surfaces get the filter
   (web lists, Trending, search, native apps) — still to be defined.
 
+- **Karma scoreboard.** (Roger — 8/13/2026.) Participation earns points and a
+  leaderboard ranks the club: watching shows, rating them, adding to lists and
+  recommending all score. Roger's framing — "the more you participate ... the
+  more points you score on the board."
+
+  Most of the raw material is already recorded. `shows.updated_at` is bumped
+  only by member-initiated writes (enrichment stamps `enriched_at` instead), so
+  the database already distinguishes a member doing something from a background
+  job doing it to them; `show_ratings` has the ratings; `/api/activity` already
+  reconstructs a who-added-what feed and already knows to skip seeded rows
+  (`added_by='seed'`, NULL `created_at`) so a starter list doesn't read as
+  activity. A first scoring pass is closer to a query than a feature.
+
+  Three questions to answer before building, none of them technical:
+
+  - **What it does to the four lists.** They are deliberately narrow and
+    "force a clear judgement" — points for adding rewards volume, which is the
+    opposite pressure. If this ships, the scoring probably has to favour acts
+    of judgement (rating a show, promoting Watching → Loved, marking a season
+    done) over acts of accumulation (adding a title). Worth deciding
+    explicitly rather than discovering it from a padded Next Up.
+  - **Who can see whose score.** A leaderboard is a new cross-member surface,
+    and cross-member reads are group-scoped everywhere else (see
+    [`INVARIANTS.md`](INVARIANTS.md) §12 and the Vibe scoping rules). Club-wide
+    or per-group is a product call; either way it needs a session, and it must
+    not become a public surface. Note also `_shared/excluded-members.js`, which
+    bounds club-level *math* today — whether an excluded member appears on a
+    leaderboard is the same question in a new place.
+  - **Whether a two-member club wants a ranking at all.** Production is small,
+    and a leaderboard between two people is a different social object than one
+    between twenty. A personal streak or a "your year in shows" summary may be
+    the same idea at the right size.
+
+  Platforms if built: **iPhone/iPad** get the board and whatever earns points.
+  **Apple TV** could display it — it's view-only, and a leaderboard is a fine
+  thing to render on a TV — but earns nothing there. **The watch doesn't**;
+  read-only and no room. **The web doesn't** — it's frozen at its restored
+  state (see [Web app status](#web-app-status)).
+
 ## Shipped (formerly backlog)
 
 - **Tag member friends** (Patrick — 7/26/2026), shipped 2026-08 as
