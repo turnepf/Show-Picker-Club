@@ -35,6 +35,8 @@ faster Apple Watch app.
 • Anyone who isn't in the app, just type their name like always.
 
 Take someone off and the show stays on their list. It's theirs now.
+
+Thayná's idea. Thank you, Thayná.
 ```
 
 ```
