@@ -3,6 +3,7 @@ import { getSession } from '../_shared/auth.js';
 import { canonicalNetwork, networkFromUrl, networkSearchUrl } from '../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../_shared/watch-providers.js';
 import { safeNetworkUrl } from '../_shared/url-utils.js';
+import { syncWatchers, watchersForShows } from '../_shared/watchers.js';
 
 
 function corsHeaders() {
@@ -44,6 +45,13 @@ export async function onRequestGet(context) {
       delete r.recommended_by;
       delete r.added_by;
     }
+  } else {
+    // Named members ride along with the owner's own rows so the list can draw
+    // them as people rather than re-parsing them out of the display string.
+    // Owner-only for the same reason watching_with is: it says who someone is
+    // spending their evenings with.
+    const byShow = await watchersForShows(env, results.map((r) => r.id));
+    for (const r of results) r.watchers = byShow.get(r.id) || [];
   }
   await borrowArtworkAcrossCopies(env, results);
   return new Response(JSON.stringify({ shows: results }), { headers: corsHeaders() });
@@ -196,7 +204,20 @@ export async function onRequestPost(context) {
     })());
   }
 
-  const show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(showId).first();
+  // Named group-mates, if any: links the two copies and puts the title on
+  // their list too. The fan-out is bounded to members the caller shares a
+  // group with — _shared/watchers.js drops anything else.
+  let show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(showId).first();
+  if (Array.isArray(body.watcher_slugs) && body.watcher_slugs.length) {
+    const synced = await syncWatchers(env, {
+      show, ownerSlug: session.member_slug, ownerEmail: session.email,
+      slugs: body.watcher_slugs, rawWatchingWith: watching_with || null,
+    });
+    show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(showId).first();
+    show.watchers = synced.watchers;
+  } else {
+    show.watchers = [];
+  }
   return new Response(JSON.stringify({ show }), { status: 201, headers: corsHeaders() });
 }
 

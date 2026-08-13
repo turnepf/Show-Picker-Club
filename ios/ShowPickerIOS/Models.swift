@@ -3,6 +3,24 @@ import Foundation
 // Mirrors the JSON shapes returned by showpicker.club. Same schema as the
 // tvOS client; iPhone gets the extra write paths (POST/PUT) below.
 
+// Someone you share a private group with — the candidate list for "Watching
+// with" (/api/group-members). Deliberately not a `Member`: this carries no
+// show counts or calendar token, only who they are and which of your groups
+// puts them in front of you.
+struct GroupMate: Codable, Identifiable, Hashable {
+    var id: String { slug }
+    let slug: String
+    let name: String
+    let groups: [String]?
+
+    // Why they're on the list, for members in more than one group. A single
+    // shared group needs no explanation.
+    var groupsLabel: String? {
+        guard let groups, !groups.isEmpty else { return nil }
+        return groups.joined(separator: ", ")
+    }
+}
+
 struct Member: Codable, Identifiable, Hashable {
     var id: String { slug }
     let slug: String

@@ -64,7 +64,7 @@ Login is by passkey, one-time code, or Sign in with Apple — there are no store
 | `notes`             | TEXT | |
 | `movie`             | INTEGER DEFAULT 0 | Suppresses TMDB season lookups. |
 | `full_series`       | INTEGER DEFAULT 0 | 🎬 badge; set when TMDB reports the series ended. |
-| `watching_with`     | TEXT | |
+| `watching_with`     | TEXT | The display string: free text first, then the names of any linked members (see [`show_watchers`](#show_watchers)). Kept composed server-side, so a client that knows nothing about links still renders it correctly. Owner-only — stripped for every other reader. |
 | `next_season_date`  | TEXT | ISO date from TMDB. |
 | `season_end_date`   | TEXT | ISO date from TMDB. |
 | `archived`          | INTEGER DEFAULT 0 | |
@@ -125,6 +125,33 @@ Entry is gated to shows on any list except Next Up (`list !== 'next'`), enforced
 `GET /api/reporting` (admin-only, backs `/reporting`) reports rating activity alongside the other show metrics: a "People who rated" card (distinct `member_slug`s with an insert/update to `show_ratings` in the same day/week/month/all-time windows as new/edited/archived shows, keyed off `updated_at` so re-rating counts as activity) plus all-time submitted-ratings and distinct-titles-rated totals. Defensive like the other migration-gated reporting fields: falls back to zeros rather than 500ing the dashboard if `show_ratings` isn't there.
 
 Native support: `ShowPickerCore/Sources/ShowPickerCore/Ratings.swift` defines `RatingsSummary`/`SeasonRatingSummary`/`RatingResponse`/`RateBacklogShow`/`RateBacklogResponse`, shared by all three Apple targets; `ShowResponse` carries `ratings` as a sibling of `show` (matching the JSON shape, not nested). iOS gets full entry via `API.rateShow(id:rating:season:)` and a "Ratings" section in `ShowDetailView` (`RatingTapRow`/`RatingEntryRow` in `Views/RatingTapRow.swift`); tvOS and watchOS only read `ratings` off their existing show-detail calls and render it (no write path — both apps are view-only/read-only generally). iOS also has a native bulk rate-your-backlog screen, `RateBacklogView` (`API.rateBacklog(member:)` → `GET /api/rate-backlog`), surfaced next to Subscription audit on Home, the iPad sidebar, and a member's own page — tvOS/watchOS don't get it. Rating is routed through the offline write queue like any other edit: `PendingMutation.Kind.rate` carries `rating`/`season`, `OfflineQueue.enqueueRate`/`pendingRating` queue and expose the latest not-yet-synced value, and `API.rateShow` falls back to queueing when offline instead of throwing.
+
+### `show_watchers`
+Migration 064. "Watching With" as people rather than only text. One row = *the owner of `show_id` has named `member_slug` as someone they're watching it with*.
+
+| Column        | Type | Notes |
+|---------------|------|-------|
+| `show_id`     | INTEGER NOT NULL REFERENCES shows(id) ON DELETE CASCADE | |
+| `member_slug` | TEXT NOT NULL REFERENCES members(slug) ON DELETE CASCADE | The person named. |
+| `created_by`  | TEXT REFERENCES members(slug) | Whoever's tag wrote the row — the show's owner, or the other member when this is the mirror row their tag created. |
+| `created_at`  | TEXT | |
+
+PK `(show_id, member_slug)`.
+
+`functions/_shared/watchers.js` owns every read and write. **This is the only cross-member write in the codebase** — suggest-a-show and share-to-member were retired in 2026-07 and still return 410 — so the rules it enforces are the point:
+
+- **Only group-mates can be named.** Every slug from a client is checked against `group_members` before anything is written. A slug for someone the caller shares no group with is dropped silently (the rest of the save still succeeds), never honoured. A group is a relationship both people opted into; that gate is the entire difference between this and the writes that were retired.
+- **Links are mirrored pairs.** Naming Whitt on your row inserts `(your_show, whitt)`, ensures Whitt has a copy of the title, and inserts `(their_show, you)` on it. "Watching with" is symmetrical by construction rather than a note one person keeps about another.
+- **A list they already made is never rearranged.** An existing copy — matched by `tmdb_id`, else case-insensitively by title — is linked where it sits, on whatever list and in whatever order they put it. Only a title they don't have is created, and only then on the same list as the tagger's copy. An **archived** copy is unarchived onto that list rather than duplicated (an archived row is on no list, so there's no placement to preserve).
+- **Unlinking never deletes their row.** Dropping a link removes both directions and takes the tagger's name out of their `watching_with`. The show stays on their list — it arrived, they may have started watching it, and removing it is their call.
+- **Deleting your copy cleans up after itself.** `DELETE /api/shows/:id` calls `unlinkShow()` first. The foreign-key cascade only reaches links hanging off the deleted row; the mirrors live on *other members'* shows and point at an owner who still exists, so without that call a deleted copy would leave its owner's name on other people's lists forever.
+- **`MAX_WATCHERS` (10)** caps how far one add can fan out.
+
+Created rows inherit the source row's enrichment (poster, overview, cast, ids) instead of re-fetching, so a fan-out doesn't multiply TMDB calls by the size of the group; a source that was never enriched triggers one title lookup for the new row. `updated_at` *is* bumped on a row a tag touches — a show arriving on your list is a member-initiated change, just by a different member (the same "shared-in" activity `last_activity_at` has always counted). The `updated_at` rule bars *background jobs*, not other members.
+
+`shows.watching_with` is not replaced. `composeWatchingWith()` rebuilds it after every link change as free text + linked names, comma-joined, so tvOS, watchOS and any already-installed build keep rendering the one field they read with no client change. Recomposition is passed the names linked *before* the change as well as after — without the "before" half, a name whose link was just dropped survives as free text and the removal appears to do nothing.
+
+The structured half rides alongside as `watchers: [{slug, name}]` on `GET /api/shows?member=<self>` and `GET /api/shows/:id` — **owner-only**, exactly like `watching_with` and `notes`.
 
 ### `sessions`
 | Column          | Type | Notes |
@@ -221,6 +248,9 @@ otherwise; only the creator can delete.
 - **Joining is a link.** `POST /api/groups/[id]/invite` mints the token and the
   share URL (`/groups/join?token=…`); opening it signed in joins the group,
   signed out it previews the group name and asks for a login.
+- **Groups are the consent boundary for "Watching with".** Sharing a group is
+  what makes someone nameable on a show — and therefore what makes it legal to
+  write a row onto their list. See [`show_watchers`](#show_watchers).
 - **Platforms.** iPhone and iPad create, invite, join, leave and delete. Apple
   TV browses groups read-only (`GroupsListViewTV` / `GroupDetailViewTV`), which
   is why the tvOS API client has only the three read calls. The watch has no
@@ -256,15 +286,16 @@ The complete map:
 | `GET /api/vibe`                        | `functions/api/vibe.js`                    | GET     | session — you and members of your groups only; any other slug is 403. Group membership is the *only* gate: the taste exclusion never hides a profile (see [Taste exclusion](#taste-exclusion-_sharedexcluded-membersjs)) |
 | `GET /api/shows`                       | `functions/api/shows.js`                   | GET     | session |
 | `GET /api/export`                      | `functions/api/export.js`                  | GET     | session (exports the caller's OWN lists only; plain-text download) |
-| `POST /api/shows`                      | `functions/api/shows.js`                   | POST    | session |
+| `POST /api/shows`                      | `functions/api/shows.js`                   | POST    | session. Optional `watcher_slugs` names group-mates — see [`show_watchers`](#show_watchers) |
+| `GET /api/group-members`               | `functions/api/group-members.js`           | GET     | session — everyone the caller shares a private group with, self-scoped (no slug param). The candidate list for the "Watching with" picker, and exactly the set `watcher_slugs` is validated against |
 | `POST /api/import/parse`               | `functions/api/import/parse.js`            | POST    | session |
 | `POST /api/import/commit`              | `functions/api/import/commit.js`           | POST    | session |
 | `GET /api/shows/all`                   | `functions/api/shows/all.js`               | GET     | session — your own rows plus those of members you share a group with |
 | `GET /api/shows/check`                 | `functions/api/shows/check.js`             | GET     | session |
 | `POST /api/shows/share`                | `functions/api/shows/share.js`             | POST    | retired 2026-07 — returns 410 Gone |
 | `GET /api/shows/[id]`                  | `functions/api/shows/[id].js`              | GET     | none; catalog fields only unless the session owns the show (notes, watching_with, recommended_by are owner-only). `group_watchers` is session-only and group-scoped — see below. `list` is present-but-empty for a logged-out visitor rather than absent: the Apple clients decode it non-optionally, and omitting it failed the whole payload, blanking a public show card whose catalog fields were all being sent |
-| `PUT /api/shows/[id]`                  | `functions/api/shows/[id].js`              | PUT     | session |
-| `DELETE /api/shows/[id]`               | `functions/api/shows/[id].js`              | DELETE  | session |
+| `PUT /api/shows/[id]`                  | `functions/api/shows/[id].js`              | PUT     | session. `watcher_slugs` is the COMPLETE set, so unticking someone unlinks them; **omitting the key entirely leaves the links alone** (what an older build sends), which is why absent and `[]` must not be conflated |
+| `DELETE /api/shows/[id]`               | `functions/api/shows/[id].js`              | DELETE  | session — unlinks watchers in both directions first (see [`show_watchers`](#show_watchers)) |
 | `PUT /api/shows/[id]/move`             | `functions/api/shows/[id]/move.js`         | PUT     | session |
 | `POST /api/shows/reorder`              | `functions/api/shows/reorder.js`           | POST    | session (own rows only) |
 | `PUT /api/shows/[id]/archive`          | `functions/api/shows/[id]/archive.js`      | PUT     | session |

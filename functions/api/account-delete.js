@@ -16,6 +16,7 @@
 
 import { getSession } from '../_shared/auth.js';
 import { sendEmail, deleteCodeEmail } from '../_shared/email.js';
+import { forgetMemberAsWatcher } from '../_shared/watchers.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -101,6 +102,15 @@ export async function onRequestPost(context) {
     return json({ error: 'invalid' }, 401);
   }
 
+  // Take the departing member's name off every row that named them, before
+  // the rows that would identify those rows are gone. This path deletes
+  // explicitly rather than leaning on cascades, and the display string isn't
+  // a foreign key at all — so without this, "watching Severance with Whitt"
+  // outlives Whitt's account on somebody else's list.
+  try {
+    await forgetMemberAsWatcher(env, slug);
+  } catch (e) { /* a database without migration 064 has nothing to forget */ }
+
   const statements = [
     env.DB.prepare('DELETE FROM actors WHERE show_id IN (SELECT id FROM shows WHERE member_slug = ?)').bind(slug),
     env.DB.prepare('DELETE FROM shows WHERE member_slug = ?').bind(slug),
@@ -115,14 +125,18 @@ export async function onRequestPost(context) {
     // separate audit table to scrub any more (migration 058).
     env.DB.prepare('DELETE FROM members WHERE slug = ?').bind(slug),
   ];
-  // member_google_ids (migration 031) and member_passkeys (062) postdate the
-  // original delete path — include them, and retry without on a database
-  // that hasn't taken those migrations yet (batch is all-or-nothing).
+  // member_google_ids (migration 031), member_passkeys (062) and
+  // show_watchers (064) postdate the original delete path — include them, and
+  // retry without on a database that hasn't taken those migrations yet (batch
+  // is all-or-nothing, so one missing table would otherwise fail the whole
+  // deletion rather than just its own line).
   try {
     await env.DB.batch([
       env.DB.prepare('DELETE FROM member_google_ids WHERE member_slug = ?').bind(slug),
       env.DB.prepare('DELETE FROM member_passkeys WHERE member_slug = ?').bind(slug),
       env.DB.prepare('DELETE FROM webauthn_challenges WHERE member_slug = ?').bind(slug),
+      env.DB.prepare('DELETE FROM show_watchers WHERE member_slug = ?').bind(slug),
+      env.DB.prepare('DELETE FROM show_watchers WHERE show_id IN (SELECT id FROM shows WHERE member_slug = ?)').bind(slug),
       ...statements,
     ]);
   } catch (e) {

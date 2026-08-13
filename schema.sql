@@ -230,6 +230,23 @@ CREATE TABLE IF NOT EXISTS show_ratings (
   UNIQUE (tmdb_id, tmdb_type, season_number, member_slug)
 );
 
+-- Migration 064. One row = "the owner of show_id has named member_slug as
+-- someone they're watching it with". Written in mirrored pairs by
+-- functions/_shared/watchers.js — tagging a group-mate also puts the title on
+-- their list and writes the row pointing back at you. `shows.watching_with`
+-- stays the display string (free text plus the linked names appended), so
+-- clients that only read that field are unaffected.
+--
+-- Only members you share a private group with can be named. That gate is what
+-- separates this from the cross-member writes retired in 2026-07.
+CREATE TABLE IF NOT EXISTS show_watchers (
+  show_id INTEGER NOT NULL REFERENCES shows(id) ON DELETE CASCADE,
+  member_slug TEXT NOT NULL REFERENCES members(slug) ON DELETE CASCADE,
+  created_by TEXT REFERENCES members(slug),
+  created_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (show_id, member_slug)
+);
+
 CREATE TABLE IF NOT EXISTS show_traits (
   title_lower TEXT PRIMARY KEY,
   title TEXT NOT NULL,
@@ -356,6 +373,8 @@ CREATE INDEX IF NOT EXISTS idx_shows_member_archived_title ON shows(member_slug,
 CREATE INDEX IF NOT EXISTS idx_shows_active_title ON shows(archived, title COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_actors_show_id ON actors(show_id);
 CREATE INDEX IF NOT EXISTS idx_show_ratings_title ON show_ratings(tmdb_id, tmdb_type);
+CREATE INDEX IF NOT EXISTS idx_show_watchers_show ON show_watchers(show_id);
+CREATE INDEX IF NOT EXISTS idx_show_watchers_member ON show_watchers(member_slug);
 CREATE INDEX IF NOT EXISTS idx_member_subs_slug ON member_subscriptions(member_slug);
 CREATE INDEX IF NOT EXISTS idx_household_member ON household_members(member_slug);
 CREATE INDEX IF NOT EXISTS idx_household_invites_code ON household_invites(code);

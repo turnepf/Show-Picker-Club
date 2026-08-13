@@ -40,6 +40,24 @@ Members only fill in title, network, and recommender — the rest is automatic. 
 
 The network dropdown lists the modern streaming-service brand (HBO Max, Paramount+, Peacock, Hulu, Disney+, Apple TV+, Amazon Prime Video, Netflix, Starz, AMC+, Food Network, Fox, BritBox, PBS, YouTube, MGM+, Pluto TV), plus two **storefronts** — Apple TV (rent or buy) and Fandango at Home — for titles nothing streams yet, like a film still in its theatrical window. A storefront charges per view, so the Subscription Audit ignores those rows entirely rather than counting them toward a monthly bill. Pluto TV is the opposite case — free and ad-supported, so it still gets an audit card (it's an app you open, not a purchase you make) but is priced at $0, and dropping it saves nothing. Entries carry parenthetical aliases that name the sub-brands they carry (e.g. "Paramount+ (including CBS, MTV, Comedy Central, Nickelodeon, BET, Showtime)"). If a member ever submits an old or sub-brand name like `HBO`, `NBC`, `Bravo`, or `FX` — via API or by pasting — it gets folded to the canonical streamer on save. See [`ARCHITECTURE.md`](ARCHITECTURE.md#networks) for the full mapping.
 
+### Watching with
+
+The "Watching with" field on a show is still free text — "my sister", "the group chat", anyone at all. What's new is that when the person is a **member you share a private group with**, you can pick them from a list instead of typing their name, and picking them does something.
+
+Naming a group-mate:
+
+- Puts the show on **their list too**, on the same list you have it on. If they already have it, nothing moves — it stays on whatever list they put it on, in the order they put it, and no second copy appears. If they'd archived it, it comes back.
+- **Names you back** on their copy's Watching with. It's a shared fact about an evening, so it reads the same from both sides rather than being a note you keep about them.
+- Can be **more than one person** at a time. Each of them sees you named on their copy — not each other, since you may share a group with both of them while they share none with each other.
+
+Unticking someone takes your name off their copy and unlinks the two. **It does not remove the show from their list** — it arrived, they may have started watching it, and deleting it is theirs to do. Deleting your own copy does the same cleanup: your name comes off every copy that was linked to it.
+
+Only people you already share a group with are offered, and only they can be named — a member of the club you have no group with is not on the list and can't be reached by hand. This is the only place in the app where one member writes to another member's library; [`INVARIANTS.md`](INVARIANTS.md) §12 has the rules that keep it narrow. If you're in no groups, the field is exactly the plain text box it always was.
+
+Who's named stays as private as the field itself: only you see the Watching with on your own rows, whether it's a typed name or a linked member.
+
+Platforms: **iPhone/iPad** get the picker (in the Add/Edit sheet). **Apple TV and the watch** render the resulting text like they always have — both are view-only, so neither can tag. The web app is frozen and doesn't get it.
+
 ### Also watching (groups)
 
 The show card names the other members of your groups who have that same title on their **Watching** list — an "Also watching: Alex, Dana" line sitting directly above Network. It appears wherever the card opens (your own list, another member's list, Trending, search), not only inside a group screen, and it's silent when nobody in your groups is watching it or you're in no groups.
@@ -606,19 +624,25 @@ A few intentional omissions:
   and stored, never guessed by title at tap time. See "Apple links vs. stored
   network" in ARCHITECTURE.md.
 
-- **Tag member friends.** (Patrick — 7/26/2026.) Let a member tag other
-  members on a show — captured for later; scope (what a tag means, where it
-  surfaces, whether it notifies) still to be defined. Note this brushes up
-  against the retired cross-member writes (suggest-a-show / share-to-member,
-  now 410) and the "no comments or threads" stance — needs a deliberate call
-  before building.
-
 - **Show Picker movie filter.** (Patrick — 7/26/2026.) A way to filter a
   member's lists (or the catalog) down to just movies vs. TV, using the
   existing `is_movie` flag on `shows`. Scope — which surfaces get the filter
   (web lists, Trending, search, native apps) — still to be defined.
 
 ## Shipped (formerly backlog)
+
+- **Tag member friends** (Patrick — 7/26/2026), shipped 2026-08 as
+  [Watching with](#watching-with). The scope question the backlog entry
+  flagged — "this brushes up against the retired cross-member writes and the
+  no-comments stance, needs a deliberate call" — was answered by making the
+  tag *the existing Watching With field* rather than a new social object.
+  Deliberately: no notifications, no threads, no inbox, nothing to accept.
+  A tag names a person in a field that already existed, and its one side
+  effect is the show landing on their list. Migration 064 (`show_watchers`),
+  gated on shared private-group membership; see
+  [`INVARIANTS.md`](INVARIANTS.md) §12 for why that gate is what made the
+  cross-member write acceptable when suggest-a-show and share-to-member were
+  not.
 
 - **Title-healing bandaids retired (July 2026).** Since TMDB type-ahead
   pinning made new rows arrive with canonical title, movie flag, poster,

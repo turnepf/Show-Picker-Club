@@ -140,6 +140,15 @@ enum API {
         return r.members
     }
 
+    // The people you can name in "Watching with" — everyone you share a
+    // private group with. Session-gated and self-scoped; a member in no group
+    // gets an empty list, which is what hides the picker entirely.
+    static func groupMates() async throws -> [GroupMate] {
+        struct Wrapper: Decodable { let members: [GroupMate] }
+        let r: Wrapper = try await get("/api/group-members")
+        return r.members
+    }
+
     static func popular() async throws -> [PopularShow] {
         let r: PopularResponse = try await getCached("/api/popular", cacheKey: "popular")
         return r.shows
@@ -751,12 +760,14 @@ enum API {
 
     static func addShow(memberSlug: String, title: String, network: String?, networkUrl: String? = nil,
                         list: String, notes: String?, recommendedBy: String?, movie: Bool, fullSeries: Bool,
-                        watchingWith: String?, tmdbId: Int? = nil, tmdbType: String? = nil) async throws -> Show {
+                        watchingWith: String?, watcherSlugs: [String]? = nil,
+                        tmdbId: Int? = nil, tmdbType: String? = nil) async throws -> Show {
         do {
             let show = try await addShowRemote(memberSlug: memberSlug, title: title, network: network,
                                                networkUrl: networkUrl, list: list, notes: notes,
                                                recommendedBy: recommendedBy, movie: movie,
                                                fullSeries: fullSeries, watchingWith: watchingWith,
+                                               watcherSlugs: watcherSlugs,
                                                tmdbId: tmdbId, tmdbType: tmdbType)
             await OfflineQueue.shared.upsert(show, slug: memberSlug)
             return show
@@ -765,7 +776,7 @@ enum API {
                 return await OfflineQueue.shared.enqueueAdd(
                     memberSlug: memberSlug, title: title, network: network, networkUrl: networkUrl,
                     list: list, notes: notes, recommendedBy: recommendedBy, movie: movie,
-                    fullSeries: fullSeries, watchingWith: watchingWith)
+                    fullSeries: fullSeries, watchingWith: watchingWith, watcherSlugs: watcherSlugs)
             }
             throw error
         }
@@ -774,7 +785,8 @@ enum API {
     @discardableResult
     static func addShowRemote(memberSlug: String, title: String, network: String?, networkUrl: String? = nil,
                               list: String, notes: String?, recommendedBy: String?, movie: Bool, fullSeries: Bool,
-                              watchingWith: String?, tmdbId: Int? = nil, tmdbType: String? = nil) async throws -> Show {
+                              watchingWith: String?, watcherSlugs: [String]? = nil,
+                              tmdbId: Int? = nil, tmdbType: String? = nil) async throws -> Show {
         struct Wrapper: Decodable { let show: Show }
         let body: [String: Any?] = [
             "title": title,
@@ -786,6 +798,10 @@ enum API {
             "movie": movie ? 1 : 0,
             "full_series": fullSeries ? 1 : 0,
             "watching_with": watchingWith,
+            // Group-mates named on the show. The server validates each slug
+            // against shared group membership, links the two copies, and puts
+            // the title on their list too.
+            "watcher_slugs": watcherSlugs,
             // Exact type-ahead pick — the server enriches this TMDB entry
             // directly instead of re-guessing from the title.
             "tmdb_id": tmdbId,
@@ -798,12 +814,14 @@ enum API {
     @discardableResult
     static func updateShow(id: Int, title: String, network: String?, list: String,
                            notes: String?, recommendedBy: String?, movie: Bool, fullSeries: Bool,
-                           watchingWith: String?, archived: Bool, memberSlug: String? = nil,
+                           watchingWith: String?, watcherSlugs: [String]? = nil,
+                           archived: Bool, memberSlug: String? = nil,
                            tmdbId: Int? = nil, tmdbType: String? = nil) async throws -> Show {
         do {
             let show = try await updateShowRemote(id: id, title: title, network: network, list: list,
                                                   notes: notes, recommendedBy: recommendedBy, movie: movie,
                                                   fullSeries: fullSeries, watchingWith: watchingWith,
+                                                  watcherSlugs: watcherSlugs,
                                                   archived: archived, tmdbId: tmdbId, tmdbType: tmdbType)
             if let slug = show.memberSlug ?? memberSlug { await OfflineQueue.shared.upsert(show, slug: slug) }
             return show
@@ -812,7 +830,7 @@ enum API {
                 return await OfflineQueue.shared.enqueueUpdate(
                     id: id, memberSlug: memberSlug, title: title, network: network, list: list,
                     notes: notes, recommendedBy: recommendedBy, movie: movie, fullSeries: fullSeries,
-                    watchingWith: watchingWith, archived: archived)
+                    watchingWith: watchingWith, watcherSlugs: watcherSlugs, archived: archived)
             }
             throw error
         }
@@ -821,7 +839,7 @@ enum API {
     @discardableResult
     static func updateShowRemote(id: Int, title: String, network: String?, list: String,
                                  notes: String?, recommendedBy: String?, movie: Bool, fullSeries: Bool,
-                                 watchingWith: String?, archived: Bool,
+                                 watchingWith: String?, watcherSlugs: [String]? = nil, archived: Bool,
                                  tmdbId: Int? = nil, tmdbType: String? = nil) async throws -> Show {
         struct Wrapper: Decodable { let show: Show }
         // Member-editable text fields are sent as explicit JSON null when
@@ -836,6 +854,12 @@ enum API {
             "movie": movie ? 1 : 0,
             "full_series": fullSeries ? 1 : 0,
             "watching_with": jsonNullable(watchingWith),
+            // The COMPLETE set of named group-mates, so unticking someone
+            // unlinks them. Omitted entirely (nil, dropped by compactMapValues
+            // below) means "leave the links alone" — which is what a caller
+            // that doesn't manage watchers wants, and what the server assumes
+            // when the key is absent.
+            "watcher_slugs": watcherSlugs,
             "archived": archived ? 1 : 0,
             "tmdb_id": tmdbId,
             "tmdb_type": tmdbType,

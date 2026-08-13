@@ -77,7 +77,7 @@ final class OfflineQueue: ObservableObject {
     @discardableResult
     func enqueueAdd(memberSlug: String, title: String, network: String?, networkUrl: String?,
                     list: String, notes: String?, recommendedBy: String?, movie: Bool,
-                    fullSeries: Bool, watchingWith: String?) -> Show {
+                    fullSeries: Bool, watchingWith: String?, watcherSlugs: [String]? = nil) -> Show {
         var m = PendingMutation(kind: .add, showId: nextTempId(), memberSlug: memberSlug)
         m.title = title
         m.network = network
@@ -88,6 +88,7 @@ final class OfflineQueue: ObservableObject {
         m.movie = movie
         m.fullSeries = fullSeries
         m.watchingWith = watchingWith
+        m.watcherSlugs = watcherSlugs
         append(m)
         return makeShow(from: m)
     }
@@ -95,7 +96,7 @@ final class OfflineQueue: ObservableObject {
     @discardableResult
     func enqueueUpdate(id: Int, memberSlug: String?, title: String, network: String?, list: String,
                        notes: String?, recommendedBy: String?, movie: Bool, fullSeries: Bool,
-                       watchingWith: String?, archived: Bool) -> Show {
+                       watchingWith: String?, watcherSlugs: [String]? = nil, archived: Bool) -> Show {
         let slug = memberSlug ?? cachedShow(id: id)?.memberSlug
         var m = PendingMutation(kind: .update, showId: id, memberSlug: slug)
         m.title = title
@@ -106,6 +107,7 @@ final class OfflineQueue: ObservableObject {
         m.movie = movie
         m.fullSeries = fullSeries
         m.watchingWith = watchingWith
+        m.watcherSlugs = watcherSlugs
         m.archived = archived
         append(m)
         // Return the show as it now looks locally (keeps enrichment fields).
@@ -194,7 +196,8 @@ final class OfflineQueue: ObservableObject {
                 memberSlug: m.memberSlug ?? "", title: m.title ?? "", network: m.network,
                 networkUrl: m.networkUrl, list: m.list ?? ShowList.watching.rawValue,
                 notes: m.notes, recommendedBy: m.recommendedBy, movie: m.movie ?? false,
-                fullSeries: m.fullSeries ?? false, watchingWith: m.watchingWith)
+                fullSeries: m.fullSeries ?? false, watchingWith: m.watchingWith,
+                watcherSlugs: m.watcherSlugs)
             if let slug = m.memberSlug { replaceTempId(m.showId, with: show, slug: slug) }
             return (m.showId, show.id)
         case .update:
@@ -203,7 +206,7 @@ final class OfflineQueue: ObservableObject {
                 list: m.list ?? ShowList.watching.rawValue, notes: m.notes,
                 recommendedBy: m.recommendedBy, movie: m.movie ?? false,
                 fullSeries: m.fullSeries ?? false, watchingWith: m.watchingWith,
-                archived: m.archived ?? false)
+                watcherSlugs: m.watcherSlugs, archived: m.archived ?? false)
             return nil
         case .move:
             try await API.moveShowRemote(id: m.showId, to: m.targetList ?? ShowList.watching.rawValue)

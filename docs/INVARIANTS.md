@@ -321,6 +321,41 @@ person and a spare device.
 
 Enforcer: `scripts/reporting-platform-test.mjs`.
 
+## 12. A write into someone else's library needs a relationship, and stops at their choices
+
+Cross-member writes were retired in 2026-07 — suggest-a-show and
+share-to-member still return 410 — because *any* logged-in member could put
+rows on *any* other member's list, and self-enrollment meant members are no
+longer all friends. "Watching With" naming a group-mate (migration 064)
+reopens that door deliberately, on much narrower terms. Those terms are the
+invariant, not the feature.
+
+- **Shared group membership is the gate.** Every slug arriving from a client
+  is validated against `group_members` before anything is written. A slug for
+  someone the caller shares no group with is dropped — the rest of the save
+  proceeds, but nothing lands. A member of the club you have no group with is
+  as unreachable as a stranger, which is the point: a group is a relationship
+  both people opted into, and a bare "is a member" check is not.
+- **Their existing choices are read-only to you.** A copy they already have is
+  linked where it sits — same list, same order, no duplicate, no promotion.
+  Only a title they don't have is created. Anything else is a stranger
+  rearranging their lists.
+- **Nothing you write is unremovable, and removing it is bounded.** Unlinking
+  takes your name off their copy and leaves the show on their list. The write
+  can be undone by the person who made it; the *consequences* of it on their
+  library can only be undone by them.
+- **The fan-out is capped** (`MAX_WATCHERS`), and cleanup is symmetrical:
+  deleting your own copy takes your name off every row that mirrors it. A
+  cascade only reaches the links hanging off the row being deleted, so the
+  mirrors have to be swept explicitly or a deleted show leaves its owner's
+  name on other people's lists permanently.
+- **A new cross-member write is a decision, not a refactor.** Anything else
+  that writes to a library the session doesn't own belongs in this section
+  first, with its own answer to "what relationship authorises this, and what
+  of theirs does it refuse to touch".
+
+Enforcer: `scripts/watching-with-test.mjs`.
+
 ## Adding an invariant
 
 Add a section here, then decide which enforcer covers it. Prefer a deterministic

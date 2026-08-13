@@ -28,6 +28,13 @@ struct PendingMutation: Codable, Identifiable, Equatable {
     var movie: Bool?
     var fullSeries: Bool?
     var watchingWith: String?
+    // Group-mates named on the show. Queued alongside the text so a tag made
+    // offline still fans out when the write finally lands — the linking, and
+    // the copy on the other person's list, happen server-side on replay.
+    // Optional, and `nil` means "don't touch the links": a mutation queued by
+    // a build that predates this decodes with the field absent, and must not
+    // read as "unlink everyone".
+    var watcherSlugs: [String]?
     var archived: Bool?
     var targetList: String?   // .move only
     var rating: Int?          // .rate only

@@ -21,6 +21,23 @@ Applies to iPhone, iPad and Mac, plus a round of Apple TV fixes and a much
 faster Apple Watch app.
 
 ```
+"Watching with" now knows who your people are.
+
+• Adding a show? Pick anyone you share a group with instead of typing
+  their name. The show goes on their list too, and their copy names you
+  back — so you both see who you're watching it with.
+
+• Pick more than one. Sunday night is rarely just two people.
+
+• If they already have the show, it stays exactly where they put it —
+  nothing gets moved or duplicated.
+
+• Anyone who isn't in the app, just type their name like always.
+
+Take someone off and the show stays on their list. It's theirs now.
+```
+
+```
 Links you share now say what you're sharing.
 
 • Send someone a show and it arrives as "Severance on Show Picker Club",

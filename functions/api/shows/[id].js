@@ -5,6 +5,7 @@ import { lookupWatchmodeUrl } from '../../_shared/watch-providers.js';
 import { safeNetworkUrl } from '../../_shared/url-utils.js';
 import { getRatingsSummary } from '../../_shared/ratings.js';
 import { creatorsForShow } from '../../_shared/people.js';
+import { syncWatchers, watchersForShow, unlinkShow } from '../../_shared/watchers.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -105,6 +106,9 @@ export async function onRequestGet(context) {
   const creators = await creatorsForShow(env, show);
 
   if (session && session.member_slug === show.member_slug) {
+    // Whom this row names, as members. Owner-only, alongside the
+    // watching_with text it was composed into — same rule as notes.
+    show.watchers = await watchersForShow(env, show.id);
     return new Response(JSON.stringify({ show, ratings, group_watchers, creators }), { headers: corsHeaders() });
   }
   const redacted = {};
@@ -209,7 +213,17 @@ export async function onRequestPut(context) {
     })());
   }
 
-  const show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(params.id).first();
+  let show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(params.id).first();
+  // `watcher_slugs` is the complete set of named group-mates, so an edit that
+  // unticks someone unlinks them. Absent entirely (an older build, a partial
+  // update) leaves the links as they are — see syncWatchers.
+  const synced = await syncWatchers(env, {
+    show, ownerSlug: session.member_slug, ownerEmail: session.email,
+    slugs: body.watcher_slugs !== undefined ? body.watcher_slugs : null,
+    rawWatchingWith: watching_with,
+  });
+  show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(params.id).first();
+  show.watchers = synced.watchers;
   return new Response(JSON.stringify({ show }), { headers: corsHeaders() });
 }
 
@@ -219,6 +233,13 @@ export async function onRequestDelete(context) {
   if (!session) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders() });
   }
+  // Take this row's name off everyone it named before it goes. The foreign
+  // key cascade only reaches the links hanging off this show; the mirrors
+  // live on other members' rows and would otherwise keep naming a member
+  // whose copy no longer exists.
+  const existing = await env.DB.prepare('SELECT * FROM shows WHERE id = ? AND member_slug = ?')
+    .bind(params.id, session.member_slug).first();
+  if (existing) await unlinkShow(env, existing);
   await env.DB.prepare('DELETE FROM shows WHERE id = ? AND member_slug = ?').bind(params.id, session.member_slug).run();
   return new Response(JSON.stringify({ success: true }), { headers: corsHeaders() });
 }

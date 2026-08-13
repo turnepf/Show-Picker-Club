@@ -97,6 +97,18 @@ to Active members), and a member-less tvOS session still counts as one device
 rather than collapsing into a phantom person.
 
 ```bash
+node scripts/watching-with-test.mjs
+```
+
+"Watching With" naming club members, on the same harness — the only
+cross-member write in the codebase, so the properties are the ones that keep
+it narrow. Only a member you share a private group with can be named (a
+hand-typed outside slug writes nothing and doesn't fail the save); a copy they
+already have is linked where it sits rather than moved or duplicated;
+unlinking takes your name off and leaves their show alone; and the free text
+still works, surviving a linked name being added and removed around it.
+
+```bash
 node scripts/vibe-scope-test.mjs
 ```
 

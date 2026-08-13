@@ -19,6 +19,22 @@ public struct Actor: Codable, Hashable, Sendable {
     }
 }
 
+// A club member named in a show's "Watching with" — someone the owner shares a
+// private group with, rather than a name they typed. The distinction matters
+// because a named member's library is linked to this row: the title is on
+// their list too, and their copy names the owner back.
+public struct ShowWatcher: Codable, Identifiable, Hashable, Sendable {
+    public let slug: String
+    public let name: String
+
+    public var id: String { slug }
+
+    public init(slug: String, name: String) {
+        self.slug = slug
+        self.name = name
+    }
+}
+
 public struct Show: Codable, Identifiable, Hashable, Sendable {
     public let id: Int
     public let title: String
@@ -71,6 +87,13 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
     public let originalLanguage: String?   // ISO code: "ja", "ko", …
     public let studio: String?             // originating studio/broadcaster, NOT the streaming service
 
+    // Migration 064. The club members named in `watchingWith`, as people. Sent
+    // only on the owner's own rows — as personal as `notes` — and empty when
+    // the field is nothing but typed text. `watchingWith` remains the display
+    // string (free text, then these names), so a client that ignores this
+    // still renders the field correctly.
+    public let watchers: [ShowWatcher]?
+
     // Explicit public init so other modules (the apps, their offline queues)
     // can construct a Show — the synthesized memberwise init is internal.
     // Parameter order matches the fields as they were declared in the apps'
@@ -113,7 +136,8 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         voteCount: Int? = nil,
         tagline: String? = nil,
         originalLanguage: String? = nil,
-        studio: String? = nil
+        studio: String? = nil,
+        watchers: [ShowWatcher]? = nil
     ) {
         self.id = id
         self.title = title
@@ -152,6 +176,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         self.tagline = tagline
         self.originalLanguage = originalLanguage
         self.studio = studio
+        self.watchers = watchers
     }
 
     enum CodingKeys: String, CodingKey {
@@ -183,6 +208,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         case tagline
         case originalLanguage = "original_language"
         case studio
+        case watchers
     }
 
     // Tolerant decoding. The API varies what it sends by context — `list` and
@@ -236,6 +262,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         tagline = try? c.decode(String.self, forKey: .tagline)
         originalLanguage = try? c.decode(String.self, forKey: .originalLanguage)
         studio = try? c.decode(String.self, forKey: .studio)
+        watchers = try? c.decode([ShowWatcher].self, forKey: .watchers)
     }
 
     public var isMovie: Bool { (movie ?? 0) == 1 }
