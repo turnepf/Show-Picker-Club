@@ -66,14 +66,8 @@ export function upscaleTmdb(url) {
  * @param {string} opts.url         Canonical URL of this link (og:url).
  * @param {string} [opts.heading]   Visible heading, when it should differ from og:title.
  * @param {number} [opts.status]    HTTP status (404 for a dead invite).
- * @param {string} [opts.webUrl]    Site-relative path that continues this link in
- *                                  the browser. Only for links the web app can
- *                                  actually finish (invites); omit it and the
- *                                  card stays App-Store-only. Never pass a value
- *                                  built from anything but our own routes.
- * @param {string} [opts.webLabel]  Wording for that link.
  */
-export function ogPage({ title, description, image, url, heading, status = 200, webUrl, webLabel = 'Continue in your browser' }) {
+export function ogPage({ title, description, image, url, heading, status = 200 }) {
   const art = safeImageUrl(image) || DEFAULT_IMAGE;
   // summary_large_image only makes sense with real artwork; a fallback logo
   // reads better in the small card than blown up across the full width.
@@ -124,7 +118,6 @@ export function ogPage({ title, description, image, url, heading, status = 200, 
     padding: 13px 18px; border-radius: 11px; background: #16161a; color: #fff;
   }
   .foot { margin: 14px 0 0; font-size: 13px; color: #86868e; text-align: center; }
-  .foot a.web { color: inherit; text-decoration: underline; }
   @media (prefers-color-scheme: dark) {
     body { background: #0d0d10; color: #f2f2f5; }
     .card { background: #1a1a1f; box-shadow: none; }
@@ -141,8 +134,7 @@ export function ogPage({ title, description, image, url, heading, status = 200, 
       <h1>${escapeHtml(heading || title)}</h1>
       <p>${escapeHtml(description)}</p>
       <a class="cta" href="${APP_STORE_URL}">Get Show Picker Club</a>
-      <p class="foot">Already have the app? Open this link on your iPhone or iPad.</p>${webUrl ? `
-      <p class="foot"><a class="web" href="${escapeHtml(webUrl)}">${escapeHtml(webLabel)}</a></p>` : ''}
+      <p class="foot">Already have the app? Open this link on your iPhone or iPad.</p>
     </div>
   </main>
 </body>

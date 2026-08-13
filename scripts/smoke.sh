@@ -63,11 +63,11 @@ expect_status() { # method path expected label
 
 note "Marketing page + catch-all"
 
-# The catch-all must serve the web app for any path that isn't a real file —
-# that's what makes a shared /patrick link render that member's lists in a
-# browser, and what lets every stale deep link land somewhere sensible.
-# Asserted by content, not byte count: a size floor would eventually trip for
-# the wrong reason.
+# The catch-all must serve the marketing page for any path that isn't a real
+# file — that's what lets a shared /patrick link and every stale bookmark land
+# somewhere sensible. Asserted by content, not byte count: the page went from
+# 177KB (the old SPA) to ~15KB in the 2026-08 teardown, and a size floor would
+# eventually trip for the wrong reason.
 #
 # This used to probe /.env and fold two questions into one assertion, which is
 # why it failed on deploys that were fine: the edge sometimes answers a
@@ -77,13 +77,13 @@ note "Marketing page + catch-all"
 catchall=""
 for attempt in 1 2 3; do
   catchall=$(get "$(cb "$BASE/no-such-page-$RANDOM")")
-  printf '%s' "$catchall" | grep -q 'id="loginOverlay"' && break
+  printf '%s' "$catchall" | grep -q 'id="shelf"' && break
   [ "$attempt" -lt 3 ] && sleep 5
 done
-if printf '%s' "$catchall" | grep -q 'id="loginOverlay"'; then
-  ok "catch-all serves the web app"
+if printf '%s' "$catchall" | grep -q 'id="shelf"'; then
+  ok "catch-all serves the marketing page"
 else
-  err "an unknown path did not return the web app — see public/_redirects"
+  err "an unknown path did not return the marketing page — see public/_redirects"
 fi
 
 # Leaked-path probe, asked the way it actually matters. Nothing under public/
@@ -100,27 +100,17 @@ else
   ok "/.env exposes no environment content"
 fi
 
-# The root is the marketing page, and it is what the Google Ads campaign pays
-# to land on — so it must keep its App Store CTA and its way into the app.
+# The web member app is gone. If any of these strings come back, a build has
+# resurrected the SPA or its login UI.
 home=$(get "$(cb "$BASE/")")
-printf '%s' "$home" | grep -q 'id="shelf"' \
-  && ok "root serves the marketing page" \
-  || err "root is not the marketing page — see public/index.html"
+for banned in "Sign in with Apple" "id=\"loginModal\"" "shell.js" "show-renderer.js"; do
+  if printf '%s' "$home" | grep -qF "$banned"; then
+    err "landing page contains \"$banned\" — the retired web app is back (docs/PRODUCT.md#web-app-status)"
+  fi
+done
 printf '%s' "$home" | grep -qF 'apps.apple.com/app/id' \
   && ok "landing page links the App Store" \
   || err "landing page has no App Store link"
-printf '%s' "$home" | grep -qF 'href="/app"' \
-  && ok "landing page links into the web app" \
-  || err "landing page has no /app link — there is no way into the web app from the root"
-
-# The app itself, at its own URL. It loads its shared scripts by src, so a
-# missing one is a page that renders and then does nothing.
-app=$(get "$(cb "$BASE/app")")
-for needed in "id=\"loginOverlay\"" "nav.js" "show-renderer.js"; do
-  printf '%s' "$app" | grep -qF "$needed" \
-    && ok "/app carries $needed" \
-    || err "/app is missing $needed — the web app is broken (docs/PRODUCT.md#web-app-status)"
-done
 
 note "Security headers"
 
@@ -137,14 +127,10 @@ csp=$(echo "$headers" | grep -i '^content-security-policy:' || true)
 for directive in "default-src" "frame-ancestors 'none'" "base-uri 'self'" "object-src\|default-src"; do
   if echo "$csp" | grep -qi -- "$directive"; then ok "CSP has $directive"; else err "CSP missing $directive"; fi
 done
-# Web sign-in is back. Each of these fails silently without its source — the
-# button renders and the flow simply never completes — so assert them here
-# rather than finding out from a member who can't log in.
-for src in "appleid.apple.com" "accounts.google.com" "challenges.cloudflare.com"; do
-  if echo "$csp" | grep -qF "$src"; then
-    ok "CSP allows $src"
-  else
-    err "CSP no longer allows $src — web sign-in needs it"
+# The web signs nobody in any more; these sources should have gone with it.
+for stale in "appleid.apple.com" "accounts.google.com" "challenges.cloudflare.com"; do
+  if echo "$csp" | grep -qF "$stale"; then
+    err "CSP still allows $stale — web sign-in was retired in 2026-08"
   fi
 done
 
@@ -207,31 +193,15 @@ else
   ok "/api/popular hides member_slugs"
 fi
 
-note "Retired paths still redirect"
+note "Retired paths redirect to the marketing page"
 
-# Member approval went away for good in 2026-08 (migration 058). These four
-# have no page behind them.
-for path in /join /setup /requests /admin; do
+for path in /join /setup /requests /admin /welcome /groups /rate-backlog \
+            /subscriptions /vibe /members /reporting /url-cleanup /vibe-admin; do
   code=$(get -o /dev/null -w "%{http_code}" "$(cb "${BASE}${path}")")
   if [ "$code" = "301" ] || [ "$code" = "308" ]; then
     ok "$path → $code"
   else
-    err "$path returned $code, expected a 301 (public/_redirects)"
-  fi
-done
-
-note "Web-app pages are served, not redirected"
-
-# These are real files again. A 301 here means a stale rule in _redirects is
-# bouncing members off the page they asked for; the catch-all would otherwise
-# hide the mistake by rendering the app at every one of them.
-for path in /app /welcome /groups /rate-backlog /subscriptions /vibe \
-            /members /reporting /url-cleanup /vibe-admin; do
-  code=$(get -o /dev/null -w "%{http_code}" "$(cb "${BASE}${path}")")
-  if [ "$code" = "200" ]; then
-    ok "$path → 200"
-  else
-    err "$path returned $code, expected 200 (public/_redirects)"
+    err "$path returned $code, expected a 301 to / (public/_redirects)"
   fi
 done
 

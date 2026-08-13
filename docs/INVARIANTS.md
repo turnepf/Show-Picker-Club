@@ -145,32 +145,18 @@ why removing every passkey is safe, and why `DELETE /api/passkeys/:id` needs no
 - Enforced by `scripts/passkey-flow-test.mjs` (endpoint flows) and
   `scripts/webauthn-test.mjs` (signature verification), both in `pr-checks.yml`.
 
-## 4. The root is the marketing page; the app lives at `/app`
+## 4. The web is a marketing site
 
-Restored 2026-08 after four weeks archived (`docs/PRODUCT.md#web-app-status`).
-Both surfaces deploy from `public/`, and the split between them is the rule.
+Retired 2026-08 (`docs/PRODUCT.md#web-app-status`). `public/` holds the
+marketing page, the three legal pages, and their assets — nothing else. The
+member app and admin tools live in `archive/web/`, outside the build output.
 
-- `/` serves `index.html` — the pitch, the Trending shelf, the App Store CTA and
-  one link into the app. It is the Google Ads landing page; the web app never
-  takes it over.
-- `app.html` anchors its routing on `APP_HOME = '/app'`. Treating `/` as its home
-  again would make it read `""` as a member slug and point every "Home" link at
-  the pitch.
-- The catch-all stays a **200 rewrite** to `app.html`. As a 301 it discards the
-  URL, and a shared `/patrick` link stops carrying who it was about — which is
-  also what iOS matches against the associated-domains file.
-- Restored pages must not be redirected. The catch-all renders the app at every
-  path, so a stale 301 fails quietly rather than 404ing.
-- The CSP carries the Apple, Google and Turnstile sources web sign-in needs. Each
-  fails silently without them: the button renders, the flow never completes.
+- No member-facing feature is built for the web.
+- Nothing under `public/` may reintroduce sign-in UI.
+- The CSP carries only what the marketing page loads. The Apple/Google/Turnstile
+  sources went with web sign-in and should not come back.
 - Comments in `_headers` stay at column 0 — Pages parses an indented line inside
   a rule block as a header and silently corrupts the block.
-- The native apps still lead. A member-facing feature ships to iOS/iPad first;
-  the web gets it when someone asks for it there.
-
-- Enforced by `scripts/check-static.sh` (file set, `APP_HOME`, the catch-all,
-  the absent redirects, the CSP sources) and `scripts/smoke.sh` (the same
-  properties against the deployed site).
 
 ## 5. `updated_at` means member intent
 

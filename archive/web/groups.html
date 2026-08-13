@@ -398,7 +398,7 @@
           const data = await res.json();
           authMember = data.member;
           if (!authMember) {
-            window.location.href = '/app';
+            window.location.href = '/';
             return;
           }
           const params = new URLSearchParams(window.location.search);
@@ -409,11 +409,11 @@
             navPush('groupsList', loadGroupsList);
           }
         } else {
-          window.location.href = '/app';
+          window.location.href = '/';
         }
       } catch (e) {
         console.error('Auth check failed:', e);
-        window.location.href = '/app';
+        window.location.href = '/';
       }
     })();
 
@@ -434,7 +434,7 @@
         else if (view === 'memberView') renderMemberView();
       } else {
         // Root of the stack: nothing to pop, so leave for the home page.
-        window.location.href = '/app';
+        window.location.href = '/';
       }
     }
 

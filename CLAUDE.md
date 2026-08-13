@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Show Picker Club — a multi-tenant TV-show/movie tracker for a small private club, live at [showpicker.club](https://showpicker.club). Each member (`/patrick`, `/whitt`) keeps four ranked lists (Watching, Awaiting, Loved, Next Up). The native SwiftUI apps for iOS, tvOS and watchOS are the product members actually use; the browser app at `/app` is back as a secondary surface (see `docs/PRODUCT.md#web-app-status`) and the Cloudflare backend in this repo serves both.
+Show Picker Club — a multi-tenant TV-show/movie tracker for a small private club, live at [showpicker.club](https://showpicker.club). Each member (`/patrick`, `/whitt`) keeps four ranked lists (Watching, Awaiting, Loved, Next Up). The native SwiftUI apps for iOS, tvOS and watchOS are the product members actually use; the web frontend is frozen (see `docs/PRODUCT.md#web-app-status`) and the Cloudflare backend in this repo serves both.
 
 **Stack:** Static HTML + vanilla JS (no framework, no build step) in `public/`; Cloudflare Pages Functions (file-system-routed JS) in `functions/`; Cloudflare D1 (SQLite) with the `DB` binding from `wrangler.toml`; OMDB + TMDB for enrichment; Claude API for vibe trait scoring; Twilio/Resend for login codes.
 
@@ -28,17 +28,14 @@ When you change behavior that these docs describe, update the docs in the same P
 Only `public/` (static assets) and `functions/` (Pages Functions) are deployed — `pages_build_output_dir = "public"` in `wrangler.toml`. Everything else (`schema.sql`, `migrations/`, `docs/`, workflows) stays out of the served output. **Never pass `.` as a deploy directory.**
 
 ```
-public/            Everything deployed. index.html is the marketing page at /
-                   (pitch + Trending + App Store link); app.html is the member
-                   SPA at /app and behind the catch-all, so /patrick renders
-                   that member's lists. Alongside them: groups/vibe/rate-backlog/
-                   subscriptions, welcome, the four admin tools (members,
-                   reporting, url-cleanup, vibe-admin), the shared scripts
-                   (shell/nav/show-renderer/app-banner), privacy/terms/sms,
-                   styles.css, favicon.svg, sw.js (tombstone — the PWA was
-                   retired 2026-08; don't delete the file, see ARCHITECTURE.md),
-                   _headers (CSP), _redirects. See
-                   ARCHITECTURE.md#frontend-pages.
+public/            Deployed static pages — marketing only since the 2026-08
+                   teardown: index.html (pitch + Trending + App Store link),
+                   privacy/terms/sms, styles.css, favicon.svg,
+                   sw.js (tombstone — the PWA was retired 2026-08; don't delete
+                   the file, see ARCHITECTURE.md), _headers (CSP), _redirects
+archive/web/       The retired web member app + admin tools. Moved here, NOT
+                   deleted, and outside the Pages build output so none of it
+                   deploys. See ARCHITECTURE.md#frontend-pages.
 functions/
 ├── api/           /api/* endpoints (one file per route; [param].js for dynamic segments)
 ├── auth/          login, logout, request-code, apple, google, enroll, check, config
@@ -235,22 +232,22 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 
 ## Working preferences
 
-- **The web member app is back (restored 2026-08), but the Apple apps still
-  lead.** `showpicker.club/` is the marketing page; the SPA is at `/app`, and
-  the catch-all rewrites member slugs and stale deep links to it with the URL
-  intact. Web sign-in (email/phone code, Apple, Google) works again. New
-  member-facing features still go to iOS/iPad **first** — the reason for the
-  teardown was two frontends drifting apart, and that cost hasn't changed — so
-  build for the web when asked for the web, not by default. The restored pages
-  predate anything shipped between the teardown and the restore (Watching With,
-  Also watching): say so rather than implying parity. See
+- **The web member app is gone (2026-08). Build features for the Apple apps.**
+  `showpicker.club` is a marketing site now — pitch, Trending shelf, App Store
+  link — and every retired path 301s to it. New member-facing features go to
+  iOS/iPad; do **not** build them for the web, and don't offer to. What still
+  gets worked on there: security fixes, anything actually broken, the `/api/*`
+  endpoints (the apps depend on them), and the marketing page itself. The old
+  SPA and the four admin tools live in `archive/web/` — moved, not deleted, so
+  restoring any of it is a `git mv` plus a `_redirects` edit. There is no web
+  sign-in any more; the login UI was part of the SPA. See
   `docs/PRODUCT.md#web-app-status` and `docs/ARCHITECTURE.md#frontend-pages`.
 
 - **Feature requests still name their platforms.** The product ships on
   iOS/iPad, tvOS, and watchOS. When a feature is requested, state which get it
   and which don't (tvOS is view-only, watch is read-only) — parity gaps between
-  the Apple targets are still expensive to rediscover, and the web is a fourth
-  surface to name now that it's back. There is no in-app What's New — release
+  the Apple targets are still expensive to rediscover. Just don't add "and the
+  web" to that list unless asked. There is no in-app What's New — release
   notes go in the App Store update text instead (retired 2026-08, along with
   `whats-new.json`, `whats-new.html` and `WhatsNewView`). Collect that text in
   `docs/RELEASE_NOTES.md` under *Unreleased* as user-facing work merges, so

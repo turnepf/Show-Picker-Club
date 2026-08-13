@@ -215,9 +215,9 @@ still point at the listing, and both live in `public/index.html`:
   fires an OS dialog and fails silently in Safari.
 
 `public/app-banner.js` — the custom dismissible bar for Chrome/Firefox on Apple
-hardware — came back with the member app in the 2026-08 restore. It promotes the
-app *from inside* the web app, which is again where a browser member sits; the
-marketing page at `/` needs no such bar, being the promotion already.
+hardware — was archived to `archive/web/` with the rest of the member app. It
+existed to promote the app *from inside* the web app; with no web app left, the
+page it would have sat on is already the promotion.
 
 - [ ] If the listing is ever re-created under a new Apple ID (App Store
       Connect → the app → App Information → "Apple ID"), update **both** the
