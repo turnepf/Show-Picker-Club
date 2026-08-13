@@ -168,8 +168,9 @@ The app is the site root; the marketing page is a real page at `/download`.
   fails silently without them: the button renders, the flow never completes.
 - Comments in `_headers` stay at column 0 — Pages parses an indented line inside
   a rule block as a header and silently corrupts the block.
-- The native apps still lead. A member-facing feature ships to iOS/iPad first;
-  the web gets it when someone asks for it there.
+- The web is frozen at its restored state: fixes keep it functional, new
+  member-facing features go to iOS/iPad only. Falling behind is the intent, not
+  a defect to close.
 
 - Enforced by `scripts/check-static.sh` (the file set, index.html being the app,
   no `app.html`, the catch-all's exact destination, the absent redirects, the

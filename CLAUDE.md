@@ -245,12 +245,16 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
   2026-08-13 (see `docs/ARCHITECTURE.md#the-catch-all-can-only-point-at-indexhtml`).
   Verify routing changes against `wrangler pages dev` before merging — a local
   emulator reproduces this exactly, and the post-deploy smoke test is a much
-  more expensive way to find out. New member-facing features still go to
-  iOS/iPad **first** — the reason for the teardown was two frontends drifting
-  apart, and that cost hasn't changed — so build for the web when asked for the
-  web, not by default. The restored pages predate anything shipped between the
-  teardown and the restore (Watching With, Also watching): say so rather than
-  implying parity. See `docs/PRODUCT.md#web-app-status`.
+  more expensive way to find out.
+
+  **The web is frozen at its restored state: keep it functional, don't build
+  for it.** Bug fixes, security fixes and anything that keeps it working, yes.
+  New member-facing features, no — those go to iOS/iPad, and the web simply
+  falls further behind on purpose. Don't offer to close the gap, and don't port
+  a feature there as a bonus. It already predates Watching With and Also
+  watching; name the gap rather than treating it as work. If Patrick wants
+  something on the web he'll ask for it on the web. See
+  `docs/PRODUCT.md#web-app-status`.
 
 - **Feature requests still name their platforms.** The product ships on
   iOS/iPad, tvOS, and watchOS. When a feature is requested, state which get it

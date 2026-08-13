@@ -180,11 +180,17 @@ What this means in practice:
   phone-first and widens into a split view on iPad and desktop. No separate
   small-screen build exists or is needed.
 
-The reason it was torn down hasn't gone away, and it's worth naming so the cost
-is a decision rather than a surprise: two frontends drift, and a full day in
-2026-08 went into reconciling web surfaces with each other and then porting the
-same fixes to Swift. **The native apps still lead.** A new feature ships to
-iOS/iPad first; the web gets it when someone asks for it there.
+**The web is stuck in time, and that is the point.** It is restored to be
+functional, not current: it gets bug fixes, security fixes and whatever keeps it
+working, and it does not get new features — not on request, not "while we're in
+there". The reason the teardown happened hasn't gone away, and this is the cheap
+version of it: two frontends drift, and a full day in 2026-08 went into
+reconciling web surfaces with each other and then porting the same fixes to
+Swift. Freezing the feature set is what stops that bill from coming back.
+
+So the web already trails, deliberately. It predates Watching With's member
+picker and the Also-watching line, and it will keep falling further behind as
+iOS ships. Say that plainly rather than treating each gap as a task.
 
 ## Native apps
 
