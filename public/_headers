@@ -1,14 +1,15 @@
-# CSP was tightened with the 2026-08 teardown: the web no longer signs anyone
-# in, so the Apple/Google/Turnstile script, frame and form-action sources that
-# the member app needed are gone. What's left is what the marketing page loads —
-# Google Analytics, Cloudflare Insights, and TMDB poster art. Keep comments at
-# column 0: an indented line inside a rule block is parsed as a header.
+# The web member app is back (2026-08), so the CSP carries the sources web
+# sign-in needs again: Apple's JS SDK and its form POST target, Google Identity
+# Services, and Turnstile — each of which renders in a frame, hence frame-src.
+# Alongside those, what the marketing page loads: Google Analytics, Cloudflare
+# Insights, and TMDB poster art. Keep comments at column 0: an indented line
+# inside a rule block is parsed as a header.
 /*
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=(), interest-cohort=()
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google-analytics.com https://image.tmdb.org; connect-src 'self' https://www.google-analytics.com https://*.analytics.google.com https://*.google-analytics.com https://cloudflareinsights.com; font-src 'self'; frame-src 'none'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; worker-src 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://appleid.cdn-apple.com https://static.cloudflareinsights.com https://accounts.google.com/gsi/client https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://appleid.cdn-apple.com https://accounts.google.com/gsi/style; img-src 'self' data: https://www.google-analytics.com https://image.tmdb.org; connect-src 'self' https://www.google-analytics.com https://*.analytics.google.com https://*.google-analytics.com https://appleid.apple.com https://cloudflareinsights.com https://accounts.google.com/gsi/; font-src 'self'; frame-src https://appleid.apple.com https://accounts.google.com/gsi/ https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self' https://appleid.apple.com; base-uri 'self'; worker-src 'self'
 
 # Apple's CDN requires the app-site-association file be served as JSON
 # (it has no extension, so Pages would otherwise guess octet-stream).

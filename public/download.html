@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Show Picker Club — track what you're watching</title>
+  <meta name="description" content="Four simple lists for the TV and movies you're watching, with artwork, ratings and premiere dates filled in automatically. Free on iPhone, iPad, Mac, Apple TV and Apple Watch.">
+
+  <!-- The App Store pitch, served at /download. The site root is the web
+       member app again (restored 2026-08, see docs/PRODUCT.md#web-app-status);
+       this page is what the App Store listing and the Ads campaign point at,
+       and it links back into the app for anyone who can't install it. -->
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CP9N26NG19"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-CP9N26NG19');</script>
+
+  <!-- iPhone/iPad Safari's native Smart App Banner: OPEN when the app is
+       installed, GET when it isn't. It is the only reliable "is it installed"
+       signal a browser gets, and Apple renders it, not us. -->
+  <meta name="apple-itunes-app" content="app-id=6780282764">
+
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/favicon.svg">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
+  <meta property="og:title" content="Show Picker Club">
+  <meta property="og:description" content="Four simple lists for what you're watching, with artwork, ratings and premiere dates filled in automatically.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://showpicker.club/download">
+  <!-- Without an og:image every shared link previewed as a bare title and no
+       artwork. Per-show and per-invite links serve their own tags from
+       functions/_shared/og-page.js; this is the fallback for everything else. -->
+  <meta property="og:image" content="https://showpicker.club/og-default.png">
+  <meta property="og:site_name" content="Show Picker Club">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Show Picker Club">
+  <meta name="twitter:description" content="Four simple lists for what you're watching, with artwork, ratings and premiere dates filled in automatically.">
+  <meta name="twitter:image" content="https://showpicker.club/og-default.png">
+  <link rel="canonical" href="https://showpicker.club/download">
+  <link rel="stylesheet" href="/styles.css?v=6">
+  <style>
+    body { background: var(--body); }
+
+    .wrap { max-width: 1000px; margin: 0 auto; padding: 0 20px; }
+
+    /* ── Hero ─────────────────────────────────────────────────── */
+    .hero { padding: clamp(48px, 9vw, 96px) 0 clamp(36px, 6vw, 64px); text-align: center; }
+
+    .mark {
+      display: inline-flex; align-items: center; gap: 10px;
+      margin-bottom: clamp(24px, 5vw, 40px);
+    }
+    .mark img { width: 34px; height: 34px; border-radius: 8px; }
+    .mark span {
+      font-family: var(--font-display); font-size: var(--text-md);
+      font-weight: 600; color: var(--ink);
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 600;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      max-width: 15ch;
+      margin: 0 auto 18px;
+    }
+
+    .lede {
+      font-size: var(--text-md);
+      line-height: 1.55;
+      color: var(--ink-muted);
+      max-width: 52ch;
+      margin: 0 auto clamp(28px, 5vw, 36px);
+    }
+
+    .cta {
+      display: inline-flex; align-items: center; gap: 9px;
+      padding: 13px 26px;
+      background: var(--accent); color: #fff;
+      border-radius: 10px;
+      font-size: var(--text-base); font-weight: 600;
+      text-decoration: none;
+      box-shadow: var(--shadow-card);
+    }
+    .cta:hover { background: var(--accent-hover); }
+    .cta:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+    .cta svg { width: 19px; height: 19px; fill: currentColor; }
+
+    .cta-note {
+      margin-top: 14px;
+      font-size: var(--text-sm);
+      color: var(--ink-quiet);
+    }
+    .cta-note + .cta-note { margin-top: 8px; }
+    .web-link { color: var(--accent); font-weight: 600; text-decoration: none; }
+    .web-link:hover { text-decoration: underline; }
+
+    /* ── Feature row ──────────────────────────────────────────── */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 22px;
+      padding: clamp(32px, 6vw, 56px) 0;
+      border-top: 1px solid var(--border-soft);
+    }
+    .feature h3 {
+      font-size: var(--text-base); font-weight: 600;
+      color: var(--ink); margin-bottom: 6px;
+    }
+    .feature p {
+      font-size: var(--text-sm); line-height: 1.55; color: var(--ink-muted);
+    }
+
+    /* ── Trending ─────────────────────────────────────────────── */
+    .trending { padding: clamp(32px, 6vw, 56px) 0; border-top: 1px solid var(--border-soft); }
+
+    .trending-head { text-align: center; margin-bottom: 28px; }
+    .trending-head h2 {
+      font-family: var(--font-display); font-size: var(--text-xl);
+      font-weight: 600; color: var(--ink); margin-bottom: 6px;
+    }
+    .trending-head p { font-size: var(--text-sm); color: var(--ink-muted); }
+
+    .shelf {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+      gap: 20px 16px;
+      list-style: none;
+    }
+
+    .card { display: flex; flex-direction: column; gap: 8px; }
+
+    .poster {
+      position: relative;
+      aspect-ratio: 2 / 3;
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--surface-2);
+      box-shadow: var(--shadow-card);
+    }
+    .poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    /* Titles with no artwork still need to occupy their slot legibly. */
+    .poster .fallback {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      padding: 10px;
+      font-size: var(--text-sm); font-weight: 600; text-align: center;
+      color: var(--ink-faint);
+    }
+
+    .card-title {
+      font-size: var(--text-sm); font-weight: 600; line-height: 1.3;
+      color: var(--ink);
+    }
+    .card-meta {
+      font-size: var(--text-xs); color: var(--ink-quiet);
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .star { color: var(--star); }
+
+    .shelf-empty, .shelf-error {
+      grid-column: 1 / -1;
+      text-align: center;
+      font-size: var(--text-sm);
+      color: var(--ink-quiet);
+      padding: 24px 0;
+    }
+
+    /* Skeletons: the shelf is the one part of this page that waits on the
+       network, so it holds its own height instead of jumping when data lands. */
+    .skeleton .poster { animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+    @media (prefers-reduced-motion: reduce) { .skeleton .poster { animation: none; } }
+
+    /* ── Footer ───────────────────────────────────────────────── */
+    footer {
+      padding: clamp(28px, 5vw, 44px) 0 48px;
+      border-top: 1px solid var(--border-soft);
+      text-align: center;
+      font-size: var(--text-sm);
+      color: var(--ink-quiet);
+    }
+    footer a { color: var(--ink-muted); }
+    footer p + p { margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <section class="hero">
+      <div class="mark">
+        <img src="/favicon.svg" alt="">
+        <span>Show Picker Club</span>
+      </div>
+
+      <h1>Keep track of what you're watching</h1>
+
+      <p class="lede">
+        Four lists keep it honest — <strong>Watching</strong>, <strong>Awaiting</strong>,
+        <strong>Loved</strong> and <strong>Next&nbsp;Up</strong>. Add a title and the
+        artwork, rating, cast and next-season date fill themselves in. Make a group to
+        see what your people are watching, and audit what you're actually paying for.
+      </p>
+
+      <a class="cta" id="cta" href="https://apps.apple.com/app/id6780282764">
+        <svg viewBox="0 0 384 512" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
+        <span id="ctaLabel">Download on the App Store</span>
+      </a>
+      <p class="cta-note" id="ctaNote">iPhone, iPad, Mac, Apple TV and Apple Watch — one free app.</p>
+      <!-- The route into the web app, which is the site root. Sign-in lives
+           inside the app itself, so this is the way in for anyone who can't
+           install the app. -->
+      <p class="cta-note"><a class="web-link" href="/">Or use it in your browser →</a></p>
+    </section>
+
+    <section class="features">
+      <div class="feature">
+        <h3>Four lists, no ceremony</h3>
+        <p>Watching, Awaiting (between seasons), Loved, and Next Up. Drag to reorder; that's the whole system.</p>
+      </div>
+      <div class="feature">
+        <h3>Fills itself in</h3>
+        <p>Type a title and get the poster, rating, cast, runtime and where to stream it — no forms.</p>
+      </div>
+      <div class="feature">
+        <h3>Premiere dates</h3>
+        <p>Next-season dates land on your lists, and subscribe to them as a calendar feed if you want.</p>
+      </div>
+      <div class="feature">
+        <h3>Groups and audits</h3>
+        <p>See what your people are watching, and find out which subscriptions you're paying for but not using.</p>
+      </div>
+    </section>
+
+    <section class="trending">
+      <div class="trending-head">
+        <h2>Trending in the club</h2>
+        <p>What members have been adding over the last 30 days.</p>
+      </div>
+      <ul class="shelf" id="shelf" aria-busy="true" aria-label="Trending shows"></ul>
+    </section>
+
+    <footer>
+      <p><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/sms">SMS consent</a></p>
+      <p>© Show Picker Club</p>
+    </footer>
+
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // ── Retired PWA sweep ────────────────────────────────────────────
+      // /sw.js is a tombstone that unregisters itself on its next update
+      // check; this clears anyone who lands here without waiting for it.
+      // Old home-screen installs would otherwise keep a cached copy of the
+      // member app that no longer exists.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations()
+          .then(function (regs) { regs.forEach(function (r) { r.unregister(); }); })
+          .catch(function () {});
+      }
+      if (window.caches) {
+        caches.keys().then(function (keys) {
+          keys.forEach(function (k) { caches.delete(k); });
+        }).catch(function () {});
+      }
+
+      // ── CTA copy per device ──────────────────────────────────────────
+      // A browser cannot tell whether the app is installed — there is no API
+      // for it, and the custom-scheme probe trick fires an OS dialog and
+      // fails silently in Safari. What DOES work is Apple's own machinery:
+      // the apple-itunes-app meta above renders OPEN vs GET on iOS Safari,
+      // Safari on every Apple platform offers "Open in app" for our
+      // universal-link domain, and links arriving from outside a browser
+      // (Mail, Messages) route straight to the app. So we only tailor the
+      // wording here, and let the App Store page — which shows Open when
+      // it's installed — be the honest fallback everywhere else.
+      var ua = navigator.userAgent || '';
+      // iPadOS 13+ claims to be a Mac; touch points give it away.
+      var isIPad = /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+      var device =
+        /iPhone|iPod/.test(ua) ? 'iPhone' :
+        isIPad ? 'iPad' :
+        /Macintosh/.test(ua) ? 'Mac' : null;
+
+      if (device === 'Mac') {
+        document.getElementById('ctaLabel').textContent = 'Open in the App Store';
+        document.getElementById('ctaNote').textContent =
+          'Already installed? The App Store will say Open. Also on iPhone, iPad, Apple TV and Apple Watch.';
+      } else if (device) {
+        document.getElementById('ctaLabel').textContent = 'Get it for ' + device;
+      }
+
+      document.getElementById('cta').addEventListener('click', function () {
+        if (typeof gtag === 'function') {
+          gtag('event', 'app_store_click', { platform: device || 'other' });
+        }
+      });
+
+      // ── Trending shelf ───────────────────────────────────────────────
+      var shelf = document.getElementById('shelf');
+      var SKELETONS = 10;
+
+      function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+
+      for (var i = 0; i < SKELETONS; i++) {
+        var sk = document.createElement('li');
+        sk.className = 'card skeleton';
+        sk.innerHTML = '<div class="poster"></div>';
+        shelf.appendChild(sk);
+      }
+
+      function render(shows) {
+        shelf.innerHTML = '';
+        shelf.setAttribute('aria-busy', 'false');
+        if (!shows.length) {
+          shelf.innerHTML = '<li class="shelf-empty">Nothing added in the last 30 days.</li>';
+          return;
+        }
+        shows.forEach(function (s) {
+          var li = document.createElement('li');
+          li.className = 'card';
+          var art = s.poster_url
+            ? '<img src="' + esc(s.poster_url) + '" alt="" loading="lazy" decoding="async">'
+            : '<span class="fallback">' + esc(s.title) + '</span>';
+          // Rating and network only — nothing here names a member. Trending
+          // is public, and "added by" needs a relationship a stranger
+          // doesn't have (the endpoint withholds names when logged out).
+          var bits = [];
+          if (s.rating) bits.push('<span class="star">★</span> ' + esc(s.rating));
+          if (s.network) bits.push(esc(s.network));
+          li.innerHTML =
+            '<div class="poster">' + art + '</div>' +
+            '<div class="card-title">' + esc(s.title) + '</div>' +
+            (bits.length ? '<div class="card-meta">' + bits.join('<span aria-hidden="true">·</span>') + '</div>' : '');
+          shelf.appendChild(li);
+        });
+      }
+
+      fetch('/api/popular')
+        .then(function (r) {
+          if (!r.ok) throw new Error('http ' + r.status);
+          return r.json();
+        })
+        .then(function (d) { render((d && d.shows) || []); })
+        .catch(function () {
+          // Say the shelf failed rather than leaving skeletons pulsing
+          // forever — a stalled placeholder reads as a broken page.
+          shelf.innerHTML = '<li class="shelf-error">Couldn’t load what’s trending just now.</li>';
+          shelf.setAttribute('aria-busy', 'false');
+        });
+    })();
+  </script>
+</body>
+</html>

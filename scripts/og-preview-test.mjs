@@ -222,9 +222,17 @@ console.log('\n/groups/join — the card names the group');
   check('og:title is "Join <Group> on Show Picker Club"',
     meta(html, 'og:title') === 'Join Thursday Night Club on Show Picker Club', meta(html, 'og:title'));
 
+  // The web app redeems invites at /groups?token=…, so the card offers that
+  // route alongside the App Store button — otherwise a browser-only member
+  // taps an invite and lands somewhere they can't act on.
+  check('a live invite offers the browser route',
+    html.includes('href="/groups?token=live-token"') && html.includes('Join in your browser'));
+
   const { res: exp, html: eh } = await get(groupJoin, `${ORIGIN}/groups/join?token=dead-token`);
   check('an expired invite does not name the group',
     !eh.includes('Thursday Night Club') && exp.status === 404);
+  check('a dead invite offers no browser route either',
+    !eh.includes('/groups?token='));
 
   const { html: uh } = await get(groupJoin, `${ORIGIN}/groups/join?token=never-existed`);
   check('unknown and expired render the same card',
@@ -266,14 +274,24 @@ console.log('\n/household/join — the card names whose household');
     meta(uh, 'og:title') === meta(eh, 'og:title'));
 }
 
-// ---------------------------------------------------------------- marketing
+// ------------------------------------------------------------ fallback card
 
-console.log('\nMarketing page');
+// Every URL without tags of its own previews from whatever the _redirects
+// catch-all serves, and that is index.html — the app since the 2026-08 restore,
+// the marketing page before it. Whichever page holds that slot needs the tags;
+// their absence is why every share used to arrive with no artwork.
+console.log('\nCatch-all fallback page (public/index.html)');
 {
   const html = readFileSync(join(repoRoot, 'public', 'index.html'), 'utf8');
   check('has an og:image — its absence is why every share had no artwork',
     meta(html, 'og:image') === `${ORIGIN}/og-default.png`, meta(html, 'og:image'));
   check('declares a large twitter card', meta(html, 'twitter:card') === 'summary_large_image');
+
+  // The marketing page is a real page at its own URL now, and it is what the
+  // App Store listing and the Ads campaign point at, so it keeps its own tags.
+  const mk = readFileSync(join(repoRoot, 'public', 'download.html'), 'utf8');
+  check('the marketing page keeps its own og:image',
+    meta(mk, 'og:image') === `${ORIGIN}/og-default.png`, meta(mk, 'og:image'));
 }
 
 console.log(`\n${failed === 0 ? 'PASS' : 'FAIL'} — ${passed} passed, ${failed} failed`);

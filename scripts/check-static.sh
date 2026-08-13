@@ -28,66 +28,88 @@ note() { echo; echo "== $1"; }
 #     nothing about whose row the id belongs to.
 PUBLIC_ENDPOINTS="shows/[id]/actors.js"
 
-note "Deployed output contains only the marketing site"
+note "Deployed output carries the web app and the marketing page"
 
-# The member app and the four admin tools were archived in 2026-08. If any of
-# them reappear under public/ they deploy, and the web member app is back.
-section_ok=1
-for f in members.html reporting.html url-cleanup.html vibe-admin.html vibe.html \
-         subscriptions.html groups.html rate-backlog.html welcome.html \
-         shell.js nav.js show-renderer.js app-banner.js; do
-  if [ -e "public/$f" ]; then
-    err "public/$f is back — the web member app was retired (docs/PRODUCT.md#web-app-status)"
-    section_ok=0
-  fi
-done
-[ "$section_ok" -eq 1 ] && ok "no retired pages under public/"
-
-for f in index.html privacy.html terms.html sms.html styles.css favicon.svg \
-         sw.js _headers _redirects .well-known/apple-app-site-association; do
+# The member app came back in 2026-08 after four weeks archived. Its pages are
+# useless without the shared scripts they load, and the failure mode is a page
+# that renders half-empty rather than one that errors, so check the whole set.
+for f in index.html download.html privacy.html terms.html sms.html styles.css \
+         favicon.svg og-default.png sw.js _headers _redirects \
+         .well-known/apple-app-site-association \
+         welcome.html groups.html vibe.html rate-backlog.html \
+         subscriptions.html members.html reporting.html url-cleanup.html \
+         vibe-admin.html shell.js nav.js show-renderer.js app-banner.js; do
   [ -e "public/$f" ] || err "public/$f is missing"
 done
-ok "expected marketing files present"
+ok "web-app pages and marketing page present"
+
+# index.html IS the app, and app.html must not exist. Both halves matter: the
+# catch-all can only point at /index.html (see public/_redirects), so an app
+# living anywhere else is an app member slugs never reach — and an app.html
+# sitting alongside is the first step back toward the rewrite that 308-looped
+# the entire site on 2026-08-13.
+grep -q 'id="loginOverlay"' public/index.html \
+  && ok "index.html is the member app" \
+  || err "public/index.html is not the app — the catch-all can only fall through to /index.html"
+[ -e public/app.html ] \
+  && err "public/app.html exists — the app must be index.html, not a rewrite target (see public/_redirects)" \
+  || ok "no app.html to rewrite to"
 
 note "Marketing page"
 
-# The smoke test's catch-all probe greps for this marker to prove an unknown
-# path rendered the marketing page. If the page loses it, that probe silently
-# stops proving anything.
-grep -q 'id="shelf"' public/index.html \
-  && ok "index.html keeps the id=\"shelf\" smoke marker" \
-  || err "index.html lost id=\"shelf\" — scripts/smoke.sh's catch-all probe depends on it"
+# The smoke test greps for this marker to prove /download still serves the
+# marketing page. If the page loses it, that probe silently stops proving
+# anything.
+grep -q 'id="shelf"' public/download.html \
+  && ok "download.html keeps the id=\"shelf\" smoke marker" \
+  || err "download.html lost id=\"shelf\" — scripts/smoke.sh depends on it"
 
 # The CTA link and the Smart App Banner must name the same listing; they drifted
-# apart once already when the listing was re-created.
-cta_id=$(grep -o 'apps\.apple\.com/app/id[0-9]\+' public/index.html | head -1 | grep -o '[0-9]\+')
-meta_id=$(grep -o 'apple-itunes-app" content="app-id=[0-9]\+' public/index.html | grep -o '[0-9]\+$')
-if [ -n "$cta_id" ] && [ "$cta_id" = "$meta_id" ]; then
-  ok "App Store id consistent (CTA and meta both $cta_id)"
-else
-  err "App Store id mismatch: CTA=${cta_id:-none} meta=${meta_id:-none} (docs/APP_STORE_SUBMISSION.md §7)"
-fi
+# apart once already when the listing was re-created. Both pages carry a link
+# now — the marketing page's CTA and the app's logged-out join card.
+meta_id=$(grep -o 'apple-itunes-app" content="app-id=[0-9]\+' public/download.html | grep -o '[0-9]\+$')
+section_ok=1
+for f in download.html index.html; do
+  cta_id=$(grep -o 'apps\.apple\.com/app/id[0-9]\+' "public/$f" | head -1 | grep -o '[0-9]\+')
+  if [ -z "$cta_id" ] || [ "$cta_id" != "$meta_id" ]; then
+    err "App Store id mismatch in public/$f: link=${cta_id:-none} meta=${meta_id:-none} (docs/APP_STORE_SUBMISSION.md §7)"
+    section_ok=0
+  fi
+done
+[ "$section_ok" -eq 1 ] && ok "App Store id consistent across both pages ($meta_id)"
+
+# Every unmatched URL previews from index.html, so its og:image is the fallback
+# card for every share that has no tags of its own.
+grep -q 'og:image" content="https://showpicker.club/og-default.png"' public/index.html \
+  && ok "index.html carries the fallback og:image" \
+  || err "public/index.html has no og:image — shared links lose their artwork"
 
 note "Redirects"
 
-for path in /join /setup /requests /admin /welcome /groups /rate-backlog \
-            /subscriptions /vibe /members /reporting /url-cleanup /vibe-admin; do
+# Member approval is gone for good (migration 058) — these four have no page
+# behind them and must keep redirecting.
+for path in /join /setup /requests /admin; do
   grep -qE "^${path}[[:space:]]" public/_redirects \
     || err "public/_redirects has no rule for $path"
 done
 ok "every retired path has a redirect rule"
 
-# The catch-all must stay a 200 rewrite. As a 301 the URL is discarded, and a
-# shared member link stops carrying who it was about.
-grep -qE '^/\*[[:space:]]+/index\.html[[:space:]]+200' public/_redirects \
-  && ok "catch-all is a 200 rewrite" \
-  || err "public/_redirects catch-all must be '/*  /index.html  200'"
+# The web-app surfaces are served by real files again, so a leftover 301 would
+# bounce a member off the page they asked for.
+for path in /welcome /groups /rate-backlog /subscriptions /vibe /members \
+            /reporting /url-cleanup; do
+  grep -qE "^${path}[[:space:]]" public/_redirects \
+    && err "public/_redirects still redirects $path — that page is served again"
+done
+ok "restored pages are not redirected away"
 
-# Member slugs must not be redirected — that would break the universal-link
-# behaviour the new-signup email depends on.
-grep -qE '^/(patrick|whitt|dorothy)[[:space:]]' public/_redirects \
-  && err "member slugs must not be redirected (they must fall through to the catch-all)" \
-  || ok "member slugs fall through to the catch-all"
+# The catch-all must stay a 200 rewrite to /index.html. Every other shape was
+# tried against `wrangler pages dev` on 2026-08-13: /app.html 308-loops the
+# whole site, and /app swallows real files including the AASA. As a 301 it
+# discards the URL, and a shared /patrick link stops carrying who it was about.
+grep -qE '^/\*[[:space:]]+/index\.html[[:space:]]+200' public/_redirects \
+  && ok "catch-all is a 200 rewrite to /index.html" \
+  || err "public/_redirects catch-all must be '/*  /index.html  200' — no other destination works (see the file's own comment)"
 
 note "Headers"
 
@@ -101,10 +123,14 @@ fi
 
 csp_line=$(grep -i 'Content-Security-Policy:' public/_headers || true)
 [ -n "$csp_line" ] && ok "CSP present" || err "public/_headers has no Content-Security-Policy"
-for stale in appleid.apple.com accounts.google.com challenges.cloudflare.com; do
-  echo "$csp_line" | grep -qF "$stale" \
-    && err "CSP still allows $stale — web sign-in was retired in 2026-08"
+
+# Web sign-in is back, and each of these fails silently when its source is
+# missing: the button renders and simply never completes.
+for src in appleid.cdn-apple.com appleid.apple.com accounts.google.com challenges.cloudflare.com; do
+  echo "$csp_line" | grep -qF "$src" \
+    || err "CSP no longer allows $src — web sign-in needs it (docs/ARCHITECTURE.md#frontend-pages)"
 done
+ok "CSP carries the web sign-in sources"
 echo "$csp_line" | grep -q "frame-ancestors 'none'" \
   && ok "CSP denies framing" \
   || err "CSP is missing frame-ancestors 'none'"

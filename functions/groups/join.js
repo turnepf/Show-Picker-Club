@@ -46,5 +46,10 @@ export async function onRequestGet(context) {
     heading: `Join ${name}`,
     description: 'See what everyone in the group is watching, and what they think is worth your time.',
     url: canonical,
+    // The web app can finish this one: /groups reads ?token= and redeems it.
+    // Only on a live invite — the expired and unknown cards stay identical, so
+    // a dead link still can't confirm the invite ever existed.
+    webUrl: `/groups?token=${encodeURIComponent(token)}`,
+    webLabel: 'Join in your browser',
   });
 }

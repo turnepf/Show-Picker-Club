@@ -145,18 +145,36 @@ why removing every passkey is safe, and why `DELETE /api/passkeys/:id` needs no
 - Enforced by `scripts/passkey-flow-test.mjs` (endpoint flows) and
   `scripts/webauthn-test.mjs` (signature verification), both in `pr-checks.yml`.
 
-## 4. The web is a marketing site
+## 4. The catch-all can only point at `/index.html`
 
-Retired 2026-08 (`docs/PRODUCT.md#web-app-status`). `public/` holds the
-marketing page, the three legal pages, and their assets — nothing else. The
-member app and admin tools live in `archive/web/`, outside the build output.
+Restored 2026-08 after four weeks archived (`docs/PRODUCT.md#web-app-status`).
+The app is the site root; the marketing page is a real page at `/download`.
 
-- No member-facing feature is built for the web.
-- Nothing under `public/` may reintroduce sign-in UI.
-- The CSP carries only what the marketing page loads. The Apple/Google/Turnstile
-  sources went with web sign-in and should not come back.
+- `public/_redirects` ends with `/*  /index.html  200` and nothing else. A
+  `.html` destination is canonicalized to its extensionless form with a 308 and
+  loops every path on the site; an extensionless one stops being a fallback and
+  swallows real files, the AASA included. Both were tried against
+  `wrangler pages dev` on 2026-08-13, one of them in production.
+- Therefore **`public/index.html` is the app**. Nothing else can answer
+  `/patrick`, and there must be no `app.html` for a rewrite to aim at.
+- The catch-all stays a **200 rewrite**. As a 301 it discards the URL, and a
+  shared `/patrick` link stops carrying who it was about — which is also what
+  iOS matches against the associated-domains file.
+- `index.html` carries the fallback `og:image`: every URL without tags of its
+  own previews from whatever the catch-all serves.
+- Restored pages must not be redirected. The catch-all renders the app at every
+  path, so a stale 301 fails quietly rather than 404ing.
+- The CSP carries the Apple, Google and Turnstile sources web sign-in needs. Each
+  fails silently without them: the button renders, the flow never completes.
 - Comments in `_headers` stay at column 0 — Pages parses an indented line inside
   a rule block as a header and silently corrupts the block.
+- The native apps still lead. A member-facing feature ships to iOS/iPad first;
+  the web gets it when someone asks for it there.
+
+- Enforced by `scripts/check-static.sh` (the file set, index.html being the app,
+  no `app.html`, the catch-all's exact destination, the absent redirects, the
+  CSP sources) and `scripts/smoke.sh` (the same properties against the deployed
+  site, plus `/patrick` answering 200 rather than a redirect).
 
 ## 5. `updated_at` means member intent
 

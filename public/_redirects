@@ -1,28 +1,31 @@
-# The web member app was retired in 2026-08 (docs/PRODUCT.md#web-app-status).
-# Everything it used to serve now lands on the marketing page. Member slugs
-# (/patrick) are deliberately NOT listed: they fall through the catch-all as a
-# 200 rewrite so the URL survives, which is what lets iOS/macOS resolve them
-# against .well-known/apple-app-site-association and open the app instead of
-# ever fetching the page. A 301 here would still work on Apple devices but
-# would throw away the member context on every other one.
-/join           /  301
-/setup          /  301
-/requests       /  301
-/admin          /  301
-/welcome        /  301
+# The web member app is back (2026-08, docs/PRODUCT.md#web-app-status) and, as
+# before the teardown, it IS index.html. That is not a stylistic choice — it is
+# the only shape Cloudflare Pages supports:
+#
+#   /*  /index.html  200   real files win; only unmatched paths fall through
+#   /*  /app.html    200   308s to /app and loops — every path, site-wide
+#   /*  /app         200   swallows real files, including the AASA
+#
+# Verified against `wrangler pages dev`. A rewrite to /index.html is the one
+# destination Pages treats as a fallback rather than an unconditional rewrite;
+# any other .html destination is canonicalized to its extensionless form with a
+# 308. Changing this line is how the site went down on 2026-08-13.
+#
+# Member slugs (/patrick) are deliberately NOT listed: they fall through the
+# catch-all as a 200 rewrite so the URL survives, which is what lets iOS/macOS
+# resolve them against .well-known/apple-app-site-association and open the app
+# instead of ever fetching the page. A 301 here would still work on Apple
+# devices but would throw away the member context on every other one.
+#
+# Pages Functions take precedence over this file, so /api/*, /auth/*,
+# /calendar/*, /show/:id and the two invite previews are unaffected.
 
-# Retired member surfaces
-/groups         /  301
-/rate-backlog   /  301
-/subscriptions  /  301
-/vibe           /  301
+# Member approval was retired in 2026-08 (migration 058); nothing serves these.
+/join     /         301
+/setup    /members  301
+/requests /members  301
+/admin    /members  301
 
-# Retired admin tools — all four live in the iOS app now
-/members        /  301
-/reporting      /  301
-/url-cleanup    /  301
-/vibe-admin     /  301
-
-# Everything else (member slugs, stale bookmarks, old SPA deep links) renders
-# the marketing page without changing the URL.
+# Everything else (member slugs, stale bookmarks, deep links) renders the app
+# without changing the URL.
 /*  /index.html  200

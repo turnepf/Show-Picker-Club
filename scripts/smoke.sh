@@ -61,30 +61,48 @@ expect_status() { # method path expected label
   fi
 }
 
+# `grep -q` exits on its first match, so a `printf … | grep -q` pipeline leaves
+# printf writing into a closed pipe. Under `set -o pipefail` that SIGPIPE
+# becomes the pipeline's exit status and reads as "not found" — but only once
+# the body outgrows the 64KB pipe buffer, which is why it never fired against
+# the 15KB marketing page and fires on every check against the ~180KB app.
+# Herestrings hand grep the whole body at once, with no pipe to break.
+
 note "Marketing page + catch-all"
 
-# The catch-all must serve the marketing page for any path that isn't a real
-# file — that's what lets a shared /patrick link and every stale bookmark land
-# somewhere sensible. Asserted by content, not byte count: the page went from
-# 177KB (the old SPA) to ~15KB in the 2026-08 teardown, and a size floor would
-# eventually trip for the wrong reason.
+# The catch-all must serve the web app for any path that isn't a real file —
+# that's what makes a shared /patrick link render that member's lists in a
+# browser, and what lets every stale deep link land somewhere sensible.
 #
-# This used to probe /.env and fold two questions into one assertion, which is
-# why it failed on deploys that were fine: the edge sometimes answers a
-# scanner-shaped request with a block page. The leak question is asked
-# separately below, on terms that don't depend on what Cloudflare decides to do
-# with it. Retried because one dropped response shouldn't fail a deploy.
+# This is the assertion that caught the 2026-08-13 outage, when the catch-all
+# pointed at /app.html and Pages 308-looped every path on the site. Asserted by
+# content, not byte count: a size floor would eventually trip for the wrong
+# reason.
+#
+# The /.env probe used to live here and folded two questions into one
+# assertion, which is why it failed on deploys that were fine: the edge
+# sometimes answers a scanner-shaped request with a block page. The leak
+# question is asked separately below, on terms that don't depend on what
+# Cloudflare decides to do with it. Retried because one dropped response
+# shouldn't fail a deploy.
 catchall=""
 for attempt in 1 2 3; do
   catchall=$(get "$(cb "$BASE/no-such-page-$RANDOM")")
-  printf '%s' "$catchall" | grep -q 'id="shelf"' && break
+  grep -q 'id="loginOverlay"' <<< "$catchall" && break
   [ "$attempt" -lt 3 ] && sleep 5
 done
-if printf '%s' "$catchall" | grep -q 'id="shelf"'; then
-  ok "catch-all serves the marketing page"
+if grep -q 'id="loginOverlay"' <<< "$catchall"; then
+  ok "catch-all serves the web app"
 else
-  err "an unknown path did not return the marketing page — see public/_redirects"
+  err "an unknown path did not return the web app — see public/_redirects"
 fi
+
+# A member slug is the case the catch-all exists for, and it must arrive as a
+# 200 rather than a redirect: a 301 would discard which member the link named.
+slug_code=$(get -o /dev/null -w "%{http_code}" "$(cb "$BASE/patrick")")
+[ "$slug_code" = "200" ] \
+  && ok "/patrick → 200 with its URL intact" \
+  || err "/patrick returned $slug_code — member links must be a 200 rewrite, not a redirect"
 
 # Leaked-path probe, asked the way it actually matters. Nothing under public/
 # is a dotfile, so /.env should never resolve — but what would make it a real
@@ -92,25 +110,38 @@ fi
 # The marketing page and a Cloudflare block page are both fine; KEY=value is
 # not. Named secrets are listed in README.md#secrets.
 dotenv=$(get "$(cb "$BASE/.env")")
-if printf '%s' "$dotenv" | grep -qE '^[A-Z][A-Z0-9_]{2,}=.'; then
+if grep -qE '^[A-Z][A-Z0-9_]{2,}=.' <<< "$dotenv"; then
   err "/.env returned environment-variable assignments — secrets are leaking"
-elif printf '%s' "$dotenv" | grep -qE 'CLOUDFLARE_API_TOKEN|TWILIO_|RESEND_API_KEY|ANTHROPIC_API_KEY|OMDB_API_KEY|TMDB_API_KEY|CRON_SECRET'; then
+elif grep -qE 'CLOUDFLARE_API_TOKEN|TWILIO_|RESEND_API_KEY|ANTHROPIC_API_KEY|OMDB_API_KEY|TMDB_API_KEY|CRON_SECRET' <<< "$dotenv"; then
   err "/.env named a known secret — secrets are leaking"
 else
   ok "/.env exposes no environment content"
 fi
 
-# The web member app is gone. If any of these strings come back, a build has
-# resurrected the SPA or its login UI.
+# The root is the app — that is the only shape the catch-all supports (see
+# public/_redirects). It must carry its shared scripts, which it loads by src:
+# a missing one is a page that renders and then does nothing.
 home=$(get "$(cb "$BASE/")")
-for banned in "Sign in with Apple" "id=\"loginModal\"" "shell.js" "show-renderer.js"; do
-  if printf '%s' "$home" | grep -qF "$banned"; then
-    err "landing page contains \"$banned\" — the retired web app is back (docs/PRODUCT.md#web-app-status)"
-  fi
+for needed in "id=\"loginOverlay\"" "nav.js" "show-renderer.js"; do
+  grep -qF "$needed" <<< "$home" \
+    && ok "root carries $needed" \
+    || err "root is missing $needed — the web app is broken (docs/PRODUCT.md#web-app-status)"
 done
-printf '%s' "$home" | grep -qF 'apps.apple.com/app/id' \
-  && ok "landing page links the App Store" \
-  || err "landing page has no App Store link"
+# Every unmatched URL previews from this page, so its og:image is the fallback
+# card for every share without tags of its own.
+grep -qF 'og-default.png' <<< "$home" \
+  && ok "root carries the fallback og:image" \
+  || err "root has no og:image — shared links arrive with no artwork"
+
+# The marketing page moved to /download when the app took the root back. It is
+# still the page the App Store CTA lives on.
+download=$(get "$(cb "$BASE/download")")
+grep -q 'id="shelf"' <<< "$download" \
+  && ok "/download serves the marketing page" \
+  || err "/download is not the marketing page — see public/download.html"
+grep -qF 'apps.apple.com/app/id' <<< "$download" \
+  && ok "marketing page links the App Store" \
+  || err "marketing page has no App Store link"
 
 note "Security headers"
 
@@ -127,10 +158,14 @@ csp=$(echo "$headers" | grep -i '^content-security-policy:' || true)
 for directive in "default-src" "frame-ancestors 'none'" "base-uri 'self'" "object-src\|default-src"; do
   if echo "$csp" | grep -qi -- "$directive"; then ok "CSP has $directive"; else err "CSP missing $directive"; fi
 done
-# The web signs nobody in any more; these sources should have gone with it.
-for stale in "appleid.apple.com" "accounts.google.com" "challenges.cloudflare.com"; do
-  if echo "$csp" | grep -qF "$stale"; then
-    err "CSP still allows $stale — web sign-in was retired in 2026-08"
+# Web sign-in is back. Each of these fails silently without its source — the
+# button renders and the flow simply never completes — so assert them here
+# rather than finding out from a member who can't log in.
+for src in "appleid.apple.com" "accounts.google.com" "challenges.cloudflare.com"; do
+  if echo "$csp" | grep -qF "$src"; then
+    ok "CSP allows $src"
+  else
+    err "CSP no longer allows $src — web sign-in needs it"
   fi
 done
 
@@ -175,33 +210,50 @@ note "Public surface leaks nothing member-derived"
 # out it must name nobody: "added by" needs a relationship a stranger doesn't
 # have. This is the endpoint behind the marketing page's shelf.
 popular=$(get "$(cb "$BASE/api/popular")")
-if printf '%s' "$popular" | grep -q '"shows"'; then
+if grep -q '"shows"' <<< "$popular"; then
   ok "/api/popular responds"
 else
   err "/api/popular did not return a shows array"
 fi
 # `members` must be present-but-empty (or absent) for an anonymous caller.
-if printf '%s' "$popular" | grep -qE '"members":\[[^]]'; then
+if grep -qE '"members":\[[^]]' <<< "$popular"; then
   err "/api/popular named members to an anonymous caller — see functions/api/popular.js"
 else
   ok "/api/popular names no members when logged out"
 fi
 # member_slugs is deleted server-side before the response is built.
-if printf '%s' "$popular" | grep -q 'member_slugs'; then
+if grep -q 'member_slugs' <<< "$popular"; then
   err "/api/popular exposed member_slugs"
 else
   ok "/api/popular hides member_slugs"
 fi
 
-note "Retired paths redirect to the marketing page"
+note "Retired paths still redirect"
 
-for path in /join /setup /requests /admin /welcome /groups /rate-backlog \
-            /subscriptions /vibe /members /reporting /url-cleanup /vibe-admin; do
+# Member approval went away for good in 2026-08 (migration 058). These four
+# have no page behind them.
+for path in /join /setup /requests /admin; do
   code=$(get -o /dev/null -w "%{http_code}" "$(cb "${BASE}${path}")")
   if [ "$code" = "301" ] || [ "$code" = "308" ]; then
     ok "$path → $code"
   else
-    err "$path returned $code, expected a 301 to / (public/_redirects)"
+    err "$path returned $code, expected a 301 (public/_redirects)"
+  fi
+done
+
+note "Web-app pages are served, not redirected"
+
+# These are real files. A 301 here means a stale rule in _redirects is bouncing
+# a member off the page they asked for; a 308 means the catch-all is rewriting
+# to something Pages canonicalizes, which is what took the site down on
+# 2026-08-13. Either way the catch-all would hide it by rendering the app.
+for path in /download /welcome /groups /rate-backlog /subscriptions /vibe \
+            /members /reporting /url-cleanup /vibe-admin; do
+  code=$(get -o /dev/null -w "%{http_code}" "$(cb "${BASE}${path}")")
+  if [ "$code" = "200" ]; then
+    ok "$path → 200"
+  else
+    err "$path returned $code, expected 200 (public/_redirects)"
   fi
 done
 
@@ -220,7 +272,7 @@ if printf '%s' "$aasa" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/d
 else
   err "AASA is not valid JSON"
 fi
-printf '%s' "$aasa" | grep -qF 'NQ6AJVVBBJ.net.patrickturner.showpickerios' \
+grep -qF 'NQ6AJVVBBJ.net.patrickturner.showpickerios' <<< "$aasa" \
   && ok "AASA carries the app ID" \
   || err "AASA is missing the app ID — universal links are dead"
 
