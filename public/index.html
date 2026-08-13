@@ -95,6 +95,9 @@
       font-size: var(--text-sm);
       color: var(--ink-quiet);
     }
+    .cta-note + .cta-note { margin-top: 8px; }
+    .web-link { color: var(--accent); font-weight: 600; text-decoration: none; }
+    .web-link:hover { text-decoration: underline; }
 
     /* ── Feature row ──────────────────────────────────────────── */
     .features {
@@ -208,6 +211,10 @@
         <span id="ctaLabel">Download on the App Store</span>
       </a>
       <p class="cta-note" id="ctaNote">iPhone, iPad, Mac, Apple TV and Apple Watch — one free app.</p>
+      <!-- The only route into the web app from the marketing page. Sign-in
+           lives inside the app itself (/app), so without this link there is no
+           way in from the root on a device that can't install the app. -->
+      <p class="cta-note"><a class="web-link" href="/app">Or use it in your browser →</a></p>
     </section>
 
     <section class="features">

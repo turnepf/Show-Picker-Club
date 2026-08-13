@@ -222,9 +222,17 @@ console.log('\n/groups/join — the card names the group');
   check('og:title is "Join <Group> on Show Picker Club"',
     meta(html, 'og:title') === 'Join Thursday Night Club on Show Picker Club', meta(html, 'og:title'));
 
+  // The web app redeems invites at /groups?token=…, so the card offers that
+  // route alongside the App Store button — otherwise a browser-only member
+  // taps an invite and lands somewhere they can't act on.
+  check('a live invite offers the browser route',
+    html.includes('href="/groups?token=live-token"') && html.includes('Join in your browser'));
+
   const { res: exp, html: eh } = await get(groupJoin, `${ORIGIN}/groups/join?token=dead-token`);
   check('an expired invite does not name the group',
     !eh.includes('Thursday Night Club') && exp.status === 404);
+  check('a dead invite offers no browser route either',
+    !eh.includes('/groups?token='));
 
   const { html: uh } = await get(groupJoin, `${ORIGIN}/groups/join?token=never-existed`);
   check('unknown and expired render the same card',

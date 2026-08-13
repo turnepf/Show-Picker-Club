@@ -93,7 +93,7 @@
 <body>
   <div class="wrap">
     <nav class="admin-nav">
-      <a href="/" class="back" aria-label="Back to Show Picker Club">&#9664;<span class="back-label">Home</span></a>
+      <a href="/app" class="back" aria-label="Back to Show Picker Club">&#9664;<span class="back-label">Home</span></a>
       <a href="/members">Members</a>
       <a href="/url-cleanup">Show Cleanup</a>
       <a href="/vibe-admin">Vibe admin</a>
@@ -317,7 +317,7 @@
       .then(r => {
         if (r.status === 401) {
           document.getElementById('generated').textContent = '';
-          document.getElementById('loadErr').innerHTML = 'Please <a href="/">log in</a> from the homepage to view reporting.';
+          document.getElementById('loadErr').innerHTML = 'Please <a href="/app">log in</a> from the app home to view reporting.';
           return null;
         }
         return r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`);

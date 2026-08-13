@@ -56,7 +56,7 @@ Only people you already share a group with are offered, and only they can be nam
 
 Who's named stays as private as the field itself: only you see the Watching with on your own rows, whether it's a typed name or a linked member.
 
-Platforms: **iPhone/iPad** get the picker (in the Add/Edit sheet). **Apple TV and the watch** render the resulting text like they always have — both are view-only, so neither can tag. The web app is frozen and doesn't get it.
+Platforms: **iPhone/iPad** get the picker (in the Add/Edit sheet). **Apple TV and the watch** render the resulting text like they always have — both are view-only, so neither can tag. **The web doesn't** — it was restored from its pre-teardown state and predates the picker; the field is still plain text there.
 
 ### Also watching (groups)
 
@@ -64,7 +64,7 @@ The show card names the other members of your groups who have that same title on
 
 Only people you already share a group with can appear, and only their first names — the line never reveals a stranger's library, and it shows nothing to a logged-out visitor. You and the member whose copy you're looking at are both left out (you know your own lists, and their list is already on screen).
 
-Platforms: iPhone/iPad show it above Network on the show card; Apple TV shows the same line above the watch button (which is where the TV names the network). The watch app doesn't — private groups were dropped there. The web app is frozen and doesn't get it.
+Platforms: iPhone/iPad show it above Network on the show card; Apple TV shows the same line above the watch button (which is where the TV names the network). The watch app doesn't — private groups were dropped there. **The web doesn't** — it predates the line.
 
 ## Authentication
 
@@ -88,7 +88,7 @@ Four rules keep it an offer rather than a nag:
 
 The Passkeys screen lists what's registered (label, last used) and removes any of them. Removing all of them is allowed and can't lock anyone out: the account's original sign-in method — Apple, Google, or an email code — never goes away.
 
-**Platforms:** iPhone and iPad (including Mac Catalyst) get both sign-in and management. **tvOS doesn't** — passkey sign-in on a TV means a cross-device QR handshake with a phone, which is a worse experience than the code the Apple TV already asks for; it keeps Sign in with Apple and one-time codes. **watchOS doesn't** — it has no login of its own, taking its session from the iPhone over WatchConnectivity. **The web doesn't** — there is no web sign-in any more (see Web app status). The server-side relying party is the domain rather than the app, so a web client could be added later without members re-enrolling anything.
+**Platforms:** iPhone and iPad (including Mac Catalyst) get both sign-in and management. **tvOS doesn't** — passkey sign-in on a TV means a cross-device QR handshake with a phone, which is a worse experience than the code the Apple TV already asks for; it keeps Sign in with Apple and one-time codes. **watchOS doesn't** — it has no login of its own, taking its session from the iPhone over WatchConnectivity. **The web doesn't** — the browser app signs members in with codes, Apple and Google, but does not enroll or manage passkeys. The server-side relying party is the domain rather than the app, so adding it to the web later needs no re-enrollment from anyone.
 
 Failed logins are rate-limited: 5 attempts per IP in any 15-minute window returns a 429 with `Retry-After`. Failed-login rows are pruned daily.
 
@@ -151,34 +151,39 @@ Logged in as yourself, every row gets Edit and Archive buttons inline. Editing r
 
 ## Web app status
 
-**The web member app was removed in 2026-08.** `showpicker.club` is now a
-marketing site: a pitch, the club's public Trending shelf, and an App Store
-link. Every retired path 301s to it.
+**The web member app is back, at `/app`** (restored 2026-08, four weeks after
+the teardown that removed it). The root of `showpicker.club` stays the marketing
+page — a pitch, the club's public Trending shelf, an App Store link, and now a
+link into the app — because that is what the Google Ads campaign pays to land
+on. Everything else resolves to the app.
 
-The reasoning didn't change, it just finished. The web app had no users — every
-member is on the iPhone/iPad app — and keeping two frontends in step was costing
-real time: a full day in 2026-08 went into fixing drift *between* web surfaces
-(five show-row implementations, two show-detail implementations, two sidebar
-navs) and then porting the same fixes to Swift.
+This was possible as a same-day change precisely because the teardown moved the
+pages instead of deleting them: the restore is the `git mv` back, a `_redirects`
+edit, the CSP sources web sign-in needs, and a one-line change teaching the SPA
+that its home is `/app` rather than `/`.
 
 What this means in practice:
 
-- **All member-facing work goes to iOS/iPad.** tvOS is view-only, watchOS is
-  read-only, and there is no web target any more.
-- **The backend is not frozen in any sense.** `functions/api/*` is what the apps
-  run on, and it gets the same attention it always did.
-- **There is no web sign-in.** The login UI lived in the SPA and went with it.
-  The `/auth/*` endpoints are untouched, so restoring the page would restore the
-  flow — but today the only way into an account is an Apple device.
-- **The admin tools are iOS-only.** Reporting, Manage members, Show Cleanup and
-  Vibe trait scoring are all in the app; the `public/` copies are archived.
-- **Nothing was deleted.** The old pages live in `archive/web/` at the repo root,
-  outside the Pages build output. Reverting is a `git mv` and a `_redirects`
-  edit.
+- **The app is at `/app`; member pages keep their own URLs.** `/patrick` still
+  renders Patrick's lists — the catch-all rewrites it to `app.html` with the URL
+  intact, which is also what lets iOS resolve it against the associated-domains
+  file and open the native app instead.
+- **Web sign-in works again.** Email code, phone code, Sign in with Apple and
+  Sign in with Google all live in the SPA's login sheet; the `/auth/*` endpoints
+  never changed, so nothing server-side had to be rebuilt.
+- **`welcome.html` is a real conversion URL again.** Fresh web signups land
+  there, which is the page the Smart campaign's conversion tracking watches.
+- **The admin tools are back on the web too** — Reporting, Manage members, Show
+  Cleanup and Vibe trait scoring — alongside their iOS counterparts.
+- **The layout is mobile-first**, which is how it always was: the SPA was built
+  phone-first and widens into a split view on iPad and desktop. No separate
+  small-screen build exists or is needed.
 
-If a member ever asks for web access — an Android user, or someone who won't
-install an app — that's the signal to revisit, and the code is still there to
-revisit with.
+The reason it was torn down hasn't gone away, and it's worth naming so the cost
+is a decision rather than a surprise: two frontends drift, and a full day in
+2026-08 went into reconciling web surfaces with each other and then porting the
+same fixes to Swift. **The native apps still lead.** A new feature ships to
+iOS/iPad first; the web gets it when someone asks for it there.
 
 ## Native apps
 
@@ -285,7 +290,7 @@ You stay in control: every service has a **Subscribed / Paused / Cancelled** tog
 
 Prices are editable defaults — approximate US standard-plan rates that each member can correct to what they actually pay. Implementation in [`ARCHITECTURE.md`](ARCHITECTURE.md#subscription-audit).
 
-Platforms: iPhone and iPad only, the whole audit and the household viewer names with it. **Apple TV doesn't** — it's view-only, and cancelling a subscription isn't something you do from the couch with a remote. **The watch doesn't** — it's read-only, and a spend audit needs the toggles and price fields it has no room for. **The web doesn't** — `subscriptions.html` went to `archive/web/` in the 2026-08 teardown (see [Web app status](#web-app-status)); the API still returns everything the page used, so restoring it is a `git mv`.
+Platforms: iPhone and iPad only, the whole audit and the household viewer names with it. **Apple TV doesn't** — it's view-only, and cancelling a subscription isn't something you do from the couch with a remote. **The watch doesn't** — it's read-only, and a spend audit needs the toggles and price fields it has no room for. **The web has it** — `subscriptions.html` came back with the 2026-08 restore (see [Web app status](#web-app-status)), reading the same API the iOS audit does.
 
 ## Vibe
 
@@ -314,8 +319,8 @@ only an excluded member holds are still never offered to anyone else as picks.
 Platforms: **iPhone and iPad**. **Apple TV doesn't** — it's view-only, and the
 picker plus the add-a-pick flow need input the remote doesn't suit. **The watch
 doesn't** — it's read-only and has no room for the trait bars. **The web
-doesn't** — `vibe.html` went to `archive/web/` in the 2026-08 teardown (see
-[Web app status](#web-app-status)); `/api/vibe` still serves the apps.
+has it** — `vibe.html` came back with the 2026-08 restore (see
+[Web app status](#web-app-status)), on the same `/api/vibe`.
 
 ## Suggestions to non-members
 
@@ -369,7 +374,8 @@ can answer on its behalf. **iPhone and iPad don't** get it: their Watch button
 opens https deep links through the web, a different mechanism with a different
 failure mode, and the iOS Admin tab is where member management lives, not device
 diagnostics. **The watch doesn't** — read-only, and it opens nothing. **The web
-doesn't** — the member app is frozen (see [Web app status](#web-app-status)).
+doesn't** — device diagnostics belong in the Admin tab, not the browser app
+(see [Web app status](#web-app-status)).
 This is the one exception to the "no admin screens on tvOS" rule below.
 
 ## Member lifecycle
@@ -469,8 +475,8 @@ A few intentional omissions:
     never signed in with Apple needs a linked Apple identity, a passkey, or
     some other migration path before their email code disappears.
   - The web keeps whatever the Apple apps can't cover. Sign in with Apple on
-    the web is a different integration from the native one; if the web is
-    reduced to a marketing site (see Web app status), this gets easier.
+    the web is a different integration from the native one, and the browser
+    app uses it again since the 2026-08 restore (see Web app status).
   - App Review needs a working demo account. `DEMO_LOGIN_EMAIL` /
     `DEMO_LOGIN_CODE` is an email-code login today, so removing that path
     means giving Review another way in first.

@@ -28,31 +28,31 @@ note() { echo; echo "== $1"; }
 #     nothing about whose row the id belongs to.
 PUBLIC_ENDPOINTS="shows/[id]/actors.js"
 
-note "Deployed output contains only the marketing site"
+note "Deployed output carries the marketing site and the web app"
 
-# The member app and the four admin tools were archived in 2026-08. If any of
-# them reappear under public/ they deploy, and the web member app is back.
-section_ok=1
-for f in members.html reporting.html url-cleanup.html vibe-admin.html vibe.html \
-         subscriptions.html groups.html rate-backlog.html welcome.html \
-         shell.js nav.js show-renderer.js app-banner.js; do
-  if [ -e "public/$f" ]; then
-    err "public/$f is back — the web member app was retired (docs/PRODUCT.md#web-app-status)"
-    section_ok=0
-  fi
-done
-[ "$section_ok" -eq 1 ] && ok "no retired pages under public/"
-
+# The member app came back in 2026-08 after four weeks archived. Its pages are
+# useless without the shared scripts they load, and the failure mode is a page
+# that renders half-empty rather than one that errors, so check the whole set.
 for f in index.html privacy.html terms.html sms.html styles.css favicon.svg \
-         sw.js _headers _redirects .well-known/apple-app-site-association; do
+         sw.js _headers _redirects .well-known/apple-app-site-association \
+         app.html welcome.html groups.html vibe.html rate-backlog.html \
+         subscriptions.html members.html reporting.html url-cleanup.html \
+         vibe-admin.html shell.js nav.js show-renderer.js app-banner.js; do
   [ -e "public/$f" ] || err "public/$f is missing"
 done
-ok "expected marketing files present"
+ok "marketing files and web-app pages present"
+
+# The app is served at /app, not at /. If app.html ever starts treating the
+# root as its home again it will read "" as a member slug on the marketing
+# page's URL and every home link will point at the pitch instead.
+grep -q "APP_HOME = '/app'" public/app.html \
+  && ok "app.html anchors its home at /app" \
+  || err "public/app.html lost APP_HOME — the app must know it lives at /app, not /"
 
 note "Marketing page"
 
-# The smoke test's catch-all probe greps for this marker to prove an unknown
-# path rendered the marketing page. If the page loses it, that probe silently
+# The smoke test greps for this marker to prove the root still serves the
+# marketing page rather than the app. If the page loses it, that probe silently
 # stops proving anything.
 grep -q 'id="shelf"' public/index.html \
   && ok "index.html keeps the id=\"shelf\" smoke marker" \
@@ -70,18 +70,28 @@ fi
 
 note "Redirects"
 
-for path in /join /setup /requests /admin /welcome /groups /rate-backlog \
-            /subscriptions /vibe /members /reporting /url-cleanup /vibe-admin; do
+# Member approval is gone for good (migration 058) — these four have no page
+# behind them and must keep redirecting.
+for path in /join /setup /requests /admin; do
   grep -qE "^${path}[[:space:]]" public/_redirects \
     || err "public/_redirects has no rule for $path"
 done
 ok "every retired path has a redirect rule"
 
-# The catch-all must stay a 200 rewrite. As a 301 the URL is discarded, and a
-# shared member link stops carrying who it was about.
-grep -qE '^/\*[[:space:]]+/index\.html[[:space:]]+200' public/_redirects \
-  && ok "catch-all is a 200 rewrite" \
-  || err "public/_redirects catch-all must be '/*  /index.html  200'"
+# The web-app surfaces are served by real files again, so a leftover 301 would
+# bounce a member off the page they asked for.
+for path in /welcome /groups /rate-backlog /subscriptions /vibe /members \
+            /reporting /url-cleanup; do
+  grep -qE "^${path}[[:space:]]" public/_redirects \
+    && err "public/_redirects still redirects $path — that page is served again"
+done
+ok "restored pages are not redirected away"
+
+# The catch-all must stay a 200 rewrite to the app. As a 301 the URL is
+# discarded, and a shared member link stops carrying who it was about.
+grep -qE '^/\*[[:space:]]+/app\.html[[:space:]]+200' public/_redirects \
+  && ok "catch-all is a 200 rewrite to the app" \
+  || err "public/_redirects catch-all must be '/*  /app.html  200'"
 
 # Member slugs must not be redirected — that would break the universal-link
 # behaviour the new-signup email depends on.
@@ -101,10 +111,14 @@ fi
 
 csp_line=$(grep -i 'Content-Security-Policy:' public/_headers || true)
 [ -n "$csp_line" ] && ok "CSP present" || err "public/_headers has no Content-Security-Policy"
-for stale in appleid.apple.com accounts.google.com challenges.cloudflare.com; do
-  echo "$csp_line" | grep -qF "$stale" \
-    && err "CSP still allows $stale — web sign-in was retired in 2026-08"
+
+# Web sign-in is back, and each of these fails silently when its source is
+# missing: the button renders and simply never completes.
+for src in appleid.cdn-apple.com appleid.apple.com accounts.google.com challenges.cloudflare.com; do
+  echo "$csp_line" | grep -qF "$src" \
+    || err "CSP no longer allows $src — web sign-in needs it (docs/ARCHITECTURE.md#frontend-pages)"
 done
+ok "CSP carries the web sign-in sources"
 echo "$csp_line" | grep -q "frame-ancestors 'none'" \
   && ok "CSP denies framing" \
   || err "CSP is missing frame-ancestors 'none'"

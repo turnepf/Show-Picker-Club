@@ -1,28 +1,20 @@
-# The web member app was retired in 2026-08 (docs/PRODUCT.md#web-app-status).
-# Everything it used to serve now lands on the marketing page. Member slugs
-# (/patrick) are deliberately NOT listed: they fall through the catch-all as a
-# 200 rewrite so the URL survives, which is what lets iOS/macOS resolve them
-# against .well-known/apple-app-site-association and open the app instead of
-# ever fetching the page. A 301 here would still work on Apple devices but
-# would throw away the member context on every other one.
-/join           /  301
-/setup          /  301
-/requests       /  301
-/admin          /  301
-/welcome        /  301
-
-# Retired member surfaces
-/groups         /  301
-/rate-backlog   /  301
-/subscriptions  /  301
-/vibe           /  301
-
-# Retired admin tools — all four live in the iOS app now
-/members        /  301
-/reporting      /  301
-/url-cleanup    /  301
-/vibe-admin     /  301
+# The web member app was restored in 2026-08 (docs/PRODUCT.md#web-app-status)
+# and lives at /app, not at /: the root stays the marketing page, which is what
+# the Google Ads campaign points at. Member slugs (/patrick) are deliberately
+# NOT listed here: they fall through the catch-all as a 200 rewrite so the URL
+# survives, which is what lets iOS/macOS resolve them against
+# .well-known/apple-app-site-association and open the app instead of ever
+# fetching the page. A 301 here would still work on Apple devices but would
+# throw away the member context on every other one.
+#
+# Retired for real — member approval went away in 2026-08 (migration 058) and
+# these have no page behind them any more.
+/join     /         301
+/setup    /members  301
+/requests /members  301
+/admin    /members  301
 
 # Everything else (member slugs, stale bookmarks, old SPA deep links) renders
-# the marketing page without changing the URL.
-/*  /index.html  200
+# the app without changing the URL. Real files win over this rule, so /,
+# /privacy, /terms, /groups and friends still serve themselves.
+/*  /app.html  200

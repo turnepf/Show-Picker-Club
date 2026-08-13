@@ -37,7 +37,7 @@ function initializeNav() {
     };
   } else {
     // Default: navigate to home
-    backLink.href = '/';
+    backLink.href = '/app';
   }
 }
 

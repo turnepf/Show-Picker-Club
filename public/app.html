@@ -1241,7 +1241,7 @@
   <div id="showPage" class="hidden">
     <aside class="split-side" id="memberSideNav">
       <div class="home-titlebar">
-        <h1 class="home-title"><a href="/?home">Show Picker Club</a></h1>
+        <h1 class="home-title"><a href="/app?home">Show Picker Club</a></h1>
         <button class="icon-btn" title="Search all libraries" aria-label="Search all libraries" onclick="openLandingSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
         <button class="icon-btn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
       </div>
@@ -1251,7 +1251,7 @@
            there's no visible route back to your own shows. Toggled by
            updateSideListsHeader(); keeps the open list via location.hash. -->
       <nav class="ios-group hidden" id="sideBackHome">
-        <a class="ios-item" id="sideBackHomeLink" href="/" onclick="if (authMember) this.href = '/' + authMember + location.hash">
+        <a class="ios-item" id="sideBackHomeLink" href="/app" onclick="if (authMember) this.href = '/' + authMember + location.hash">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-person"/></svg></span>
           <span class="ios-item-label">Back to My Shows</span>
         </a>
@@ -1314,7 +1314,7 @@
           <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
           <span class="ios-item-label">Vibe trait scoring</span>
         </a>
-        <a class="ios-item" href="/?home">
+        <a class="ios-item" href="/app?home">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-flame"/></svg></span>
           <span class="ios-item-label">Trending</span>
         </a>
@@ -1328,7 +1328,7 @@
       <header>
         <div class="header-top">
           <div class="header-actions">
-            <a href="/?home" class="back-link" title="All members" aria-label="Back to all members"><svg class="ic"><use href="#i-chevron-left"/></svg>Home</a>
+            <a href="/app?home" class="back-link" title="All members" aria-label="Back to all members"><svg class="ic"><use href="#i-chevron-left"/></svg>Home</a>
           </div>
           <div class="header-actions">
             <button class="icon-btn" id="searchBtn" title="Search this member's shows" aria-label="Search this member's shows" onclick="openSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
@@ -1827,12 +1827,19 @@
       next: "Shows that have been recommended but we haven't watched.",
     };
 
-    // Determine if we're on landing page or member page
+    // Determine if we're on landing page or member page.
+    //
+    // The app lives at /app, not at /: showpicker.club's root is the marketing
+    // page, and the catch-all in _redirects rewrites everything else (member
+    // slugs, stale SPA deep links) to this file with the URL intact. So the
+    // app's own "home" URL is APP_HOME, and every hardcoded home link below
+    // uses it rather than '/'.
+    const APP_HOME = '/app';
     const path = window.location.pathname.replace(/\/$/, '');
-    const slug = path.substring(1); // remove leading /
+    const slug = path === APP_HOME ? '' : path.substring(1); // remove leading /
 
     if (!slug) {
-      // Opening the site root: logged-in members go straight to their own
+      // Opening the app root: logged-in members go straight to their own
       // list; logged-out visitors get the landing/discovery page. We check
       // auth before rendering so there's no flash of the landing page.
       landingOrMyList();
@@ -1843,7 +1850,7 @@
         } else {
           // Slug doesn't match any member even after sanitizing. Fall back to
           // the landing page rather than rendering a confusing blank profile.
-          history.replaceState(null, '', '/');
+          history.replaceState(null, '', APP_HOME);
           showLanding();
         }
       });

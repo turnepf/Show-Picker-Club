@@ -120,7 +120,7 @@ Member ratings (docs/PRODUCT.md backlog: "Member ratings"). Migration 053. Keyed
 
 Entry is gated to shows on any list except Next Up (`list !== 'next'`), enforced server-side in `PUT /api/shows/:id/rating`; a show with no `tmdb_id` yet (not enriched) can't be rated either. The average/count show on every card regardless of login state — a deliberate, scoped exception to the otherwise-tiny public surface (`GET /api/shows/:id` returns the summary in its public/redacted branch too, never member names or individual scores beyond the specific owner being viewed).
 
-`GET /api/rate-backlog` (session required) backs the bulk-rate flow (the web page was archived in the 2026-08 teardown — see [Frontend pages](#frontend-pages) — and the iOS `RateBacklogView` is the live client): every active show the member has except Next Up and archived rows, left-joined to `show_ratings` for the member's existing overall (`season_number = 0`) rating, unrated shows first. Overall-only by design — each row links to `/<slug>?show=<id>` (the show's detail page, which `showMember()` opens directly via a `show` query param) for season-level rating. `GET /api/rate-backlog-count` returns `{ count }` for the same set of rows — the "Rate my backlog" nav badge, which the main app derives from the library it already has loaded but `shell.js` has no library for. The two share an eligibility clause; change one and change the other, or the badge disagrees with the page it links to.
+`GET /api/rate-backlog` (session required) backs the bulk-rate flow (`rate-backlog.html` on the web and the iOS `RateBacklogView` are both live clients — see [Frontend pages](#frontend-pages)): every active show the member has except Next Up and archived rows, left-joined to `show_ratings` for the member's existing overall (`season_number = 0`) rating, unrated shows first. Overall-only by design — each row links to `/<slug>?show=<id>` (the show's detail page, which `showMember()` opens directly via a `show` query param) for season-level rating. `GET /api/rate-backlog-count` returns `{ count }` for the same set of rows — the "Rate my backlog" nav badge, which the main app derives from the library it already has loaded but `shell.js` has no library for. The two share an eligibility clause; change one and change the other, or the badge disagrees with the page it links to.
 
 `GET /api/reporting` (admin-only, backs `/reporting`) reports rating activity alongside the other show metrics: a "People who rated" card (distinct `member_slug`s with an insert/update to `show_ratings` in the same day/week/month/all-time windows as new/edited/archived shows, keyed off `updated_at` so re-rating counts as activity) plus all-time submitted-ratings and distinct-titles-rated totals. Defensive like the other migration-gated reporting fields: falls back to zeros rather than 500ing the dashboard if `show_ratings` isn't there.
 
@@ -213,7 +213,7 @@ Members a person shares streaming services with, so the audit pools everyone's s
 
 ## Subscription audit
 
-`GET/PUT /api/subscriptions` (`functions/api/subscriptions.js`), the web page (`subscriptions.html`) was archived in the 2026-08 teardown; the iOS Subscription audit is the live client. Both verbs require a session and operate on the logged-in member.
+`GET/PUT /api/subscriptions` (`functions/api/subscriptions.js`), read by both `subscriptions.html` on the web and the iOS Subscription audit. Both verbs require a session and operate on the logged-in member.
 
 - **Household pooling.** Before grouping, the GET reads the member's `household_members` and pools active shows across the member + those members. The same title appearing on more than one household member's list is deduped per network, keeping the most-active list (watching > waiting > next up > loved) so the verdict reflects whoever's furthest along. The response includes `household` (the pooled members' slugs + display names) for the "including …" line.
 - **Who's watching.** When (and only when) a household is pooled, every show in a service's `shows` array carries `viewers`: `[{ slug, name, list }]` — each household member who has that title and the list it sits on *for them*, so a title deduped to `watching` still shows that it's only `next up` for you. `name` is the first-name label (`You` for the caller), disambiguated by last initial exactly as `/api/members` and `/api/household` do — one members lookup now serves both the viewer labels and the `household` array. A solo audit omits `viewers` entirely: with one person pooled, naming them says nothing. iOS renders it under each row of a service's "Why?" list and in the `keep` reason line ("Active now: Severance (Dorothy)"), which is the case where the verdict can rest on somebody else's show. Household is invite-based on iOS, the same shape as groups: `POST /api/household/invite` mints a 7-day link (`/household/join?code=…`), the recipient's app accepts it via `POST /api/household/join`, and `POST /api/household/remove` drops someone. You can't add a person to your household from a roster any more than you can add them to a group. `GET /api/household` still returns the current set; `PUT` (whole-set replace) remains for the web modal.
@@ -439,38 +439,49 @@ Durable login tracking is separate: `members.last_login_at` (stamped by `_shared
 
 ## Frontend pages
 
-**The web member app was removed in 2026-08.** `showpicker.club` is a marketing
-site: a pitch, the public Trending shelf, and an App Store link. What still
-deploys from `public/` is `index.html` (the marketing page), `privacy.html`,
-`terms.html`, `sms.html` (all three are linked from the App Store listing and
-from each other), `styles.css`, `favicon.svg`, the `sw.js` tombstone, `_headers`,
-`_redirects`, and `.well-known/`. Nothing else.
+**The web member app was removed in 2026-08 and restored the same month.** The
+archive existed for four weeks; the restore was a `git mv` back, a `_redirects`
+edit, the CSP sources sign-in needs, and one line in the SPA. `archive/` is gone
+again — the files are back under `public/` where they were.
 
-The retired pages were **moved, not deleted**, to `archive/web/` at the repo root
-— outside `pages_build_output_dir`, so they no longer deploy but are one
-`git mv` from coming back. That set is: the member SPA (`archive/web/member-app.html`,
-formerly `public/index.html`), `groups.html`, `rate-backlog.html`,
-`subscriptions.html`, `vibe.html`, the four admin tools (`members.html`,
-`reporting.html`, `url-cleanup.html`, `vibe-admin.html`), `welcome.html`, and the
-shared front-end scripts they depended on (`shell.js`, `nav.js`,
-`show-renderer.js`, `app-banner.js`).
+The split now is by URL, not by existence:
 
-Consequences worth knowing before you go looking for them:
+| URL | Serves |
+|---|---|
+| `/` | `index.html` — the marketing page. Unchanged by the restore; it's the Google Ads landing page, and it gained one link into the app. |
+| `/app` | `app.html` — the member SPA (formerly `public/index.html`, briefly `archive/web/member-app.html`). |
+| `/patrick`, any unknown path | `app.html` via the catch-all, **URL intact** |
+| `/groups`, `/vibe`, `/rate-backlog`, `/subscriptions`, `/welcome` | their own pages |
+| `/members`, `/reporting`, `/url-cleanup`, `/vibe-admin` | the four admin tools |
+| `/privacy`, `/terms`, `/sms` | legal pages, linked from the App Store listing |
 
-- **There is no web sign-in any more.** The SPA carried the entire login UI, so
-  archiving it removed email-code, Sign in with Apple, and Sign in with Google
-  from the browser. The `/auth/*` endpoints themselves are untouched — the Apple
-  apps run on them — and restoring the page restores the flow.
-- **The four admin tools are iOS-only now.** Reporting, Manage members, Show
-  Cleanup and Vibe trait scoring all exist in the iPhone/iPad app, which is why
-  they were safe to pull.
-- **`welcome.html` was the Google Ads conversion URL.** With no web signup it can
-  never fire again; the Smart campaign's conversion setting is now pointing at a
-  page that 301s to `/`.
-- **CSP got tighter with the teardown** (`public/_headers`): the Apple, Google
-  and Turnstile script/frame/form-action sources existed only for web sign-in and
-  are gone. What remains covers Google Analytics, Cloudflare Insights, and TMDB
-  poster art.
+Things that follow from the app living at `/app` rather than `/`:
+
+- **`app.html` defines `APP_HOME = '/app'`** and derives its own routing from it:
+  the slug parser treats that exact path as "no slug", and every hardcoded home
+  link uses it. Without that, the app would read `""` as a member slug and every
+  "Home" link would point at the marketing pitch. `check-static.sh` asserts the
+  constant is still there.
+- **The catch-all is `/*  /app.html  200`.** Real files win over it, which is why
+  `/`, `/privacy` and `/groups` still serve themselves — the same precedence the
+  marketing-only catch-all relied on.
+- **Member slugs stay out of `_redirects`.** A 301 would work on Apple devices
+  (universal links resolve before the fetch) but would throw away the member
+  context everywhere else.
+- **Web sign-in works again**, so the CSP carries the Apple, Google and Turnstile
+  script/frame/form-action sources again alongside Google Analytics, Cloudflare
+  Insights and TMDB poster art. Each one fails *silently* when missing — the
+  button renders and the flow never completes — so both `check-static.sh` and
+  `smoke.sh` assert them.
+- **`welcome.html` is a live Google Ads conversion URL again.** Fresh web signups
+  land there (see `finishLogin` in `app.html`), which is the page the Smart
+  campaign counts.
+- **Group invites shared from iOS (`/groups/join?token=…`) hit a Pages Function,
+  not the SPA.** That's the link-preview card, and it now carries a "Join in your
+  browser" link to `/groups?token=…` — the URL `groups.html` actually redeems —
+  on live invites only, so an expired and an unknown token still render the same
+  card. Household invite codes have no web redemption path, so that card stays
+  App-Store-only.
 
 ### `index.html` — the marketing page
 
@@ -493,14 +504,17 @@ Store page itself shows Open when the app is already installed.
 
 ### Redirects
 
-`public/_redirects` 301s every retired path to `/`: `/join`, `/setup`,
-`/requests`, `/admin`, `/welcome`, `/groups`, `/rate-backlog`, `/subscriptions`,
-`/vibe`, `/members`, `/reporting`, `/url-cleanup`, `/vibe-admin`.
+`public/_redirects` 301s the four paths member approval left behind: `/join` →
+`/`, and `/setup`, `/requests`, `/admin` → `/members`. Nothing else redirects —
+the pages the 2026-08 teardown pointed at `/` are real files again, and a
+leftover rule would bounce a member off the page they asked for (`check-static.sh`
+and `smoke.sh` both assert their absence, because the catch-all would otherwise
+hide the mistake by rendering the app at every one of them).
 
 Member slugs are deliberately **not** in that list. They keep falling through the
-SPA-era catch-all (`/*  /index.html  200`), which is a rewrite rather than a
-redirect, so `showpicker.club/patrick` keeps its URL and renders the marketing
-page. That is what lets iOS and macOS match it against
+catch-all (`/*  /app.html  200`), which is a rewrite rather than a
+redirect, so `showpicker.club/patrick` keeps its URL and renders that member's
+lists. That is what lets iOS and macOS match it against
 `.well-known/apple-app-site-association` and open the app instead of ever
 fetching the page. A 301 would still work on Apple devices — the OS resolves the
 link before any request goes out — but it would throw away the member context on
@@ -510,7 +524,7 @@ every other device, and on a shared link that context is the whole point.
 
 The apps share three kinds of link — a show, a group invite, a household invite. All three are universal links that iOS already routes into the app; **this is not about the tap.** When a link is sent in Messages (or Slack, or WhatsApp), the device makes a plain server-side GET to build the preview bubble: no app is involved, and it happens whether or not the recipient has the app installed. The bubble is rendered entirely from the Open Graph tags in the HTML that GET returns.
 
-Before 2026-08 there were no such tags. Every shared link fell through `_redirects`' catch-all to the marketing page, whose `og:title` is the constant "Show Picker Club" and which carried **no `og:image` at all** — so every share of every show arrived looking identical, with no artwork. Note the consequence for the Swift side: nothing passed to `ShareLink(subject:message:)` reaches that bubble. `subject`/`message`/`SharePreview` style the *share sheet* and the message body; the card comes from the page.
+Before 2026-08 there were no such tags. Every shared link fell through `_redirects`' catch-all, whose `og:title` is the constant "Show Picker Club" and which carried **no `og:image` at all** — so every share of every show arrived looking identical, with no artwork. Note the consequence for the Swift side: nothing passed to `ShareLink(subject:message:)` reaches that bubble. `subject`/`message`/`SharePreview` style the *share sheet* and the message body; the card comes from the page.
 
 | Route | og:title | Image |
 |---|---|---|
@@ -520,7 +534,7 @@ Before 2026-08 there were no such tags. Every shared link fell through `_redirec
 
 `functions/_shared/og-page.js` renders all three, plus `public/og-default.png` (1200×630) as the fallback and the marketing page's `og:image`.
 
-These are Pages Functions, so they take precedence over the `_redirects` catch-all for their paths; `/groups/join` does not collide with the `/groups` 301, which is an exact match. They are **preview metadata plus a card for whoever opens one without the app — not a return of the web member app** (see [PRODUCT.md#web-app-status](PRODUCT.md#web-app-status)).
+These are Pages Functions, so they take precedence over the `_redirects` catch-all for their paths; `/groups/join` does not collide with the `/groups` 301, which is an exact match. They are **preview metadata plus a card for whoever opens one without the app**; the web member app is a separate surface at `/app` (see [PRODUCT.md#web-app-status](PRODUCT.md#web-app-status)).
 
 Because they are public and session-free, the constraints are all negative ones, and `scripts/og-preview-test.mjs` pins them:
 
@@ -951,5 +965,5 @@ Two things in `smoke.sh` look like fussiness and are not. Every request carries 
 - **Network URLs that look like `/search`, `/s?`, or `/?q=` are placeholders.** The frontend renders these as plain text instead of links; sync-urls and calendar feed treat them as missing.
 - **Member display names disambiguate dynamically.** `/api/members` counts first-name collisions and appends `last_initial` only when it would otherwise be ambiguous.
 - **Slug `dorothy` was renamed to `whitt`.** A permanent 301 in `_redirects` covers the old URL. She has since gone back to displaying as Dorothy (migration 025 updated her name and login email) — the slug stays `whitt`.
-- **Show rows are a Swift-only concern now.** `public/show-renderer.js` was the single web renderer for every row and detail body; it went to `archive/web/` with the member app in 2026-08. `ShowRow.swift` is the one renderer left, and the convention it enforced — one renderer, never hand-rolled markup per screen — still applies on the Swift side.
+- **One renderer per platform, never hand-rolled markup per screen.** `public/show-renderer.js` renders every row and detail body on the web; `ShowRow.swift` does the same job in Swift. Both came back to that rule the hard way (five row implementations on the web in 2026-08), and it holds on either side.
 - **Always clean up branches when a chunk of work is done.** After the work is merged to `main` and pushed live, delete the feature branch — local and remote. Caveat: in the Claude-Code-on-the-web remote environment the git proxy rejects remote-branch deletion (HTTP 403) and the GitHub MCP server has no delete-branch tool, so the remote branch may have to be deleted from GitHub's UI/API outside that environment. The local branch can always be deleted.
