@@ -236,7 +236,8 @@ Details that matter in use:
 - **Titles you already have are greyed out** and can't be ticked back on, archived ones included, so the screen never promises an add that silently doesn't happen.
 - **No length limit.** A very long paste takes longer; it isn't truncated or capped. There is a per-day ceiling of 300 rows across imports and hand-adds together.
 - **Artwork and cast fill in shortly after**, not at import time — the rows appear immediately with a poster and land fully enriched a little later.
-- **The default list is Watching** when a paste has no structure to place a title. That means an unstructured import lands in the calendar feed too (which draws from Watching + Awaiting), which is the main reason the review step exists.
+- **A title the paste doesn't place lands on the list you opened the importer from.** Paste a bare list of titles while looking at Next Up and they go to Next Up; from Watching, Watching. Headings in your paste still win — "Loved" over a title puts it on Loved wherever you started. The two Home doors have no list in view, so they use Watching.
+- **That fallback is why the review step exists.** Watching feeds the calendar (which draws from Watching + Awaiting), so a list that lands there lands in a subscribed feed too.
 
 ## Export your lists
 

@@ -936,8 +936,16 @@ enum API {
     // and `section` back in, until `nextCursor` comes back nil — a normal
     // paste finishes on the first call, so the loop is usually invisible.
     // Writes nothing; the rows come back for the member to review.
-    static func importParse(text: String, cursor: Int, section: String) async throws -> ImportParseResponse {
-        let body: [String: Any?] = ["text": text, "cursor": cursor, "section": section]
+    //
+    // `defaultList` is where a title lands when the paste says nothing about
+    // it — the list the member was looking at when they opened the importer.
+    // Headings in the pasted text still win over it.
+    static func importParse(text: String, cursor: Int, section: String,
+                            defaultList: ShowList) async throws -> ImportParseResponse {
+        let body: [String: Any?] = [
+            "text": text, "cursor": cursor, "section": section,
+            "default_list": defaultList.rawValue,
+        ]
         return try await postJSON("/api/import/parse", body: body)
     }
 

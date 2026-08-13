@@ -640,7 +640,7 @@ Two endpoints and a shared module, and **no schema change**: imported rows are o
 | Piece | What it does |
 |---|---|
 | `functions/_shared/list-parse.js` | Slice the paste at a line boundary, one Claude call per slice, then one TMDB search per extracted title. Also the dupe-check query and the four-list constants. |
-| `POST /api/import/parse` | Session-gated. Body `{ text, cursor?, section? }` → `{ items, next_cursor, section, total_chars }`. **Writes nothing.** |
+| `POST /api/import/parse` | Session-gated. Body `{ text, cursor?, section?, default_list? }` → `{ items, next_cursor, section, default_list, total_chars }`. **Writes nothing.** |
 | `POST /api/import/commit` | Session-gated. Body `{ items }` → `{ added, skipped, titles, skipped_titles }`. Inserts into `shows`, always for the caller's own `member_slug`. |
 
 ### Why it pages
@@ -670,7 +670,13 @@ Unmatched titles are **kept, not dropped** — TMDB misses real things — and f
 
 ### Default list
 
-An extracted title with nothing to place it goes to **Watching**. Note this feeds the calendar (`functions/calendar/[slug].js` selects `watching` + `waiting`), so an unstructured import does land in a subscribed feed — the review screen is what keeps that honest.
+An extracted title with nothing in the text to place it goes to **the list the member was looking at when they opened the importer** — `parse`'s `default_list`, which the client sets from `MemberView`'s `currentList`, the same context rule Add Show follows. Pasting a bare list of titles from Next Up puts them on Next Up.
+
+Headings in the paste always win over it: the fallback only applies to titles the text says nothing about.
+
+Callers with no list in view — both Home doors — send nothing and get **Watching**, which is also what an omitted or unrecognised `default_list` resolves to (`normalizeList()` in `_shared/list-parse.js`). That matters because Watching feeds the calendar (`functions/calendar/[slug].js` selects `watching` + `waiting`): before the fallback was caller-controlled, an unheaded watchlist landed in a subscribed feed. It still can from Home, and the review screen is what keeps that honest.
+
+The fallback rides in the **user turn**, not the system prompt. The system prompt is cached `ephemeral` and stays byte-identical across every slice of every import; interpolating one of four list names into it would cost a cache entry per list. `scripts/import-list-test.mjs` pins that it doesn't vary.
 
 ## Networks
 

@@ -411,5 +411,98 @@ console.log('\n== the request Claude receives is the one we intend');
   check('one TMDB search per extracted title', tmdb.calls.length === 1, String(tmdb.calls.length));
 }
 
+// The fallback is the only thing deciding where an unheaded paste lands, and
+// Watching feeds the calendar — so a watchlist pasted from Next Up landing on
+// Watching would push forty unwatched titles into a subscribed feed. These pin
+// the contract in both directions: the caller's choice reaches Claude and the
+// row builder, junk never does, and a heading still beats both.
+console.log('\n== the default list follows the door the member came in by');
+{
+  const env = makeEnv();
+  claude.reply = { items: [], trailing_section: '' };
+  await parse.onRequestPost(context(env, post('/api/import/parse', {
+    text: 'Severance', default_list: 'next',
+  })));
+  check('the caller\'s fallback reaches Claude', claude.calls[0].user.includes('Fallback list for titles the text does not place: next'),
+        claude.calls[0].user);
+
+  const env2 = makeEnv();
+  claude.reply = { items: [], trailing_section: '' };
+  await parse.onRequestPost(context(env2, post('/api/import/parse', { text: 'Severance' })));
+  check('an omitted fallback is still Watching', claude.calls[0].user.includes('place: watching'),
+        claude.calls[0].user);
+
+  // The system prompt is cached ephemeral and must stay byte-identical across
+  // every slice of every import — which is exactly why the fallback rides in
+  // the user turn. A four-way interpolation here would quietly cost a cache
+  // entry per list and break the claim in ARCHITECTURE.md.
+  const env3 = makeEnv();
+  claude.reply = { items: [], trailing_section: '' };
+  await parse.onRequestPost(context(env3, post('/api/import/parse', { text: 'A', default_list: 'next' })));
+  const withNext = claude.calls[0].system;
+  const env4 = makeEnv();
+  claude.reply = { items: [], trailing_section: '' };
+  await parse.onRequestPost(context(env4, post('/api/import/parse', { text: 'A', default_list: 'recommending' })));
+  check('the cached system prompt does not vary with it', withNext === claude.calls[0].system);
+  check('and it names no single list as the default', !withNext.includes('use "watching"'));
+}
+
+console.log('\n== a junk default cannot steer the import');
+{
+  for (const bad of ['archived', 'WATCHING', '', 'next; drop table shows', 42, null]) {
+    const env = makeEnv();
+    knowTitle('Severance', 95396);
+    // Claude echoing a bad list back is the other half of the same hole.
+    claude.reply = { items: [item({ list: 'nonsense' })], trailing_section: '' };
+    const res = await parse.onRequestPost(context(env, post('/api/import/parse', {
+      text: 'Severance', default_list: bad,
+    })));
+    const out = await res.json();
+    check(`${JSON.stringify(bad)} falls back to Watching`,
+          out.default_list === 'watching' && out.items[0].list === 'watching',
+          JSON.stringify({ d: out.default_list, l: out.items[0]?.list }));
+  }
+}
+
+console.log('\n== a heading still beats the default');
+{
+  const env = makeEnv();
+  knowTitle('Severance', 95396);
+  knowTitle('The Bear', 136315);
+  // What a well-behaved model does with a heading: places the title itself and
+  // ignores the fallback. The fallback must not overwrite that.
+  claude.reply = {
+    items: [item({ title: 'Severance', list: 'recommending' }), item({ title: 'The Bear', list: 'next' })],
+    trailing_section: '',
+  };
+  const res = await parse.onRequestPost(context(env, post('/api/import/parse', {
+    text: 'Loved\nSeverance\n\nNext Up\nThe Bear', default_list: 'watching',
+  })));
+  const out = await res.json();
+  check('a placed title keeps its list', out.items[0].list === 'recommending', out.items[0].list);
+  check('and so does the second', out.items[1].list === 'next', out.items[1].list);
+  check('the response reports the fallback that was applied', out.default_list === 'watching', out.default_list);
+}
+
+console.log('\n== an unplaced title lands on the caller\'s list, all the way to the row');
+{
+  const env = makeEnv();
+  knowTitle('Severance', 95396);
+  // A model that returns a list key outside the four — the row builder's own
+  // fallback, which used to be hardcoded to Watching.
+  claude.reply = { items: [item({ list: 'not-a-list' })], trailing_section: '' };
+  const res = await parse.onRequestPost(context(env, post('/api/import/parse', {
+    text: 'Severance', default_list: 'next',
+  })));
+  const out = await res.json();
+  check('the row builder honours it too', out.items[0].list === 'next', out.items[0].list);
+
+  const done = await commit.onRequestPost(context(env, post('/api/import/commit', { items: out.items })));
+  check('and commit accepts the row', done.status === 200, `got ${done.status}`);
+  const rows = shows(env);
+  check('the show is on Next Up in the database', rows.length === 1 && rows[0].list === 'next',
+        JSON.stringify(rows.map(r => r.list)));
+}
+
 console.log(`\n${failed === 0 ? 'PASS' : 'FAIL'} — ${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

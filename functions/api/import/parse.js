@@ -1,7 +1,14 @@
 // POST /api/import/parse — read a slice of a pasted list.
 //
-// Body: { text: "<the whole paste>", cursor?: <int>, section?: "<carried heading>" }
-// Returns: { items: [...], next_cursor: <int|null>, section: "<heading>" }
+// Body: { text: "<the whole paste>", cursor?: <int>, section?: "<carried heading>",
+//         default_list?: "watching"|"waiting"|"recommending"|"next" }
+// Returns: { items: [...], next_cursor: <int|null>, section: "<heading>",
+//            default_list: "<the fallback actually used>" }
+//
+// `default_list` is where titles land when the paste says nothing about them —
+// the client sends the list the member was looking at when they opened the
+// importer. Headings in the text still win. Omitted or unrecognised, it falls
+// back to Watching, which is what every caller did before it existed.
 //
 // Writes nothing. The client calls this repeatedly, threading `next_cursor` and
 // `section` back in, until `next_cursor` comes back null — then posts the
@@ -14,7 +21,7 @@
 // subrequest budget and time out long before it finished.
 
 import { getSession } from '../../_shared/auth.js';
-import { extractItems, resolveItems, existingTitles, sliceChunk } from '../../_shared/list-parse.js';
+import { extractItems, resolveItems, existingTitles, sliceChunk, normalizeList } from '../../_shared/list-parse.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -45,20 +52,23 @@ export async function onRequestPost(context) {
   const cursor = Number.isInteger(body.cursor) ? body.cursor : 0;
   if (cursor < 0 || cursor > text.length) return json({ error: 'bad cursor' }, 400);
   const carriedSection = typeof body.section === 'string' ? body.section.slice(0, 200) : '';
+  const defaultList = normalizeList(body.default_list);
 
   const { chunk, nextCursor } = sliceChunk(text, cursor);
-  if (!chunk) return json({ items: [], next_cursor: null, section: carriedSection });
+  if (!chunk) {
+    return json({ items: [], next_cursor: null, section: carriedSection, default_list: defaultList });
+  }
 
   let extracted;
   try {
-    extracted = await extractItems(env, chunk, carriedSection);
+    extracted = await extractItems(env, chunk, carriedSection, defaultList);
   } catch (e) {
     console.error('[import] extract failed', e.message);
     return json({ error: 'parse_failed', detail: e.message.slice(0, 140) }, 502);
   }
 
   const existing = await existingTitles(env, session.member_slug);
-  const items = await resolveItems(env, extracted.items, existing);
+  const items = await resolveItems(env, extracted.items, existing, defaultList);
 
   // Two lines of a paste can name the same show ("Severence" under Watching,
   // "Severance" further down). They resolve to one canonical title, so keep
@@ -76,6 +86,9 @@ export async function onRequestPost(context) {
     items: deduped,
     next_cursor: nextCursor,
     section: extracted.trailingSection,
+    // Echoed so the client shows the fallback that was actually applied rather
+    // than the one it believes it asked for.
+    default_list: defaultList,
     // So the client can draw an honest progress bar instead of a spinner that
     // says nothing about how much is left.
     total_chars: text.length,

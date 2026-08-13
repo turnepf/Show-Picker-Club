@@ -19,6 +19,14 @@ import SwiftUI
 struct ImportListView: View {
     // No member slug: /api/import/commit always writes to the caller's own
     // lists, resolved from the session, exactly like /api/export reads them.
+    //
+    // `defaultList` is where an unplaced title lands, and it is the list the
+    // member was looking at when they opened this — the same context rule
+    // Add Show follows (AddEditShowView's initialList). A bare list of titles
+    // means something different from Next Up than it does from Watching, and
+    // the server has no way to know which door was used. Callers with no list
+    // in view (Home) leave it at Watching.
+    var defaultList: ShowList = .watching
     let onFinished: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -133,10 +141,12 @@ struct ImportListView: View {
     // A worked example of a paste. Deliberately uses two of the app's own list
     // names as headings and the "on <service>" form, since those are the two
     // things the parser reads structure from — a heading is what puts a title
-    // anywhere other than Watching, and "on <service>" is what fills the
-    // network field. Neither is required (an unstructured list works and lands
-    // on Watching), so the last line says so rather than letting the example
-    // read as a format the paste has to match.
+    // somewhere other than the default list, and "on <service>" is what fills
+    // the network field. Neither is required, so the last line names where an
+    // unheaded list actually lands rather than letting the example read as a
+    // format the paste has to match. That line has to track `defaultList`: it
+    // is the only place the member is told where a bare list goes, so hard-
+    // coding "Watching" here would be a lie from the Next Up door.
     private var exampleCard: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("For example")
@@ -152,7 +162,7 @@ struct ImportListView: View {
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
-            Text("Headings are optional — a plain list of titles works too.")
+            Text("Headings are optional — a plain list of titles lands on \(defaultList.title).")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -306,7 +316,8 @@ struct ImportListView: View {
 
         while slices < 200 {
             do {
-                let page = try await API.importParse(text: text, cursor: cursor, section: section)
+                let page = try await API.importParse(text: text, cursor: cursor, section: section,
+                                                     defaultList: defaultList)
                 items.append(contentsOf: page.items)
                 section = page.section ?? ""
                 guard let next = page.nextCursor else {

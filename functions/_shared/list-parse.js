@@ -22,13 +22,27 @@ import { canonicalNetwork } from './networks.js';
 // The four lists, exactly as `shows.list` stores them.
 export const LIST_KEYS = ['watching', 'waiting', 'recommending', 'next'];
 
-// Where a title goes when the paste has no structure to place it. Patrick's
-// call (2026-08): an undifferentiated list is most often "stuff I'm watching",
-// and Watching is where the app expects you to triage from. Note this feeds
-// the calendar (functions/calendar/[slug].js selects watching + waiting), so
-// an unstructured import does show up in a subscribed feed — the review
-// screen is what keeps that honest.
-const DEFAULT_LIST = 'watching';
+// Where a title goes when the paste has no structure to place it, absent a
+// caller saying otherwise. Patrick's call (2026-08): an undifferentiated list
+// is most often "stuff I'm watching", and Watching is where the app expects
+// you to triage from. Note this feeds the calendar
+// (functions/calendar/[slug].js selects watching + waiting), so an
+// unstructured import does show up in a subscribed feed — the review screen
+// is what keeps that honest.
+//
+// It is only the fallback's fallback. The caller passes the list the member
+// was looking at when they opened the importer (see normalizeList), because
+// the same unstructured paste means different things from different places:
+// a bare list of titles opened from Next Up is a watchlist, not a confession
+// that they're mid-season on forty shows. Headings in the text still win over
+// both.
+export const DEFAULT_LIST = 'watching';
+
+// A caller-supplied default is untrusted input; anything that isn't one of the
+// four keys falls back rather than reaching Claude or a `shows.list` column.
+export function normalizeList(value) {
+  return LIST_KEYS.includes(value) ? value : DEFAULT_LIST;
+}
 
 // Characters of pasted text handed to one Claude call. Sized so the extracted
 // items comfortably fit the response and so the TMDB resolution below stays
@@ -58,7 +72,7 @@ Read the whole slice before deciding. Headings, all-caps lines, lines ending in 
 
 You are also given the heading that was in effect at the end of the previous slice, since the text is processed in pieces. If the slice begins with titles and no heading of its own, they belong to that carried-over section.
 
-When nothing in the text places a title, use "${DEFAULT_LIST}".
+When nothing in the text places a title, use the fallback list named in the message below. Only fall back when the text really is silent about where a title goes — a heading, a section, or a remark next to the title always wins over the fallback.
 
 For each title, also pull out what the person wrote around it:
 
@@ -124,11 +138,15 @@ const RESPONSE_SCHEMA = {
   additionalProperties: false,
 };
 
-async function callClaude(env, chunk, carriedSection) {
+async function callClaude(env, chunk, carriedSection, defaultList) {
   const userMsg = [
     carriedSection
       ? `Heading in effect at the end of the previous slice: ${carriedSection}`
       : 'This is the start of the list.',
+    // Per-request, so it rides in the user turn rather than the system prompt:
+    // the system prompt is cached ephemeral and stays byte-identical across
+    // every slice of every import, which a four-way interpolation would break.
+    `Fallback list for titles the text does not place: ${defaultList}`,
     '',
     'Pasted list:',
     chunk,
@@ -161,15 +179,16 @@ async function callClaude(env, chunk, carriedSection) {
 
 // One Claude call for one slice. Returns the raw extracted items — unresolved,
 // unvalidated beyond the schema.
-export async function extractItems(env, chunk, carriedSection) {
+export async function extractItems(env, chunk, carriedSection, defaultList = DEFAULT_LIST) {
   if (!env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not set');
+  const fallback = normalizeList(defaultList);
 
-  let res = await callClaude(env, chunk, carriedSection);
+  let res = await callClaude(env, chunk, carriedSection, fallback);
   // Same 429 handling as the vibe filler: read Retry-After, sleep, try once more.
   if (res.status === 429) {
     const ra = parseInt(res.headers.get('retry-after') || '10', 10);
     await new Promise(r => setTimeout(r, Math.min(Math.max(ra * 1000, 2000), 30000)));
-    res = await callClaude(env, chunk, carriedSection);
+    res = await callClaude(env, chunk, carriedSection, fallback);
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -197,7 +216,8 @@ function blank(v) {
 
 // Resolve extracted titles against TMDB and flag the ones the member already
 // has. Runs in waves of RESOLVE_CONCURRENCY.
-export async function resolveItems(env, rawItems, existingByTitle) {
+export async function resolveItems(env, rawItems, existingByTitle, defaultList = DEFAULT_LIST) {
+  const fallback = normalizeList(defaultList);
   const out = [];
   for (let i = 0; i < rawItems.length; i += RESOLVE_CONCURRENCY) {
     const wave = rawItems.slice(i, i + RESOLVE_CONCURRENCY);
@@ -220,7 +240,10 @@ export async function resolveItems(env, rawItems, existingByTitle) {
         // What the member actually typed, so the review row can show that we
         // read "Severence" as "Severance" instead of silently correcting it.
         raw_title: title,
-        list: LIST_KEYS.includes(raw.list) ? raw.list : DEFAULT_LIST,
+        // Claude is schema-constrained to the four keys, so this is the belt to
+        // that braces — and it has to honour the caller's fallback too, or a
+        // malformed row would quietly land on Watching from a Next Up import.
+        list: LIST_KEYS.includes(raw.list) ? raw.list : fallback,
         notes: blank(raw.notes) || null,
         network: network ? canonicalNetwork(network) : null,
         recommended_by: blank(raw.recommended_by) || null,

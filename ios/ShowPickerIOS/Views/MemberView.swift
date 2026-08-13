@@ -324,7 +324,11 @@ struct MemberView: View {
         }
         .sheet(isPresented: $showingImport) {
             if isMine {
-                ImportListView { await load() }
+                // Same rule as "+" above: the list being viewed is where an
+                // unplaced title lands, so a bare watchlist pasted from Next
+                // Up stays a watchlist instead of claiming forty shows are
+                // in progress. Headings in the paste still override it.
+                ImportListView(defaultList: currentList) { await load() }
             }
         }
     }
