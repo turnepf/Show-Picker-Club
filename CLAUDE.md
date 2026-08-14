@@ -4,9 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Show Picker Club — a multi-tenant TV-show/movie tracker for a small private club, live at [showpicker.club](https://showpicker.club). Each member (`/patrick`, `/whitt`) keeps four ranked lists (Watching, Awaiting, Loved, Next Up). The native SwiftUI apps for iOS, tvOS and watchOS are the product members actually use; the browser app at `/app` is back as a secondary surface (see `docs/PRODUCT.md#web-app-status`) and the Cloudflare backend in this repo serves both.
+Show Picker Club — a multi-tenant TV-show/movie tracker, live at [showpicker.club](https://showpicker.club) and publicly listed on the App Store. Each member has a slug (`/patrick`, `/whitt`, …) and keeps four ranked lists (Watching, Awaiting, Loved, Next Up). The native SwiftUI apps for iPhone/iPad/Mac, Apple TV and Apple Watch are the product members actually use; the browser app is back as a secondary surface (see `docs/PRODUCT.md#web-app-status`) and the Cloudflare backend in this repo serves both.
 
-**Stack:** Static HTML + vanilla JS (no framework, no build step) in `public/`; Cloudflare Pages Functions (file-system-routed JS) in `functions/`; Cloudflare D1 (SQLite) with the `DB` binding from `wrangler.toml`; OMDB + TMDB for enrichment; Claude API for vibe trait scoring; Twilio/Resend for login codes.
+**Despite the name, this is not a small private club any more — don't design as if it were.** Signup is open and self-service (email code / Apple / Google), the universal app is on the public App Store, and the membership is dozens of people rather than a couple of friends. Privacy moved *inside* the product: **private groups** and **households** are joined by invite link only, and group membership — not club membership — is what lets two members see or touch each other's libraries. So "another member" is not a synonym for "a friend": private memos (notes, watching-with text, recommended-by) stay owner-only, the social features (Also watching, vibe, cross-library reads) are group-scoped, and the one cross-member *write* that exists, Watching With, is allowed precisely because a group is a relationship both people opted into. The word *club* in the name and the UI is branding, not an access model.
+
+**Stack:** Static HTML + vanilla JS (no framework, no build step) in `public/`; Cloudflare Pages Functions (file-system-routed JS) in `functions/`; Cloudflare D1 (SQLite) with the `DB` binding from `wrangler.toml`; TMDB for enrichment (OMDB retired 2026-07) and Watchmode for watch links; Claude API for vibe trait scoring; Twilio/Resend for login codes.
 
 ## Documentation map
 
@@ -49,13 +51,18 @@ migrations/        Numbered D1 upgrades (auto-applied on deploy when pending)
 schema.sql         Complete schema for fresh databases
 ShowPickerCore/    Shared Swift package (models) used by all Apple targets
 ios/  tvos/        SwiftUI apps; open ShowPickerClub.xcworkspace at the repo root
+                   (the watch app and the widgets are targets under ios/)
+roku/              Native Roku channel (SceneGraph/BrightScript) against the same
+                   /api/*. On main but never compiled or run — Roku has no
+                   simulator — so it is not a shipping platform; see
+                   roku/NEXT_STEPS.md
 scripts/           apply-migrations.sh, member-engagement.sh, vibe-diagnose.mjs
                    (operator tools)
 ```
 
 ## Commands
 
-There is **no package.json or linter** — the web side has no build step. Verification is by reading, local preview, and four checks that run in CI and also run fine from a laptop:
+There is **no package.json or linter** — the web side has no build step. Verification is by reading, local preview, and the checks below, most of which run in CI (`.github/workflows/pr-checks.yml`) and all of which run fine from a laptop:
 
 ```bash
 bash scripts/check-static.sh
@@ -180,7 +187,9 @@ cd ShowPickerCore && swift test
 
 Unit tests for the shared core (macOS, or Linux with a Swift toolchain — the package is deliberately Foundation-only so CI needs no macOS runner). `SessionScopeTests` guards the rule that session-derived UI state dies with the session.
 
-The rules all three enforce are written down in `docs/INVARIANTS.md`; adding a rule there also extends the advisory PR review.
+Two of the suites above — `watching-with-test.mjs` and `og-preview-test.mjs` — are **not** wired into `pr-checks.yml`; run them by hand when you touch what they cover.
+
+The rules these checks enforce are written down in `docs/INVARIANTS.md`; adding a rule there also extends the advisory PR review.
 
 Local preview of the site + Functions (uses a local D1 unless you point it at remote):
 
@@ -214,13 +223,14 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 
 - **Routing** is Pages Functions file routing (`functions/api/shows/[id].js` → `/api/shows/:id`) layered over `public/_redirects` (SPA fallback `/*` → `/index.html`). The full route/method/auth table is in `docs/ARCHITECTURE.md#routing`.
 - **Auth:** passkeys (WebAuthn, iOS/iPad — added from inside a session, never a way to sign up), one-time codes (SMS via Twilio Verify, email via Resend), Sign in with Apple, Sign in with Google (web). Sessions are 30-day HttpOnly cookies; `_shared/auth.js#getSession(request, env)` is the gate every session-protected endpoint calls first. Admin = a session whose member row has `members.is_admin = 1`, checked via `_shared/admin.js#isAdmin()` — admin rights live in the DB, not in code or a secret.
-- **Everyone self-enrolls.** Signing up (email code / Apple / Google) is the only way a member row is created, and a new member is immediately a full member. Retired 2026-08 (migration 058): `members.approved` and the held state, the `signup_requests` table, the `/join` form, the operator approval queue, `admin-member-approve`, manual member creation, `SELF_ENROLL`, and `DEMO_APPLE_FALLBACK`. `createMember()` lives in `functions/_shared/create-member.js` and only `_shared/enroll.js` calls it. **The matching Swift cleanup is deferred until after the App Store launch** — the iOS app keeps its (now inert, gracefully-degrading) approval queue, signup models, and `WelcomeIntroPanel.swift` so the launch archive stays on known-good code. Don't touch the Apple targets for this until those apps have shipped.
-- **Public surface is deliberately tiny** (roster first names, Trending, catalog-level show detail, auth endpoints). Everything derived from members' libraries requires a session. Keep it that way.
-- **Enrichment:** synchronous on insert (`_shared/enrichment.js`, TMDB preferred, OMDB fallback), plus background `POST /api/enrich` fired from member pages. New rows inherit a sibling copy's real `network_url` when one exists.
+- **Everyone self-enrolls.** Signing up (email code / Apple / Google) is the only way a member row is created, and a new member is immediately a full member. Retired 2026-08 (migration 058): `members.approved` and the held state, the `signup_requests` table, the `/join` form, the operator approval queue, `admin-member-approve`, manual member creation, `SELF_ENROLL`, and `DEMO_APPLE_FALLBACK`. `createMember()` lives in `functions/_shared/create-member.js` and only `_shared/enroll.js` calls it. The matching **Swift cleanup was deferred until the App Store launch, which has since happened** — the iOS app still carries the inert, gracefully-degrading approval queue, signup models and `WelcomeIntroPanel.swift` (`Models.swift`, `API.swift`, `ManageMembersView.swift`, `AdminView.swift`). Nothing blocks removing them now; it simply hasn't been done.
+- **Private groups and households are the privacy unit — the club isn't.** Groups (migration 056: `groups`, `group_members`, `group_invites`) and households are joined by invite *link* only; there is no roster you can add somebody from. Every group route re-checks `group_members` and 403s otherwise, and only the creator can delete. Group membership is what scopes vibe reads, `GET /api/shows/all`, `group_watchers` ("Also watching"), Group Trending, and who Watching With may name. iPhone/iPad create, invite, join, leave and delete; Apple TV browses groups read-only; the watch has no groups. In Swift, `SwiftUI.Group` collides with the model — spell it `ShowPickerCore.Group` in type position.
+- **Three tiers of visibility, not two.** *Logged out:* roster first names, Trending, catalog-level show detail, auth endpoints — deliberately tiny, keep it that way. *Any logged-in member:* another member's list titles, but never their `notes`, `watching_with`, `recommended_by` or `added_by`, which are owner-only because with signup open other members are not all friends (`functions/api/shows.js`). *Group-mates only:* vibe, Also watching, cross-library reads, Watching With links. A new endpoint has to land in one of those three on purpose.
+- **Enrichment:** synchronous on insert (`_shared/enrichment.js`, TMDB only — OMDB was retired 2026-07 and `rating` now carries TMDB's audience score), plus background `POST /api/enrich` fired from member pages. Watch links come from Watchmode (`_shared/watch-providers.js`), never pasted by a member. New rows inherit a sibling copy's real `network_url` when one exists.
 - **Networks:** `_shared/networks.js` is the source of truth for canonical streaming-service names, aliases, and search-URL templates. All incoming `network` values pass through `canonicalNetwork()`.
-- **Vibe:** 27-trait fingerprints per title (`show_traits`, scored by Claude via `/api/admin-vibe-fill`), matched to 7 clusters in `/api/vibe`.
+- **Vibe:** 26-trait fingerprints per title (`show_traits`, scored by Claude via `/api/admin-vibe-fill`), matched to 8 clusters in `/api/vibe`, scored against the club's own distribution rather than the trait scale; reads are group-scoped. (`docs/ARCHITECTURE.md` and `README.md` still say 27 traits / 7 clusters — `_shared/vibe-traits.js` and `_shared/vibe-clusters.js` are the counts that are right.)
 - **Feature flags via secrets:** `DEMO_LOGIN_EMAIL`/`DEMO_LOGIN_CODE` (App Review demo account with auto-reset), inert when unset. Signup is always open — there is no kill switch and no approval step.
-- **Retired 2026-07:** all cross-member writes (suggest-a-show, share-to-member) — those endpoints return 410. "Picks for You" (`/api/recommendations`) is no longer called by any client but kept for compatibility.
+- **Retired 2026-07:** the open cross-member writes (suggest-a-show, share-to-member) — those endpoints still return 410, and the reason they're gone is that anyone could push a row onto anyone. **Watching With (2026-08) is the one cross-member write that exists now**, and it's the shape a new one would have to take: only a group-mate can be named, an existing copy is linked where it already sits rather than moved or duplicated, and unlinking touches only your own row (`_shared/watchers.js`, `scripts/watching-with-test.mjs`). "Picks for You" (`/api/recommendations`) is no longer called by any client but kept for compatibility.
 - **The home page does not list members.** `/api/members` is still the roster source for the member-page sidebar, cross-library search, household, and the calendar-feed link — just not the landing page.
 - **Native apps** call the same `/api/*` endpoints; shared models live in the repo-root `ShowPickerCore` package. tvOS is view-only. watchOS gets its session from the iPhone via WatchConnectivity. iOS has offline caching + a queued-write sync layer (`ios/ShowPickerIOS/Offline/`).
 
@@ -257,10 +267,13 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
   `docs/PRODUCT.md#web-app-status`.
 
 - **Feature requests still name their platforms.** The product ships on
-  iOS/iPad, tvOS, and watchOS. When a feature is requested, state which get it
-  and which don't (tvOS is view-only, watch is read-only) — parity gaps between
-  the Apple targets are still expensive to rediscover, and the web is a fourth
-  surface to name now that it's back. There is no in-app What's New — release
+  iPhone/iPad, Mac (Catalyst — it runs the iPad split view and gets what iPad
+  gets), tvOS and watchOS, under one universal App Store listing. When a feature
+  is requested, state which get it and which don't (tvOS is view-only, watch is
+  read-only and has no groups at all) — parity gaps between the Apple targets
+  are still expensive to rediscover, and the web is a further surface to name
+  now that it's back. Don't count Roku: the channel in `roku/` has never run on
+  a device. There is no in-app What's New — release
   notes go in the App Store update text instead (retired 2026-08, along with
   `whats-new.json`, `whats-new.html` and `WhatsNewView`). Collect that text in
   `docs/RELEASE_NOTES.md` under *Unreleased* as user-facing work merges, so
