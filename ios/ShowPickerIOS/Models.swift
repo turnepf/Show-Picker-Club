@@ -796,6 +796,53 @@ struct MemberActivity: Codable {
     let next: Int
 }
 
+// /api/admin-member-groups — which private groups a member is in, and who else
+// is in each, for the Groups section of the admin member screen.
+//
+// Deliberately not ShowPickerCore.Group: that model is what a member sees of
+// their *own* groups and carries is_creator meaning "can I delete this". This
+// one is an operator's read of somebody else's groups, where the creator is a
+// fact about another person, not a permission of the reader's.
+struct AdminMemberGroupsResponse: Codable {
+    let member: String
+    let groups: [AdminGroup]
+}
+
+struct AdminGroup: Codable, Identifiable, Hashable {
+    let id: Int
+    let name: String
+    let creatorSlug: String?
+    let createdAt: String?
+    let members: [AdminGroupMember]
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, members
+        case creatorSlug = "creator_slug"
+        case createdAt = "created_at"
+    }
+
+    // The roster's own length, never the server's member_count. The section
+    // row and the screen behind it are then the same number by construction —
+    // a count that can disagree with the list it opens is worse than no count.
+    var memberCount: Int { members.count }
+}
+
+struct AdminGroupMember: Codable, Identifiable, Hashable {
+    let slug: String
+    let name: String
+    let isCreator: Int?
+    let disabled: Int?
+
+    var id: String { slug }
+    var isTheCreator: Bool { (isCreator ?? 0) == 1 }
+    var isDisabled: Bool { (disabled ?? 0) == 1 }
+
+    enum CodingKeys: String, CodingKey {
+        case slug, name, disabled
+        case isCreator = "is_creator"
+    }
+}
+
 // /api/activity — recent adds, newest first, club-wide or (?member=) scoped to
 // one person. `text` is the server's rendered line; the fields beside it exist
 // so a client can lay the same event out its own way.

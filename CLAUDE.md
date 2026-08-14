@@ -95,7 +95,10 @@ member actually chose (no seeded starter rows), and a bulk import collapses
 into one line **per list** rather than one line for the whole burst.
 `/api/admin-member-emails` hands out login emails and phone numbers, so it
 stays admin-only — a logged-in non-admin gets 403, not their own row — and
-`?member=<slug>` returns that member and nobody else.
+`?member=<slug>` returns that member and nobody else. `/api/admin-member-groups`
+is the same gate on the one read of a private group from outside it: a
+non-admin gets 403 even for a group they're in, and the payload carries
+membership (names, rosters, creator) but never the group's shows.
 
 ```bash
 node scripts/reporting-platform-test.mjs

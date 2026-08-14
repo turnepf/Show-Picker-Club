@@ -127,11 +127,14 @@ That screen opens with:
   - total shows and how many they've archived
   - **`30d:`** — adds per list in the last 30 days
   - every platform they've ever used the app from (iPhone, iPad, Apple Watch, Mac, Apple TV, web), lit when used and dim when not
+- **Groups** — every private group they're in, newest first, each with its size and who created it ("4 members · created by Stacy Matos"). Tapping one opens the group's roster; tapping anyone on that roster opens *their* admin member screen, which lists their groups, so an operator can walk outward from whoever they started with. A member in no groups says so.
 - **Recent adds** — their eight most recent additions, newest first, with a relative timestamp. Bulk imports collapse to one line per list. Seeded starter rows never appear: a new member who has added nothing reads as having added nothing.
 - **Open member page** — their four lists, exactly as they see them.
 - then the editing controls (rename, emails, phones, make admin, disable).
 
 The `lists:` totals and the "N shows" line under them come from the same query on the same terms (active, non-seed), so the four always sum to the one. `scripts/admin-member-detail-test.mjs` asserts it.
+
+**Groups is the one place a private group is visible from outside it, and it stops at membership.** An admin sees names, rosters, sizes and who created a group they aren't in — a smaller disclosure than the login emails and phone numbers the same screen already shows them. What the group is *watching* isn't there: no shared library, no group trending, no lists. Reading a group doesn't join the admin to it, and it doesn't widen their own vibe, Also watching or cross-library results by a single row. A logged-in non-admin gets nothing at all from that endpoint, including for groups they belong to — they have the Groups screen for those. See [`INVARIANTS.md` §13](INVARIANTS.md#13-a-groups-membership-is-legible-to-admins-its-content-never-is).
 
 **The signup notification email lands here.** That email deep-links to `/<slug>`, and the question it raises — who is this, and are they using it? — is this screen's whole content, so for an **admin session opening someone else's slug** the link resolves to the admin member screen rather than the member page. Your own slug still opens your page, and a non-admin following any slug only ever gets the member page. On iPad and Mac the sidebar moves to Manage members underneath it, so Back lands somewhere useful.
 

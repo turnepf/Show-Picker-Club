@@ -375,6 +375,32 @@ invariant, not the feature.
 
 Enforcer: `scripts/watching-with-test.mjs`.
 
+## 13. A group's membership is legible to admins; its content never is
+
+Private groups are private to their members (§12's gate is the same one), with
+exactly one exception, added 2026-08: `GET /api/admin-member-groups` lets an
+**admin** see which groups any member is in and who else is in them. The
+exception is bounded, and the bounds are the invariant.
+
+- **The bar is an admin session, not a group-mate.** A logged-in non-admin gets
+  403 — including for a group they are in, which they read through `/api/groups`
+  like anyone else. There is no "nearly an admin" tier here.
+- **Membership, never content.** Names, rosters, who created it, when. What the
+  group is *watching* — Group Trending, the shared library, anyone's lists —
+  stays behind `group_members` in `/api/groups/[id]`. An operator answering
+  "who is this person in a group with?" needs the shape of the graph, not
+  everybody's libraries.
+- **Reading is not joining.** The endpoint writes nothing. An admin who can see
+  a group still can't post to it, invite to it, rename it or leave it, and
+  their own group-scoped features (vibe, Also watching, cross-library reads)
+  don't widen by one row because they looked.
+- **The justification is proportionality, and it has a floor.** Admins already
+  read every member's login email and phone through `/api/admin-member-emails`;
+  a group name and a roster of names is a smaller disclosure than that. If a
+  future admin surface can't clear that bar, it doesn't get the exception.
+
+Enforcer: `scripts/admin-member-detail-test.mjs`.
+
 ## Adding an invariant
 
 Add a section here, then decide which enforcer covers it. Prefer a deterministic

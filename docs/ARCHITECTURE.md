@@ -251,10 +251,21 @@ otherwise; only the creator can delete.
 - **Groups are the consent boundary for "Watching with".** Sharing a group is
   what makes someone nameable on a show — and therefore what makes it legal to
   write a row onto their list. See [`show_watchers`](#show_watchers).
+- **One read from outside the group, and it belongs to admins.**
+  `GET /api/admin-member-groups?member=<slug>` answers which groups a member is
+  in and who else is in each, for the Groups section of the admin member screen
+  (`MemberAdminDetail` → `AdminGroupRosterView`). Admin session only — a
+  logged-in non-admin gets 403 even for a group they belong to — and it returns
+  membership without content: no shows, no trending, no lists. Reading is not
+  joining; the endpoint writes nothing and doesn't widen the admin's own
+  group-scoped features. See
+  [Invariant 13](INVARIANTS.md#13-a-groups-membership-is-legible-to-admins-its-content-never-is).
 - **Platforms.** iPhone and iPad create, invite, join, leave and delete. Apple
   TV browses groups read-only (`GroupsListViewTV` / `GroupDetailViewTV`), which
   is why the tvOS API client has only the three read calls. The watch has no
-  groups at all. Note that `SwiftUI.Group` collides with the model in any file
+  groups at all. The admin Groups section above is iPhone/iPad/Mac only, like
+  every other admin tool — Apple TV and the watch have no admin surface to put
+  it on. Note that `SwiftUI.Group` collides with the model in any file
   that uses it in type position — spell it `ShowPickerCore.Group` there
   (`CoreImports.swift` re-exports the package into every file of the app).
 
@@ -324,6 +335,7 @@ The complete map:
 | `GET /api/passkeys`                    | `functions/api/passkeys.js`                | GET     | session — the caller's own registered passkeys |
 | `DELETE /api/passkeys/:id`             | `functions/api/passkeys/[id].js`           | DELETE  | session — removes one of the caller's own passkeys |
 | `GET/POST /api/admin-member-emails`    | `functions/api/admin-member-emails.js`     | GET, POST | admin session — GET is the roster with contacts, platforms, last login, current per-list totals and 30-day activity; `?member=<slug>` narrows it to one row (the admin member screen). `list_counts` and `show_count` share the active-non-seed filter, so the four sum to the one. POST edits one member's name/emails/phones |
+| `GET /api/admin-member-groups`         | `functions/api/admin-member-groups.js`     | GET     | admin session — `?member=<slug>` (required; 400 without it) returns the private groups that member is in, each with its roster (`slug`, `name`, `is_creator`, `disabled`). The one read of a group from outside it; membership only, never the group's content — see [Invariant 13](INVARIANTS.md#13-a-groups-membership-is-legible-to-admins-its-content-never-is) |
 | `POST /api/admin-member-disable`       | `functions/api/admin-member-disable.js`    | POST    | admin session |
 | `POST /api/admin-member-role`          | `functions/api/admin-member-role.js`       | POST    | admin session — promote/demote `members.is_admin`; refuses to demote the last admin |
 | `POST /api/admin-member-merge`         | `functions/api/admin-member-merge.js`      | POST    | admin session — merge a duplicate member account into the kept one, then delete the duplicate |

@@ -448,6 +448,16 @@ enum API {
         return r.members.first
     }
 
+    // The private groups one member belongs to, each with its roster — the
+    // Groups section of the admin member screen. Admin-only server-side (403
+    // otherwise), and it answers with membership only: a group's shows are not
+    // in the payload, and this doesn't join the caller to anything.
+    static func adminMemberGroups(slug: String) async throws -> [AdminGroup] {
+        let enc = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? slug
+        let r: AdminMemberGroupsResponse = try await get("/api/admin-member-groups?member=\(enc)")
+        return r.groups
+    }
+
     // Recent adds, newest first. Bulk adds arrive pre-collapsed into one
     // "added N shows to <list>" entry by the server.
     static func activity(member: String? = nil, limit: Int = 10) async throws -> [ActivityItem] {

@@ -22,6 +22,14 @@ struct MemberAdminDetail: View {
 
     @EnvironmentObject private var auth: AuthStore
     @State private var activity: [ActivityItem] = []
+    @State private var groups: [AdminGroup] = []
+    // "Couldn't load" and "isn't in any groups" are different answers, and on
+    // an operator screen the difference is the whole point: an admin reading
+    // "isn't in any groups" will act on it. They looked identical until an
+    // older server — one where /api/admin-member-groups doesn't exist yet —
+    // answered the request with the SPA catch-all's HTML at 200, which decodes
+    // as a failure and rendered as a confident, wrong, empty state.
+    @State private var groupsFailed = false
     @State private var loading = true
 
     private let recentLimit = 8
@@ -32,6 +40,30 @@ struct MemberAdminDetail: View {
                 identityBlock(member)
             } header: {
                 Text("Admin")
+            }
+
+            Section {
+                if groups.isEmpty {
+                    Text(groupsEmptyText)
+                        .font(.callout).foregroundStyle(groupsFailed && !loading ? .orange : .secondary)
+                } else {
+                    ForEach(groups) { group in
+                        NavigationLink {
+                            AdminGroupRosterView(group: group, viewing: member.slug)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(group.name).font(.callout)
+                                Text(groupSubtitle(group)).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            } header: {
+                Text("Groups")
+            } footer: {
+                if !groups.isEmpty {
+                    Text("Who they share a library with. Open one to see everyone in it.")
+                }
             }
 
             Section {
@@ -105,6 +137,24 @@ struct MemberAdminDetail: View {
         }
     }
 
+    private var groupsEmptyText: String {
+        if loading { return "Loading…" }
+        if groupsFailed { return "Couldn't load their groups. Pull to refresh, or check the server is up to date." }
+        return "\(member.personName) isn't in any groups."
+    }
+
+    // "4 members · created by Stacy Member" — the two facts an operator asks
+    // about a group they can't see from the inside. The creator's name comes
+    // out of the roster we already have rather than a second lookup.
+    private func groupSubtitle(_ g: AdminGroup) -> String {
+        let count = g.memberCount
+        var line = "\(count) member\(count == 1 ? "" : "s")"
+        if let creator = g.members.first(where: { $0.isTheCreator }) {
+            line += creator.slug == member.slug ? " · they created it" : " · created by \(creator.name)"
+        }
+        return line
+    }
+
     private func libraryLine(_ d: AdminMember) -> String {
         let total = d.listCounts.map { $0.watching + $0.waiting + $0.recommending + $0.next }
             ?? (d.showCount ?? 0)
@@ -125,12 +175,68 @@ struct MemberAdminDetail: View {
     private func load() async {
         guard auth.isAdmin else {
             activity = []
+            groups = []
+            groupsFailed = false
             loading = false
             return
         }
         loading = true
         defer { loading = false }
         activity = (try? await API.activity(member: member.slug, limit: recentLimit)) ?? activity
+        do {
+            groups = try await API.adminMemberGroups(slug: member.slug)
+            groupsFailed = false
+        } catch {
+            groupsFailed = true
+        }
+    }
+}
+
+// Everyone in one private group, reached from the admin member screen.
+//
+// The rows are people, so they lead where people lead everywhere else on this
+// screen: into that member's admin profile — which lists *their* groups, so an
+// operator can walk the graph outward from whoever they started with.
+//
+// Nothing here is a membership of the viewer's: this screen can't join, invite,
+// rename or leave. It is a read of somebody else's group, and the only reason
+// it can be read at all is an admin session (see docs/INVARIANTS.md §13).
+struct AdminGroupRosterView: View {
+    let group: AdminGroup
+    /// The member whose screen we arrived from — marked in the list so an
+    /// operator doesn't lose track of who they were looking at.
+    let viewing: String
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(group.members) { m in
+                    NavigationLink {
+                        MemberAdminDetailLoader(slug: m.slug)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text(m.name).font(.callout)
+                                if m.isTheCreator {
+                                    Text("CREATOR").font(.caption2.weight(.semibold)).foregroundStyle(.blue)
+                                }
+                                if m.isDisabled {
+                                    Text("DISABLED").font(.caption2.weight(.semibold)).foregroundStyle(.red)
+                                }
+                            }
+                            Text(m.slug == viewing ? "@\(m.slug) · the member you're viewing" : "@\(m.slug)")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Text("\(group.memberCount) member\(group.memberCount == 1 ? "" : "s")")
+            } footer: {
+                Text("Members only — what this group is watching stays inside it.")
+            }
+        }
+        .navigationTitle(group.name)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
