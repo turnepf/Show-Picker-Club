@@ -344,9 +344,13 @@ private struct ConflictResolveView: View {
         .overlay { if working { ProgressView().controlSize(.large) } }
     }
 
-    // The conflicting networks first, then any other canonical ones.
+    // The conflicting networks first, then any other canonical ones. The
+    // canonical list comes from the server via NetworkCatalogStore, so this
+    // screen offers whatever the backend currently canonicalizes rather than
+    // whatever was known when the build shipped.
     private var mergedNetworks: [String] {
-        conflict.networks + CANONICAL_NETWORKS.filter { !conflict.networks.contains($0) }
+        let canonical = NetworkCatalogStore.shared.names
+        return conflict.networks + canonical.filter { !conflict.networks.contains($0) }
     }
 
     private func resolve() async {
@@ -427,7 +431,7 @@ private struct UrlCleanupItemView: View {
             Section {
                 Picker("Network", selection: $network) {
                     Text("None").tag("")
-                    ForEach(CANONICAL_NETWORKS, id: \.self) { Text($0).tag($0) }
+                    ForEach(NetworkCatalogStore.shared.names, id: \.self) { Text($0).tag($0) }
                 }
                 // Finding the deep link is the actual work — hand off the
                 // search instead of making the operator retype the title.

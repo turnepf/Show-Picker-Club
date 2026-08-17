@@ -132,6 +132,10 @@ Awaiting and it goes to Awaiting — you can still switch lists before saving.
   sectioned in the iPhone/iPad picker and recognized by the share extension.
   The free-to-air ones are priced at $0; the paid non-US ones arrive unpriced
   because the audit totals US dollars.
+- The network picker is now served by the backend (`GET /api/networks`) rather
+  than compiled into the app, so the *next* network added arrives without an
+  App Store release. Not member-visible on its own — worth knowing at
+  submission time because it changes what a future "we added X" note requires.
 - Add Show opens on the list you're viewing instead of always Watching —
   reported by Thayná, who kept landing awaited shows in Watching.
 

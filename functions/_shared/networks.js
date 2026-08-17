@@ -13,6 +13,11 @@
 // domains:   hostnames that uniquely identify this network. Used by
 //            networkFromUrl() to auto-correct the stored network when a
 //            pasted URL disagrees with the dropdown pick.
+// region:    which section of a client's picker this belongs in. Omitted
+//            means 'us', the unlabelled first group. See networkCatalog()
+//            at the bottom — the apps read their picker from that, over the
+//            wire, so adding an entry here reaches installed apps without
+//            an App Store release.
 // search:    fallback URL used when the user picks a network but doesn't
 //            paste a deep link. Optional { param } means the title gets
 //            appended as a query param; bare bases just open the network's
@@ -164,6 +169,7 @@ export const NETWORKS = [
     // 'BBC America' is already an AMC+ alias and stays there — it's a US cable
     // channel that licenses BBC shows, not a way to reach iPlayer.
     stored: 'BBC iPlayer',
+    region: 'uk',
     display: 'BBC iPlayer (including BBC One, BBC Two, BBC Three, BBC Four)',
     aliases: ['BBC', 'iPlayer', 'BBC One', 'BBC Two', 'BBC Three', 'BBC Four', 'BBC1', 'BBC2', 'BBC Scotland'],
     domains: ['bbc.co.uk', 'bbc.com'],
@@ -171,6 +177,7 @@ export const NETWORKS = [
   },
   {
     stored: 'ITVX',
+    region: 'uk',
     display: 'ITVX (including ITV1, ITV2, ITV3, ITV4, ITVBe)',
     aliases: ['ITV', 'ITV X', 'ITV Hub', 'ITV Player', 'ITV1', 'ITV2', 'ITV3', 'ITV4', 'ITVBe'],
     domains: ['itv.com', 'itvx.com'],
@@ -178,6 +185,7 @@ export const NETWORKS = [
   },
   {
     stored: 'Channel 4',
+    region: 'uk',
     display: 'Channel 4 (including E4, More4, Film4)',
     aliases: ['Channel4', 'All 4', 'All4', '4oD', 'E4', 'More4', 'Film4'],
     domains: ['channel4.com'],
@@ -187,6 +195,7 @@ export const NETWORKS = [
     // Paramount owns Channel 5, but it's a separate app with a separate
     // catalogue — the same reason Pluto TV isn't a Paramount+ alias.
     stored: 'Channel 5',
+    region: 'uk',
     display: 'Channel 5 (My5)',
     aliases: ['Channel5', 'My5', 'My 5'],
     domains: ['channel5.com', 'my5.tv'],
@@ -198,6 +207,7 @@ export const NETWORKS = [
     // folds in here rather than becoming its own entry. Displayed with "Sky" in
     // the name because that's what members call it.
     stored: 'NOW',
+    region: 'uk',
     display: 'NOW (Sky — Sky Atlantic, Sky Max, Sky Cinema)',
     aliases: ['NOW TV', 'NowTV', 'Now TV', 'Sky', 'Sky Go', 'Sky Atlantic', 'Sky Max', 'Sky One', 'Sky Showcase', 'Sky Cinema', 'Sky Comedy', 'Sky Crime', 'Sky Documentaries'],
     domains: ['nowtv.com', 'sky.com'],
@@ -211,6 +221,7 @@ export const NETWORKS = [
   // open; the channel names are aliases.
   {
     stored: 'Stan',
+    region: 'au',
     display: 'Stan',
     aliases: [],
     domains: ['stan.com.au'],
@@ -218,6 +229,7 @@ export const NETWORKS = [
   },
   {
     stored: 'Binge',
+    region: 'au',
     display: 'Binge',
     aliases: [],
     domains: ['binge.com.au'],
@@ -225,6 +237,7 @@ export const NETWORKS = [
   },
   {
     stored: 'Foxtel',
+    region: 'au',
     display: 'Foxtel (including Foxtel Now)',
     // Binge is Foxtel-owned but priced and subscribed to separately, so it
     // stays its own entry above rather than folding in here.
@@ -236,6 +249,7 @@ export const NETWORKS = [
     // Never aliased as bare 'ABC' — that belongs to the US network, which folds
     // into Hulu. TMDB writes the Australian one as "ABC (AU)".
     stored: 'ABC iview',
+    region: 'au',
     display: 'ABC iview (Australia)',
     aliases: ['iview', 'ABC iView', 'ABC (AU)', 'ABC Australia', 'ABC TV (Australia)'],
     domains: ['iview.abc.net.au', 'abc.net.au'],
@@ -243,6 +257,7 @@ export const NETWORKS = [
   },
   {
     stored: 'SBS On Demand',
+    region: 'au',
     display: 'SBS On Demand (including NITV, SBS World Movies)',
     aliases: ['SBS', 'SBS on Demand', 'SBS Viceland', 'SBS World Movies', 'NITV'],
     domains: ['sbs.com.au'],
@@ -250,6 +265,7 @@ export const NETWORKS = [
   },
   {
     stored: '9Now',
+    region: 'au',
     display: '9Now (Nine Network)',
     aliases: ['Nine Network', 'Channel 9', 'Channel Nine', '9Go!', '9Gem', '9Life'],
     domains: ['9now.com.au', 'nine.com.au'],
@@ -257,6 +273,7 @@ export const NETWORKS = [
   },
   {
     stored: '7plus',
+    region: 'au',
     display: '7plus (Seven Network)',
     aliases: ['7 plus', 'Seven Network', 'Channel 7', 'Channel Seven', '7two', '7mate', '7flix'],
     domains: ['7plus.com.au', 'seven.com.au'],
@@ -264,6 +281,7 @@ export const NETWORKS = [
   },
   {
     stored: '10 play',
+    region: 'au',
     display: '10 play (Network 10)',
     aliases: ['10play', '10 Play', 'Network 10', 'Network Ten', 'Channel 10', 'Channel Ten', '10 Peach', '10 Bold'],
     domains: ['10play.com.au'],
@@ -316,6 +334,64 @@ export const NETWORKS = [
     kind: 'storefront',
   },
 ];
+
+// --- The catalog clients read ---
+//
+// The apps used to carry their own copy of this list, which meant a network
+// added here reached a member only when they installed a new build from the
+// App Store — weeks later, and never for anyone who doesn't update. They now
+// fetch `networkCatalog()` from GET /api/networks, so adding an entry above is
+// the whole change.
+//
+// Picker sections are built here rather than by each client: a client groups
+// consecutive entries by the `section` string it is handed and renders that
+// string as the header, so a region added later needs no app release either.
+// Regions are emitted in this order, storefronts last regardless of where they
+// sit in NETWORKS — grouping can't depend on somebody keeping the array tidy.
+const REGION_SECTIONS = [
+  // `null` is the unlabelled first group: the services most of the club uses,
+  // which shouldn't wear a "United States" header nobody needs.
+  { region: 'us', section: null },
+  { region: 'uk', section: 'United Kingdom' },
+  { region: 'au', section: 'Australia' },
+];
+
+const STOREFRONT_SECTION = 'Rent or buy';
+
+export function networkCatalog() {
+  const subscriptions = NETWORKS.filter(n => n.kind !== 'storefront');
+  const networks = [];
+  for (const { region, section } of REGION_SECTIONS) {
+    for (const n of subscriptions.filter(n => (n.region || 'us') === region)) {
+      networks.push({ stored: n.stored, display: n.display, section, storefront: false });
+    }
+  }
+  // A region added to an entry but not to REGION_SECTIONS would otherwise
+  // vanish from every picker silently. Emit it under its own raw key instead —
+  // ugly beats missing, and networks-test.mjs fails on it.
+  for (const n of subscriptions) {
+    if (networks.some(x => x.stored === n.stored)) continue;
+    networks.push({ stored: n.stored, display: n.display, section: n.region, storefront: false });
+  }
+  for (const n of NETWORKS.filter(n => n.kind === 'storefront')) {
+    networks.push({ stored: n.stored, display: n.display, section: STOREFRONT_SECTION, storefront: true });
+  }
+  return { version: catalogVersion(networks), networks };
+}
+
+// Cheap content hash (FNV-1a) over what a client actually renders, so a client
+// can tell "same list as last time" without diffing, and so a stale cache is
+// identifiable in a bug report. Not a security boundary — the payload is
+// public — just a version string that changes when the list does.
+function catalogVersion(networks) {
+  const text = networks.map(n => `${n.stored}|${n.display}|${n.section || ''}|${n.storefront}`).join('\n');
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `${networks.length}-${h.toString(16)}`;
+}
 
 // Storefronts are rent/buy shops rather than monthly services. Everything
 // without an explicit kind is a subscription.

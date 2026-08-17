@@ -13,6 +13,9 @@ struct AddEditShowView: View {
     let onSave: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
+    // The picker's contents, fetched and cached rather than compiled in, so a
+    // network added on the server reaches this build.
+    @ObservedObject private var catalog = NetworkCatalogStore.shared
     @State private var title = ""
     @State private var network = ""
     // Free-text network for anything outside the canonical list. Selecting
@@ -59,34 +62,30 @@ struct AddEditShowView: View {
                         Button { pick(hit) } label: { TitleHitRow(hit: hit) }
                             .buttonStyle(.plain)
                     }
+                    // Sections and their order are the server's (see
+                    // NetworkCatalogStore): the regional services are grouped
+                    // under their own headers rather than interleaved, because
+                    // most of the club will never pick from them and merging
+                    // would put 9Now and Channel 4 ahead of the services
+                    // everyone uses. Rows show the canonical name; the server's
+                    // longer `display` carries sub-brand hints that suit a web
+                    // <select> and overflow a menu row here.
                     Picker("Network", selection: $network) {
                         Text("None").tag("")
-                        ForEach(US_NETWORKS, id: \.self) { n in
-                            Text(n).tag(n)
-                        }
-                        // Sectioned rather than merged into one alphabetical
-                        // run: most of the club will never pick from these, and
-                        // interleaving them puts 9Now and Channel 4 in front of
-                        // the services everyone uses. The storefronts get the
-                        // same treatment for the opposite reason — they're
-                        // rent/buy, not a service you subscribe to.
-                        Section("United Kingdom") {
-                            ForEach(UK_NETWORKS, id: \.self) { n in
-                                Text(n).tag(n)
+                        ForEach(catalog.sections) { section in
+                            if let title = section.title {
+                                Section(title) {
+                                    ForEach(section.options) { option in
+                                        Text(option.stored).tag(option.stored)
+                                    }
+                                }
+                            } else {
+                                ForEach(section.options) { option in
+                                    Text(option.stored).tag(option.stored)
+                                }
                             }
                         }
-                        Section("Australia") {
-                            ForEach(AU_NETWORKS, id: \.self) { n in
-                                Text(n).tag(n)
-                            }
-                        }
-                        Section("Rent or buy") {
-                            ForEach(STOREFRONT_NETWORKS, id: \.self) { n in
-                                Text(n).tag(n)
-                            }
-                        }
-                        // The canonical list covers the services the club
-                        // actually uses; anything else (a regional channel,
+                        // Anything the list doesn't carry (a regional channel,
                         // a sports tier) was simply unenterable before. The
                         // server canonicalizes what it recognizes and keeps
                         // the rest as typed.
@@ -165,6 +164,9 @@ struct AddEditShowView: View {
             .interactiveDismissDisabled(saving)
             .onAppear(perform: prefill)
             .task { await loadGroupMates() }
+            // Cheap after the first call per launch, and a failure leaves
+            // whatever list is already loaded in place.
+            .task { await catalog.refreshIfNeeded() }
             .overlay { if saving { ProgressView().controlSize(.large) } }
             .alert("Already in your archive", isPresented: $showingRestorePrompt) {
                 Button("Add back to \(list.title)") { Task { await restoreArchived() } }
@@ -258,7 +260,7 @@ struct AddEditShowView: View {
         guard let s = existing else { list = initialList; return }
         title = s.title
         let existingNetwork = s.network ?? ""
-        if !existingNetwork.isEmpty && !CANONICAL_NETWORKS.contains(existingNetwork) {
+        if !existingNetwork.isEmpty && !catalog.contains(existingNetwork) {
             customNetwork = existingNetwork
             network = Self.otherNetworkTag
         } else {

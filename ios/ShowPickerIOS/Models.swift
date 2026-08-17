@@ -1046,64 +1046,12 @@ struct AccountDeleteResponse: Codable {
 
 // The four lists, in display order.
 
-// Canonical networks for the picker. Keep in sync with
-// functions/_shared/networks.js on the backend — `scripts/networks-test.mjs`
-// fails the build when the two drift, which is how MGM+ came to be missing here
-// while the server knew about it.
-//
-// Split by region so the picker can group them: the UK and Australian services
-// are a long tail for most of the club, and a flat alphabetical list would file
-// 9Now above AMC+ for everyone. CANONICAL_NETWORKS remains the flat list, in
-// picker order, for the callers that just need "is this one of ours".
-let US_NETWORKS: [String] = [
-    "AMC+",
-    "Amazon Prime Video",
-    "Apple TV+",
-    "BritBox",
-    "Disney+",
-    "Food Network",
-    "Fox",
-    "HBO Max",
-    "Hulu",
-    "MGM+",
-    "Netflix",
-    "Paramount+",
-    "PBS",
-    "Peacock",
-    "Pluto TV",
-    "Starz",
-    "YouTube",
-]
-
-let UK_NETWORKS: [String] = [
-    "BBC iPlayer",
-    "Channel 4",
-    "Channel 5",
-    "ITVX",
-    "NOW",
-]
-
-let AU_NETWORKS: [String] = [
-    "10 play",
-    "7plus",
-    "9Now",
-    "ABC iview",
-    "Binge",
-    "Foxtel",
-    "SBS On Demand",
-    "Stan",
-]
-
-// Storefronts (rent/buy) rather than subscriptions — offered because plenty of
-// titles have no streaming home, but the Subscription Audit skips them so they
-// never read as a monthly bill.
-let STOREFRONT_NETWORKS: [String] = [
-    "Apple TV Store",
-    "Fandango at Home",
-    "Fandango",
-]
-
-let CANONICAL_NETWORKS: [String] = US_NETWORKS + UK_NETWORKS + AU_NETWORKS + STOREFRONT_NETWORKS
+// The canonical network list used to live here as a `[String]` literal, which
+// meant a network added on the server reached a member only when they installed
+// a new App Store build. It now comes from GET /api/networks — see
+// NetworkCatalogStore (fetch + cache) and ShowPickerCore.NetworkCatalog (the
+// model, the section grouping, and the bundled seed for a first launch with no
+// signal). Don't reintroduce a literal here.
 
 // MARK: - List import (paste a list, /api/import/*)
 

@@ -228,6 +228,22 @@ else
   ok "/api/popular hides member_slugs"
 fi
 
+# The network picker the apps fetch. Public on purpose (a constant table, no
+# member data), and worth a live check because a 404 here doesn't break an app
+# loudly — every installed copy just stays frozen on the list it cached, and
+# nobody finds out until a member asks where a service went.
+networks=$(get "$(cb "$BASE/api/networks")")
+if grep -q '"networks"' <<< "$networks" && grep -q '"stored"' <<< "$networks"; then
+  ok "/api/networks serves the picker"
+else
+  err "/api/networks did not return a networks array — installed apps are stuck on their cached list"
+fi
+if grep -qE '"stored":"Netflix"' <<< "$networks"; then
+  ok "/api/networks carries the canonical names"
+else
+  err "/api/networks is missing canonical entries"
+fi
+
 note "Retired paths still redirect"
 
 # Member approval went away for good in 2026-08 (migration 058). These four

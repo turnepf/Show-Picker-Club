@@ -26,7 +26,12 @@ note() { echo; echo "== $1"; }
 #
 #   shows/[id]/actors.js — cast list for a title. Catalog data, and it reveals
 #     nothing about whose row the id belongs to.
-PUBLIC_ENDPOINTS="shows/[id]/actors.js"
+#   networks.js — the network picker the apps fetch instead of hardcoding. A
+#     constant table compiled into the Worker: no member data of any kind, and
+#     the same brand names already ship in public/index.html's <select> to
+#     logged-out visitors. Public so an app that hasn't signed in yet can still
+#     warm its picker, and so the edge can cache a response that doesn't vary.
+PUBLIC_ENDPOINTS="shows/[id]/actors.js networks.js"
 
 note "Deployed output carries the web app and the marketing page"
 

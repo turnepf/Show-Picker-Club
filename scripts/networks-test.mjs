@@ -12,14 +12,22 @@
 //      is the shape of the Apple TV / Apple TV+ collision the module's own
 //      comments are about, and it can arrive by accident: the US ABC folds into
 //      Hulu, and the Australian ABC is one careless alias away from stealing it.
-//   2. **The Swift copy drifting.** ios/ShowPickerIOS/Models.swift mirrors
-//      NETWORKS[].stored for the picker, with no compiler anywhere to notice
-//      when the two disagree. MGM+ had already gone missing from it once, so a
-//      member on MGM+ couldn't pick their own service.
+//   2. **A network not reaching the apps.** The picker used to be a literal in
+//      Models.swift, so MGM+ went missing from it while the server knew about
+//      the service. The apps now fetch `networkCatalog()` from /api/networks,
+//      which moves the risk rather than removing it: the payload has to carry
+//      every entry, in sections a client can group by consecutive runs, and
+//      the Swift seed left behind for a first offline launch must never name a
+//      service the server wouldn't canonicalize.
 //
 // Also pins that a network can't be priced under a name the DB never stores —
 // a typo'd key in DEFAULT_PRICE_CENTS reads as "nobody has priced this yet"
 // rather than as an error.
+//
+// The client half of this — what happens when the payload is empty, junk, or
+// carries a section this build has never heard of — is
+// ShowPickerCore/Tests/ShowPickerCoreTests/NetworkCatalogTests.swift, which
+// runs on the same PR.
 //
 // Pure module reads, no database, no network.
 
@@ -35,7 +43,7 @@ writeFileSync(join(sandbox, 'package.json'), '{"type":"module"}');
 
 const {
   NETWORKS, DEFAULT_PRICE_CENTS, canonicalNetwork, knownNetwork,
-  networkFromUrl, networkSearchUrl, isStorefront,
+  networkFromUrl, networkSearchUrl, isStorefront, networkCatalog,
 } = await import(join(sandbox, 'functions', '_shared', 'networks.js'));
 
 let passed = 0, failed = 0;
@@ -154,29 +162,73 @@ console.log('\n== prices are keyed to names the DB actually stores');
   check('non-US paid services carry no US-cent guess', guessed.length === 0, guessed.join(', '));
 }
 
-console.log('\n== the iOS picker knows every network the server does');
+console.log('\n== the catalog the apps fetch');
 {
-  const swift = readFileSync(join(repoRoot, 'ios/ShowPickerIOS/Models.swift'), 'utf8');
-  // Each region array in Models.swift, concatenated the way CANONICAL_NETWORKS
-  // concatenates them.
-  const listNames = ['US_NETWORKS', 'UK_NETWORKS', 'AU_NETWORKS', 'STOREFRONT_NETWORKS'];
-  const fromSwift = [];
-  for (const name of listNames) {
-    const m = swift.match(new RegExp(`let ${name}: \\[String\\] = \\[([^\\]]*)\\]`));
-    if (!m) { fromSwift.push(`<missing ${name}>`); continue; }
-    for (const line of m[1].split('\n')) {
-      const q = line.match(/"([^"]+)"/);
-      if (q) fromSwift.push(q[1]);
-    }
-  }
-  const fromServer = NETWORKS.map(n => n.stored);
-  const missing = fromServer.filter(n => !fromSwift.includes(n));
-  const extra = fromSwift.filter(n => !fromServer.includes(n));
-  check('the picker offers every server network', missing.length === 0, missing.join(', '));
-  check('and offers nothing the server would not canonicalize', extra.length === 0, extra.join(', '));
+  const catalog = networkCatalog();
+  const stored = NETWORKS.map(n => n.stored);
 
-  check('CANONICAL_NETWORKS is still the concatenation of the region lists',
-        /let CANONICAL_NETWORKS: \[String\] = US_NETWORKS \+ UK_NETWORKS \+ AU_NETWORKS \+ STOREFRONT_NETWORKS/.test(swift));
+  check('every network reaches the catalog', catalog.networks.length === stored.length,
+        `${catalog.networks.length} vs ${stored.length}`);
+  const missing = stored.filter(s => !catalog.networks.some(n => n.stored === s));
+  check('and none is dropped on the way', missing.length === 0, missing.join(', '));
+
+  // A client groups *consecutive* entries by section, so a section that
+  // appears in two runs would render as two headers with the same name.
+  const runs = [];
+  for (const n of catalog.networks) {
+    if (!runs.length || runs[runs.length - 1] !== n.section) runs.push(n.section);
+  }
+  check('each section is one consecutive run', new Set(runs).size === runs.length, runs.join(' | '));
+  check('the first group is unlabelled', runs[0] === null, String(runs[0]));
+  check('storefronts land in their own section last',
+        runs[runs.length - 1] === 'Rent or buy' && catalog.networks.filter(n => n.storefront).length === 3,
+        runs.join(' | '));
+
+  // A region on an entry that REGION_SECTIONS doesn't know would otherwise
+  // vanish from every picker. networkCatalog() emits it under its raw key
+  // rather than dropping it, and this is what notices.
+  const known = [null, 'United Kingdom', 'Australia', 'Rent or buy'];
+  const strays = [...new Set(catalog.networks.map(n => n.section))].filter(s => !known.includes(s));
+  check('no entry carries a region with no section title', strays.length === 0, strays.join(', '));
+
+  check('every entry has a display string', catalog.networks.every(n => n.display && n.stored));
+  check('the version changes with the list',
+        networkCatalog().version === catalog.version &&
+        catalogVersionOf([...catalog.networks].reverse()) !== catalog.version);
+
+  function catalogVersionOf(networks) {
+    // Same shape the endpoint returns, rebuilt from a permuted list — the
+    // version has to be a function of content *and* order, since order is what
+    // a picker renders.
+    const text = networks.map(n => `${n.stored}|${n.display}|${n.section || ''}|${n.storefront}`).join('\n');
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return `${networks.length}-${h.toString(16)}`;
+  }
+}
+
+console.log('\n== the iOS seed is a fallback, not a second source of truth');
+{
+  // The apps fetch /api/networks, so the Swift list is only what a first
+  // launch with no signal shows. It is allowed to be *shorter* than the
+  // server's — that's the whole point, a new network arrives without a build.
+  // What it must never be is *wrong*: a name here that the server doesn't
+  // canonicalize would write an unrecognized value into shows.network.
+  const swift = readFileSync(
+    join(repoRoot, 'ShowPickerCore/Sources/ShowPickerCore/NetworkCatalog.swift'), 'utf8');
+  const seedBlock = swift.split('public static let bundled')[1] || '';
+  const seeded = [...seedBlock.matchAll(/NetworkOption\("([^"]+)"/g)].map(m => m[1]);
+
+  check('the seed was found and is not empty', seeded.length > 0, String(seeded.length));
+  const stored = new Set(NETWORKS.map(n => n.stored));
+  const unknown = seeded.filter(n => !stored.has(n));
+  check('every seeded name is one the server canonicalizes', unknown.length === 0, unknown.join(', '));
+  check('the seed does not repeat a name', new Set(seeded).size === seeded.length);
+
+  // Nothing may reintroduce a hardcoded picker list in the app target.
+  const models = readFileSync(join(repoRoot, 'ios/ShowPickerIOS/Models.swift'), 'utf8');
+  check('the app no longer hardcodes the picker',
+        !/let (CANONICAL|US|UK|AU|STOREFRONT)_NETWORKS/.test(models));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -149,6 +149,13 @@ enum API {
         return r.members
     }
 
+    // The network picker's contents. Public endpoint — no session — so a
+    // launch before sign-in can still warm the list. NetworkCatalogStore owns
+    // the caching and the fallback; this is just the fetch.
+    static func networks() async throws -> NetworkCatalog {
+        try await get("/api/networks")
+    }
+
     static func popular() async throws -> [PopularShow] {
         let r: PopularResponse = try await getCached("/api/popular", cacheKey: "popular")
         return r.shows

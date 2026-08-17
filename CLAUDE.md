@@ -153,12 +153,15 @@ prints the two distributions side by side. Read-only, no deploy.
 node scripts/networks-test.mjs
 ```
 
-The canonical network table and the two copies of it that can drift. The alias
+The canonical network table and the catalog the apps fetch from it. The alias
 index is a Map built in list order, so a name claimed twice doesn't error — the
 later entry silently wins, which is how the US `ABC` (a Hulu sub-brand) could
-lose to Australia's ABC iview. Also pins that the iOS picker offers exactly the
-networks the server canonicalizes (MGM+ had gone missing from the Swift copy
-once), and that a default price is never keyed to a name the DB doesn't store.
+lose to Australia's ABC iview. Also pins the `/api/networks` payload (every
+entry present, sections as consecutive runs a client can group by), that the
+Swift seed left for a first offline launch never names a service the server
+wouldn't canonicalize, and that a default price is never keyed to a name the DB
+doesn't store. The client half — an empty or junk payload must not empty the
+picker — is `NetworkCatalogTests` in `ShowPickerCore`.
 
 ```bash
 node scripts/auth-code-flow-test.mjs
@@ -241,7 +244,7 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 - **Private groups and households are the privacy unit — the club isn't.** Groups (migration 056: `groups`, `group_members`, `group_invites`) and households are joined by invite *link* only; there is no roster you can add somebody from. Every group route re-checks `group_members` and 403s otherwise, and only the creator can delete. Group membership is what scopes vibe reads, `GET /api/shows/all`, `group_watchers` ("Also watching"), Group Trending, and who Watching With may name. iPhone/iPad create, invite, join, leave and delete; Apple TV browses groups read-only; the watch has no groups. In Swift, `SwiftUI.Group` collides with the model — spell it `ShowPickerCore.Group` in type position.
 - **Three tiers of visibility, not two.** *Logged out:* roster first names, Trending, catalog-level show detail, auth endpoints — deliberately tiny, keep it that way. *Any logged-in member:* another member's list titles, but never their `notes`, `watching_with`, `recommended_by` or `added_by`, which are owner-only because with signup open other members are not all friends (`functions/api/shows.js`). *Group-mates only:* vibe, Also watching, cross-library reads, Watching With links. A new endpoint has to land in one of those three on purpose.
 - **Enrichment:** synchronous on insert (`_shared/enrichment.js`, TMDB only — OMDB was retired 2026-07 and `rating` now carries TMDB's audience score), plus background `POST /api/enrich` fired from member pages. Watch links come from Watchmode (`_shared/watch-providers.js`), never pasted by a member. New rows inherit a sibling copy's real `network_url` when one exists.
-- **Networks:** `_shared/networks.js` is the source of truth for canonical streaming-service names, aliases, and search-URL templates. All incoming `network` values pass through `canonicalNetwork()`.
+- **Networks:** `_shared/networks.js` is the source of truth for canonical streaming-service names, aliases, and search-URL templates. All incoming `network` values pass through `canonicalNetwork()`. **The apps don't hardcode the list** — `networkCatalog()` serves it at the public `GET /api/networks`, `ShowPickerCore.NetworkCatalog` is the client model (with a bundled seed and a "never render an empty picker" rule), and `NetworkCatalogStore` caches it. Adding a network is a server-only change that reaches installed apps.
 - **Vibe:** 26-trait fingerprints per title (`show_traits`, scored by Claude via `/api/admin-vibe-fill`), matched to 8 clusters in `/api/vibe`, scored against the club's own distribution rather than the trait scale; reads are group-scoped. (`docs/ARCHITECTURE.md` and `README.md` still say 27 traits / 7 clusters — `_shared/vibe-traits.js` and `_shared/vibe-clusters.js` are the counts that are right.)
 - **Feature flags via secrets:** `DEMO_LOGIN_EMAIL`/`DEMO_LOGIN_CODE` (App Review demo account with auto-reset), inert when unset. Signup is always open — there is no kill switch and no approval step.
 - **Retired 2026-07:** the open cross-member writes (suggest-a-show, share-to-member) — those endpoints still return 410, and the reason they're gone is that anyone could push a row onto anyone. **Watching With (2026-08) is the one cross-member write that exists now**, and it's the shape a new one would have to take: only a group-mate can be named, an existing copy is linked where it already sits rather than moved or duplicated, and unlinking touches only your own row (`_shared/watchers.js`, `scripts/watching-with-test.mjs`). "Picks for You" (`/api/recommendations`) is no longer called by any client but kept for compatibility.

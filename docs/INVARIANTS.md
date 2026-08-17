@@ -14,6 +14,7 @@ catch different classes of mistake:
 | Admin member detail tests (`scripts/admin-member-detail-test.mjs`) | every PR | `/api/admin-member-emails` stays admin-only, and `?member=` returns that member and nobody else |
 | Reporting platform tests (`scripts/reporting-platform-test.mjs`) | every PR | `/api/reporting` stays admin-only, and the platform breakdown counts people rather than sessions |
 | List import tests (`scripts/import-list-test.mjs`) | every PR | The paste-a-list path: what a model may and may not put in the database, paging, and the commit-side validation |
+| Network tests (`scripts/networks-test.mjs`) | every PR | The canonical table: a name claimed by two services, and the catalog `/api/networks` serves to the apps |
 | `scripts/smoke.sh` | after deploy, and nightly | Live behavior: auth gates, headers, leakage, redirects |
 | Invariants review (`.github/workflows/pr-review.yml`) | every PR | Judgement calls the four above can't express |
 
@@ -400,6 +401,37 @@ exception is bounded, and the bounds are the invariant.
   future admin surface can't clear that bar, it doesn't get the exception.
 
 Enforcer: `scripts/admin-member-detail-test.mjs`.
+
+## 14. A list served to a client degrades to something usable, never to nothing
+
+The network picker moved from a literal in the app to `GET /api/networks`
+(2026-08) so a service added on the server reaches phones already installed.
+That trade is worth making only if the failure modes of a network fetch can't
+reach the member, so:
+
+- **A bad payload never empties the picker.** Empty, all-junk, or unparseable
+  falls back to the last cached list and then to the seed compiled into the
+  build. A member opening Add Show mid-deploy to find no networks at all is
+  strictly worse than a slightly stale list.
+- **The shipped seed is a fallback, not a second source of truth.** It may be
+  shorter than the server's list — that is the entire point — but it must never
+  name a service the server wouldn't canonicalize, or the app writes an
+  unrecognized value into `shows.network`.
+- **Sections come from the server, not from a client-side map of regions.**
+  A client groups consecutive entries by the section string it is handed and
+  renders that string as the header. Nothing in the app knows what "United
+  Kingdom" means, so a region added later needs no App Store release either.
+- **The endpoint's absence has to be noticed by a machine.** A 404 here breaks
+  nothing loudly: every installed app just stays frozen on its cached list
+  until a member asks where a service went. `smoke.sh` asserts it after every
+  deploy for that reason.
+
+This generalizes past networks: any list a client renders from an endpoint
+needs a defined answer for "the server said nothing usable", and that answer
+can't be an empty screen.
+
+Enforcers: `ShowPickerCore` tests (`NetworkCatalogTests`),
+`scripts/networks-test.mjs`, `scripts/smoke.sh`.
 
 ## Adding an invariant
 

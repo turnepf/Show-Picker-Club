@@ -18,6 +18,10 @@ struct ShowPickerIOSApp: App {
                     await auth.refresh()
                     // Drain anything queued while the app was closed/offline.
                     await OfflineQueue.shared.flush()
+                    // Warm the network picker from the server so the first Add
+                    // Show of the session already has any newly added service.
+                    // Needs no session, and a failure leaves the cached list.
+                    await NetworkCatalogStore.shared.refreshIfNeeded()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     // Returning to the foreground is a good moment to retry.
