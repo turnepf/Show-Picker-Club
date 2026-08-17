@@ -413,6 +413,12 @@ reach the member, so:
   falls back to the last cached list and then to the seed compiled into the
   build. A member opening Add Show mid-deploy to find no networks at all is
   strictly worse than a slightly stale list.
+- **The cache answers a failed pull; it is never a reason to skip one.** The
+  client tries the server on launch, on every foreground and every time the
+  picker appears — not once per launch, which left a resident app on a
+  week-old list. That's affordable because the catalog version doubles as an
+  ETag and an unchanged list answers 304 with no body, so "ask often" and
+  "cost nothing" aren't in tension.
 - **The shipped seed is a fallback, not a second source of truth.** It may be
   shorter than the server's list — that is the entire point — but it must never
   name a service the server wouldn't canonicalize, or the app writes an

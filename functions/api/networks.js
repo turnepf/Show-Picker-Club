@@ -21,17 +21,30 @@ import { networkCatalog } from '../_shared/networks.js';
 // the list changes a few times a year, and a member adding a show should never
 // wait on this. Clients keep their own copy anyway, so a cache miss during a
 // deploy is invisible.
+//
+// The clients try to pull every time they show a picker rather than once per
+// launch — a cached list is the fallback for a failed pull, not a reason to
+// skip one — so the repeat request is made as cheap as it can be: the catalog
+// version doubles as an ETag, and an unchanged list answers 304 with no body.
 
-function headers() {
+function headers(etag) {
   return {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': 'https://showpicker.club',
     'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+    ETag: etag,
   };
 }
 
-export async function onRequestGet() {
-  return new Response(JSON.stringify(networkCatalog()), { headers: headers() });
+export async function onRequestGet({ request }) {
+  const catalog = networkCatalog();
+  const etag = `"${catalog.version}"`;
+  // Weak-comparison tolerant: a cache upstream may have weakened it to W/"…".
+  const seen = (request?.headers?.get('If-None-Match') || '').replace(/^W\//, '');
+  if (seen === etag) {
+    return new Response(null, { status: 304, headers: headers(etag) });
+  }
+  return new Response(JSON.stringify(catalog), { headers: headers(etag) });
 }
 
 export async function onRequestOptions() {

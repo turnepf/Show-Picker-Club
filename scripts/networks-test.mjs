@@ -207,6 +207,35 @@ console.log('\n== the catalog the apps fetch');
   }
 }
 
+console.log('\n== the endpoint, including the repeat pull');
+{
+  // Clients try the server every time they show a picker rather than once per
+  // launch, so the cheap answer to "still the same list?" is load-bearing: it
+  // is what makes trying that often reasonable.
+  const { onRequestGet } = await import(join(sandbox, 'functions', 'api', 'networks.js'));
+  const call = (headers = {}) => onRequestGet({ request: new Request('https://showpicker.club/api/networks', { headers }) });
+
+  const first = await call();
+  const etag = first.headers.get('ETag');
+  const body = await first.json();
+  check('a cold request serves the list', first.status === 200 && body.networks.length > 0);
+  check('with an ETag that is the catalog version', etag === `"${body.version}"`, String(etag));
+  check('and a cacheable Cache-Control', /max-age=\d+/.test(first.headers.get('Cache-Control') || ''));
+
+  const repeat = await call({ 'If-None-Match': etag });
+  check('an unchanged list answers 304', repeat.status === 304, String(repeat.status));
+  check('and sends no body with it', (await repeat.text()) === '');
+
+  // A cache in the middle may weaken the validator; the client still gets its
+  // 304 rather than re-downloading the list on every picker.
+  const weak = await call({ 'If-None-Match': `W/${etag}` });
+  check('a weakened validator still matches', weak.status === 304, String(weak.status));
+
+  const stale = await call({ 'If-None-Match': '"1-deadbeef"' });
+  check('a stale validator gets the full list', stale.status === 200 &&
+        (await stale.json()).networks.length === body.networks.length);
+}
+
 console.log('\n== the iOS seed is a fallback, not a second source of truth');
 {
   // The apps fetch /api/networks, so the Swift list is only what a first

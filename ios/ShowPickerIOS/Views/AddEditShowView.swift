@@ -164,9 +164,11 @@ struct AddEditShowView: View {
             .interactiveDismissDisabled(saving)
             .onAppear(perform: prefill)
             .task { await loadGroupMates() }
-            // Cheap after the first call per launch, and a failure leaves
-            // whatever list is already loaded in place.
-            .task { await catalog.refreshIfNeeded() }
+            // Every time the sheet opens, not once per launch: the cached
+            // list is the fallback for a pull that fails, not a reason to skip
+            // one. An unchanged list answers 304, and a failure leaves what's
+            // already loaded on screen.
+            .task { await catalog.refresh() }
             .overlay { if saving { ProgressView().controlSize(.large) } }
             .alert("Already in your archive", isPresented: $showingRestorePrompt) {
                 Button("Add back to \(list.title)") { Task { await restoreArchived() } }
