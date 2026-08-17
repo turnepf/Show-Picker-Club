@@ -61,8 +61,29 @@ struct AddEditShowView: View {
                     }
                     Picker("Network", selection: $network) {
                         Text("None").tag("")
-                        ForEach(CANONICAL_NETWORKS, id: \.self) { n in
+                        ForEach(US_NETWORKS, id: \.self) { n in
                             Text(n).tag(n)
+                        }
+                        // Sectioned rather than merged into one alphabetical
+                        // run: most of the club will never pick from these, and
+                        // interleaving them puts 9Now and Channel 4 in front of
+                        // the services everyone uses. The storefronts get the
+                        // same treatment for the opposite reason — they're
+                        // rent/buy, not a service you subscribe to.
+                        Section("United Kingdom") {
+                            ForEach(UK_NETWORKS, id: \.self) { n in
+                                Text(n).tag(n)
+                            }
+                        }
+                        Section("Australia") {
+                            ForEach(AU_NETWORKS, id: \.self) { n in
+                                Text(n).tag(n)
+                            }
+                        }
+                        Section("Rent or buy") {
+                            ForEach(STOREFRONT_NETWORKS, id: \.self) { n in
+                                Text(n).tag(n)
+                            }
                         }
                         // The canonical list covers the services the club
                         // actually uses; anything else (a regional channel,

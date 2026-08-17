@@ -110,6 +110,12 @@ else you watch there can be filed where it belongs.
 Pluto TV joins the network list too. It's free, so it shows up in the
 Subscription Audit at $0 a month — no bill to cut.
 
+British and Australian services are in the list as well — BBC iPlayer, ITVX,
+Channel 4, Channel 5, NOW, Stan, Binge, Foxtel, ABC iview, SBS On Demand,
+9Now, 7plus and 10 play. They have their own section in the network picker,
+share links from those apps come in knowing where they're from, and the free
+ones sit at $0 in the Subscription Audit.
+
 Adding a show now starts on the list you're looking at. Tap + while you're on
 Awaiting and it goes to Awaiting — you can still switch lists before saving.
 ```
@@ -121,6 +127,11 @@ Awaiting and it goes to Awaiting — you can still switch lists before saving.
 - Paste button and the worked example card on the import screen (#363).
 - PBS added as a canonical network, with Passport, Masterpiece and PBS Kids
   folded in as aliases.
+- UK and Australian networks added (BBC iPlayer, ITVX, Channel 4, Channel 5,
+  NOW, Stan, Binge, Foxtel, ABC iview, SBS On Demand, 9Now, 7plus, 10 play),
+  sectioned in the iPhone/iPad picker and recognized by the share extension.
+  The free-to-air ones are priced at $0; the paid non-US ones arrive unpriced
+  because the audit totals US dollars.
 - Add Show opens on the list you're viewing instead of always Watching —
   reported by Thayná, who kept landing awaited shows in Watching.
 

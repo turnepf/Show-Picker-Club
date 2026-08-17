@@ -149,6 +149,28 @@ enum ShareTitleParser {
         if lower.contains("starz")                                   { return "Starz"               }
         if lower.contains("britbox")                                 { return "BritBox"             }
         if lower.contains("pbs") || lower.contains("masterpiece")    { return "PBS"                 }
+        // UK and Australia. Only names that can't be a substring of ordinary
+        // share text get a check here — "sky" lives inside "whisky", "stan"
+        // inside "Istanbul", and "binge" inside every "perfect binge-watch"
+        // blurb, so those three are recognized by host only (networkFrom below)
+        // and a bare mention of them stays unmatched rather than guessed wrong.
+        // "BBC America" is a US cable channel that folds into AMC+, so it is
+        // explicitly not iPlayer.
+        if lower.contains("iplayer") ||
+           (lower.contains("bbc") && !lower.contains("bbc america"))  { return "BBC iPlayer"         }
+        if lower.contains("itvx") || lower.contains("itv")            { return "ITVX"                }
+        if lower.contains("channel 4") || lower.contains("all 4") ||
+           lower.contains("film4") || lower.contains("more4")         { return "Channel 4"           }
+        if lower.contains("channel 5") || lower.contains("my5")       { return "Channel 5"           }
+        if lower.contains("now tv") || lower.contains("nowtv") ||
+           lower.contains("sky atlantic") || lower.contains("sky max") ||
+           lower.contains("sky cinema")                               { return "NOW"                 }
+        if lower.contains("foxtel")                                   { return "Foxtel"              }
+        if lower.contains("iview")                                    { return "ABC iview"           }
+        if lower.contains("sbs on demand") || lower.contains("sbs")   { return "SBS On Demand"       }
+        if lower.contains("9now")                                     { return "9Now"                }
+        if lower.contains("7plus")                                    { return "7plus"               }
+        if lower.contains("10 play") || lower.contains("10play")      { return "10 play"             }
         return nil
     }
 
@@ -181,6 +203,22 @@ enum ShareTitleParser {
         if host.contains("amc.")                               { return "AMC+"                }
         if host.contains("britbox")                            { return "BritBox"             }
         if host.contains("pbs.org") || host.contains("pbskids") { return "PBS"                }
+        // UK and Australia. Hosts are unambiguous where the text names aren't,
+        // so Stan, Binge and NOW/Sky are recognized here even though they get
+        // no text check above.
+        if host.contains("bbc.co.uk") || host.contains("bbc.com") { return "BBC iPlayer"      }
+        if host.contains("itv.com") || host.contains("itvx")   { return "ITVX"                }
+        if host.contains("channel4.com")                       { return "Channel 4"           }
+        if host.contains("channel5.com") || host.contains("my5.tv") { return "Channel 5"      }
+        if host.contains("nowtv.com") || host.contains("sky.com") { return "NOW"              }
+        if host.contains("stan.com.au")                        { return "Stan"                }
+        if host.contains("binge.com.au")                       { return "Binge"               }
+        if host.contains("foxtel.com.au")                      { return "Foxtel"              }
+        if host.contains("abc.net.au")                         { return "ABC iview"           }
+        if host.contains("sbs.com.au")                         { return "SBS On Demand"       }
+        if host.contains("9now.com.au")                        { return "9Now"                }
+        if host.contains("7plus.com.au")                       { return "7plus"               }
+        if host.contains("10play.com.au")                      { return "10 play"             }
         return nil
     }
 

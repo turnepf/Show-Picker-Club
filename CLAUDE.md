@@ -150,6 +150,17 @@ every member in a production snapshot under both the old and new matcher and
 prints the two distributions side by side. Read-only, no deploy.
 
 ```bash
+node scripts/networks-test.mjs
+```
+
+The canonical network table and the two copies of it that can drift. The alias
+index is a Map built in list order, so a name claimed twice doesn't error — the
+later entry silently wins, which is how the US `ABC` (a Hulu sub-brand) could
+lose to Australia's ABC iview. Also pins that the iOS picker offers exactly the
+networks the server canonicalizes (MGM+ had gone missing from the Swift copy
+once), and that a default price is never keyed to a name the DB doesn't store.
+
+```bash
 node scripts/auth-code-flow-test.mjs
 ```
 

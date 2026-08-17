@@ -19,7 +19,10 @@ name: PR checks
 #   authcodes — the email login/signup code flow, same harness, with a fake
 #              Resend that refuses reserved domains the way the real one does.
 #              App Review rejected tvOS 1.2 over a code that never arrived;
-#              that failure now has a test.
+#              that failure now has a test. Also carries the pure-module suites
+#              that need no database — vibe matching, and networks-test.mjs,
+#              which catches an alias claimed by two services and the iOS
+#              picker's copy of the list drifting from the server's.
 #
 # The judgement half lives in pr-review.yml.
 
@@ -75,6 +78,8 @@ jobs:
         run: node scripts/vibe-scope-test.mjs
       - name: Vibe cluster matching
         run: node scripts/vibe-match-test.mjs
+      - name: Canonical networks and the iOS picker copy
+        run: node scripts/networks-test.mjs
 
   listimport:
     runs-on: ubuntu-latest

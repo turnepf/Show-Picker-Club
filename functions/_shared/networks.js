@@ -150,6 +150,126 @@ export const NETWORKS = [
     search: { base: 'https://pluto.tv/us/search' },
   },
 
+  // --- United Kingdom ---
+  // BritBox already sits above: it's the BBC/ITV export service sold in the US,
+  // which is a different product from what someone in Britain actually watches.
+  // These are the home services, and they exist here for the same reason the US
+  // ones do — a member types "on iPlayer" or pastes an itv.com link, and without
+  // an entry that lands in the DB as free text nothing can group, price or link.
+  //
+  // Aliases stay specific enough that a bare English word can't claim a
+  // canonical. Channel 4's sub-brands (E4, Film4) are safe; "Five", "Nine" and
+  // "Ten" are not, so they're absent even though the broadcasters go by them.
+  {
+    // 'BBC America' is already an AMC+ alias and stays there — it's a US cable
+    // channel that licenses BBC shows, not a way to reach iPlayer.
+    stored: 'BBC iPlayer',
+    display: 'BBC iPlayer (including BBC One, BBC Two, BBC Three, BBC Four)',
+    aliases: ['BBC', 'iPlayer', 'BBC One', 'BBC Two', 'BBC Three', 'BBC Four', 'BBC1', 'BBC2', 'BBC Scotland'],
+    domains: ['bbc.co.uk', 'bbc.com'],
+    search: { base: 'https://www.bbc.co.uk/iplayer/search', param: 'q' },
+  },
+  {
+    stored: 'ITVX',
+    display: 'ITVX (including ITV1, ITV2, ITV3, ITV4, ITVBe)',
+    aliases: ['ITV', 'ITV X', 'ITV Hub', 'ITV Player', 'ITV1', 'ITV2', 'ITV3', 'ITV4', 'ITVBe'],
+    domains: ['itv.com', 'itvx.com'],
+    search: { base: 'https://www.itv.com/search', param: 'q' },
+  },
+  {
+    stored: 'Channel 4',
+    display: 'Channel 4 (including E4, More4, Film4)',
+    aliases: ['Channel4', 'All 4', 'All4', '4oD', 'E4', 'More4', 'Film4'],
+    domains: ['channel4.com'],
+    search: { base: 'https://www.channel4.com/search', param: 'q' },
+  },
+  {
+    // Paramount owns Channel 5, but it's a separate app with a separate
+    // catalogue — the same reason Pluto TV isn't a Paramount+ alias.
+    stored: 'Channel 5',
+    display: 'Channel 5 (My5)',
+    aliases: ['Channel5', 'My5', 'My 5'],
+    domains: ['channel5.com', 'my5.tv'],
+    search: { base: 'https://www.channel5.com/search', param: 'q' },
+  },
+  {
+    // Stored as the streaming brand, which is what a title is actually watched
+    // on — Sky's channels reach a phone through NOW, and every Sky channel name
+    // folds in here rather than becoming its own entry. Displayed with "Sky" in
+    // the name because that's what members call it.
+    stored: 'NOW',
+    display: 'NOW (Sky — Sky Atlantic, Sky Max, Sky Cinema)',
+    aliases: ['NOW TV', 'NowTV', 'Now TV', 'Sky', 'Sky Go', 'Sky Atlantic', 'Sky Max', 'Sky One', 'Sky Showcase', 'Sky Cinema', 'Sky Comedy', 'Sky Crime', 'Sky Documentaries'],
+    domains: ['nowtv.com', 'sky.com'],
+    search: { base: 'https://www.nowtv.com/gb/search', param: 'q' },
+  },
+
+  // --- Australia ---
+  // Same reasoning as the UK block. The three commercial broadcasters are
+  // stored under their streaming names (9Now, 7plus, 10 play) rather than
+  // "Channel 9" and friends, so the stored value names something a member can
+  // open; the channel names are aliases.
+  {
+    stored: 'Stan',
+    display: 'Stan',
+    aliases: [],
+    domains: ['stan.com.au'],
+    search: { base: 'https://www.stan.com.au/search', param: 'q' },
+  },
+  {
+    stored: 'Binge',
+    display: 'Binge',
+    aliases: [],
+    domains: ['binge.com.au'],
+    search: { base: 'https://binge.com.au/search', param: 'q' },
+  },
+  {
+    stored: 'Foxtel',
+    display: 'Foxtel (including Foxtel Now)',
+    // Binge is Foxtel-owned but priced and subscribed to separately, so it
+    // stays its own entry above rather than folding in here.
+    aliases: ['Foxtel Now', 'Foxtel Go', 'Foxtel Play'],
+    domains: ['foxtel.com.au'],
+    search: { base: 'https://www.foxtel.com.au/search', param: 'q' },
+  },
+  {
+    // Never aliased as bare 'ABC' — that belongs to the US network, which folds
+    // into Hulu. TMDB writes the Australian one as "ABC (AU)".
+    stored: 'ABC iview',
+    display: 'ABC iview (Australia)',
+    aliases: ['iview', 'ABC iView', 'ABC (AU)', 'ABC Australia', 'ABC TV (Australia)'],
+    domains: ['iview.abc.net.au', 'abc.net.au'],
+    search: { base: 'https://iview.abc.net.au/search', param: 'keyword' },
+  },
+  {
+    stored: 'SBS On Demand',
+    display: 'SBS On Demand (including NITV, SBS World Movies)',
+    aliases: ['SBS', 'SBS on Demand', 'SBS Viceland', 'SBS World Movies', 'NITV'],
+    domains: ['sbs.com.au'],
+    search: { base: 'https://www.sbs.com.au/ondemand/search', param: 'q' },
+  },
+  {
+    stored: '9Now',
+    display: '9Now (Nine Network)',
+    aliases: ['Nine Network', 'Channel 9', 'Channel Nine', '9Go!', '9Gem', '9Life'],
+    domains: ['9now.com.au', 'nine.com.au'],
+    search: { base: 'https://www.9now.com.au/search', param: 'q' },
+  },
+  {
+    stored: '7plus',
+    display: '7plus (Seven Network)',
+    aliases: ['7 plus', 'Seven Network', 'Channel 7', 'Channel Seven', '7two', '7mate', '7flix'],
+    domains: ['7plus.com.au', 'seven.com.au'],
+    search: { base: 'https://7plus.com.au/search', param: 'q' },
+  },
+  {
+    stored: '10 play',
+    display: '10 play (Network 10)',
+    aliases: ['10play', '10 Play', 'Network 10', 'Network Ten', 'Channel 10', 'Channel Ten', '10 Peach', '10 Bold'],
+    domains: ['10play.com.au'],
+    search: { base: 'https://10play.com.au/search', param: 'q' },
+  },
+
   // --- Storefronts (kind: 'storefront') ---
   // Rent/buy shops, not subscriptions. A title here costs money per view, so
   // it is never a reason to keep or start a monthly service and the
@@ -363,6 +483,27 @@ export const DEFAULT_PRICE_CENTS = {
   // of PBS streams free without it, so this is the one default a member is
   // likeliest to zero out.
   'PBS': 500,
+
+  // Free-to-air catch-up, UK and Australia. Zero for the same reason Pluto TV
+  // is zero — we know these cost nothing rather than nobody having priced them
+  // — and zero is the one figure that survives being quoted in US cents.
+  // ITVX, Channel 4 and My5 sell optional ad-free tiers; the default is the
+  // free tier everyone actually uses. BBC iPlayer is funded by the TV licence,
+  // which is a household bill nobody cancels from a show tracker.
+  'BBC iPlayer': 0,
+  'ITVX': 0,
+  'Channel 4': 0,
+  'Channel 5': 0,
+  'ABC iview': 0,
+  'SBS On Demand': 0,
+  '9Now': 0,
+  '7plus': 0,
+  '10 play': 0,
+  // Deliberately absent: NOW, Stan, Binge, Foxtel. They're paid, but they're
+  // billed in pounds and Australian dollars, and this table is US cents that
+  // the Subscription Audit sums into one total. A converted guess would be
+  // wrong twice over — wrong rate, wrong currency in the sum — so these arrive
+  // unpriced and the member enters what they actually pay.
 };
 
 export function defaultPriceCents(network) {
