@@ -17,6 +17,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "CDB361682FC7CA68009F34F5"
                BuildableName = "ShowPickerTV.app"
+               BlueprintName = "ShowPickerTV"
                ReferencedContainer = "container:ShowPickerTV.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -46,6 +47,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "CDB361682FC7CA68009F34F5"
             BuildableName = "ShowPickerTV.app"
+            BlueprintName = "ShowPickerTV"
             ReferencedContainer = "container:ShowPickerTV.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -62,6 +64,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "CDB361682FC7CA68009F34F5"
             BuildableName = "ShowPickerTV.app"
+            BlueprintName = "ShowPickerTV"
             ReferencedContainer = "container:ShowPickerTV.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
