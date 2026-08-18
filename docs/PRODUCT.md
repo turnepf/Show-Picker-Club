@@ -244,6 +244,31 @@ The iOS app ships **home-screen widgets** on iPhone, iPad, and Mac (the Mac Cata
 
 **Up Next shows the next thing on your calendar, not the next premiere.** It carries exactly what the Calendar screen and the `.ics` feed carry — season premieres *and* season finales from Watching and Awaiting, one row per show (whichever of its two dates comes first), each row saying which it is ("Premieres Aug 20" / "Finale Aug 14"). Premieres alone left the widget empty for weeks at a stretch, since only a fraction of tracked shows have an announced return date at any moment. Empty now means genuinely nothing dated ahead.
 
+### Genre filter (Next Up)
+
+Next Up carries a **genre dropdown** in the same menu as sort — "All Genres"
+plus the genres actually present on that list, commonest first.
+
+**Next Up only, on purpose.** It's the list that grows without limit — the
+someday pile — so it's the one where "just show me the comedies" is how you
+pick something. The other three stay short enough to read straight through.
+
+Options are the intersection of the list's own genres with TMDB's top-level
+set, so the menu never offers a filter that matches nothing and never fills
+with the niche tags a title also carries. It appears only when there's more
+than one genre to choose between; a one-option dropdown is furniture.
+
+Two rules keep it from lying: while drag-to-reorder is active the filter is
+ignored, since repositioning rows against titles you can't see would write an
+arrangement you didn't intend; and when a filter empties the screen the list
+says *"Nothing on this list is Comedy"* rather than showing the empty-list
+copy for a list that isn't empty.
+
+**Platforms:** iPhone and iPad, Mac via Catalyst. Not Apple TV, the watch or
+the web.
+
+Idea from Liza.
+
 ## Sort and toggle controls
 
 Footer of each list:

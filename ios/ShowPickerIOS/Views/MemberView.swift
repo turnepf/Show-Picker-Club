@@ -65,6 +65,11 @@ struct MemberView: View {
     // the list, so it's a visible control rather than a menu item. Remembered
     // per list, like sort.
     @State private var mediaFilterByList: [String: MediaFilter] = [:]
+    // Liza's genre filter, offered on Next Up alone. Next Up is the list that
+    // grows without limit — it's the someday pile — so it's the one where
+    // "just show me the comedies" is how you actually pick something. The
+    // other three are short enough to read.
+    @State private var genreFilter: String?
     // Archive Undo: the just-archived show, shown in a 6-second bottom
     // banner (mirrors the web's undo toast).
     @State private var undoShow: Show?
@@ -129,6 +134,11 @@ struct MemberView: View {
                     Group {
                         if loadFailed && shows.isEmpty {
                             loadFailedState
+                        } else if currentList == .next, let genreFilter, !listItems().isEmpty {
+                            // Say which filter emptied the screen, rather than
+                            // letting a full list read as an empty one.
+                            Text("Nothing on this list is \(genreFilter).")
+                                .foregroundStyle(.secondary)
                         } else if mediaFilter != .all && !listItems().isEmpty {
                             Text(mediaFilter == .movies
                                  ? "No movies on this list."
@@ -351,6 +361,15 @@ struct MemberView: View {
                     Text("\(member.label)'s Order").tag(SortOption.manual)
                 }
             }
+            if showsGenreFilter {
+                Divider()
+                Picker("Genre", selection: $genreFilter) {
+                    Text("All Genres").tag(String?.none)
+                    ForEach(genreOptions, id: \.self) { g in
+                        Text(g).tag(String?.some(g))
+                    }
+                }
+            }
         } label: {
             Image(systemName: "line.3.horizontal.decrease.circle")
         }
@@ -364,6 +383,38 @@ struct MemberView: View {
 
     private var mediaFilter: MediaFilter {
         mediaFilterByList[currentList.rawValue] ?? .all
+    }
+
+    // TMDB's top-level genres, movie set and TV set both. The dropdown is
+    // filtered to these on purpose: titles carry niche tags as well, and
+    // offering every one of them turns a filter into a taxonomy.
+    private static let majorGenres: Set<String> = [
+        "Action", "Action & Adventure", "Adventure", "Animation", "Comedy",
+        "Crime", "Documentary", "Drama", "Family", "Fantasy", "History",
+        "Horror", "Kids", "Music", "Mystery", "News", "Reality", "Romance",
+        "Sci-Fi & Fantasy", "Science Fiction", "Soap", "Talk", "Thriller",
+        "War", "War & Politics", "Western",
+    ]
+
+    // Built from the genres actually on the open list, commonest first, so the
+    // menu never offers a filter that matches nothing — and never shows a
+    // single-title genre above one that covers half the list.
+    private var genreOptions: [String] {
+        var counts: [String: Int] = [:]
+        for show in listItems() {
+            for g in show.genreList where Self.majorGenres.contains(g) {
+                counts[g, default: 0] += 1
+            }
+        }
+        return counts
+            .sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
+            .map(\.key)
+    }
+
+    // Next Up only, and only once there's more than one genre to choose
+    // between — a dropdown with one option in it is furniture.
+    private var showsGenreFilter: Bool {
+        currentList == .next && genreOptions.count > 1
     }
 
     // The row only earns its space on a list that holds both kinds. On
@@ -457,7 +508,16 @@ struct MemberView: View {
     // Same ordering rules as the web: undated shows sink to the bottom on
     // "Next episode", and "Date Added" is newest-first with seed (null-date) rows last.
     private func sortedItems() -> [Show] {
-        let base = isReordering ? listItems() : listItems().filter { mediaFilter.matches($0) }
+        var base = isReordering ? listItems() : listItems().filter { mediaFilter.matches($0) }
+        // Reordering is a write to the member's own arrangement, so it always
+        // acts on the whole list — dragging inside a filtered subset would
+        // silently reposition rows against titles you can't see.
+        // Scoped to Next Up, the only list that offers the control. Applying
+        // it anywhere else would filter a list whose menu can't show — or
+        // clear — the filter doing it.
+        if !isReordering, currentList == .next, let genreFilter {
+            base = base.filter { $0.genreList.contains(genreFilter) }
+        }
         switch currentSort {
         case .alpha:
             return base.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }

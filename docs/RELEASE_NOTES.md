@@ -31,6 +31,9 @@ Watching, Awaiting and Loved lists, with the shows that put them there and
 a link to everything else they've been in.
 
 Nothing to set up — it reads your own lists. iPhone and iPad.
+
+Next Up has a genre filter now. Tap the sort button and pick a genre —
+handy once Next Up has grown past the point of reading it all.
 ```
 
 ### What this covers
@@ -42,6 +45,10 @@ Nothing to set up — it reads your own lists. iPhone and iPad.
   lists; the list rule is what makes the extra rows worth reading.
 - **Favorite Actors** (Nico's idea) — derived top-ten actors from the member's
   own lists, with IMDB links. iPhone/iPad/Mac; not tvOS, watch or web.
+- **Genre filter on Next Up** (Liza's idea) — options built from the list's own
+  genres intersected with TMDB's top-level set, so it never offers a dead
+  filter. Ignored while reordering; names itself in the empty state.
+  iPhone/iPad/Mac.
 
 ---
 
