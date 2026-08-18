@@ -1,4 +1,10 @@
 import { getSession } from '../../../_shared/auth.js';
+import { TRENDING_LISTS_SQL } from '../../../_shared/trending-lists.js';
+
+// Mirrors /api/popular: clients draw the first 10 and expand behind a
+// "Show more", and the cap bounds a hand-written ?limit=.
+const TRENDING_DEFAULT = 10;
+const TRENDING_MAX = 50;
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -14,6 +20,11 @@ async function checkGroupMembership(env, groupId, memberSlug) {
 export async function onRequestGet(context) {
   const { env, request, params } = context;
   const session = await getSession(request, env);
+
+  const asked = Number(new URL(request.url).searchParams.get('limit'));
+  const limit = Number.isFinite(asked) && asked > 0
+    ? Math.min(Math.trunc(asked), TRENDING_MAX)
+    : TRENDING_DEFAULT;
   if (!session) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders() });
   }
@@ -64,19 +75,29 @@ export async function onRequestGet(context) {
        AND s.member_slug IN (${placeholders})
        AND COALESCE(s.added_by, '') != 'seed'
        AND s.created_at >= datetime('now', '-30 days')
+       -- Same rule as club Trending: intent lists only, never Next Up.
+       AND s.list IN (${TRENDING_LISTS_SQL})
      GROUP BY LOWER(s.title)
      ORDER BY member_count DESC, CAST(rating AS REAL) DESC
-     LIMIT 10`
-  ).bind(...memberSlugs).all();
+     LIMIT ?${memberSlugs.length + 1}`
+  ).bind(...memberSlugs, limit).all();
 
-  // Pull actors for each show
-  for (const show of results) {
+  // One query for the page's actors, not one per show — see /api/popular.
+  const showIds = results.map(s => s.id);
+  const byShow = new Map();
+  if (showIds.length) {
     const { results: acts } = await env.DB.prepare(
-      'SELECT name, imdb_id FROM actors WHERE show_id = ?'
-    ).bind(show.id).all();
-    show.actors = acts.length
-      ? acts.map(a => ({ name: a.name, imdb_id: a.imdb_id }))
-      : null;
+      `SELECT show_id, name, imdb_id FROM actors
+        WHERE show_id IN (${showIds.map(() => '?').join(',')})
+        ORDER BY show_id, ord`
+    ).bind(...showIds).all();
+    for (const a of acts) {
+      if (!byShow.has(a.show_id)) byShow.set(a.show_id, []);
+      byShow.get(a.show_id).push({ name: a.name, imdb_id: a.imdb_id });
+    }
+  }
+  for (const show of results) {
+    show.actors = byShow.get(show.id) || null;
   }
 
   // Map slugs to first names

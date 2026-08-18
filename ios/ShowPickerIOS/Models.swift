@@ -167,6 +167,40 @@ struct PopularShow: Codable, Identifiable, Hashable {
 
 struct PopularResponse: Codable { let shows: [PopularShow] }
 
+// One row of the Favorite Actors page: someone who recurs across the member's
+// Watching / Awaiting / Loved lists, with the titles that put them there.
+//
+// Derived, never picked — there is no favourite flag in the schema. The signal
+// is already in the library, and a second list to curate would only decay.
+struct FavoriteActor: Codable, Identifiable, Hashable {
+    let name: String
+    let imdbId: String?
+    let tmdbPersonId: Int?
+    let showCount: Int
+    let shows: [String]
+
+    // The server groups on tmdb_person_id when TMDB supplied one and the
+    // lowercased name otherwise; the row identity has to match that, or two
+    // credits for the same person collide in the ForEach.
+    var id: String { tmdbPersonId.map(String.init) ?? name.lowercased() }
+
+    // Nil for a credit that predates actor IMDB ids — the row still renders,
+    // it just isn't a link. Better than a link that 404s.
+    var imdbURL: URL? {
+        guard let imdbId, !imdbId.isEmpty else { return nil }
+        return URL(string: "https://www.imdb.com/name/\(imdbId)/")
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case name, shows
+        case imdbId = "imdb_id"
+        case tmdbPersonId = "tmdb_person_id"
+        case showCount = "show_count"
+    }
+}
+
+struct FavoriteActorsResponse: Codable { let actors: [FavoriteActor] }
+
 // Auth check response.
 struct AuthCheckResponse: Codable {
     let authenticated: Bool

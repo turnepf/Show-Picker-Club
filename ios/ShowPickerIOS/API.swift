@@ -156,9 +156,23 @@ enum API {
         try await get("/api/networks")
     }
 
-    static func popular() async throws -> [PopularShow] {
-        let r: PopularResponse = try await getCached("/api/popular", cacheKey: "popular")
+    // limit: nil takes the server default (10) — what Home draws on launch.
+    // Passing a larger value is the "Show more" path, cached under its own key
+    // so the expanded list can't be served from the ten-row snapshot or
+    // overwrite it.
+    static func popular(limit: Int? = nil) async throws -> [PopularShow] {
+        let path = limit.map { "/api/popular?limit=\($0)" } ?? "/api/popular"
+        let key = limit.map { "popular-\($0)" } ?? "popular"
+        let r: PopularResponse = try await getCached(path, cacheKey: key)
         return r.shows
+    }
+
+    // Favourite actors, derived from the member's own Watching / Awaiting /
+    // Loved lists. Owner-only on the server, so there's no member parameter.
+    static func favoriteActors() async throws -> [FavoriteActor] {
+        let r: FavoriteActorsResponse = try await getCached("/api/favorite-actors",
+                                                           cacheKey: "favorite-actors")
+        return r.actors
     }
 
     // Active shows for a member. Online: fetch and refresh the offline snapshot.

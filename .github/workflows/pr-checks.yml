@@ -80,6 +80,8 @@ jobs:
         run: node scripts/vibe-match-test.mjs
       - name: Canonical networks and the iOS picker copy
         run: node scripts/networks-test.mjs
+      - name: Favorite actors, and what counts as trending
+        run: node scripts/favorite-actors-test.mjs
 
   listimport:
     runs-on: ubuntu-latest

@@ -1,10 +1,24 @@
 import { EXCLUDED_FROM_TASTE } from '../_shared/excluded-members.js';
 import { getSession } from '../_shared/auth.js';
+import { TRENDING_LISTS_SQL } from '../_shared/trending-lists.js';
 
 const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
 
+// How many trending titles the endpoint will return. Clients draw the first
+// TRENDING_PAGE and expand to the rest behind a "Show more", so the default is
+// what a client gets when it asks for nothing, and the cap is what stops a
+// hand-written ?limit= from turning this into a full table scan with an actor
+// join per row.
+const TRENDING_DEFAULT = 10;
+const TRENDING_MAX = 50;
+
 export async function onRequestGet(context) {
   const { env, request } = context;
+
+  const asked = Number(new URL(request.url).searchParams.get('limit'));
+  const limit = Number.isFinite(asked) && asked > 0
+    ? Math.min(Math.trunc(asked), TRENDING_MAX)
+    : TRENDING_DEFAULT;
 
   // Top shows by how many members added them in the last 30 days — a rolling
   // "what the club is picking up right now" feed. The RANKING uses only recent
@@ -34,22 +48,37 @@ export async function onRequestGet(context) {
        AND COALESCE(s.added_by, '') != 'seed'
        -- Only adds from the last 30 days feed the ranking.
        AND s.created_at >= datetime('now', '-30 days')
+       -- Watching/Awaiting/Loved only. Next Up is the maybe-pile, and counting
+       -- it let a title nobody had started trend on bookmarks alone.
+       AND s.list IN (${TRENDING_LISTS_SQL})
      GROUP BY LOWER(s.title)
      ORDER BY member_count DESC, CAST(rating AS REAL) DESC
-     LIMIT 10`
-  ).all();
+     LIMIT ?1`
+  ).bind(limit).all();
 
-  // Pull actors for each (one query per show; n=10 max). Include imdb_id so
-  // the front end can render clickable IMDB links — matching the {name, imdb_id}
-  // shape the member-page endpoints return. A plain name string would parse to
-  // imdb_id:null and render as non-clickable tags.
-  for (const show of results) {
+  // Pull actors for the whole page in one query rather than one per show.
+  // This used to be a loop when the limit was a hardcoded 10; with ?limit= it
+  // would be up to TRENDING_MAX round trips, which is the kind of thing that
+  // only shows up as slowness once somebody actually expands the list.
+  // Include imdb_id so the front end can render clickable IMDB links —
+  // matching the {name, imdb_id} shape the member-page endpoints return. A
+  // plain name string would parse to imdb_id:null and render as
+  // non-clickable tags.
+  const showIds = results.map(s => s.id);
+  const byShow = new Map();
+  if (showIds.length) {
     const { results: acts } = await env.DB.prepare(
-      'SELECT name, imdb_id FROM actors WHERE show_id = ?'
-    ).bind(show.id).all();
-    show.actors = acts.length
-      ? acts.map(a => ({ name: a.name, imdb_id: a.imdb_id }))
-      : null;
+      `SELECT show_id, name, imdb_id FROM actors
+        WHERE show_id IN (${showIds.map(() => '?').join(',')})
+        ORDER BY show_id, ord`
+    ).bind(...showIds).all();
+    for (const a of acts) {
+      if (!byShow.has(a.show_id)) byShow.set(a.show_id, []);
+      byShow.get(a.show_id).push({ name: a.name, imdb_id: a.imdb_id });
+    }
+  }
+  for (const show of results) {
+    show.actors = byShow.get(show.id) || null;
   }
 
   // Map slugs to first names. Members.name is the possessive display

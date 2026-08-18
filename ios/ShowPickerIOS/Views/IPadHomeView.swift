@@ -21,6 +21,7 @@ enum SidebarItem: Hashable {
     case subscriptionAudit
     case rateBacklog
     case calendar
+    case favoriteActors
     // Admin tools shown directly in the menu when user is an admin
     case adminReporting
     case adminManageMembers
@@ -239,6 +240,10 @@ struct IPadHomeView: View {
                     // Vibe is personal too: opens the member's own vibe.
                     Label("Vibe", systemImage: "sparkles")
                         .tag(SidebarItem.vibe)
+                    // Your actors, worked out from your own lists — so it
+                    // sits with the other personal reads, not near Trending.
+                    Label("Favorite Actors", systemImage: "person.2.fill")
+                        .tag(SidebarItem.favoriteActors)
                 }
                 // What's coming up on your lists, with the subscribe button
                 // on the screen itself rather than firing webcal:// from the
@@ -427,6 +432,8 @@ struct IPadHomeView: View {
                 } else {
                     placeholder("Log in to see your vibe.", "sparkles")
                 }
+            case .favoriteActors:
+                FavoriteActorsView()
             case .subscriptionAudit:
                 SubscriptionAuditView()
             case .rateBacklog:
@@ -470,6 +477,8 @@ struct IPadHomeView: View {
         // exist app-wide, so the switch has to answer for them.
         case .calendar:
             if let me = myMember { CalendarView(member: me) }
+        case .favoriteActors:
+            FavoriteActorsView()
         case .adminReporting:
             ReportingView()
         case .adminMembers:
@@ -664,12 +673,47 @@ struct IPadHomeView: View {
 private struct TrendingListView: View {
     let shows: [PopularShow]
 
+    // The detail column owns its expansion: the sidebar's copy stays the ten
+    // rows Home loaded, and opening Trending is what asks for the rest.
+    @State private var expanded: [PopularShow] = []
+    @State private var expanding = false
+    @State private var didExpand = false
+
+    private let pageSize = 10
+    private let maxSize = 50
+
+    private var rows: [PopularShow] { didExpand ? expanded : shows }
+
     var body: some View {
-        List(shows) { s in
-            NavigationLink(value: Route.detail(id: s.id, title: s.title, network: s.network, rating: s.rating)) {
-                ShowRow(s)
+        List {
+            ForEach(rows) { s in
+                NavigationLink(value: Route.detail(id: s.id, title: s.title, network: s.network, rating: s.rating)) {
+                    ShowRow(s)
+                }
+            }
+            if !didExpand && shows.count >= pageSize {
+                Button {
+                    Task { await expand() }
+                } label: {
+                    HStack {
+                        Text("More")
+                        if expanding {
+                            Spacer()
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(expanding)
             }
         }
         .navigationTitle("Trending")
+    }
+
+    private func expand() async {
+        expanding = true
+        defer { expanding = false }
+        guard let more = try? await API.popular(limit: maxSize) else { return }
+        expanded = more
+        didExpand = true
     }
 }

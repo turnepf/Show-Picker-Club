@@ -244,7 +244,12 @@ otherwise; only the creator can delete.
 - **Group Trending** mirrors `/api/popular` but scoped to the group's members
   and the last 30 days, ranked by how many of them added the title. Each row
   carries `members` (first names) so the apps can caption a row with who added
-  it.
+  it. It shares `?limit=` and the list rule below with the club-wide query.
+- **What counts as trending** is `_shared/trending-lists.js`: Watching,
+  Awaiting and Loved, never Next Up. Both queries import it rather than
+  spelling the list out, because two copies of this rule is exactly the thing
+  that drifts. Next Up used to count, which let a title nobody had started
+  trend on bookmarks alone. Pinned by `scripts/favorite-actors-test.mjs`.
 - **Joining is a link.** `POST /api/groups/[id]/invite` mints the token and the
   share URL (`/groups/join?token=…`); opening it signed in joins the group,
   signed out it previews the group name and asks for a login.
@@ -289,7 +294,8 @@ The complete map:
 | `GET /auth/check`                      | `functions/auth/check.js`                  | GET     | none (reads cookie) |
 | `GET/POST /auth/logout`                | `functions/auth/logout.js`                 | GET, POST | none (POST is canonical; GET kept for shipped app builds) |
 | `GET /api/members`                     | `functions/api/members.js`                 | GET     | none (full names + calendar tokens only with a session) |
-| `GET /api/popular`                     | `functions/api/popular.js`                 | GET     | none |
+| `GET /api/popular`                     | `functions/api/popular.js`                 | GET     | none — `?limit=` (1–50, default 10) is the "More" expansion; ranks Watching/Awaiting/Loved adds only, never Next Up |
+| `GET /api/favorite-actors`             | `functions/api/favorite-actors.js`         | GET     | session — the caller's OWN library only; takes no `?member=` |
 | `GET /api/networks`                    | `functions/api/networks.js`                | GET     | none — the network picker the apps fetch instead of hardcoding; constant table, no member data, edge-cached 1h |
 | `GET /api/activity`                    | `functions/api/activity.js`                | GET     | session — `?member=<slug>` scopes it to one person, `?limit=` (1–50, default 10) |
 | `GET /api/rate-backlog`                | `functions/api/rate-backlog.js`            | GET     | session — backs `/rate-backlog`, the bulk-rate flow |

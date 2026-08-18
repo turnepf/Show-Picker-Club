@@ -4,6 +4,12 @@ struct HomeView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var members: [Member] = []
     @State private var popular: [PopularShow] = []
+    // Trending draws ten on launch and fetches the rest only if asked. Home is
+    // the launch screen, so the default stays small; expandedTrending is a
+    // one-way switch per session so a pull-to-refresh doesn't collapse a list
+    // the member deliberately opened.
+    @State private var expandedTrending = false
+    @State private var expandingTrending = false
     // Session-derived state (here just the unrated count behind the "Rate My
     // Shows" badge) in one value that clears itself on logout — the same type
     // the iPad/Mac sidebar uses. See ShowPickerCore/SessionScope.swift.
@@ -132,6 +138,12 @@ struct HomeView: View {
                             } label: {
                                 Label("Subscription Audit", systemImage: "creditcard")
                             }
+                            // Sits with the other reads of your own library
+                            // rather than near Trending: these are YOUR
+                            // actors, not the club's.
+                            NavigationLink(value: Route.favoriteActors) {
+                                Label("Favorite Actors", systemImage: "person.2.fill")
+                            }
                         }
                         // Vibe is personal: logged-in members only, opening
                         // their own vibe.
@@ -183,6 +195,24 @@ struct HomeView: View {
                                     popularRow(show)
                                 }
                             }
+                            // Only offered when the shelf is actually full —
+                            // a nine-row Trending has nothing more to show,
+                            // and a "More" that returns the same nine reads
+                            // as a bug.
+                            if !expandedTrending && popular.count >= trendingPageSize {
+                                Button {
+                                    Task { await expandTrending() }
+                                } label: {
+                                    HStack {
+                                        Text("More")
+                                        if expandingTrending {
+                                            Spacer()
+                                            ProgressView()
+                                        }
+                                    }
+                                }
+                                .disabled(expandingTrending)
+                            }
                         }
                     }
                     // Attribution required by the TMDB API terms; OMDb credited
@@ -217,6 +247,8 @@ struct HomeView: View {
                     GroupDetailView(groupId: id)
                 case .calendar:
                     if let me = myMember { CalendarView(member: me) }
+                case .favoriteActors:
+                    FavoriteActorsView()
                 case .adminReporting:
                     ReportingView()
                 case .adminMembers:
@@ -487,6 +519,19 @@ struct HomeView: View {
         }
     }
 
+    // The server's own default page. Kept here so the "More" button's
+    // appearance and the fetch agree on what "a full shelf" means.
+    private let trendingPageSize = 10
+    private let trendingMaxSize = 50
+
+    private func expandTrending() async {
+        expandingTrending = true
+        defer { expandingTrending = false }
+        guard let more = try? await API.popular(limit: trendingMaxSize) else { return }
+        popular = more
+        expandedTrending = true
+    }
+
     private func load() async {
         loading = true
         defer { loading = false }
@@ -503,7 +548,12 @@ struct HomeView: View {
             if la != lb { return la > lb }
             return $0.activeCount > $1.activeCount
         }
+        // A refresh while expanded refetches the expanded page, so pulling
+        // down doesn't silently drop the member back to ten rows.
         popular = pr ?? popular
+        if expandedTrending, let more = try? await API.popular(limit: trendingMaxSize) {
+            popular = more
+        }
         session.backlogCount = auth.isLoggedIn ? ((try? await API.rateBacklogCount()) ?? 0) : 0
         if let link = pendingLink {
             pendingLink = nil
@@ -579,6 +629,9 @@ enum Route: Hashable {
     // push by value: a Button inside a Menu can append to the path, while a
     // NavigationLink inside a Menu doesn't push at all.
     case calendar
+    // Derived from the member's own library, so it needs no argument — the
+    // session decides whose actors these are.
+    case favoriteActors
     case adminReporting
     case adminMembers
     case adminUrlCleanup

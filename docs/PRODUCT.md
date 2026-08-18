@@ -101,9 +101,40 @@ The member roster and Trending are public, but browsing a member's lists require
 The landing page (`/`) shows:
 
 1. **My Shows link** — appears for logged-in members, jumps to their own page. Logged-out visitors instead get a join-pitch card explaining what an account adds, under **one** button reading "Log in or sign up". One, not a "Create your free account" / "Already a member?" pair: both opened the same sheet, and the sheet is identifier-first — it works out whether you're new or returning from what you type. Two buttons to one destination only asked people to classify themselves before anything had happened. The button's label matches the sheet's own title on purpose, so a returning member taps it and lands on a screen that says the same words.
-2. **Trending** — top 10 shows by how many members added them in the last 30 days. Tap + to add to your own list. Seed-only members are excluded from this calculation.
+2. **Trending** — top shows by how many members added them in the last 30 days, ten at a time with a **More** button that expands to 50. Tap + to add to your own list. Seed-only members are excluded from this calculation, and so is **Next Up**: only Watching, Awaiting and Loved adds count, because bookmarking a show is not yet a statement that anybody is watching it. Group Trending uses the same rule and the same expansion.
 3. **Members** — the six members with the longest Watching lists are featured at the top (Awaiting count is the tiebreaker). A "Browse all members ▾" disclosure underneath reveals the rest of the roster, alphabetized, so anyone is reachable. The point of the featured row is to lead with members who actually have something on their list worth looking at.
 4. **Search all libraries** — opens a modal that searches every active show across every member by title or actor. Each result shows the owning member and the list it's on; logged-in users can tap + to add to their own list.
+
+## Favorite Actors
+
+A list of the people who keep turning up across your **Watching, Awaiting and
+Loved** lists, most-seen first, capped at ten. Each row names the actor, says
+how many of your shows they're in, lists those titles, and links out to their
+IMDB page for everything else they've been in.
+
+**Nothing here is curated.** There is no "favourite" flag and no way to add
+one: the signal is already in the library, and a second list to maintain would
+only decay. That also means the page needs no onboarding — a thin library gets
+a short list, which is honest. Next Up is excluded for the same reason Trending
+excludes it.
+
+Two credits for the same person are one person: enrichment stores a TMDB person
+id per actor, and credits predating it fall back to the name. A credit with no
+IMDB id still counts — the row renders without a link rather than disappearing
+and quietly changing the count.
+
+**Platforms:** iPhone and iPad, and Mac via Catalyst (it gets the iPad sidebar
+entry). **Apple TV doesn't** — it's view-only and has no per-member reads of
+this kind. **The watch doesn't** — it's read-only and a list of links out to a
+browser is useless on a wrist. **The web doesn't** — it's frozen at its
+restored state (see [Web app status](#web-app-status)).
+
+Owner-only: the endpoint reads the session's own member and takes no `?member=`
+parameter. This aggregates a whole library into a sharper picture of taste than
+the list titles a group-mate can already browse, so it does not follow the
+group-scoped tier that Vibe and Also watching use.
+
+Idea from Nico.
 
 ## Member page (`/<slug>`)
 

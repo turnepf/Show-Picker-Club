@@ -164,6 +164,21 @@ doesn't store. The client half — an empty or junk payload must not empty the
 picker — is `NetworkCatalogTests` in `ShowPickerCore`.
 
 ```bash
+node scripts/favorite-actors-test.mjs
+```
+
+`/api/favorite-actors` and the list rule both Trending queries share. The
+endpoint is **owner-only** — it aggregates a whole library into a sharper
+picture of taste than the list titles a group-mate can already read, so a
+session gets its own actors and `?member=` is ignored rather than honoured.
+Also pins that a person is counted once per *title* (the same show on two
+lists is one credit), that a TMDB id and a bare name for the same person
+collapse into one row, and that a credit with no `imdb_id` still counts
+instead of vanishing. On the Trending side: Next Up never feeds the ranking
+(`_shared/trending-lists.js`), and `?limit=` pages, caps at 50 and falls back
+to 10 on junk.
+
+```bash
 node scripts/auth-code-flow-test.mjs
 ```
 

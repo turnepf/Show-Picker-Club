@@ -15,7 +15,37 @@ first two or three lines before "more", so the most useful change goes first.
 
 ---
 
-## Unreleased — next App Store update
+## Unreleased — the update after 1.3
+
+Nothing here is in 1.3 (build 22). Start the next What's New from this section.
+
+```
+Trending shows more than ten now. Tap More at the bottom of the list.
+
+Trending also counts the right things: a show only counts if someone is
+watching it, awaiting it, or loved it. Titles parked on Next Up were
+padding the list without anybody having started them.
+
+New: Favorite Actors, on Home. The people who keep turning up across your
+Watching, Awaiting and Loved lists, with the shows that put them there and
+a link to everything else they've been in.
+
+Nothing to set up — it reads your own lists. iPhone and iPad.
+```
+
+### What this covers
+
+- Trending expands from 10 to 50 behind a **More** button, on iPhone Home and
+  the iPad detail column (#TBD). `?limit=` on `/api/popular` and group Trending.
+- Both Trending queries now count Watching/Awaiting/Loved only, never Next Up —
+  the shared rule lives in `_shared/trending-lists.js`. Sarah asked for longer
+  lists; the list rule is what makes the extra rows worth reading.
+- **Favorite Actors** (Nico's idea) — derived top-ten actors from the member's
+  own lists, with IMDB links. iPhone/iPad/Mac; not tvOS, watch or web.
+
+---
+
+## 1.3 (build 22) — uploaded 2026-08-18, not yet submitted
 
 Covers everything merged since **1.2 / build 20**, the build on the Store.
 Applies to iPhone, iPad and Mac, plus a round of Apple TV fixes and a much
