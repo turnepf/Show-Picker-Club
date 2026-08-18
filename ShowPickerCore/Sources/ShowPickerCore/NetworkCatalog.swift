@@ -112,9 +112,13 @@ public struct NetworkCatalog: Codable, Equatable, Sendable {
     /// The list as it stood when this build shipped, for a first launch with no
     /// signal. Kept flat and name-only — `display` defaults to the stored name,
     /// which is what the picker draws anyway.
+    ///
+    /// Alphabetical within each section, case-insensitively, matching the order
+    /// `networkCatalog()` serves — so the picker doesn't visibly reshuffle the
+    /// moment the first fetch lands.
     public static let bundled = NetworkCatalog(networks: [
         // United States (the unlabelled first group).
-        NetworkOption("AMC+"), NetworkOption("Amazon Prime Video"),
+        NetworkOption("Amazon Prime Video"), NetworkOption("AMC+"),
         NetworkOption("Apple TV+"), NetworkOption("BritBox"),
         NetworkOption("Disney+"), NetworkOption("Food Network"),
         NetworkOption("Fox"), NetworkOption("HBO Max"),
@@ -140,8 +144,8 @@ public struct NetworkCatalog: Codable, Equatable, Sendable {
         NetworkOption("Stan", section: "Australia"),
         // Storefronts.
         NetworkOption("Apple TV Store", section: "Rent or buy", storefront: true),
-        NetworkOption("Fandango at Home", section: "Rent or buy", storefront: true),
         NetworkOption("Fandango", section: "Rent or buy", storefront: true),
+        NetworkOption("Fandango at Home", section: "Rent or buy", storefront: true),
     ])
 }
 

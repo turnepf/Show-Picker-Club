@@ -141,8 +141,8 @@ Bringing over a list you keep somewhere else is much easier now.
 
 The network list has grown: PBS, Pluto TV, and the British and Australian
 services — BBC iPlayer, ITVX, Channel 4, Channel 5, NOW, Stan, Binge,
-Foxtel, ABC iview, SBS On Demand, 9Now, 7plus and 10 play. The free ones
-sit at $0 in the Subscription Audit — no bill to cut.
+Foxtel, ABC iview, SBS On Demand, 9Now, 7plus and 10 play. It's in
+alphabetical order now, and the free ones sit at $0 in the audit.
 ```
 
 ```

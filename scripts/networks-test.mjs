@@ -192,6 +192,18 @@ console.log('\n== the catalog the apps fetch');
   check('no entry carries a region with no section title', strays.length === 0, strays.join(', '));
 
   check('every entry has a display string', catalog.networks.every(n => n.display && n.stored));
+
+  // Order inside a section is alphabetical rather than however NETWORKS
+  // happens to be arranged, so appending a service to the array can't drop it
+  // in the middle of a member's picker. Case-insensitive on the label a client
+  // draws: "Amazon Prime Video" before "AMC+", where a member looks for it.
+  const unsorted = [];
+  for (const section of new Set(catalog.networks.map(n => n.section))) {
+    const labels = catalog.networks.filter(n => n.section === section).map(n => n.display.toLowerCase());
+    const sorted = [...labels].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    if (labels.join('|') !== sorted.join('|')) unsorted.push(section === null ? '(unlabelled)' : section);
+  }
+  check('each section is alphabetical', unsorted.length === 0, unsorted.join(', '));
   check('the version changes with the list',
         networkCatalog().version === catalog.version &&
         catalogVersionOf([...catalog.networks].reverse()) !== catalog.version);

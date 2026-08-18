@@ -348,6 +348,9 @@ export const NETWORKS = [
 // string as the header, so a region added later needs no app release either.
 // Regions are emitted in this order, storefronts last regardless of where they
 // sit in NETWORKS — grouping can't depend on somebody keeping the array tidy.
+// Within a section the rows are sorted alphabetically, for the same reason:
+// where an entry sits in the NETWORKS array decides nothing a member sees, so
+// a new service can be appended wherever it reads best in the source.
 const REGION_SECTIONS = [
   // `null` is the unlabelled first group: the services most of the club uses,
   // which shouldn't wear a "United States" header nobody needs.
@@ -358,24 +361,42 @@ const REGION_SECTIONS = [
 
 const STOREFRONT_SECTION = 'Rent or buy';
 
+// Alphabetical, case-insensitively: "Amazon Prime Video" comes before "AMC+"
+// rather than after it, which is where a raw codepoint sort ('M' < 'm') puts
+// it and not where anyone looks for it. Sorted on `display`, the label the web
+// <select> draws; the iOS menu draws `stored`, and every display string starts
+// with its stored name except "Apple TV Store" (whose storefront neighbours
+// sort the same either way), so both surfaces read alphabetically. The tie
+// break on `stored` keeps the order — and the version hashed from it — stable.
+function byLabel(a, b) {
+  const al = a.display.toLowerCase(), bl = b.display.toLowerCase();
+  if (al !== bl) return al < bl ? -1 : 1;
+  return a.stored < b.stored ? -1 : a.stored > b.stored ? 1 : 0;
+}
+
 export function networkCatalog() {
   const subscriptions = NETWORKS.filter(n => n.kind !== 'storefront');
   const networks = [];
+  const row = (n, section, storefront) =>
+    ({ stored: n.stored, display: n.display, section, storefront });
   for (const { region, section } of REGION_SECTIONS) {
-    for (const n of subscriptions.filter(n => (n.region || 'us') === region)) {
-      networks.push({ stored: n.stored, display: n.display, section, storefront: false });
-    }
+    networks.push(...subscriptions
+      .filter(n => (n.region || 'us') === region)
+      .map(n => row(n, section, false))
+      .sort(byLabel));
   }
   // A region added to an entry but not to REGION_SECTIONS would otherwise
   // vanish from every picker silently. Emit it under its own raw key instead —
-  // ugly beats missing, and networks-test.mjs fails on it.
-  for (const n of subscriptions) {
-    if (networks.some(x => x.stored === n.stored)) continue;
-    networks.push({ stored: n.stored, display: n.display, section: n.region, storefront: false });
-  }
-  for (const n of NETWORKS.filter(n => n.kind === 'storefront')) {
-    networks.push({ stored: n.stored, display: n.display, section: STOREFRONT_SECTION, storefront: true });
-  }
+  // ugly beats missing, and networks-test.mjs fails on it. Sorted by section
+  // first so each stray region still arrives as one consecutive run.
+  networks.push(...subscriptions
+    .filter(n => !networks.some(x => x.stored === n.stored))
+    .map(n => row(n, n.region, false))
+    .sort((a, b) => (a.section < b.section ? -1 : a.section > b.section ? 1 : byLabel(a, b))));
+  networks.push(...NETWORKS
+    .filter(n => n.kind === 'storefront')
+    .map(n => row(n, STOREFRONT_SECTION, true))
+    .sort(byLabel));
   return { version: catalogVersion(networks), networks };
 }
 
