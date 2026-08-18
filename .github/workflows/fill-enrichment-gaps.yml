@@ -1,0 +1,77 @@
+name: Fill enrichment gaps (missing cast and episodes)
+
+# One-time repair, run from the Actions tab. Deliberately NOT a button in the
+# app: draining this backlog is done once, and a permanent control for a
+# one-time job is clutter that outlives its reason.
+#
+# What it repairs. The rate-limit bug fixed in #345 turned a TMDB 429 into
+# "no such title", and the caller then did the right thing for a hopeless
+# title: stamped enriched_at on every copy and moved on. So the damaged rows
+# are marked DONE with no cast and no episode count, carrying a FRESH
+# timestamp — and because the ordinary queue is oldest-first, they sit at the
+# very BACK. A normal enrichment run retries the whole library before reaching
+# them. `mode: gaps` selects on missing data instead of age, which is the only
+# ordering that finds them.
+#
+# Safe to re-run: it's idempotent, and once the backlog is clear it reports
+# nothing to do. Start with dry_run to see the size of the problem.
+#
+# Auth: scripts/fill-enrichment-gaps.mjs sends X-Cron-Secret, which
+# /api/enrich accepts in place of a member session.
+#
+# Required repo secret (must equal the Pages CRON_SECRET):
+#   CRON_SECRET — Settings → Secrets and variables → Actions.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Report the outstanding count and enrich nothing.'
+        type: boolean
+        required: false
+        default: true
+      max_rounds:
+        description: 'Round ceiling, so a bad run cannot spin forever.'
+        required: false
+        default: '60'
+      max_tmdb:
+        description: 'Titles per round. Lower is gentler on TMDB.'
+        required: false
+        default: '20'
+      sleep_seconds:
+        description: 'Pause between rounds, in seconds.'
+        required: false
+        default: '4'
+
+jobs:
+  fill:
+    runs-on: ubuntu-latest
+    # Many small rounds with a real pause between them is slow in wall-clock
+    # even though it asks less of TMDB per minute — which is the trade this
+    # job wants, given hammering TMDB is what caused the damage.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # node:sqlite isn't needed here, but the repo's scripts assume a modern
+      # Node and this one uses top-level await.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Fill the gaps
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repo secret is not set"
+            exit 1
+          fi
+          ARGS="--max-rounds ${{ github.event.inputs.max_rounds || '60' }}"
+          ARGS="$ARGS --max-tmdb ${{ github.event.inputs.max_tmdb || '20' }}"
+          ARGS="$ARGS --sleep ${{ github.event.inputs.sleep_seconds || '4' }}"
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          echo "Running: node scripts/fill-enrichment-gaps.mjs $ARGS"
+          node scripts/fill-enrichment-gaps.mjs $ARGS

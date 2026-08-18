@@ -164,6 +164,20 @@ doesn't store. The client half — an empty or junk payload must not empty the
 picker — is `NetworkCatalogTests` in `ShowPickerCore`.
 
 ```bash
+CRON_SECRET=… node scripts/fill-enrichment-gaps.mjs --dry-run
+```
+
+Counts the titles holding no cast or no episode data, and enriches nothing.
+Drop `--dry-run` to fill them. Needed because the 2026-08-11 rate-limit bug
+stamped `enriched_at` on rows it *failed* to enrich, so they look done and
+sit at the back of the oldest-first queue — `{mode:'gaps'}` selects on missing
+data instead of age. Nothing schedules this; it's an operator tool for
+draining that backlog once, and the Actions tab → **Fill enrichment gaps** is
+the same thing with the secret already wired up (dry run by default). One-time
+repairs live in Actions rather than the admin screens on purpose — a permanent
+control for a job done once is clutter that outlives its reason.
+
+```bash
 node scripts/favorite-actors-test.mjs
 ```
 

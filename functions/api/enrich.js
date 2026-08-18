@@ -176,6 +176,16 @@ export async function onRequestPost(context) {
   // is kept as an alias now that OMDB is gone — it still selects posters-only.)
   const skipOmdb = body.skip_omdb === true || body.mode === 'posters';
   const skipActors = body.skip_actors === true || body.mode === 'posters';
+  // `mode: 'gaps'` targets rows that are marked enriched but hold no data —
+  // the wreckage of the rate-limit bug this file's tmdbGet comment describes.
+  // Those rows carry a FRESH enriched_at (the no-match path stamped them), so
+  // the ordinary oldest-first rotation sends them to the back and a plain
+  // re-run retries the whole library before reaching them. Selecting on the
+  // absence of data instead of on age is the only thing that finds them.
+  //
+  // It also reports `remaining`, so a caller can drive it to zero rather than
+  // guessing when the library is whole.
+  const gapsOnly = body.mode === 'gaps';
   // Optional: restrict the TMDB passes to a specific set of titles (e.g. the
   // Trending shelf), so we can prioritise the most-visible shows first.
   const titles = Array.isArray(body.titles) && body.titles.length
@@ -217,9 +227,20 @@ export async function onRequestPost(context) {
     // on shows that already have a poster (the sync above just filled every
     // row a sibling could cover — poster_url NULL now means no copy has one),
     // and take one row per title since the fetch propagates to all copies.
+    // A series with no cast row, or with no episode count, is a series the
+    // no-match path burned — both come from the same detail fetch, so one
+    // predicate catches both halves of the damage. One row per title, since
+    // the fetch propagates to every copy.
+    const TV_GAP = `(NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id)
+                     OR episodes_released IS NULL)`;
     const tvSelect = skipOmdb
       ? `SELECT id, title, movie, list, network_url FROM shows
           WHERE ${tvWhere} AND poster_url IS NULL
+          GROUP BY LOWER(title)
+          ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
+      : gapsOnly
+      ? `SELECT id, title, movie, list, network_url FROM shows
+          WHERE ${tvWhere} AND ${TV_GAP}
           GROUP BY LOWER(title)
           ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
       : `SELECT id, title, movie, list, network_url FROM shows
@@ -384,7 +405,12 @@ export async function onRequestPost(context) {
   // touches movies that still lack a poster; stamps enriched_at either way so
   // titles TMDB can't find rotate to the back instead of blocking the queue.
   if (hasTmdb) {
-    let mvWhere = `archived = 0 AND movie = 1 AND poster_url IS NULL`;
+    // Normally this pass is a poster top-up. In gaps mode it's the cast that
+    // matters, so a film with artwork but no cast still qualifies.
+    let mvWhere = gapsOnly
+      ? `archived = 0 AND movie = 1
+         AND NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id)`
+      : `archived = 0 AND movie = 1 AND poster_url IS NULL`;
     const mvBinds = [];
     if (member) { mvWhere += ` AND member_slug = ?`; mvBinds.push(member); }
     if (titles) { mvWhere += ` AND LOWER(title) IN (${titles.map(() => '?').join(',')})`; mvBinds.push(...titles); }
@@ -529,12 +555,31 @@ export async function onRequestPost(context) {
     }
   }
 
+  // How many titles still hold no data. Counted DISTINCT by title to match
+  // what the passes above consume (one fetch per title, propagated to copies),
+  // so a caller looping until this hits zero is counting the same units it is
+  // working through. Only computed in gaps mode — it's two extra scans.
+  let remaining = null;
+  if (gapsOnly) {
+    const row = await env.DB.prepare(
+      `SELECT
+         (SELECT COUNT(DISTINCT LOWER(title)) FROM shows
+           WHERE archived = 0 AND movie = 0
+             AND (NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id)
+                  OR episodes_released IS NULL)) AS tv,
+         (SELECT COUNT(DISTINCT LOWER(title)) FROM shows
+           WHERE archived = 0 AND movie = 1
+             AND NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id)) AS movies`
+    ).first().catch(() => null);
+    remaining = row ? { tv: row.tv, movies: row.movies, total: row.tv + row.movies } : null;
+  }
+
   // tvCandidates/movieCandidates say whether a zero means "nothing to do" or
   // "nothing worked" — the two used to be indistinguishable from outside.
   return new Response(JSON.stringify({
     enriched, tmdbUpdated, actorImdbFilled, actorIdsFromCache,
     tvCandidates, movieCandidates, tvErrors, movieErrors, lastError,
-    budgetExhausted, subrequests: spent,
+    budgetExhausted, subrequests: spent, remaining,
   }), {
     headers: { 'Content-Type': 'application/json' },
   });

@@ -298,6 +298,21 @@ The complete map:
 | `GET/POST /auth/logout`                | `functions/auth/logout.js`                 | GET, POST | none (POST is canonical; GET kept for shipped app builds) |
 | `GET /api/members`                     | `functions/api/members.js`                 | GET     | none (full names + calendar tokens only with a session) |
 | `GET /api/popular`                     | `functions/api/popular.js`                 | GET     | none — `?limit=` (1–50, default 10) is the "More" expansion; ranks Watching/Awaiting/Loved adds only, never Next Up |
+**Filling the gaps left by the rate-limit bug.** `POST /api/enrich` with
+`{mode:'gaps'}` selects rows on the *absence of data* — no `actors` row, or a
+series with no `episodes_released` — rather than on age, and reports
+`remaining` so a caller can drive it to zero. This is the only ordering that
+finds them: the no-match path stamped `enriched_at` on rows it failed to
+enrich, so the damaged rows carry a *fresh* timestamp and the ordinary
+oldest-first rotation sends them to the back, where a plain re-run reaches them
+last. `scripts/fill-enrichment-gaps.mjs` is the runner — it loops until
+`remaining.total` is 0, sleeps between rounds, and stops after three rounds
+that attempt work and change nothing (what's left then is a genuine TMDB
+no-match, not damage). `--dry-run` reports the count and enriches nothing. **Actions → "Fill
+enrichment gaps"** runs that script with the repo's `CRON_SECRET` and defaults
+to a dry run, which is where this is meant to be driven from: the backlog is
+drained once, so it deliberately has no button in the app.
+
 | `GET /api/favorite-actors`             | `functions/api/favorite-actors.js`         | GET     | session — the caller's OWN library only; takes no `?member=` |
 | `GET /api/networks`                    | `functions/api/networks.js`                | GET     | none — the network picker the apps fetch instead of hardcoding; constant table, no member data, edge-cached 1h |
 | `GET /api/activity`                    | `functions/api/activity.js`                | GET     | session — `?member=<slug>` scopes it to one person, `?limit=` (1–50, default 10) |
