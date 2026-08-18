@@ -175,7 +175,10 @@ data instead of age. Nothing schedules this; it's an operator tool for
 draining that backlog once, and the Actions tab → **Fill enrichment gaps** is
 the same thing with the secret already wired up (dry run by default). One-time
 repairs live in Actions rather than the admin screens on purpose — a permanent
-control for a job done once is clutter that outlives its reason.
+control for a job done once is clutter that outlives its reason. **Re-check
+Apple TV+ rentals** is the other one (`scripts/reclassify-storefronts.mjs`),
+draining the storefront rows that predate #337; its admin button was removed
+when it moved.
 
 ```bash
 node scripts/favorite-actors-test.mjs

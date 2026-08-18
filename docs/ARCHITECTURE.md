@@ -810,6 +810,22 @@ Two traps this exists to avoid, both of which had already happened:
 
 `storefrontFromUrl(url)` maps a link to its storefront and is deliberately separate from `networkFromUrl()`: `tv.apple.com` resolves to the Apple TV+ *subscription* there and to the Apple *storefront* here. `reclassify_storefronts` uses it so a row's new label agrees with the link already sitting on it — without it, TMDB's own rent/buy ordering put Apple-linked rows on Fandango at Home.
 
+**Repairing the rows that predate the fix.** #337 corrected classification at
+insert time, so new rows are right — and repaired nothing already stored.
+Nothing else will either: `/api/enrich`'s rotation never touches storefront
+classification, so without a deliberate pass the legacy backlog stays wrong
+forever. **Actions → "Re-check Apple TV+ rentals"** runs
+`scripts/reclassify-storefronts.mjs` against `reclassify_storefronts` until
+`remaining` is zero (dry run by default). It lives in Actions rather than the
+admin screens because it drains a backlog *once*; the button it replaced was
+permanent UI for a one-time job.
+
+That action is also the one thing on `/api/admin-url-cleanup` that accepts
+`X-Cron-Secret` in place of an admin session, because it only re-derives a
+network from what TMDB says and is idempotent. `dismiss`, `save`,
+`resolve_conflict` and the rest stay admin-session-only, so a leaked cron
+secret cannot dismiss a title out of the queue or overwrite a link.
+
 `canonicalNetwork(name)` (from the same module) returns the canonical `stored` for any alias-or-stored name (case-insensitive). `POST /api/shows` and `PUT /api/shows/[id]` both run incoming `network` values through it so an alias submitted via API or pasted in the "other" field still ends up consistent in the DB.
 
 **Default prices are US cents, and that bounds what can be priced.** `DEFAULT_PRICE_CENTS` seeds the Subscription Audit, which sums one currency. Free-to-air catch-up (BBC iPlayer, ITVX, Channel 4, Channel 5, ABC iview, SBS On Demand, 9Now, 7plus, 10 play) is `0` — the one figure that survives being quoted in dollars, and `0` means "we know it's free" where absent means "nobody has priced this". The paid non-US services (NOW, Stan, Binge, Foxtel) are deliberately **absent**: converting a pound or an Australian dollar into the total would be wrong twice, wrong rate and wrong currency, so those arrive unpriced and the member enters what they actually pay.

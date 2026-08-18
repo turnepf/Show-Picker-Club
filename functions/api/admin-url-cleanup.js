@@ -1,6 +1,7 @@
 import { canonicalNetwork, networkFromUrl, storefrontFromUrl } from '../_shared/networks.js';
 import { extractUrl, safeNetworkUrl } from '../_shared/url-utils.js';
 import { isAdmin } from '../_shared/admin.js';
+import { cronAuthorized } from '../_shared/secrets.js';
 import { fetchEnrichment, fetchAvailability } from '../_shared/enrichment.js';
 import { renameShowCopies } from '../_shared/title-fix.js';
 
@@ -451,10 +452,6 @@ async function fetchNetworks(env) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  if (!(await isAdmin(request, env))) {
-    return json({ error: 'Forbidden' }, 403);
-  }
-
   let body;
   try {
     body = await request.json();
@@ -463,6 +460,20 @@ export async function onRequestPost(context) {
   }
 
   const action = body.action || 'list';
+
+  // Admin session, or — for the storefront reclassification alone — a matching
+  // X-Cron-Secret, so the one-off Actions workflow can drive it without a
+  // session. The narrowness is the point: that action only re-derives a
+  // network from what TMDB says about a title, and is idempotent. Every other
+  // action here writes something an operator has to be trusted with —
+  // dismissing a title out of the queue, overwriting a link, resolving a
+  // mismatch — and stays admin-session-only, so a leaked cron secret cannot
+  // reach them.
+  const cronOk = action === 'reclassify_storefronts'
+    && await cronAuthorized(request, env);
+  if (!cronOk && !(await isAdmin(request, env))) {
+    return json({ error: 'Forbidden' }, 403);
+  }
   await env.DB.prepare(CREATE_IGNORES_TABLE).run();
 
   if (action === 'dismiss') {

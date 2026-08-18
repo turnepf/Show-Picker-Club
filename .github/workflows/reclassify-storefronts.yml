@@ -1,0 +1,80 @@
+name: Re-check Apple TV+ rentals (storefront reclassification)
+
+# One-time repair, run from the Actions tab. Deliberately NOT a button in the
+# app: this drains a legacy backlog once, and a permanent admin control for a
+# job done once is clutter that outlives its reason.
+#
+# What it repairs. tv.apple.com serves Apple TV+ originals and $3.99 rentals
+# from the same URL shape, so before #337 every pasted Apple link landed on
+# "Apple TV+" — telling the Subscription Audit a member had to keep paying
+# Apple every month for what was actually a one-off rental.
+#
+# #337 fixed classification at insert time, so new rows are right. It repaired
+# nothing already stored, and nothing else will: /api/enrich's rotation never
+# touches storefront classification. Without this workflow the legacy backlog
+# stays wrong forever.
+#
+# Links are left alone. A tv.apple.com URL on a rental is correct — it was the
+# carrier that was wrong.
+#
+# Auth: sends X-Cron-Secret. /api/admin-url-cleanup accepts that in place of an
+# admin session for THIS ACTION ONLY — it re-derives a network from TMDB and is
+# idempotent. Dismissing titles, overwriting links and resolving mismatches all
+# remain admin-session-only, so the secret can't reach them.
+#
+# Required repo secret (must equal the Pages CRON_SECRET):
+#   CRON_SECRET — Settings → Secrets and variables → Actions.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Report the outstanding count and change nothing.'
+        type: boolean
+        required: false
+        default: true
+      network:
+        description: 'Carrier to re-check. Apple TV+ is the one this was built for.'
+        required: false
+        default: 'Apple TV+'
+      max_rounds:
+        description: 'Round ceiling, so a bad run cannot spin forever.'
+        required: false
+        default: '40'
+      max_titles:
+        description: 'Titles per round. Each costs one TMDB request.'
+        required: false
+        default: '40'
+      sleep_seconds:
+        description: 'Pause between rounds, in seconds.'
+        required: false
+        default: '3'
+
+jobs:
+  reclassify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Re-check storefront rows
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repo secret is not set"
+            exit 1
+          fi
+          ARGS="--network '${{ github.event.inputs.network || 'Apple TV+' }}'"
+          ARGS="$ARGS --max-rounds ${{ github.event.inputs.max_rounds || '40' }}"
+          ARGS="$ARGS --max-titles ${{ github.event.inputs.max_titles || '40' }}"
+          ARGS="$ARGS --sleep ${{ github.event.inputs.sleep_seconds || '3' }}"
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          echo "Running: node scripts/reclassify-storefronts.mjs $ARGS"
+          eval "node scripts/reclassify-storefronts.mjs $ARGS"

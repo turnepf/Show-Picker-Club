@@ -358,16 +358,6 @@ enum API {
         return try JSONDecoder().decode(T.self, from: data)
     }
 
-    // Ask TMDB which titles labeled as a subscription service are really
-    // rent/buy, and move those off it. One batch per call; the response's
-    // `remaining` says whether to come back for more.
-    static func reclassifyStorefronts(network: String = "Apple TV+",
-                                      maxTitles: Int = 40) async throws -> StorefrontReclassifyResult {
-        try await postDecoding("/api/admin-url-cleanup",
-                               body: ["action": "reclassify_storefronts",
-                                      "network": network, "max_titles": maxTitles])
-    }
-
     // Resolve a conflict: set every active copy of a title to one network.
     static func resolveUrlConflict(title: String, network: String) async throws -> AdminActionResult {
         try await postDecoding("/api/admin-url-cleanup",
