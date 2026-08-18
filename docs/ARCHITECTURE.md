@@ -249,7 +249,10 @@ otherwise; only the creator can delete.
   Awaiting and Loved, never Next Up. Both queries import it rather than
   spelling the list out, because two copies of this rule is exactly the thing
   that drifts. Next Up used to count, which let a title nobody had started
-  trend on bookmarks alone. Pinned by `scripts/favorite-actors-test.mjs`.
+  trend on bookmarks alone. Reported by Sarah against Group Trending, where it
+  is most visible — a small member set makes one person's bookmarks move the
+  ranking — but it was true of the club-wide query as well. Pinned by
+  `scripts/favorite-actors-test.mjs`.
 - **Joining is a link.** `POST /api/groups/[id]/invite` mints the token and the
   share URL (`/groups/join?token=…`); opening it signed in joins the group,
   signed out it previews the group name and asks for a login.

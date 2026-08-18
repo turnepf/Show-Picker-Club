@@ -6,6 +6,10 @@
 // people bookmarking it. Both Trending queries (club-wide and per-group) share
 // this so the two can't drift apart on what "trending" means.
 //
+// Sarah reported it against Group Trending, where a small member set makes one
+// person's bookmarks visibly move the ranking. Neither query had ever filtered
+// on list, so the club-wide one had the same bug, less legibly.
+//
 // These are the stored list keys; ShowPickerCore.ShowList maps them to the
 // display names Watching / Awaiting / Loved / Next Up.
 export const TRENDING_LISTS = ['watching', 'waiting', 'recommending'];

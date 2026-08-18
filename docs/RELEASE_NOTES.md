@@ -41,8 +41,11 @@ handy once Next Up has grown past the point of reading it all.
 - Trending expands from 10 to 50 behind a **More** button, on iPhone Home and
   the iPad detail column (#TBD). `?limit=` on `/api/popular` and group Trending.
 - Both Trending queries now count Watching/Awaiting/Loved only, never Next Up —
-  the shared rule lives in `_shared/trending-lists.js`. Sarah asked for longer
-  lists; the list rule is what makes the extra rows worth reading.
+  the shared rule lives in `_shared/trending-lists.js`. **Sarah spotted this on
+  Group Trending**, and it turned out to be true of club Trending too: neither
+  query filtered on list at all. It's also what makes her longer lists worth
+  reading, since expanding to 50 would otherwise just surface more of the
+  maybe-pile.
 - **Favorite Actors** (Nico's idea) — derived top-ten actors from the member's
   own lists, with IMDB links. iPhone/iPad/Mac; not tvOS, watch or web.
 - **Genre filter on Next Up** (Liza's idea) — options built from the list's own
