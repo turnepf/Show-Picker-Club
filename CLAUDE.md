@@ -190,8 +190,11 @@ picture of taste than the list titles a group-mate can already read, so a
 session gets its own actors and `?member=` is ignored rather than honoured.
 Also pins that a person is counted once per *title* (the same show on two
 lists is one credit), that a TMDB id and a bare name for the same person
-collapse into one row, and that a credit with no `imdb_id` still counts
-instead of vanishing. On the Trending side: Next Up never feeds the ranking
+collapse into one row — including a legacy name-only credit resolving through
+the member's own library or the `people` bank, the split that once halved real
+counts — that a credit with no `imdb_id` still counts instead of vanishing,
+and that `show_cards` carries the member's own copies (one per title, with id,
+network, rating, poster) alongside the legacy bare-title `shows` array. On the Trending side: Next Up never feeds the ranking
 (`_shared/trending-lists.js`), and `?limit=` pages, caps at 50 and falls back
 to 10 on junk.
 

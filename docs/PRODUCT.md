@@ -109,8 +109,11 @@ The landing page (`/`) shows:
 
 A list of the people who keep turning up across your **Watching, Awaiting and
 Loved** lists, most-seen first, capped at ten. Each row names the actor, says
-how many of your shows they're in, lists those titles, and links out to their
-IMDB page for everything else they've been in.
+how many of your shows they're in, and links out to their IMDB page for
+everything else they've been in. Under the name, the shows that put them there
+draw as **standard show rows** — poster, network, rating — and tapping one
+opens the same show card every other screen opens; they're the member's own
+copies, just reached via the person.
 
 **Nothing here is curated.** There is no "favourite" flag and no way to add
 one: the signal is already in the library, and a second list to maintain would
@@ -119,9 +122,13 @@ a short list, which is honest. Next Up is excluded for the same reason Trending
 excludes it.
 
 Two credits for the same person are one person: enrichment stores a TMDB person
-id per actor, and credits predating it fall back to the name. A credit with no
-IMDB id still counts — the row renders without a link rather than disappearing
-and quietly changing the count.
+id per actor, and a credit predating it (a bare name) resolves to the id the
+member's own library already knows for that name, then to the id the club-wide
+people bank knows, before falling back to the name itself. Without that
+resolution the same actor split into two half-counted rows — which is how a
+library full of favourites once rendered as a wall of "2 shows". A credit with
+no IMDB id still counts — the row renders without a link rather than
+disappearing and quietly changing the count.
 
 **Platforms:** iPhone and iPad, and Mac via Catalyst (it gets the iPad sidebar
 entry). **Apple TV doesn't** — it's view-only and has no per-member reads of

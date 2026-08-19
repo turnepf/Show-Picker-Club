@@ -79,6 +79,16 @@ extension VibePick: ShowRowDisplayable {
     }
 }
 
+// A favourite actor's show draws as an ordinary show row and pushes the same
+// card — it IS one of the member's own copies, just reached via the person.
+extension FavoriteActorShow: ShowRowDisplayable {
+    var rowTitle: String { title }
+    var rowPosterUrl: String? { posterUrl }
+    var rowNetwork: String? { network }
+    var rowRating: String? { rating }
+    var rowIsMovie: Bool { (movie ?? 0) == 1 }
+}
+
 extension RateBacklogShow: ShowRowDisplayable {
     var rowTitle: String { title }
     var rowPosterUrl: String? { posterUrl }

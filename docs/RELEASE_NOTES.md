@@ -27,8 +27,8 @@ watching it, awaiting it, or loved it. Titles parked on Next Up were
 padding the list without anybody having started them.
 
 New: Favorite Actors, on Home. The people who keep turning up across your
-Watching, Awaiting and Loved lists, with the shows that put them there and
-a link to everything else they've been in.
+Watching, Awaiting and Loved lists, with the shows that put them there —
+tap one to open it — and a link to everything else they've been in.
 
 Nothing to set up — it reads your own lists. iPhone and iPad.
 
@@ -50,7 +50,13 @@ instead of cramped rows, and tapping a poster opens that show.
   reading, since expanding to 50 would otherwise just surface more of the
   maybe-pile.
 - **Favorite Actors** (Nico's idea) — derived top-ten actors from the member's
-  own lists, with IMDB links. iPhone/iPad/Mac; not tvOS, watch or web.
+  own lists, with IMDB links. iPhone/iPad/Mac; not tvOS, watch or web. The
+  shows under each actor draw as standard show rows and open the show card
+  (`show_cards` on `/api/favorite-actors`; the bare-title `shows` array stays
+  for older clients). Counts no longer split one person in two when some
+  credits predate TMDB person ids — legacy name-only credits resolve through
+  the member's own library, then the `people` bank, before falling back to the
+  name (Patrick hit this as a wall of "2 shows").
 - **Genre filter on Next Up** (Liza's idea) — options built from the list's own
   genres intersected with TMDB's top-level set, so it never offers a dead
   filter. Ignored while reordering; names itself in the empty state.

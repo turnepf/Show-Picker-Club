@@ -178,6 +178,10 @@ struct FavoriteActor: Codable, Identifiable, Hashable {
     let tmdbPersonId: Int?
     let showCount: Int
     let shows: [String]
+    // The member's own copies behind the count — enough to draw the standard
+    // show row and push the show card. Optional so a payload without it (or a
+    // cached older one) still decodes; the view falls back to bare titles.
+    let showCards: [FavoriteActorShow]?
 
     // The server groups on tmdb_person_id when TMDB supplied one and the
     // lowercased name otherwise; the row identity has to match that, or two
@@ -196,6 +200,23 @@ struct FavoriteActor: Codable, Identifiable, Hashable {
         case imdbId = "imdb_id"
         case tmdbPersonId = "tmdb_person_id"
         case showCount = "show_count"
+        case showCards = "show_cards"
+    }
+}
+
+// One of those copies: the id opens the show card, the rest is what ShowRow
+// needs to look like every other show row in the app.
+struct FavoriteActorShow: Codable, Identifiable, Hashable {
+    let id: Int
+    let title: String
+    let network: String?
+    let rating: String?
+    let posterUrl: String?
+    let movie: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, network, rating, movie
+        case posterUrl = "poster_url"
     }
 }
 

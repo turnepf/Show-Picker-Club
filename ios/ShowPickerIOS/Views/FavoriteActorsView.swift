@@ -62,12 +62,28 @@ struct FavoriteActorsView: View {
             header(actor)
         }
 
-        // Why they're on the list. The count and the titles say the same thing,
-        // but the titles are the part that makes it feel true.
-        ForEach(actor.shows, id: \.self) { title in
-            Text(title)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        // Why they're on the list — the member's own copies, drawn as the
+        // standard show row and opening the same card every other screen
+        // opens. The count and the rows say the same thing, but the rows are
+        // the part that makes it feel true.
+        if let cards = actor.showCards, !cards.isEmpty {
+            ForEach(cards) { card in
+                NavigationLink {
+                    ShowDetailView(id: card.id, initialTitle: card.title,
+                                   initialNetwork: card.network, initialRating: card.rating,
+                                   initialPoster: card.posterUrl)
+                } label: {
+                    ShowRow(card)
+                }
+            }
+        } else {
+            // A payload without cards (older cached response) still names the
+            // titles rather than rendering an empty section.
+            ForEach(actor.shows, id: \.self) { title in
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

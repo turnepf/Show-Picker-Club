@@ -16,9 +16,17 @@
 //      the same show on two lists must not double-count its cast, or shuffling
 //      a show between lists would invent a favourite.
 //   4. The same person arriving under a TMDB id and under a bare name is one
-//      person, not two — credits predating actor ids fall back to the name.
+//      person, not two — credits predating migration 060 carry no
+//      tmdb_person_id, so a name-only credit resolves to the id the member's
+//      own library knows for that name, then to the club's `people` bank.
+//      Grouping on the raw row split every such person into two half-counted
+//      strangers, which is how a real library rendered as a wall of "2 shows".
 //   5. A credit with no imdb_id is still returned. The row renders without a
 //      link rather than vanishing, which is what keeps the count honest.
+//   6. Each actor carries `show_cards` — the member's own copies with id,
+//      network, rating and poster, so the client can draw its standard show
+//      row and push the show card. One card per distinct title, and the legacy
+//      `shows` title array stays byte-compatible for older clients.
 //
 // Plus the shared TRENDING_LISTS rule, which is now the one thing standing
 // between "the club is watching this" and "somebody bookmarked it".
@@ -73,16 +81,22 @@ function addSession(env, slug) {
   return id;
 }
 // created_at recent so the row also counts for Trending's 30-day window.
-function addShow(env, { slug, title, list = 'watching', archived = 0, addedBy = 'member' }) {
+function addShow(env, { slug, title, list = 'watching', archived = 0, addedBy = 'member',
+                        network = null, rating = null, posterUrl = null }) {
   env._db.prepare(
-    `INSERT INTO shows (title, list, member_slug, added_by, archived, created_at)
-     VALUES (?,?,?,?,?,?)`
-  ).run(title, list, slug, addedBy, archived, new Date().toISOString());
+    `INSERT INTO shows (title, list, member_slug, added_by, archived, created_at, network, rating, poster_url)
+     VALUES (?,?,?,?,?,?,?,?,?)`
+  ).run(title, list, slug, addedBy, archived, new Date().toISOString(), network, rating, posterUrl);
   return env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id;
 }
 function addActor(env, showId, { name, imdbId = null, personId = null, ord = 0 }) {
   env._db.prepare('INSERT INTO actors (show_id, name, imdb_id, tmdb_person_id, ord) VALUES (?,?,?,?,?)')
     .run(showId, name, imdbId, personId, ord);
+}
+// The club-wide bank of people enrichment has resolved (migration 060).
+function addPerson(env, { personId, name, imdbId = null }) {
+  env._db.prepare('INSERT INTO people (tmdb_person_id, name, name_lower, imdb_id) VALUES (?,?,?,?)')
+    .run(personId, name, name.toLowerCase(), imdbId);
 }
 
 const req = (path, session) => new Request(`${ORIGIN}${path}`, {
@@ -163,6 +177,22 @@ console.log('\n== counted per title, and per person');
   const c2 = addShow(env, { slug: 'patrick', title: 'Show B' });
   addActor(env, c2, { name: 'Jane Doe', personId: null });
 
+  // Same person split across a post-060 credit (with id) and a legacy
+  // name-only credit — nothing in `people`, so only the member's own library
+  // can make the link. This is the split that halved real counts.
+  const d1 = addShow(env, { slug: 'patrick', title: 'Show C' });
+  addActor(env, d1, { name: 'John Smith', personId: 77 });
+  const d2 = addShow(env, { slug: 'patrick', title: 'Show D' });
+  addActor(env, d2, { name: 'John Smith', personId: null });
+
+  // All-legacy credits whose name the club's people bank has since resolved:
+  // one person, and the banked id comes back on the row.
+  addPerson(env, { personId: 88, name: 'Maya Chen' });
+  for (const t of ['Show E', 'Show F']) {
+    const id = addShow(env, { slug: 'patrick', title: t });
+    addActor(env, id, { name: 'Maya Chen', personId: null });
+  }
+
   const { actors } = await body(await favoriteActors.onRequestGet({ env, request: req('/api/favorite-actors', s) }));
   const by = Object.fromEntries(actors.map(a => [a.name, a]));
   check('same title on two lists counts once', by['Adam Scott']?.show_count === 1,
@@ -171,9 +201,48 @@ console.log('\n== counted per title, and per person');
         `got ${by['Natasha Lyonne']?.show_count}`);
   check('name-only credits group into one person', by['Jane Doe']?.show_count === 2,
         `got ${by['Jane Doe']?.show_count}`);
+  check('an id credit and a legacy name credit are one person',
+        by['John Smith']?.show_count === 2, `got ${by['John Smith']?.show_count}`);
+  check('the merged person keeps the TMDB id', by['John Smith']?.tmdb_person_id === 77,
+        `got ${by['John Smith']?.tmdb_person_id}`);
+  check('legacy credits link through the people bank',
+        by['Maya Chen']?.show_count === 2 && by['Maya Chen']?.tmdb_person_id === 88,
+        `got ${by['Maya Chen']?.show_count} / ${by['Maya Chen']?.tmdb_person_id}`);
   check('ordered by show count, most first', actors[0].show_count >= actors[actors.length - 1].show_count);
   check('the titles behind the count come back',
         (by['Natasha Lyonne']?.shows || []).length === 2);
+  check('a merged person lists titles from both credit shapes',
+        (by['John Smith']?.shows || []).sort().join(',') === 'Show C,Show D',
+        (by['John Smith']?.shows || []).join(','));
+}
+
+console.log('\n== show_cards: the rows behind the titles');
+{
+  const env = makeEnv();
+  addMember(env, 'patrick');
+  const s = addSession(env, 'patrick');
+
+  const a1 = addShow(env, { slug: 'patrick', title: 'Severance', list: 'watching',
+                            network: 'Apple TV+', rating: '8.7', posterUrl: 'https://image.tmdb.org/t/p/w342/sev.jpg' });
+  addActor(env, a1, { name: 'Adam Scott', personId: 1 });
+  // The same title on a second list must not become a second card.
+  const a2 = addShow(env, { slug: 'patrick', title: 'Severance', list: 'recommending' });
+  addActor(env, a2, { name: 'Adam Scott', personId: 1 });
+  const b1 = addShow(env, { slug: 'patrick', title: 'Party Down' });
+  addActor(env, b1, { name: 'Adam Scott', personId: 1 });
+
+  const { actors } = await body(await favoriteActors.onRequestGet({ env, request: req('/api/favorite-actors', s) }));
+  const adam = actors.find(a => a.name === 'Adam Scott');
+  check('one card per distinct title', adam?.show_cards?.length === 2,
+        `got ${adam?.show_cards?.length}`);
+  const sev = (adam?.show_cards || []).find(c => c.title === 'Severance');
+  check('a card carries the member\'s own show id', sev && sev.id === a1);
+  check('a card carries network, rating and poster',
+        sev && sev.network === 'Apple TV+' && sev.rating === '8.7' && sev.poster_url?.includes('sev.jpg'));
+  check('a card with no artwork still comes back with nulls',
+        (adam?.show_cards || []).some(c => c.title === 'Party Down' && c.poster_url === null && c.network === null));
+  check('legacy `shows` titles mirror the cards',
+        adam && adam.shows.join(',') === adam.show_cards.map(c => c.title).join(','));
 }
 
 console.log('\n== a credit with no IMDB id still counts');
