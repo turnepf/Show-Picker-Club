@@ -34,6 +34,9 @@ Nothing to set up — it reads your own lists. iPhone and iPad.
 
 Next Up has a genre filter now. Tap the sort button and pick a genre —
 handy once Next Up has grown past the point of reading it all.
+
+The medium and large widgets are poster grids now — proper artwork
+instead of cramped rows, and tapping a poster opens that show.
 ```
 
 ### What this covers
@@ -52,6 +55,11 @@ handy once Next Up has grown past the point of reading it all.
   genres intersected with TMDB's top-level set, so it never offers a dead
   filter. Ignored while reordering; names itself in the empty state.
   iPhone/iPad/Mac.
+- **Medium/large widgets redesigned as poster grids** — Up Next and Trending
+  both drop the 38×57-thumbnail rows for the small widget's full-bleed poster
+  look, three across (medium) or three-by-two (large), each poster its own
+  deep link. Up Next keeps its "how soon" badge and the premiere/finale label.
+  iPhone/iPad/Mac; the extra-large Trending grid on iPad/Mac keeps its rows.
 
 ---
 

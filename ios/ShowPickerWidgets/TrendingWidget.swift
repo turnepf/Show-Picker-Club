@@ -26,7 +26,7 @@ struct TrendingProvider: TimelineProvider {
         switch family {
         case .systemSmall:      return 1
         case .systemMedium:     return 3
-        case .systemLarge:      return 5
+        case .systemLarge:      return 6
         case .systemExtraLarge: return 8
         default:                return 3
         }
@@ -87,10 +87,10 @@ struct TrendingView: View {
         } else {
             switch family {
             case .systemSmall:      small
-            case .systemMedium:     medium
-            case .systemLarge:      list(rows: 5, header: true)
+            case .systemMedium:     posterGrid(count: 3)
+            case .systemLarge:      posterGrid(count: 6)
             case .systemExtraLarge: grid
-            default:                medium
+            default:                posterGrid(count: 3)
             }
         }
     }
@@ -102,41 +102,12 @@ struct TrendingView: View {
             .widgetURL(top.deepLink)
     }
 
-    // Medium — top three as poster columns.
-    private var medium: some View {
-        HStack(alignment: .top, spacing: 10) {
-            ForEach(entry.shows.prefix(3)) { show in
-                WidgetLink(show: show) {
-                    VStack(spacing: 4) {
-                        PosterThumbImage(data: show.posterData, width: 62, height: 93)
-                        Text(show.title)
-                            .font(.caption2.weight(.medium))
-                            .lineLimit(2)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
-        }
-        .padding(.vertical, 2)
-        .containerBackground(.fill.tertiary, for: .widget)
-    }
-
-    // Large — header + rows.
-    private func list(rows: Int, header: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if header {
-                Label("Trending at the club", systemImage: "flame")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(entry.shows.prefix(rows)) { show in
-                WidgetLink(show: show) { TrendingRow(show: show) }
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .containerBackground(.fill.tertiary, for: .widget)
+    // Medium / large — the small card's poster look, three across (medium) or
+    // three-by-two (large), rank order left to right, each poster tappable.
+    private func posterGrid(count: Int) -> some View {
+        PosterGrid(shows: Array(entry.shows.prefix(count)), columns: 3,
+                   caption: { $0.network })
+            .containerBackground(.fill.tertiary, for: .widget)
     }
 
     // Extra large (iPad / Mac) — two columns of rows.

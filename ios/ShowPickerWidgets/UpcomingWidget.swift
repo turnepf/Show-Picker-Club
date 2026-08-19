@@ -128,8 +128,8 @@ struct UpcomingView: View {
             case .systemSmall:          small
             case .accessoryInline:      inline
             case .accessoryRectangular: accessoryRect
-            case .systemLarge:          list(rows: 6, header: true)
-            default:                    list(rows: 3, header: false)
+            case .systemLarge:          posterGrid(count: 6)
+            default:                    posterGrid(count: 3)
             }
         }
     }
@@ -186,21 +186,21 @@ struct UpcomingView: View {
         return s
     }
 
-    // Medium / large — dated rows.
-    private func list(rows: Int, header: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if header {
-                Label("Up next", systemImage: "calendar.badge.clock")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(entry.shows.prefix(rows)) { show in
-                WidgetLink(show: show) { UpcomingRow(show: show, now: entry.date) }
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .containerBackground(.fill.tertiary, for: .widget)
+    // Medium / large — the small card's poster look, three across (medium) or
+    // three-by-two (large), each poster tappable. The badge is how soon, the
+    // caption is what kind of date ("Premieres Aug 16") — a bare date would
+    // read a finale as a premiere.
+    private func posterGrid(count: Int) -> some View {
+        PosterGrid(shows: Array(entry.shows.prefix(count)), columns: 3,
+                   badge: { show in
+                       show.eventDate.map { WidgetData.relative($0, from: entry.date) }
+                   },
+                   caption: { show in
+                       show.eventDate.map {
+                           "\(show.eventLabel.map { "\($0) " } ?? "")\(WidgetData.dayLabel($0))"
+                       }
+                   })
+            .containerBackground(.fill.tertiary, for: .widget)
     }
 
     // Lock screen: one line… which still has to say what the date is. The
@@ -254,36 +254,5 @@ struct UpcomingView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .containerBackground(.clear, for: .widget)
-    }
-}
-
-private struct UpcomingRow: View {
-    let show: WidgetShow
-    let now: Date
-
-    var body: some View {
-        HStack(spacing: 10) {
-            PosterThumbImage(data: show.posterData, width: 38, height: 57)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(show.title)
-                    .font(.footnote.weight(.semibold))
-                    .lineLimit(1)
-                if let d = show.eventDate {
-                    // "Premieres Jul 24 · in 3 days" — the label distinguishes
-                    // a season start from a finale at a glance.
-                    Text("\(show.eventLabel.map { "\($0) " } ?? "")\(WidgetData.dayLabel(d)) · \(WidgetData.relative(d, from: now))")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                if let n = show.network {
-                    Text(n)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                }
-            }
-            Spacer(minLength: 0)
-        }
     }
 }
