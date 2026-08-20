@@ -52,8 +52,21 @@ status() { # method path -> http code
 }
 
 expect_status() { # method path expected label
-  local code
-  code=$(status "$1" "$2")
+  local code attempt
+  for attempt in 1 2 3; do
+    code=$(status "$1" "$2")
+    [ "$code" = "$3" ] && break
+    # A 5xx — or no response at all — is the edge having a moment, not the
+    # endpoint answering wrongly: the 2026-08-20 nightly failed on two
+    # consecutive 503s from Cloudflare with healthy responses either side
+    # (#398). Only that shape is retried. A definitive wrong answer (a 200
+    # where a 401 belongs) is the regression this suite exists to catch and
+    # fails on the first sighting.
+    case "$code" in
+      5??|000) [ "$attempt" -lt 3 ] && sleep 5 ;;
+      *) break ;;
+    esac
+  done
   if [ "$code" != "$3" ]; then
     err "$1 $2 returned $code, expected $3 ($4)"
   else
