@@ -29,7 +29,7 @@ export async function onRequestGet(context) {
      FROM groups g
      INNER JOIN group_members gm ON gm.group_id = g.id
      WHERE gm.member_slug = ?
-     ORDER BY g.created_at DESC`
+     ORDER BY g.name COLLATE NOCASE, g.created_at DESC`
   ).bind(session.member_slug, session.member_slug).all();
 
   return new Response(JSON.stringify({ groups }), { headers: corsHeaders() });

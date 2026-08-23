@@ -45,6 +45,9 @@ how it got there.
 Movies you can only rent or buy now say where — "Apple TV (rent or buy)"
 instead of no platform at all. And when we don't know the service, the
 show's page still gives you a "Where to watch" link instead of silence.
+
+Your groups are listed alphabetically now, so the one you want is where
+you expect it.
 ```
 
 ### What this covers
@@ -83,6 +86,9 @@ show's page still gives you a "Where to watch" link instead of silence.
   show card also renders the aggregator "Where to watch" link even when there
   is no network to name (iPhone/iPad/Mac; tvOS and watch pick up the filled
   network from the API without a client change, web likewise).
+- **The Groups list is alphabetical** — `GET /api/groups` orders by name
+  (case-insensitive) instead of newest-first. No client re-sorts, so this one
+  server change lands on iPhone/iPad/Mac, Apple TV and the web at once.
 - **Medium/large widgets redesigned as poster grids** — Up Next and Trending
   both drop the 38×57-thumbnail rows for the small widget's full-bleed poster
   look, three across (medium) or three-by-two (large), each poster its own

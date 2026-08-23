@@ -241,6 +241,10 @@ otherwise; only the creator can delete.
   `ShowPickerCore.Group` from all three, and the detail screen gates its
   Delete action on `is_creator`, so an endpoint that drops those columns
   silently disables it.
+- **The list is alphabetical.** `GET /api/groups` orders a member's groups by
+  `name COLLATE NOCASE` (ties broken newest-first), and no client re-sorts —
+  web, iPhone/iPad and Apple TV all render the server's order, so ordering is a
+  server-only change.
 - **Group Trending** mirrors `/api/popular` but scoped to the group's members
   and the last 30 days, ranked by how many of them added the title. Each row
   carries `members` (first names) so the apps can caption a row with who added
