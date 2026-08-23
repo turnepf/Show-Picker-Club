@@ -74,7 +74,9 @@ it worked. Now it says so.
 On a Mac or an iPad with a keyboard, Command-F opens search and Command-R
 refreshes.
 
-On Apple TV, buttons no longer come out dark-on-dark on some screens.
+On Apple TV, buttons no longer come out dark-on-dark on some screens, and
+VoiceOver reads a show's title straight from its poster instead of staying
+silent until you focus it.
 ```
 
 ### What this covers
