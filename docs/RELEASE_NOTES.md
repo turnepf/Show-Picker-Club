@@ -15,9 +15,21 @@ first two or three lines before "more", so the most useful change goes first.
 
 ---
 
-## Unreleased — the update after 1.3
+## Unreleased — the update after 1.4
 
-Nothing here is in 1.3 (build 22). Start the next What's New from this section.
+Nothing here yet. Add user-facing work as it merges.
+
+---
+
+## 1.4 (build 23) — not yet archived
+
+Covers everything merged since **1.3 / build 22**, which was submitted on
+2026-08-18. Build 23 was opened the day 22 was spent and nothing has claimed
+it since, so this release archives at 23 without another bump.
+
+Applies to iPhone, iPad and Mac. Apple TV, the watch and the web pick up the
+server-side items (group ordering, storefront names, the big-library fix, the
+cast de-duplication) with no client change; the rest is iPhone/iPad/Mac only.
 
 ```
 Trending shows more than ten now. Tap More at the bottom of the list.
@@ -48,12 +60,18 @@ show's page still gives you a "Where to watch" link instead of silence.
 
 Your groups are listed alphabetically now, so the one you want is where
 you expect it.
+
+Fixed: a library past about a hundred shows had stopped loading at all.
+It loads again, however long your lists get.
+
+Fixed: a cast list no longer names the same actor twice when they played
+more than one part.
 ```
 
 ### What this covers
 
 - Trending expands from 10 to 50 behind a **More** button, on iPhone Home and
-  the iPad detail column (#TBD). `?limit=` on `/api/popular` and group Trending.
+  the iPad detail column (#388). `?limit=` on `/api/popular` and group Trending.
 - Both Trending queries now count Watching/Awaiting/Loved only, never Next Up —
   the shared rule lives in `_shared/trending-lists.js`. **Sarah spotted this on
   Group Trending**, and it turned out to be true of club Trending too: neither
@@ -99,10 +117,36 @@ you expect it.
   look, three across (medium) or three-by-two (large), each poster its own
   deep link. Up Next keeps its "how soon" badge and the premiere/finale label.
   iPhone/iPad/Mac; the extra-large Trending grid on iPad/Mac keeps its rows.
+- **A 100+ show library stopped loading entirely** (#401). D1 binds at most 100
+  parameters per query and the watchers lookup built one `IN (...)` per owned
+  row, so the day a member crossed 100 active shows their own list started
+  500ing — and only theirs, since the lookup runs just for the owner. Chunked,
+  and written up as invariant 15. Server-side: already fixed for every surface
+  without this build.
+- **One cast row per person** (#408). TMDB sends one credits entry per role, so
+  a dual part arrived as the same actor twice and the wholesale refresh healed
+  any manual cleanup right back. Deduped before the billing cap in both the
+  add-time enricher and the background refresh, which now repairs existing
+  doubles on its own. Server-side.
+
+Merged but deliberately **not** in the What's New text:
+
+- **The session cookie moved to the Keychain** (#407) — it was being shared
+  between the app, Share Extension, widgets and watch app through App Group
+  UserDefaults, an unencrypted plist. `ShowPickerCore.SessionStore` keeps it in
+  the Keychain instead and migrates the plaintext copy on first read, so
+  upgrading signs nobody out. **This one needs the build** — it is the only
+  client-side change here that members can't already have. Left out of the
+  member text because "we improved how your login is stored" reads as an
+  admission rather than a feature.
+- Admin and operator work invisible to members: the reporting-table escaping
+  and list validation on edit (#405), the enrichment-gap and storefront
+  backfills (#393, #394), the vibe trait-fill cron dropping to daily (#400),
+  and smoke-test retries (#399).
 
 ---
 
-## 1.3 (build 22) — uploaded 2026-08-18, not yet submitted
+## 1.3 (build 22) — submitted 2026-08-18
 
 Covers everything merged since **1.2 / build 20**, the build on the Store.
 Applies to iPhone, iPad and Mac, plus a round of Apple TV fixes and a much
