@@ -97,6 +97,9 @@ struct AddShowView: View {
                             .disabled(working)
                     }
                 }
+                // The four list buttons carried no style, so their unfocused
+                // plate followed the box's appearance.
+                .buttonStyle(ActionButtonStyle())
 
                 if let errorText {
                     Text(errorText)

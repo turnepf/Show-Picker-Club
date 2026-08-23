@@ -28,6 +28,9 @@ struct ShowCard: View {
             .overlay(alignment: .topTrailing) { logo }
             .overlay(alignment: .bottom) { if showsTitle { titleBlock } }
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            // The title only draws on focus, so without this VoiceOver has
+            // nothing to read on an unfocused poster.
+            .accessibilityLabel(title)
     }
 
     @ViewBuilder private var nextUpBadge: some View {
@@ -55,6 +58,7 @@ struct ShowCard: View {
             .frame(maxWidth: 64, maxHeight: 24, alignment: .topTrailing)
             .shadow(color: .black.opacity(0.6), radius: 4, y: 1)
             .padding(12)
+            .accessibilityHidden(true)  // decorative template-rendered logo
         }
     }
 
@@ -81,6 +85,7 @@ struct ShowCard: View {
         .background(
             LinearGradient(colors: [.clear, .black.opacity(0.85)],
                            startPoint: .top, endPoint: .bottom)
+                .accessibilityHidden(true)  // decorative legibility scrim
         )
     }
 
@@ -112,5 +117,6 @@ struct ShowCard: View {
             colors: [Theme.tileColor(for: title), Theme.tileColor(for: title).opacity(0.78)],
             startPoint: .topLeading, endPoint: .bottomTrailing
         )
+        .accessibilityHidden(true)  // decorative; the card carries the title
     }
 }

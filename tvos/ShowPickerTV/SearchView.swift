@@ -90,6 +90,7 @@ struct SearchView: View {
                                 Label("Add “\(query)” as a new show", systemImage: "plus")
                                     .font(.system(size: 24, weight: .semibold))
                             }
+                            .buttonStyle(ActionButtonStyle())
                         }
                     }
                 } else {
