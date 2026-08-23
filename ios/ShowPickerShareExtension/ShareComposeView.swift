@@ -1,18 +1,5 @@
 import SwiftUI
-
-// Mirrors ShowList from the main app's Models.swift.
-private enum ShareList: String, CaseIterable, Identifiable {
-    case watching, waiting, recommending, next
-    var id: String { rawValue }
-    var label: String {
-        switch self {
-        case .watching:     return "Watching"
-        case .waiting:      return "Awaiting"
-        case .recommending: return "Loved"
-        case .next:         return "Next Up"
-        }
-    }
-}
+import ShowPickerCore
 
 struct ShareComposeView: View {
     let onComplete: () -> Void
@@ -20,7 +7,7 @@ struct ShareComposeView: View {
 
     @State private var title:   String
     @State private var network: String
-    @State private var list:    ShareList = .next
+    @State private var list:    ShowList = .next
     @State private var notes  = ""
     @State private var movie  = false
     @State private var saving = false
@@ -48,7 +35,7 @@ struct ShareComposeView: View {
                 }
                 Section("List") {
                     Picker("List", selection: $list) {
-                        ForEach(ShareList.allCases) { l in Text(l.label).tag(l) }
+                        ForEach(ShowList.allCases) { l in Text(l.title).tag(l) }
                     }
                     .pickerStyle(.segmented)
                 }
@@ -93,7 +80,7 @@ struct ShareComposeView: View {
         } catch ShareAPI.APIError.notLoggedIn {
             errorText = "Not logged in — open Show Picker Club first."
         } catch ShareAPI.APIError.duplicate(let dupList, let archived) {
-            let listName = dupList.flatMap { ShareList(rawValue: $0)?.label }
+            let listName = dupList.flatMap { ShowList(rawValue: $0)?.title }
             errorText = archived
                 ? "“\(t)” is in your archive — restore it from the app."
                 : "“\(t)” is already on \(listName.map { "your \($0) list" } ?? "one of your lists")."

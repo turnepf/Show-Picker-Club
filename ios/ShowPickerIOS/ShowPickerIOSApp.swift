@@ -37,5 +37,6 @@ struct ShowPickerIOSApp: App {
                     if phase == .background { WidgetCenter.shared.reloadAllTimelines() }
                 }
         }
+        .commands { AppCommands() }
     }
 }

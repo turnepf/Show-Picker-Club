@@ -93,6 +93,7 @@ struct IPadHomeView: View {
                         Button { showingSearch = true } label: {
                             Image(systemName: "magnifyingglass")
                         }
+                        .accessibilityLabel("Search")
                     }
                     ToolbarItem(placement: .topBarTrailing) { accountControl }
                 }
@@ -119,6 +120,10 @@ struct IPadHomeView: View {
         .sheet(isPresented: $showingLogin) { LoginView().environmentObject(auth) }
         .sheet(isPresented: $showingDeleteAccount) { DeleteAccountView().environmentObject(auth) }
         .sheet(isPresented: $showingSearch) { SearchView().environmentObject(auth) }
+        // Menu-bar and hardware-keyboard commands (⌘F, ⌘R on Mac Catalyst and
+        // an iPad with a keyboard).
+        .onAppCommand(.showSearchCommand) { showingSearch = true }
+        .onAppCommand(.refreshCommand) { Task { await load() } }
         .sheet(isPresented: $showingPasskeys) { PasskeysView().environmentObject(auth) }
         .sheet(isPresented: $showingExport) { ExportListsView().environmentObject(auth) }
         // Reload on dismiss so the sidebar's show counts reflect the import.
@@ -491,16 +496,10 @@ struct IPadHomeView: View {
     }
 
     private func placeholder(_ text: String, _ symbol: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: symbol)
-                .font(.system(size: 46))
-                .foregroundStyle(.secondary)
-            Text(text)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // The system empty-state component: scales with Dynamic Type and reads
+        // as one element under VoiceOver, where the hand-rolled stack read as a
+        // stray glyph followed by a stray sentence.
+        ContentUnavailableView { Label(text, systemImage: symbol) }
     }
 
     // Logging out clears the session, but the sidebar is drawn from @State
@@ -623,7 +622,10 @@ struct IPadHomeView: View {
             if let code = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first(where: { $0.name == "code" })?.value, !code.isEmpty {
                 Task {
-                    _ = try? await API.joinHousehold(code: code)
+                    // A dead invite otherwise walked you into the audit screen
+                    // as though the join had worked.
+                    let joined = await ErrorCenter.run("join the household", { _ = try await API.joinHousehold(code: code) })
+                    guard joined else { return }
                     selection = .subscriptionAudit
                 }
             }
@@ -634,9 +636,10 @@ struct IPadHomeView: View {
             if let token = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first(where: { $0.name == "token" })?.value, !token.isEmpty {
                 Task {
-                    if let result = try? await API.joinGroup(token: token) {
-                        detailPath = [.groupDetail(result.groupId)]
-                    }
+                    // A dead invite otherwise left you sitting on the Groups
+                    // tab with no sign the link had failed.
+                    do { detailPath = [.groupDetail(try await API.joinGroup(token: token).groupId)] }
+                    catch { ErrorCenter.shared.report("join the group") }
                 }
             }
             return

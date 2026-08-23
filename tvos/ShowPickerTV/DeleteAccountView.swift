@@ -88,6 +88,8 @@ struct DeleteAccountView: View {
                 }
             }
             .padding(.horizontal, 120)
+            // Never black-on-dark: the plate and the text flip together.
+            .buttonStyle(ActionButtonStyle())
         }
     }
 

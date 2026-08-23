@@ -266,6 +266,7 @@ struct MemberView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 if isMine {
                     Button { showingAdd = true } label: { Image(systemName: "plus") }
+                        .accessibilityLabel("Add show")
                 } else if auth.isLoggedIn {
                     EmptyView()
                 } else {
@@ -373,6 +374,7 @@ struct MemberView: View {
         } label: {
             Image(systemName: "line.3.horizontal.decrease.circle")
         }
+        .accessibilityLabel("Sort")
     }
 
     // Everything on the open list, before the media filter — the chips count
@@ -524,14 +526,9 @@ struct MemberView: View {
         case .added:
             return base.sorted { ($0.createdAt ?? "") > ($1.createdAt ?? "") }
         case .nextup:
-            return base.sorted { a, b in
-                let da = (a.nextSeasonDate?.isEmpty == false) ? a.nextSeasonDate! : "9999-12-31"
-                let db = (b.nextSeasonDate?.isEmpty == false) ? b.nextSeasonDate! : "9999-12-31"
-                if da != db { return da < db }
-                return (Double(a.rating ?? "0") ?? 0) > (Double(b.rating ?? "0") ?? 0)
-            }
+            return base.sorted(by: Show.byNextPremiere)
         case .rating:
-            return base.sorted { (Double($0.rating ?? "0") ?? 0) > (Double($1.rating ?? "0") ?? 0) }
+            return base.sorted(by: Show.byRating)
         case .manual:
             // My saved drag order; never-placed rows (nil sort_order — e.g.
             // added after the last drag) sink to the bottom, rating-sorted.

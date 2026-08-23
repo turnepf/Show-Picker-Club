@@ -44,6 +44,12 @@ struct AccountView: View {
                             .foregroundColor(.red)
                     }
                 }
+                // Dark plate + light text unfocused, white plate focused. The
+                // system style takes its unfocused plate from the box's
+                // appearance, which on our always-dark canvas can come out
+                // black-on-dark. The Delete label keeps its own red — the
+                // label's foreground wins over the style's.
+                .buttonStyle(ActionButtonStyle())
             }
             .fullScreenCover(isPresented: $showingDelete) {
                 DeleteAccountView()

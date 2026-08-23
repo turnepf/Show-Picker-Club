@@ -9,11 +9,15 @@ import UIKit
 // both belong on the split view.
 struct RootView: View {
     var body: some View {
-        if UIDevice.current.userInterfaceIdiom == .pad
-            || UIDevice.current.userInterfaceIdiom == .mac {
-            IPadHomeView()
-        } else {
-            HomeView()
+        Group {
+            if UIDevice.current.userInterfaceIdiom == .pad
+                || UIDevice.current.userInterfaceIdiom == .mac {
+                IPadHomeView()
+            } else {
+                HomeView()
+            }
         }
+        // One toast surface for every failed mutation anywhere in the app.
+        .errorToasts()
     }
 }

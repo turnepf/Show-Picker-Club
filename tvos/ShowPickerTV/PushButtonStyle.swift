@@ -73,3 +73,48 @@ struct PushButtonStyle: ButtonStyle {
         }
     }
 }
+// Plate style for text/pill buttons (detail actions, sign-in, watch, etc.).
+// The system style's unfocused plate follows the box's light/dark appearance,
+// so on our always-dark canvas it can render black text on a dark plate —
+// unreadable. Pin the Apple TV app's pattern instead: unfocused = dark
+// translucent plate + light text, focused = white plate + black text, with
+// the same grow/lift pop as PushButtonStyle. The invariant: text color flips
+// together with the fill — never black-on-dark.
+struct ActionButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        FocusAware(configuration: configuration)
+    }
+
+    private struct FocusAware: View {
+        let configuration: ButtonStyle.Configuration
+        @Environment(\.isFocused) private var focused: Bool
+        @Environment(\.isEnabled) private var enabled: Bool
+
+        var body: some View {
+            configuration.label
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundColor(textColor)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 14)
+                .background(Capsule().fill(focused ? Color.white : Theme.surface.opacity(0.9)))
+                .opacity(enabled ? 1 : 0.45)
+                .scaleEffect(scale)
+                .shadow(color: .black.opacity(focused ? 0.5 : 0),
+                        radius: focused ? 16 : 0, x: 0, y: focused ? 10 : 0)
+                .animation(.easeOut(duration: 0.18), value: focused)
+                .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+        }
+
+        // Destructive buttons keep their red signal on both plates; everything
+        // else is light-on-dark unfocused, black-on-white focused.
+        private var textColor: Color {
+            if configuration.role == .destructive { return .red }
+            return focused ? .black : Theme.text
+        }
+
+        private var scale: CGFloat {
+            if configuration.isPressed { return 1.03 }
+            return focused ? 1.06 : 1.0
+        }
+    }
+}

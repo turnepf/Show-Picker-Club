@@ -75,7 +75,11 @@ struct CalendarView: View {
     private var subscribeURL: URL? {
         guard let token = member.calendarToken, !token.isEmpty else { return nil }
         let slug = member.slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? member.slug
-        return URL(string: "webcal://showpicker.club/calendar/\(slug).ics?key=\(token)")
+        // The token goes in a query value, so it needs query escaping — the
+        // slug's path escaping leaves `?`, `&` and `#` alone, which would end
+        // the value early. The web builds this same URL with encodeURIComponent.
+        let key = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? token
+        return URL(string: "webcal://showpicker.club/calendar/\(slug).ics?key=\(key)")
     }
 
     // Grouped by month so a long list stays scannable; months are already in

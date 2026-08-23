@@ -367,7 +367,7 @@ private struct MismatchRow: View {
     private func fix(keep: String) async {
         working = true
         defer { working = false }
-        _ = try? await API.fixUrlMismatch(id: mismatch.id, keep: keep)
+        await ErrorCenter.run("apply the fix", { _ = try await API.fixUrlMismatch(id: mismatch.id, keep: keep) })
         await onChange()
     }
 }

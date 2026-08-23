@@ -56,6 +56,7 @@ struct HomeView: View {
                     } label: {
                         Image(systemName: "magnifyingglass").font(.title3)
                     }
+                    .accessibilityLabel("Search")
                     .padding(.trailing, 4)
                     accountControl
                 }
@@ -288,6 +289,10 @@ struct HomeView: View {
                 ShakePickView(show: pick).environmentObject(auth)
             }
             .onShake { Task { await handleShake() } }
+            // Menu-bar and hardware-keyboard commands (⌘F, ⌘R on Mac Catalyst
+            // and an iPad with a keyboard).
+            .onAppCommand(.showSearchCommand) { showingSearch = true }
+            .onAppCommand(.refreshCommand) { Task { await load() } }
             // A link that needed a session (a group invite) waits for one
             // rather than being dropped when the login sheet takes over.
             .onChange(of: auth.memberSlug) { _, slug in
@@ -412,7 +417,10 @@ struct HomeView: View {
             if !auth.isLoggedIn { showingLogin = true }
             return
         }
-        _ = try? await API.joinHousehold(code: code)
+        // A dead or already-used invite used to land on the "you're in!"
+        // screen anyway, because the failure was swallowed.
+        let joined = await ErrorCenter.run("join the household", { _ = try await API.joinHousehold(code: code) })
+        guard joined else { return }
         path = [.member(me)]
         showingHouseholdJoined = true
     }
@@ -495,12 +503,14 @@ struct HomeView: View {
                 } label: {
                     Image(systemName: "person.crop.circle").font(.title)
                 }
+                .accessibilityLabel("Account")
             } else {
                 Button {
                     showingLogin = true
                 } label: {
                     Image(systemName: "person.crop.circle").font(.title)
                 }
+                .accessibilityLabel("Log in")
             }
         }
     }

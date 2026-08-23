@@ -156,7 +156,7 @@ struct ShowRow<Leading: View, Extra: View>: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(show.rowTitle).font(.body)
-                    if show.rowIsFullSeries { Text("🎬") }
+                    if show.rowIsFullSeries { Text("🎬").accessibilityLabel("Complete series") }
                     if show.rowIsMovie {
                         Text("(Movie)").font(.caption).foregroundStyle(.secondary)
                     }

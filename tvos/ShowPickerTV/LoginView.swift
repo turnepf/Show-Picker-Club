@@ -84,6 +84,9 @@ struct LoginView: View {
                 }
             }
             .padding(.horizontal, 120)
+            // Light-on-dark unfocused, black-on-white focused, whatever
+            // appearance the box is set to.
+            .buttonStyle(ActionButtonStyle())
             .overlay { if submitting { ProgressView().controlSize(.large) } }
         }
         // Signed in (any path: code, Apple, enroll) — clear the flow so a

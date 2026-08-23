@@ -27,9 +27,10 @@ Covers everything merged since **1.3 / build 22**, which was submitted on
 2026-08-18. Build 23 was opened the day 22 was spent and nothing has claimed
 it since, so this release archives at 23 without another bump.
 
-Applies to iPhone, iPad and Mac. Apple TV, the watch and the web pick up the
-server-side items (group ordering, storefront names, the big-library fix, the
-cast de-duplication) with no client change; the rest is iPhone/iPad/Mac only.
+Applies to iPhone, iPad and Mac, plus a round of Apple TV button-contrast and
+focus fixes. The watch and the web pick up the server-side items (group
+ordering, storefront names, the big-library fix, the cast de-duplication) with
+no client change; the rest is iPhone/iPad/Mac only.
 
 ```
 Trending shows more than ten now. Tap More at the bottom of the list.
@@ -66,6 +67,14 @@ It loads again, however long your lists get.
 
 Fixed: a cast list no longer names the same actor twice when they played
 more than one part.
+
+Fixed: a group or household invite link that had expired used to look like
+it worked. Now it says so.
+
+On a Mac or an iPad with a keyboard, Command-F opens search and Command-R
+refreshes.
+
+On Apple TV, buttons no longer come out dark-on-dark on some screens.
 ```
 
 ### What this covers
@@ -104,6 +113,24 @@ more than one part.
   show card also renders the aggregator "Where to watch" link even when there
   is no network to name (iPhone/iPad/Mac; tvOS and watch pick up the filled
   network from the API without a client change, web likewise).
+- **A failed invite stops pretending it worked** — following a dead group or
+  household link swallowed the error and walked you into the "you're in"
+  screen (or, on iPad, just left you on the Groups tab). Both now surface a
+  toast, from one app-wide error surface (`ErrorCenter`) that the remaining
+  silent write paths — the URL cleanup fix, the vibe rescore controls — also
+  use. iPhone/iPad/Mac.
+- **⌘F and ⌘R** open search and refresh on Mac Catalyst and an iPad with a
+  keyboard, from a real menu-bar command group. Mac and iPad only.
+- **Apple TV button contrast** — the system button style takes its unfocused
+  plate from the box's appearance, which on our always-dark canvas could come
+  out black-on-dark. Sign-in, delete-account, Add a Show and the Home retry
+  button now pin light-on-dark unfocused and black-on-white focused, and the
+  Trending shelf moves focus as a unit so up reaches the tab bar. tvOS only.
+- **One list order, defined once** — the premiere/rating comparator was copied
+  into the phone, the TV and the watch; it now lives in `ShowPickerCore`
+  (`ShowSorting.swift`) with tests pinning the rule the copies kept losing: an
+  undated show sorts *last*, and rating only breaks a tie. No visible change,
+  three fewer places to drift.
 - **A cast list can't credit the same actor twice** — TMDB sends one credit
   per role, so a dual part arrived as a doubled name on the cast line;
   `dedupeCast()` now collapses them at enrichment time, and the background

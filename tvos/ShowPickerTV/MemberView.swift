@@ -24,6 +24,7 @@ struct MemberView: View {
                             Label("Add a Show", systemImage: "plus")
                                 .font(.system(size: 24, weight: .semibold))
                         }
+                        .buttonStyle(ActionButtonStyle())
                     }
                 }
                 .padding(.top, 20)
@@ -106,7 +107,10 @@ struct MemberView: View {
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(alignment: .top, spacing: 40) {
-                    ForEach(sorted(items, for: list)) { show in
+                    // Canonical ordering from ShowPickerCore: a member's own
+                    // "My Order" if they arranged one (TV has no sort UI of
+                    // its own), otherwise the list default.
+                    ForEach(items.orderedForList(list)) { show in
                         NavigationLink(value: Route.detail(id: show.id, title: show.title, network: show.network, rating: show.rating)) {
                             // Premiere badge on every shelf — a Loved show
                             // that drops a new season deserves the flag.
@@ -127,32 +131,6 @@ struct MemberView: View {
         // Let the tvOS focus engine move up/down between shelves. Without this,
         // focus can drop into a lower row but won't climb back out of it.
         .focusSection()
-    }
-
-
-    // Match iOS defaults: Watching/Waiting lead with the soonest premiere,
-    // the other lists with the highest rating.
-    private func sorted(_ items: [Show], for list: ShowList) -> [Show] {
-        // A member who arranged a "My Order" on web/iOS sees that order here
-        // too (TV has no sort UI of its own). Never-placed rows sink to the
-        // bottom, rating-sorted.
-        if items.contains(where: { $0.sortOrder != nil }) {
-            return items.sorted { a, b in
-                let pa = a.sortOrder ?? Int.max
-                let pb = b.sortOrder ?? Int.max
-                if pa != pb { return pa < pb }
-                return (Double(a.rating ?? "0") ?? 0) > (Double(b.rating ?? "0") ?? 0)
-            }
-        }
-        if list == .watching || list == .waiting {
-            return items.sorted { a, b in
-                let da = (a.nextSeasonDate?.isEmpty == false) ? a.nextSeasonDate! : "9999-12-31"
-                let db = (b.nextSeasonDate?.isEmpty == false) ? b.nextSeasonDate! : "9999-12-31"
-                if da != db { return da < db }
-                return (Double(a.rating ?? "0") ?? 0) > (Double(b.rating ?? "0") ?? 0)
-            }
-        }
-        return items.sorted { (Double($0.rating ?? "0") ?? 0) > (Double($1.rating ?? "0") ?? 0) }
     }
 
     private func load() async {

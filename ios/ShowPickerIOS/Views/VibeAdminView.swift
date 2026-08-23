@@ -154,9 +154,9 @@ struct VibeAdminView: View {
         busy = true
         defer { busy = false }
         if start {
-            _ = try? await API.startBackgroundRescore()
+            await ErrorCenter.run("start the rescore", { _ = try await API.startBackgroundRescore() })
         } else {
-            _ = try? await API.cancelBackgroundRescore()
+            await ErrorCenter.run("cancel the rescore", { _ = try await API.cancelBackgroundRescore() })
         }
         await loadStatus()
     }

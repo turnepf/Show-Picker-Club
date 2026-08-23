@@ -55,23 +55,5 @@ struct ListShowsView: View {
     // Watching/Awaiting lead with the soonest premiere; the rest by rating —
     // matching the phone and TV apps. A "My Order" arrangement dragged on
     // web/iOS wins when one exists (the watch has no sort UI of its own).
-    private var sorted: [Show] {
-        if shows.contains(where: { $0.sortOrder != nil }) {
-            return shows.sorted { a, b in
-                let pa = a.sortOrder ?? Int.max
-                let pb = b.sortOrder ?? Int.max
-                if pa != pb { return pa < pb }
-                return (Double(a.rating ?? "0") ?? 0) > (Double(b.rating ?? "0") ?? 0)
-            }
-        }
-        if list == .watching || list == .waiting {
-            return shows.sorted { a, b in
-                let da = (a.nextSeasonDate?.isEmpty == false) ? a.nextSeasonDate! : "9999-12-31"
-                let db = (b.nextSeasonDate?.isEmpty == false) ? b.nextSeasonDate! : "9999-12-31"
-                if da != db { return da < db }
-                return (Double(a.rating ?? "0") ?? 0) > (Double(b.rating ?? "0") ?? 0)
-            }
-        }
-        return shows.sorted { (Double($0.rating ?? "0") ?? 0) > (Double($1.rating ?? "0") ?? 0) }
-    }
+    private var sorted: [Show] { shows.orderedForList(list) }
 }

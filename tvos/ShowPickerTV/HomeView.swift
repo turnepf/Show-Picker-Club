@@ -33,6 +33,7 @@ struct HomeView: View {
                                 .foregroundColor(Theme.muted)
                             Button("Try again") { Task { await load() } }
                                 .font(.system(size: 24, weight: .semibold))
+                                .buttonStyle(ActionButtonStyle())
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 40)
@@ -82,6 +83,10 @@ struct HomeView: View {
                     .padding(.vertical, 30)
                 }
             }
+            // Focus leaves the shelf as a unit, so pressing up from a card
+            // reaches the tab bar instead of snagging on a neighbouring card
+            // (the same treatment the MemberView shelves get).
+            .focusSection()
         }
     }
 
