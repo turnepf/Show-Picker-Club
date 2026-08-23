@@ -4,18 +4,23 @@ name: Background vibe trait fill
 # Hits /api/admin-vibe-fill in batches of 5 until the endpoint reports
 # nothing left to process, then exits.
 #
-# Runs every 15 minutes; the workflow short-circuits within ~10s when the
-# queue is empty. It also drains a background re-score: once the operator
-# starts one (which stores a cursor in vibe_state), the endpoint's cursor
-# path means these plain fill calls keep that re-score going with the page
-# closed, until the cursor clears.
+# Runs once daily (06:17 UTC — off the hour, clear of the 03:00 backup and
+# 04:05 demo reset); the workflow short-circuits within ~10s when the queue
+# is empty. Was every 15 minutes until 2026-08 — each run can score up to
+# 200 titles through the Claude API, and 96 runs a day burned through the
+# API credits whenever a re-score cursor was live. Daily caps the spend at
+# one run's worth; the iOS Vibe trait scoring screen still fills on demand
+# when a day is too long to wait. It also drains a background re-score:
+# once the operator starts one (which stores a cursor in vibe_state), the
+# endpoint's cursor path means these plain fill calls keep that re-score
+# going with the page closed, until the cursor clears.
 #
 # Required repo secret (Settings → Secrets and variables → Actions):
 #   CRON_SECRET — must match the CRON_SECRET Pages secret on the project.
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '17 6 * * *'
   workflow_dispatch:
 
 jobs:

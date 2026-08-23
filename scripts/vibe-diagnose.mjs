@@ -234,7 +234,7 @@ line('scored titles the club shares', solo.shared_titles ?? 0);
 line('scored titles only they hold', `${solo.solo_titles ?? 0} ${dim('— scored while a copy was still elsewhere')}`);
 
 if (unscored.length) {
-  console.log(`\n  ${bold('Waiting on the scorer')} ${dim('(vibe-fill.yml runs every 15 min)')}`);
+  console.log(`\n  ${bold('Waiting on the scorer')} ${dim('(vibe-fill.yml runs daily at 06:17 UTC)')}`);
   for (const r of unscored.slice(0, 40)) console.log(`    · ${r.title}`);
   if (unscored.length > 40) console.log(dim(`    …and ${unscored.length - 40} more`));
 }
