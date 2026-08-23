@@ -21,62 +21,117 @@ Nothing here yet. Add user-facing work as it merges.
 
 ---
 
-## 1.4 (build 23) — not yet archived
+## 1.4 (build 23) — not yet archived; supersedes 1.3
 
-Covers everything merged since **1.3 / build 22**, which was submitted on
-2026-08-18. Build 23 was opened the day 22 was spent and nothing has claimed
-it since, so this release archives at 23 without another bump.
+Covers everything merged since **1.2.1 / build 21**, the last build that
+actually reached the Store.
 
-Applies to iPhone, iPad and Mac, plus a round of Apple TV button-contrast and
-focus fixes. The watch and the web pick up the server-side items (group
+**1.3 was never submitted.** Its version record sat in App Store Connect at
+`READY_FOR_REVIEW` with build 22 attached and `submittedDate` null — prepared
+on 2026-08-17 and then left, so no member ever received it. 1.4 therefore
+supersedes it, and the What's New below is the **merged** 1.3 + 1.4 text.
+Merging mattered: 1.3's text alone was 3977 characters against Apple's 4000
+cap, so roughly 1700 characters had to come out to fit both. The merged block
+is 3715 characters.
+
+The plan of record is to **rename the existing 1.3 record to 1.4** rather than
+create a new one — it was never submitted, so its version string is still
+editable — and swap build 22 for build 23. A build only appears for attaching
+when its `CFBundleShortVersionString` matches the record, so build 23 (1.4)
+cannot attach to a record still named 1.3.
+
+Applies to iPhone, iPad and Mac, plus the Apple TV button-contrast and
+VoiceOver fixes. The watch and the web pick up the server-side items (group
 ordering, storefront names, the big-library fix, the cast de-duplication) with
 no client change; the rest is iPhone/iPad/Mac only.
 
 ```
-Trending shows more than ten now. Tap More at the bottom of the list.
+"Watching with" now knows who your people are.
 
-Trending also counts the right things: a show only counts if someone is
-watching it, awaiting it, or loved it. Titles parked on Next Up were
-padding the list without anybody having started them.
+• Pick anyone you share a group with instead of typing their name. The show
+  goes on their list too, and their copy names you back.
+
+• Pick more than one. Sunday night is rarely just two people.
+
+• If they already have the show, it stays exactly where they put it —
+  nothing moved, nothing duplicated. Take someone off later and it stays on
+  their list. It's theirs now.
+
+• Anyone who isn't in the app, just type their name like always.
+
+Thayná's idea. Thank you, Thayná.
+
+Sign in with your face instead of waiting on a code. Sign in with a code
+once and the app offers to save a passkey — after that it's Face ID or Touch
+ID and you're in. There's one door in now instead of two: a single "Log in
+or sign up" button that works out which you are from whatever you type.
 
 New: Favorite Actors, on Home. The people who keep turning up across your
-Watching, Awaiting and Loved lists, with the shows that put them there —
-tap one to open it — and a link to everything else they've been in.
+Watching, Awaiting and Loved lists, with the shows that put them there — tap
+one to open it. Nothing to set up; it reads your own lists.
 
-Nothing to set up — it reads your own lists. iPhone and iPad.
+Links you share now say what you're sharing. Send someone a show and it
+arrives as "Severance on Show Picker Club", with the artwork. Group invites
+name the group, household invites name whoever sent it.
 
-Next Up has a genre filter now. Tap the sort button and pick a genre —
-handy once Next Up has grown past the point of reading it all.
+Your lists open the moment you raise your wrist. The Apple Watch app used to
+sit on a spinner; it now shows the lists it already had, instantly, and
+refreshes them quietly behind you. It works with no signal at all, and tells
+you how old the lists are.
 
-The medium and large widgets are poster grids now — proper artwork
-instead of cramped rows, and tapping a poster opens that show.
+Trending shows more than ten now — tap More at the bottom. It also counts
+the right things: a show only counts if someone is watching it, awaiting it
+or loved it. Titles parked on Next Up were padding the list.
 
-When someone tags you as watching a show together, the show that lands on
-your list now says who added it — so a title you don't recognize explains
-how it got there.
+Next Up has a genre filter. Tap the sort button and pick a genre.
+
+The medium and large widgets are poster grids now — proper artwork instead
+of cramped rows, and tapping a poster opens that show.
+
+Bringing over a list you keep somewhere else is much easier. Paste a list
+whenever you like — it's always there now, in the account menu and above My
+Shows, and on iPad and Mac where it wasn't offered at all.
+
+Shows now say how many episodes there are, not just how many seasons. Four
+seasons of Severance is 19 episodes; four of Grey's Anatomy is 90.
 
 Movies you can only rent or buy now say where — "Apple TV (rent or buy)"
-instead of no platform at all. And when we don't know the service, the
-show's page still gives you a "Where to watch" link instead of silence.
+instead of no platform at all — and there's always a "Where to watch" link.
 
-Your groups are listed alphabetically now, so the one you want is where
-you expect it.
+The network list has grown: PBS, Pluto TV, and the British and Australian
+services — BBC iPlayer, ITVX, Channel 4, NOW, Stan, Binge, ABC iview and
+more. The free ones sit at $0 in the Subscription Audit — no bill to cut.
 
-Fixed: a library past about a hundred shows had stopped loading at all.
-It loads again, however long your lists get.
+When someone tags you as watching a show together, the show that lands on
+your list now says who added it. Your groups are listed alphabetically.
 
-Fixed: a cast list no longer names the same actor twice when they played
-more than one part.
-
-Fixed: a group or household invite link that had expired used to look like
-it worked. Now it says so.
+On Apple TV, the buttons for Netflix, Paramount+, Hulu and Prime Video open
+their apps again, buttons are readable instead of dark-on-dark, and
+VoiceOver reads a show's title straight from its poster.
 
 On a Mac or an iPad with a keyboard, Command-F opens search and Command-R
 refreshes.
 
-On Apple TV, buttons no longer come out dark-on-dark on some screens, and
-VoiceOver reads a show's title straight from its poster instead of staying
-silent until you focus it.
+Fixed:
+
+• A library past about a hundred shows had stopped loading at all.
+
+• A cast list no longer names the same actor twice when they played more
+  than one part.
+
+• A group or household invite link that had expired used to look like it
+  worked. Now it says so.
+
+• Signing up while the app was already open left you with almost nothing
+  until you force-quit.
+
+• The Subscription Audit stopped counting rentals as subscriptions. One
+  Apple rental made it look like you paid for Apple TV+ monthly.
+
+• The Up Next widget sat empty for weeks at a stretch. It shows finales as
+  well as premieres now.
+
+• Everyone in a group gets a different vibe now.
 ```
 
 ### What this covers
@@ -175,9 +230,15 @@ Merged but deliberately **not** in the What's New text:
 
 ---
 
-## 1.3 (build 22) — submitted 2026-08-18
+## 1.3 (build 22) — NEVER SUBMITTED; folded into 1.4
 
-Covers everything merged since **1.2 / build 20**, the build on the Store.
+Prepared 2026-08-17 and then left: the App Store Connect version record stayed
+at `READY_FOR_REVIEW` with `submittedDate` null, so this never reached review
+and no member ever saw it. **Its What's New text below is superseded** — the
+member-facing half was merged into 1.4's block above, trimmed to fit the 4000
+character cap. Kept here as the record of what shipped in the binary.
+
+Covers everything merged since **1.2 / build 20**.
 Applies to iPhone, iPad and Mac, plus a round of Apple TV fixes and a much
 faster Apple Watch app.
 
