@@ -301,6 +301,21 @@ console.log('\n== the network a row falls back to when the member picked none');
   const nothing = extractTmdbDetailFields(detail(null), 'movie');
   check('no known availability stays null instead of guessing',
         fallbackNetwork(nothing) === null && fallbackNetwork(null) === null);
+
+  // TMDB can credit the same person twice (one entry per role). Stored as-is
+  // that doubled cast rows on every copy of a title, and the wholesale cast
+  // refresh re-created them after any hand cleanup — so the dedupe has to
+  // happen at extraction, before the depth cap spends a slot on the echo.
+  const { dedupeCast } = await import(join(sandbox, 'functions', '_shared', 'enrichment.js'));
+  const twice = dedupeCast([
+    { id: 29221, name: 'Brittany Snow' },
+    { id: 1, name: 'Someone Else' },
+    { id: 29221, name: 'Brittany Snow' },
+  ]);
+  check('a person credited twice is stored once, keeping top billing',
+        twice.length === 2 && twice[0].id === 29221 && twice[1].id === 1);
+  check('id-less legacy credits dedupe by name instead of colliding on undefined',
+        dedupeCast([{ name: 'No Id' }, { name: 'no id ' }, { name: 'Other' }]).length === 2);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

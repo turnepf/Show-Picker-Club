@@ -1,6 +1,6 @@
 import { getSession } from '../_shared/auth.js';
 import { cronAuthorized } from '../_shared/secrets.js';
-import { fetchEnrichment, extractTmdbDetailFields, fallbackNetwork, CAST_DEPTH } from '../_shared/enrichment.js';
+import { fetchEnrichment, extractTmdbDetailFields, fallbackNetwork, dedupeCast, CAST_DEPTH } from '../_shared/enrichment.js';
 import { fillActorIdsFromKnownPeople, knownByPersonIds, rememberPeople } from '../_shared/people.js';
 
 // TMDB GET that works with either credential the worker has configured:
@@ -82,7 +82,7 @@ async function tmdbSearchFirst(title, type, env) {
 // up by a later round or by the free cache pass, so a tight budget costs
 // links, never the cast itself.
 async function refreshCastFromDetail(env, show, detail) {
-  const cast = (detail.credits?.cast || []).slice(0, CAST_DEPTH);
+  const cast = dedupeCast(detail.credits?.cast).slice(0, CAST_DEPTH);
   if (!cast.length) return;
   const known = await knownByPersonIds(env, cast.map(p => p.id));
   const people = [];

@@ -86,6 +86,11 @@ you expect it.
   show card also renders the aggregator "Where to watch" link even when there
   is no network to name (iPhone/iPad/Mac; tvOS and watch pick up the filled
   network from the API without a client change, web likewise).
+- **A cast list can't credit the same actor twice** — TMDB sends one credit
+  per role, so a dual part arrived as a doubled name on the cast line;
+  `dedupeCast()` now collapses them at enrichment time, and the background
+  cast refresh heals rows that already carry the double. All platforms (the
+  data is fixed at the source).
 - **The Groups list is alphabetical** — `GET /api/groups` orders by name
   (case-insensitive) instead of newest-first. No client re-sorts, so this one
   server change lands on iPhone/iPad/Mac, Apple TV and the web at once.

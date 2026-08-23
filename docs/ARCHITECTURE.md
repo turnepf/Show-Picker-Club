@@ -711,7 +711,11 @@ club's shows share actors constantly. `fillActorIdsFromKnownPeople()` runs on
 every `/api/enrich` call and links unlinked actor rows from that cache in pure
 SQL, with no TMDB requests at all — the metered backfill pass only handles
 what the cache can't. `actors.ord` stores TMDB's billing order so "the first
-few" means the principals. Creators come back from `GET /api/shows/:id` as a
+few" means the principals. TMDB can credit the same person twice (one entry
+per role); `dedupeCast()` keeps the best-billed entry per person id (per name
+for id-less credits) before the depth cap, in both the add-time path and the
+background cast refresh — without it the refresh's delete-and-reinsert
+re-created any dupes cleaned up by hand. Creators come back from `GET /api/shows/:id` as a
 `creators` array of `{name, imdb_id}` (up to 4, resolved per name): `director`
 is one comma-joined string carrying a single id for the first credit, so a
 co-created show could previously link none of its creators.

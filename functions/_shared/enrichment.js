@@ -142,6 +142,24 @@ export function extractTmdbDetailFields(detail, mediaType) {
   };
 }
 
+// TMDB credits can list the same person twice — one entry per role (a dual
+// part, an archive-footage credit next to the main billing). Stored as-is
+// that became two identical cast rows on every copy of a title (Brittany
+// Snow twice on The Hunting Wives, 2026-08), and because the cast refresh
+// replaces rows wholesale, deleting the extras by hand just re-created them
+// on the next pass. Keep the first (best-billed) entry per person, keyed on
+// TMDB's person id when there is one and the name otherwise, BEFORE the
+// depth cap — so the echo doesn't spend one of the CAST_DEPTH slots either.
+export function dedupeCast(cast) {
+  const seen = new Set();
+  return (cast || []).filter((p) => {
+    const key = p.id ?? `name:${(p.name || '').trim().toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 // The network to store when the member picked none: the subscription service
 // that streams the title, else — when the only way to watch is paying per
 // view — the storefront that sells it ("Apple TV Store", "Fandango at Home").
@@ -223,7 +241,7 @@ async function enrichFromTmdbId(tmdbId, mediaType, env, fallbackPoster = null) {
   // the first entries ARE the principals. The old cap of 4 routinely cut a
   // major character; 12 covers a main ensemble without turning the card into
   // a phone book, and clients decide how many of those to draw.
-  const cast = (detail.credits?.cast || []).slice(0, CAST_DEPTH);
+  const cast = dedupeCast(detail.credits?.cast).slice(0, CAST_DEPTH);
   // Anyone we've already resolved on another show costs no request at all —
   // which is what makes a deeper cast affordable inside the subrequest
   // budget, since a club's shows share actors constantly.
