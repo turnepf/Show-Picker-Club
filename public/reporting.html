@@ -109,6 +109,12 @@
 
   <script>
     function fmt(n) { return (n || 0).toLocaleString(); }
+    // Every cell below is built by string concatenation into innerHTML, and
+    // the values are member-supplied (show titles, network names, display
+    // names) or client-supplied (the platform key). Escape at the seam.
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    }
     function fmtDate(iso) {
       const d = new Date(iso);
       return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
@@ -176,7 +182,7 @@
       const rows = ordered.map(k => {
         const label = PLATFORM_LABELS[k] || k;
         return `<tr>
-          <td>${label}</td>
+          <td>${escapeHtml(label)}</td>
           <td class="num">${fmt((bp.day || {})[k])}</td>
           <td class="num">${fmt((bp.week || {})[k])}</td>
           <td class="num">${fmt((bp.month || {})[k])}</td>
@@ -209,7 +215,7 @@
           ? (m.show_count > 0 ? 'Seeds only' : 'No shows')
           : 'Has activity';
         return `<tr>
-          <td>${name}</td>
+          <td>${escapeHtml(name)}</td>
           <td class="num">${fmt(m.show_count)}</td>
           <td>${status}</td>
         </tr>`;
@@ -285,7 +291,7 @@
               <thead><tr><th>Network</th><th class="num">Active shows</th></tr></thead>
               <tbody>
                 ${d.top_networks.map(n => `<tr>
-                  <td>${n.network}</td>
+                  <td>${escapeHtml(n.network)}</td>
                   <td class="num">${fmt(n.cnt)}</td>
                 </tr>`).join('')}
               </tbody>
@@ -300,7 +306,7 @@
               <thead><tr><th>Show</th><th class="num">Members</th></tr></thead>
               <tbody>
                 ${d.top_shared.map(s => `<tr>
-                  <td>${s.title}</td>
+                  <td>${escapeHtml(s.title)}</td>
                   <td class="num">${fmt(s.members)}</td>
                 </tr>`).join('')}
               </tbody>

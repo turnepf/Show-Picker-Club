@@ -156,6 +156,12 @@ export async function onRequestPut(context) {
   const network = networkFromUrl(network_url) || canonicalNetwork(val('network')) || null;
   const recommended_by = val('recommended_by');
   const list = val('list');
+  // Same allowlist as move.js — the two write paths that set `list` have to
+  // agree, or an edit can park a row on a list no screen renders.
+  const validLists = ['watching', 'waiting', 'recommending', 'next'];
+  if (!validLists.includes(list)) {
+    return new Response(JSON.stringify({ error: 'Invalid list' }), { status: 400, headers: corsHeaders() });
+  }
   const notes = val('notes');
   const movie = val('movie');
   const full_series = val('full_series');
