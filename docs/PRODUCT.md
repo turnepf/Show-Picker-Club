@@ -749,6 +749,51 @@ A few intentional omissions:
   read-only and no room. **The web doesn't** — it's frozen at its restored
   state (see [Web app status](#web-app-status)).
 
+- **Share / recommend a show within a group.** (JC, via Jennifer Biggs —
+  8/23/2026.) "A way to share or recommend shows within a group … like let's
+  watch this show together next." This is the retired suggest-a-show reborn at
+  the scope that could make it acceptable: the 2026-07 retirement was about
+  *anyone* pushing a row onto *anyone's* list once self-enroll opened the club,
+  but a group is a relationship both people opted into — the same argument that
+  admitted Watching With as the one surviving cross-member write.
+
+  The direction if built — settled when the request was assessed, so the call
+  doesn't have to be re-made later:
+
+  - **A group-owned "Watch Next" board, not a push.** Don't build "recommend a
+    show *to a person*" — even group-scoped, that puts rows on someone's list
+    without per-title consent, and Watching With only earns its write because
+    the claim is mutual and it never rearranges a list someone already made.
+    Instead: a small shared list that belongs to *the group*, not to any
+    member's library. Any group member proposes a title into it (optionally
+    with a note), others tap +1 / "I'm in", and adopting it is **pull** — one
+    tap adds it to *your own* Next Up via the normal add path. Zero new
+    cross-member writes; once people actually start, the existing Watching
+    With linking covers the "together" part. The gap this fills is the
+    *proposal* stage before anyone has added the show.
+  - **Visibility tier:** group-mates only, every route re-checking
+    `group_members` like the other group endpoints. Flag in
+    [`INVARIANTS.md`](INVARIANTS.md) that a note on a group suggestion is
+    **group-visible by design**, unlike the owner-only memos (`notes`,
+    `recommended_by`) on library rows.
+  - **Rough shape:** a `group_suggestions` table (group_id, title/tmdb ids,
+    suggested_by, note, created_at) plus votes, routes under
+    `functions/api/groups/[id]/`, UI on the iPhone/iPad group screen next to
+    Group Trending / Also Watching. Enrichment inherited from the suggester's
+    own copy (the `ensureCopy` pattern) so a suggestion doesn't cost a TMDB
+    call per viewer.
+  - **Ship minimal first.** The retired feature's autopsy (18 suggestions
+    ever, 1 in the trailing year, most never acted on) says suggestion
+    features here go unused. Propose + I'm in + add-to-my-list, no
+    votes-beyond-that/comments/threading, and see whether JC's group actually
+    uses it before elaborating.
+
+  Platforms if built: **iPhone/iPad** get it fully (Mac via Catalyst).
+  **Apple TV** shows the group's board read-only — fits its browse-only
+  posture, and a couch is where "what should we watch next" gets asked.
+  **The watch doesn't** — it has no groups at all. **The web doesn't** —
+  frozen at its restored state (see [Web app status](#web-app-status)).
+
 ## Shipped (formerly backlog)
 
 - **Tag member friends** (Patrick — 7/26/2026), shipped 2026-08 as
