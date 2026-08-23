@@ -41,6 +41,10 @@ instead of cramped rows, and tapping a poster opens that show.
 When someone tags you as watching a show together, the show that lands on
 your list now says who added it — so a title you don't recognize explains
 how it got there.
+
+Movies you can only rent or buy now say where — "Apple TV (rent or buy)"
+instead of no platform at all. And when we don't know the service, the
+show's page still gives you a "Where to watch" link instead of silence.
 ```
 
 ### What this covers
@@ -71,6 +75,14 @@ how it got there.
   `added_by` email; the show card renders "Added by <name>" beside Watching
   with. iPhone/iPad/Mac; not tvOS, watch or web (they render only the
   `watching_with` string).
+- **Rent/buy-only movies name their storefront** (Paula, via group Trending —
+  tapping into a movie's details listed no platform). Enrichment now falls
+  back to the storefront ("Apple TV Store", "Fandango at Home") when no
+  subscription service streams a title, everywhere `network` is filled, and
+  the background movie pass retroactively fills copies that predate this. The
+  show card also renders the aggregator "Where to watch" link even when there
+  is no network to name (iPhone/iPad/Mac; tvOS and watch pick up the filled
+  network from the API without a client change, web likewise).
 - **Medium/large widgets redesigned as poster grids** — Up Next and Trending
   both drop the 38×57-thumbnail rows for the small widget's full-bleed poster
   look, three across (medium) or three-by-two (large), each poster its own

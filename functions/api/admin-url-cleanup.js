@@ -2,7 +2,7 @@ import { canonicalNetwork, networkFromUrl, storefrontFromUrl } from '../_shared/
 import { extractUrl, safeNetworkUrl } from '../_shared/url-utils.js';
 import { isAdmin } from '../_shared/admin.js';
 import { cronAuthorized } from '../_shared/secrets.js';
-import { fetchEnrichment, fetchAvailability } from '../_shared/enrichment.js';
+import { fetchEnrichment, fetchAvailability, fallbackNetwork } from '../_shared/enrichment.js';
 import { renameShowCopies } from '../_shared/title-fix.js';
 
 function json(data, status = 200) {
@@ -320,7 +320,7 @@ async function commitTitleFix(env, oldTitle, rawNew, enriched) {
   ).bind(enriched.rating, enriched.posterUrl, enriched.networkLogoUrl,
     enriched.overview, enriched.backdropUrl, enriched.tmdbRating, enriched.contentRating,
     enriched.trailerKey, enriched.director, enriched.runtime, enriched.releaseYear,
-    enriched.providerNetwork, enriched.watchLink, enriched.tmdbId, enriched.tmdbType, finalTitle).run();
+    fallbackNetwork(enriched), enriched.watchLink, enriched.tmdbId, enriched.tmdbType, finalTitle).run();
 
   if (enriched.actors.length > 0) {
     const { results: copies } = await env.DB.prepare(
@@ -744,7 +744,7 @@ export async function onRequestPost(context) {
       ).bind(enriched.posterUrl, enriched.networkLogoUrl, enriched.rating,
         enriched.overview, enriched.backdropUrl, enriched.tmdbRating, enriched.contentRating,
         enriched.trailerKey, enriched.director, enriched.runtime, enriched.releaseYear,
-        enriched.providerNetwork, enriched.watchLink, enriched.tmdbId, enriched.tmdbType, row.title).run();
+        fallbackNetwork(enriched), enriched.watchLink, enriched.tmdbId, enriched.tmdbType, row.title).run();
     } else {
       // Nothing found — stamp so the title rotates to the back of the
       // oldest-first background pass instead of blocking it every round.

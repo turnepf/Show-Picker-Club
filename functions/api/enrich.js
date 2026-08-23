@@ -1,6 +1,6 @@
 import { getSession } from '../_shared/auth.js';
 import { cronAuthorized } from '../_shared/secrets.js';
-import { fetchEnrichment, extractTmdbDetailFields, CAST_DEPTH } from '../_shared/enrichment.js';
+import { fetchEnrichment, extractTmdbDetailFields, fallbackNetwork, CAST_DEPTH } from '../_shared/enrichment.js';
 import { fillActorIdsFromKnownPeople, knownByPersonIds, rememberPeople } from '../_shared/people.js';
 
 // TMDB GET that works with either credential the worker has configured:
@@ -348,7 +348,7 @@ export async function onRequestPost(context) {
               enriched_at = datetime('now') WHERE id = ?`
         ).bind(newDate, endDate, isComplete, genres, seasonsReleased, posterUrl, networkLogoUrl,
           df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey, df.director, directorImdbId,
-          df.runtime, df.releaseYear, df.providerNetwork, df.watchLink,
+          df.runtime, df.releaseYear, fallbackNetwork(df), df.watchLink,
           df.episodesReleased, df.voteCount, df.tagline, df.originalLanguage, df.studio,
           tmdbId, show.id).run();
         // Catalog fields (artwork + the new detail fields) are the same for
@@ -402,15 +402,19 @@ export async function onRequestPost(context) {
 
   // Movie posters — the pass above is TV-only (movie = 0), so movies need their
   // own poster fetch (no seasons/dates/network logo apply to movies). Only
-  // touches movies that still lack a poster; stamps enriched_at either way so
-  // titles TMDB can't find rotate to the back instead of blocking the queue.
+  // touches movies still missing a poster or a network; stamps enriched_at
+  // either way so titles TMDB can't find rotate to the back instead of
+  // blocking the queue.
   if (hasTmdb) {
-    // Normally this pass is a poster top-up. In gaps mode it's the cast that
-    // matters, so a film with artwork but no cast still qualifies.
+    // Normally this pass is a poster/platform top-up — network qualifies a row
+    // because a rent/buy-only movie inserts with none, and this pass is the
+    // only background path that can fill it (fallbackNetwork names the
+    // storefront). In gaps mode it's the cast that matters, so a film with
+    // artwork but no cast still qualifies.
     let mvWhere = gapsOnly
       ? `archived = 0 AND movie = 1
          AND NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id)`
-      : `archived = 0 AND movie = 1 AND poster_url IS NULL`;
+      : `archived = 0 AND movie = 1 AND (poster_url IS NULL OR network IS NULL)`;
     const mvBinds = [];
     if (member) { mvWhere += ` AND member_slug = ?`; mvBinds.push(member); }
     if (titles) { mvWhere += ` AND LOWER(title) IN (${titles.map(() => '?').join(',')})`; mvBinds.push(...titles); }
@@ -472,7 +476,7 @@ export async function onRequestPost(context) {
             WHERE archived = 0
               AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
         ).bind(posterUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey,
-          df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.providerNetwork, df.watchLink,
+          df.director, directorImdbId, df.runtime, df.releaseYear, genres, fallbackNetwork(df), df.watchLink,
           df.voteCount, df.tagline, df.originalLanguage, df.studio,
           first.id, show.id).run();
         if (posterUrl) tmdbUpdated++;

@@ -1,4 +1,4 @@
-import { fetchEnrichment, fetchEnrichmentById } from '../../_shared/enrichment.js';
+import { fetchEnrichment, fetchEnrichmentById, fallbackNetwork } from '../../_shared/enrichment.js';
 import { getSession } from '../../_shared/auth.js';
 import { canonicalNetwork, networkFromUrl } from '../../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../../_shared/watch-providers.js';
@@ -174,7 +174,7 @@ export async function onRequestPut(context) {
   if (!enriched) enriched = await fetchEnrichment(title, env, !!movie);
   const rating = enriched.rating || existing.rating;
 
-  const finalNetwork = network || enriched.providerNetwork || null;
+  const finalNetwork = network || fallbackNetwork(enriched);
   await env.DB.prepare(
     `UPDATE shows SET title = ?, network = ?, network_url = ?, recommended_by = ?, list = ?, notes = ?, movie = ?, full_series = ?, watching_with = ?, rating = ?, archived = ?,
         poster_url = COALESCE(?, poster_url), network_logo_url = COALESCE(?, network_logo_url),

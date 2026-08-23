@@ -111,6 +111,14 @@ struct ShowDetailView: View {
                         } else {
                             LabeledContent("Network", value: n)
                         }
+                    } else if let wl = show?.whereToWatchURL {
+                        // No service to name — a title enriched before the
+                        // storefront fallback existed, or one TMDB knows no
+                        // US provider for. The aggregator link still answers
+                        // the question this row is for.
+                        LabeledContent("Network") {
+                            Link("Where to watch", destination: wl)
+                        }
                     }
                     if let turl = show?.trailerURL {
                         LabeledContent("Trailer") { Link("▶ Watch trailer", destination: turl) }
@@ -295,7 +303,7 @@ struct ShowDetailView: View {
     // Whether the "where to watch" section has anything to show.
     private var hasWatchRow: Bool {
         (network.map { !$0.isEmpty } ?? false) || show?.trailerURL != nil
-            || !groupWatchers.isEmpty
+            || !groupWatchers.isEmpty || show?.whereToWatchURL != nil
     }
 
     // "Alex, Dana" — first names only, which is all the endpoint sends.

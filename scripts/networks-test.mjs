@@ -272,5 +272,36 @@ console.log('\n== the iOS seed is a fallback, not a second source of truth');
         !/let (CANONICAL|US|UK|AU|STOREFRONT)_NETWORKS/.test(models));
 }
 
+console.log('\n== the network a row falls back to when the member picked none');
+{
+  // fallbackNetwork() is what names a platform on titles nobody chose a
+  // service for — Paula's "it doesn't list the platform" report was a
+  // rent/buy-only movie, which used to insert with no network at all. The
+  // properties that keep it honest: a subscription service always wins, a
+  // rent/buy-only title gets the *storefront* (never the Apple TV+ alias the
+  // raw provider name would canonicalize to — the #337 mislabel), and an
+  // unknown picture stays null rather than guessing.
+  const { extractTmdbDetailFields, fallbackNetwork } =
+    await import(join(sandbox, 'functions', '_shared', 'enrichment.js'));
+
+  const detail = (providers) => ({ 'watch/providers': { results: { US: providers } } });
+
+  const rentOnly = extractTmdbDetailFields(
+    detail({ link: 'https://www.themoviedb.org/movie/1/watch', rent: [{ provider_name: 'Apple TV' }], buy: [{ provider_name: 'Apple TV' }] }), 'movie');
+  check('a rent/buy-only movie falls back to the storefront',
+        fallbackNetwork(rentOnly) === 'Apple TV Store', String(fallbackNetwork(rentOnly)));
+  check('and never to the Apple TV+ subscription the raw name aliases to',
+        fallbackNetwork(rentOnly) !== 'Apple TV+');
+
+  const streamed = extractTmdbDetailFields(
+    detail({ flatrate: [{ provider_name: 'Netflix' }], rent: [{ provider_name: 'Apple TV' }] }), 'movie');
+  check('a streaming service beats the storefront selling the same title',
+        fallbackNetwork(streamed) === 'Netflix', String(fallbackNetwork(streamed)));
+
+  const nothing = extractTmdbDetailFields(detail(null), 'movie');
+  check('no known availability stays null instead of guessing',
+        fallbackNetwork(nothing) === null && fallbackNetwork(null) === null);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

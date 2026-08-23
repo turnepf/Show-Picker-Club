@@ -142,6 +142,21 @@ export function extractTmdbDetailFields(detail, mediaType) {
   };
 }
 
+// The network to store when the member picked none: the subscription service
+// that streams the title, else — when the only way to watch is paying per
+// view — the storefront that sells it ("Apple TV Store", "Fandango at Home").
+// The storefront half is what names a platform on rent/buy-only movies (new
+// releases between theatres and streaming), which otherwise land with no
+// network anywhere a card could show one. Reaching for the storefront ONLY on
+// a rent_buy verdict keeps this from re-introducing the Apple TV+ rental
+// mislabel that reclassify-storefronts exists to drain.
+export function fallbackNetwork(enriched) {
+  if (!enriched) return null;
+  if (enriched.providerNetwork) return enriched.providerNetwork;
+  if (enriched.availability === 'rent_buy') return (enriched.storefronts || [])[0] || null;
+  return null;
+}
+
 // The null-valued shape of the detail fields, for the empty/failed returns.
 const EMPTY_DETAIL = {
   overview: null, backdropUrl: null, tmdbRating: null, contentRating: null,

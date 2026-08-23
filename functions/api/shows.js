@@ -1,4 +1,4 @@
-import { fetchEnrichment, fetchEnrichmentById } from '../_shared/enrichment.js';
+import { fetchEnrichment, fetchEnrichmentById, fallbackNetwork } from '../_shared/enrichment.js';
 import { getSession } from '../_shared/auth.js';
 import { canonicalNetwork, networkFromUrl, networkSearchUrl } from '../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../_shared/watch-providers.js';
@@ -167,7 +167,7 @@ export async function onRequestPost(context) {
     networkFromUrl(userUrl) ||
     networkFromUrl(goodCopyUrl) ||
     (rawNetwork ? canonicalNetwork(rawNetwork) : null) ||
-    enriched.providerNetwork || null;
+    fallbackNetwork(enriched);
   const finalUrl =
     userUrl ||
     goodCopyUrl ||
