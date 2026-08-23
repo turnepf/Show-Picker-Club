@@ -62,19 +62,33 @@ function check(name, cond, detail = '') {
 
 // ---- D1 shim over node:sqlite ----
 
+// D1 refuses a query with more than 100 bound parameters. node:sqlite is far
+// more permissive (32k+), which is how an IN (...) built over a whole library
+// could pass every test here and still 500 in production — so the shim
+// enforces the real limit.
+const D1_MAX_BOUND_PARAMS = 100;
+
 class Stmt {
   constructor(db, sql, args = []) { this.db = db; this.sql = sql; this.args = args; }
   bind(...args) {
     return new Stmt(this.db, this.sql, args.map((a) => (a === undefined ? null : a)));
   }
+  guard() {
+    if (this.args.length > D1_MAX_BOUND_PARAMS) {
+      throw new Error(`D1_ERROR: too many bound parameters (${this.args.length} > ${D1_MAX_BOUND_PARAMS})`);
+    }
+  }
   async first() {
+    this.guard();
     const rows = this.db.prepare(this.sql).all(...this.args);
     return rows.length ? { ...rows[0] } : null;
   }
   async all() {
+    this.guard();
     return { results: this.db.prepare(this.sql).all(...this.args).map((r) => ({ ...r })) };
   }
   async run() {
+    this.guard();
     const r = this.db.prepare(this.sql).run(...this.args);
     return { meta: { changes: Number(r.changes ?? 0), last_row_id: Number(r.lastInsertRowid ?? 0) } };
   }
@@ -415,6 +429,29 @@ console.log('\n== a member leaving takes their name with them');
   const after = rowFor(env, 'patrick', 'Deadwood');
   check('the departing member’s name is gone', !after.watching_with.includes('Whitt'), after.watching_with);
   check('and the free text is untouched', after.watching_with === 'my sister', after.watching_with);
+}
+
+console.log('\n== a library bigger than one query’s bind limit still loads');
+{
+  // watchersForShows takes one id per owned row, and D1 binds at most 100
+  // parameters per query — so the day a library crossed 100 active rows, the
+  // owner's own list load (and only the owner's: the watchers lookup runs
+  // just for them) started 500ing. The lookup pages through the ids now.
+  const env = club();
+  const cookie = addSession(env, 'patrick');
+  for (let i = 0; i < 120; i++) {
+    addShow(env, { slug: 'patrick', title: `Filler ${i}` });
+  }
+  await postShow(env, cookie, {
+    title: 'Fruitvale Station', list: 'watching', movie: 1, watcher_slugs: ['whitt'],
+  });
+
+  const res = await getShows(env, cookie, 'patrick');
+  check('the owner’s list still loads', res.status === 200, `got ${res.status}`);
+  const { shows } = await res.json();
+  check('every row is there', shows.length === 121, `got ${shows.length}`);
+  const tagged = shows.find((s) => s.title === 'Fruitvale Station');
+  check('watchers survive the chunk seams', (tagged.watchers || []).some((w) => w.slug === 'whitt'));
 }
 
 console.log('\n== the display string is composed, not accumulated');

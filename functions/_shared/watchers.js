@@ -98,19 +98,30 @@ export async function groupMates(env, slug) {
   return results || [];
 }
 
-// The linked members on each of `showIds`, as {slug, name}. One query for the
-// whole page rather than one per row — list loads call this with every show
-// the member owns.
+// D1 allows at most 100 bound parameters per query — well under the size of a
+// keen member's library, and this helper is called with one id per owned row.
+// Chunking keeps the whole list load from 500ing on the day someone's library
+// crosses that line.
+const IN_CHUNK = 90;
+
+// The linked members on each of `showIds`, as {slug, name}. One query per
+// chunk of the page rather than one per row — list loads call this with every
+// show the member owns.
 export async function watchersForShows(env, showIds) {
   const byShow = new Map(showIds.map((id) => [id, []]));
   if (!showIds.length) return byShow;
-  const placeholders = showIds.map(() => '?').join(',');
-  const { results } = await env.DB.prepare(
-    `SELECT sw.show_id, m.slug, m.name, m.first_name, m.last_initial, m.last_name
-       FROM show_watchers sw
-       INNER JOIN members m ON m.slug = sw.member_slug
-      WHERE sw.show_id IN (${placeholders})`
-  ).bind(...showIds).all();
+  const results = [];
+  for (let i = 0; i < showIds.length; i += IN_CHUNK) {
+    const chunk = showIds.slice(i, i + IN_CHUNK);
+    const placeholders = chunk.map(() => '?').join(',');
+    const { results: rows } = await env.DB.prepare(
+      `SELECT sw.show_id, m.slug, m.name, m.first_name, m.last_initial, m.last_name
+         FROM show_watchers sw
+         INNER JOIN members m ON m.slug = sw.member_slug
+        WHERE sw.show_id IN (${placeholders})`
+    ).bind(...chunk).all();
+    results.push(...(rows || []));
+  }
   const names = displayNames(results || []);
   for (const r of results || []) {
     const list = byShow.get(r.show_id);

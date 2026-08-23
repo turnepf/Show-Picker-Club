@@ -439,6 +439,28 @@ can't be an empty screen.
 Enforcers: `ShowPickerCore` tests (`NetworkCatalogTests`),
 `scripts/networks-test.mjs`, `scripts/smoke.sh`.
 
+## 15. A query grows with a member's library only in chunks
+
+D1 refuses any query binding more than 100 parameters — far below the size of
+a keen member's library, and far above what `node:sqlite` enforces, so a test
+suite passes cleanly on SQL that 500s in production. The failure mode is the
+worst kind: everything works until one member's data crosses the line, and
+then *their* screen — nobody else's — goes empty. That is how a library's
+101st show broke its owner's list load (2026-08, `watchersForShows`).
+
+- **An `IN (...)` built per owned row pages through the ids** in chunks under
+  the limit, rather than binding them all at once.
+- **A bind list scaled by anything member-sized** — shows owned, members
+  enrolled — needs either a hard cap it can cite (Trending's `LIMIT 50`) or
+  chunking. A list bounded by the schema (one title's cast, one group's
+  roster, the four lists) is fine as it is.
+- **The harness enforces D1's limit, not SQLite's.** The D1 shim in the test
+  scripts throws over 100 bound parameters, so the next unchunked query fails
+  on a laptop instead of on a member.
+
+Enforcer: `scripts/watching-with-test.mjs` (the shim's parameter guard, and
+the 121-show list-load case).
+
 ## Adding an invariant
 
 Add a section here, then decide which enforcer covers it. Prefer a deterministic
