@@ -16,6 +16,7 @@
 		CDA1B000000000000000000E /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CD0077132FF5CADE00DCCF4D /* WidgetKit.framework */; };
 		CDA1B000000000000000000F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CD0077152FF5CADE00DCCF4D /* SwiftUI.framework */; };
 		CDA1B0000000000000000011 /* ShowPickerCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDA1B0000000000000000010 /* ShowPickerCore */; };
+		CD5E110000000000000000A1 /* ShowPickerCore in Frameworks */ = {isa = PBXBuildFile; productRef = CD5E110000000000000000A2 /* ShowPickerCore */; };
 		CDA1B0000000000000000012 /* Shared/SharedSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* Shared/SharedSession.swift */; };
 		CDD1EA862FF5BE6300F095DE /* ShowPickerWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = CDD1EA7C2FF5BE6200F095DE /* ShowPickerWatch Watch App.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CDD1EA982FF5C17700F095DE /* ShowPickerCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDD1EA972FF5C17700F095DE /* ShowPickerCore */; };
@@ -155,6 +156,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CD5E110000000000000000A1 /* ShowPickerCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -263,6 +265,7 @@
 			);
 			name = ShowPickerShareExtension;
 			packageProductDependencies = (
+				CD5E110000000000000000A2 /* ShowPickerCore */,
 			);
 			productName = ShowPickerShareExtension;
 			productReference = A100000000000000000000C2 /* ShowPickerShareExtension.appex */;
@@ -964,6 +967,10 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		CD5E110000000000000000A2 /* ShowPickerCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ShowPickerCore;
+		};
 		CDA1B0000000000000000010 /* ShowPickerCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ShowPickerCore;

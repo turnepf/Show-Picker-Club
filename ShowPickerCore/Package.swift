@@ -9,6 +9,10 @@ let package = Package(
         .iOS(.v16),
         .tvOS(.v16),
         .watchOS(.v9),
+        // Mac Catalyst builds as iOS, so this line isn't for the shipping app —
+        // it's for `swift build`/`swift test` on a Mac, which otherwise assumes
+        // 10.13 and rejects the modern Keychain API in SessionStore.
+        .macOS(.v13),
     ],
     products: [
         .library(name: "ShowPickerCore", targets: ["ShowPickerCore"]),

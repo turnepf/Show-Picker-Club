@@ -21,7 +21,10 @@ enum OfflineCache {
 
     static func save<T: Encodable>(_ value: T, for key: String) {
         guard let data = try? JSONEncoder().encode(value) else { return }
-        try? data.write(to: fileURL(for: key), options: .atomic)
+        // completeFileProtection: these files hold member data — lists, notes,
+        // queued writes — so keep them encrypted at rest. We only read and
+        // write in the foreground, so the device is unlocked when we need them.
+        try? data.write(to: fileURL(for: key), options: [.atomic, .completeFileProtection])
     }
 
     static func load<T: Decodable>(_ type: T.Type, for key: String) -> T? {

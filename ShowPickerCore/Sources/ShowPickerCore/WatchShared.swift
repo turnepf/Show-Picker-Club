@@ -2,9 +2,10 @@ import Foundation
 
 // The watch app's persisted session: the member slug (+ cookie) handed off
 // from the iPhone, kept so the watch works at cold launch before the phone
-// re-sends. Stored in the App Group suite (the watch app target declares the
-// `WatchShared.appGroup` entitlement); `defaults` falls back to `.standard`
-// if the suite is unavailable, so the cache still works either way.
+// re-sends. The slug is not sensitive and lives in the App Group suite (the
+// watch app target declares the `WatchShared.appGroup` entitlement);
+// `defaults` falls back to `.standard` if the suite is unavailable, so the
+// cache still works either way. The cookie does not — see `cookieHeader`.
 public enum WatchShared {
     public static let appGroup = "group.net.patrickturner.showpickerios"
     public static let slugKey = "memberSlug"
@@ -19,9 +20,23 @@ public enum WatchShared {
         set { set(slugKey, newValue) }
     }
 
+    // The cookie is a live credential, so it lives in the Keychain
+    // (SessionStore), not the plaintext defaults suite. The getter migrates any
+    // value an older build wrote to the defaults slot, then scrubs it.
     public static var cookieHeader: String? {
-        get { value(cookieKey) }
-        set { set(cookieKey, newValue) }
+        get {
+            if let v = SessionStore.cookieHeader { return v }
+            if let legacy = value(cookieKey) {
+                SessionStore.cookieHeader = legacy
+                set(cookieKey, nil)
+                return legacy
+            }
+            return nil
+        }
+        set {
+            SessionStore.cookieHeader = newValue
+            set(cookieKey, nil)
+        }
     }
 
     private static func value(_ key: String) -> String? {

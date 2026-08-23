@@ -468,6 +468,35 @@ then *their* screen — nobody else's — goes empty. That is how a library's
 Enforcer: `scripts/watching-with-test.mjs` (the shim's parameter guard, and
 the 121-show list-load case).
 
+## 16. A credential at rest is encrypted; a cache holds no secrets
+
+The session cookie is a live 30-day credential, and several targets need it —
+the app, the Share Extension, the widgets, the watch app. Sharing it is not the
+same as leaving it in the open.
+
+- **The cookie lives in the Keychain, never in `UserDefaults`.** App Group
+  `UserDefaults` is a plist inside the shared container: readable by anything
+  with file access to the container, and unencrypted on disk. The App Group ID
+  doubles as the keychain access group, so the same targets still share one
+  item (`ShowPickerCore.SessionStore`).
+- **Moving a credential migrates it, it doesn't drop it.** A build that finds a
+  cookie in the old plaintext slot copies it into the Keychain and scrubs the
+  slot on first read. Nobody gets signed out by a storage change.
+- **A cache holds no secrets.** `Member` carries `calendar_token`, the
+  per-member secret for the `.ics` feed. Decoding reads it so the live session
+  can show Subscribe; encoding — which only ever happens when `OfflineCache`
+  writes to disk — leaves it out.
+- **Cache files are protected at rest.** `OfflineCache` writes with
+  `.completeFileProtection`. It reads and writes in the foreground only, so the
+  device is unlocked whenever the files are needed.
+
+The general rule: when something moves from memory to disk, decide what it is.
+A credential goes in the Keychain, a secret gets dropped, and everything else
+gets file protection on the way down.
+
+Enforcer: review, plus `SessionStore`'s own structure — the plaintext slot has
+no writer left, only the migrating reader.
+
 ## Adding an invariant
 
 Add a section here, then decide which enforcer covers it. Prefer a deterministic

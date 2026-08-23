@@ -50,6 +50,25 @@ struct Member: Codable, Identifiable, Hashable {
         case calendarToken = "calendar_token"
     }
 
+    // Encoding only happens when the offline cache writes us to disk, so it
+    // deliberately drops the calendar token: it's a per-member secret that
+    // grants the whole .ics feed, and it has no business sitting in a cache
+    // file. Decoding still reads it, so the live session keeps its Subscribe
+    // row.
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(slug, forKey: .slug)
+        try c.encode(name, forKey: .name)
+        try c.encodeIfPresent(firstName, forKey: .firstName)
+        try c.encodeIfPresent(displayName, forKey: .displayName)
+        try c.encodeIfPresent(showCount, forKey: .showCount)
+        try c.encodeIfPresent(watchingCount, forKey: .watchingCount)
+        try c.encodeIfPresent(waitingCount, forKey: .waitingCount)
+        try c.encodeIfPresent(recommendingCount, forKey: .recommendingCount)
+        try c.encodeIfPresent(nextCount, forKey: .nextCount)
+        try c.encodeIfPresent(lastActivityAt, forKey: .lastActivityAt)
+    }
+
     var label: String { displayName ?? firstName ?? name }
 
     // A couple's label ("Jane & Joe", "Patrick and Ali") is a plural subject,

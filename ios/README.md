@@ -29,7 +29,7 @@ The Xcode project is committed at `ios/ShowPickerIOS.xcodeproj` with **every tar
 1. **Open `ShowPickerClub.xcworkspace`** (at the repo root) in Xcode — it contains the iOS and tvOS apps plus the shared `ShowPickerCore` package. (Opening `ios/ShowPickerIOS.xcodeproj` on its own still works, but the workspace is the intended entry point.)
 2. **Signing & Capabilities** → for *both* the `ShowPickerIOS` and `ShowPickerShareExtension` targets, select your Team. The project ships with `DEVELOPMENT_TEAM = NQ6AJVVBBJ` (the same team as the tvOS app); if that's not your team, change it on both targets.
    - The bundle IDs are `net.patrickturner.showpickerios` (app) and `net.patrickturner.showpickerios.ShareExtension` (extension). Change the prefix on both if you need a different one — keep the extension ID as a child of the app ID.
-   - The **App Group** `group.net.patrickturner.showpickerios` is declared in the entitlements of every target that shares session state: the app, the share extension, the widget extension, and the watch app. Xcode's automatic signing will register it for you; if you change the group ID, update all `.entitlements` files **and** the constants in `ios/Shared/SharedSession.swift` (`appGroupID`) and `ShowPickerCore/Sources/ShowPickerCore/WatchShared.swift` (`appGroup`).
+   - The **App Group** `group.net.patrickturner.showpickerios` is declared in the entitlements of every target that shares session state: the app, the share extension, the widget extension, and the watch app. It carries two things — the App Group container (for the member slug) and, doubling as a keychain access group, the shared Keychain item that holds the session cookie. Xcode's automatic signing will register it for you; if you change the group ID, update all `.entitlements` files **and** the constants in `ios/Shared/SharedSession.swift` (`appGroupID`), `ShowPickerCore/Sources/ShowPickerCore/WatchShared.swift` (`appGroup`) and `ShowPickerCore/Sources/ShowPickerCore/SessionStore.swift` (`accessGroup`).
 3. Pick the iPhone simulator and **Cmd+R** (scheme: `ShowPickerIOS`). You should see the home screen load against the live API.
 4. To run on your actual iPhone, plug it in (or pair via Wi-Fi: Window → Devices and Simulators), pick it from the device dropdown, then Cmd+R.
 
@@ -68,7 +68,7 @@ The project uses Xcode's file-system-synchronized groups (same as the tvOS proje
 ios/
 ├── ShowPickerIOS.xcodeproj         ← open this
 ├── Shared/
-│   └── SharedSession.swift         ← compiled into app + share extension + widgets (App Group cookie bridge)
+│   └── SharedSession.swift         ← compiled into app + share extension + widgets (slug in the App Group, cookie in the Keychain)
 ├── ShowPickerIOS/                  ← app target folder (auto-synced)
 │   ├── ShowPickerIOS.entitlements
 │   └── … app sources
@@ -120,7 +120,7 @@ The Share Extension lets you hit the share button in Netflix, the Apple TV app, 
 ### How it works
 
 - The extension runs as a separate process bundled inside the main app.
-- Session credentials (the cookie + your member slug) are stored in a shared App Group container by the main app after you log in. The extension reads them from there to make authenticated API calls.
+- Session credentials are stored by the main app after you log in, and the extension reads them to make authenticated API calls. They're split by sensitivity: the member slug goes in the App Group `UserDefaults`, and the session cookie — a live 30-day credential — goes in the Keychain via `ShowPickerCore.SessionStore`, keyed to the App Group ID as its access group. Upgrading from a build that kept the cookie in `UserDefaults` migrates it on first read and scrubs the old slot, so nobody gets signed out.
 - When you share from the source app, the extension gets the URL and, when the source app provides it, the show title as well. For Apple TV URLs (`tv.apple.com/*/show/show-name/id`) it can extract the title directly from the URL path. Netflix shares a whole sentence instead (`Check out "I Will Find You" on Netflix https://…`), so the extension parses that down to just the title (the quoted show name) and auto-detects the network from the "on <Service>" mention even when no discrete URL is attached. You can still edit the title before saving.
 - A small compose form appears: title (editable), network (auto-detected from the URL), list (defaults to **Next Up**), movie toggle, optional notes. Tap **Add** and it calls `POST /api/shows` and dismisses.
 
@@ -133,11 +133,11 @@ The moving parts, for reference:
 ```
 ios/
 ├── Shared/
-│   ├── SharedSession.swift         ← in BOTH app + extension; manages the App Group cookie
+│   ├── SharedSession.swift         ← in BOTH app + extension; slug in the App Group, cookie in the Keychain
 │   └── ShareTitleParser.swift      ← in extension + test target; normalizes shared text → title + network
 ├── ShowPickerIOS/
 │   ├── ShowPickerIOS.entitlements  ← App Group for main app
-│   ├── AuthStore.swift             ← syncs cookie to App Group on login/logout
+│   ├── AuthStore.swift             ← syncs the session to the shared store on login/logout
 │   └── … (existing files)
 ├── ShowPickerShareExtension/
 │   ├── ShareViewController.swift   ← entry point; extracts the share payload, defers parsing to ShareTitleParser
