@@ -111,6 +111,11 @@ function addMember(env, slug, name, { disabled = 0 } = {}) {
   env._db.prepare(
     'INSERT INTO members (slug, name, first_name, last_name, last_initial, disabled) VALUES (?, ?, ?, ?, ?, ?)'
   ).run(slug, name, first, last || null, last ? last.charAt(0) : null, disabled);
+  // The same email addSession() stamps on the session — added_by carries the
+  // session email, and attribution resolves it back through member_emails.
+  env._db.prepare(
+    'INSERT INTO member_emails (email, member_slug, is_primary) VALUES (?, ?, 1)'
+  ).run(`${slug}@example.com`, slug);
 }
 
 function addSession(env, slug) {
@@ -429,6 +434,44 @@ console.log('\n== a member leaving takes their name with them');
   const after = rowFor(env, 'patrick', 'Deadwood');
   check('the departing member’s name is gone', !after.watching_with.includes('Whitt'), after.watching_with);
   check('and the free text is untouched', after.watching_with === 'my sister', after.watching_with);
+}
+
+console.log('\n== the arriving copy says who put it there');
+{
+  // A tag lands a title on a list its owner never touched, and before this
+  // the copy carried no visible explanation — Paula's "not sure where this
+  // came from". The owner's reads now resolve added_by back to the member it
+  // belongs to; everyone else still gets nothing, same rule as added_by.
+  const env = club();
+  const cookie = addSession(env, 'patrick');
+  await postShow(env, cookie, {
+    title: 'Fruitvale Station', list: 'watching', movie: 1, watcher_slugs: ['whitt'],
+  });
+
+  const theirs = addSession(env, 'whitt');
+  const { shows } = await (await getShows(env, theirs, 'whitt')).json();
+  const arrived = shows.find((s) => s.title === 'Fruitvale Station');
+  check('the recipient sees who added it',
+    arrived.added_by_member && arrived.added_by_member.slug === 'patrick',
+    JSON.stringify(arrived.added_by_member));
+  check('as a display name, not an email', arrived.added_by_member?.name === 'Patrick',
+    String(arrived.added_by_member?.name));
+
+  const detail = await (await showApi.onRequestGet(
+    ctx(env, req(`/api/shows/${arrived.id}`, { cookie: theirs }), { id: String(arrived.id) }))).json();
+  check('the single-show read carries it too',
+    detail.show.added_by_member && detail.show.added_by_member.slug === 'patrick',
+    JSON.stringify(detail.show.added_by_member));
+
+  const own = await (await getShows(env, cookie, 'patrick')).json();
+  const mine = own.shows.find((s) => s.title === 'Fruitvale Station');
+  check('your own adds carry no attribution', mine.added_by_member === undefined,
+    JSON.stringify(mine.added_by_member));
+
+  const other = await (await getShows(env, theirs, 'patrick')).json();
+  const visible = other.shows.find((s) => s.title === 'Fruitvale Station');
+  check('another member gets neither added_by nor its name',
+    visible.added_by === undefined && visible.added_by_member === undefined);
 }
 
 console.log('\n== a library bigger than one query’s bind limit still loads');

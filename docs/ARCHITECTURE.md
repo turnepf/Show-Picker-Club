@@ -151,7 +151,7 @@ Created rows inherit the source row's enrichment (poster, overview, cast, ids) i
 
 `shows.watching_with` is not replaced. `composeWatchingWith()` rebuilds it after every link change as free text + linked names, comma-joined, so tvOS, watchOS and any already-installed build keep rendering the one field they read with no client change. Recomposition is passed the names linked *before* the change as well as after — without the "before" half, a name whose link was just dropped survives as free text and the removal appears to do nothing.
 
-The structured half rides alongside as `watchers: [{slug, name}]` on `GET /api/shows?member=<self>` and `GET /api/shows/:id` — **owner-only**, exactly like `watching_with` and `notes`.
+The structured half rides alongside as `watchers: [{slug, name}]` on `GET /api/shows?member=<self>` and `GET /api/shows/:id` — **owner-only**, exactly like `watching_with` and `notes`. So does attribution: on the same owner-only reads, a row whose `added_by` email resolves (via `member_emails`) to a member other than the owner carries `added_by_member: {slug, name}` — the group-mate whose tag created the copy — so a title the owner never added says why it's on their list. The apps render it as "Added by <name>" on the show card.
 
 ### `sessions`
 | Column          | Type | Notes |

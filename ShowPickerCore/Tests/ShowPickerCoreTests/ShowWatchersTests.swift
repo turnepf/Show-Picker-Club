@@ -74,15 +74,47 @@ final class ShowWatchersTests: XCTestCase {
         XCTAssertEqual(show.list, "watching")
     }
 
+    /// A copy created by someone else's tag names its creator, so a title the
+    /// owner never added can explain why it's on their list. Owner-only, and
+    /// absent on rows the owner added themselves.
+    func testAddedByMemberDecodes() throws {
+        let show = try decode("""
+        {"id": 7, "title": "Fruitvale Station", "list": "watching",
+         "watching_with": "Patrick",
+         "added_by_member": {"slug": "patrick", "name": "Patrick"}}
+        """)
+        XCTAssertEqual(show.addedByMember?.slug, "patrick")
+        XCTAssertEqual(show.addedByMember?.name, "Patrick")
+    }
+
+    /// Absent on your own adds and on every payload from an older server —
+    /// nil, with the rest of the row intact. Malformed costs the field, not
+    /// the show, same rule as `watchers`.
+    func testAbsentOrMalformedAddedByMemberDoesNotFailTheRow() throws {
+        let own = try decode("""
+        {"id": 8, "title": "Heat", "list": "loved"}
+        """)
+        XCTAssertNil(own.addedByMember)
+        XCTAssertEqual(own.title, "Heat")
+
+        let mangled = try decode("""
+        {"id": 9, "title": "Ronin", "list": "loved", "added_by_member": "patrick"}
+        """)
+        XCTAssertNil(mangled.addedByMember)
+        XCTAssertEqual(mangled.title, "Ronin")
+    }
+
     /// Round-trips through the offline cache, which encodes and re-decodes
     /// whole `Show` values.
     func testRoundTrip() throws {
         let original = Show(id: 6, title: "Dune", list: "watching",
                             watchingWith: "Amy, Whitt",
                             watchers: [ShowWatcher(slug: "amy", name: "Amy"),
-                                       ShowWatcher(slug: "whitt", name: "Whitt")])
+                                       ShowWatcher(slug: "whitt", name: "Whitt")],
+                            addedByMember: ShowWatcher(slug: "amy", name: "Amy"))
         let back = try JSONDecoder().decode(Show.self, from: JSONEncoder().encode(original))
         XCTAssertEqual(back.watchers, original.watchers)
         XCTAssertEqual(back.watchingWith, "Amy, Whitt")
+        XCTAssertEqual(back.addedByMember, original.addedByMember)
     }
 }

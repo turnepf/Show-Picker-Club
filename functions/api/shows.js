@@ -3,7 +3,7 @@ import { getSession } from '../_shared/auth.js';
 import { canonicalNetwork, networkFromUrl, networkSearchUrl } from '../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../_shared/watch-providers.js';
 import { safeNetworkUrl } from '../_shared/url-utils.js';
-import { syncWatchers, watchersForShows } from '../_shared/watchers.js';
+import { syncWatchers, watchersForShows, attachAddedByMembers } from '../_shared/watchers.js';
 
 
 function corsHeaders() {
@@ -52,6 +52,10 @@ export async function onRequestGet(context) {
     // spending their evenings with.
     const byShow = await watchersForShows(env, results.map((r) => r.id));
     for (const r of results) r.watchers = byShow.get(r.id) || [];
+    // And who put each row here, when it wasn't them — the group-mate whose
+    // Watching With tag created it. A mystery title on your own list should
+    // explain itself.
+    await attachAddedByMembers(env, results, member);
   }
   await borrowArtworkAcrossCopies(env, results);
   return new Response(JSON.stringify({ shows: results }), { headers: corsHeaders() });

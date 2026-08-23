@@ -157,6 +157,13 @@ struct ShowDetailView: View {
                     if let w = myCopy?.watchingWith, !w.isEmpty {
                         LabeledContent("Watching with", value: w)
                     }
+                    // Why a title you never added is on your list: the
+                    // group-mate whose Watching With tag put it there.
+                    // Owner-only and nil on your own adds, so it renders
+                    // exactly when there's something to explain.
+                    if let tagger = myCopy?.addedByMember {
+                        LabeledContent("Added by", value: tagger.name)
+                    }
                     if let notes = myCopy?.notes, !notes.isEmpty {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Notes").font(.caption).foregroundStyle(.secondary)

@@ -5,7 +5,7 @@ import { lookupWatchmodeUrl } from '../../_shared/watch-providers.js';
 import { safeNetworkUrl } from '../../_shared/url-utils.js';
 import { getRatingsSummary } from '../../_shared/ratings.js';
 import { creatorsForShow } from '../../_shared/people.js';
-import { syncWatchers, watchersForShow, unlinkShow } from '../../_shared/watchers.js';
+import { syncWatchers, watchersForShow, unlinkShow, attachAddedByMembers } from '../../_shared/watchers.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -107,8 +107,11 @@ export async function onRequestGet(context) {
 
   if (session && session.member_slug === show.member_slug) {
     // Whom this row names, as members. Owner-only, alongside the
-    // watching_with text it was composed into — same rule as notes.
+    // watching_with text it was composed into — same rule as notes. And who
+    // created the row when it wasn't the owner: the group-mate whose
+    // Watching With tag put it here.
     show.watchers = await watchersForShow(env, show.id);
+    await attachAddedByMembers(env, [show], session.member_slug);
     return new Response(JSON.stringify({ show, ratings, group_watchers, creators }), { headers: corsHeaders() });
   }
   const redacted = {};

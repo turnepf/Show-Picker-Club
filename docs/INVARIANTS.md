@@ -369,6 +369,13 @@ invariant, not the feature.
   cascade only reaches the links hanging off the row being deleted, so the
   mirrors have to be swept explicitly or a deleted show leaves its owner's
   name on other people's lists permanently.
+- **The write is legible to its recipient.** A copy created by someone else's
+  tag tells its owner who put it there: the owner's reads resolve `added_by`
+  to the member it names (`added_by_member`), and the show card renders it. A
+  title appearing on your list with no explanation reads as a breach even
+  when it isn't one — Paula reported exactly that — so the one write another
+  member can make into your library must never be anonymous to you. Owner-only,
+  like every other personal field on the row.
 - **A new cross-member write is a decision, not a refactor.** Anything else
   that writes to a library the session doesn't own belongs in this section
   first, with its own answer to "what relationship authorises this, and what

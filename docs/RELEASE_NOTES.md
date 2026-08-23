@@ -37,6 +37,10 @@ handy once Next Up has grown past the point of reading it all.
 
 The medium and large widgets are poster grids now — proper artwork
 instead of cramped rows, and tapping a poster opens that show.
+
+When someone tags you as watching a show together, the show that lands on
+your list now says who added it — so a title you don't recognize explains
+how it got there.
 ```
 
 ### What this covers
@@ -61,6 +65,12 @@ instead of cramped rows, and tapping a poster opens that show.
   genres intersected with TMDB's top-level set, so it never offers a dead
   filter. Ignored while reordering; names itself in the empty state.
   iPhone/iPad/Mac.
+- **A tagged-in show names its tagger** (Paula found the gap — a movie
+  appeared on her list with nothing saying why). Owner-only `added_by_member`
+  on `/api/shows?member=<self>` and `/api/shows/:id`, resolved from the row's
+  `added_by` email; the show card renders "Added by <name>" beside Watching
+  with. iPhone/iPad/Mac; not tvOS, watch or web (they render only the
+  `watching_with` string).
 - **Medium/large widgets redesigned as poster grids** — Up Next and Trending
   both drop the 38×57-thumbnail rows for the small widget's full-bleed poster
   look, three across (medium) or three-by-two (large), each poster its own

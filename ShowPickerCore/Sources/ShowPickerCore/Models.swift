@@ -94,6 +94,12 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
     // still renders the field correctly.
     public let watchers: [ShowWatcher]?
 
+    // Who put this row here, when it wasn't the owner: the group-mate whose
+    // Watching With tag created it. Owner-only like `watchers`, and nil on
+    // rows the owner added themselves — so it exists exactly when "why is
+    // this on my list" is a real question.
+    public let addedByMember: ShowWatcher?
+
     // Explicit public init so other modules (the apps, their offline queues)
     // can construct a Show — the synthesized memberwise init is internal.
     // Parameter order matches the fields as they were declared in the apps'
@@ -137,7 +143,8 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         tagline: String? = nil,
         originalLanguage: String? = nil,
         studio: String? = nil,
-        watchers: [ShowWatcher]? = nil
+        watchers: [ShowWatcher]? = nil,
+        addedByMember: ShowWatcher? = nil
     ) {
         self.id = id
         self.title = title
@@ -177,6 +184,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         self.originalLanguage = originalLanguage
         self.studio = studio
         self.watchers = watchers
+        self.addedByMember = addedByMember
     }
 
     enum CodingKeys: String, CodingKey {
@@ -209,6 +217,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         case originalLanguage = "original_language"
         case studio
         case watchers
+        case addedByMember = "added_by_member"
     }
 
     // Tolerant decoding. The API varies what it sends by context — `list` and
@@ -263,6 +272,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         originalLanguage = try? c.decode(String.self, forKey: .originalLanguage)
         studio = try? c.decode(String.self, forKey: .studio)
         watchers = try? c.decode([ShowWatcher].self, forKey: .watchers)
+        addedByMember = try? c.decode(ShowWatcher.self, forKey: .addedByMember)
     }
 
     public var isMovie: Bool { (movie ?? 0) == 1 }

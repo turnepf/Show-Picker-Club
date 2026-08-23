@@ -135,6 +135,41 @@ export async function watchersForShow(env, showId) {
   return (await watchersForShows(env, [showId])).get(showId) || [];
 }
 
+// Owner-only attribution: which member each row's `added_by` email belongs
+// to, attached as `added_by_member` {slug, name} when it isn't the owner
+// themselves. `added_by` has always carried the session email of whoever
+// created the row; for a copy created by a Watching With tag that is the
+// tagger — and naming them is what answers "why is this on my list" for a
+// title the owner never added. Resolution goes through member_emails, so a
+// non-member value ('seed', a departed member's email) resolves to nothing
+// and the row simply carries no attribution.
+export async function attachAddedByMembers(env, rows, ownerSlug) {
+  const emails = [...new Set(rows.map((r) => r.added_by).filter((e) => e && e.includes('@')))];
+  if (!emails.length) return;
+  const found = [];
+  for (let i = 0; i < emails.length; i += IN_CHUNK) {
+    const chunk = emails.slice(i, i + IN_CHUNK);
+    const { results } = await env.DB.prepare(
+      `SELECT me.email, m.slug, m.name, m.first_name, m.last_initial, m.last_name
+         FROM member_emails me
+         INNER JOIN members m ON m.slug = me.member_slug
+        WHERE me.email IN (${chunk.map(() => '?').join(',')})`
+    ).bind(...chunk).all();
+    found.push(...(results || []));
+  }
+  if (!found.length) return;
+  // One member can hold several emails; dedupe before display-name counting
+  // or a two-email member would read as two people sharing a first name and
+  // pick up a spurious last initial.
+  const bySlug = new Map(found.map((m) => [m.slug, m]));
+  const names = displayNames([...bySlug.values()]);
+  const byEmail = new Map(found.map((m) => [m.email, m.slug]));
+  for (const r of rows) {
+    const slug = r.added_by ? byEmail.get(r.added_by) : null;
+    if (slug && slug !== ownerSlug) r.added_by_member = { slug, name: names.get(slug) };
+  }
+}
+
 // The member's own copy of a title, if they have one. Matched the way copies
 // are matched everywhere else in the app: by tmdb_id when both rows carry
 // one, else case-insensitively by title. Archived rows count — finding one is
