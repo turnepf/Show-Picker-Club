@@ -21,7 +21,7 @@ Nothing here yet. Add user-facing work as it merges.
 
 ---
 
-## 1.4 (build 23) — not yet archived; supersedes 1.3
+## 1.4 (build 23) — archived and uploaded on all three platforms; supersedes 1.3
 
 Covers everything merged since **1.2.1 / build 21**, the last build that
 actually reached the Store.
@@ -34,11 +34,25 @@ Merging mattered: 1.3's text alone was 3977 characters against Apple's 4000
 cap, so roughly 1700 characters had to come out to fit both. The merged block
 is 3715 characters.
 
-The plan of record is to **rename the existing 1.3 record to 1.4** rather than
-create a new one — it was never submitted, so its version string is still
-editable — and swap build 22 for build 23. A build only appears for attaching
-when its `CFBundleShortVersionString` matches the record, so build 23 (1.4)
-cannot attach to a record still named 1.3.
+Renaming the existing 1.3 records to 1.4 — rather than creating new ones — was
+the plan of record and it worked on both iPhone and Apple TV: neither had been
+submitted, so the version string was still editable, and build 22 gave way to
+build 23. A build only appears for attaching when its
+`CFBundleShortVersionString` matches the record, so build 23 (1.4) cannot
+attach to a record still named 1.3.
+
+**The Mac had no 1.3 record to rename, and the API would not create one.**
+macOS had never been prepared for 1.3, so 1.2.1 was still its newest record.
+`POST /v1/appStoreVersions` refused with *"You cannot create a new version of
+the App in the current state"* — the app already had 1.4 in flight on the other
+two platforms. A probe with a throwaway version string drew the same error, so
+the block is the app's state and not the version number. **App Store Connect's
+own UI creates it happily** (＋ Version or Platform → macOS → 1.4); only the API
+path is closed. Expect that on any release where one platform runs ahead of
+another, and reach for the UI for the record rather than hunting for an
+endpoint that does it.
+
+All three platforms carry the same What's New text, byte for byte.
 
 Applies to iPhone, iPad and Mac, plus the Apple TV button-contrast and
 VoiceOver fixes. The watch and the web pick up the server-side items (group
