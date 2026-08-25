@@ -153,6 +153,49 @@ Created rows inherit the source row's enrichment (poster, overview, cast, ids) i
 
 The structured half rides alongside as `watchers: [{slug, name}]` on `GET /api/shows?member=<self>` and `GET /api/shows/:id` — **owner-only**, exactly like `watching_with` and `notes`. So does attribution: on the same owner-only reads, a row whose `added_by` email resolves (via `member_emails`) to a member other than the owner carries `added_by_member: {slug, name}` — the group-mate whose tag created the copy — so a title the owner never added says why it's on their list. The apps render it as "Added by <name>" on the show card.
 
+### `group_suggestions` / `group_suggestion_responses`
+Migration 065. "Recommend to group" — JC's pop-up (via Jennifer). One
+`group_suggestions` row = *`suggested_by` proposed this title to `group_id`*;
+the row belongs to the **group**, not to any member's library.
+
+| Column         | Type | Notes |
+|----------------|------|-------|
+| `id`           | INTEGER PK | |
+| `group_id`     | INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE | |
+| `suggested_by` | TEXT NOT NULL REFERENCES members(slug) ON DELETE CASCADE | |
+| `show_id`      | INTEGER REFERENCES shows(id) ON DELETE SET NULL | The recommender's own copy at suggest time — the enrichment source every "Add to Next Up" clones, and the id the apps navigate to detail with. Nulls out if they delete that copy; the snapshot columns keep the card renderable and addable. |
+| `title` / `tmdb_id` / `movie` / `poster_url` / `network` | | Identity snapshot from that copy. |
+| `note`         | TEXT | **Group-visible by design** — addressed to the group, unlike the owner-only memos (`notes`, `recommended_by`) on library rows. |
+| `created_at`   | TEXT | |
+
+`group_suggestion_responses` (PK `(suggestion_id, member_slug)`, `response IN
+('dismissed','added')`) records each member's answer to the pop-up. A later
+answer replaces an earlier one, so dismissing the pop-up doesn't bar adding
+from the board afterwards.
+
+`functions/_shared/group-suggestions.js` owns the logic, and the design rule
+is the inverse of [`show_watchers`](#show_watchers): **nothing here writes to
+another member's list, ever.** Recommending writes a group-owned card;
+"Add to Next Up" is the *recipient's own* tap, which pulls a copy onto their
+own Next Up through the same `ensureCopy` path Watching With uses (existing
+copy honoured wherever it sits, archived copy revived, cast and enrichment
+inherited from the recommender's row); Dismiss is a per-member mark that
+hides nothing from anyone else. A fresh copy created by an Add stamps
+`recommended_by` with the recommender's display name — the owner-only memo
+that has always meant exactly this — and `added_by` with the *adder's own*
+email (it was their tap). A copy they already had keeps its memos untouched.
+
+Bounds: you can only recommend a copy you own; a duplicate title folds into
+the group's existing card (200, same shape) instead of stacking pop-ups;
+`MAX_SUGGESTIONS_PER_DAY` (10, per member per group) caps the fan-out of
+pop-up attention; removal is the recommender or the group's creator. Leaving
+a group deletes your cards in it (and your response marks there); account
+deletion sweeps both tables explicitly like the rest of that path. Enforced
+end to end by `scripts/group-suggestions-test.mjs`.
+
+There is deliberately no push notification — the pop-up is delivered in-app
+when a member next opens the group screen, one unanswered card at a time.
+
 ### `sessions`
 | Column          | Type | Notes |
 |-----------------|------|-------|
@@ -263,6 +306,12 @@ otherwise; only the creator can delete.
 - **Groups are the consent boundary for "Watching with".** Sharing a group is
   what makes someone nameable on a show — and therefore what makes it legal to
   write a row onto their list. See [`show_watchers`](#show_watchers).
+- **Watch Next boards (migration 065).** Each group has a recommendation
+  board: "Recommend to group" on a show puts a card on it, and group-mates
+  get an in-app pop-up — "JC has recommended Lanterns" — with Dismiss or Add
+  to Next Up. Pull-only by design: no write to anyone's list except the
+  recipient's own tap onto their own Next Up. See
+  [`group_suggestions`](#group_suggestions--group_suggestion_responses).
 - **One read from outside the group, and it belongs to admins.**
   `GET /api/admin-member-groups?member=<slug>` answers which groups a member is
   in and who else is in each, for the Groups section of the admin member screen
@@ -272,9 +321,11 @@ otherwise; only the creator can delete.
   joining; the endpoint writes nothing and doesn't widen the admin's own
   group-scoped features. See
   [Invariant 13](INVARIANTS.md#13-a-groups-membership-is-legible-to-admins-its-content-never-is).
-- **Platforms.** iPhone and iPad create, invite, join, leave and delete. Apple
+- **Platforms.** iPhone and iPad create, invite, join, leave and delete — and
+  carry the whole Watch Next flow (recommend, pop-up, board). Apple
   TV browses groups read-only (`GroupsListViewTV` / `GroupDetailViewTV`), which
-  is why the tvOS API client has only the three read calls. The watch has no
+  is why the tvOS API client has only the read calls (the board renders there
+  as a read-only shelf). The watch has no
   groups at all. The admin Groups section above is iPhone/iPad/Mac only, like
   every other admin tool — Apple TV and the watch have no admin surface to put
   it on. Note that `SwiftUI.Group` collides with the model in any file
@@ -349,6 +400,10 @@ drained once, so it deliberately has no button in the app.
 | `POST /api/groups/[id]/invite`         | `functions/api/groups/[id]/invite.js`      | POST    | session + membership — mints a 7-day token |
 | `POST /api/groups/[id]/leave`          | `functions/api/groups/[id]/leave.js`       | POST    | session + membership |
 | `GET /api/groups/[id]/trending`        | `functions/api/groups/[id]/trending.js`    | GET     | session + membership — top 10 titles the group added in 30 days |
+| `GET /api/groups/[id]/suggestions`     | `functions/api/groups/[id]/suggestions.js` | GET     | session + membership — the group's Watch Next board, shaped for the viewer |
+| `POST /api/groups/[id]/suggestions`    | `functions/api/groups/[id]/suggestions.js` | POST    | session + membership — recommend your own copy of a show to the group (daily ceiling; duplicate titles fold) |
+| `POST /api/groups/[id]/suggestions/[sid]` | `functions/api/groups/[id]/suggestions/[sid].js` | POST | session + membership — answer the pop-up (`dismiss` \| `add`); `add` copies onto the caller's own Next Up |
+| `DELETE /api/groups/[id]/suggestions/[sid]` | `functions/api/groups/[id]/suggestions/[sid].js` | DELETE | session + (recommender or group creator) |
 | `GET /api/groups/join?token=`          | `functions/api/groups/join.js`             | GET     | session joins; without one, returns a name-only preview |
 | `POST /api/enrich`                     | `functions/api/enrich.js`                  | POST    | session or `CRON_SECRET` header |
 | `POST /api/sync-urls`                  | `functions/api/sync-urls.js`               | POST    | session (demo member's rows excluded as URL sources) |

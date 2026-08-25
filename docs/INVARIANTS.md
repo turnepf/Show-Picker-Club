@@ -384,6 +384,40 @@ invariant, not the feature.
 
 Enforcer: `scripts/watching-with-test.mjs`.
 
+## 12a. A recommendation is an invitation, never a write
+
+"Recommend to group" (migration 065) is the retired suggest-a-show reborn at
+the one scope that makes it acceptable — and the way it stays acceptable is
+that it sits *outside* §12 entirely: it contains **no cross-member write**.
+Watching With remains the only one.
+
+- **The card belongs to the group, not to anyone's library.** Recommending
+  writes a `group_suggestions` row and nothing else. No copy appears on any
+  list until its owner taps for it.
+- **Adding is pull.** "Add to Next Up" runs under the *recipient's* session
+  and writes only to the recipient's own library, through the same
+  copy-honouring path as Watching With: an existing copy is linked where it
+  sits (never moved to Next Up), an archived one is revived, their memos are
+  never overwritten. A fresh copy says who to thank (`recommended_by`) but
+  records the adder's own tap as `added_by`.
+- **Dismiss is per-member.** One member's dismissal is a mark about them; the
+  card stands for everyone else, and a dismiss can be superseded by an add.
+  Your own recommendation never asks you to respond.
+- **The note is group-visible by design.** It is addressed to the group —
+  the deliberate exception to the owner-only memo rule (`notes`,
+  `recommended_by`, `watching_with` on library rows), and the exception is
+  written down here so it never becomes a precedent by accident.
+- **Attention fan-out is bounded like write fan-out.** A recommendation pops
+  up at the whole group, so: only a copy you own can be recommended, a
+  duplicate title folds into the existing card, `MAX_SUGGESTIONS_PER_DAY`
+  caps each member per group, and removal is the recommender or the group's
+  creator. Group-mates only in every direction — an outsider can neither
+  read a board nor put a card on it.
+- **Your cards leave when you do.** Leaving a group deletes your
+  recommendations in it; account deletion sweeps both tables.
+
+Enforcer: `scripts/group-suggestions-test.mjs`.
+
 ## 13. A group's membership is legible to admins; its content never is
 
 Private groups are private to their members (§12's gate is the same one), with

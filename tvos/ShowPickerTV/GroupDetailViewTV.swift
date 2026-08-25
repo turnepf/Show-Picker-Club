@@ -10,6 +10,9 @@ struct GroupDetailViewTV: View {
     // this supplies the display name and the Member value a row navigates with.
     @State private var roster: [String: Member] = [:]
     @State private var trending: [PopularShow] = []
+    // The group's Watch Next board — read-only here, like everything else on
+    // this app. Recommending and answering happen on iPhone/iPad.
+    @State private var suggestions: [GroupSuggestion] = []
     @State private var loading = true
     @State private var errorText: String?
 
@@ -68,12 +71,48 @@ struct GroupDetailViewTV: View {
                 // horizontal row of them costs one band of screen instead of
                 // pushing Trending below the fold.
                 membersSection
+                // Watch Next above Trending: a couch is where "what should
+                // we watch next" actually gets asked, and this shelf is the
+                // group's own answer. Hidden entirely while the board is
+                // empty — an empty exhortation would just push Trending down.
+                if !suggestions.isEmpty {
+                    watchNextSection
+                }
                 trendingSection
             }
             .padding(.horizontal, 60)
             .padding(.bottom, 60)
         }
         .background(Theme.background.ignoresSafeArea())
+    }
+
+    private var watchNextSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            sectionHeader("Watch Next")
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 40), count: 4),
+                      spacing: 40) {
+                ForEach(suggestions) { suggestion in
+                    if let showId = suggestion.showId {
+                        NavigationLink(value: Route.detail(id: showId, title: suggestion.title,
+                                                           network: suggestion.network, rating: nil)) {
+                            ShowCard(title: suggestion.title,
+                                     subtitle: "Recommended by \(suggestion.suggestedByName)",
+                                     networkLogoUrl: nil,
+                                     posterUrl: suggestion.posterUrl)
+                        }
+                        .buttonStyle(PushButtonStyle())
+                    } else {
+                        // The recommender deleted their copy — the snapshot
+                        // still names the show, there's just nowhere to push.
+                        ShowCard(title: suggestion.title,
+                                 subtitle: "Recommended by \(suggestion.suggestedByName)",
+                                 networkLogoUrl: nil,
+                                 posterUrl: suggestion.posterUrl)
+                    }
+                }
+            }
+            .padding(.vertical, 20)
+        }
     }
 
     private var trendingSection: some View {
@@ -174,6 +213,9 @@ struct GroupDetailViewTV: View {
             self.members = detail.members
             let shows = try await API.groupTrending(id: groupId)
             self.trending = shows
+            // Non-fatally: a board that fails to load hides its shelf rather
+            // than blanking the group.
+            self.suggestions = (try? await API.groupSuggestions(groupId: groupId)) ?? []
             // Roster last and non-fatally: it only decides whether a member
             // row opens their lists, so a failure here shouldn't blank the group.
             if let all = try? await API.members() {

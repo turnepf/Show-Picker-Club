@@ -1,4 +1,8 @@
 import SwiftUI
+// Imported by name (not just via CoreImports' re-export) because this file
+// spells the model `ShowPickerCore.Group` — SwiftUI's own `Group` claims the
+// bare name. Same reason GroupsListView and GroupDetailView import it.
+import ShowPickerCore
 
 struct ShowDetailView: View {
     let id: Int?
@@ -24,6 +28,14 @@ struct ShowDetailView: View {
     // Fellow group members with this title on their Watching list. Empty
     // unless I'm in a group with someone who's watching it.
     @State private var groupWatchers: [GroupWatcher] = []
+    // My groups, for "Recommend to group" — the button only renders once
+    // there's a group to recommend to.
+    @State private var myGroups: [ShowPickerCore.Group] = []
+    @State private var choosingRecommendGroup = false
+    // The group picked for a recommendation; non-nil drives the note alert.
+    @State private var recommendGroup: ShowPickerCore.Group?
+    @State private var recommendNote = ""
+    @State private var recommending = false
     // Creators resolved to individual people by the server (up to four).
     @State private var creators: [Credit] = []
 
@@ -180,6 +192,23 @@ struct ShowDetailView: View {
                     }
                     if let m = mineActive {
                         Button("Edit") { showingEdit = true }
+                        // JC's button: put this show on a group's Watch Next
+                        // board. It recommends MY copy — that's also the
+                        // enrichment source every group-mate's "Add to Next
+                        // Up" clones — so it renders only when the title is
+                        // on one of my lists and I have a group to tell.
+                        if !myGroups.isEmpty {
+                            Button {
+                                if myGroups.count == 1 {
+                                    startRecommend(to: myGroups[0])
+                                } else {
+                                    choosingRecommendGroup = true
+                                }
+                            } label: {
+                                Label("Recommend to group", systemImage: "megaphone")
+                            }
+                            .disabled(recommending)
+                        }
                         Button(role: .destructive) {
                             Task { await archive(m.id) }
                         } label: {
@@ -298,6 +327,26 @@ struct ShowDetailView: View {
                presenting: addAlert) { _ in
             Button("OK", role: .cancel) { }
         } message: { Text($0.message) }
+        .confirmationDialog("Recommend to which group?",
+                            isPresented: $choosingRecommendGroup,
+                            titleVisibility: .visible) {
+            ForEach(myGroups) { g in
+                Button(g.name) { startRecommend(to: g) }
+            }
+            Button("Cancel", role: .cancel) { }
+        }
+        // Note entry rides the same alert-with-TextField shape as the group
+        // rename. The note is group-visible by design — it's addressed to
+        // the group, unlike the owner-only Notes field on this row.
+        .alert("Recommend to \(recommendGroup?.name ?? "group")",
+               isPresented: Binding(get: { recommendGroup != nil }, set: { if !$0 { recommendGroup = nil } }),
+               presenting: recommendGroup) { g in
+            TextField("Add a note (optional)", text: $recommendNote)
+            Button("Recommend") { Task { await recommend(to: g) } }
+            Button("Cancel", role: .cancel) { }
+        } message: { g in
+            Text("Everyone in \(g.name) gets a pop-up with Dismiss or Add to Next Up. The note is visible to the whole group.")
+        }
     }
 
     // Whether the "where to watch" section has anything to show.
@@ -500,6 +549,39 @@ struct ShowDetailView: View {
             cast = (try? await API.actors(showId: id)) ?? []
         }
         await refreshMyCopy()
+        // Non-fatally: no groups just means no Recommend button.
+        if auth.memberSlug != nil {
+            myGroups = (try? await API.groups())?.groups ?? []
+        }
+    }
+
+    private func startRecommend(to group: ShowPickerCore.Group) {
+        recommendNote = ""
+        recommendGroup = group
+    }
+
+    // Put my copy on the group's board. Nothing lands on anyone's list here —
+    // each group-mate's own tap does that, on their own list.
+    private func recommend(to group: ShowPickerCore.Group) async {
+        guard let m = mineActive, !recommending else { return }
+        recommending = true
+        defer { recommending = false }
+        let note = recommendNote.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            _ = try await API.recommendToGroup(groupId: group.id, showId: m.id,
+                                               note: note.isEmpty ? nil : note)
+            addAlert = AddAlert(title: "Recommended",
+                                message: "“\(title)” is on \(group.name)’s Watch Next board — everyone gets asked about it next time they visit the group.")
+        } catch let e as API.APIError where e.status == 429 {
+            addAlert = AddAlert(title: "That’s a lot of recommendations",
+                                message: "You’ve hit today’s limit for this group — try again tomorrow.")
+        } catch let e as API.APIError where e.status == 401 {
+            addAlert = AddAlert(title: "Logged out",
+                                message: "Your session expired — sign in again from Home.")
+        } catch {
+            addAlert = AddAlert(title: "Couldn’t recommend",
+                                message: "Something went wrong. Please try again.")
+        }
     }
 
     // Find my own row for this title (active or archived) so the actions and

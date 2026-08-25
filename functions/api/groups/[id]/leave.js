@@ -42,6 +42,21 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ error: 'Cannot leave a group with only one member' }), { status: 400, headers: corsHeaders() });
   }
 
+  // Leaving takes your recommendations off the group's board — a card is a
+  // memo about your taste addressed to people you were in a group with, and
+  // it shouldn't keep speaking for you after you've gone. Your dismissed/
+  // added marks on other people's cards go too; they only shaped your own
+  // view. (Try/catch: a database without migration 065 has no board.)
+  try {
+    await env.DB.prepare(
+      'DELETE FROM group_suggestions WHERE group_id = ? AND suggested_by = ?'
+    ).bind(groupId, session.member_slug).run();
+    await env.DB.prepare(
+      `DELETE FROM group_suggestion_responses WHERE member_slug = ?
+        AND suggestion_id IN (SELECT id FROM group_suggestions WHERE group_id = ?)`
+    ).bind(session.member_slug, groupId).run();
+  } catch (e) { /* pre-065 database */ }
+
   await env.DB.prepare(
     'DELETE FROM group_members WHERE group_id = ? AND member_slug = ?'
   ).bind(groupId, session.member_slug).run();

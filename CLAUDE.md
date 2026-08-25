@@ -123,6 +123,22 @@ unlinking takes your name off and leaves their show alone; and the free text
 still works, surviving a linked name being added and removed around it.
 
 ```bash
+node scripts/group-suggestions-test.mjs
+```
+
+"Recommend to group" (migration 065), same harness — JC's pop-up on top of a
+group-owned Watch Next board. The properties pinned are the ones that keep it
+**pull-only**: recommending writes a card the group owns and touches nobody's
+list; "Add to Next Up" runs under the recipient's session onto their own list
+(existing copies honoured where they sit, archived ones revived, memos never
+overwritten, `recommended_by` stamped only on a fresh copy); Dismiss is a
+per-member mark that hides nothing from anyone else. Plus the bounds:
+group-mates only in both directions, only a copy you own can be recommended,
+duplicate titles fold into the existing card, a per-member daily ceiling,
+removal by recommender or creator only, and leaving a group takes your cards
+with you. See `docs/INVARIANTS.md` §12a.
+
+```bash
 node scripts/vibe-scope-test.mjs
 ```
 
@@ -290,7 +306,7 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 - **Routing** is Pages Functions file routing (`functions/api/shows/[id].js` → `/api/shows/:id`) layered over `public/_redirects` (SPA fallback `/*` → `/index.html`). The full route/method/auth table is in `docs/ARCHITECTURE.md#routing`.
 - **Auth:** passkeys (WebAuthn, iOS/iPad — added from inside a session, never a way to sign up), one-time codes (SMS via Twilio Verify, email via Resend), Sign in with Apple, Sign in with Google (web). Sessions are 30-day HttpOnly cookies; `_shared/auth.js#getSession(request, env)` is the gate every session-protected endpoint calls first. Admin = a session whose member row has `members.is_admin = 1`, checked via `_shared/admin.js#isAdmin()` — admin rights live in the DB, not in code or a secret.
 - **Everyone self-enrolls.** Signing up (email code / Apple / Google) is the only way a member row is created, and a new member is immediately a full member. Retired 2026-08 (migration 058): `members.approved` and the held state, the `signup_requests` table, the `/join` form, the operator approval queue, `admin-member-approve`, manual member creation, `SELF_ENROLL`, and `DEMO_APPLE_FALLBACK`. `createMember()` lives in `functions/_shared/create-member.js` and only `_shared/enroll.js` calls it. The matching **Swift cleanup was deferred until the App Store launch, which has since happened** — the iOS app still carries the inert, gracefully-degrading approval queue, signup models and `WelcomeIntroPanel.swift` (`Models.swift`, `API.swift`, `ManageMembersView.swift`, `AdminView.swift`). Nothing blocks removing them now; it simply hasn't been done.
-- **Private groups and households are the privacy unit — the club isn't.** Groups (migration 056: `groups`, `group_members`, `group_invites`) and households are joined by invite *link* only; there is no roster you can add somebody from. Every group route re-checks `group_members` and 403s otherwise, and only the creator can delete. Group membership is what scopes vibe reads, `GET /api/shows/all`, `group_watchers` ("Also watching"), Group Trending, and who Watching With may name. iPhone/iPad create, invite, join, leave and delete; Apple TV browses groups read-only; the watch has no groups. In Swift, `SwiftUI.Group` collides with the model — spell it `ShowPickerCore.Group` in type position.
+- **Private groups and households are the privacy unit — the club isn't.** Groups (migration 056: `groups`, `group_members`, `group_invites`) and households are joined by invite *link* only; there is no roster you can add somebody from. Every group route re-checks `group_members` and 403s otherwise, and only the creator can delete. Group membership is what scopes vibe reads, `GET /api/shows/all`, `group_watchers` ("Also watching"), Group Trending, the Watch Next recommendation board (migration 065, pull-only — see `docs/INVARIANTS.md` §12a), and who Watching With may name. iPhone/iPad create, invite, join, leave and delete; Apple TV browses groups read-only; the watch has no groups. In Swift, `SwiftUI.Group` collides with the model — spell it `ShowPickerCore.Group` in type position.
 - **Three tiers of visibility, not two.** *Logged out:* roster first names, Trending, catalog-level show detail, auth endpoints — deliberately tiny, keep it that way. *Any logged-in member:* another member's list titles, but never their `notes`, `watching_with`, `recommended_by` or `added_by`, which are owner-only because with signup open other members are not all friends (`functions/api/shows.js`). *Group-mates only:* vibe, Also watching, cross-library reads, Watching With links. A new endpoint has to land in one of those three on purpose.
 - **Enrichment:** synchronous on insert (`_shared/enrichment.js`, TMDB only — OMDB was retired 2026-07 and `rating` now carries TMDB's audience score), plus background `POST /api/enrich` fired from member pages. Watch links come from Watchmode (`_shared/watch-providers.js`), never pasted by a member. New rows inherit a sibling copy's real `network_url` when one exists.
 - **Networks:** `_shared/networks.js` is the source of truth for canonical streaming-service names, aliases, and search-URL templates. All incoming `network` values pass through `canonicalNetwork()`. **The apps don't hardcode the list** — `networkCatalog()` serves it at the public `GET /api/networks`, `ShowPickerCore.NetworkCatalog` is the client model (with a bundled seed and a "never render an empty picker" rule), and `NetworkCatalogStore` caches it. Adding a network is a server-only change that reaches installed apps.

@@ -13,6 +13,13 @@ struct GroupDetailView: View {
     // the same Member value the rest of the app navigates with.
     @State private var roster: [String: Member] = [:]
     @State private var trending: [PopularShow] = []
+    // The group's recommendation board, shaped for me by the server.
+    @State private var suggestions: [GroupSuggestion] = []
+    // The card the pop-up is currently asking about — "JC has recommended
+    // Lanterns", Dismiss / Add to Next Up. Advanced through the unanswered
+    // cards one at a time; nil when the queue is empty.
+    @State private var pendingPopup: GroupSuggestion?
+    @State private var responding = false
     @State private var loading = true
     @State private var errorText: String?
     @State private var selectedTab: Tab = .trending
@@ -28,6 +35,7 @@ struct GroupDetailView: View {
 
     enum Tab {
         case trending
+        case watchNext
         case members
     }
 
@@ -69,12 +77,33 @@ struct GroupDetailView: View {
 
                     Picker("Tab", selection: $selectedTab) {
                         Text("Trending").tag(Tab.trending)
+                        Text("Watch Next").tag(Tab.watchNext)
                         Text("Members").tag(Tab.members)
                     }
                     .pickerStyle(.segmented)
                     .padding()
 
-                    if selectedTab == .trending {
+                    if selectedTab == .watchNext {
+                        if suggestions.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "megaphone")
+                                    .font(.largeTitle)
+                                    .foregroundStyle(.secondary)
+                                Text("No recommendations yet")
+                                    .foregroundStyle(.secondary)
+                                Text("Recommend a show from its detail page and the group sees it here.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 32)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            List(suggestions) { suggestion in
+                                suggestionRow(suggestion)
+                            }
+                        }
+                    } else if selectedTab == .trending {
                         if trending.isEmpty {
                             VStack(spacing: 12) {
                                 Image(systemName: "flame")
@@ -160,6 +189,21 @@ struct GroupDetailView: View {
             Button("Save") { Task { await rename() } }
             Button("Cancel", role: .cancel) { }
         }
+        // JC's pop-up, verbatim: "JC has recommended Lanterns" with two
+        // buttons — Dismiss or Add to Next Up. One card at a time; both
+        // answers are per-member marks on the server, so dismissing here
+        // hides it for me and nobody else, and the card stays on the Watch
+        // Next board either way.
+        .alert(pendingPopup.map { "\($0.suggestedByName) has recommended \($0.title)" } ?? "",
+               isPresented: Binding(get: { pendingPopup != nil }, set: { if !$0 { pendingPopup = nil } }),
+               presenting: pendingPopup) { suggestion in
+            Button("Add to Next Up") { Task { await respondToPopup(suggestion, response: "add") } }
+            Button("Dismiss", role: .cancel) { Task { await respondToPopup(suggestion, response: "dismiss") } }
+        } message: { suggestion in
+            if let note = suggestion.note, !note.isEmpty {
+                Text("“\(note)”")
+            }
+        }
         // `item:`, never `isPresented:`. The invite arrives and the sheet opens
         // in the same state update, and a Bool-driven sheet presents the body
         // captured *before* that update — which is how the first "Invite
@@ -194,6 +238,85 @@ struct GroupDetailView: View {
     private func addedByCaption(_ show: PopularShow) -> String? {
         guard let names = show.members, !names.isEmpty else { return nil }
         return "Added by: \(names.joined(separator: ", "))"
+    }
+
+    // One card on the Watch Next board. Tappable through to the show's
+    // detail screen while the recommender's copy exists — the same
+    // cross-member id Trending rows navigate with — and a plain card once
+    // they've deleted it (the snapshot still names and pictures the show).
+    @ViewBuilder
+    private func suggestionRow(_ suggestion: GroupSuggestion) -> some View {
+        SwiftUI.Group {
+            if let showId = suggestion.showId {
+                NavigationLink(value: Route.detail(id: showId, title: suggestion.title,
+                                                   network: suggestion.network, rating: nil)) {
+                    suggestionCard(suggestion)
+                }
+            } else {
+                suggestionCard(suggestion)
+            }
+        }
+        .swipeActions(edge: .trailing) {
+            // The same two hands the server allows: the recommender
+            // retracting their own card, or the creator tidying the board.
+            if suggestion.isYours || (group?.isCreator ?? false) {
+                Button(role: .destructive) {
+                    Task { await removeSuggestion(suggestion) }
+                } label: {
+                    Label("Remove", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func suggestionCard(_ suggestion: GroupSuggestion) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            PosterThumb(url: suggestion.posterUrl, width: 45, height: 68)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(suggestion.title)
+                    .font(.headline)
+                Text(suggestion.isYours ? "Your recommendation"
+                                        : "Recommended by \(suggestion.suggestedByName)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let note = suggestion.note, !note.isEmpty {
+                    Text("“\(note)”")
+                        .font(.caption)
+                        .italic()
+                        .foregroundStyle(.secondary)
+                }
+                if !suggestion.addedNames.isEmpty {
+                    Text("Added by \(suggestion.addedNames.joined(separator: ", "))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                suggestionStatus(suggestion)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    // The card's action line: a checkmark once the title is on one of my
+    // lists, otherwise the same Add-to-Next-Up the pop-up offers — a dismiss
+    // isn't final, so the board keeps the door open.
+    @ViewBuilder
+    private func suggestionStatus(_ suggestion: GroupSuggestion) -> some View {
+        if let list = suggestion.onYourList, let l = ShowList(rawValue: list) {
+            Label("On your \(l.title) list", systemImage: "checkmark")
+                .font(.caption)
+                .foregroundStyle(.green)
+        } else if !suggestion.isYours {
+            Button {
+                Task { await respond(suggestion, response: "add") }
+            } label: {
+                Label("Add to Next Up", systemImage: "plus")
+                    .font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.borderless)
+            .tint(.orange)
+            .disabled(responding)
+        }
     }
 
     @ViewBuilder
@@ -289,6 +412,15 @@ struct GroupDetailView: View {
             self.trending = shows
             loading = false
 
+            // Non-fatally, like the roster below: a board that fails to load
+            // shouldn't blank the group. Then start the pop-up queue — this
+            // screen opening IS the delivery moment for "JC has recommended
+            // Lanterns" (there's no push infrastructure, by design).
+            if let board = try? await API.groupSuggestions(groupId: groupId) {
+                self.suggestions = board
+                advancePopup()
+            }
+
             // Roster last and non-fatally: it only decides whether a member
             // row is tappable, so a failure here shouldn't blank the group.
             if let all = try? await API.members() {
@@ -297,6 +429,49 @@ struct GroupDetailView: View {
         } catch {
             self.errorText = API.failureLine(error, action: "load group")
             loading = false
+        }
+    }
+
+    // The next unanswered card that isn't mine, if any.
+    private func advancePopup() {
+        pendingPopup = suggestions.first { $0.needsResponse }
+    }
+
+    // Answer from the pop-up: record it, then ask about the next card. A
+    // failed save ends the queue for this visit instead of re-presenting the
+    // same alert — the card stays unanswered server-side, so the next visit
+    // asks again.
+    @MainActor
+    private func respondToPopup(_ suggestion: GroupSuggestion, response: String) async {
+        if await respond(suggestion, response: response) {
+            advancePopup()
+        }
+    }
+
+    // Answer a card — "dismiss" or "add". Both are marks about ME on the
+    // server; "add" also puts the title on my own Next Up (or finds the copy
+    // I already have).
+    @MainActor
+    @discardableResult
+    private func respond(_ suggestion: GroupSuggestion, response: String) async -> Bool {
+        guard !responding else { return false }
+        responding = true
+        defer { responding = false }
+        guard let updated = try? await API.respondToGroupSuggestion(
+            groupId: groupId, suggestionId: suggestion.id, response: response) else { return false }
+        if let i = suggestions.firstIndex(where: { $0.id == updated.id }) {
+            suggestions[i] = updated
+        }
+        return true
+    }
+
+    @MainActor
+    private func removeSuggestion(_ suggestion: GroupSuggestion) async {
+        do {
+            _ = try await API.removeGroupSuggestion(groupId: groupId, suggestionId: suggestion.id)
+            suggestions.removeAll { $0.id == suggestion.id }
+        } catch {
+            self.errorText = API.failureLine(error, action: "remove recommendation")
         }
     }
 

@@ -575,6 +575,49 @@ enum API {
         return r.shows
     }
 
+    // The group's recommendation board — every card, shaped for this member
+    // (is_yours / your_response / on_your_list are about the session, not
+    // the card).
+    static func groupSuggestions(groupId: Int) async throws -> [GroupSuggestion] {
+        let r: GroupSuggestionsResponse = try await get("/api/groups/\(groupId)/suggestions")
+        return r.suggestions
+    }
+
+    // "Recommend to group": put my own copy of a show on the group's board.
+    // A duplicate title folds into the existing card server-side (200 rather
+    // than 201, same shape); the per-member daily ceiling comes back 429.
+    static func recommendToGroup(groupId: Int, showId: Int, note: String? = nil) async throws -> GroupSuggestion {
+        struct R: Decodable { let suggestion: GroupSuggestion }
+        let r: R = try await postJSON("/api/groups/\(groupId)/suggestions",
+                                      body: ["show_id": showId, "note": note])
+        return r.suggestion
+    }
+
+    // Answer a card's pop-up: response is "dismiss" or "add". Dismiss marks
+    // it seen for ME only; add pulls a copy onto MY OWN Next Up server-side
+    // (or honours the copy I already have, wherever it sits). Never touches
+    // anyone else's list.
+    static func respondToGroupSuggestion(groupId: Int, suggestionId: Int, response: String) async throws -> GroupSuggestion {
+        struct R: Decodable { let suggestion: GroupSuggestion }
+        let r: R = try await postJSON("/api/groups/\(groupId)/suggestions/\(suggestionId)",
+                                      body: ["response": response])
+        return r.suggestion
+    }
+
+    // Take a card down for everyone — the recommender retracting their own,
+    // or the group's creator tidying the board. 403 for anyone else.
+    @discardableResult
+    static func removeGroupSuggestion(groupId: Int, suggestionId: Int) async throws -> Bool {
+        guard let url = URL(string: baseString + "/api/groups/\(groupId)/suggestions/\(suggestionId)") else { throw APIError.badURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        let (_, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw APIError.badResponse((resp as? HTTPURLResponse)?.statusCode ?? -1)
+        }
+        return true
+    }
+
     static func createGroup(name: String) async throws -> (Group, GroupInvite) {
         struct CreateResponse: Decodable { let group: Group; let invite: GroupInvite }
         let r: CreateResponse = try await postJSON("/api/groups", body: ["name": name])

@@ -612,3 +612,131 @@ public struct GroupsResponse: Codable, Sendable {
         self.groups = groups
     }
 }
+
+// One card on a group's recommendation board ("Recommend to group", migration
+// 065), shaped by the server for the viewing member: `isYours` and
+// `yourResponse` decide whether the pop-up still asks them, `onYourList`
+// labels the Add button honestly, and `showId` is the recommender's copy —
+// the same cross-member id Trending cards navigate with, nil once they
+// delete that copy (the snapshot fields still render the card).
+public struct GroupSuggestion: Codable, Identifiable, Hashable, Sendable {
+    public let id: Int
+    public let groupId: Int
+    public let showId: Int?
+    public let title: String
+    public let tmdbId: Int?
+    public let isMovie: Bool
+    public let posterUrl: String?
+    public let network: String?
+    public let note: String?
+    public let createdAt: String?
+    public let suggestedBy: String
+    public let suggestedByName: String
+    public let isYours: Bool
+    /// "dismissed" or "added" once this member has answered; nil until then.
+    public let yourResponse: String?
+    public let addedCount: Int
+    public let addedNames: [String]
+    /// The list the viewer's own active copy sits on, nil if they have none.
+    public let onYourList: String?
+
+    /// Whether the pop-up should still ask this member: not their own card,
+    /// and not yet answered.
+    public var needsResponse: Bool { !isYours && yourResponse == nil }
+
+    public init(
+        id: Int,
+        groupId: Int,
+        showId: Int? = nil,
+        title: String,
+        tmdbId: Int? = nil,
+        isMovie: Bool = false,
+        posterUrl: String? = nil,
+        network: String? = nil,
+        note: String? = nil,
+        createdAt: String? = nil,
+        suggestedBy: String,
+        suggestedByName: String,
+        isYours: Bool = false,
+        yourResponse: String? = nil,
+        addedCount: Int = 0,
+        addedNames: [String] = [],
+        onYourList: String? = nil
+    ) {
+        self.id = id
+        self.groupId = groupId
+        self.showId = showId
+        self.title = title
+        self.tmdbId = tmdbId
+        self.isMovie = isMovie
+        self.posterUrl = posterUrl
+        self.network = network
+        self.note = note
+        self.createdAt = createdAt
+        self.suggestedBy = suggestedBy
+        self.suggestedByName = suggestedByName
+        self.isYours = isYours
+        self.yourResponse = yourResponse
+        self.addedCount = addedCount
+        self.addedNames = addedNames
+        self.onYourList = onYourList
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, note, network
+        case groupId = "group_id"
+        case showId = "show_id"
+        case tmdbId = "tmdb_id"
+        case isMovie = "movie"
+        case posterUrl = "poster_url"
+        case createdAt = "created_at"
+        case suggestedBy = "suggested_by"
+        case suggestedByName = "suggested_by_name"
+        case isYours = "is_yours"
+        case yourResponse = "your_response"
+        case addedCount = "added_count"
+        case addedNames = "added_names"
+        case onYourList = "on_your_list"
+    }
+
+    // D1 has no boolean type, so `movie` and `is_yours` arrive as 1/0 — read
+    // a real JSON boolean too, same as Group.isCreator. Everything beyond the
+    // card's identity decodes as absent-means-default so a payload trimmed by
+    // an older (or newer) server never fails the whole board.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        groupId = try c.decodeIfPresent(Int.self, forKey: .groupId) ?? 0
+        showId = try c.decodeIfPresent(Int.self, forKey: .showId)
+        title = try c.decode(String.self, forKey: .title)
+        tmdbId = try c.decodeIfPresent(Int.self, forKey: .tmdbId)
+        if let flag = try? c.decode(Bool.self, forKey: .isMovie) {
+            isMovie = flag
+        } else {
+            isMovie = (try c.decodeIfPresent(Int.self, forKey: .isMovie) ?? 0) != 0
+        }
+        posterUrl = try c.decodeIfPresent(String.self, forKey: .posterUrl)
+        network = try c.decodeIfPresent(String.self, forKey: .network)
+        note = try c.decodeIfPresent(String.self, forKey: .note)
+        createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
+        suggestedBy = try c.decodeIfPresent(String.self, forKey: .suggestedBy) ?? ""
+        suggestedByName = try c.decodeIfPresent(String.self, forKey: .suggestedByName) ?? suggestedBy
+        if let flag = try? c.decode(Bool.self, forKey: .isYours) {
+            isYours = flag
+        } else {
+            isYours = (try c.decodeIfPresent(Int.self, forKey: .isYours) ?? 0) != 0
+        }
+        yourResponse = try c.decodeIfPresent(String.self, forKey: .yourResponse)
+        addedCount = try c.decodeIfPresent(Int.self, forKey: .addedCount) ?? 0
+        addedNames = try c.decodeIfPresent([String].self, forKey: .addedNames) ?? []
+        onYourList = try c.decodeIfPresent(String.self, forKey: .onYourList)
+    }
+}
+
+public struct GroupSuggestionsResponse: Codable, Sendable {
+    public let suggestions: [GroupSuggestion]
+
+    public init(suggestions: [GroupSuggestion]) {
+        self.suggestions = suggestions
+    }
+}

@@ -68,6 +68,23 @@ Only people you already share a group with can appear, and only their first name
 
 Platforms: iPhone/iPad show it above Network on the show card; Apple TV shows the same line above the watch button (which is where the TV names the network). The watch app doesn't — private groups were dropped there. **The web doesn't** — it predates the line.
 
+### Watch Next (group recommendations)
+
+Every group has a **Watch Next board**: a shared list of titles members have recommended to the group, sitting on the group screen next to Trending. It's JC's pop-up on top of a group-owned board (shipped 2026-08, migration 065).
+
+Recommending: on a show that's on one of **your own** lists, tap **Recommend to group** (in the My Lists section of the show card). If you're in several groups you pick one; you can attach a short note, and the note is **visible to the whole group** — it's addressed to them, unlike the private Notes on your own rows. The show lands on the group's board as a card naming you.
+
+Receiving: next time a group-mate opens the group, they get a pop-up — *"JC has recommended Lanterns"*, with the note underneath — and two buttons:
+
+- **Add to Next Up** puts the title on **their own** Next Up list. If they already have it somewhere, nothing moves and no duplicate appears — the card just shows where it already sits. A copy created this way says "Recommended by JC" in the Recommended-by field.
+- **Dismiss** clears the pop-up **for them only**. The card stays on the board for everyone else, and they can still add it from the board later — a dismiss isn't final.
+
+Unanswered cards are asked about one at a time; your own recommendations never pop up at you. The board shows every card with who recommended it, the note, and who has added it so far. The recommender can retract their own card; the group's creator can remove any card. There is **no push notification** — delivery is the group screen itself, by design (the pop-up is attention enough; see the ceilings in [`INVARIANTS.md`](INVARIANTS.md) §12a).
+
+Nothing about recommending touches anyone's list. Adding is each member's own tap onto their own list — the retired suggest-a-show's problem (anyone pushing rows onto anyone) structurally can't recur, because the feature contains no cross-member write at all. Watching With remains the only one.
+
+Platforms: **iPhone/iPad** get all of it — recommend, pop-up, board (Mac via Catalyst). **Apple TV** shows the board as a read-only Watch Next shelf on the group screen — a couch is where "what should we watch next" gets asked — but can't recommend or answer. **The watch doesn't** — it has no groups. **The web doesn't** — frozen at its restored state (see [Web app status](#web-app-status)).
+
 ## Authentication
 
 A member logs in with a passkey (iPhone/iPad), a one-time code sent to their phone (SMS via Twilio Verify) or email (via Resend, validated against `login_otps`), or with Sign in with Apple (iOS and tvOS). All paths resolve to an existing member and set a 30-day HttpOnly session cookie. There are no static per-member passwords.
@@ -749,73 +766,22 @@ A few intentional omissions:
   read-only and no room. **The web doesn't** — it's frozen at its restored
   state (see [Web app status](#web-app-status)).
 
-- **Share / recommend a show within a group.** (JC, via Jennifer Biggs —
-  8/23/2026.) "A way to share or recommend shows within a group … like let's
-  watch this show together next." This is the retired suggest-a-show reborn at
-  the scope that could make it acceptable: the 2026-07 retirement was about
-  *anyone* pushing a row onto *anyone's* list once self-enroll opened the club,
-  but a group is a relationship both people opted into — the same argument that
-  admitted Watching With as the one surviving cross-member write.
-
-  **JC's concrete proposal** (via Jennifer — 8/25/2026): a button the
-  recommender taps on a show — "Recommend to group" — after which the group's
-  members get a pop-up ("JC has recommended Lanterns") with two buttons:
-  **Dismiss** or **Add to Next Up**.
-
-  How that maps onto the settled direction below: the receiving side already
-  complies. "Add to Next Up" is pull — the member's own tap through the normal
-  add path onto their own list — and Dismiss writes nothing, so there is still
-  no new cross-member write. Where it differs is delivery: a pop-up fanned out
-  to every group member is push *attention*, where the board is ambient. The
-  two compose rather than compete — the recommendation lands on the group's
-  board either way, and the pop-up is how a member first meets it: shown
-  in-app on next visit to the group (or as a badge on the group screen), since
-  the app has no push-notification infrastructure today and building APNs for
-  this would be far beyond ship-minimal. Dismiss clears the alert for that
-  member only and leaves the board entry for everyone else; Add to Next Up is
-  the "I'm in" of the board model collapsed into one tap. So JC's one-tap
-  framing becomes the UI, while the storage stays group-owned — a
-  per-member seen/dismissed mark on the suggestion row, not a copy pushed
-  into anyone's library.
-
-  The direction if built — settled when the request was assessed, so the call
-  doesn't have to be re-made later:
-
-  - **A group-owned "Watch Next" board, not a push.** Don't build "recommend a
-    show *to a person*" — even group-scoped, that puts rows on someone's list
-    without per-title consent, and Watching With only earns its write because
-    the claim is mutual and it never rearranges a list someone already made.
-    Instead: a small shared list that belongs to *the group*, not to any
-    member's library. Any group member proposes a title into it (optionally
-    with a note), others tap +1 / "I'm in", and adopting it is **pull** — one
-    tap adds it to *your own* Next Up via the normal add path. Zero new
-    cross-member writes; once people actually start, the existing Watching
-    With linking covers the "together" part. The gap this fills is the
-    *proposal* stage before anyone has added the show.
-  - **Visibility tier:** group-mates only, every route re-checking
-    `group_members` like the other group endpoints. Flag in
-    [`INVARIANTS.md`](INVARIANTS.md) that a note on a group suggestion is
-    **group-visible by design**, unlike the owner-only memos (`notes`,
-    `recommended_by`) on library rows.
-  - **Rough shape:** a `group_suggestions` table (group_id, title/tmdb ids,
-    suggested_by, note, created_at) plus votes, routes under
-    `functions/api/groups/[id]/`, UI on the iPhone/iPad group screen next to
-    Group Trending / Also Watching. Enrichment inherited from the suggester's
-    own copy (the `ensureCopy` pattern) so a suggestion doesn't cost a TMDB
-    call per viewer.
-  - **Ship minimal first.** The retired feature's autopsy (18 suggestions
-    ever, 1 in the trailing year, most never acted on) says suggestion
-    features here go unused. Propose + I'm in + add-to-my-list, no
-    votes-beyond-that/comments/threading, and see whether JC's group actually
-    uses it before elaborating.
-
-  Platforms if built: **iPhone/iPad** get it fully (Mac via Catalyst).
-  **Apple TV** shows the group's board read-only — fits its browse-only
-  posture, and a couch is where "what should we watch next" gets asked.
-  **The watch doesn't** — it has no groups at all. **The web doesn't** —
-  frozen at its restored state (see [Web app status](#web-app-status)).
-
 ## Shipped (formerly backlog)
+
+- **Share / recommend a show within a group** (JC, via Jennifer Biggs —
+  8/23/2026; JC's pop-up proposal 8/25/2026), shipped 2026-08 as
+  [Watch Next](#watch-next-group-recommendations). Built exactly to the
+  settled direction: a group-owned board with pull-only adoption, wearing
+  JC's UI — a "Recommend to group" button, and a pop-up ("JC has recommended
+  Lanterns") with Dismiss or Add to Next Up as its delivery layer. Zero new
+  cross-member writes (Watching With remains the only one); the note on a
+  card is group-visible by design; delivery is in-app on the next visit to
+  the group, no push infrastructure. Migration 065 (`group_suggestions` +
+  per-member `group_suggestion_responses`); rules in
+  [`INVARIANTS.md`](INVARIANTS.md) §12a, enforced by
+  `scripts/group-suggestions-test.mjs`. Shipped minimal per the retired
+  feature's autopsy — recommend + pop-up + board, no votes, no comments, no
+  threading — to see whether JC's group actually uses it before elaborating.
 
 - **Tag member friends** (Patrick — 7/26/2026), shipped 2026-08 as
   [Watching with](#watching-with). The scope question the backlog entry

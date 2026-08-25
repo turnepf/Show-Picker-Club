@@ -174,7 +174,7 @@ export async function attachAddedByMembers(env, rows, ownerSlug) {
 // are matched everywhere else in the app: by tmdb_id when both rows carry
 // one, else case-insensitively by title. Archived rows count — finding one is
 // what stops a tag from creating a second copy of something they shelved.
-async function copyForMember(env, memberSlug, { title, tmdb_id }) {
+export async function copyForMember(env, memberSlug, { title, tmdb_id }) {
   if (tmdb_id) {
     const byId = await env.DB.prepare(
       'SELECT * FROM shows WHERE member_slug = ? AND tmdb_id = ? LIMIT 1'
@@ -208,7 +208,11 @@ export async function validWatcherSlugs(env, ownerSlug, slugs) {
 // A created row inherits the source row's enrichment (poster, overview, cast,
 // ids) instead of re-fetching it — same title, same TMDB entry, and it keeps
 // a fan-out from multiplying upstream API calls by the size of the group.
-async function ensureCopy(env, memberSlug, source, list, taggerEmail) {
+//
+// Exported for group suggestions (_shared/group-suggestions.js), whose
+// "Add to Next Up" is the same operation pointed the other way: the member
+// pulls a copy of the recommender's row onto their own list.
+export async function ensureCopy(env, memberSlug, source, list, taggerEmail) {
   const existing = await copyForMember(env, memberSlug, source);
   if (existing) {
     if (existing.archived) {

@@ -137,6 +137,10 @@ export async function onRequestPost(context) {
       env.DB.prepare('DELETE FROM webauthn_challenges WHERE member_slug = ?').bind(slug),
       env.DB.prepare('DELETE FROM show_watchers WHERE member_slug = ?').bind(slug),
       env.DB.prepare('DELETE FROM show_watchers WHERE show_id IN (SELECT id FROM shows WHERE member_slug = ?)').bind(slug),
+      // Group boards (065): their recommendations go with them; their
+      // dismissed/added marks on other cards only ever shaped their own view.
+      env.DB.prepare('DELETE FROM group_suggestions WHERE suggested_by = ?').bind(slug),
+      env.DB.prepare('DELETE FROM group_suggestion_responses WHERE member_slug = ?').bind(slug),
       ...statements,
     ]);
   } catch (e) {

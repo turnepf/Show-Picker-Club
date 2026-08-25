@@ -255,6 +255,14 @@ enum API {
         return r.shows
     }
 
+    // The group's recommendation board. tvOS only reads it — recommending
+    // and answering happen on iPhone/iPad, matching this app's view-only
+    // posture.
+    static func groupSuggestions(groupId: Int) async throws -> [GroupSuggestion] {
+        let r: GroupSuggestionsResponse = try await get("/api/groups/\(groupId)/suggestions")
+        return r.suggestions
+    }
+
     // MARK: Error copy
 
     // One line a screen can show verbatim. A 401 means the session lapsed, and

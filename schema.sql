@@ -351,6 +351,35 @@ CREATE TABLE IF NOT EXISTS group_invites (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Migration 065: a title recommended to a group. The row belongs to the
+-- group, not to any member's library — adding is pull (the member's own tap
+-- copies it onto their own Next Up), dismissing is a per-member mark, and no
+-- cross-member write exists anywhere in the feature. Identity is snapshotted
+-- from the recommender's copy; show_id points at that copy for enrichment
+-- inheritance and nulls out if it is deleted. The note is group-visible by
+-- design, unlike the owner-only memos on library rows (docs/INVARIANTS.md).
+CREATE TABLE IF NOT EXISTS group_suggestions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  suggested_by TEXT NOT NULL REFERENCES members(slug) ON DELETE CASCADE,
+  show_id INTEGER REFERENCES shows(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  tmdb_id INTEGER,
+  movie INTEGER DEFAULT 0,
+  poster_url TEXT,
+  network TEXT,
+  note TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS group_suggestion_responses (
+  suggestion_id INTEGER NOT NULL REFERENCES group_suggestions(id) ON DELETE CASCADE,
+  member_slug TEXT NOT NULL REFERENCES members(slug) ON DELETE CASCADE,
+  response TEXT NOT NULL CHECK (response IN ('dismissed', 'added')),
+  created_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (suggestion_id, member_slug)
+);
+
 CREATE INDEX IF NOT EXISTS idx_members_enroll_ip ON members(enroll_ip, created_at);
 CREATE INDEX IF NOT EXISTS idx_member_phones_phone ON member_phones(phone);
 CREATE INDEX IF NOT EXISTS idx_member_phones_slug ON member_phones(member_slug);
@@ -385,3 +414,6 @@ CREATE INDEX IF NOT EXISTS idx_group_members_member ON group_members(member_slug
 CREATE INDEX IF NOT EXISTS idx_group_invites_group ON group_invites(group_id);
 CREATE INDEX IF NOT EXISTS idx_group_invites_token ON group_invites(token);
 CREATE INDEX IF NOT EXISTS idx_group_invites_expires ON group_invites(expires_at);
+CREATE INDEX IF NOT EXISTS idx_group_suggestions_group ON group_suggestions(group_id);
+CREATE INDEX IF NOT EXISTS idx_group_suggestions_by ON group_suggestions(suggested_by);
+CREATE INDEX IF NOT EXISTS idx_group_suggestion_responses_member ON group_suggestion_responses(member_slug);

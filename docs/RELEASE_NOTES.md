@@ -17,6 +17,15 @@ first two or three lines before "more", so the most useful change goes first.
 
 ## Unreleased — the update after 1.4
 
+**Recommend a show to your group.** Found something the group needs to see?
+Open the show, tap Recommend to group, and add a note if you like. Everyone
+in the group gets asked about it next time they open the group — one tap adds
+it to their own Next Up, or they can dismiss it. Every recommendation also
+lives on the group's new Watch Next board, so a dismissed pick can still be
+added later, and you can see who's in. Nothing is ever added to anyone's
+lists except by their own tap. On iPhone and iPad; Apple TV shows the
+group's Watch Next board on the group screen.
+
 *(Server-side, already live for everyone — listed so the story is complete,
 no app update required.)*
 
