@@ -34,6 +34,9 @@ no app update required.)*
   quietly swap in the older show with the same name a little while later.
   Your exact pick is now remembered for good, and two shows that share a name
   no longer trade posters, casts, or watch links.
+- And when a show has been remade, a plain title now means the new version.
+  Adding or importing one without picking a specific year lands on the
+  current show, not the decades-old original that happens to share its name.
 
 ---
 

@@ -174,8 +174,14 @@ globalThis.fetch = async (url) => {
   const u = new URL(url);
   if (u.pathname === '/3/search/tv') {
     const q = (u.searchParams.get('query') || '').toLowerCase();
-    // Popularity order, the way the real index answers: original first.
-    if (q === TITLE.toLowerCase()) return jsonRes({ results: [searchHit(ORIGINAL_ID), searchHit(REMAKE_ID)] });
+    // Popularity order, the way the real index answers — and adversarially: a
+    // dateless exact-titled junk entry first, then the popular original, then
+    // the remake. (Queries arrive with any "(YYYY)" suffix already stripped;
+    // the suffixed form returns nothing, like the real index often does.)
+    if (q === TITLE.toLowerCase()) {
+      const junk = { id: 999999, name: TITLE, first_air_date: '', poster_path: null };
+      return jsonRes({ results: [junk, searchHit(ORIGINAL_ID), searchHit(REMAKE_ID)] });
+    }
     if (q === 'fargo') return jsonRes({ results: [searchHit(FARGO_ID)] });
     return jsonRes({ results: [] });
   }
@@ -364,6 +370,34 @@ console.log('\n== a row nothing ever pinned still resolves by title search');
   check('cast lands too', castFor(env, id).join(',') === 'Allison Tolman', castFor(env, id).join(','));
 }
 
+console.log('\n== a bare title means the newest version, and a "(YYYY)" suffix pins its own');
+{
+  // Three unpinned copies of the remade title: a bare one, and one suffixed
+  // for each era — the shape real rows arrived in when TMDB's own entry was
+  // named "Little House on the Prairie (2026)".
+  const env = makeEnv();
+  addMember(env, 'whitt', 'Whitt Dorothy');
+  addMember(env, 'patrick', 'Patrick Turner');
+  addMember(env, 'jennifer', 'Jennifer Turner');
+  const bareId = addShow(env, { slug: 'whitt', title: TITLE });
+  const newId = addShow(env, { slug: 'jennifer', title: `${TITLE} (2026)` });
+  const oldId = addShow(env, { slug: 'patrick', title: `${TITLE} (1974)` });
+
+  await runEnrich(env, addSession(env, 'whitt'));
+  const bare = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(bareId) };
+  const suffNew = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(newId) };
+  const suffOld = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(oldId) };
+  check('a bare title resolves to the newest version, not the popular original',
+    bare.tmdb_id === REMAKE_ID, `got ${bare.tmdb_id}`);
+  check('a dateless junk entry never wins, however popular', bare.tmdb_id !== 999999);
+  check('"(2026)" resolves to the 2026 entry — the suffix searches stripped, picks pinned',
+    suffNew.tmdb_id === REMAKE_ID && (suffNew.poster_url || '').includes('/new-poster.jpg'),
+    `${suffNew.tmdb_id} / ${suffNew.poster_url}`);
+  check('"(1974)" still gets the original — the year hint outranks newest',
+    suffOld.tmdb_id === ORIGINAL_ID && suffOld.release_year === 1974,
+    `${suffOld.tmdb_id} / ${suffOld.release_year}`);
+}
+
 console.log('\n== the movie pass honors pins the same way');
 {
   const env = makeEnv();
@@ -390,8 +424,8 @@ console.log('\n== the movie pass honors pins the same way');
   check('overviews do not cross', pat.overview === 'The 1995 classic.' && jen.overview === 'The 2026 sequel-remake.',
     `${pat.overview} / ${jen.overview}`);
 
-  // An unpinned movie still resolves by search — and lands on the popular
-  // original, which is all a bare title can say.
+  // An unpinned movie still resolves by search — and a bare title means the
+  // newest version there too, not the popularity-ranked original.
   addMember(env, 'whitt', 'Whitt Dorothy');
   const unpinnedId = addShow(env, { slug: 'whitt', title: MOVIE_TITLE });
   env._db.prepare('UPDATE shows SET movie = 1 WHERE id = ?').run(unpinnedId);
@@ -399,7 +433,7 @@ console.log('\n== the movie pass honors pins the same way');
   await runEnrich(env, addSession(env, 'whitt'));
   const unpinned = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(unpinnedId) };
   check('an unpinned movie resolves by search', fetchLog.some((u) => u.includes('/search/movie')));
-  check('and stores the id it resolved to', unpinned.tmdb_id === MOVIE_ORIGINAL_ID, `got ${unpinned.tmdb_id}`);
+  check('and a bare movie title means the newest version', unpinned.tmdb_id === MOVIE_REMAKE_ID, `got ${unpinned.tmdb_id}`);
 }
 
 console.log('\n== artwork never crosses the identity boundary');

@@ -555,6 +555,17 @@ the original it remade), so a title is a display string, never an identifier.
 - **Grouped enrichment queues group by `(title, tmdb_id)`**, not title alone,
   so a pinned remake and its same-titled original each get their own fetch
   rather than whichever row the GROUP BY kept answering for both.
+- **When a bare title has to be resolved, the newest version wins.** For rows
+  nothing ever pinned, `pickBestMatch` prefers exact title matches as before,
+  but among several same-named entries it takes the newest dated one — the
+  club wants the current version of a remade show, not the one TMDB's
+  popularity ranking favors (stated by Patrick, 2026-08). A trailing
+  `"(YYYY)"` in the stored title pins that year's entry instead (and is
+  stripped from the search query itself, which often returns nothing for the
+  suffixed form). Dateless entries never beat dated ones — those are usually
+  catalog junk, not upcoming remakes. Every resolution path shares this
+  matcher: `fetchEnrichment`, `searchTmdbTitle`/`searchTmdbId` (list import,
+  TMDB backfill) and `enrich.js`'s lighter search.
 
 Enforcer: `scripts/enrich-identity-test.mjs` (every PR) — drives the add and
 `/api/enrich` against a fake TMDB serving two same-titled entries, popular

@@ -326,16 +326,48 @@ export async function fetchAvailability(tmdbId, mediaType, env) {
   }
 }
 
-// Pick the best TMDB search hit for a title: prefer an exact (case/space-
-// insensitive) title match — TMDB sorts by popularity, so a popular spin-off
-// ("Below Deck Mediterranean") can outrank the exact original ("Below
-// Deck") — and fall back to the most-popular result otherwise.
-function pickBestMatch(results, mediaType, title) {
-  const want = title.replace(/\s+/g, ' ').trim().toLowerCase();
-  return results.find(
-    (r) => ((mediaType === 'movie' ? r.title : r.name) || '')
-      .replace(/\s+/g, ' ').trim().toLowerCase() === want
-  ) || results[0];
+// Strip a trailing "(YYYY)" disambiguator from a stored title: members,
+// clients and TMDB itself write "Little House on the Prairie (2026)" to tell
+// a remake from the original it remade. TMDB's search matches better without
+// the suffix, and the year is exactly the hint that picks the right entry
+// out of the results.
+export function titleSearchTerms(title) {
+  const m = /^(.*\S)\s*\(((?:19|20)\d{2})\)\s*$/.exec(title || '');
+  return m ? { query: m[1], year: parseInt(m[2], 10) } : { query: title, year: null };
+}
+
+const normTitle = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+const resultDate = (r, mediaType) => (mediaType === 'movie' ? r.release_date : r.first_air_date) || '';
+
+// Pick the best TMDB search hit for a title. Exact (case/space-insensitive)
+// title matches beat popularity — TMDB sorts by popularity, so a popular
+// spin-off ("Below Deck Mediterranean") can outrank the exact original
+// ("Below Deck"). Among several exact matches — a remake next to the original
+// it remade, sharing one exact name — a "(YYYY)" year in the stored title
+// picks its own entry, and otherwise the NEWEST dated entry wins: when a
+// show has a current version, that's the one a member reaching for the bare
+// title means; nobody adds the 1974 series by accident the year the remake
+// lands. Dateless entries only win when nothing dated matches — an entry
+// with no date at all is more often catalog junk than an upcoming remake.
+// Exported for enrich.js's lighter search, so every title-resolution path
+// picks by the same rule.
+export function pickBestMatch(results, mediaType, title) {
+  const { query, year } = titleSearchTerms(title);
+  const want = normTitle(query);
+  const exact = results.filter(
+    (r) => normTitle(mediaType === 'movie' ? r.title : r.name) === want
+  );
+  if (!exact.length) return results[0];
+  if (year) {
+    const hinted = exact.find((r) => resultDate(r, mediaType).slice(0, 4) === String(year));
+    if (hinted) return hinted;
+  }
+  const dated = exact.filter((r) => resultDate(r, mediaType));
+  if (dated.length) {
+    return dated.reduce((best, r) =>
+      (resultDate(r, mediaType) > resultDate(best, mediaType) ? r : best));
+  }
+  return exact[0];
 }
 
 // Lightweight TMDB search: resolves just the canonical id + media type for a
@@ -362,11 +394,15 @@ export async function searchTmdbTitle(title, env, isMovie) {
   const token = env.TMDB_TOKEN;
   if (!token) return { ...empty, reason: 'no_tmdb_token' };
   const mediaTypes = isMovie ? ['movie', 'tv'] : ['tv', 'movie'];
+  // Search without a trailing "(YYYY)" — TMDB's index often returns nothing
+  // for the suffixed form; pickBestMatch still sees the full title, so the
+  // year keeps doing its disambiguation work on the results.
+  const { query } = titleSearchTerms(title);
   let reason = 'no_results';
   try {
     for (const t of mediaTypes) {
       const s = await tmdbFetch(
-        `/search/${t}?query=${encodeURIComponent(title)}&language=en-US&page=1`,
+        `/search/${t}?query=${encodeURIComponent(query)}&language=en-US&page=1`,
         token
       );
       if (s.results?.length) {
@@ -399,12 +435,15 @@ export async function fetchEnrichment(title, env, isMovie) {
 
   // ── TMDB path ──────────────────────────────────────────────────────────────
   if (token) {
+    // Same stripped-query rule as searchTmdbTitle: the "(YYYY)" suffix hurts
+    // the search and helps the pick.
+    const { query } = titleSearchTerms(title);
     try {
       let search = null;
       let mediaType = mediaTypes[0];
       for (const t of mediaTypes) {
         const s = await tmdbFetch(
-          `/search/${t}?query=${encodeURIComponent(title)}&language=en-US&page=1`,
+          `/search/${t}?query=${encodeURIComponent(query)}&language=en-US&page=1`,
           token
         );
         if (s.results?.length) { search = s; mediaType = t; break; }

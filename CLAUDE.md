@@ -226,7 +226,9 @@ pinned row by its id instead of re-guessing from the title — which is how a
 picked remake used to come back as the 1974 original — and every title-scoped
 propagation (catalog fields, cast, artwork, inherited URLs) stops at a copy
 pinned to a different id. Rows nothing ever pinned still resolve by title
-search, and store the id they resolve to.
+search, store the id they resolve to, and among same-named entries prefer the
+newest — a bare title means the current version of a remade show, and a
+trailing "(YYYY)" pins that year's entry instead.
 
 ```bash
 node scripts/auth-code-flow-test.mjs

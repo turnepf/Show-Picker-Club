@@ -1,6 +1,6 @@
 import { getSession } from '../_shared/auth.js';
 import { cronAuthorized } from '../_shared/secrets.js';
-import { fetchEnrichment, fetchEnrichmentById, extractTmdbDetailFields, fallbackNetwork, dedupeCast, CAST_DEPTH } from '../_shared/enrichment.js';
+import { fetchEnrichment, fetchEnrichmentById, extractTmdbDetailFields, fallbackNetwork, dedupeCast, CAST_DEPTH, pickBestMatch, titleSearchTerms } from '../_shared/enrichment.js';
 import { fillActorIdsFromKnownPeople, knownByPersonIds, rememberPeople } from '../_shared/people.js';
 
 // TMDB GET that works with either credential the worker has configured:
@@ -53,26 +53,24 @@ async function tmdbGet(path, env, attempt = 0) {
 
 // Best TMDB result for the title (or null). type is 'tv' | 'movie'.
 //
-// TMDB sorts search results by popularity, not title match, so a popular
-// spin-off outranks the exact-title original it was named after — a search for
-// "Below Deck" returns the more-popular "Below Deck Mediterranean" first, and
-// blindly taking results[0] pins the wrong poster on the original. So prefer a
-// result whose title matches the query exactly (case-insensitive); only fall
-// back to the first (most-popular) result when nothing matches exactly.
-function tmdbResultTitle(r, type) {
-  return ((type === 'movie' ? r.title : r.name) || '').replace(/\s+/g, ' ').trim().toLowerCase();
-}
+// The pick itself is the shared pickBestMatch (enrichment.js): exact title
+// match beats popularity, a "(YYYY)" suffix in the stored title pins the
+// year, and among several same-named entries the newest wins — the club
+// wants the current version of a remade show, not the original TMDB's
+// popularity ranking favors. The search query goes out with the year suffix
+// stripped, since TMDB often returns nothing for the suffixed form.
+//
 // null means one thing only: TMDB answered, and has no such title. Errors are
 // deliberately NOT caught here — the callers treat null as "hopeless, stamp it
 // and move on", so swallowing a transient failure into null is what silently
 // retired real titles. Let it throw; the per-show catch counts it as an error
 // and leaves enriched_at untouched for a genuine retry.
 async function tmdbSearchFirst(title, type, env) {
-  const data = await tmdbGet(`/search/${type}?query=${encodeURIComponent(title)}`, env);
+  const { query } = titleSearchTerms(title);
+  const data = await tmdbGet(`/search/${type}?query=${encodeURIComponent(query)}`, env);
   const results = (data && data.results) || [];
   if (!results.length) return null;
-  const want = title.replace(/\s+/g, ' ').trim().toLowerCase();
-  return results.find((r) => tmdbResultTitle(r, type) === want) || results[0];
+  return pickBestMatch(results, type, title);
 }
 
 // Store the cast TMDB just handed us, CAST_DEPTH deep and in billing order,
