@@ -17,7 +17,14 @@ first two or three lines before "more", so the most useful change goes first.
 
 ## Unreleased — the update after 1.4
 
-Nothing here yet. Add user-facing work as it merges.
+*(Server-side, already live for everyone — listed so the story is complete,
+no app update required.)*
+
+- Picking a remake or rerelease now sticks. If you chose the new version of a
+  show from search — say the new Little House on the Prairie — the app used to
+  quietly swap in the older show with the same name a little while later.
+  Your exact pick is now remembered for good, and two shows that share a name
+  no longer trade posters, casts, or watch links.
 
 ---
 

@@ -199,6 +199,20 @@ network, rating, poster) alongside the legacy bare-title `shows` array. On the T
 to 10 on junk.
 
 ```bash
+node scripts/enrich-identity-test.mjs
+```
+
+A stored `tmdb_id` is the row's identity, on the same harness with a fake
+TMDB serving two entries that share one exact title (a remake next to the
+original it remade, popularity-ordered the way the real index is). Pins the
+rule that fixed the rerelease bug: the background `/api/enrich` passes fetch a
+pinned row by its id instead of re-guessing from the title — which is how a
+picked remake used to come back as the 1974 original — and every title-scoped
+propagation (catalog fields, cast, artwork, inherited URLs) stops at a copy
+pinned to a different id. Rows nothing ever pinned still resolve by title
+search, and store the id they resolve to.
+
+```bash
 node scripts/auth-code-flow-test.mjs
 ```
 

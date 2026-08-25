@@ -15,6 +15,7 @@ catch different classes of mistake:
 | Reporting platform tests (`scripts/reporting-platform-test.mjs`) | every PR | `/api/reporting` stays admin-only, and the platform breakdown counts people rather than sessions |
 | List import tests (`scripts/import-list-test.mjs`) | every PR | The paste-a-list path: what a model may and may not put in the database, paging, and the commit-side validation |
 | Network tests (`scripts/networks-test.mjs`) | every PR | The canonical table: a name claimed by two services, and the catalog `/api/networks` serves to the apps |
+| Enrichment identity tests (`scripts/enrich-identity-test.mjs`) | every PR | A stored `tmdb_id` is the row's identity: enrichment never re-guesses a pinned row by title, and propagation never crosses two entries sharing one title |
 | `scripts/smoke.sh` | after deploy, and nightly | Live behavior: auth gates, headers, leakage, redirects |
 | Invariants review (`.github/workflows/pr-review.yml`) | every PR | Judgement calls the four above can't express |
 
@@ -496,6 +497,34 @@ gets file protection on the way down.
 
 Enforcer: review, plus `SessionStore`'s own structure — the plaintext slot has
 no writer left, only the migrating reader.
+
+## 17. A stored `tmdb_id` is the row's identity
+
+*Broke in 2026-08.* A member picked the new Little House on the Prairie from
+type-ahead search and the 1974 original appeared on her Watching list. The add
+had stored her pick correctly; the next `/api/enrich` rotation re-resolved the
+row **by title**, and TMDB's popularity-ordered search returned the original —
+same exact name — whose poster, year, overview, cast and "Ended" status then
+overwrote hers. Two TMDB entries can share one exact title (a remake next to
+the original it remade), so a title is a display string, never an identifier.
+
+- **Enrichment never re-guesses a pinned row.** A row with a `tmdb_id` is
+  fetched by that id; the title search serves only rows nothing ever pinned,
+  or an id TMDB no longer serves (404). The pick made in type-ahead — or the
+  id a previous search resolved — is the row's identity from then on.
+- **Title-scoped propagation stops at an identity boundary.** Catalog fields,
+  cast, artwork and URLs copied "to every copy of the title" skip copies
+  pinned to a *different* `tmdb_id` — those are a different show. This covers
+  the enrich passes, the cast refresh, the artwork syncs (write-time and
+  display-time), add-time network/URL inheritance, and the Watchmode URL
+  propagation.
+- **Grouped enrichment queues group by `(title, tmdb_id)`**, not title alone,
+  so a pinned remake and its same-titled original each get their own fetch
+  rather than whichever row the GROUP BY kept answering for both.
+
+Enforcer: `scripts/enrich-identity-test.mjs` (every PR) — drives the add and
+`/api/enrich` against a fake TMDB serving two same-titled entries, popular
+original first, and asserts each pin keeps its own data.
 
 ## Adding an invariant
 

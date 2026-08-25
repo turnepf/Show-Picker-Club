@@ -212,12 +212,17 @@ export async function onRequestPut(context) {
     network_url.includes('/search') || network_url.includes('/s?') ||
     network_url.includes('?q=') || network_url.includes('?query=');
   if (finalNetwork && (networkChanged || onPlaceholder)) {
+    // Propagates only to copies of the same TMDB entry (or unpinned ones) —
+    // a same-titled row pinned to a different entry streams a different show.
+    const rowTmdbId = enriched.tmdbId || existing.tmdb_id || null;
     context.waitUntil((async () => {
       const realUrl = await lookupWatchmodeUrl(env, title, finalNetwork, !!movie);
       if (realUrl) {
         await env.DB.prepare(
-          "UPDATE shows SET network_url = ?, enriched_at = datetime('now') WHERE LOWER(title) = LOWER(?) AND archived = 0"
-        ).bind(realUrl, title).run();
+          `UPDATE shows SET network_url = ?, enriched_at = datetime('now')
+            WHERE LOWER(title) = LOWER(?) AND archived = 0
+              AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)`
+        ).bind(realUrl, title, rowTmdbId, rowTmdbId).run();
       }
     })());
   }

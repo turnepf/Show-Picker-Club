@@ -82,6 +82,8 @@ jobs:
         run: node scripts/networks-test.mjs
       - name: Favorite actors, and what counts as trending
         run: node scripts/favorite-actors-test.mjs
+      - name: Enrichment honors the member's exact TMDB pick
+        run: node scripts/enrich-identity-test.mjs
 
   listimport:
     runs-on: ubuntu-latest

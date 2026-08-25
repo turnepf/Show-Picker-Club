@@ -1,6 +1,6 @@
 import { getSession } from '../_shared/auth.js';
 import { cronAuthorized } from '../_shared/secrets.js';
-import { fetchEnrichment, extractTmdbDetailFields, fallbackNetwork, dedupeCast, CAST_DEPTH } from '../_shared/enrichment.js';
+import { fetchEnrichment, fetchEnrichmentById, extractTmdbDetailFields, fallbackNetwork, dedupeCast, CAST_DEPTH } from '../_shared/enrichment.js';
 import { fillActorIdsFromKnownPeople, knownByPersonIds, rememberPeople } from '../_shared/people.js';
 
 // TMDB GET that works with either credential the worker has configured:
@@ -80,8 +80,10 @@ async function tmdbSearchFirst(title, type, env) {
 // table when we've seen the person before (no request), and are looked up
 // only while the subrequest budget allows — anyone left unresolved is picked
 // up by a later round or by the free cache pass, so a tight budget costs
-// links, never the cast itself.
-async function refreshCastFromDetail(env, show, detail) {
+// links, never the cast itself. Copies pinned to a DIFFERENT tmdb_id are a
+// different show that happens to share the title (a remake next to the
+// original) — their cast is not this cast, so they keep their own rows.
+async function refreshCastFromDetail(env, show, detail, tmdbId) {
   const cast = dedupeCast(detail.credits?.cast).slice(0, CAST_DEPTH);
   if (!cast.length) return;
   const known = await knownByPersonIds(env, cast.map(p => p.id));
@@ -99,8 +101,10 @@ async function refreshCastFromDetail(env, show, detail) {
   await rememberPeople(env, people).catch(() => {});
 
   const { results: copies } = await env.DB.prepare(
-    'SELECT id FROM shows WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?) AND archived = 0'
-  ).bind(show.id).all();
+    `SELECT id FROM shows
+      WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?) AND archived = 0
+        AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)`
+  ).bind(show.id, tmdbId ?? null, tmdbId ?? null).all();
   const insert = env.DB.prepare(
     'INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id) VALUES (?, ?, ?, ?, ?)'
   );
@@ -116,26 +120,31 @@ async function refreshCastFromDetail(env, show, detail) {
 // fetched for one member's copy covers everyone's, so no TMDB budget should
 // ever be spent on a title that already has artwork somewhere. Pure DB work,
 // zero subrequests. (New fetches also propagate at write time; this sweep
-// catches the backlog from before that existed.)
+// catches the backlog from before that existed.) A sibling pinned to a
+// different tmdb_id is a different show sharing the title — never a donor.
 async function syncArtworkAcrossCopies(env) {
   await env.DB.prepare(
     `UPDATE shows SET poster_url = (
         SELECT s2.poster_url FROM shows s2
          WHERE LOWER(s2.title) = LOWER(shows.title)
+           AND (s2.tmdb_id IS NULL OR shows.tmdb_id IS NULL OR s2.tmdb_id = shows.tmdb_id)
            AND s2.archived = 0 AND s2.poster_url IS NOT NULL LIMIT 1)
       WHERE archived = 0 AND poster_url IS NULL
         AND EXISTS (SELECT 1 FROM shows s2
                      WHERE LOWER(s2.title) = LOWER(shows.title)
+                       AND (s2.tmdb_id IS NULL OR shows.tmdb_id IS NULL OR s2.tmdb_id = shows.tmdb_id)
                        AND s2.archived = 0 AND s2.poster_url IS NOT NULL)`
   ).run();
   await env.DB.prepare(
     `UPDATE shows SET network_logo_url = (
         SELECT s2.network_logo_url FROM shows s2
          WHERE LOWER(s2.title) = LOWER(shows.title)
+           AND (s2.tmdb_id IS NULL OR shows.tmdb_id IS NULL OR s2.tmdb_id = shows.tmdb_id)
            AND s2.archived = 0 AND s2.network_logo_url IS NOT NULL LIMIT 1)
       WHERE archived = 0 AND network_logo_url IS NULL
         AND EXISTS (SELECT 1 FROM shows s2
                      WHERE LOWER(s2.title) = LOWER(shows.title)
+                       AND (s2.tmdb_id IS NULL OR shows.tmdb_id IS NULL OR s2.tmdb_id = shows.tmdb_id)
                        AND s2.archived = 0 AND s2.network_logo_url IS NOT NULL)`
   ).run();
 }
@@ -233,17 +242,21 @@ export async function onRequestPost(context) {
     // the fetch propagates to every copy.
     const TV_GAP = `(NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id)
                      OR episodes_released IS NULL)`;
+    // Grouped by (title, tmdb_id), not title alone: two members can hold two
+    // different TMDB entries under one title (a remake next to its original),
+    // and each pin deserves its own fetch — one row per title would let
+    // whichever copy the GROUP BY happened to keep answer for both.
     const tvSelect = skipOmdb
-      ? `SELECT id, title, movie, list, network_url FROM shows
+      ? `SELECT id, title, movie, list, network_url, tmdb_id, tmdb_type FROM shows
           WHERE ${tvWhere} AND poster_url IS NULL
-          GROUP BY LOWER(title)
+          GROUP BY LOWER(title), tmdb_id
           ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
       : gapsOnly
-      ? `SELECT id, title, movie, list, network_url FROM shows
+      ? `SELECT id, title, movie, list, network_url, tmdb_id, tmdb_type FROM shows
           WHERE ${tvWhere} AND ${TV_GAP}
-          GROUP BY LOWER(title)
+          GROUP BY LOWER(title), tmdb_id
           ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
-      : `SELECT id, title, movie, list, network_url FROM shows
+      : `SELECT id, title, movie, list, network_url, tmdb_id, tmdb_type FROM shows
           WHERE ${tvWhere}
           ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`;
     const tmdbStmt = env.DB.prepare(tvSelect).bind(...tvBinds, maxTmdb);
@@ -255,28 +268,50 @@ export async function onRequestPost(context) {
       // can't finish.
       if (budgetLeft() < 3) { budgetExhausted = true; break; }
       try {
-        // Search TMDB for the show by its stored title.
-        const first = await tmdbSearchFirst(show.title, 'tv', env);
-        if (!first) {
-          // Stamp enriched_at so a title TMDB can't match rotates to the back
-          // of the oldest-first queue instead of blocking it every round. (A DB
-          // write, not a fetch — it doesn't count against the subrequest cap.)
-          // Every copy of the title, not just this row: the posters-mode batch
-          // groups by title and sorts by the group's oldest stamp, so one
-          // unstamped sibling would pin a hopeless title to the front forever.
-          await env.DB.prepare(
-            `UPDATE shows SET enriched_at = datetime('now')
-              WHERE archived = 0
-                AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
-          ).bind(show.id).run();
-          continue;
+        // A stored tmdb_id is the row's identity — the member's exact
+        // type-ahead pick, or a previously resolved lookup — so fetch that
+        // entry directly. Re-guessing from the title is what used to swap a
+        // picked remake for the more-popular original sharing the exact same
+        // name (Little House on the Prairie, 2026-08): TMDB sorts by
+        // popularity, both entries exact-match, and the next rotation
+        // overwrote the pick. The title search remains only for rows with no
+        // id yet, and for an id TMDB no longer serves.
+        let tmdbId = (show.tmdb_id && show.tmdb_type !== 'movie') ? show.tmdb_id : null;
+        let detail = null;
+        if (tmdbId) {
+          try {
+            // append_to_response folds videos/providers/content-ratings into
+            // the one detail call we already make — no extra subrequest budget.
+            detail = await tmdbGet(
+              `/tv/${tmdbId}?append_to_response=videos,watch/providers,content_ratings,credits`, env);
+          } catch (e) {
+            // Only a dead id (the entry was removed) falls back to the title
+            // search; rate limits and outages stay real errors for the outer
+            // catch, so the row keeps its place in the queue and retries.
+            if (!String(e && e.message).includes('TMDB 404')) throw e;
+            tmdbId = null;
+          }
         }
-
-        const tmdbId = first.id;
-        // append_to_response folds videos/providers/content-ratings into the
-        // one detail call we already make — no extra subrequest budget.
-        const detail = await tmdbGet(
-          `/tv/${tmdbId}?append_to_response=videos,watch/providers,content_ratings,credits`, env);
+        if (!detail) {
+          const first = await tmdbSearchFirst(show.title, 'tv', env);
+          if (!first) {
+            // Stamp enriched_at so a title TMDB can't match rotates to the back
+            // of the oldest-first queue instead of blocking it every round. (A DB
+            // write, not a fetch — it doesn't count against the subrequest cap.)
+            // Every copy of the title, not just this row: the posters-mode batch
+            // groups by title and sorts by the group's oldest stamp, so one
+            // unstamped sibling would pin a hopeless title to the front forever.
+            await env.DB.prepare(
+              `UPDATE shows SET enriched_at = datetime('now')
+                WHERE archived = 0
+                  AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
+            ).bind(show.id).run();
+            continue;
+          }
+          tmdbId = first.id;
+          detail = await tmdbGet(
+            `/tv/${tmdbId}?append_to_response=videos,watch/providers,content_ratings,credits`, env);
+        }
         const df = extractTmdbDetailFields(detail, 'tv');
         const directorImdbId = await personImdbId(df.directorPersonId, env);
 
@@ -381,17 +416,20 @@ export async function onRequestPost(context) {
               -- the club's ratings on that title.
               tmdb_id = COALESCE(tmdb_id, ?), tmdb_type = COALESCE(tmdb_type, 'tv')
             WHERE archived = 0
-              AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
+              AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)
+              -- Same title, different pinned id = a different show (remake
+              -- vs original) — its copies keep their own catalog data.
+              AND (tmdb_id IS NULL OR tmdb_id = ?)`
         ).bind(posterUrl, networkLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating,
           df.trailerKey, df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.watchLink,
           df.episodesReleased, df.voteCount, df.tagline, df.originalLanguage, df.studio,
-          tmdbId, show.id).run();
+          tmdbId, show.id, tmdbId).run();
 
         // Cast comes free with the detail call we just made — this pass used
         // to ignore it entirely, which is why a title enriched here kept
         // whatever shallow cast it was first given. Only people we've never
         // resolved cost a request, and only while the budget holds.
-        await refreshCastFromDetail(env, show, detail);
+        await refreshCastFromDetail(env, show, detail, tmdbId);
         tmdbUpdated++;
       } catch (e) {
         tvErrors++;
@@ -418,11 +456,13 @@ export async function onRequestPost(context) {
     const mvBinds = [];
     if (member) { mvWhere += ` AND member_slug = ?`; mvBinds.push(member); }
     if (titles) { mvWhere += ` AND LOWER(title) IN (${titles.map(() => '?').join(',')})`; mvBinds.push(...titles); }
-    // One row per title — the fetch propagates to every copy, and the artwork
-    // sync above already filled anything a sibling could cover.
+    // One row per (title, tmdb_id) — the fetch propagates to the copies that
+    // share the identity, and the artwork sync above already filled anything
+    // a sibling could cover. Grouping by id too keeps a remake pinned next to
+    // its same-titled original from being answered by the wrong entry.
     const movieStmt = env.DB.prepare(
-      `SELECT id, title, network_url FROM shows WHERE ${mvWhere}
-        GROUP BY LOWER(title)
+      `SELECT id, title, network_url, tmdb_id, tmdb_type FROM shows WHERE ${mvWhere}
+        GROUP BY LOWER(title), tmdb_id
         ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
     ).bind(...mvBinds, maxTmdb);
     const { results: movieShows } = await movieStmt.all();
@@ -430,24 +470,44 @@ export async function onRequestPost(context) {
 
     for (const show of movieShows) {
       try {
-        const first = await tmdbSearchFirst(show.title, 'movie', env);
-        if (!first) {
-          // No match — stamp so the title rotates to the back instead of
-          // pinning the front of the grouped-by-title queue.
-          await env.DB.prepare(
-            `UPDATE shows SET enriched_at = datetime('now')
-              WHERE archived = 0 AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
-          ).bind(show.id).run();
-          continue;
+        // Same identity rule as the TV pass: a stored tmdb_id is fetched
+        // directly, and the title search only serves rows with no id (or a
+        // dead one) — so a picked rerelease can't be re-resolved to the
+        // more-popular original film of the same name.
+        let tmdbId = (show.tmdb_id && show.tmdb_type !== 'tv') ? show.tmdb_id : null;
+        let detail = null;
+        let searchPoster = null;
+        if (tmdbId) {
+          try {
+            detail = await tmdbGet(
+              `/movie/${tmdbId}?append_to_response=videos,watch/providers,release_dates,credits`, env);
+          } catch (e) {
+            if (!String(e && e.message).includes('TMDB 404')) throw e;
+            tmdbId = null;
+          }
         }
-        // One detail call (append folds in videos/providers/release_dates/credits)
-        // gets the poster AND the rich fields — same subrequest budget as before
-        // plus this single GET per matched movie.
-        const detail = await tmdbGet(
-          `/movie/${first.id}?append_to_response=videos,watch/providers,release_dates,credits`, env);
+        if (!detail) {
+          const first = await tmdbSearchFirst(show.title, 'movie', env);
+          if (!first) {
+            // No match — stamp so the title rotates to the back instead of
+            // pinning the front of the grouped-by-title queue.
+            await env.DB.prepare(
+              `UPDATE shows SET enriched_at = datetime('now')
+                WHERE archived = 0 AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
+            ).bind(show.id).run();
+            continue;
+          }
+          tmdbId = first.id;
+          searchPoster = first.poster_path;
+          // One detail call (append folds in videos/providers/release_dates/credits)
+          // gets the poster AND the rich fields — same subrequest budget as before
+          // plus this single GET per matched movie.
+          detail = await tmdbGet(
+            `/movie/${tmdbId}?append_to_response=videos,watch/providers,release_dates,credits`, env);
+        }
         const df = extractTmdbDetailFields(detail, 'movie');
         const directorImdbId = await personImdbId(df.directorPersonId, env);
-        const posterPath = detail.poster_path || first.poster_path;
+        const posterPath = detail.poster_path || searchPoster;
         const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
         const genres = (detail.genres || []).map(g => g.name).join(', ') || null;
         // Title-scoped: fills every member's copy in one go (fill-only COALESCE,
@@ -474,11 +534,14 @@ export async function onRequestPost(context) {
               tmdb_id = COALESCE(tmdb_id, ?), tmdb_type = COALESCE(tmdb_type, 'movie'),
               enriched_at = datetime('now')
             WHERE archived = 0
-              AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
+              AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)
+              -- Copies pinned to a different id are a different film that
+              -- shares the title — they get their own turn, not this data.
+              AND (tmdb_id IS NULL OR tmdb_id = ?)`
         ).bind(posterUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey,
           df.director, directorImdbId, df.runtime, df.releaseYear, genres, fallbackNetwork(df), df.watchLink,
           df.voteCount, df.tagline, df.originalLanguage, df.studio,
-          first.id, show.id).run();
+          tmdbId, show.id, tmdbId).run();
         if (posterUrl) tmdbUpdated++;
       } catch (e) {
         movieErrors++;
@@ -523,13 +586,15 @@ export async function onRequestPost(context) {
     // shrinks all of it rather than just its first half.
     const actorDefault = Number.isFinite(maxTmdb) ? Math.min(8, Math.max(1, maxTmdb)) : 8;
     const maxActorImdb = parseInt(body.max_actor_imdb ?? String(actorDefault), 10);
-    const backfillBase = `SELECT s.title, MAX(s.movie) AS movie
+    // Grouped by (title, tmdb_id) like the passes above, so a pinned remake
+    // and its same-titled original each refresh from their own entry.
+    const backfillBase = `SELECT s.title, MAX(s.movie) AS movie, s.tmdb_id, MAX(s.tmdb_type) AS tmdb_type
        FROM shows s
        WHERE s.archived = 0
          AND EXISTS (SELECT 1 FROM actors a WHERE a.show_id = s.id AND a.imdb_id IS NULL)`;
     const backfillStmt = member
-      ? env.DB.prepare(`${backfillBase} AND s.member_slug = ? GROUP BY LOWER(s.title) ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(member, maxActorImdb)
-      : env.DB.prepare(`${backfillBase} GROUP BY LOWER(s.title) ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(maxActorImdb);
+      ? env.DB.prepare(`${backfillBase} AND s.member_slug = ? GROUP BY LOWER(s.title), s.tmdb_id ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(member, maxActorImdb)
+      : env.DB.prepare(`${backfillBase} GROUP BY LOWER(s.title), s.tmdb_id ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(maxActorImdb);
     const { results: backfillShows } = await backfillStmt.all();
 
     // fetchEnrichment does its own fetching and doesn't touch `spent`, so
@@ -540,15 +605,24 @@ export async function onRequestPost(context) {
       if (budgetLeft() - actorSpend < ACTOR_TITLE_COST) { budgetExhausted = true; break; }
       actorSpend += ACTOR_TITLE_COST;
       try {
-        const result = await fetchEnrichment(show.title, env, !!show.movie);
+        // A stored tmdb_id is enriched directly (the pick is the identity);
+        // the title search only covers rows nothing ever pinned.
+        const result = show.tmdb_id
+          ? await fetchEnrichmentById(show.tmdb_id, show.tmdb_type || (show.movie ? 'movie' : 'tv'), env)
+          : await fetchEnrichment(show.title, env, !!show.movie);
         const actors = result.actors || [];
         // Only act when TMDB actually returned IMDB ids. If it found nothing
         // (all ids null), leave the existing cast untouched.
         if (!actors.some(a => a.imdb_id)) continue;
 
+        // Guard on the entry this cast actually came from — for a NULL-id
+        // group that's whatever the title search resolved to, and a sibling
+        // pinned to a different entry keeps its own cast either way.
+        const castFromId = result.tmdbId ?? show.tmdb_id ?? null;
         const { results: copies } = await env.DB.prepare(
-          'SELECT id FROM shows WHERE LOWER(title) = LOWER(?) AND archived = 0'
-        ).bind(show.title).all();
+          `SELECT id FROM shows WHERE LOWER(title) = LOWER(?) AND archived = 0
+             AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)`
+        ).bind(show.title, castFromId, castFromId).all();
         const insert = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id) VALUES (?, ?, ?, ?, ?)');
         for (const copy of copies) {
           await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(copy.id).run();
