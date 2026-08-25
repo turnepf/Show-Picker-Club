@@ -757,6 +757,27 @@ A few intentional omissions:
   but a group is a relationship both people opted into — the same argument that
   admitted Watching With as the one surviving cross-member write.
 
+  **JC's concrete proposal** (via Jennifer — 8/25/2026): a button the
+  recommender taps on a show — "Recommend to group" — after which the group's
+  members get a pop-up ("JC has recommended Lanterns") with two buttons:
+  **Dismiss** or **Add to Next Up**.
+
+  How that maps onto the settled direction below: the receiving side already
+  complies. "Add to Next Up" is pull — the member's own tap through the normal
+  add path onto their own list — and Dismiss writes nothing, so there is still
+  no new cross-member write. Where it differs is delivery: a pop-up fanned out
+  to every group member is push *attention*, where the board is ambient. The
+  two compose rather than compete — the recommendation lands on the group's
+  board either way, and the pop-up is how a member first meets it: shown
+  in-app on next visit to the group (or as a badge on the group screen), since
+  the app has no push-notification infrastructure today and building APNs for
+  this would be far beyond ship-minimal. Dismiss clears the alert for that
+  member only and leaves the board entry for everyone else; Add to Next Up is
+  the "I'm in" of the board model collapsed into one tap. So JC's one-tap
+  framing becomes the UI, while the storage stays group-owned — a
+  per-member seen/dismissed mark on the suggestion row, not a copy pushed
+  into anyone's library.
+
   The direction if built — settled when the request was assessed, so the call
   doesn't have to be re-made later:
 
