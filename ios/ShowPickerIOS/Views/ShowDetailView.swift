@@ -57,14 +57,10 @@ struct ShowDetailView: View {
         Form {
             // One hero image (backdrop preferred, else poster). No tap-to-
             // enlarge — the affordance confused people.
-            if let b = show?.backdropUrl, !b.isEmpty, let url = URL(string: b) {
+            if let b = show?.backdropUrl, !b.isEmpty, URL(string: b) != nil {
                 Section {
-                    AsyncImage(url: url) { phase in
-                        if let img = phase.image {
-                            img.resizable().scaledToFit()
-                        } else {
-                            Color(.secondarySystemBackground)
-                        }
+                    CachedImage(url: b, contentMode: .fit) {
+                        Color(.secondarySystemBackground)
                     }
                     // Keep the backdrop's natural 16:9 shape so it fills the
                     // width without cropping. A fixed short height + scaledToFill

@@ -11,8 +11,11 @@ import UIKit
 // static snapshot and can't load images themselves — so each entry carries
 // small poster thumbnails as raw Data.
 
-// One show as a widget renders it, art included.
-struct WidgetShow: Identifiable, Hashable {
+// One show as a widget renders it, art included. Codable because each
+// successful fetch is snapshotted to the App Group (WidgetSnapshotCache) and
+// replayed when a later refresh fails — an offline widget shows the last good
+// rows instead of "Nothing trending yet" / "Nothing dated coming up".
+struct WidgetShow: Identifiable, Hashable, Codable {
     let id: Int
     let title: String
     let network: String?
@@ -56,7 +59,13 @@ enum WidgetData {
     private struct PopularResponse: Decodable { let shows: [PopularRow] }
 
     static func trending(limit: Int) async -> [WidgetShow] {
-        guard let rows: PopularResponse = await getJSON(path: "/api/popular") else { return [] }
+        // The snapshot is keyed per limit because each widget family fetches
+        // its own row count — a small widget's one-row snapshot shouldn't
+        // starve a large widget of its six.
+        let cacheKey = "trending-\(limit)"
+        guard let rows: PopularResponse = await getJSON(path: "/api/popular") else {
+            return WidgetSnapshotCache.load([WidgetShow].self, for: cacheKey) ?? []
+        }
         var out: [WidgetShow] = []
         for row in rows.shows.prefix(limit) {
             let members = row.members.flatMap { $0.isEmpty ? nil : "Watching: " + $0.joined(separator: ", ") }
@@ -65,6 +74,7 @@ enum WidgetData {
                                   eventDate: nil, eventKind: nil,
                                   posterData: await poster(row.posterUrl)))
         }
+        WidgetSnapshotCache.save(out, for: cacheKey)
         return out
     }
 
@@ -77,10 +87,22 @@ enum WidgetData {
     // states apart via `isSignedIn`.
     static func upcoming(limit: Int, on day: Date) async -> [WidgetShow] {
         guard let slug = SharedSession.memberSlug,
-              let enc = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let rows: ShowsResponse = await getJSON(path: "/api/shows?member=\(enc)",
-                                                      cookie: SharedSession.cookieHeader)
+              let enc = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
         else { return [] }
+
+        // Keyed by slug (as well as limit) so a different member signing in on
+        // this device can never be shown the previous member's calendar.
+        let cacheKey = "upcoming-\(slug)-\(limit)"
+        guard let rows: ShowsResponse = await getJSON(path: "/api/shows?member=\(enc)",
+                                                      cookie: SharedSession.cookieHeader)
+        else {
+            // Offline: replay the last good snapshot, minus any date that has
+            // passed since it was taken — a premiere from last week must not
+            // sit on the home screen as "Today".
+            let start = Calendar.current.startOfDay(for: day)
+            let cached = WidgetSnapshotCache.load([WidgetShow].self, for: cacheKey) ?? []
+            return cached.filter { ($0.eventDate ?? .distantPast) >= start }
+        }
 
         var out: [WidgetShow] = []
         for item in ShowCalendar.upcoming(from: rows.shows, on: day).prefix(limit) {
@@ -89,6 +111,7 @@ enum WidgetData {
                                   eventDate: item.date, eventKind: item.kind,
                                   posterData: await poster(item.show.posterUrl)))
         }
+        WidgetSnapshotCache.save(out, for: cacheKey)
         return out
     }
 

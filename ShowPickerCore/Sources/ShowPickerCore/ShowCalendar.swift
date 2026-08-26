@@ -15,7 +15,9 @@ extension Show {
 }
 
 public enum ShowCalendar {
-    public enum Kind: Sendable, Hashable {
+    // String-backed + Codable so the widgets' last-good snapshot (rendered
+    // when the device is offline) can round-trip through JSON on disk.
+    public enum Kind: String, Codable, Sendable, Hashable {
         case premiere
         case finale
 

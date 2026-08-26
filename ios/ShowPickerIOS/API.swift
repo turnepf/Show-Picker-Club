@@ -185,6 +185,13 @@ enum API {
         do {
             let r: ShowsResponse = try await get(path)
             if !includeArchived { await OfflineQueue.shared.replaceMember(slug, shows: r.shows) }
+            // Fire-and-forget: warm the offline caches (artwork for these
+            // rows; detail + cast when they're the session's own) so every
+            // show on every list keeps working without a connection.
+            let fetched = r.shows
+            Task.detached(priority: .utility) {
+                await OfflinePrefetcher.shared.prefetch(shows: fetched, member: slug)
+            }
             return r.shows
         } catch {
             if isOffline(error) {

@@ -17,6 +17,17 @@ first two or three lines before "more", so the most useful change goes first.
 
 ## Unreleased — the update after 1.4
 
+**Widgets that work on a plane.** The Trending and Up Next home-screen
+widgets now remember what they last showed you — lose the connection and
+they keep showing your shows, posters and all, instead of going blank. Up
+Next keeps its dates honest offline, too: anything that has already aired
+drops off.
+
+**Your whole library, offline.** The app now saves the posters, artwork,
+cast, and ratings for everything on your lists ahead of time — not just the
+shows you've opened recently. Go offline and every show on every list looks
+and works the way it does online. On iPhone, iPad, and Mac.
+
 **Recommend a show to your group.** Found something the group needs to see?
 Open the show, tap Recommend to group, and add a note if you like. Everyone
 in the group gets asked about it next time they open the group — one tap adds

@@ -107,6 +107,12 @@ Mechanics, for reference:
   requires (`ShowPickerWidgets-Catalyst.entitlements`).
 - Poster art is fetched inside the timeline provider and stored in each entry —
   widget views render from a static snapshot and can't load images themselves.
+- Both widgets keep a **last-good snapshot** (rows + poster art) in the App
+  Group container (`ios/Shared/WidgetSnapshotCache.swift`). When a timeline
+  refresh can't reach the API — airplane mode, dead spots — the provider
+  replays that snapshot instead of rendering an empty state, with Up Next
+  dropping any date that has since passed. The app clears the snapshots on
+  logout so the next member doesn't inherit stale rows.
 - Every show links to `https://showpicker.club/show/<id>?title=…`; the app's
   universal-link routing (`Route.showLink` in `HomeView.swift`, plus the iPad
   split view's `detailPath`) opens that show's card from it.
@@ -194,11 +200,13 @@ Everything lives in `ShowPickerIOS/Offline/`:
 
 ```
 Offline/
-├── Connectivity.swift     NWPathMonitor → isOnline; kicks a flush on reconnect
-├── OfflineCache.swift     disk JSON cache for read endpoints (Application Support)
-├── PendingMutation.swift  one queued write (add / update / move / archive / delete / rate)
-├── OfflineQueue.swift     shows-per-member snapshot + the write queue + flush
-└── OfflineBanner.swift    the status strip shown in Home + Member views
+├── Connectivity.swift       NWPathMonitor → isOnline; kicks a flush on reconnect
+├── OfflineCache.swift       disk JSON cache for read endpoints (Application Support)
+├── ImageCache.swift         disk artwork cache (posters + backdrops), keyed by URL
+├── OfflinePrefetcher.swift  warms artwork + detail/cast for whole lists after each fetch
+├── PendingMutation.swift    one queued write (add / update / move / archive / delete / rate)
+├── OfflineQueue.swift       shows-per-member snapshot + the write queue + flush
+└── OfflineBanner.swift      the status strip shown in Home + Member views
 ```
 
 - **Reads (browse offline).** `API`'s GET helpers mirror every success to
@@ -207,6 +215,17 @@ Offline/
   instead of throwing. Members, popular, a member's shows, a show's detail,
   cast, and cross-library search are all cached. Real server
   errors (4xx/5xx, decode failures) still propagate as before.
+
+- **Artwork and whole-list prefetch.** Posters and backdrops load through
+  `ImageCache` — a disk store in Application Support keyed by URL — instead of
+  `AsyncImage`'s evictable `URLCache`, so art that has been seen once renders
+  offline forever after. On top of that, every successful list fetch kicks
+  `OfflinePrefetcher`: it downloads the artwork for every non-archived show on
+  the fetched lists, and for the signed-in member's own library also fills any
+  missing show-detail (ratings, group watchers, creators) and cast entries in
+  `OfflineCache`. Only missing pieces are fetched, so a settled library costs
+  roughly nothing per sweep — but everything on every list (archived excluded
+  on purpose) works offline in full, visited or not.
 
 - **Writes (add / edit offline).** Each write in `API` is split into a
   `…Remote` core (hits the network, throws on failure) and a public wrapper.
@@ -222,8 +241,9 @@ Offline/
   just-created show targets the right row. A mutation the server *rejects*
   (e.g. the show was deleted on the web) is dropped so it can't wedge the queue.
 
-- **Lifecycle.** Logging out wipes the read cache and clears any queued edits
-  so the next person on the device starts clean.
+- **Lifecycle.** Logging out wipes the read cache, the artwork cache, the
+  widgets' last-good snapshots, and any queued edits so the next person on the
+  device starts clean.
 
 ### Limits
 

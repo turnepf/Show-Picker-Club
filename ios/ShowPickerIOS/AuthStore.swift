@@ -129,10 +129,13 @@ final class AuthStore: ObservableObject {
         isAdmin = false
         SharedSession.clear()
         WatchBridge.shared.clear()
-        // Drop cached reads and any queued offline edits so the next person to
-        // sign in on this device starts clean.
+        // Drop cached reads, cached artwork, the widgets' last-good snapshots,
+        // and any queued offline edits so the next person to sign in on this
+        // device starts clean.
         OfflineQueue.shared.reset()
         OfflineCache.clearAll()
+        ImageCache.shared.clearAll()
+        WidgetSnapshotCache.clearAll()
         WidgetCenter.shared.reloadAllTimelines()
     }
 

@@ -10,6 +10,8 @@
 		A100000000000000000000E2 /* Shared/SharedSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* Shared/SharedSession.swift */; };
 		A100000000000000000000E3 /* Shared/SharedSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* Shared/SharedSession.swift */; };
 		A100000000000000000000E6 /* Shared/ShareTitleParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E5 /* Shared/ShareTitleParser.swift */; };
+		A100000000000000000000E9 /* Shared/WidgetSnapshotCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E8 /* Shared/WidgetSnapshotCache.swift */; };
+		A100000000000000000000EA /* Shared/WidgetSnapshotCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E8 /* Shared/WidgetSnapshotCache.swift */; };
 		A100000000000000000000E7 /* Shared/ShareTitleParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E5 /* Shared/ShareTitleParser.swift */; };
 		A1000000000000000000010D /* ShowPickerShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A100000000000000000000C2 /* ShowPickerShareExtension.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CDA1B000000000000000000D /* ShowPickerWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CDA1B0000000000000000001 /* ShowPickerWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -79,6 +81,7 @@
 		A100000000000000000000C3 /* ShowPickerShareExtensionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShowPickerShareExtensionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A100000000000000000000E1 /* Shared/SharedSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/SharedSession.swift; sourceTree = "<group>"; };
 		A100000000000000000000E5 /* Shared/ShareTitleParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/ShareTitleParser.swift; sourceTree = "<group>"; };
+		A100000000000000000000E8 /* Shared/WidgetSnapshotCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/WidgetSnapshotCache.swift; sourceTree = "<group>"; };
 		CD0077132FF5CADE00DCCF4D /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		CD0077152FF5CADE00DCCF4D /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		CDA1B0000000000000000001 /* ShowPickerWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShowPickerWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -189,6 +192,7 @@
 				A100000000000000000000D5 /* ShowPickerShareExtensionTests */,
 				A100000000000000000000E1 /* Shared/SharedSession.swift */,
 				A100000000000000000000E5 /* Shared/ShareTitleParser.swift */,
+				A100000000000000000000E8 /* Shared/WidgetSnapshotCache.swift */,
 				CDD1EA7D2FF5BE6200F095DE /* ShowPickerWatch Watch App */,
 				CDA1B0000000000000000006 /* ShowPickerWidgets */,
 				CDE59A2C2FF5B30D00CBD097 /* Frameworks */,
@@ -426,6 +430,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A100000000000000000000E2 /* Shared/SharedSession.swift in Sources */,
+				A100000000000000000000E9 /* Shared/WidgetSnapshotCache.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -451,6 +456,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CDA1B0000000000000000012 /* Shared/SharedSession.swift in Sources */,
+				A100000000000000000000EA /* Shared/WidgetSnapshotCache.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
