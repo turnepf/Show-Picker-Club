@@ -625,9 +625,9 @@ enum API {
         return true
     }
 
-    static func createGroup(name: String) async throws -> (Group, GroupInvite) {
+    static func createGroup(name: String, icon: String? = nil, color: String? = nil) async throws -> (Group, GroupInvite) {
         struct CreateResponse: Decodable { let group: Group; let invite: GroupInvite }
-        let r: CreateResponse = try await postJSON("/api/groups", body: ["name": name])
+        let r: CreateResponse = try await postJSON("/api/groups", body: ["name": name, "icon": icon, "color": color])
         return (r.group, r.invite)
     }
 
@@ -635,6 +635,17 @@ enum API {
     static func renameGroup(id: Int, name: String) async throws -> Group {
         struct RenameResponse: Decodable { let group: Group }
         let r: RenameResponse = try await sendJSON(method: "PATCH", path: "/api/groups/\(id)", body: ["name": name])
+        return r.group
+    }
+
+    // Creator only, like rename. Both keys are always sent: NSNull is how a
+    // cleared choice reaches the server (the JSON body drops nil values, and
+    // an absent key means "leave it alone" server-side, not "clear it").
+    static func setGroupIcon(id: Int, icon: String?, color: String?) async throws -> Group {
+        struct PatchResponse: Decodable { let group: Group }
+        let r: PatchResponse = try await sendJSON(method: "PATCH", path: "/api/groups/\(id)",
+                                                  body: ["icon": icon.map { $0 as Any } ?? NSNull(),
+                                                         "color": color.map { $0 as Any } ?? NSNull()])
         return r.group
     }
 

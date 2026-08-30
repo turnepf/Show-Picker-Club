@@ -478,19 +478,26 @@ public struct Group: Codable, Identifiable, Hashable, Sendable {
     public let createdAt: String
     public let memberCount: Int
     public let isCreator: Bool
+    // Creator-picked SF Symbol and named accent color (migration 066). Either
+    // can be nil — a group without them renders name-only, as before.
+    public let icon: String?
+    public let color: String?
 
-    public init(id: Int, name: String, creatorSlug: String, createdAt: String, memberCount: Int = 0, isCreator: Bool = false) {
+    public init(id: Int, name: String, creatorSlug: String, createdAt: String, memberCount: Int = 0, isCreator: Bool = false, icon: String? = nil, color: String? = nil) {
         self.id = id
         self.name = name
         self.creatorSlug = creatorSlug
         self.createdAt = createdAt
         self.memberCount = memberCount
         self.isCreator = isCreator
+        self.icon = icon
+        self.color = color
     }
 
     enum CodingKeys: String, CodingKey {
         case id, name, creatorSlug = "creator_slug", createdAt = "created_at"
         case memberCount = "member_count", isCreator = "is_creator"
+        case icon, color
     }
 
     // member_count / is_creator are computed columns the group list carries but
@@ -512,7 +519,30 @@ public struct Group: Codable, Identifiable, Hashable, Sendable {
         } else {
             isCreator = (try c.decodeIfPresent(Int.self, forKey: .isCreator) ?? 0) != 0
         }
+        icon = try c.decodeIfPresent(String.self, forKey: .icon)
+        color = try c.decodeIfPresent(String.self, forKey: .color)
     }
+}
+
+// The curated choices the group-icon picker offers, mirroring the server's
+// sets in functions/_shared/group-icons.js — the server rejects anything
+// outside them, so the apps and the API can't drift apart silently. Kept here
+// (Foundation-only) as plain strings; mapping a color name to a platform
+// Color happens in each app.
+public enum GroupIcon {
+    public static let symbols: [String] = [
+        "person.2.fill", "person.3.fill", "house.fill", "sofa.fill", "tv.fill",
+        "film.fill", "theatermasks.fill", "star.fill", "heart.fill", "flame.fill",
+        "sparkles", "moon.stars.fill", "sun.max.fill", "bolt.fill", "crown.fill",
+        "gamecontroller.fill", "pawprint.fill", "leaf.fill", "book.fill",
+        "music.note", "globe.americas.fill", "airplane", "fork.knife",
+        "cup.and.saucer.fill",
+    ]
+
+    public static let colors: [String] = [
+        "red", "orange", "yellow", "green", "teal", "blue", "indigo", "purple",
+        "pink", "brown",
+    ]
 }
 
 public struct GroupMember: Codable, Identifiable, Hashable, Sendable {

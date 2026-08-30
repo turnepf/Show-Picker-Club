@@ -529,14 +529,6 @@ A few intentional omissions:
 
 ## Backlog
 
-- **Give each group an icon.** Groups are identified by name alone everywhere
-  they appear — the Groups list and group detail on iPhone and iPad, the
-  Groups tab and group tiles on Apple TV. A per-group icon (an SF Symbol the
-  creator picks, or a color, or both) would make them recognizable at a
-  glance and give the tiles something to be. Needs a column on `groups`, a
-  picker in create/rename, and the icon rendered in every place a group name
-  is shown. **Deferred until after the 1.2 build ships.**
-
 - **Retire email-code login, and the third-party services that go with it.**
   Apple sign-in covers the Apple apps, which is where the product lives, and
   the apps are what members actually use. Every other sign-in path costs
@@ -579,17 +571,107 @@ A few intentional omissions:
   half of `/auth/login`, `member_phones`, `public/sms.html`, and the SMS
   sections of the privacy policy.
 
-- **SMS consent language promises retired notifications.** `public/sms.html`
-  and the SMS section of `public/privacy.html` both say members receive texts
-  "when another member recommends or shares a show with you". Those features
-  were retired 2026-07 and their endpoints return 410, so those texts can no
-  longer be sent. This is over-disclosure rather than under-disclosure, so
-  it is not a compliance problem and there is no rush — but it is wrong.
-  Not a drive-by fix: `sms.html` quotes verbatim the consent language
-  registered with Twilio for A2P 10DLC, so the page and the registered
-  campaign text have to change together. `sms.html` also still describes the
-  club as "invitation-only", which stopped being true when approval was
-  removed in 2026-08.
+- **Registered A2P campaign text is behind the site.** The site half was
+  fixed 2026-08-30: `public/sms.html` and the SMS section of
+  `public/privacy.html` now describe login codes as the only text we send,
+  and no longer call the club "invitation-only" or promise the
+  recommend/share alerts retired in 2026-07. What remains is the operator
+  half the old entry warned about: the consent language registered with
+  Twilio for the A2P 10DLC campaign still carries the old wording, so the
+  registered campaign text needs updating (Twilio console) to match the
+  page's consent block verbatim. Until then the registration over-discloses
+  message types we no longer send — not a compliance emergency, but the two
+  texts should say the same thing again. (This whole entry dissolves if the
+  SMS channel is retired first — see the entry above.)
+
+- **Episode-level ratings.** (Amy — 7/24/2026, feedback on the ratings
+  design doc.) Rate individual episodes, not just overall/season, shared
+  with other members watching the same show. A step below season-level
+  granularity — not part of the ratings design above, captured here for
+  later. Overlaps with the "Group watch / episode chat" scope question
+  below (per-episode visibility, spoiler safety).
+
+- **Similar-taste discovery.** (Susan — 7/24/2026, feedback on the ratings
+  design doc.) Use member ratings to find other members with similar taste
+  and surface what they're watching — "find people with similar tastes and
+  see what they are watching," in her words. Adjacent to "Find something to
+  watch" below, but driven by ratings rather than vibe traits.
+
+- **Bracket competition.** (Amy — 7/2026.) A bracket-style tournament built
+  from the group's shows, where members who have watched a show vote for
+  their favorites round by round.
+
+- **Find something to watch.** (Amy — 7/2026.) A picker that weighs which
+  streaming services you actually have (the subscription-audit data already
+  knows), how much time you have tonight, and what your ratings say about
+  your taste — the vibe trait vectors could drive that last part.
+
+- **Group watch / episode chat.** (Amy — 7/2026.) Chat about specific
+  episodes with other members who are watching the same show. Note this
+  cuts against the current "no comments or threads" stance above — needs a
+  deliberate call on scope (per-episode threads? spoiler-safety by episode
+  progress?) before building.
+
+- **Deep-link pass, especially Apple TV.** (Patrick — 7/23/2026, reopened
+  8/10/2026; **on-device audit done 8/12/2026**, see
+  ARCHITECTURE.md#tvos-watch-button.) Patrick wants streaming deep links to
+  work consistently across services, not one bug at a time. The 8/12 pass
+  walked every network the club carries on a real Apple TV and fixed what it
+  found, so all eight now at least launch their app. What remains open is the
+  harder half: only HBO Max and Apple TV+ land on the actual *show*.
+  Everything else opens its app to the home screen, because those services
+  don't publish a show-level entry point tvOS will accept.
+
+  The previously agreed direction — store an Apple TV (`tv.apple.com`) link as
+  a universal fallback while keeping `network` set to the service that
+  actually carries the title — is **not** superseded, but note the 8/12
+  finding that killed the client-side version of it: looking a title up in
+  Apple's catalog from the app (iTunes Search) matched episode titles across
+  the whole catalog and sent members to the wrong show entirely. If this is
+  revisited, the Apple link has to be resolved server-side against a real id
+  and stored, never guessed by title at tap time. See "Apple links vs. stored
+  network" in ARCHITECTURE.md.
+
+- **Karma scoreboard.** (Roger — 8/13/2026.) Participation earns points and a
+  leaderboard ranks the club: watching shows, rating them, adding to lists and
+  recommending all score. Roger's framing — "the more you participate ... the
+  more points you score on the board."
+
+  Most of the raw material is already recorded. `shows.updated_at` is bumped
+  only by member-initiated writes (enrichment stamps `enriched_at` instead), so
+  the database already distinguishes a member doing something from a background
+  job doing it to them; `show_ratings` has the ratings; `/api/activity` already
+  reconstructs a who-added-what feed and already knows to skip seeded rows
+  (`added_by='seed'`, NULL `created_at`) so a starter list doesn't read as
+  activity. A first scoring pass is closer to a query than a feature.
+
+  Three questions to answer before building, none of them technical:
+
+  - **What it does to the four lists.** They are deliberately narrow and
+    "force a clear judgement" — points for adding rewards volume, which is the
+    opposite pressure. If this ships, the scoring probably has to favour acts
+    of judgement (rating a show, promoting Watching → Loved, marking a season
+    done) over acts of accumulation (adding a title). Worth deciding
+    explicitly rather than discovering it from a padded Next Up.
+  - **Who can see whose score.** A leaderboard is a new cross-member surface,
+    and cross-member reads are group-scoped everywhere else (see
+    [`INVARIANTS.md`](INVARIANTS.md) §12 and the Vibe scoping rules). Club-wide
+    or per-group is a product call; either way it needs a session, and it must
+    not become a public surface. Note also `_shared/excluded-members.js`, which
+    bounds club-level *math* today — whether an excluded member appears on a
+    leaderboard is the same question in a new place.
+  - **Whether a two-member club wants a ranking at all.** Production is small,
+    and a leaderboard between two people is a different social object than one
+    between twenty. A personal streak or a "your year in shows" summary may be
+    the same idea at the right size.
+
+  Platforms if built: **iPhone/iPad** get the board and whatever earns points.
+  **Apple TV** could display it — it's view-only, and a leaderboard is a fine
+  thing to render on a TV — but earns nothing there. **The watch doesn't**;
+  read-only and no room. **The web doesn't** — it's frozen at its restored
+  state (see [Web app status](#web-app-status)).
+
+## Shipped (formerly backlog)
 
 - **Member ratings.** (Amy Brownlee 7/16, Susan 7/22, Rob Maltzhan 7/23 —
   2026.) Members rate shows 1-10 (whole numbers), and those ratings show up
@@ -669,104 +751,34 @@ A few intentional omissions:
     in the backlog list won't reappear before the queue actually syncs it.
   - **Not building yet:** clearing/un-rating a show once rated — revisit if
     it's requested.
-  - **Ships as v1.1, build 19** — version bumped in both `ios/ShowPickerIOS.xcodeproj`
-    and `tvos/ShowPickerTV.xcodeproj`; still needs an actual Xcode
-    archive + TestFlight/App Store submission (can't be done from this
-    environment — no Mac/Xcode here).
+  - **Shipped in v1.1 (build 19)** and long since on the Store — every build
+    through 1.4 (build 23) carries the native ratings UI. Confirmed done
+    2026-08-30; nothing left on this entry.
 
-- **Episode-level ratings.** (Amy — 7/24/2026, feedback on the ratings
-  design doc.) Rate individual episodes, not just overall/season, shared
-  with other members watching the same show. A step below season-level
-  granularity — not part of the ratings design above, captured here for
-  later. Overlaps with the "Group watch / episode chat" scope question
-  below (per-episode visibility, spoiler safety).
+- **Give each group an icon** (backlogged 2026-08, shipped in code
+  2026-08-30). A per-group SF Symbol plus a named accent color, both
+  creator-picked from curated sets, so groups are recognizable at a glance
+  everywhere their name appears. Migration 066 adds nullable `icon` and
+  `color` to `groups`; `functions/_shared/group-icons.js` is the server-side
+  allowlist (a value outside it is a 400, so clients render what arrives
+  without re-validating), and `ShowPickerCore.GroupIcon` mirrors the same
+  sets for the picker. Create and PATCH (creator-only, same bar as rename;
+  absent key = leave alone, null = clear) carry the fields. **iPhone/iPad**
+  pick and render (badge on the Groups list rows, the group detail header,
+  the create sheet, and a creator-only "Change icon" sheet); **Apple TV**
+  renders the badge on group tiles and the detail header, view-only as ever;
+  the watch has no groups and the web is frozen (its groups page stays
+  name-only — a named gap, not work). A group that never picked gets a
+  neutral default badge rather than a hole. Needs the next app build to be
+  visible in the apps.
 
-- **Similar-taste discovery.** (Susan — 7/24/2026, feedback on the ratings
-  design doc.) Use member ratings to find other members with similar taste
-  and surface what they're watching — "find people with similar tastes and
-  see what they are watching," in her words. Adjacent to "Find something to
-  watch" below, but driven by ratings rather than vibe traits.
-
-- **Bracket competition.** (Amy — 7/2026.) A bracket-style tournament built
-  from the group's shows, where members who have watched a show vote for
-  their favorites round by round.
-
-- **Find something to watch.** (Amy — 7/2026.) A picker that weighs which
-  streaming services you actually have (the subscription-audit data already
-  knows), how much time you have tonight, and what your ratings say about
-  your taste — the vibe trait vectors could drive that last part.
-
-- **Group watch / episode chat.** (Amy — 7/2026.) Chat about specific
-  episodes with other members who are watching the same show. Note this
-  cuts against the current "no comments or threads" stance above — needs a
-  deliberate call on scope (per-episode threads? spoiler-safety by episode
-  progress?) before building.
-
-- **Deep-link pass, especially Apple TV.** (Patrick — 7/23/2026, reopened
-  8/10/2026; **on-device audit done 8/12/2026**, see
-  ARCHITECTURE.md#tvos-watch-button.) Patrick wants streaming deep links to
-  work consistently across services, not one bug at a time. The 8/12 pass
-  walked every network the club carries on a real Apple TV and fixed what it
-  found, so all eight now at least launch their app. What remains open is the
-  harder half: only HBO Max and Apple TV+ land on the actual *show*.
-  Everything else opens its app to the home screen, because those services
-  don't publish a show-level entry point tvOS will accept.
-
-  The previously agreed direction — store an Apple TV (`tv.apple.com`) link as
-  a universal fallback while keeping `network` set to the service that
-  actually carries the title — is **not** superseded, but note the 8/12
-  finding that killed the client-side version of it: looking a title up in
-  Apple's catalog from the app (iTunes Search) matched episode titles across
-  the whole catalog and sent members to the wrong show entirely. If this is
-  revisited, the Apple link has to be resolved server-side against a real id
-  and stored, never guessed by title at tap time. See "Apple links vs. stored
-  network" in ARCHITECTURE.md.
-
-- **Show Picker movie filter.** (Patrick — 7/26/2026.) A way to filter a
-  member's lists (or the catalog) down to just movies vs. TV, using the
-  existing `is_movie` flag on `shows`. Scope — which surfaces get the filter
-  (web lists, Trending, search, native apps) — still to be defined.
-
-- **Karma scoreboard.** (Roger — 8/13/2026.) Participation earns points and a
-  leaderboard ranks the club: watching shows, rating them, adding to lists and
-  recommending all score. Roger's framing — "the more you participate ... the
-  more points you score on the board."
-
-  Most of the raw material is already recorded. `shows.updated_at` is bumped
-  only by member-initiated writes (enrichment stamps `enriched_at` instead), so
-  the database already distinguishes a member doing something from a background
-  job doing it to them; `show_ratings` has the ratings; `/api/activity` already
-  reconstructs a who-added-what feed and already knows to skip seeded rows
-  (`added_by='seed'`, NULL `created_at`) so a starter list doesn't read as
-  activity. A first scoring pass is closer to a query than a feature.
-
-  Three questions to answer before building, none of them technical:
-
-  - **What it does to the four lists.** They are deliberately narrow and
-    "force a clear judgement" — points for adding rewards volume, which is the
-    opposite pressure. If this ships, the scoring probably has to favour acts
-    of judgement (rating a show, promoting Watching → Loved, marking a season
-    done) over acts of accumulation (adding a title). Worth deciding
-    explicitly rather than discovering it from a padded Next Up.
-  - **Who can see whose score.** A leaderboard is a new cross-member surface,
-    and cross-member reads are group-scoped everywhere else (see
-    [`INVARIANTS.md`](INVARIANTS.md) §12 and the Vibe scoping rules). Club-wide
-    or per-group is a product call; either way it needs a session, and it must
-    not become a public surface. Note also `_shared/excluded-members.js`, which
-    bounds club-level *math* today — whether an excluded member appears on a
-    leaderboard is the same question in a new place.
-  - **Whether a two-member club wants a ranking at all.** Production is small,
-    and a leaderboard between two people is a different social object than one
-    between twenty. A personal streak or a "your year in shows" summary may be
-    the same idea at the right size.
-
-  Platforms if built: **iPhone/iPad** get the board and whatever earns points.
-  **Apple TV** could display it — it's view-only, and a leaderboard is a fine
-  thing to render on a TV — but earns nothing there. **The watch doesn't**;
-  read-only and no room. **The web doesn't** — it's frozen at its restored
-  state (see [Web app status](#web-app-status)).
-
-## Shipped (formerly backlog)
+- **Show Picker movie filter** (Patrick — 7/26/2026). Shipped as the
+  TV/Movies filter on a member's lists on iPhone/iPad/Mac, using `is_movie`:
+  originally a chip row under the list header, moved 2026-08-30 into the
+  sort/filter menu at the top (per Patrick — same menu as sort and the Next
+  Up genre filter), with counts on each option. Only offered on a list that
+  holds both kinds; remembered per list; ignored while reordering. Trending,
+  search, tvOS, watch and web don't have it — nobody has asked there.
 
 - **Share / recommend a show within a group** (JC, via Jennifer Biggs —
   8/23/2026; JC's pop-up proposal 8/25/2026), shipped 2026-08 as

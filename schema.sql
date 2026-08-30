@@ -332,7 +332,11 @@ CREATE TABLE IF NOT EXISTS groups (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   creator_slug TEXT NOT NULL REFERENCES members(slug),
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT (datetime('now')),
+  -- Creator-picked SF Symbol name and named accent color (migration 066).
+  -- Both nullable; the API validates against its curated sets.
+  icon TEXT,
+  color TEXT
 );
 
 CREATE TABLE IF NOT EXISTS group_members (

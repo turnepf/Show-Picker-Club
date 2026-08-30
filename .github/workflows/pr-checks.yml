@@ -84,6 +84,8 @@ jobs:
         run: node scripts/favorite-actors-test.mjs
       - name: Group recommendations stay pull-only and group-scoped
         run: node scripts/group-suggestions-test.mjs
+      - name: Group icons are curated, creator-only, and rename-safe
+        run: node scripts/group-icons-test.mjs
       - name: Enrichment honors the member's exact TMDB pick
         run: node scripts/enrich-identity-test.mjs
 

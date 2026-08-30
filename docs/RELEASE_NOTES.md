@@ -17,6 +17,17 @@ first two or three lines before "more", so the most useful change goes first.
 
 ## Unreleased — the update after 1.4
 
+**Give your groups a face.** If you created a group, you can give it an icon
+— pick a symbol and a color and it shows up everywhere the group does, so
+Thursday Night Club and the family group stop looking like two lines of
+text. Pick it when you create a group or add one later from the group's
+menu. On iPhone and iPad; Apple TV shows your icon on its group tiles.
+
+**The TV/Movies filter moved up top.** On a list that mixes shows and
+movies, the filter now lives in the sort menu in the corner — one place for
+sort, genre, and what kind — instead of a row of buttons above the list.
+On iPhone, iPad, and Mac.
+
 **Widgets that work on a plane.** The Trending and Up Next home-screen
 widgets now remember what they last showed you — lose the connection and
 they keep showing your shows, posters and all, instead of going blank. Up

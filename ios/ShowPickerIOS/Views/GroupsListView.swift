@@ -13,6 +13,8 @@ struct GroupsListView: View {
     @State private var showingCreate = false
     @State private var showingJoin = false
     @State private var newGroupName = ""
+    @State private var newGroupIcon: String?
+    @State private var newGroupColor: String?
     @State private var joinToken = ""
 
     var body: some View {
@@ -76,12 +78,15 @@ struct GroupsListView: View {
             } else {
                 List(groups) { group in
                     NavigationLink(value: Route.groupDetail(group.id)) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(group.name)
-                                .font(.headline)
-                            Text("\(group.memberCount) member\(group.memberCount == 1 ? "" : "s")")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                        HStack(spacing: 12) {
+                            GroupIconBadge(icon: group.icon, color: group.color)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(group.name)
+                                    .font(.headline)
+                                Text("\(group.memberCount) member\(group.memberCount == 1 ? "" : "s")")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                         .padding(.vertical, 4)
                     }
@@ -121,11 +126,19 @@ struct GroupsListView: View {
     @ViewBuilder
     private var createGroupSheet: some View {
         NavigationStack {
-            VStack(spacing: 16) {
-                TextField("Group name", text: $newGroupName)
-                    .textFieldStyle(.roundedBorder)
-                    .padding()
-                Spacer()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 12) {
+                        GroupIconBadge(icon: newGroupIcon, color: newGroupColor, size: 44)
+                        TextField("Group name", text: $newGroupName)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    Text("Pick an icon so the group is recognizable at a glance — you can change it any time.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    GroupIconPicker(icon: $newGroupIcon, color: $newGroupColor)
+                }
+                .padding()
             }
             .navigationTitle("Create Group")
             .navigationBarTitleDisplayMode(.inline)
@@ -196,8 +209,10 @@ struct GroupsListView: View {
         guard !name.isEmpty else { return }
 
         do {
-            let (group, _) = try await API.createGroup(name: name)
+            let (group, _) = try await API.createGroup(name: name, icon: newGroupIcon, color: newGroupColor)
             newGroupName = ""
+            newGroupIcon = nil
+            newGroupColor = nil
             showingCreate = false
             await load()
             path.append(.groupDetail(group.id))

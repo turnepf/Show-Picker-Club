@@ -27,6 +27,12 @@ struct GroupDetailView: View {
     @State private var confirmingDelete = false
     @State private var renaming = false
     @State private var renameText = ""
+    // "Change icon" drafts — seeded from the group when the sheet opens, saved
+    // in one PATCH so backing out changes nothing.
+    @State private var editingIcon = false
+    @State private var iconDraft: String?
+    @State private var colorDraft: String?
+    @State private var savingIcon = false
     // The invite itself is the presentation state. Held apart from a Bool flag
     // on purpose: see the `.sheet(item:)` note below.
     @State private var invite: GroupInvite?
@@ -68,12 +74,15 @@ struct GroupDetailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if group != nil {
                 VStack(spacing: 0) {
-                    Text("\(members.count) member\(members.count == 1 ? "" : "s")")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal)
-                        .padding(.top, 8)
+                    HStack(spacing: 10) {
+                        GroupIconBadge(icon: group?.icon, color: group?.color, size: 30)
+                        Text("\(members.count) member\(members.count == 1 ? "" : "s")")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
 
                     Picker("Tab", selection: $selectedTab) {
                         Text("Trending").tag(Tab.trending)
@@ -162,6 +171,13 @@ struct GroupDetailView: View {
                             } label: {
                                 Label("Rename", systemImage: "pencil")
                             }
+                            Button {
+                                iconDraft = group.icon
+                                colorDraft = group.color
+                                editingIcon = true
+                            } label: {
+                                Label("Change icon", systemImage: "face.smiling")
+                            }
                             Button(role: .destructive) {
                                 confirmingDelete = true
                             } label: {
@@ -211,6 +227,9 @@ struct GroupDetailView: View {
         // link. Passing the invite in means the sheet can't render without it.
         .sheet(item: $invite) { invite in
             inviteSheet(invite)
+        }
+        .sheet(isPresented: $editingIcon) {
+            iconSheet
         }
         .task {
             await load()
@@ -472,6 +491,47 @@ struct GroupDetailView: View {
             suggestions.removeAll { $0.id == suggestion.id }
         } catch {
             self.errorText = API.failureLine(error, action: "remove recommendation")
+        }
+    }
+
+    @ViewBuilder
+    private var iconSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 12) {
+                        GroupIconBadge(icon: iconDraft, color: colorDraft, size: 44)
+                        Text(group?.name ?? "Group")
+                            .font(.headline)
+                    }
+                    GroupIconPicker(icon: $iconDraft, color: $colorDraft)
+                }
+                .padding()
+            }
+            .navigationTitle("Group Icon")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { editingIcon = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { Task { await saveIcon() } }
+                        .disabled(savingIcon)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func saveIcon() async {
+        guard !savingIcon else { return }
+        savingIcon = true
+        defer { savingIcon = false }
+        do {
+            group = try await API.setGroupIcon(id: groupId, icon: iconDraft, color: colorDraft)
+            editingIcon = false
+        } catch {
+            self.errorText = API.failureLine(error, action: "save group icon")
         }
     }
 

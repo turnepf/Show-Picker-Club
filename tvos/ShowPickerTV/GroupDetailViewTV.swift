@@ -55,13 +55,16 @@ struct GroupDetailViewTV: View {
     private func content(_ group: ClubGroup) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 40) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(group.name)
-                        .font(.system(size: 56, weight: .bold))
-                        .foregroundColor(Theme.text)
-                    Text("\(members.count) member\(members.count == 1 ? "" : "s")")
-                        .font(.system(size: 24))
-                        .foregroundColor(Theme.muted)
+                HStack(spacing: 24) {
+                    GroupIconBadgeTV(icon: group.icon, color: group.color, size: 76)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(group.name)
+                            .font(.system(size: 56, weight: .bold))
+                            .foregroundColor(Theme.text)
+                        Text("\(members.count) member\(members.count == 1 ? "" : "s")")
+                            .font(.system(size: 24))
+                            .foregroundColor(Theme.muted)
+                    }
                 }
                 .padding(.top, 20)
 

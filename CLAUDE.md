@@ -139,6 +139,16 @@ removal by recommender or creator only, and leaving a group takes your cards
 with you. See `docs/INVARIANTS.md` §12a.
 
 ```bash
+node scripts/group-icons-test.mjs
+```
+
+Group icons (migration 066), same harness. The server is the only gate — an
+icon or color outside the curated sets in `_shared/group-icons.js` is a 400 on
+create and PATCH, so clients render what arrives without re-validating — and
+the PATCH semantics that keep a rename from wiping an icon: absent key keeps,
+null clears, creator only (same bar as rename).
+
+```bash
 node scripts/vibe-scope-test.mjs
 ```
 

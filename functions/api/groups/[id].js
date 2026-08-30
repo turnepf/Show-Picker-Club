@@ -1,4 +1,5 @@
 import { getSession } from '../../_shared/auth.js';
+import { GROUP_ICONS, GROUP_COLORS, readIconField } from '../../_shared/group-icons.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -31,7 +32,7 @@ export async function onRequestGet(context) {
   // Same shape as the group list — the apps decode one Group model, and the
   // detail screen gates its Delete action on is_creator.
   const group = await env.DB.prepare(
-    `SELECT id, name, creator_slug, created_at,
+    `SELECT id, name, creator_slug, created_at, icon, color,
             (SELECT COUNT(*) FROM group_members WHERE group_id = groups.id) AS member_count,
             CASE WHEN creator_slug = ? THEN 1 ELSE 0 END AS is_creator
      FROM groups WHERE id = ?`
@@ -83,7 +84,15 @@ export async function onRequestPatch(context) {
   let body = {};
   try { body = await request.json(); } catch (e) {}
   const name = typeof body.name === 'string' ? body.name.trim() : '';
-  if (!name) {
+  // Icon and color ride the same creator-only PATCH (migration 066): an
+  // absent key leaves the stored value alone, null clears it, and anything
+  // outside the curated sets is rejected rather than stored.
+  const icon = readIconField(body, 'icon', GROUP_ICONS);
+  const color = readIconField(body, 'color', GROUP_COLORS);
+  if (!icon.ok || !color.ok) {
+    return new Response(JSON.stringify({ error: 'Unknown icon or color' }), { status: 400, headers: corsHeaders() });
+  }
+  if (!name && !icon.present && !color.present) {
     return new Response(JSON.stringify({ error: 'Group name is required' }), { status: 400, headers: corsHeaders() });
   }
 
@@ -95,11 +104,16 @@ export async function onRequestPatch(context) {
     return new Response(JSON.stringify({ error: 'Only the creator can rename a group' }), { status: 403, headers: corsHeaders() });
   }
 
-  await env.DB.prepare('UPDATE groups SET name = ? WHERE id = ?').bind(name, groupId).run();
+  const sets = [];
+  const binds = [];
+  if (name) { sets.push('name = ?'); binds.push(name); }
+  if (icon.present) { sets.push('icon = ?'); binds.push(icon.value); }
+  if (color.present) { sets.push('color = ?'); binds.push(color.value); }
+  await env.DB.prepare(`UPDATE groups SET ${sets.join(', ')} WHERE id = ?`).bind(...binds, groupId).run();
 
   // Same group shape every other endpoint returns, so clients can swap it in.
   const group = await env.DB.prepare(
-    `SELECT id, name, creator_slug, created_at,
+    `SELECT id, name, creator_slug, created_at, icon, color,
             (SELECT COUNT(*) FROM group_members WHERE group_id = groups.id) AS member_count,
             CASE WHEN creator_slug = ? THEN 1 ELSE 0 END AS is_creator
      FROM groups WHERE id = ?`

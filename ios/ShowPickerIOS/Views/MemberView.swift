@@ -115,13 +115,7 @@ struct MemberView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
                 .padding(.top, 6)
-                .padding(.bottom, showsMediaChips ? 4 : 6)
-
-            // Under the help line, above the list: the filter belongs where
-            // the decision gets made. Hidden entirely on a list that's all
-            // one kind. Not shown while reordering — the help line there is
-            // the drag how-to, and the list is deliberately unfiltered.
-            if !isReordering { mediaChips }
+                .padding(.bottom, 6)
 
             importPrompt
 
@@ -362,6 +356,18 @@ struct MemberView: View {
                     Text("\(member.label)'s Order").tag(SortOption.manual)
                 }
             }
+            // The TV/Movies split lives up here with the other display
+            // choices (moved from a chip row under the help line, 2026-08).
+            // Same visibility rule the chips had: only on a list that holds
+            // both kinds. Ignored while reordering, like the genre filter.
+            if showsMediaFilter {
+                Divider()
+                Picker("Show", selection: mediaFilterSelection) {
+                    ForEach(MediaFilter.allCases) { f in
+                        Text("\(f.title) (\(f.count(in: listItems())))").tag(f)
+                    }
+                }
+            }
             if showsGenreFilter {
                 Divider()
                 Picker("Genre", selection: $genreFilter) {
@@ -374,11 +380,18 @@ struct MemberView: View {
         } label: {
             Image(systemName: "line.3.horizontal.decrease.circle")
         }
-        .accessibilityLabel("Sort")
+        .accessibilityLabel("Sort and filter")
     }
 
-    // Everything on the open list, before the media filter — the chips count
-    // from this, so switching filters doesn't change the numbers on the chips.
+    private var mediaFilterSelection: Binding<MediaFilter> {
+        Binding(
+            get: { mediaFilter },
+            set: { mediaFilterByList[currentList.rawValue] = $0 }
+        )
+    }
+
+    // Everything on the open list, before the media filter — the menu's
+    // counts come from this, so switching filters doesn't change the numbers.
     private func listItems() -> [Show] {
         shows.filter { $0.list == currentList.rawValue && !$0.isArchived }
     }
@@ -419,43 +432,11 @@ struct MemberView: View {
         currentList == .next && genreOptions.count > 1
     }
 
-    // The row only earns its space on a list that holds both kinds. On
-    // Watching, where nearly everything is a series, it stays out of the way.
-    private var showsMediaChips: Bool {
+    // The filter only earns its menu section on a list that holds both kinds.
+    // On Watching, where nearly everything is a series, it stays out of the way.
+    private var showsMediaFilter: Bool {
         let items = listItems()
         return items.contains(where: { $0.isMovie }) && items.contains(where: { !$0.isMovie })
-    }
-
-    @ViewBuilder private var mediaChips: some View {
-        if showsMediaChips {
-            let items = listItems()
-            HStack(spacing: 8) {
-                ForEach(MediaFilter.allCases) { f in
-                    chip(f, count: f.count(in: items))
-                }
-                Spacer()
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 4)
-        }
-    }
-
-    private func chip(_ f: MediaFilter, count: Int) -> some View {
-        let selected = mediaFilter == f
-        return Button {
-            withAnimation(.easeOut(duration: 0.15)) {
-                mediaFilterByList[currentList.rawValue] = f
-            }
-        } label: {
-            Text("\(f.title) \(count)")
-                .font(.caption.weight(selected ? .semibold : .regular))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(selected ? Color.accentColor.opacity(0.18) : Color(.secondarySystemBackground),
-                            in: Capsule())
-                .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-        }
-        .buttonStyle(.plain)
     }
 
     // Short description of what each list is for, shown under the tab picker,

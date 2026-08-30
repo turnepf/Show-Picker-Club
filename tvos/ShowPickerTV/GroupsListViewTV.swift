@@ -119,15 +119,18 @@ struct GroupTileTV: View {
     let group: ClubGroup
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(group.name)
-                .font(.system(size: 26, weight: .semibold))
-                .foregroundColor(Theme.text)
-                .lineLimit(1)
+        HStack(spacing: 16) {
+            GroupIconBadgeTV(icon: group.icon, color: group.color, size: 52)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(group.name)
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundColor(Theme.text)
+                    .lineLimit(1)
 
-            Text("\(group.memberCount) member\(group.memberCount == 1 ? "" : "s")")
-                .font(.system(size: 18))
-                .foregroundColor(Theme.muted)
+                Text("\(group.memberCount) member\(group.memberCount == 1 ? "" : "s")")
+                    .font(.system(size: 18))
+                    .foregroundColor(Theme.muted)
+            }
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 20)
