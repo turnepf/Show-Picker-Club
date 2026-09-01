@@ -225,6 +225,20 @@ network, rating, poster) alongside the legacy bare-title `shows` array. On the T
 to 10 on junk.
 
 ```bash
+node scripts/trending-cache-test.mjs
+```
+
+`/api/popular`'s daily snapshot (migration 067). Trending is computed once
+per UTC day into `trending_cache` and every other request reads the one
+cached row — the ranking is the most expensive read in the product and the
+endpoint is public, which is how bots burned the whole free-tier daily D1
+read budget on 2026-09-01. Pins that a later `?limit=` expansion pages the
+cached 50 rather than recomputing or coming up short, that a title added
+after the snapshot waits for tomorrow, that member names are resolved fresh
+per session (slugs cached, names never), and that a stale, corrupt or
+missing cache recomputes instead of erroring.
+
+```bash
 node scripts/enrich-identity-test.mjs
 ```
 

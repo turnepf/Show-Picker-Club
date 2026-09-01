@@ -153,6 +153,28 @@ Created rows inherit the source row's enrichment (poster, overview, cast, ids) i
 
 The structured half rides alongside as `watchers: [{slug, name}]` on `GET /api/shows?member=<self>` and `GET /api/shows/:id` — **owner-only**, exactly like `watching_with` and `notes`. So does attribution: on the same owner-only reads, a row whose `added_by` email resolves (via `member_emails`) to a member other than the owner carries `added_by_member: {slug, name}` — the group-mate whose tag created the copy — so a title the owner never added says why it's on their list. The apps render it as "Added by <name>" on the show card.
 
+### `trending_cache`
+Migration 067. Trending as a **daily snapshot**. One row: `day` (UTC date,
+the primary key), `payload` (the ranked shows as JSON), `computed_at`. The
+first `GET /api/popular` of a UTC day runs the ranking query at its full
+50-row cap and stores it here; every later request that day reads this one
+row and slices it to the caller's `?limit=`. Yesterday's row is deleted when
+today's is written, so the table holds one row in steady state.
+
+Why: the ranking query title-matches copies across the whole `shows` table
+with correlated subqueries, and the endpoint is public and sits on every
+platform's launch screen — so every uncached hit paid a cost proportional to
+the whole library. On 2026-09-01 bot traffic burned the free tier's entire
+daily D1 `rows_read` budget through it and took the API down for everyone.
+
+The cached payload keeps `member_slugs` per row (never served) so the
+per-viewer "Added by" names are still resolved fresh from the viewer's
+session and groups on every request — nothing session-scoped is cached. A
+missing table (pre-067 preview DB) or corrupt payload degrades to a fresh
+compute, never an error. New adds trend the next UTC day on purpose. Group
+Trending is a different, group-scoped and session-gated query and is not
+cached. Pinned by `scripts/trending-cache-test.mjs`.
+
 ### `group_suggestions` / `group_suggestion_responses`
 Migration 065. "Recommend to group" — JC's pop-up (via Jennifer). One
 `group_suggestions` row = *`suggested_by` proposed this title to `group_id`*;
@@ -362,7 +384,7 @@ The complete map:
 | `GET /auth/check`                      | `functions/auth/check.js`                  | GET     | none (reads cookie) |
 | `GET/POST /auth/logout`                | `functions/auth/logout.js`                 | GET, POST | none (POST is canonical; GET kept for shipped app builds) |
 | `GET /api/members`                     | `functions/api/members.js`                 | GET     | none (full names + calendar tokens only with a session) |
-| `GET /api/popular`                     | `functions/api/popular.js`                 | GET     | none — `?limit=` (1–50, default 10) is the "More" expansion; ranks Watching/Awaiting/Loved adds only, never Next Up |
+| `GET /api/popular`                     | `functions/api/popular.js`                 | GET     | none — `?limit=` (1–50, default 10) is the "More" expansion; ranks Watching/Awaiting/Loved adds only, never Next Up; served from the `trending_cache` daily snapshot, recomputed on the first request of each UTC day |
 **Filling the gaps left by the rate-limit bug.** `POST /api/enrich` with
 `{mode:'gaps'}` selects rows on the *absence of data* — no `actors` row, or a
 series with no `episodes_released` — rather than on age, and reports

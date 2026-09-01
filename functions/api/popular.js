@@ -12,14 +12,18 @@ const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
 const TRENDING_DEFAULT = 10;
 const TRENDING_MAX = 50;
 
-export async function onRequestGet(context) {
-  const { env, request } = context;
-
-  const asked = Number(new URL(request.url).searchParams.get('limit'));
-  const limit = Number.isFinite(asked) && asked > 0
-    ? Math.min(Math.trunc(asked), TRENDING_MAX)
-    : TRENDING_DEFAULT;
-
+// Trending is a DAILY SNAPSHOT, recomputed at most once per UTC day. The
+// ranking below is the most expensive read in the product — correlated
+// title-matched subqueries across the whole shows table — and this endpoint is
+// public and sits on every platform's launch screen, so every uncached hit
+// paid that cost. On 2026-09-01 bot traffic against the public surface burned
+// the free tier's entire daily D1 rows_read budget through it and took the
+// API down for everyone. The first request of a day computes the full
+// TRENDING_MAX ranking into trending_cache; every other request that day —
+// including every anonymous bot hit — reads one row. New adds surface in
+// Trending the next UTC day; per-viewer member naming still happens fresh on
+// every request, so nothing session-scoped is ever cached.
+async function computeTrending(env) {
   // Top shows by how many members added them in the last 30 days — a rolling
   // "what the club is picking up right now" feed. The RANKING uses only recent
   // adds, but the DISPLAY fields (poster, logo, rating, network) are pulled
@@ -54,12 +58,9 @@ export async function onRequestGet(context) {
      GROUP BY LOWER(s.title)
      ORDER BY member_count DESC, CAST(rating AS REAL) DESC
      LIMIT ?1`
-  ).bind(limit).all();
+  ).bind(TRENDING_MAX).all();
 
-  // Pull actors for the whole page in one query rather than one per show.
-  // This used to be a loop when the limit was a hardcoded 10; with ?limit= it
-  // would be up to TRENDING_MAX round trips, which is the kind of thing that
-  // only shows up as slowness once somebody actually expands the list.
+  // Pull actors for the whole snapshot in one query rather than one per show.
   // Include imdb_id so the front end can render clickable IMDB links —
   // matching the {name, imdb_id} shape the member-page endpoints return. A
   // plain name string would parse to imdb_id:null and render as
@@ -80,6 +81,42 @@ export async function onRequestGet(context) {
   for (const show of results) {
     show.actors = byShow.get(show.id) || null;
   }
+  return results;
+}
+
+export async function onRequestGet(context) {
+  const { env, request } = context;
+
+  const asked = Number(new URL(request.url).searchParams.get('limit'));
+  const limit = Number.isFinite(asked) && asked > 0
+    ? Math.min(Math.trunc(asked), TRENDING_MAX)
+    : TRENDING_DEFAULT;
+
+  // Serve today's snapshot if one exists; compute and store it otherwise. The
+  // snapshot always holds the full TRENDING_MAX ranking regardless of what
+  // this particular request asked for, so a later ?limit= expansion slices the
+  // same cached ranking instead of forcing a recompute. The .catch()es keep
+  // the endpoint alive if the trending_cache table isn't there yet (a preview
+  // DB that predates migration 067): reads fall through to a fresh compute,
+  // which is exactly the old behavior.
+  const day = new Date().toISOString().slice(0, 10);
+  let rows = null;
+  const cached = await env.DB.prepare('SELECT payload FROM trending_cache WHERE day = ?')
+    .bind(day).first().catch(() => null);
+  if (cached) {
+    try { rows = JSON.parse(cached.payload); } catch { rows = null; }
+  }
+  if (!Array.isArray(rows)) {
+    rows = await computeTrending(env);
+    // Snapshot before the per-viewer pass below mutates the rows, and keep
+    // the table at one row rather than accumulating a row per day.
+    const payload = JSON.stringify(rows);
+    await env.DB.prepare('DELETE FROM trending_cache WHERE day != ?').bind(day).run().catch(() => {});
+    await env.DB.prepare('INSERT OR REPLACE INTO trending_cache (day, payload) VALUES (?, ?)')
+      .bind(day, payload).run().catch(() => {});
+  }
+
+  const results = rows.slice(0, limit);
 
   // Map slugs to first names. Members.name is the possessive display
   // name ("Carter's Shows") — splitting on space gave "Carter's", which

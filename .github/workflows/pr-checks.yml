@@ -82,6 +82,8 @@ jobs:
         run: node scripts/networks-test.mjs
       - name: Favorite actors, and what counts as trending
         run: node scripts/favorite-actors-test.mjs
+      - name: Trending is a daily snapshot served from cache
+        run: node scripts/trending-cache-test.mjs
       - name: Group recommendations stay pull-only and group-scoped
         run: node scripts/group-suggestions-test.mjs
       - name: Group icons are curated, creator-only, and rename-safe

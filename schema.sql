@@ -384,6 +384,17 @@ CREATE TABLE IF NOT EXISTS group_suggestion_responses (
   PRIMARY KEY (suggestion_id, member_slug)
 );
 
+-- Daily Trending snapshot (migration 067). /api/popular computes its ranking
+-- once per UTC day and serves everyone else from this one-row cache — the
+-- ranking query is the most expensive read in the product and the endpoint is
+-- public, which is how bots burned the free-tier daily D1 read budget on
+-- 2026-09-01.
+CREATE TABLE IF NOT EXISTS trending_cache (
+  day TEXT PRIMARY KEY,              -- UTC date, YYYY-MM-DD
+  payload TEXT NOT NULL,             -- JSON array of ranked show rows
+  computed_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_members_enroll_ip ON members(enroll_ip, created_at);
 CREATE INDEX IF NOT EXISTS idx_member_phones_phone ON member_phones(phone);
 CREATE INDEX IF NOT EXISTS idx_member_phones_slug ON member_phones(member_slug);
@@ -404,6 +415,9 @@ CREATE INDEX IF NOT EXISTS idx_shows_archived ON shows(archived);
 CREATE INDEX IF NOT EXISTS idx_shows_member ON shows(member_slug);
 CREATE INDEX IF NOT EXISTS idx_shows_member_archived_title ON shows(member_slug, archived, title COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_shows_active_title ON shows(archived, title COLLATE NOCASE);
+-- Serves LOWER(title) matches (Trending's daily compute, title-scoped
+-- propagation); idx_shows_active_title is COLLATE NOCASE and can't.
+CREATE INDEX IF NOT EXISTS idx_shows_title_lower ON shows(LOWER(title));
 CREATE INDEX IF NOT EXISTS idx_actors_show_id ON actors(show_id);
 CREATE INDEX IF NOT EXISTS idx_show_ratings_title ON show_ratings(tmdb_id, tmdb_type);
 CREATE INDEX IF NOT EXISTS idx_show_watchers_show ON show_watchers(show_id);

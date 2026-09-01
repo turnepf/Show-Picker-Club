@@ -571,6 +571,35 @@ Enforcer: `scripts/enrich-identity-test.mjs` (every PR) — drives the add and
 `/api/enrich` against a fake TMDB serving two same-titled entries, popular
 original first, and asserts each pin keeps its own data.
 
+## 18. A public endpoint costs O(1) reads per request
+
+Trending taught this the expensive way. `/api/popular` is public, sits on
+every platform's launch screen, and its ranking query title-matches copies
+across the whole `shows` table — so every anonymous hit paid a cost
+proportional to the whole library. On 2026-09-01 bot traffic against it
+burned the free tier's entire daily D1 `rows_read` budget and took the API
+down for everyone. The rules that came out of it:
+
+- **Trending is a daily snapshot.** The first request of a UTC day computes
+  the full 50-row ranking into `trending_cache`; every other request that
+  day — every bot hit included — reads one row and slices it to `?limit=`.
+  New adds trend the next UTC day on purpose.
+- **Nothing session-scoped is cached.** The snapshot stores member *slugs*,
+  never names; the names a viewer may see (group-mates only, per §1)
+  are resolved fresh from their session on every request. A cache shared
+  across viewers holds only what the least-privileged viewer may read, plus
+  keys to resolve more.
+- **A stale, corrupt or missing cache degrades to a recompute, never an
+  error** — §14's rule again: "the cache said nothing usable" needs a
+  defined answer, and that answer can't be an outage.
+
+This generalizes: an endpoint in the logged-out tier answers request volumes
+the club doesn't control, so its per-request read cost must not scale with
+the size of the library. A public endpoint whose cost grows with the data is
+a resource-exhaustion outage waiting for one crawler.
+
+Enforced by `scripts/trending-cache-test.mjs`.
+
 ## Adding an invariant
 
 Add a section here, then decide which enforcer covers it. Prefer a deterministic
