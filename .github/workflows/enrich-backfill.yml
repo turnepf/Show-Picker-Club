@@ -123,7 +123,11 @@ jobs:
               # failing loudly on: the secret is wrong or missing, so every
               # remaining round would fail identically.
               if [ "$http" = "401" ] || [ "$http" = "403" ]; then
-                echo "::error::round $i returned HTTP $http — CRON_SECRET is missing or does not match the Pages secret: $body"
+                if printf '%s' "$body" | grep -q '_cf_chl_opt\|Just a moment'; then
+                  echo "::error::round $i hit a Cloudflare bot challenge — the request never reached the Function. Fix is in the zone's Security settings (dashboard), not the secret."
+                else
+                  echo "::error::round $i returned HTTP $http — CRON_SECRET is missing or does not match the Pages secret: $body"
+                fi
                 exit 1
               fi
               attempt=$((attempt + 1))

@@ -51,7 +51,11 @@ jobs:
           body=$(printf '%s' "$resp" | sed '$d')
           echo "HTTP $http: $body"
           if [ "$http" != "200" ]; then
-            echo "::error::watch-url fill returned HTTP $http (CRON_SECRET rejected, or endpoint error)"
+            if printf '%s' "$body" | grep -q '_cf_chl_opt\|Just a moment'; then
+              echo "::error::Cloudflare served a bot challenge to the GitHub runner — the request never reached the Function. Fix is in the zone's Security settings (dashboard), not the secret."
+            else
+              echo "::error::watch-url fill returned HTTP $http (CRON_SECRET rejected, or endpoint error)"
+            fi
             exit 1
           fi
           if printf '%s' "$body" | grep -q '"error"'; then

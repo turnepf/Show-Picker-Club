@@ -27,7 +27,24 @@ jobs:
           resp=$(curl -sS -X POST https://showpicker.club/api/admin-demo-reset \
             -H "Content-Type: application/json" \
             -H "X-Cron-Secret: ${CRON_SECRET}" \
-            -d '{}')
-          echo "$resp"
-          # Fail the run if the endpoint rejected us (bad/missing secret).
-          echo "$resp" | grep -q '"error":"Forbidden"' && { echo "::error::CRON_SECRET rejected"; exit 1; } || true
+            -d '{}' \
+            -w $'\n%{http_code}')
+          http=$(printf '%s' "$resp" | tail -n1)
+          body=$(printf '%s' "$resp" | sed '$d')
+          echo "HTTP $http: $body"
+          # Fail loudly on anything that isn't a clean 200 — grepping the body
+          # for one known error string let a Cloudflare bot challenge (403 with
+          # an HTML interstitial) pass green for two days in 2026-09 while no
+          # reset actually ran.
+          if [ "$http" != "200" ]; then
+            if printf '%s' "$body" | grep -q '_cf_chl_opt\|Just a moment'; then
+              echo "::error::Cloudflare served a bot challenge to the GitHub runner — the request never reached the Function. Fix is in the zone's Security settings (dashboard), not the secret."
+            else
+              echo "::error::demo reset returned HTTP $http (CRON_SECRET rejected, or endpoint error)"
+            fi
+            exit 1
+          fi
+          if printf '%s' "$body" | grep -q '"error"'; then
+            echo "::error::demo reset returned an error body"
+            exit 1
+          fi
