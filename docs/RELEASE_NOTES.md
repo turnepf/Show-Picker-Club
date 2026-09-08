@@ -15,54 +15,124 @@ first two or three lines before "more", so the most useful change goes first.
 
 ---
 
-## Unreleased — the update after 1.4
+## Unreleased — the update after 1.4.1
 
-**Give your groups a face.** If you created a group, you can give it an icon
-— pick a symbol and a color and it shows up everywhere the group does, so
-Thursday Night Club and the family group stop looking like two lines of
-text. Pick it when you create a group or add one later from the group's
-menu. On iPhone and iPad; Apple TV shows your icon on its group tiles.
-
-**The TV/Movies filter moved up top.** On a list that mixes shows and
-movies, the filter now lives in the sort menu in the corner — one place for
-sort, genre, and what kind — instead of a row of buttons above the list.
-On iPhone, iPad, and Mac.
-
-**Widgets that work on a plane.** The Trending and Up Next home-screen
-widgets now remember what they last showed you — lose the connection and
-they keep showing your shows, posters and all, instead of going blank. Up
-Next keeps its dates honest offline, too: anything that has already aired
-drops off.
-
-**Your whole library, offline.** The app now saves the posters, artwork,
-cast, and ratings for everything on your lists ahead of time — not just the
-shows you've opened recently. Go offline and every show on every list looks
-and works the way it does online. On iPhone, iPad, and Mac.
-
-**Recommend a show to your group.** Found something the group needs to see?
-Open the show, tap Recommend to group, and add a note if you like. Everyone
-in the group gets asked about it next time they open the group — one tap adds
-it to their own Next Up, or they can dismiss it. Every recommendation also
-lives on the group's new Watch Next board, so a dismissed pick can still be
-added later, and you can see who's in. Nothing is ever added to anyone's
-lists except by their own tap. On iPhone and iPad; Apple TV shows the
-group's Watch Next board on the group screen.
-
-*(Server-side, already live for everyone — listed so the story is complete,
-no app update required.)*
-
-- Picking a remake or rerelease now sticks. If you chose the new version of a
-  show from search — say the new Little House on the Prairie — the app used to
-  quietly swap in the older show with the same name a little while later.
-  Your exact pick is now remembered for good, and two shows that share a name
-  no longer trade posters, casts, or watch links.
-- And when a show has been remade, a plain title now means the new version.
-  Adding or importing one without picking a specific year lands on the
-  current show, not the decades-old original that happens to share its name.
+*(Nothing yet. Add member-facing changes here as they merge.)*
 
 ---
 
-## 1.4 (build 23) — archived and uploaded on all three platforms; supersedes 1.3
+## 1.4.1 (build 24) — version bumped 2026-09-08; not yet archived
+
+Covers everything merged since **1.4 / build 23**, which reached the App Store
+on **2026-08-26**. A point release rather than 1.5: the changes are refinements
+to surfaces that already shipped, plus one new group feature that lives inside
+the group screen.
+
+Applies to **iPhone, iPad and Mac**. **Apple TV** gets the group icons on its
+group tiles and the group's Watch Next board, both read-only. The **watch** is
+unchanged — it has no groups at all. The **web app** predates all of it and
+stays that way on purpose (`docs/PRODUCT.md#web-app-status`).
+
+**Archive from a Mac running release Xcode.** The version bump is committed
+(`MARKETING_VERSION = 1.4.1`, `CURRENT_PROJECT_VERSION = 24`, in both
+`ios/ShowPickerIOS.xcodeproj` and `tvos/ShowPickerTV.xcodeproj`), so the
+archiving Mac needs only a pull — no Xcode edits before Product → Archive.
+
+**Expect to create the version records in the UI.** 1.4 shipped on all three
+platforms, so iPhone, Apple TV and Mac each need a fresh 1.4.1 record. When
+`POST /v1/appStoreVersions` refuses with *"You cannot create a new version of
+the App in the current state"*, App Store Connect's own ＋ Version or Platform
+button creates it without complaint. That was the lesson from 1.4; it costs
+nothing to reach for the UI first.
+
+All platforms carry the same What's New text, byte for byte. The block below
+is 2,163 characters against Apple's 4,000 cap.
+
+```
+Recommend a show to your group. Found something the group needs to see? Open
+the show, tap Recommend to group, and add a note if you like. Everyone in the
+group gets asked about it the next time they open the group — one tap adds it
+to their own Next Up, or they can dismiss it. Every recommendation also lives
+on the group's new Watch Next board, so a pick someone dismissed can still be
+added later. Nothing ever lands on anyone's lists except by their own tap.
+
+JC's idea. Thank you, JC.
+
+Your whole library, offline. The app now saves the posters, artwork, cast and
+ratings for everything on your lists ahead of time — not just the shows you
+happen to have opened recently. Go offline and every show on every list looks
+and works the way it does online.
+
+Widgets that work on a plane. The Trending and Up Next home screen widgets
+remember what they last showed you. Lose the connection and they keep your
+shows and their posters instead of going blank. Up Next keeps its dates
+honest offline too: anything that has already aired drops off.
+
+Give your groups a face. If you created a group, you can give it an icon —
+pick a symbol and a color and it shows up everywhere the group does, so
+Thursday Night Club and the family group stop looking like two lines of the
+same text. Choose it when you create a group, or add one later from the
+group's menu.
+
+The TV/Movies filter moved up top. On a list that mixes shows and movies, the
+filter now lives in the sort menu in the corner — one place for sort, genre
+and what kind — instead of a row of buttons sitting above the list.
+
+Fixed:
+
+• Picking a remake or a rerelease now sticks. If you chose the new version of
+  a show from search — say the new Little House on the Prairie — the app used
+  to quietly swap in the older show of the same name a little while later.
+  Your exact pick is remembered for good now, and two shows that share a name
+  no longer trade posters, casts or watch links.
+
+• A plain title now means the current version of a show that has been remade.
+  Adding or importing one without picking a year lands on the new show
+  instead of the decades-old original that happens to share its name.
+```
+
+### What this covers
+
+- **Recommend to group** (#417) — pull-only Watch Next boards, JC's pop-up.
+  Recommending writes a card the group owns and touches nobody's list; "Add to
+  Next Up" runs under the recipient's own session. Bounded by group membership
+  in both directions and a per-member daily ceiling. `docs/INVARIANTS.md` §12a,
+  pinned by `scripts/group-suggestions-test.mjs`.
+- **Full-library offline caching** (#419) — posters, artwork, cast and ratings
+  prefetched for every list rather than only recently-opened shows, plus
+  widget-side caching so Trending and Up Next survive no connection. Up Next
+  filters already-aired entries from the cached copy.
+- **Group icons** (#420, migration 066) — curated symbol and color sets, with
+  the server as the only gate: anything outside `_shared/group-icons.js` is a
+  400 on create and PATCH, so clients render what arrives. Absent key keeps,
+  null clears, creator only. `scripts/group-icons-test.mjs`.
+- **TV/Movies filter folded into the sort menu** (#420) — one control for sort,
+  genre and kind on mixed lists, replacing the button row.
+- **The member's exact TMDB pick survives enrichment** (#416) — background
+  `/api/enrich` passes a pinned row by id instead of re-guessing from the
+  title, and every title-scoped propagation stops at a copy pinned to a
+  different id. `scripts/enrich-identity-test.mjs`.
+- **A bare title resolves to the newest version of a remade show** (#418), with
+  a trailing "(YYYY)" pinning that year's entry.
+
+*(Server-side, already live for everyone — listed so the story is complete, no
+app update required.)*
+
+- Trending is now computed once per UTC day into a one-row cache and served
+  from there (#424, migration 067). The ranking is the most expensive read in
+  the product and the endpoint is public; bot traffic burned the whole
+  free-tier daily D1 read budget through it on 2026-09-01. Members see the
+  same list, refreshed daily rather than per request; a title added today
+  appears tomorrow. `scripts/trending-cache-test.mjs`, invariant §18.
+- The four scheduled cron workflows now fail loudly on a Cloudflare bot
+  challenge instead of reporting success (#422). `demo-reset.yml` had stayed
+  green for two days while no reset actually ran.
+- The SMS consent text on `sms.html` and `privacy.html` no longer promises
+  message types the product doesn't send (#420).
+
+---
+
+## 1.4 (build 23) — released on the App Store 2026-08-26; supersedes 1.3
 
 Covers everything merged since **1.2.1 / build 21**, the last build that
 actually reached the Store.
