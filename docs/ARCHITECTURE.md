@@ -297,12 +297,13 @@ Members a person shares streaming services with, so the audit pools everyone's s
 Migration 056: `groups` (name + `creator_slug`), `group_members` (the join
 table membership is checked against on every group route), and `group_invites`
 (a 24-character token with a 7-day `expires_at`). Migration 066 adds nullable
-`icon` (an SF Symbol name) and `color` (a named accent) to `groups` —
-creator-picked, validated against the curated sets in
-`functions/_shared/group-icons.js`, mirrored client-side by
-`ShowPickerCore.GroupIcon`. A group is private to its members — every endpoint
-below the group id verifies membership and 403s otherwise; only the creator
-can delete.
+`icon` (an SF Symbol name) and `color` (a named accent) to `groups`, validated
+against the curated sets in `functions/_shared/group-icons.js`, mirrored
+client-side by `ShowPickerCore.GroupIcon`. Migration 068 adds
+`profile_changed_by`/`profile_changed_at`/`profile_changed_fields` to `groups`
+and `last_seen_change_at` to `group_members`, backing the rename/icon change
+notice below. A group is private to its members — every endpoint below the
+group id verifies membership and 403s otherwise; only the creator can delete.
 
 - **One `Group` payload shape.** Every endpoint that returns a group returns
   `id`, `name`, `creator_slug`, `created_at`, `icon`, `color`, plus the
@@ -312,10 +313,27 @@ can delete.
   Delete action on `is_creator`, so an endpoint that drops those columns
   silently disables it.
 - **Icon writes ride create and PATCH.** `POST /api/groups` takes optional
-  `icon`/`color`; `PATCH /api/groups/[id]` (creator-only, the same handler as
-  rename) treats an absent key as "leave it alone", `null` (or `''`) as
-  "clear it", and rejects any value outside the curated sets with a 400 — so
-  clients render whatever arrives without re-validating.
+  `icon`/`color`; `PATCH /api/groups/[id]` (any group member, since migration
+  068 — Delete is the only rename/icon-adjacent action still creator-only)
+  treats an absent key as "leave it alone", `null` (or `''`) as "clear it",
+  and rejects any value outside the curated sets with a 400 — so clients
+  render whatever arrives without re-validating.
+- **A real rename or icon change is announced once (migration 068).** `PATCH`
+  diffs against the stored row — a no-op PATCH (renaming to the same name)
+  stamps nothing — and on an actual change stores who touched `name` and/or
+  `icon`/`color` (folded into one `'icon'` field; they're one user-facing
+  action) and when, via `strftime('%Y-%m-%d %H:%M:%f','now')` for millisecond
+  precision. The editor's own `group_members.last_seen_change_at` is stamped
+  in the same call, so they never see their own notice. `GET
+  /api/groups/[id]` compares each *other* member's `last_seen_change_at` and
+  `joined_at` against that stamp: a member already in the group when it
+  happened and who hasn't seen this exact change yet gets a `change_notice`
+  object (`changed_by`, `changed_by_name`, `changed_fields`, `changed_at`) —
+  which also advances their high-water mark, so a second load never repeats
+  it — and a member who joined afterward gets nothing, since they've never
+  known the group any other way. Only the latest change is ever tracked, not
+  a log: a second edit before anyone visits overwrites the first's notice.
+  iPhone/iPad only, matching where the edit itself lives.
 - **The list is alphabetical.** `GET /api/groups` orders a member's groups by
   `name COLLATE NOCASE` (ties broken newest-first), and no client re-sorts —
   web, iPhone/iPad and Apple TV all render the server's order, so ordering is a
@@ -427,8 +445,8 @@ drained once, so it deliberately has no button in the app.
 | `POST /api/suggestions`                | `functions/api/suggestions.js`             | POST    | retired 2026-07 — returns 410 Gone |
 | `GET /api/groups`                      | `functions/api/groups.js`                  | GET     | session — the caller's own groups |
 | `POST /api/groups`                     | `functions/api/groups.js`                  | POST    | session — creates the group, joins the caller, returns a first invite |
-| `GET /api/groups/[id]`                 | `functions/api/groups/[id].js`             | GET     | session + membership (403 otherwise) |
-| `PATCH /api/groups/[id]`               | `functions/api/groups/[id].js`             | PATCH   | session + creator — rename and/or set `icon`/`color` (curated sets; absent = keep, null = clear) |
+| `GET /api/groups/[id]`                 | `functions/api/groups/[id].js`             | GET     | session + membership (403 otherwise) — response carries `change_notice` at most once per member per rename/icon change |
+| `PATCH /api/groups/[id]`               | `functions/api/groups/[id].js`             | PATCH   | session + membership (any member, not just creator) — rename and/or set `icon`/`color` (curated sets; absent = keep, null = clear) |
 | `DELETE /api/groups/[id]`              | `functions/api/groups/[id].js`             | DELETE  | session + creator |
 | `POST /api/groups/[id]/invite`         | `functions/api/groups/[id]/invite.js`      | POST    | session + membership — mints a 7-day token |
 | `POST /api/groups/[id]/leave`          | `functions/api/groups/[id]/leave.js`       | POST    | session + membership |

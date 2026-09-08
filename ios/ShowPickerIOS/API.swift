@@ -631,16 +631,18 @@ enum API {
         return (r.group, r.invite)
     }
 
-    // Creator only; 403 for anyone else. Returns the renamed group.
+    // Any group member; 403 for a non-member. Returns the renamed group.
     static func renameGroup(id: Int, name: String) async throws -> Group {
         struct RenameResponse: Decodable { let group: Group }
         let r: RenameResponse = try await sendJSON(method: "PATCH", path: "/api/groups/\(id)", body: ["name": name])
         return r.group
     }
 
-    // Creator only, like rename. Both keys are always sent: NSNull is how a
-    // cleared choice reaches the server (the JSON body drops nil values, and
-    // an absent key means "leave it alone" server-side, not "clear it").
+    // Any group member, like rename — a real change stamps who/what on the
+    // group for the change-notice banner other members see once. Both keys
+    // are always sent: NSNull is how a cleared choice reaches the server
+    // (the JSON body drops nil values, and an absent key means "leave it
+    // alone" server-side, not "clear it").
     static func setGroupIcon(id: Int, icon: String?, color: String?) async throws -> Group {
         struct PatchResponse: Decodable { let group: Group }
         let r: PatchResponse = try await sendJSON(method: "PATCH", path: "/api/groups/\(id)",

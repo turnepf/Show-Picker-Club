@@ -660,6 +660,40 @@ repair belongs in a sweep you invoke rather than a rotation that never ends.
 
 Enforced by `scripts/enrich-movie-detail-test.mjs`.
 
+## 20. A shared-object change notice is exactly-once, and never to the editor
+
+Migration 068 opened `PATCH /api/groups/[id]` to any group member, not just
+its creator — Patrick hit the old creator-only bar as a member of a group he
+didn't start. Loosening a write from "one person" to "anyone in the
+relationship" (the same shape §12's Watching With already takes) needs the
+other members told, or an edit becomes indistinguishable from someone
+quietly overwriting what was there. The telling has its own bounds:
+
+- **Diff against the stored row, not the request.** A PATCH that resends the
+  current name stamps nothing — `existing.name`/`icon`/`color` are compared
+  before anything is written, so a no-op edit can't manufacture a notice.
+- **Never to the person who made it.** The editor's own
+  `group_members.last_seen_change_at` is stamped in the same write that
+  records the change, so their own next `GET` has nothing to tell them about
+  themselves.
+- **Never to someone who joined afterward.** `GET` also checks the viewer's
+  `joined_at` against the change's timestamp — a member who has never known
+  the group any other way isn't told it used to be different.
+- **Exactly once.** Seeing the notice is what advances a member's own
+  high-water mark, whether or not it happened to be theirs to receive — a
+  second `GET` after the first never repeats it.
+- **Millisecond precision on purpose.** The stamp uses
+  `strftime('%Y-%m-%d %H:%M:%f','now')`, not `datetime('now')`'s whole
+  seconds — two edits landing in the same second (a rename right after an
+  icon change) still have to stay distinguishable, or the second correctly
+  overwrites the first's notice before anyone ever saw it.
+- **Latest change only, not a log.** There is one `profile_changed_*` triple
+  per group, not an append-only history — a second edit before anyone visits
+  replaces the first's notice rather than queuing both. Acceptable for a
+  cosmetic banner; would not be for anything load-bearing.
+
+Enforcer: `scripts/group-icons-test.mjs`.
+
 ## Adding an invariant
 
 Add a section here, then decide which enforcer covers it. Prefer a deterministic

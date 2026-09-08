@@ -1,5 +1,6 @@
-// Tests for group icons (migration 066) — the creator-picked SF Symbol and
-// accent color on `groups`.
+// Tests for group icons (migration 066) and who may change a group's profile
+// (migration 068) — the SF Symbol and accent color on `groups`, and the
+// change notice that replaced the old creator-only bar on rename/icon.
 //
 //   node scripts/group-icons-test.mjs
 //
@@ -11,9 +12,13 @@
 //   2. PATCH semantics: an absent key leaves the stored value alone (a plain
 //      rename can't wipe the icon), null clears it, and icon/color can ride
 //      with or without a rename.
-//   3. Creator-only, like rename — a group-mate who didn't create the group
-//      gets 403.
+//   3. Any group member may rename or re-icon — Delete stays creator-only,
+//      but rename/icon isn't gated on that any more (migration 068).
 //   4. Every group payload (list, detail, patch) carries icon and color.
+//   5. The change notice: a real change stamps who/what/when on the group,
+//      GET surfaces it exactly once to every OTHER member who was already in
+//      the group when it happened, never to the member who made it, and
+//      never to one who joined afterward.
 //
 // Same harness as scripts/group-suggestions-test.mjs: the functions tree is
 // copied to a temp directory with a `type: module` package.json, and
@@ -155,7 +160,7 @@ console.log('\n== create stores the choice and every payload carries it');
   check('a group created without a choice stores nulls', bare.icon === null && bare.color === null);
 }
 
-console.log('\n== PATCH: absent keeps, null clears, creator only');
+console.log('\n== PATCH: absent keeps, null clears, any member');
 {
   const { env, patrick, whitt } = club();
   const { group } = await (await createGroup(env, patrick, { name: 'Movie Night', icon: 'film.fill', color: 'purple' })).json();
@@ -185,9 +190,68 @@ console.log('\n== PATCH: absent keeps, null clears, creator only');
   check('an empty PATCH is still 400', empty.status === 400, `got ${empty.status}`);
 
   const mate = await patchGroup(env, whitt, group.id, { icon: 'star.fill' });
-  check('a group-mate who is not the creator gets 403', mate.status === 403, `got ${mate.status}`);
+  check('a group-mate who is not the creator can still re-icon', mate.status === 200, `got ${mate.status}`);
   row = storedIcon(env, group.id);
-  check('and wrote nothing', row.icon === null && row.color === null, JSON.stringify(row));
+  check('and it stuck', row.icon === 'star.fill', JSON.stringify(row));
+
+  addMember(env, 'nico', 'Nico Reyes');
+  const outsider = addSession(env, 'nico');
+  const stranger = await patchGroup(env, outsider, group.id, { name: 'Hijacked' });
+  check('a non-member gets 403', stranger.status === 403, `got ${stranger.status}`);
+  row = storedIcon(env, group.id);
+  check('and the icon this group-mate set is untouched', row.icon === 'star.fill', JSON.stringify(row));
+}
+
+console.log('\n== the change notice: once, never to the editor, never before joining');
+{
+  const { env, patrick, whitt } = club();
+  const { group } = await (await createGroup(env, patrick, { name: 'Queen Jelena 2026', icon: 'crown.fill', color: 'purple' })).json();
+  env._db.prepare('INSERT INTO group_members (group_id, member_slug) VALUES (?, ?)').run(group.id, 'whitt');
+
+  const beforeRename = await (await getGroup(env, whitt, group.id)).json();
+  check('nothing to tell whitt before anything changed', beforeRename.change_notice === null,
+        JSON.stringify(beforeRename.change_notice));
+
+  // whitt — not the creator — renames it.
+  const renamed = await patchGroup(env, whitt, group.id, { name: 'Queen Jelena Fan Club' });
+  check('a group-mate who is not the creator can rename it', renamed.status === 200, `got ${renamed.status}`);
+
+  const patrickView = await (await getGroup(env, patrick, group.id)).json();
+  check('patrick is told whitt renamed it', patrickView.change_notice?.changed_by === 'whitt',
+        JSON.stringify(patrickView.change_notice));
+  check('by first name', patrickView.change_notice?.changed_by_name === 'Whitt');
+  check('naming what changed', JSON.stringify(patrickView.change_notice?.changed_fields) === JSON.stringify(['name']));
+
+  const patrickAgain = await (await getGroup(env, patrick, group.id)).json();
+  check('and not a second time', patrickAgain.change_notice === null, JSON.stringify(patrickAgain.change_notice));
+
+  const whittView = await (await getGroup(env, whitt, group.id)).json();
+  check('whitt never gets told about her own change', whittView.change_notice === null,
+        JSON.stringify(whittView.change_notice));
+
+  // A new member joins after the rename — nothing to tell them either.
+  // joined_at is pinned to 1ms after the rename's own (millisecond-precision)
+  // timestamp rather than left to real wall-clock time, so "after" is
+  // unambiguous even on a run fast enough to land both in the same second.
+  addMember(env, 'nico', 'Nico Reyes');
+  const nico = addSession(env, 'nico');
+  env._db.prepare(
+    `INSERT INTO group_members (group_id, member_slug, joined_at)
+     SELECT ?, ?, strftime('%Y-%m-%d %H:%M:%f', profile_changed_at, '+0.001 seconds') FROM groups WHERE id = ?`
+  ).run(group.id, 'nico', group.id);
+  const nicoView = await (await getGroup(env, nico, group.id)).json();
+  check('a member who joined after the rename sees nothing about it', nicoView.change_notice === null,
+        JSON.stringify(nicoView.change_notice));
+
+  // patrick changes the icon; both whitt and nico should be told once, and
+  // this time the field named is 'icon', not 'name'.
+  await patchGroup(env, patrick, group.id, { icon: 'sparkles' });
+  const whittIconView = await (await getGroup(env, whitt, group.id)).json();
+  check('whitt is told about the icon change', whittIconView.change_notice?.changed_by === 'patrick',
+        JSON.stringify(whittIconView.change_notice));
+  check('naming icon, not name', JSON.stringify(whittIconView.change_notice?.changed_fields) === JSON.stringify(['icon']));
+  const nicoIconView = await (await getGroup(env, nico, group.id)).json();
+  check('nico — a member at the time — is told too', nicoIconView.change_notice?.changed_by === 'patrick');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

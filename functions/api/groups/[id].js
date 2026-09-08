@@ -24,22 +24,28 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify({ error: 'Invalid group ID' }), { status: 400, headers: corsHeaders() });
   }
 
-  const isMember = await checkGroupMembership(env, groupId, session.member_slug);
-  if (!isMember) {
+  const membership = await env.DB.prepare(
+    'SELECT joined_at, last_seen_change_at FROM group_members WHERE group_id = ? AND member_slug = ?'
+  ).bind(groupId, session.member_slug).first();
+  if (!membership) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders() });
   }
 
   // Same shape as the group list — the apps decode one Group model, and the
-  // detail screen gates its Delete action on is_creator.
-  const group = await env.DB.prepare(
+  // detail screen gates its Delete action on is_creator. profile_changed_*
+  // rides along here rather than a second query, then gets stripped before
+  // this becomes the "group" the client decodes (see below).
+  const row = await env.DB.prepare(
     `SELECT id, name, creator_slug, created_at, icon, color,
+            profile_changed_by, profile_changed_at, profile_changed_fields,
             (SELECT COUNT(*) FROM group_members WHERE group_id = groups.id) AS member_count,
             CASE WHEN creator_slug = ? THEN 1 ELSE 0 END AS is_creator
      FROM groups WHERE id = ?`
   ).bind(session.member_slug, groupId).first();
-  if (!group) {
+  if (!row) {
     return new Response(JSON.stringify({ error: 'Group not found' }), { status: 404, headers: corsHeaders() });
   }
+  const { profile_changed_by, profile_changed_at, profile_changed_fields, ...group } = row;
 
   // Get members with their show counts
   const { results: members } = await env.DB.prepare(
@@ -58,17 +64,48 @@ export async function onRequestGet(context) {
 
   const isCreator = group.creator_slug === session.member_slug;
 
+  // Tell a member once that somebody else renamed the group or changed its
+  // icon: never to the member who made the change (they know), never to a
+  // member who joined after it happened (they've never known it any other
+  // way), and never twice — seeing it here is what advances my own
+  // high-water mark below, whether or not there was anything to show.
+  let changeNotice = null;
+  if (
+    profile_changed_at &&
+    profile_changed_by !== session.member_slug &&
+    membership.joined_at <= profile_changed_at &&
+    (!membership.last_seen_change_at || membership.last_seen_change_at < profile_changed_at)
+  ) {
+    const changer = await env.DB.prepare('SELECT first_name FROM members WHERE slug = ?')
+      .bind(profile_changed_by).first();
+    changeNotice = {
+      changed_by: profile_changed_by,
+      changed_by_name: changer?.first_name || profile_changed_by,
+      changed_fields: profile_changed_fields ? profile_changed_fields.split(',') : [],
+      changed_at: profile_changed_at,
+    };
+  }
+  if (profile_changed_at && profile_changed_at !== membership.last_seen_change_at) {
+    await env.DB.prepare(
+      'UPDATE group_members SET last_seen_change_at = ? WHERE group_id = ? AND member_slug = ?'
+    ).bind(profile_changed_at, groupId, session.member_slug).run();
+  }
+
   return new Response(JSON.stringify({
     group,
     members,
     is_creator: isCreator,
-    can_manage: isCreator
+    can_manage: isCreator,
+    change_notice: changeNotice
   }), { headers: corsHeaders() });
 }
 
-// Rename a group. Creator only — the same bar as deleting it. groups.html has
-// been calling this since private groups shipped; the handler never existed,
-// so every rename came back 405.
+// Rename a group and/or set its icon/color. Any group member may — creator
+// was the original bar (and still is for Delete, see below), but Patrick hit
+// it as a member of a group he didn't create and there was no reason a
+// group-mate couldn't tidy up a shared thing. groups.html has been calling
+// this since private groups shipped; the handler never existed, so every
+// rename came back 405.
 export async function onRequestPatch(context) {
   const { env, request, params } = context;
   const session = await getSession(request, env);
@@ -84,9 +121,9 @@ export async function onRequestPatch(context) {
   let body = {};
   try { body = await request.json(); } catch (e) {}
   const name = typeof body.name === 'string' ? body.name.trim() : '';
-  // Icon and color ride the same creator-only PATCH (migration 066): an
-  // absent key leaves the stored value alone, null clears it, and anything
-  // outside the curated sets is rejected rather than stored.
+  // Icon and color ride the same PATCH (migration 066): an absent key leaves
+  // the stored value alone, null clears it, and anything outside the curated
+  // sets is rejected rather than stored.
   const icon = readIconField(body, 'icon', GROUP_ICONS);
   const color = readIconField(body, 'color', GROUP_COLORS);
   if (!icon.ok || !color.ok) {
@@ -96,20 +133,52 @@ export async function onRequestPatch(context) {
     return new Response(JSON.stringify({ error: 'Group name is required' }), { status: 400, headers: corsHeaders() });
   }
 
-  const existing = await env.DB.prepare('SELECT creator_slug FROM groups WHERE id = ?').bind(groupId).first();
+  const existing = await env.DB.prepare('SELECT name, icon, color FROM groups WHERE id = ?').bind(groupId).first();
   if (!existing) {
     return new Response(JSON.stringify({ error: 'Group not found' }), { status: 404, headers: corsHeaders() });
   }
-  if (existing.creator_slug !== session.member_slug) {
-    return new Response(JSON.stringify({ error: 'Only the creator can rename a group' }), { status: 403, headers: corsHeaders() });
+  const isMember = await checkGroupMembership(env, groupId, session.member_slug);
+  if (!isMember) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders() });
   }
 
   const sets = [];
   const binds = [];
-  if (name) { sets.push('name = ?'); binds.push(name); }
+  // What actually changed, for the "X renamed the group" notice everyone
+  // else gets once (migration 068) — not just what was sent. Icon and color
+  // are one user-facing action ("Change icon"), so they fold into a single
+  // 'icon' field rather than two.
+  const changedFields = [];
+  if (name && name !== existing.name) { sets.push('name = ?'); binds.push(name); changedFields.push('name'); }
+  const iconChanged = icon.present && icon.value !== existing.icon;
+  const colorChanged = color.present && color.value !== existing.color;
   if (icon.present) { sets.push('icon = ?'); binds.push(icon.value); }
   if (color.present) { sets.push('color = ?'); binds.push(color.value); }
-  await env.DB.prepare(`UPDATE groups SET ${sets.join(', ')} WHERE id = ?`).bind(...binds, groupId).run();
+  if (iconChanged || colorChanged) changedFields.push('icon');
+
+  if (changedFields.length > 0) {
+    // Stamped via the DB's own clock, in the same 'YYYY-MM-DD HH:MM:SS[.SSS]'
+    // shape as joined_at's `datetime('now')` default — mixing that with a JS
+    // `toISOString()` (which inserts a 'T') would break the string
+    // comparisons GET does against it, since ' ' sorts before 'T' regardless
+    // of the actual times involved. Millisecond precision (`%f`, vs.
+    // datetime('now')'s whole seconds) matters here specifically: two edits
+    // landing in the same second — a rename right after an icon change, say
+    // — need to stay distinguishable so a member's high-water mark against
+    // the first doesn't accidentally also cover the second.
+    const { now } = await env.DB.prepare("SELECT strftime('%Y-%m-%d %H:%M:%f', 'now') AS now").first();
+    sets.push('profile_changed_by = ?', 'profile_changed_at = ?', 'profile_changed_fields = ?');
+    binds.push(session.member_slug, now, changedFields.join(','));
+    // I've obviously seen my own change — this keeps it from ever notifying
+    // me about myself.
+    await env.DB.prepare(
+      'UPDATE group_members SET last_seen_change_at = ? WHERE group_id = ? AND member_slug = ?'
+    ).bind(now, groupId, session.member_slug).run();
+  }
+
+  if (sets.length > 0) {
+    await env.DB.prepare(`UPDATE groups SET ${sets.join(', ')} WHERE id = ?`).bind(...binds, groupId).run();
+  }
 
   // Same group shape every other endpoint returns, so clients can swap it in.
   const group = await env.DB.prepare(

@@ -1,7 +1,9 @@
-// Group icons (migration 066): the curated SF Symbol set and named palette a
-// creator can pick from, mirrored in the apps (ShowPickerCore.GroupIcon). The
-// server is the gate — a value outside these sets never reaches the DB, so
-// clients can render whatever arrives without re-validating.
+// Group icons (migration 066): the curated SF Symbol set and named palette
+// any group member can pick from (migration 068 lifted this off the
+// creator-only bar rename/icon started with), mirrored in the apps
+// (ShowPickerCore.GroupIcon). The server is the gate — a value outside these
+// sets never reaches the DB, so clients can render whatever arrives without
+// re-validating.
 
 export const GROUP_ICONS = new Set([
   'person.2.fill', 'person.3.fill', 'house.fill', 'sofa.fill', 'tv.fill',

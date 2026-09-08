@@ -756,21 +756,34 @@ A few intentional omissions:
     2026-08-30; nothing left on this entry.
 
 - **Give each group an icon** (backlogged 2026-08, shipped in code
-  2026-08-30). A per-group SF Symbol plus a named accent color, both
-  creator-picked from curated sets, so groups are recognizable at a glance
-  everywhere their name appears. Migration 066 adds nullable `icon` and
-  `color` to `groups`; `functions/_shared/group-icons.js` is the server-side
-  allowlist (a value outside it is a 400, so clients render what arrives
-  without re-validating), and `ShowPickerCore.GroupIcon` mirrors the same
-  sets for the picker. Create and PATCH (creator-only, same bar as rename;
-  absent key = leave alone, null = clear) carry the fields. **iPhone/iPad**
-  pick and render (badge on the Groups list rows, the group detail header,
-  the create sheet, and a creator-only "Change icon" sheet); **Apple TV**
-  renders the badge on group tiles and the detail header, view-only as ever;
-  the watch has no groups and the web is frozen (its groups page stays
-  name-only — a named gap, not work). A group that never picked gets a
-  neutral default badge rather than a hole. Needs the next app build to be
-  visible in the apps.
+  2026-08-30). A per-group SF Symbol plus a named accent color, from curated
+  sets, so groups are recognizable at a glance everywhere their name appears.
+  Migration 066 adds nullable `icon` and `color` to `groups`;
+  `functions/_shared/group-icons.js` is the server-side allowlist (a value
+  outside it is a 400, so clients render what arrives without
+  re-validating), and `ShowPickerCore.GroupIcon` mirrors the same sets for
+  the picker. Create and PATCH (absent key = leave alone, null = clear)
+  carry the fields. **iPhone/iPad** pick and render (badge on the Groups
+  list rows, the group detail header, the create sheet, and a "Change icon"
+  sheet); **Apple TV** renders the badge on group tiles and the detail
+  header, view-only as ever; the watch has no groups and the web is frozen
+  (its groups page stays name-only — a named gap, not work). A group that
+  never picked gets a neutral default badge rather than a hole. Needs the
+  next app build to be visible in the apps.
+
+- **Renaming and re-icon-ing a group are open to any member, not just its
+  creator** (backlogged 2026-09, shipped in code 2026-09-08). The original
+  Change icon build gated both on `is_creator` — Patrick hit it directly: a
+  group he was a member of but hadn't created showed no Change icon option
+  at all. Migration 068 lifts the bar on `PATCH /api/groups/[id]` to any
+  group member (Delete stays creator-only). To keep an edit from being a
+  silent takeover, the group remembers who last touched its name/icon and
+  what, and `GET /api/groups/[id]` tells every *other* member once — a
+  banner at the top of the group screen, "X renamed the group" / "X changed
+  the group's icon" / both — the first time they open it after the change;
+  never to the member who made it, never to a member who joined afterward,
+  and never a second time. **iPhone/iPad** only, matching where the edit
+  itself lives. Needs the next app build.
 
 - **Show Picker movie filter** (Patrick — 7/26/2026). Shipped as the
   TV/Movies filter on a member's lists on iPhone/iPad/Mac, using `is_movie`:

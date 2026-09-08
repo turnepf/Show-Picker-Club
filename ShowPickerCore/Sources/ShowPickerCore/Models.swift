@@ -592,16 +592,56 @@ public struct GroupDetail: Codable, Sendable {
     public let members: [GroupMember]
     public let isCreator: Bool
     public let canManage: Bool
+    // Set once, the visit after somebody other than me renamed the group or
+    // changed its icon (migration 068) — GET clears my own high-water mark
+    // as it hands this back, so a second load of the same screen won't carry
+    // it again.
+    public let changeNotice: GroupChangeNotice?
 
-    public init(group: Group, members: [GroupMember], isCreator: Bool = false, canManage: Bool = false) {
+    public init(group: Group, members: [GroupMember], isCreator: Bool = false, canManage: Bool = false, changeNotice: GroupChangeNotice? = nil) {
         self.group = group
         self.members = members
         self.isCreator = isCreator
         self.canManage = canManage
+        self.changeNotice = changeNotice
     }
 
     enum CodingKeys: String, CodingKey {
         case group, members, isCreator = "is_creator", canManage = "can_manage"
+        case changeNotice = "change_notice"
+    }
+}
+
+// Who last renamed a group or changed its icon, and what they touched —
+// rename and icon/color are the only two things a member profile edit can
+// touch, so `summary` only ever has to say one or both.
+public struct GroupChangeNotice: Codable, Sendable {
+    public let changedBy: String
+    public let changedByName: String
+    public let changedFields: [String]
+    public let changedAt: String
+
+    public init(changedBy: String, changedByName: String, changedFields: [String], changedAt: String) {
+        self.changedBy = changedBy
+        self.changedByName = changedByName
+        self.changedFields = changedFields
+        self.changedAt = changedAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case changedBy = "changed_by", changedByName = "changed_by_name"
+        case changedFields = "changed_fields", changedAt = "changed_at"
+    }
+
+    public var summary: String {
+        let hasName = changedFields.contains("name")
+        let hasIcon = changedFields.contains("icon")
+        switch (hasName, hasIcon) {
+        case (true, true): return "\(changedByName) renamed the group and changed its icon."
+        case (true, false): return "\(changedByName) renamed the group."
+        case (false, true): return "\(changedByName) changed the group's icon."
+        default: return "\(changedByName) updated the group."
+        }
     }
 }
 

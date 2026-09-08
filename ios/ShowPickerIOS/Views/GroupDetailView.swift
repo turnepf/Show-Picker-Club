@@ -25,6 +25,10 @@ struct GroupDetailView: View {
     @State private var selectedTab: Tab = .trending
     @State private var confirmingLeave = false
     @State private var confirmingDelete = false
+    // Set from the detail load, shown once at the top of the screen, then
+    // gone — the server itself only ever sends this once per member per
+    // change (see load()).
+    @State private var changeNotice: GroupChangeNotice?
     @State private var renaming = false
     @State private var renameText = ""
     // "Change icon" drafts — seeded from the group when the sheet opens, saved
@@ -74,6 +78,21 @@ struct GroupDetailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if group != nil {
                 VStack(spacing: 0) {
+                    if let changeNotice = changeNotice {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "info.circle.fill")
+                                .foregroundStyle(.blue)
+                            Text(changeNotice.summary)
+                                .font(.subheadline)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(12)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                    }
+
                     HStack(spacing: 10) {
                         GroupIconBadge(icon: group?.icon, color: group?.color, size: 30)
                         Text("\(members.count) member\(members.count == 1 ? "" : "s")")
@@ -164,20 +183,25 @@ struct GroupDetailView: View {
                         } label: {
                             Label("Leave", systemImage: "arrowshape.turn.up.left")
                         }
+                        // Rename and Change icon are open to any group
+                        // member, not just the creator — the other members
+                        // find out via the change notice above, the next
+                        // time they open the group. Delete stays
+                        // creator-only.
+                        Button {
+                            renameText = group.name
+                            renaming = true
+                        } label: {
+                            Label("Rename", systemImage: "pencil")
+                        }
+                        Button {
+                            iconDraft = group.icon
+                            colorDraft = group.color
+                            editingIcon = true
+                        } label: {
+                            Label("Change icon", systemImage: "face.smiling")
+                        }
                         if group.isCreator {
-                            Button {
-                                renameText = group.name
-                                renaming = true
-                            } label: {
-                                Label("Rename", systemImage: "pencil")
-                            }
-                            Button {
-                                iconDraft = group.icon
-                                colorDraft = group.color
-                                editingIcon = true
-                            } label: {
-                                Label("Change icon", systemImage: "face.smiling")
-                            }
                             Button(role: .destructive) {
                                 confirmingDelete = true
                             } label: {
@@ -426,6 +450,7 @@ struct GroupDetailView: View {
             let detail = try await API.groupDetail(id: groupId)
             self.group = detail.group
             self.members = detail.members
+            self.changeNotice = detail.changeNotice
 
             let shows = try await API.groupTrending(id: groupId)
             self.trending = shows

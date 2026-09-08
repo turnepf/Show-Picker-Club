@@ -142,11 +142,16 @@ with you. See `docs/INVARIANTS.md` §12a.
 node scripts/group-icons-test.mjs
 ```
 
-Group icons (migration 066), same harness. The server is the only gate — an
-icon or color outside the curated sets in `_shared/group-icons.js` is a 400 on
-create and PATCH, so clients render what arrives without re-validating — and
-the PATCH semantics that keep a rename from wiping an icon: absent key keeps,
-null clears, creator only (same bar as rename).
+Group icons (migration 066) and the rename/icon change notice (migration
+068), same harness. The server is the only gate — an icon or color outside
+the curated sets in `_shared/group-icons.js` is a 400 on create and PATCH, so
+clients render what arrives without re-validating — and the PATCH semantics
+that keep a rename from wiping an icon: absent key keeps, null clears, any
+group member (not just the creator — Delete is the only rename/icon-adjacent
+action still creator-only). Also pins the change notice: a real edit stamps
+who/what/when on the group, `GET` surfaces it once to every other member who
+was already in the group when it happened, never to the editor, and never to
+someone who joined afterward.
 
 ```bash
 node scripts/vibe-scope-test.mjs

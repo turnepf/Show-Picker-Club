@@ -333,16 +333,26 @@ CREATE TABLE IF NOT EXISTS groups (
   name TEXT NOT NULL,
   creator_slug TEXT NOT NULL REFERENCES members(slug),
   created_at TEXT DEFAULT (datetime('now')),
-  -- Creator-picked SF Symbol name and named accent color (migration 066).
-  -- Both nullable; the API validates against its curated sets.
+  -- SF Symbol name and named accent color (migration 066). Both nullable;
+  -- the API validates against its curated sets.
   icon TEXT,
-  color TEXT
+  color TEXT,
+  -- Migration 068: any group member may set name/icon/color, not just the
+  -- creator, so the last edit is tracked here to tell everyone else once —
+  -- see group_members.last_seen_change_at.
+  profile_changed_by TEXT REFERENCES members(slug),
+  profile_changed_at TEXT,
+  profile_changed_fields TEXT
 );
 
 CREATE TABLE IF NOT EXISTS group_members (
   group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
   member_slug TEXT NOT NULL REFERENCES members(slug) ON DELETE CASCADE,
   joined_at TEXT DEFAULT (datetime('now')),
+  -- Migration 068: this member's own high-water mark against
+  -- groups.profile_changed_at, so a rename/icon change notice shows exactly
+  -- once per member.
+  last_seen_change_at TEXT,
   PRIMARY KEY (group_id, member_slug)
 );
 

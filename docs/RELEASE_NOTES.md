@@ -17,6 +17,11 @@ first two or three lines before "more", so the most useful change goes first.
 
 ## Unreleased — the update after 1.4.1
 
+**Anyone in the group can rename it or change its icon**, not just whoever
+started it — the option simply wasn't there for anyone else before. If
+someone else renames the group or picks a new icon, you'll see a quick note
+about it the next time you open the group. On iPhone and iPad.
+
 *(Server-side, live for everyone the moment it deploys — no app update
 required, so this does not need to hold up 1.4.1.)*
 
