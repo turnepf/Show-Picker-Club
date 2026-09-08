@@ -41,12 +41,16 @@ required. Listed so the story is complete; the member-facing halves are in
 
 ---
 
-## 1.4.1 (build 24) — version bumped 2026-09-08; not yet archived
+## 1.4.1 (build 24) — archived and uploaded 2026-09-08; awaiting submission
 
 Covers everything merged since **1.4 / build 23**, which reached the App Store
 on **2026-08-26**. A point release rather than 1.5: the changes are refinements
 to surfaces that already shipped, plus one new group feature that lives inside
 the group screen.
+
+Build 24 is uploaded and attached on iPhone/iPad, Mac and Apple TV, with the
+text below set byte-identically on all three. When it ships, change this
+heading to *released on the App Store <date>*.
 
 Applies to **iPhone, iPad and Mac**. **Apple TV** gets the group icons on its
 group tiles and the group's Watch Next board, both read-only. The **watch** is
