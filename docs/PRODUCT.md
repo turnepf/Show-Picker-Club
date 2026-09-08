@@ -83,6 +83,13 @@ comparing the two never has to know that TMDB's "Max" is our "HBO Max". A
 provider that maps to no service we can name — "Starz Amazon Channel" — is
 left out rather than shown. See `docs/INVARIANTS.md` §20.
 
+Adopting one of the named services — editing the show and picking it — is the
+member answering the line, so it stops saying it: the note narrows to whatever
+is still worth naming, or disappears when their pick was the only one listed.
+Changing the network also **clears the service badge**, which was derived from
+the service they just replaced; a blank badge is correct where a stale one is
+a lie, and the next `mode: 'logos'` sweep refills it.
+
 Platforms: **iPhone/iPad** show it as a Streaming row under Network (Mac via
 Catalyst). **Apple TV** shows it in the metadata block above the watch button,
 where that screen already names the network. **The watch doesn't** — it has no

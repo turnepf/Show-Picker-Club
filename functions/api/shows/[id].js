@@ -184,9 +184,17 @@ export async function onRequestPut(context) {
   const rating = enriched.rating || existing.rating;
 
   const finalNetwork = network || fallbackNetwork(enriched);
+  // The service badge was derived from the network this row USED to name, so a
+  // member switching services must not keep the previous one's logo — that is
+  // the mismatch #429 fixed, arriving through the edit path instead. Cleared
+  // rather than recomputed: the right logo needs a TMDB round trip this
+  // handler isn't making, and a blank badge is correct where a stale one is a
+  // lie. `mode: 'logos'` selects on exactly this NULL, so a sweep refills it.
+  const networkChanged = (finalNetwork || null) !== (existing.network || null);
   await env.DB.prepare(
     `UPDATE shows SET title = ?, network = ?, network_url = ?, recommended_by = ?, list = ?, notes = ?, movie = ?, full_series = ?, watching_with = ?, rating = ?, archived = ?,
-        poster_url = COALESCE(?, poster_url), network_logo_url = COALESCE(?, network_logo_url),
+        poster_url = COALESCE(?, poster_url),
+        network_logo_url = CASE WHEN ? = 1 THEN NULL ELSE COALESCE(?, network_logo_url) END,
         overview = COALESCE(?, overview), backdrop_url = COALESCE(?, backdrop_url),
         tmdb_rating = COALESCE(?, tmdb_rating), content_rating = COALESCE(?, content_rating),
         trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director),
@@ -196,7 +204,7 @@ export async function onRequestPut(context) {
         tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type),
         updated_at = datetime('now') WHERE id = ?`
   ).bind(title, finalNetwork, network_url, recommended_by, list, notes, movie, full_series, watching_with, rating, archived,
-    enriched.posterUrl || null, enriched.networkLogoUrl || null,
+    enriched.posterUrl || null, networkChanged ? 1 : 0, enriched.networkLogoUrl || null,
     enriched.overview || null, enriched.backdropUrl || null, enriched.tmdbRating || null, enriched.contentRating || null,
     enriched.trailerKey || null, enriched.director || null, enriched.directorImdbId || null, enriched.runtime || null, enriched.releaseYear || null,
     enriched.watchLink || null, enriched.tmdbId || null, enriched.tmdbType || null, params.id).run();
@@ -210,7 +218,6 @@ export async function onRequestPut(context) {
   // If the network changed (or we landed on a placeholder URL), kick off
   // a Watchmode lookup in the background to keep the row on a real
   // deep link. Propagates to all members' same-titled active rows.
-  const networkChanged = (finalNetwork || null) !== (existing.network || null);
   const onPlaceholder = !network_url ||
     network_url.includes('/search') || network_url.includes('/s?') ||
     network_url.includes('?q=') || network_url.includes('?query=');

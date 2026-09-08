@@ -69,6 +69,25 @@ final class StreamingOnTests: XCTestCase {
         XCTAssertEqual(s.streamingNote, "Also on Hulu")
     }
 
+    /// Editing a show to name one of the listed services is the member saying
+    /// "yes, that one" — the line must stop pointing them at it rather than
+    /// keep nagging about a service they just chose.
+    func testTheLineStopsWhenTheyAdoptTheOnlyListedService() {
+        let before = show(network: "Netflix", streamingOn: "Hulu")
+        XCTAssertEqual(before.streamingNote, "Now on Hulu")
+        let after = show(network: "Hulu", streamingOn: "Hulu")
+        XCTAssertNil(after.streamingNote)
+    }
+
+    /// And when several were listed, adopting one narrows the line to what is
+    /// still worth saying instead of clearing it — the others are real.
+    func testAdoptingOneOfSeveralNarrowsTheLine() {
+        let before = show(network: "Netflix", streamingOn: "Hulu, Peacock")
+        XCTAssertEqual(before.streamingNote, "Now on Hulu, Peacock")
+        let after = show(network: "Hulu", streamingOn: "Hulu, Peacock")
+        XCTAssertEqual(after.streamingNote, "Also on Peacock")
+    }
+
     /// Decoding: the field arrives as `streaming_on`, and a payload without it
     /// — an older cached row, another member's list — must decode cleanly to
     /// nil rather than failing the whole show.
