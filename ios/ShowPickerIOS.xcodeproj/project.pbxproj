@@ -233,6 +233,7 @@
 				A100000000000000000000F3 /* Resources */,
 				A100000000000000000000F4 /* Embed Foundation Extensions */,
 				CDD1EA872FF5BE6300F095DE /* Embed Watch Content */,
+				A1000000000000000000BEEF /* Stamp git commit */,
 			);
 			buildRules = (
 			);
@@ -423,6 +424,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A1000000000000000000BEEF /* Stamp git commit */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Stamp git commit";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "SHA=$(git -C \"$SRCROOT\" rev-parse --short HEAD 2>/dev/null || echo unknown)\nPLIST=\"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\nif [ -f \"$PLIST\" ]; then /usr/libexec/PlistBuddy -c \"Set :GitCommit $SHA\" \"$PLIST\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Add :GitCommit string $SHA\" \"$PLIST\"; fi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		A100000000000000000000F1 /* Sources */ = {

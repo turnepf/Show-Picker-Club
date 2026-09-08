@@ -121,6 +121,26 @@ Nothing about recommending touches anyone's list. Adding is each member's own ta
 
 Platforms: **iPhone/iPad** get all of it — recommend, pop-up, board (Mac via Catalyst). **Apple TV** shows the board as a read-only Watch Next shelf on the group screen — a couch is where "what should we watch next" gets asked — but can't recommend or answer. **The watch doesn't** — it has no groups. **The web doesn't** — frozen at its restored state (see [Web app status](#web-app-status)).
 
+### Which build am I on
+
+The account menu on Home ends with a readout: `1.4.1 (24) · 8784b9a` — version,
+build number, and the commit the binary was built from. Disabled, because it is
+a readout rather than an action.
+
+The commit is the point. Version and build alone can't identify a binary during
+testing: several different builds ship as the same `1.4.1 (24)` before a
+release is cut, so "am I on the one with the fix?" has no answer without it. A
+`Stamp git commit` build phase writes `GitCommit` into Info.plist at build
+time; when the source isn't a git checkout it writes `unknown`, and the app
+drops the suffix entirely rather than showing that to someone who installed
+from the App Store.
+
+Platforms: **iPhone/iPad** (Mac via Catalyst) — it lives in the account menu,
+which only they have. **Apple TV and the watch don't** — neither has that menu,
+and neither is a target you side-load successive test builds onto. **The web
+doesn't** — frozen at its restored state, and a browser reload is never
+ambiguous about which version it just fetched.
+
 ## Authentication
 
 A member logs in with a passkey (iPhone/iPad), a one-time code sent to their phone (SMS via Twilio Verify) or email (via Resend, validated against `login_otps`), or with Sign in with Apple (iOS and tvOS). All paths resolve to an existing member and set a 30-day HttpOnly session cookie. There are no static per-member passwords.

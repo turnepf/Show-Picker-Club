@@ -438,6 +438,20 @@ struct HomeView: View {
         }
     }
 
+    // "1.4.1 (24) · 8784b9a" — version, build, and the commit the binary was
+    // built from. GitCommit is stamped into Info.plist by the "Stamp git
+    // commit" build phase; it reads "unknown" if the source isn't a git
+    // checkout, and the whole suffix is dropped rather than showing that to
+    // someone who installed from the App Store, where it would be noise.
+    static var buildIdentifier: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        let sha = info?["GitCommit"] as? String ?? ""
+        let base = "\(version) (\(build))"
+        return sha.isEmpty || sha == "unknown" ? base : "\(base) · \(sha)"
+    }
+
     // Account control shown on the title line: a menu (Log out) when signed in,
     // otherwise a tap target that opens the login sheet.
     private var accountControl: some View {
@@ -500,6 +514,16 @@ struct HomeView: View {
                     } label: {
                         Label("Delete Account…", systemImage: "trash")
                     }
+                    // Which build this actually is. The version and build
+                    // number alone can't answer that during testing — several
+                    // different binaries ship as the same "1.4.1 (24)" before
+                    // a release is cut — so the commit is stamped in at build
+                    // time and shown here. Disabled: it's a readout, not an
+                    // action, and this menu is where the other things you only
+                    // want occasionally already live.
+                    Divider()
+                    Button {} label: { Text(Self.buildIdentifier) }
+                        .disabled(true)
                 } label: {
                     Image(systemName: "person.crop.circle").font(.title)
                 }
