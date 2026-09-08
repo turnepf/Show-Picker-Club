@@ -182,7 +182,7 @@ export async function onRequestPost(context) {
   // batch so an artwork backfill fits comfortably within budget. (`skip_omdb`
   // is kept as an alias now that OMDB is gone — it still selects posters-only.)
   const skipOmdb = body.skip_omdb === true || body.mode === 'posters';
-  const skipActors = body.skip_actors === true || body.mode === 'posters';
+  const skipActors = body.skip_actors === true || body.mode === 'posters' || body.mode === 'logos';
   // `mode: 'gaps'` targets rows that are marked enriched but hold no data —
   // the wreckage of the rate-limit bug this file's tmdbGet comment describes.
   // Those rows carry a FRESH enriched_at (the no-match path stamped them), so
@@ -193,6 +193,16 @@ export async function onRequestPost(context) {
   // It also reports `remaining`, so a caller can drive it to zero rather than
   // guessing when the library is whole.
   const gapsOnly = body.mode === 'gaps';
+  // `mode: 'logos'` is a one-time sweep for movie service badges, and is
+  // deliberately NOT folded into MOVIE_GAP below. A rent/buy-only film has no
+  // flatrate provider and therefore no logo to fetch, so a standing
+  // `network_logo_url IS NULL` gate would re-select those rows on every member
+  // page load forever — spending the whole budget on rows nothing can fill,
+  // which is the churn a data-absence gate invites when the data is sometimes
+  // legitimately absent. New films need no sweep: they insert without genres,
+  // so MOVIE_GAP already selects them and the pass writes the logo on the way
+  // past. This mode exists only to drain the films that predate the fix.
+  const logosOnly = body.mode === 'logos';
   // Optional: restrict the TMDB passes to a specific set of titles (e.g. the
   // Trending shelf), so we can prioritise the most-visible shows first.
   const titles = Array.isArray(body.titles) && body.titles.length
@@ -222,7 +232,7 @@ export async function onRequestPost(context) {
   let tvErrors = 0;
   let movieErrors = 0;
   let lastError = null;
-  if (hasTmdb) {
+  if (hasTmdb && !logosOnly) {
     // Cover everything a sibling copy already covers before spending budget.
     await syncArtworkAcrossCopies(env);
 
@@ -436,6 +446,11 @@ export async function onRequestPost(context) {
     }
   }
 
+  // A logo sweep skips the TV pass above, but not the copy-to-copy artwork
+  // sync it opens with: that propagates network_logo_url between copies of one
+  // title with no requests at all, which is work no sweep should pay TMDB for.
+  if (hasTmdb && logosOnly) await syncArtworkAcrossCopies(env);
+
   // Movie detail — the pass above is TV-only (movie = 0), so movies need their
   // own fetch (no seasons/dates/network logo apply to movies). Stamps
   // enriched_at either way so titles TMDB can't find rotate to the back
@@ -458,7 +473,10 @@ export async function onRequestPost(context) {
                         OR NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id))`;
     // Posters mode keeps the narrow artwork gate — it exists to catch artwork
     // up in a small batch (max_tmdb 6), not to fill detail.
-    let mvWhere = `archived = 0 AND movie = 1 AND ${skipOmdb ? '(poster_url IS NULL OR network IS NULL)' : MOVIE_GAP}`;
+    const mvGate = skipOmdb ? "(poster_url IS NULL OR network IS NULL)"
+      : logosOnly ? "(network_logo_url IS NULL OR network_logo_url = '')"
+      : MOVIE_GAP;
+    let mvWhere = `archived = 0 AND movie = 1 AND ${mvGate}`;
     const mvBinds = [];
     if (member) { mvWhere += ` AND member_slug = ?`; mvBinds.push(member); }
     if (titles) { mvWhere += ` AND LOWER(title) IN (${titles.map(() => '?').join(',')})`; mvBinds.push(...titles); }
@@ -527,6 +545,10 @@ export async function onRequestPost(context) {
         // enriched_at on all of them so the title rotates evenly.
         await env.DB.prepare(
           `UPDATE shows SET poster_url = COALESCE(?, poster_url),
+              -- The service badge. TV takes it from detail.networks[0]; a movie
+              -- has no networks[], so it comes off the flatrate provider that
+              -- named the network in the first place. Fill-only, like the rest.
+              network_logo_url = COALESCE(network_logo_url, ?),
               overview = COALESCE(overview, ?), backdrop_url = COALESCE(backdrop_url, ?),
               tmdb_rating = COALESCE(tmdb_rating, ?), rating = COALESCE(?, rating), content_rating = COALESCE(content_rating, ?),
               trailer_key = COALESCE(trailer_key, ?), director = COALESCE(director, ?), director_imdb_id = COALESCE(director_imdb_id, ?),
@@ -550,7 +572,7 @@ export async function onRequestPost(context) {
               -- Copies pinned to a different id are a different film that
               -- shares the title — they get their own turn, not this data.
               AND (tmdb_id IS NULL OR tmdb_id = ?)`
-        ).bind(posterUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey,
+        ).bind(posterUrl, df.providerLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey,
           df.director, directorImdbId, df.runtime, df.releaseYear, genres, fallbackNetwork(df), df.watchLink,
           df.voteCount, df.tagline, df.originalLanguage, df.studio,
           tmdbId, show.id, tmdbId).run();
@@ -664,6 +686,18 @@ export async function onRequestPost(context) {
                   OR NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id))) AS movies`
     ).first().catch(() => null);
     remaining = row ? { tv: row.tv, movies: row.movies, total: row.tv + row.movies } : null;
+  } else if (logosOnly) {
+    // Same contract as gaps mode, so the same driver script can run this to
+    // ground: how many titles the sweep still considers outstanding. Note this
+    // counts films a sweep may never be able to fill (a rent/buy-only film has
+    // no provider logo), so a caller must stop on a count that stops falling
+    // rather than on one that reaches zero.
+    const row = await env.DB.prepare(
+      `SELECT COUNT(DISTINCT LOWER(title)) AS movies FROM shows
+        WHERE archived = 0 AND movie = 1
+          AND (network_logo_url IS NULL OR network_logo_url = '')`
+    ).first().catch(() => null);
+    remaining = row ? { tv: 0, movies: row.movies, total: row.movies } : null;
   }
 
   // tvCandidates/movieCandidates say whether a zero means "nothing to do" or

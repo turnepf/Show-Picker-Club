@@ -1,4 +1,4 @@
-name: Fill enrichment gaps (missing cast and episodes)
+name: Fill enrichment gaps (missing cast, episodes, movie badges)
 
 # One-time repair, run from the Actions tab. Deliberately NOT a button in the
 # app: draining this backlog is done once, and a permanent control for a
@@ -13,6 +13,17 @@ name: Fill enrichment gaps (missing cast and episodes)
 # them. `mode: gaps` selects on missing data instead of age, which is the only
 # ordering that finds them.
 #
+# `mode: logos` is the other one-time repair: movie service badges. TV takes
+# its logo from TMDB's `networks[0]`, a field movies don't have, and the movie
+# pass never wrote the column at all — so films carried no badge on Apple TV.
+# The logo now comes off the flatrate provider that names the network, and this
+# sweep drains the films that predate that. It is a SWEEP rather than part of
+# the standing gate on purpose: a rent/buy-only film has no flatrate provider
+# and so no badge to fetch, and a permanent `network_logo_url IS NULL` gate
+# would re-select those rows on every member page load forever. For the same
+# reason its count bottoms out above zero — the driver stops when the number
+# stops falling, which is expected and not damage.
+#
 # Safe to re-run: it's idempotent, and once the backlog is clear it reports
 # nothing to do. Start with dry_run to see the size of the problem.
 #
@@ -25,6 +36,14 @@ name: Fill enrichment gaps (missing cast and episodes)
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'gaps = missing cast/episodes. logos = one-time movie service-badge sweep.'
+        type: choice
+        required: false
+        default: 'gaps'
+        options:
+          - gaps
+          - logos
       dry_run:
         description: 'Report the outstanding count and enrich nothing.'
         type: boolean
@@ -67,7 +86,8 @@ jobs:
             echo "::error::CRON_SECRET repo secret is not set"
             exit 1
           fi
-          ARGS="--max-rounds ${{ github.event.inputs.max_rounds || '60' }}"
+          ARGS="--mode ${{ github.event.inputs.mode || 'gaps' }}"
+          ARGS="$ARGS --max-rounds ${{ github.event.inputs.max_rounds || '60' }}"
           ARGS="$ARGS --max-tmdb ${{ github.event.inputs.max_tmdb || '20' }}"
           ARGS="$ARGS --sleep ${{ github.event.inputs.sleep_seconds || '4' }}"
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then

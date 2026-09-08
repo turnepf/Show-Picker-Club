@@ -82,6 +82,11 @@ export function extractTmdbDetailFields(detail, mediaType) {
   // to a service we know (knownNetwork); the link is a fallback aggregator
   // page (never a deep link), stored separately in `watch_link`.
   let providerNetwork = null;
+  // The service's badge, taken off the same provider object that names the
+  // network. TV reads its logo from `detail.networks[0].logo_path`, a field
+  // movies simply don't have — the watch-provider block is the only place a
+  // film's logo can come from, and it rides in a response we already fetch.
+  let providerLogoUrl = null;
   let watchLink = null;
   // Storefronts that sell the title outright, and the availability verdict:
   // 'subscription' when some service streams it on a plan, 'rent_buy' when the
@@ -100,7 +105,11 @@ export function extractTmdbDetailFields(detail, mediaType) {
     );
     for (const p of flatrate) {
       const n = knownNetwork(p.provider_name);
-      if (n) { providerNetwork = n; break; }
+      if (n) {
+        providerNetwork = n;
+        providerLogoUrl = p.logo_path ? `https://image.tmdb.org/t/p/w154${p.logo_path}` : null;
+        break;
+      }
     }
     const rentBuy = [...(wp.rent || []), ...(wp.buy || [])];
     storefronts = [...new Set(
@@ -136,7 +145,7 @@ export function extractTmdbDetailFields(detail, mediaType) {
 
   return {
     overview, backdropUrl, tmdbRating, contentRating, trailerKey,
-    director, directorPersonId, runtime, releaseYear, providerNetwork, watchLink,
+    director, directorPersonId, runtime, releaseYear, providerNetwork, providerLogoUrl, watchLink,
     storefronts, availability,
     episodesReleased, voteCount, tagline, originalLanguage, studio,
   };
@@ -179,7 +188,7 @@ export function fallbackNetwork(enriched) {
 const EMPTY_DETAIL = {
   overview: null, backdropUrl: null, tmdbRating: null, contentRating: null,
   trailerKey: null, director: null, directorPersonId: null, runtime: null,
-  releaseYear: null, providerNetwork: null, watchLink: null,
+  releaseYear: null, providerNetwork: null, providerLogoUrl: null, watchLink: null,
   storefronts: [], availability: null,
   episodesReleased: null, voteCount: null, tagline: null,
   originalLanguage: null, studio: null,

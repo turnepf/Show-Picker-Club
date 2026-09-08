@@ -636,9 +636,27 @@ matched no genre at all.
   work without bounding it spends straight past `SUBREQUEST_BUDGET` into
   Cloudflare's own per-request ceiling.
 
+The same audit found the mirror-image defect: `network_logo_url` was never in
+the movie write at all. TV reads its logo from `detail.networks[0].logo_path`,
+a field TMDB does not return for films, so 128 of 137 movies had a network and
+no badge. The logo now comes off the flatrate provider that already names the
+network, out of a response the pass was fetching anyway.
+
+**But a data-absence gate needs data that is always obtainable.** That repair
+is `mode: 'logos'`, a deliberate sweep, and deliberately *not* part of
+`MOVIE_GAP`: a rent/buy-only film has no flatrate provider and therefore no
+badge to fetch, so a standing `network_logo_url IS NULL` gate would re-select
+those rows on every member page load forever — spending the whole budget on
+rows nothing can fill. Its count bottoms out above zero for the same reason,
+so the driver stops when the number stops falling rather than when it reaches
+zero. New films need no sweep: they insert without genres, so `MOVIE_GAP`
+already selects them and the pass writes the badge on the way past.
+
 The general rule: when you widen what a pass writes, widen what it selects in
 the same change, or you have created rows that are permanently done and
-permanently empty.
+permanently empty. And when you gate on the absence of data, check whether that
+data is always obtainable — if it isn't, the gate is a treadmill, and the
+repair belongs in a sweep you invoke rather than a rotation that never ends.
 
 Enforced by `scripts/enrich-movie-detail-test.mjs`.
 

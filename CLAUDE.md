@@ -269,7 +269,14 @@ its detail block is selected, that a complete one isn't re-fetched, that
 narrower predicate than the pass, so a dry run reported nothing to do over a
 backlog of 125), that `mode: 'posters'` keeps its narrow artwork gate, and that
 the loop stops on the subrequest budget — it had no check at all, which was
-safe only while its selection was empty. See `docs/INVARIANTS.md` §19.
+safe only while its selection was empty. Also covers movie **service badges**:
+`network_logo_url` was never written for films at all (TV reads it from TMDB's
+`networks[0]`, which movies don't have), so it now comes off the flatrate
+provider that names the network. That repair is `mode: 'logos'`, a deliberate
+one-time sweep rather than part of the standing gate — a rent/buy-only film has
+no provider and so no badge to fetch, and a permanent `network_logo_url IS
+NULL` gate would re-select those rows on every page load forever. The test pins
+that churn is impossible. See `docs/INVARIANTS.md` §19.
 
 ```bash
 node scripts/auth-code-flow-test.mjs

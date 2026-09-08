@@ -35,6 +35,18 @@ const num = (flag, dflt) => {
 const maxRounds = num('--max-rounds', 60);
 const sleepSecs = num('--sleep', 4);
 const maxTmdb = num('--max-tmdb', 20);
+// `--mode logos` drives the one-time movie service-badge sweep instead of the
+// cast/episode gaps backlog. It needs a different stop rule: a film that only
+// rents has no flatrate provider and therefore no logo to fetch, so the count
+// bottoms out above zero instead of reaching it. Stop when it stops falling.
+const modeArg = (() => {
+  const i = args.indexOf('--mode');
+  return i >= 0 && args[i + 1] ? args[i + 1] : 'gaps';
+})();
+if (!['gaps', 'logos'].includes(modeArg)) {
+  console.error(`Unknown --mode ${modeArg}. Expected 'gaps' or 'logos'.`);
+  process.exit(1);
+}
 
 if (!SECRET) {
   console.error('CRON_SECRET is not set. It is the same secret the scheduled');
@@ -50,7 +62,7 @@ async function round(probeOnly) {
     headers: { 'Content-Type': 'application/json', 'X-Cron-Secret': SECRET },
     // max_tmdb 0 makes the passes select nothing, so the response is just the
     // remaining count — a probe that spends no TMDB budget.
-    body: JSON.stringify({ mode: 'gaps', max_tmdb: probeOnly ? 0 : maxTmdb }),
+    body: JSON.stringify({ mode: modeArg, max_tmdb: probeOnly ? 0 : maxTmdb }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return res.json();
@@ -59,10 +71,12 @@ async function round(probeOnly) {
 const first = await round(true);
 const start = first.remaining;
 if (!start) {
-  console.error('No `remaining` in the response — is this deploy running gaps mode yet?');
+  console.error(`No \`remaining\` in the response — is this deploy running ${modeArg} mode yet?`);
   process.exit(1);
 }
-console.log(`Outstanding: ${start.total} titles (${start.tv} series, ${start.movies} films)`);
+console.log(modeArg === 'logos'
+  ? `Outstanding: ${start.movies} films with no service badge`
+  : `Outstanding: ${start.total} titles (${start.tv} series, ${start.movies} films)`);
 
 if (dryRun) {
   console.log('--dry-run — nothing enriched.');
@@ -73,7 +87,7 @@ if (start.total === 0) {
   process.exit(0);
 }
 
-let filled = 0, stalls = 0;
+let filled = 0, stalls = 0, prevLeft = start.total;
 for (let i = 1; i <= maxRounds; i++) {
   const r = await round(false);
   const left = r.remaining?.total ?? null;
@@ -92,10 +106,24 @@ for (let i = 1; i <= maxRounds; i++) {
   // fixed by retrying: titles TMDB genuinely has no match for. Stop rather
   // than burn the API forever — three in a row, so one bad round doesn't end
   // an otherwise-working run.
-  if (did > 0 && !(r.tmdbUpdated > 0)) {
+  // In logos mode the count is the only honest progress signal: `tmdbUpdated`
+  // counts a row whose poster came back, which is every row here, so it stays
+  // positive even when no badge was actually filled.
+  const madeProgress = modeArg === 'logos'
+    ? (left !== null && left < prevLeft)
+    : (r.tmdbUpdated > 0);
+  prevLeft = left ?? prevLeft;
+
+  if (did > 0 && !madeProgress) {
     if (++stalls >= 3) {
-      console.log(`\nStopped: ${left} titles left that TMDB can't match. These are`);
-      console.log('genuine no-matches, not the rate-limit damage — inspect them by hand.');
+      if (modeArg === 'logos') {
+        console.log(`\nStopped: ${left} films left with no badge to fetch — these stream`);
+        console.log('nowhere on a subscription, so TMDB lists no flatrate provider and');
+        console.log('there is no logo to take. Expected, not damage.');
+      } else {
+        console.log(`\nStopped: ${left} titles left that TMDB can't match. These are`);
+        console.log('genuine no-matches, not the rate-limit damage — inspect them by hand.');
+      }
       process.exit(0);
     }
   } else {

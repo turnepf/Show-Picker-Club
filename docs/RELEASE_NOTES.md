@@ -25,6 +25,11 @@ required, so this does not need to hold up 1.4.1.)*
   carried no genre, description or running time at all. The visible symptom:
   filtering Next Up by genre hid every movie, because no movie matched any
   genre. The backlog drains on its own now.
+- Movies show their streaming service's logo on Apple TV. Films never carried
+  one — the badge TV shows have comes from a field TMDB doesn't publish for
+  movies — so a film's card sat blank where a series' card showed Max or
+  Netflix. It now comes from the service the film actually streams on. A movie
+  you can only rent still shows none, because it streams nowhere.
 
 ---
 

@@ -84,6 +84,9 @@ const FILMS = {
   503: { title: 'Hundreds of Beavers', year: '2024-02-16', genre: 'Comedy', runtime: 108 },
   504: { title: 'Flow', year: '2024-11-22', genre: 'Animation', runtime: 85 },
   505: { title: 'Nickel Boys', year: '2024-12-13', genre: 'Drama', runtime: 140 },
+  // Rent/buy only — no flatrate provider, so no logo exists to fetch. This is
+  // the film a standing `network_logo_url IS NULL` gate would churn on forever.
+  506: { title: 'Anora', year: '2024-10-18', genre: 'Drama', runtime: 139, provider: null },
 };
 
 const movieDetail = (id) => {
@@ -97,7 +100,13 @@ const movieDetail = (id) => {
     production_companies: [{ name: 'A24' }],
     credits: { cast: [{ id: 900 + Number(id), name: `${f.title} Lead`, order: 0 }],
                crew: [{ job: 'Director', id: 800 + Number(id), name: `${f.title} Director` }] },
-    videos: { results: [] }, 'watch/providers': { results: {} }, release_dates: { results: [] },
+    videos: { results: [] }, release_dates: { results: [] },
+    // A flatrate provider, the way TMDB answers for a film that streams: the
+    // provider object carries the logo. Movies have no `networks[]`, so this
+    // is the only place a film's service badge can come from.
+    'watch/providers': { results: { US: { link: 'https://tmdb/watch',
+      flatrate: f.provider === null ? [] : [{ provider_name: 'Max', logo_path: '/max-logo.jpg', display_priority: 1 }],
+      rent: f.provider === null ? [{ provider_name: 'Apple TV' }] : [] } } },
   };
 };
 
@@ -143,12 +152,12 @@ function makeEnv() {
 
 // A film as it actually sits after insert-time enrichment: poster and network
 // present, detail block empty, enriched_at already stamped.
-function addMovie(env, { title, tmdbId, poster = '/have.jpg', network = 'Max', genres = null, withCast = true, complete = false }) {
+function addMovie(env, { title, tmdbId, poster = '/have.jpg', network = 'Max', genres = null, withCast = true, complete = false, logo = null }) {
   env._db.prepare(
     `INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, poster_url, network,
-                        genres, overview, runtime, enriched_at, created_at, updated_at)
-     VALUES (?, 'next', 'patrick', 1, ?, 'movie', ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(title, tmdbId, poster, network,
+                        network_logo_url, genres, overview, runtime, enriched_at, created_at, updated_at)
+     VALUES (?, 'next', 'patrick', 1, ?, 'movie', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(title, tmdbId, poster, network, logo,
         complete ? FILMS[tmdbId].genre : genres,
         complete ? 'already here' : null,
         complete ? FILMS[tmdbId].runtime : null,
@@ -258,6 +267,60 @@ console.log('\nThe loop stops on the subrequest budget');
     JSON.stringify(res));
   check('and stops well inside Cloudflare\'s per-request ceiling', res.subrequests <= 50,
     `subrequests=${res.subrequests}`);
+}
+
+// ---------------------------------------------------------------- 6
+
+console.log('\nMovies get a service badge, from the provider that named the network');
+{
+  const env = makeEnv();
+  addMovie(env, { title: 'Sinners', tmdbId: 501 });
+
+  await runEnrich(env);
+  check('the detail pass fills network_logo_url for a movie',
+    rowFor(env, 'Sinners').network_logo_url === 'https://image.tmdb.org/t/p/w154/max-logo.jpg',
+    `logo=${rowFor(env, 'Sinners').network_logo_url}`);
+}
+
+console.log('\nThe logo sweep drains films that predate the fix, and nothing else');
+{
+  const env = makeEnv();
+  // Complete in every respect except the badge — invisible to MOVIE_GAP, which
+  // is the whole reason the sweep exists.
+  addMovie(env, { title: 'Sinners', tmdbId: 501, complete: true, logo: null });
+  addMovie(env, { title: 'Conclave', tmdbId: 502, complete: true, logo: '/already.jpg' });
+
+  const normal = await (await runEnrich(env)).json();
+  check('the standing gate leaves a logo-only gap alone', normal.movieCandidates === 0,
+    `movieCandidates=${normal.movieCandidates}`);
+
+  const sweep = await (await runEnrich(env, { mode: 'logos' })).json();
+  check('the sweep selects exactly the film missing its badge', sweep.movieCandidates === 1,
+    `movieCandidates=${sweep.movieCandidates}`);
+  check('and fills it', rowFor(env, 'Sinners').network_logo_url === 'https://image.tmdb.org/t/p/w154/max-logo.jpg');
+  check('leaving a film that already had one untouched',
+    rowFor(env, 'Conclave').network_logo_url === '/already.jpg');
+}
+
+console.log('\nA rent/buy-only film cannot churn the standing gate');
+{
+  const env = makeEnv();
+  // No flatrate provider, so no logo will ever exist for it.
+  addMovie(env, { title: 'Anora', tmdbId: 506, complete: true, logo: null });
+
+  const first = await (await runEnrich(env)).json();
+  check('it is not selected by the normal pass even once', first.movieCandidates === 0,
+    `movieCandidates=${first.movieCandidates}`);
+
+  // The sweep may take it (it is missing a logo) but must not be able to fill
+  // it — the point is that this row never enters the standing rotation, which
+  // runs on every member page load.
+  await runEnrich(env, { mode: 'logos' });
+  check('the sweep leaves it empty rather than inventing a badge',
+    rowFor(env, 'Anora').network_logo_url === null);
+  const again = await (await runEnrich(env)).json();
+  check('and it still does not qualify for the standing gate afterwards', again.movieCandidates === 0,
+    `movieCandidates=${again.movieCandidates}`);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
