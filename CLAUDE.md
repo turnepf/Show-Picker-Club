@@ -212,6 +212,21 @@ draining the storefront rows that predate #337; its admin button was removed
 when it moved.
 
 ```bash
+node scripts/asc.mjs status
+```
+
+The App Store Connect operator tool — `status`, `set-notes <version> <file>`,
+`attach <version> <build>`, `upload <ipa|pkg>`. Reads and writes the app's
+version records directly so a release doesn't depend on three identical
+pastes into the web UI; `set-notes` re-reads Apple and compares SHA-256
+against the local file, which is what actually enforces "byte-identical on
+all three platforms". Credentials stay out of the repo (key in
+`~/.appstoreconnect/private_keys/`, issuer in `~/.appstoreconnect/issuer_id`).
+There is no `submit` subcommand on purpose — sending a version to review
+stays a human decision. Used by the run sheet in
+`docs/APP_STORE_SUBMISSION.md#6a-run-sheet-releasing-from-a-second-mac`.
+
+```bash
 node scripts/favorite-actors-test.mjs
 ```
 

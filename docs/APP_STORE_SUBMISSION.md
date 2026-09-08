@@ -242,25 +242,58 @@ into Info.plist so the account menu can show it. It needs command-line `git`;
 without it the value reads `unknown` and the app drops the suffix. Harmless
 either way — it never fails the build.
 
-**5. Create the version records — in the web UI, not the API.** All three
-platforms shipped 1.4.1's predecessor, so each needs a *new* 1.4.1 record and
-none can be renamed from an unsubmitted one.
+**5. Check what already exists before creating anything.**
 
-Use **＋ Version or Platform** in App Store Connect. Do not reach for
-`POST /v1/appStoreVersions`: it refuses with *"You cannot create a new version
-of the App in the current state"* whenever a release is in flight on another
-platform, and a throwaway version string draws the same error — the block is
-the app's state, not the version number. This cost real time in 1.4; the UI
-creates the record without complaint.
+```
+node scripts/asc.mjs status
+```
 
-**6. Paste the What's New text** from the current version's section in
-`docs/RELEASE_NOTES.md` — the fenced block, **byte for byte identical on all
-three platforms**. 1.4.1's is 2,560 characters against Apple's 4,000 cap, so
-no trimming; 1.4 needed roughly 1,700 characters cut and that is worth
-checking before you paste rather than after.
+That prints every editable version record with its attached build and the
+length and SHA-256 of its What's New text. **Records for the new version may
+already be there** — all three of 1.4.1's were, sitting in
+`PREPARE_FOR_SUBMISSION`, so nothing needed creating.
+
+If a platform *is* missing one, create it **in the web UI** with
+**＋ Version or Platform**. Do not reach for `POST /v1/appStoreVersions`: it
+refuses with *"You cannot create a new version of the App in the current
+state"* whenever a release is in flight on another platform, and a throwaway
+version string draws the same error — the block is the app's state, not the
+version number. This cost real time in 1.4; the UI creates the record without
+complaint.
+
+**6. Set the What's New text with the tool, not by pasting three times.**
+Extract the fenced block from the current version's section of
+`docs/RELEASE_NOTES.md` into a file, then:
+
+```
+node scripts/asc.mjs set-notes 1.4.1 <file>
+```
+
+It refuses anything over Apple's 4,000 cap, writes every platform and locale,
+then re-reads Apple and compares SHA-256 against the local file — which is
+what actually guarantees the three are byte-identical instead of hoping three
+pastes matched. 1.4.1's is 2,560 characters; 1.4 needed roughly 1,700 cut,
+and that is worth checking before you paste rather than after.
+
+**6a. Upload and attach.** Export each archive, then:
+
+```
+node scripts/asc.mjs upload "<path to .ipa or .pkg>"
+node scripts/asc.mjs attach 1.4.1 24
+```
+
+`attach` matches each build to its own platform and skips a platform whose
+build has not arrived yet, so it is safe to run early and again later.
+Uploads are sequential and a few minutes each; a build shows up at Apple
+within a minute or two of its upload finishing, so a platform missing from
+`status` usually means still-in-flight rather than failed.
 
 **7. Work §6's hygiene list** — iPad and Apple TV launches, demo sign-in on
 Mac, screenshots, export compliance — then submit.
+
+Submitting is deliberately not automatable here: `scripts/asc.mjs` has no
+`submit` subcommand, so the final send to review is always a person in the
+web UI.
 
 **8. After it ships:** move the version's section in `docs/RELEASE_NOTES.md`
 under its release date and open a fresh *Unreleased*.
