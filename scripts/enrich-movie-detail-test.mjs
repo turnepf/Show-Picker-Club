@@ -174,12 +174,15 @@ function makeEnv() {
 
 // A film as it actually sits after insert-time enrichment: poster and network
 // present, detail block empty, enriched_at already stamped.
-function addMovie(env, { title, tmdbId, poster = '/have.jpg', network = 'Max', genres = null, withCast = true, complete = false, logo = null }) {
+// `complete` means "nothing left for the pass to fill", which since migration
+// 069 includes a written streaming_on — empty string counts, since the pass
+// always writes one. Tests that want the streaming gap itself pass it as null.
+function addMovie(env, { title, tmdbId, poster = '/have.jpg', network = 'Max', genres = null, withCast = true, complete = false, logo = null, streamingOn = complete ? '' : null }) {
   env._db.prepare(
     `INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, poster_url, network,
-                        network_logo_url, genres, overview, runtime, enriched_at, created_at, updated_at)
-     VALUES (?, 'next', 'patrick', 1, ?, 'movie', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(title, tmdbId, poster, network, logo,
+                        network_logo_url, streaming_on, genres, overview, runtime, enriched_at, created_at, updated_at)
+     VALUES (?, 'next', 'patrick', 1, ?, 'movie', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(title, tmdbId, poster, network, logo, streamingOn,
         complete ? FILMS[tmdbId].genre : genres,
         complete ? 'already here' : null,
         complete ? FILMS[tmdbId].runtime : null,
@@ -447,6 +450,38 @@ console.log('\nWhere a title streams now sits beside the network, never over it'
   check('every copy of the title carries the same list',
     copies.length === 2 && copies.every((c) => c.streaming_on === 'Amazon Prime Video, HBO Max'),
     JSON.stringify(copies));
+}
+
+// --------------------------------------------------------------- 11
+
+console.log('\nFilms reach the streaming list without a sweep, and only once');
+{
+  const env = makeEnv();
+  // Complete in every other respect. Without streaming_on in the gate this
+  // film is invisible to the movie pass forever — the TV pass runs first and
+  // spends the budget, so a movie only ever enters through MOVIE_GAP.
+  addMovie(env, { title: 'Sing Sing', tmdbId: 507, network: 'Max', complete: true, streamingOn: null });
+  const first = await (await runEnrich(env)).json();
+  check('a film missing only its streaming list is selected', first.movieCandidates === 1,
+    `movieCandidates=${first.movieCandidates}`);
+  check('and receives it', rowFor(env, 'Sing Sing').streaming_on === 'Amazon Prime Video, HBO Max');
+
+  const second = await (await runEnrich(env)).json();
+  check('it does not qualify a second time', second.movieCandidates === 0,
+    `movieCandidates=${second.movieCandidates}`);
+}
+{
+  const env = makeEnv();
+  // The churn question, which is why this clause is safe where the badge's is
+  // not: a film TMDB lists nowhere still gets a written value (empty string),
+  // so it drops out of the gate instead of re-qualifying on every page load.
+  addMovie(env, { title: 'Anora', tmdbId: 506, network: 'Apple TV Store', complete: true, streamingOn: null });
+  await runEnrich(env);
+  check('a film TMDB lists nowhere still gets a written value',
+    rowFor(env, 'Anora').streaming_on === '', `streaming_on=${JSON.stringify(rowFor(env, 'Anora').streaming_on)}`);
+  const again = await (await runEnrich(env)).json();
+  check('so it cannot churn the gate', again.movieCandidates === 0,
+    `movieCandidates=${again.movieCandidates}`);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -491,6 +491,17 @@ export async function onRequestPost(context) {
     // is missing all of them.
     const MOVIE_GAP = `(poster_url IS NULL OR network IS NULL
                         OR genres IS NULL OR genres = ''
+                        -- NULL only until the first pass touches the row: this
+                        -- statement always writes a value, empty string
+                        -- included, so a film can never re-qualify on it. That
+                        -- is what makes it safe here where the badge is not —
+                        -- the badge can be permanently unobtainable, this
+                        -- cannot. Without it films would never receive
+                        -- streaming_on at all: the TV pass runs first and
+                        -- spends the subrequest budget, so movies only ever
+                        -- enter through this gate, and every other clause in
+                        -- it is already satisfied across the library.
+                        OR streaming_on IS NULL
                         OR NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id))`;
     // Posters mode keeps the narrow artwork gate — it exists to catch artwork
     // up in a small batch (max_tmdb 6), not to fill detail.
