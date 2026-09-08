@@ -436,21 +436,29 @@ export async function onRequestPost(context) {
     }
   }
 
-  // Movie posters — the pass above is TV-only (movie = 0), so movies need their
-  // own poster fetch (no seasons/dates/network logo apply to movies). Only
-  // touches movies still missing a poster or a network; stamps enriched_at
-  // either way so titles TMDB can't find rotate to the back instead of
-  // blocking the queue.
+  // Movie detail — the pass above is TV-only (movie = 0), so movies need their
+  // own fetch (no seasons/dates/network logo apply to movies). Stamps
+  // enriched_at either way so titles TMDB can't find rotate to the back
+  // instead of blocking the queue.
   if (hasTmdb) {
-    // Normally this pass is a poster/platform top-up — network qualifies a row
-    // because a rent/buy-only movie inserts with none, and this pass is the
-    // only background path that can fill it (fallbackNetwork names the
-    // storefront). In gaps mode it's the cast that matters, so a film with
-    // artwork but no cast still qualifies.
-    let mvWhere = gapsOnly
-      ? `archived = 0 AND movie = 1
-         AND NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id)`
-      : `archived = 0 AND movie = 1 AND (poster_url IS NULL OR network IS NULL)`;
+    // This pass writes the whole detail block, so it has to select on the whole
+    // of it. Gating it on `poster_url IS NULL OR network IS NULL` alone is what
+    // left 91% of the movie library with no genres, overview or runtime up to
+    // 1.4: a film inserts WITH a poster and a network (synchronous insert
+    // enrichment sets both and neither path writes genres), so it never
+    // qualified again — and unlike the TV pass, which cycles its whole library
+    // by oldest enriched_at, no second path could reach it. `network` still
+    // qualifies a row on its own because a rent/buy-only film inserts with
+    // none and this is the only background path that can name the storefront.
+    // Genres stand in for the rest of the detail block: overview, runtime,
+    // tagline and studio all ride in the same response, so a row missing one
+    // is missing all of them.
+    const MOVIE_GAP = `(poster_url IS NULL OR network IS NULL
+                        OR genres IS NULL OR genres = ''
+                        OR NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id))`;
+    // Posters mode keeps the narrow artwork gate — it exists to catch artwork
+    // up in a small batch (max_tmdb 6), not to fill detail.
+    let mvWhere = `archived = 0 AND movie = 1 AND ${skipOmdb ? '(poster_url IS NULL OR network IS NULL)' : MOVIE_GAP}`;
     const mvBinds = [];
     if (member) { mvWhere += ` AND member_slug = ?`; mvBinds.push(member); }
     if (titles) { mvWhere += ` AND LOWER(title) IN (${titles.map(() => '?').join(',')})`; mvBinds.push(...titles); }
@@ -467,6 +475,12 @@ export async function onRequestPost(context) {
     movieCandidates = (movieShows || []).length;
 
     for (const show of movieShows) {
+      // Two calls minimum per title (search + detail); don't start one we
+      // can't finish. The loop ran with no check at all while its selection
+      // was nearly always empty — now that it has real work to do, an
+      // unbounded run would spend straight past SUBREQUEST_BUDGET into
+      // Cloudflare's own per-request ceiling and fail the whole endpoint.
+      if (budgetLeft() < 3) { budgetExhausted = true; break; }
       try {
         // Same identity rule as the TV pass: a stored tmdb_id is fetched
         // directly, and the title search only serves rows with no id (or a
@@ -645,7 +659,9 @@ export async function onRequestPost(context) {
                   OR episodes_released IS NULL)) AS tv,
          (SELECT COUNT(DISTINCT LOWER(title)) FROM shows
            WHERE archived = 0 AND movie = 1
-             AND NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id)) AS movies`
+             AND (poster_url IS NULL OR network IS NULL
+                  OR genres IS NULL OR genres = ''
+                  OR NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id))) AS movies`
     ).first().catch(() => null);
     remaining = row ? { tv: row.tv, movies: row.movies, total: row.tv + row.movies } : null;
   }

@@ -17,7 +17,14 @@ first two or three lines before "more", so the most useful change goes first.
 
 ## Unreleased — the update after 1.4.1
 
-*(Nothing yet. Add member-facing changes here as they merge.)*
+*(Server-side, live for everyone the moment it deploys — no app update
+required, so this does not need to hold up 1.4.1.)*
+
+- Movies have genres again. The background pass that fills a film's details
+  was only ever reaching films missing their artwork, so 125 of 137 movies
+  carried no genre, description or running time at all. The visible symptom:
+  filtering Next Up by genre hid every movie, because no movie matched any
+  genre. The backlog drains on its own now.
 
 ---
 

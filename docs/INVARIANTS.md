@@ -16,6 +16,7 @@ catch different classes of mistake:
 | List import tests (`scripts/import-list-test.mjs`) | every PR | The paste-a-list path: what a model may and may not put in the database, paging, and the commit-side validation |
 | Network tests (`scripts/networks-test.mjs`) | every PR | The canonical table: a name claimed by two services, and the catalog `/api/networks` serves to the apps |
 | Enrichment identity tests (`scripts/enrich-identity-test.mjs`) | every PR | A stored `tmdb_id` is the row's identity: enrichment never re-guesses a pinned row by title, and propagation never crosses two entries sharing one title |
+| Movie enrichment tests (`scripts/enrich-movie-detail-test.mjs`) | every PR | A background pass selects on every field it writes — the movie detail pass is not gated on artwork alone, and its gaps counter matches its selection |
 | `scripts/smoke.sh` | after deploy, and nightly | Live behavior: auth gates, headers, leakage, redirects |
 | Invariants review (`.github/workflows/pr-review.yml`) | every PR | Judgement calls the four above can't express |
 
@@ -599,6 +600,47 @@ the size of the library. A public endpoint whose cost grows with the data is
 a resource-exhaustion outage waiting for one crawler.
 
 Enforced by `scripts/trending-cache-test.mjs`.
+
+## 19. A background pass selects on everything it writes
+
+A pass that fills data picks its rows with one predicate and writes with
+another statement. When the write is wider than the predicate, the difference
+is a set of rows that qualify for nothing and are never repaired — and because
+they carry a fresh `enriched_at`, they look finished from the outside.
+
+The movie pass in `functions/api/enrich.js` wrote eighteen fields — genres,
+overview, runtime, tagline, studio, director, trailer, content rating — while
+selecting on `poster_url IS NULL OR network IS NULL`. A film inserts *with* a
+poster and a network (synchronous insert enrichment sets both, and nothing on
+that path writes genres), so it never qualified again and never received the
+other sixteen. By 2026-09 that was **125 of 137 unarchived films with no
+genre, overview or runtime** — 91% of the movie library. The member-visible
+symptom was the genre filter on Next Up hiding every movie, because a movie
+matched no genre at all.
+
+- **The gate must cover the write.** `MOVIE_GAP` now names artwork, network,
+  genres and cast together — genres standing in for the whole detail block,
+  since overview, runtime, tagline and studio arrive in the same response.
+- **Two repair paths that share a blind spot are one repair path.** These rows
+  were invisible to *both*: the normal pass skipped them for having artwork,
+  and `mode: 'gaps'` skipped them for having cast. A repair mode has to select
+  on the absence of the data it repairs, not on a proxy that happened to
+  correlate once.
+- **A "remaining" count is part of the gate.** `mode: 'gaps'` reports
+  `remaining` so an operator can drive it to zero; while that count used a
+  narrower predicate than the pass, a dry run answered "nothing to do" over a
+  backlog of 125. A counter that disagrees with the selection is worse than no
+  counter — it certifies the gap it can't see.
+- **A widened gate needs a budget check.** The movie loop had none, which was
+  safe only while its selection was nearly always empty. Giving a loop real
+  work without bounding it spends straight past `SUBREQUEST_BUDGET` into
+  Cloudflare's own per-request ceiling.
+
+The general rule: when you widen what a pass writes, widen what it selects in
+the same change, or you have created rows that are permanently done and
+permanently empty.
+
+Enforced by `scripts/enrich-movie-detail-test.mjs`.
 
 ## Adding an invariant
 

@@ -255,6 +255,23 @@ newest — a bare title means the current version of a remade show, and a
 trailing "(YYYY)" pins that year's entry instead.
 
 ```bash
+node scripts/enrich-movie-detail-test.mjs
+```
+
+The movie half of the enrichment rotation, same harness and fake TMDB. A pass
+must select on every field it writes: the movie pass fills eighteen (genres,
+overview, runtime, tagline, studio…) but was gated on `poster_url IS NULL OR
+network IS NULL`, so a film that inserted with artwork — the normal case —
+never qualified again. That left 91% of the movie library with no genres, and
+the genre filter on Next Up hiding every movie. Pins that a film missing only
+its detail block is selected, that a complete one isn't re-fetched, that
+`mode: 'gaps'` sees it *and* counts it in `remaining` (the counter used a
+narrower predicate than the pass, so a dry run reported nothing to do over a
+backlog of 125), that `mode: 'posters'` keeps its narrow artwork gate, and that
+the loop stops on the subrequest budget — it had no check at all, which was
+safe only while its selection was empty. See `docs/INVARIANTS.md` §19.
+
+```bash
 node scripts/auth-code-flow-test.mjs
 ```
 
