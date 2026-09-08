@@ -322,6 +322,14 @@ token renders the same card as an expired one, so a dead link never confirms it
 existed. Also guards the `og:image` on the marketing page, whose absence is why
 every share used to arrive with no artwork.
 
+`StreamingOnTests` guards the other half of invariant §20 — the client rule
+for `streaming_on`. A member's `network` is never overwritten, so the UI states
+the difference instead: "Also on Hulu" when their service is one of several,
+"Now on Paramount+" when it isn't among them at all, and **nothing** when TMDB
+named no service or was never asked. Those last two must read alike — an empty
+list means "asked, streams nowhere on a plan", nil means nobody looked, and
+claiming the former on the latter asserts a fact never checked.
+
 ```bash
 cd ShowPickerCore && swift test
 ```

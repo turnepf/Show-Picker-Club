@@ -128,6 +128,15 @@ struct ShowDetailView: View {
                             Link("Where to watch", destination: wl)
                         }
                     }
+                    // Where it streams today, when that differs from the row's
+                    // own network. The network above is the member's record and
+                    // is never overwritten, so it drifts as licensing moves —
+                    // this states the current answer without correcting theirs.
+                    // Silent when TMDB names nothing or was never asked; see
+                    // Show.streamingNote.
+                    if let note = show?.streamingNote {
+                        LabeledContent("Streaming", value: note)
+                    }
                     if let turl = show?.trailerURL {
                         LabeledContent("Trailer") { Link("▶ Watch trailer", destination: turl) }
                     }

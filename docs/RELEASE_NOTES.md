@@ -23,7 +23,8 @@ someone else renames the group or picks a new icon, you'll see a quick note
 about it the next time you open the group. On iPhone and iPad.
 
 *(Server-side, live for everyone the moment it deploys — no app update
-required, so this does not need to hold up 1.4.1.)*
+required. Listed so the story is complete; the member-facing halves are in
+1.4.1 below.)*
 
 - Movies have genres again. The background pass that fills a film's details
   was only ever reaching films missing their artwork, so 125 of 137 movies
@@ -65,7 +66,7 @@ button creates it without complaint. That was the lesson from 1.4; it costs
 nothing to reach for the UI first.
 
 All platforms carry the same What's New text, byte for byte. The block below
-is 2,163 characters against Apple's 4,000 cap.
+is 2,492 characters against Apple's 4,000 cap.
 
 ```
 Recommend a show to your group. Found something the group needs to see? Open
@@ -92,6 +93,12 @@ pick a symbol and a color and it shows up everywhere the group does, so
 Thursday Night Club and the family group stop looking like two lines of the
 same text. Choose it when you create a group, or add one later from the
 group's menu.
+
+Your shows say where they stream now. Licensing moves, and the service you
+noted when you added something can quietly stop carrying it. Show detail now
+adds a line — "Also on Hulu" when it's on more than one, "Now on Paramount+"
+when it has moved on entirely. Your own answer is left exactly as you set it;
+this sits beside it.
 
 The TV/Movies filter moved up top. On a list that mixes shows and movies, the
 filter now lives in the sort menu in the corner — one place for sort, genre

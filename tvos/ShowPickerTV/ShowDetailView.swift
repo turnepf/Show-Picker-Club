@@ -432,6 +432,14 @@ struct ShowDetailView: View {
             if let extra = extraMetaLine(s) {
                 Text(extra).foregroundColor(Theme.text.opacity(0.7))
             }
+            // Where it streams today, when that differs from the network the
+            // watch button below names. That network is the member's record and
+            // is never overwritten, so it drifts as licensing moves; this says
+            // the current answer without correcting theirs. Silent when TMDB
+            // names nothing or was never asked — see Show.streamingNote.
+            if let note = s.streamingNote {
+                Text(note).foregroundColor(Theme.text.opacity(0.7))
+            }
             if let notes = s.notes, !notes.isEmpty {
                 Text(notes).italic().foregroundColor(Theme.muted)
             }

@@ -51,6 +51,12 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
     public let seasonEndDate: String?
     public let seasonsReleased: Int?
     public let genres: String?
+    // Where TMDB says the title streams today, comma-separated canonical
+    // names. Sits beside `network`, which is the member's own answer and is
+    // never overwritten — see docs/INVARIANTS.md §20. Empty string means TMDB
+    // was asked and named nothing; nil means it was never asked, which is why
+    // `streamingNote` distinguishes them.
+    public let streamingOn: String?
     public let memberSlug: String?
     public let posterUrl: String?
     public let networkLogoUrl: String?
@@ -144,11 +150,13 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         originalLanguage: String? = nil,
         studio: String? = nil,
         watchers: [ShowWatcher]? = nil,
-        addedByMember: ShowWatcher? = nil
+        addedByMember: ShowWatcher? = nil,
+        streamingOn: String? = nil
     ) {
         self.id = id
         self.title = title
         self.list = list
+        self.streamingOn = streamingOn
         self.network = network
         self.networkUrl = networkUrl
         self.recommendedBy = recommendedBy
@@ -199,6 +207,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         case memberSlug = "member_slug"
         case posterUrl = "poster_url"
         case networkLogoUrl = "network_logo_url"
+        case streamingOn = "streaming_on"
         case createdAt = "created_at"
         case sortOrder = "sort_order"
         case overview
@@ -238,6 +247,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         title = try c.decode(String.self, forKey: .title)
         list = (try? c.decode(String.self, forKey: .list)) ?? ""
         network = try? c.decode(String.self, forKey: .network)
+        streamingOn = try? c.decode(String.self, forKey: .streamingOn)
         networkUrl = try? c.decode(String.self, forKey: .networkUrl)
         recommendedBy = try? c.decode(String.self, forKey: .recommendedBy)
         rating = try? c.decode(String.self, forKey: .rating)
@@ -281,6 +291,38 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
 
     public var genreList: [String] {
         (genres ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    public var streamingOnList: [String] {
+        (streamingOn ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    // The line the detail screen shows under the network, or nil when there is
+    // nothing worth saying.
+    //
+    // `network` is the member's record and is never overwritten, so it drifts
+    // as licensing moves — 45% of films carried a network TMDB no longer
+    // listed. Rather than correct their answer, say what TMDB says now:
+    //
+    //   • the card's network is among them  → "Also on Hulu" (the others)
+    //   • it isn't, but TMDB names services → "Now on Paramount+"
+    //   • TMDB names nothing, or was never asked → nil
+    //
+    // The nothing/never-asked cases both return nil on purpose: an empty
+    // `streaming_on` means TMDB was asked and found no subscription service,
+    // which is ordinary for a rental, and nil means nobody has looked. Neither
+    // is worth a line, and claiming "streams nowhere" on the second would be
+    // asserting something we never checked.
+    public var streamingNote: String? {
+        let services = streamingOnList
+        guard !services.isEmpty else { return nil }
+        let mine = (network ?? "").trimmingCharacters(in: .whitespaces)
+        if !mine.isEmpty, services.contains(where: { $0.caseInsensitiveCompare(mine) == .orderedSame }) {
+            let others = services.filter { $0.caseInsensitiveCompare(mine) != .orderedSame }
+            guard !others.isEmpty else { return nil }
+            return "Also on \(others.joined(separator: ", "))"
+        }
+        return "Now on \(services.joined(separator: ", "))"
     }
 
     // "3 seasons" / "1 season" — total seasons released, when known.
