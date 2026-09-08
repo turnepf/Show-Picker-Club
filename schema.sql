@@ -181,7 +181,13 @@ CREATE TABLE IF NOT EXISTS shows (
   vote_count INTEGER,
   tagline TEXT,
   original_language TEXT,
-  studio TEXT
+  studio TEXT,
+  -- TMDB's current US flatrate services, comma-separated canonical names.
+  -- Sits BESIDE `network` rather than replacing it: `network` is the member's
+  -- record and is written fill-only, so it goes stale as licensing moves.
+  -- Pure derived data, refreshed authoritatively by enrichment. See
+  -- migrations/069_streaming_on.sql.
+  streaming_on TEXT
 );
 
 CREATE TABLE IF NOT EXISTS actors (

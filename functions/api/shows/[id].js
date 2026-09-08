@@ -24,6 +24,9 @@ const PUBLIC_SHOW_FIELDS = [
   // logged-out Trending detail screen.
   'overview', 'backdrop_url', 'tmdb_rating', 'content_rating', 'trailer_key',
   'director', 'director_imdb_id', 'runtime', 'release_year', 'watch_link',
+  // Where it streams today. A catalog fact like the rest — it says nothing
+  // about whose list the title is on, only what TMDB reports about the title.
+  'streaming_on',
 ];
 
 // Other members of the viewer's groups who have this same title on their

@@ -193,13 +193,16 @@ export async function onRequestPost(context) {
   const result = await env.DB.prepare(
     `INSERT INTO shows (title, network, network_url, recommended_by, rating, list, notes, movie, full_series, watching_with, poster_url, network_logo_url, member_slug, added_by,
        overview, backdrop_url, tmdb_rating, content_rating, trailer_key, director, director_imdb_id, runtime, release_year, watch_link, tmdb_id, tmdb_type,
-       episodes_released, vote_count, tagline, original_language, studio)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       episodes_released, vote_count, tagline, original_language, studio, streaming_on)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(finalTitle, finalNetwork, finalUrl, recommended_by || null, enriched.rating, list, notes || null, movie || 0, full_series || 0, watching_with || null, enriched.posterUrl || null, enriched.networkLogoUrl || null, session.member_slug, session.email,
     enriched.overview || null, enriched.backdropUrl || null, enriched.tmdbRating || null, enriched.contentRating || null, enriched.trailerKey || null, enriched.director || null, enriched.directorImdbId || null, enriched.runtime || null, enriched.releaseYear || null, enriched.watchLink || null,
     enriched.tmdbId || null, enriched.tmdbType || null,
     enriched.episodesReleased ?? null, enriched.voteCount ?? null, enriched.tagline || null,
-    enriched.originalLanguage || null, enriched.studio || null).run();
+    enriched.originalLanguage || null, enriched.studio || null,
+    // Stored from the very first fetch, so a title never spends its first days
+    // looking as though TMDB was never asked where it streams.
+    Array.isArray(enriched.flatrateNetworks) ? enriched.flatrateNetworks.join(', ') : '').run();
 
   const showId = result.meta.last_row_id;
   if (enriched.actors.length > 0) {

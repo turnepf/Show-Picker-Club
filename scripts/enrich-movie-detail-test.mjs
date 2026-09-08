@@ -136,7 +136,22 @@ globalThis.fetch = async (url) => {
   if (movie) return FILMS[movie[1]] ? jsonRes(movieDetail(movie[1])) : jsonRes({ success: false }, 404);
   const person = u.pathname.match(/^\/3\/person\/(\d+)\/external_ids$/);
   if (person) return jsonRes({ imdb_id: `nm${person[1].padStart(7, '0')}` });
-  if (u.pathname.startsWith('/3/tv/') || u.pathname === '/3/search/tv') return jsonRes({ results: [] });
+  const tv = u.pathname.match(/^\/3\/tv\/(\d+)$/);
+  if (tv) {
+    if (tv[1] !== '700') return jsonRes({ success: false }, 404);
+    return jsonRes({
+      id: 700, name: 'The Rehearsal', first_air_date: '2022-07-15',
+      poster_path: '/reh.jpg', overview: 'A series.', vote_average: 8.0, vote_count: 500,
+      status: 'Returning Series', number_of_episodes: 12, number_of_seasons: 2,
+      episode_run_time: [40], genres: [{ name: 'Comedy' }],
+      networks: [{ name: 'HBO', logo_path: '/hbo.png' }],
+      created_by: [], credits: { cast: [] },
+      videos: { results: [] }, content_ratings: { results: [] },
+      'watch/providers': { results: { US: { link: 'https://tmdb/watch',
+        flatrate: [{ provider_name: 'Max', logo_path: '/max-logo.jpg', display_priority: 1 }] } } },
+    });
+  }
+  if (u.pathname === '/3/search/tv') return jsonRes({ results: [] });
   throw new Error(`unexpected fetch: ${url}`);
 };
 
@@ -363,6 +378,75 @@ console.log('\nThe badge matches the network the card actually shows');
   check('a row with no network gets both, and they agree',
     r.network === 'Amazon Prime Video' && r.network_logo_url === 'https://image.tmdb.org/t/p/w154/prime-logo.jpg',
     `network=${r.network} logo=${r.network_logo_url}`);
+}
+
+// --------------------------------------------------------------- 10
+
+console.log('\nWhere a title streams now sits beside the network, never over it');
+{
+  const env = makeEnv();
+  // The member says Netflix. TMDB says Max. Both facts are kept: the member's
+  // answer is theirs, TMDB's is current, and the UI shows the difference.
+  addMovie(env, { title: 'Sing Sing', tmdbId: 507, network: 'Netflix' });
+  await runEnrich(env);
+  const r = rowFor(env, 'Sing Sing');
+  check('the member\'s network is left exactly as they set it', r.network === 'Netflix',
+    `network=${r.network}`);
+  // Canonical names, matching the vocabulary `network` itself uses — TMDB
+  // says "Max", the table says "HBO Max", and a member comparing the two
+  // should not have to know they are the same service.
+  check('and TMDB\'s current services are recorded alongside, canonicalized',
+    r.streaming_on === 'Amazon Prime Video, HBO Max', `streaming_on=${r.streaming_on}`);
+  check('no badge, since the card\'s own network is not among them',
+    r.network_logo_url === null, `logo=${r.network_logo_url}`);
+}
+{
+  const env = makeEnv();
+  // A stale value must be replaced, not preserved — being current is this
+  // column's entire job, so unlike everything beside it, it is not fill-only.
+  const id = addMovie(env, { title: 'Sing Sing', tmdbId: 507, network: 'Netflix' });
+  env._db.prepare('UPDATE shows SET streaming_on = ? WHERE id = ?').run('Peacock', id);
+  await runEnrich(env);
+  check('a stale list is overwritten rather than kept',
+    rowFor(env, 'Sing Sing').streaming_on === 'Amazon Prime Video, HBO Max',
+    `streaming_on=${rowFor(env, 'Sing Sing').streaming_on}`);
+}
+{
+  const env = makeEnv();
+  // Rent/buy only: TMDB was asked and named nothing. Empty string, not NULL —
+  // "streams nowhere on a plan" is a different fact from "never asked".
+  addMovie(env, { title: 'Anora', tmdbId: 506, network: 'Apple TV Store' });
+  await runEnrich(env);
+  check('a film streaming nowhere records an empty list, not null',
+    rowFor(env, 'Anora').streaming_on === '', `streaming_on=${JSON.stringify(rowFor(env, 'Anora').streaming_on)}`);
+}
+{
+  const env = makeEnv();
+  // The TV pass is a separate UPDATE statement, so it gets its own check.
+  env._db.prepare(
+    `INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, network, created_at, updated_at)
+     VALUES ('The Rehearsal', 'watching', 'patrick', 0, 700, 'tv', 'Netflix', '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z')`
+  ).run();
+  await runEnrich(env);
+  const r = rowFor(env, 'The Rehearsal');
+  check('a series records its services too', r.streaming_on === 'HBO Max', `streaming_on=${r.streaming_on}`);
+  check('and its member-set network survives', r.network === 'Netflix', `network=${r.network}`);
+}
+{
+  const env = makeEnv();
+  // Two members, one film: the list is a fact about the title, so it reaches
+  // the copy the rotation didn't pick.
+  addMovie(env, { title: 'Sing Sing', tmdbId: 507, network: 'Max' });
+  env._db.prepare('INSERT INTO members (slug, name, first_name) VALUES (?, ?, ?)').run('whitt', 'Whitt D', 'Whitt');
+  env._db.prepare(
+    `INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, poster_url, network, genres, enriched_at, created_at, updated_at)
+     VALUES ('Sing Sing', 'next', 'whitt', 1, 507, 'movie', '/have.jpg', 'Max', 'Drama', '2026-09-01T00:00:00Z', '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z')`
+  ).run();
+  await runEnrich(env);
+  const copies = env._db.prepare("SELECT member_slug, streaming_on FROM shows WHERE LOWER(title)='sing sing'").all();
+  check('every copy of the title carries the same list',
+    copies.length === 2 && copies.every((c) => c.streaming_on === 'Amazon Prime Video, HBO Max'),
+    JSON.stringify(copies));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

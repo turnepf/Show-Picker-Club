@@ -94,6 +94,11 @@ export function extractTmdbDetailFields(detail, mediaType) {
   // contradicts its own label is worse than no badge.
   let providerLogoUrl = null;
   const providerLogos = {};
+  // Every service TMDB currently lists, in priority order — what `streaming_on`
+  // stores. Only providers that map to a network we can name: a raw listing
+  // like "Starz Amazon Channel" would put a service nobody recognises under
+  // that name in front of a member.
+  const flatrateNetworks = [];
   let watchLink = null;
   // Storefronts that sell the title outright, and the availability verdict:
   // 'subscription' when some service streams it on a plan, 'rent_buy' when the
@@ -117,6 +122,7 @@ export function extractTmdbDetailFields(detail, mediaType) {
       // First entry wins per network — flatrate is sorted by display_priority,
       // so this keeps the service's primary listing over its resold variants.
       if (logo && !(n in providerLogos)) providerLogos[n] = logo;
+      if (!flatrateNetworks.includes(n)) flatrateNetworks.push(n);
       if (!providerNetwork) { providerNetwork = n; providerLogoUrl = logo; }
     }
     const rentBuy = [...(wp.rent || []), ...(wp.buy || [])];
@@ -153,7 +159,7 @@ export function extractTmdbDetailFields(detail, mediaType) {
 
   return {
     overview, backdropUrl, tmdbRating, contentRating, trailerKey,
-    director, directorPersonId, runtime, releaseYear, providerNetwork, providerLogoUrl, providerLogos, watchLink,
+    director, directorPersonId, runtime, releaseYear, providerNetwork, providerLogoUrl, providerLogos, flatrateNetworks, watchLink,
     storefronts, availability,
     episodesReleased, voteCount, tagline, originalLanguage, studio,
   };
@@ -196,7 +202,8 @@ export function fallbackNetwork(enriched) {
 const EMPTY_DETAIL = {
   overview: null, backdropUrl: null, tmdbRating: null, contentRating: null,
   trailerKey: null, director: null, directorPersonId: null, runtime: null,
-  releaseYear: null, providerNetwork: null, providerLogoUrl: null, providerLogos: {}, watchLink: null,
+  releaseYear: null, providerNetwork: null, providerLogoUrl: null, providerLogos: {},
+  flatrateNetworks: [], watchLink: null,
   storefronts: [], availability: null,
   episodesReleased: null, voteCount: null, tagline: null,
   originalLanguage: null, studio: null,

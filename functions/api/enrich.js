@@ -160,6 +160,14 @@ async function personImdbId(personId, env) {
   }
 }
 
+// The stored form of TMDB's flatrate list: canonical names, comma-separated,
+// matching `network`'s vocabulary. Empty string rather than NULL when TMDB
+// answered and named nothing — "asked, streams nowhere on a plan" is a
+// different fact from "never asked", and the UI needs to tell them apart.
+function streamingOn(df) {
+  return Array.isArray(df.flatrateNetworks) ? df.flatrateNetworks.join(', ') : '';
+}
+
 export async function onRequestPost(context) {
   const { env, request } = context;
   // Normally driven by a logged-in member loading their page. Also allow a
@@ -373,6 +381,13 @@ export async function onRequestPost(context) {
               trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director), director_imdb_id = COALESCE(?, director_imdb_id),
               runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
               network = COALESCE(network, ?), watch_link = COALESCE(?, watch_link),
+              -- TMDB's current answer, refreshed authoritatively rather than
+              -- filled once: unlike the network column beside it, this holds no
+              -- member intent to protect, and its whole job is to be current.
+              -- network stays fill-only, so the UI can show where a title
+              -- streams now without discarding where the member says they
+              -- watch it.
+              streaming_on = ?,
               -- New-value-wins, same shape as seasons_released: a running
               -- series gains episodes and collects votes, so these have to
               -- converge rather than freeze at whatever the first pass saw.
@@ -392,7 +407,7 @@ export async function onRequestPost(context) {
               enriched_at = datetime('now') WHERE id = ?`
         ).bind(newDate, endDate, isComplete, genres, seasonsReleased, posterUrl, networkLogoUrl,
           df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey, df.director, directorImdbId,
-          df.runtime, df.releaseYear, fallbackNetwork(df), df.watchLink,
+          df.runtime, df.releaseYear, fallbackNetwork(df), df.watchLink, streamingOn(df),
           df.episodesReleased, df.voteCount, df.tagline, df.originalLanguage, df.studio,
           tmdbId, show.id).run();
         // Catalog fields (artwork + the new detail fields) are the same for
@@ -416,6 +431,11 @@ export async function onRequestPost(context) {
               tagline = COALESCE(tagline, ?),
               original_language = COALESCE(original_language, ?),
               studio = COALESCE(studio, ?),
+              -- Not fill-only, unlike everything above it: where a title
+              -- streams is a fact about today, and a sibling copy holding last
+              -- season's answer is exactly the staleness this column exists to
+              -- fix. Same value for every copy, so it propagates like the rest.
+              streaming_on = ?,
               -- The id is the most catalog-level thing here: every member's
               -- copy of a title is the same TMDB entry. This is the half that
               -- reaches seeded rows — they're rarely the copy the rotation
@@ -431,7 +451,7 @@ export async function onRequestPost(context) {
               AND (tmdb_id IS NULL OR tmdb_id = ?)`
         ).bind(posterUrl, networkLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating,
           df.trailerKey, df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.watchLink,
-          df.episodesReleased, df.voteCount, df.tagline, df.originalLanguage, df.studio,
+          df.episodesReleased, df.voteCount, df.tagline, df.originalLanguage, df.studio, streamingOn(df),
           tmdbId, show.id, tmdbId).run();
 
         // Cast comes free with the detail call we just made — this pass used
@@ -578,6 +598,13 @@ export async function onRequestPost(context) {
               runtime = COALESCE(runtime, ?), release_year = COALESCE(release_year, ?),
               genres = COALESCE(genres, ?), network = COALESCE(network, ?),
               watch_link = COALESCE(watch_link, ?),
+              -- TMDB's current answer, refreshed authoritatively rather than
+              -- filled once: unlike the network column beside it, this holds no
+              -- member intent to protect, and its whole job is to be current.
+              -- network stays fill-only, so the UI can show where a title
+              -- streams now without discarding where the member says they
+              -- watch it.
+              streaming_on = ?,
               -- vote_count converges like rating does (a film keeps collecting
               -- votes); the rest are fill-only, matching this statement's
               -- prevailing shape. A movie has no episode count.
@@ -596,7 +623,7 @@ export async function onRequestPost(context) {
               -- shares the title — they get their own turn, not this data.
               AND (tmdb_id IS NULL OR tmdb_id = ?)`
         ).bind(posterUrl, badgeNetwork, badgeLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey,
-          df.director, directorImdbId, df.runtime, df.releaseYear, genres, fallbackNetwork(df), df.watchLink,
+          df.director, directorImdbId, df.runtime, df.releaseYear, genres, fallbackNetwork(df), df.watchLink, streamingOn(df),
           df.voteCount, df.tagline, df.originalLanguage, df.studio,
           tmdbId, show.id, tmdbId).run();
         if (posterUrl) tmdbUpdated++;

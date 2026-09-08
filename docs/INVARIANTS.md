@@ -17,6 +17,7 @@ catch different classes of mistake:
 | Network tests (`scripts/networks-test.mjs`) | every PR | The canonical table: a name claimed by two services, and the catalog `/api/networks` serves to the apps |
 | Enrichment identity tests (`scripts/enrich-identity-test.mjs`) | every PR | A stored `tmdb_id` is the row's identity: enrichment never re-guesses a pinned row by title, and propagation never crosses two entries sharing one title |
 | Movie enrichment tests (`scripts/enrich-movie-detail-test.mjs`) | every PR | A background pass selects on every field it writes — the movie detail pass is not gated on artwork alone, and its gaps counter matches its selection |
+| Streaming-services tests (`scripts/enrich-movie-detail-test.mjs`) | every PR | Enrichment never overwrites a member's `network`; TMDB's current services land in `streaming_on` beside it, refreshed authoritatively and canonicalized |
 | `scripts/smoke.sh` | after deploy, and nightly | Live behavior: auth gates, headers, leakage, redirects |
 | Invariants review (`.github/workflows/pr-review.yml`) | every PR | Judgement calls the four above can't express |
 
@@ -705,6 +706,45 @@ quietly overwriting what was there. The telling has its own bounds:
   cosmetic banner; would not be for anything load-bearing.
 
 Enforcer: `scripts/group-icons-test.mjs`.
+
+## 20. A machine never overwrites a member's answer; it answers beside it
+
+`shows.network` is written `network = COALESCE(network, ?)` in both enrichment
+passes. Fill-only, on purpose: the member picks a network when they add a
+title, and enrichment supplies one only when they didn't. It is the same rule
+`updated_at` encodes — member intent outranks a background job.
+
+The cost is staleness. Once set, `network` is never revisited, and licensing
+moves: **61 of 137 unarchived films (45%) carry a network TMDB no longer lists
+as a US flatrate provider.** Conclave reads Apple TV+ where TMDB now says
+Starz; Avatar reads Netflix where TMDB says Paramount+. The wrong movie badges
+of 2026-09 were this staleness becoming visible — the badge didn't cause it,
+it exposed it.
+
+The fix is *not* to start overwriting. **We store no provenance**, so nothing
+distinguishes "the member chose Hulu" from "TMDB said Hulu in March", and a
+refresh would silently discard deliberate answers to correct machine-set ones.
+Instead `streaming_on` (migration 069) carries TMDB's current answer beside
+`network`, and the UI surfaces the difference.
+
+- **`network` stays fill-only. `streaming_on` is refreshed authoritatively** —
+  including across sibling copies, where a fill-only propagation would pin the
+  first answer any copy ever received. It holds no member intent, and being
+  current is its whole purpose.
+- **Canonical names, matching `network`'s own vocabulary** (`_shared/networks.js`).
+  TMDB says "Max"; the table says "HBO Max"; a member comparing the two should
+  not have to know they are the same service. A provider that maps to nothing
+  we can name — "Starz Amazon Channel" — is omitted rather than shown.
+- **Empty string and NULL mean different things.** Empty means TMDB was asked
+  and named nothing (a film that only rents); NULL means it was never asked. A
+  UI that conflates them tells a member a title streams nowhere when the truth
+  is that nobody has looked.
+
+The general rule: when a machine's answer and a member's disagree, store both
+and show the difference. Overwriting is only safe on a field that never held
+an answer of theirs.
+
+Enforced by `scripts/enrich-movie-detail-test.mjs`.
 
 ## Adding an invariant
 
