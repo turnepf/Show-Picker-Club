@@ -34,7 +34,9 @@ required, so this does not need to hold up 1.4.1.)*
   one — the badge TV shows have comes from a field TMDB doesn't publish for
   movies — so a film's card sat blank where a series' card showed Max or
   Netflix. It now comes from the service the film actually streams on. A movie
-  you can only rent still shows none, because it streams nowhere.
+  you can only rent still shows none, because it streams nowhere — as does one
+  whose service the film isn't actually listed on, rather than showing the
+  wrong company's logo.
 
 ---
 

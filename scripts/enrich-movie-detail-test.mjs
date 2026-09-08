@@ -87,6 +87,8 @@ const FILMS = {
   // Rent/buy only — no flatrate provider, so no logo exists to fetch. This is
   // the film a standing `network_logo_url IS NULL` gate would churn on forever.
   506: { title: 'Anora', year: '2024-10-18', genre: 'Drama', runtime: 139, provider: null },
+  // Streams on several services at once, Prime ranked above Max.
+  507: { title: 'Sing Sing', year: '2024-07-12', genre: 'Drama', runtime: 105, multi: true },
 };
 
 const movieDetail = (id) => {
@@ -105,7 +107,12 @@ const movieDetail = (id) => {
     // provider object carries the logo. Movies have no `networks[]`, so this
     // is the only place a film's service badge can come from.
     'watch/providers': { results: { US: { link: 'https://tmdb/watch',
-      flatrate: f.provider === null ? [] : [{ provider_name: 'Max', logo_path: '/max-logo.jpg', display_priority: 1 }],
+      flatrate: f.provider === null ? [] : (f.multi
+        // Priority order the way TMDB answers: Prime first, Max further down.
+        // A film whose card says Max must not be given Prime's badge.
+        ? [{ provider_name: 'Amazon Prime Video', logo_path: '/prime-logo.jpg', display_priority: 1 },
+           { provider_name: 'Max', logo_path: '/max-logo.jpg', display_priority: 5 }]
+        : [{ provider_name: 'Max', logo_path: '/max-logo.jpg', display_priority: 1 }]),
       rent: f.provider === null ? [{ provider_name: 'Apple TV' }] : [] } } },
   };
 };
@@ -321,6 +328,41 @@ console.log('\nA rent/buy-only film cannot churn the standing gate');
   const again = await (await runEnrich(env)).json();
   check('and it still does not qualify for the standing gate afterwards', again.movieCandidates === 0,
     `movieCandidates=${again.movieCandidates}`);
+}
+
+// ---------------------------------------------------------------- 9
+
+console.log('\nThe badge matches the network the card actually shows');
+{
+  const env = makeEnv();
+  // Card says Max. TMDB ranks Prime first. Taking the top provider put
+  // Amazon's logo on an HBO Max card in production (~22% of badged films).
+  addMovie(env, { title: 'Sing Sing', tmdbId: 507, network: 'Max' });
+  await runEnrich(env);
+  check('it takes the logo of the row\'s own network, not the top-ranked one',
+    rowFor(env, 'Sing Sing').network_logo_url === 'https://image.tmdb.org/t/p/w154/max-logo.jpg',
+    `logo=${rowFor(env, 'Sing Sing').network_logo_url}`);
+}
+{
+  const env = makeEnv();
+  // Card says Hulu; TMDB doesn't list Hulu at all. A blank badge is correct —
+  // a logo contradicting its own label is worse than none.
+  addMovie(env, { title: 'Sing Sing', tmdbId: 507, network: 'Hulu' });
+  await runEnrich(env);
+  check('a network TMDB does not list gets no badge rather than a wrong one',
+    rowFor(env, 'Sing Sing').network_logo_url === null,
+    `logo=${rowFor(env, 'Sing Sing').network_logo_url}`);
+}
+{
+  const env = makeEnv();
+  // No network yet: the statement sets one from the primary provider, so the
+  // badge may follow it — they agree by construction.
+  addMovie(env, { title: 'Sing Sing', tmdbId: 507, network: null });
+  await runEnrich(env);
+  const r = rowFor(env, 'Sing Sing');
+  check('a row with no network gets both, and they agree',
+    r.network === 'Amazon Prime Video' && r.network_logo_url === 'https://image.tmdb.org/t/p/w154/prime-logo.jpg',
+    `network=${r.network} logo=${r.network_logo_url}`);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

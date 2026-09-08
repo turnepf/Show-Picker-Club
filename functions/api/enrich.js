@@ -2,6 +2,7 @@ import { getSession } from '../_shared/auth.js';
 import { cronAuthorized } from '../_shared/secrets.js';
 import { fetchEnrichment, fetchEnrichmentById, extractTmdbDetailFields, fallbackNetwork, dedupeCast, CAST_DEPTH, pickBestMatch, titleSearchTerms } from '../_shared/enrichment.js';
 import { fillActorIdsFromKnownPeople, knownByPersonIds, rememberPeople } from '../_shared/people.js';
+import { canonicalNetwork } from '../_shared/networks.js';
 
 // TMDB GET that works with either credential the worker has configured:
 // the v4 Bearer token (TMDB_TOKEN, what the shared enrichment path uses) is
@@ -485,7 +486,7 @@ export async function onRequestPost(context) {
     // a sibling could cover. Grouping by id too keeps a remake pinned next to
     // its same-titled original from being answered by the wrong entry.
     const movieStmt = env.DB.prepare(
-      `SELECT id, title, network_url, tmdb_id, tmdb_type FROM shows WHERE ${mvWhere}
+      `SELECT id, title, network, network_url, tmdb_id, tmdb_type FROM shows WHERE ${mvWhere}
         GROUP BY LOWER(title), tmdb_id
         ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
     ).bind(...mvBinds, maxTmdb);
@@ -536,6 +537,23 @@ export async function onRequestPost(context) {
             `/movie/${tmdbId}?append_to_response=videos,watch/providers,release_dates,credits`, env);
         }
         const df = extractTmdbDetailFields(detail, 'movie');
+        // The badge must be the logo of the network this row actually shows.
+        // A film's stored network is often the member's own answer, or an
+        // older one, and need not be TMDB's highest-priority provider — so
+        // pick the provider matching it, and fall back to the primary only
+        // for a row with no network yet (which this same statement is about
+        // to set to that provider, so the two agree by construction). No
+        // match means no badge: a logo that contradicts the label is worse
+        // than a blank.
+        // Look the badge up under the CANONICAL name (providerLogos is keyed
+        // that way) but match rows on the string they actually store: a
+        // legacy row can hold "Max" where the table says "HBO Max", and the
+        // UPDATE below compares the column, not its canonical form.
+        const canonNet = show.network ? canonicalNetwork(show.network) : null;
+        const badgeNetwork = show.network || df.providerNetwork || null;
+        const badgeLogoUrl = show.network
+          ? (canonNet ? df.providerLogos[canonNet] || null : null)
+          : (df.providerLogoUrl || null);
         const directorImdbId = await personImdbId(df.directorPersonId, env);
         const posterPath = detail.poster_path || searchPoster;
         const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
@@ -547,8 +565,13 @@ export async function onRequestPost(context) {
           `UPDATE shows SET poster_url = COALESCE(?, poster_url),
               -- The service badge. TV takes it from detail.networks[0]; a movie
               -- has no networks[], so it comes off the flatrate provider that
-              -- named the network in the first place. Fill-only, like the rest.
-              network_logo_url = COALESCE(network_logo_url, ?),
+              -- matches this row's network. Scoped to copies that actually
+              -- show that network: this statement spans every copy of the
+              -- title, and two members can hold one film under two different
+              -- services. Fill-only, like the rest.
+              network_logo_url = CASE
+                WHEN network IS NULL OR network = ? THEN COALESCE(network_logo_url, ?)
+                ELSE network_logo_url END,
               overview = COALESCE(overview, ?), backdrop_url = COALESCE(backdrop_url, ?),
               tmdb_rating = COALESCE(tmdb_rating, ?), rating = COALESCE(?, rating), content_rating = COALESCE(content_rating, ?),
               trailer_key = COALESCE(trailer_key, ?), director = COALESCE(director, ?), director_imdb_id = COALESCE(director_imdb_id, ?),
@@ -572,7 +595,7 @@ export async function onRequestPost(context) {
               -- Copies pinned to a different id are a different film that
               -- shares the title — they get their own turn, not this data.
               AND (tmdb_id IS NULL OR tmdb_id = ?)`
-        ).bind(posterUrl, df.providerLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey,
+        ).bind(posterUrl, badgeNetwork, badgeLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey,
           df.director, directorImdbId, df.runtime, df.releaseYear, genres, fallbackNetwork(df), df.watchLink,
           df.voteCount, df.tagline, df.originalLanguage, df.studio,
           tmdbId, show.id, tmdbId).run();

@@ -281,7 +281,11 @@ provider that names the network. That repair is `mode: 'logos'`, a deliberate
 one-time sweep rather than part of the standing gate — a rent/buy-only film has
 no provider and so no badge to fetch, and a permanent `network_logo_url IS
 NULL` gate would re-select those rows on every page load forever. The test pins
-that churn is impossible. See `docs/INVARIANTS.md` §19.
+that churn is impossible, and that the badge always matches the network the
+card shows — taking TMDB's highest-priority provider instead put Amazon's logo
+on an HBO Max card, so the lookup is keyed by the row's own network and a
+service TMDB doesn't list gets no badge rather than a wrong one. See
+`docs/INVARIANTS.md` §19.
 
 ```bash
 node scripts/auth-code-flow-test.mjs

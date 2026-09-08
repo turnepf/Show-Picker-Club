@@ -652,6 +652,18 @@ so the driver stops when the number stops falling rather than when it reaches
 zero. New films need no sweep: they insert without genres, so `MOVIE_GAP`
 already selects them and the pass writes the badge on the way past.
 
+**A derived label and its artwork must come from the same source.** The first
+cut of the badge took the highest-priority flatrate provider TMDB returned,
+independent of the network the row displays. A film's `network` is often the
+member's own answer, or an older one, and TMDB ranks by `display_priority` —
+so a card reading "HBO Max" was given Amazon's logo, HBO Max being present in
+the list but not first. About 22% of badged films were affected. The badge is
+now looked up by the row's own network (canonicalized for the lookup, matched
+on the stored string for the write, since a legacy row can hold "Max" where
+the table says "HBO Max"), and a network TMDB doesn't list gets **no badge**
+rather than a plausible wrong one. A logo that contradicts its own label is
+worse than a blank.
+
 The general rule: when you widen what a pass writes, widen what it selects in
 the same change, or you have created rows that are permanently done and
 permanently empty. And when you gate on the absence of data, check whether that
