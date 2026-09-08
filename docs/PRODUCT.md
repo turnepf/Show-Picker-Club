@@ -60,6 +60,35 @@ Who's named stays as private as the field itself: only you see the Watching with
 
 Platforms: **iPhone/iPad** get the picker (in the Add/Edit sheet). **Apple TV and the watch** render the resulting text like they always have — both are view-only, so neither can tag. **The web doesn't** — it was restored from its pre-teardown state and predates the picker; the field is still plain text there.
 
+### Where it streams now
+
+`network` on a show is **the member's own record** and is never overwritten —
+they pick it when they add a title, and enrichment only fills a blank. That
+makes it drift: licensing moves and the row doesn't. By 2026-09, 45% of films
+named a service TMDB no longer listed.
+
+Rather than correct someone's answer, show detail adds a line beside it:
+
+- **"Also on Hulu"** — their service is one of several TMDB lists.
+- **"Now on Paramount+"** — their service isn't among them any more.
+- **Nothing** — their service is the only one listed (the row above already
+  says it), *or* TMDB named no subscription service, *or* TMDB was never asked.
+  The last two read alike on purpose: an empty list means "asked, streams
+  nowhere on a plan", which is ordinary for a rental, and never-asked means
+  nobody looked. Claiming the former on the latter would assert a fact we
+  never checked.
+
+Services are named in the same vocabulary as `network` itself, so a member
+comparing the two never has to know that TMDB's "Max" is our "HBO Max". A
+provider that maps to no service we can name — "Starz Amazon Channel" — is
+left out rather than shown. See `docs/INVARIANTS.md` §20.
+
+Platforms: **iPhone/iPad** show it as a Streaming row under Network (Mac via
+Catalyst). **Apple TV** shows it in the metadata block above the watch button,
+where that screen already names the network. **The watch doesn't** — it has no
+show detail screen to put it on. **The web doesn't** — frozen at its restored
+state (see [Web app status](#web-app-status)).
+
 ### Also watching (groups)
 
 The show card names the other members of your groups who have that same title on their **Watching** list — an "Also watching: Alex, Dana" line sitting directly above Network. It appears wherever the card opens (your own list, another member's list, Trending, search), not only inside a group screen, and it's silent when nobody in your groups is watching it or you're in no groups.
