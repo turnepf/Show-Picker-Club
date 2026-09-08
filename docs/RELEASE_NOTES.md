@@ -66,7 +66,7 @@ button creates it without complaint. That was the lesson from 1.4; it costs
 nothing to reach for the UI first.
 
 All platforms carry the same What's New text, byte for byte. The block below
-is 2,492 characters against Apple's 4,000 cap.
+is 2,560 characters against Apple's 4,000 cap.
 
 ```
 Recommend a show to your group. Found something the group needs to see? Open
@@ -88,11 +88,11 @@ remember what they last showed you. Lose the connection and they keep your
 shows and their posters instead of going blank. Up Next keeps its dates
 honest offline too: anything that has already aired drops off.
 
-Give your groups a face. If you created a group, you can give it an icon —
-pick a symbol and a color and it shows up everywhere the group does, so
-Thursday Night Club and the family group stop looking like two lines of the
-same text. Choose it when you create a group, or add one later from the
-group's menu.
+Give your groups a face. Any member can give a group an icon — pick a symbol
+and a color and it shows up everywhere the group does, so Thursday Night Club
+and the family group stop looking like two lines of the same text. Choose it
+when you create a group, or add one later from the group's menu. Rename it
+there too; everyone else finds out the next time they open the group.
 
 Your shows say where they stream now. Licensing moves, and the service you
 noted when you added something can quietly stop carrying it. Show detail now

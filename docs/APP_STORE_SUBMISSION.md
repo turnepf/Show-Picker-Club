@@ -198,6 +198,73 @@ broken — but clear them in the first build after the apps have shipped.
 - [ ] Verify the demo sign-in once on the **Mac** build too — Review opens
       every platform on the listing.
 
+## 6a. Run sheet: releasing from a second Mac
+
+Written for 1.4.1, but the shape is every release. The development Mac
+(PaddyMac) runs **Xcode beta**, which cannot be used for App Store archives —
+so the archive is cut elsewhere and that machine needs nothing but a pull.
+
+**Before you start, on the archiving Mac:** a release (non-beta) Xcode, signed
+into the Apple ID with App Store Connect access for Show Picker Club, and a
+clone of this repo.
+
+**1. Get the code.**
+
+```
+cd <path-to>/Show-Picker-Club
+git checkout main
+git pull
+```
+
+**2. Confirm the version without opening Xcode.** Both must print `10` and `2`
+respectively, and the stale-value check must print nothing:
+
+```
+grep -c "MARKETING_VERSION = 1.4.1;" ios/ShowPickerIOS.xcodeproj/project.pbxproj
+grep -c "MARKETING_VERSION = 1.4.1;" tvos/ShowPickerTV.xcodeproj/project.pbxproj
+```
+
+**Do not bump the build number.** 1.4.1 / build 24 is already committed in both
+projects. Build 24 was never uploaded to Apple, so the number is still free
+even though several test builds have carried it.
+
+**3. Open the workspace** — `ShowPickerClub.xcworkspace` at the repo root, not
+either `.xcodeproj`. The workspace is what wires in the `ShowPickerCore`
+package.
+
+**4. Three archives**, per §6: iOS (Any iOS Device), macOS (Any Mac — Mac
+Catalyst, from the iOS project so it shares the version and build), tvOS (Any
+tvOS Device, `ShowPickerTV` scheme). Product → Archive each, then Distribute →
+App Store Connect.
+
+A `Stamp git commit` build phase runs during the archive and writes the commit
+into Info.plist so the account menu can show it. It needs command-line `git`;
+without it the value reads `unknown` and the app drops the suffix. Harmless
+either way — it never fails the build.
+
+**5. Create the version records — in the web UI, not the API.** All three
+platforms shipped 1.4.1's predecessor, so each needs a *new* 1.4.1 record and
+none can be renamed from an unsubmitted one.
+
+Use **＋ Version or Platform** in App Store Connect. Do not reach for
+`POST /v1/appStoreVersions`: it refuses with *"You cannot create a new version
+of the App in the current state"* whenever a release is in flight on another
+platform, and a throwaway version string draws the same error — the block is
+the app's state, not the version number. This cost real time in 1.4; the UI
+creates the record without complaint.
+
+**6. Paste the What's New text** from the current version's section in
+`docs/RELEASE_NOTES.md` — the fenced block, **byte for byte identical on all
+three platforms**. 1.4.1's is 2,560 characters against Apple's 4,000 cap, so
+no trimming; 1.4 needed roughly 1,700 characters cut and that is worth
+checking before you paste rather than after.
+
+**7. Work §6's hygiene list** — iPad and Apple TV launches, demo sign-in on
+Mac, screenshots, export compliance — then submit.
+
+**8. After it ships:** move the version's section in `docs/RELEASE_NOTES.md`
+under its release date and open a fresh *Unreleased*.
+
 ## 7. The marketing site's App Store link
 
 The web member app was removed in 2026-08, so there is no longer a banner
