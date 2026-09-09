@@ -506,3 +506,17 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
   already offers the branch delete, so don't paste `branches/all?query=…`
   links or remind about deleting merged branches — just say whether the
   branch is merged yet.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `turnepf/Show-Picker-Club`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage labels, used under their default names. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
