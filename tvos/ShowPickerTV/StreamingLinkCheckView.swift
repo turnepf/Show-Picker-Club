@@ -30,8 +30,15 @@ struct StreamingLinkCheckView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 34) {
                     header
+                    sectionHeading("Does the app open?",
+                                   detail: "A bare scheme, so a pass lands on the app's own home screen.")
                     ForEach(StreamingApps.all) { service in
                         serviceRow(service)
+                    }
+                    sectionHeading("Does it open on the show?",
+                                   detail: "A real title with the real link the club stored for it. Apple TV+ and HBO Max are the controls; the rest are unproven, and a red row is a result, not a bug.\n\nRead the dot narrowly: green means the device ACCEPTED the URL, not that it landed on the show. Prime Video accepts a link and then says it can't stream the title. Only what you see on screen after the switch answers the question in the heading.")
+                    ForEach(StreamingApps.showLinks) { link in
+                        showLinkRow(link)
                     }
                     directLinkNote
                     Button("Clear results") { clearResults() }
@@ -84,11 +91,66 @@ struct StreamingLinkCheckView: View {
         }
     }
 
+    private func sectionHeading(_ title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 34, weight: .bold))
+                .foregroundColor(Theme.text)
+            Text(detail)
+                .font(.system(size: 20))
+                .foregroundColor(Theme.muted)
+                .frame(maxWidth: 1100, alignment: .leading)
+        }
+        .padding(.top, 20)
+    }
+
+    // Same shape as serviceRow, but each button is a full URL rather than a
+    // bare scheme, and the row names the title being used so a stale sample is
+    // recognisable as a stale sample.
+    @ViewBuilder private func showLinkRow(_ link: StreamingApps.ShowLink) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 16) {
+                Text("\(link.service) · \(link.title)")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundColor(Theme.text)
+                if let note = link.note {
+                    Text(note)
+                        .font(.system(size: 20))
+                        .foregroundColor(Theme.muted)
+                }
+            }
+            HStack(spacing: 16) {
+                ForEach(link.candidates) { candidate in
+                    Button { probe(url: candidate.url) } label: {
+                        HStack(spacing: 10) {
+                            statusDot(for: candidate.url)
+                            Text(candidate.label)
+                        }
+                        .font(.system(size: 24, weight: .semibold))
+                        .lineLimit(1)
+                        .fixedSize()
+                    }
+                    .buttonStyle(ChipButtonStyle())
+                }
+            }
+            // The exact string that was sent, so a result can be reproduced
+            // (or corrected) without reading the source.
+            ForEach(link.candidates) { candidate in
+                Text(candidate.url)
+                    .font(.system(size: 16))
+                    .foregroundColor(Theme.muted)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: 1100, alignment: .leading)
+            }
+        }
+    }
+
     // Green when this device opened it, red when it refused, hollow when the
     // scheme hasn't been pressed yet. Shape as well as color, so the state
     // survives a TV with the color turned down.
-    @ViewBuilder private func statusDot(for scheme: String) -> some View {
-        switch results[scheme] {
+    @ViewBuilder private func statusDot(for key: String) -> some View {
+        switch results[key] {
         case .some(true):
             Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
         case .some(false):
@@ -99,7 +161,7 @@ struct StreamingLinkCheckView: View {
     }
 
     private var directLinkNote: some View {
-        Text("HBO Max and Apple TV+ aren't listed: their tvOS apps handle their own https URLs and land on the actual show, so they need no scheme. Everything above can only open its app to the home screen — tvOS gives third-party apps no way to reach another app except a registered URL scheme.")
+        Text("HBO Max and Apple TV+ have no scheme row: their tvOS apps handle their own https URLs, so the show link above is the whole story for them. Everywhere else tvOS gives third-party apps no way to reach another app except a registered URL scheme, which is why a service can open its app and still not reach the show.")
             .font(.system(size: 20))
             .foregroundColor(Theme.muted)
             .frame(maxWidth: 1100, alignment: .leading)
@@ -107,9 +169,15 @@ struct StreamingLinkCheckView: View {
     }
 
     private func probe(_ scheme: String) {
-        guard let url = URL(string: "\(scheme)://") else { return }
+        probe(url: "\(scheme)://")
+    }
+
+    // Results are keyed by the exact string sent, so a scheme row and a show
+    // row never collide even when they open the same app.
+    private func probe(url string: String) {
+        guard let url = URL(string: string) else { return }
         openURL(url) { accepted in
-            record(scheme, accepted)
+            record(string, accepted)
         }
     }
 
@@ -124,8 +192,8 @@ struct StreamingLinkCheckView: View {
         (UserDefaults.standard.dictionary(forKey: storeKey) as? [String: Bool]) ?? [:]
     }
 
-    private func record(_ scheme: String, _ accepted: Bool) {
-        results[scheme] = accepted
+    private func record(_ key: String, _ accepted: Bool) {
+        results[key] = accepted
         UserDefaults.standard.set(results, forKey: Self.storeKey)
     }
 
