@@ -38,6 +38,10 @@ required. Listed so the story is complete; the member-facing halves are in
   you can only rent still shows none, because it streams nowhere — as does one
   whose service the film isn't actually listed on, rather than showing the
   wrong company's logo.
+- Apple TV: clicking My Shows in the top bar while looking at a show now takes
+  you back to your lists, the way clicking any other tab already did. Also
+  smoothed out moving around a group's screen with the remote — the focus
+  could get stuck moving between the members row and the show grids below it.
 
 ---
 

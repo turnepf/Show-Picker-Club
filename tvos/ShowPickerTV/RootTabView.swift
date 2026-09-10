@@ -72,8 +72,10 @@ struct RootTabView: View {
         // from a pushed show card produces no selection change at all — the
         // selection binding never fires and the card stays put. And popping
         // merely when the bar takes focus is too eager (bringing up the bar
-        // to glance at it would lose your place). A select-press recognizer
-        // installed on the underlying UITabBar catches the actual click.
+        // to glance at it would lose your place). `shouldSelect` on the
+        // underlying UITabBarController catches the actual click, reselects
+        // included — unlike SwiftUI's own selection binding, it fires every
+        // time a tab item is clicked, not only when the selection changes.
         .background(TabBarClickCatcher {
             // Focusing a *different* tab already switched sections and reset
             // its path via the selection binding, so by click time the
@@ -106,43 +108,69 @@ struct RootTabView: View {
 
 }
 
-// Invisible helper that finds the window's UITabBar (SwiftUI's tvOS TabView
-// is backed by UITabBarController) and attaches a Siri-remote select-press
-// recognizer to it. The recognizer only sees presses while focus is inside
-// the bar — content presses never reach it — so firing means "the user
-// clicked a tab item", which SwiftUI otherwise surfaces no event for when
-// the clicked tab is already selected.
-private struct TabBarClickCatcher: UIViewRepresentable {
+// Invisible helper that finds the ancestor UITabBarController (SwiftUI's
+// tvOS TabView is backed by one) and becomes its delegate so it can catch a
+// click on the tab that's already selected.
+//
+// This used to hunt the view hierarchy for a UITabBar and attach a
+// select-press gesture recognizer to it directly — fragile, since the bar's
+// own focus-select handling can consume the press before an ancestor
+// recognizer ever sees it, and depends on the bar being that exact concrete
+// UIKit class. `shouldSelect` is the documented hook for this instead: it
+// fires on every attempted tab selection, including a reselect of the
+// current tab, regardless of how the bar itself is drawn.
+private struct TabBarClickCatcher: UIViewControllerRepresentable {
     let onClick: () -> Void
 
-    func makeUIView(context: Context) -> CatcherView { CatcherView() }
-
-    func updateUIView(_ uiView: CatcherView, context: Context) {
-        uiView.onClick = onClick
+    func makeUIViewController(context: Context) -> Controller {
+        Controller(onClick: onClick)
     }
 
-    final class CatcherView: UIView {
-        var onClick: (() -> Void)?
-        private weak var installedOn: UITabBar?
+    func updateUIViewController(_ uiViewController: Controller, context: Context) {
+        uiViewController.onClick = onClick
+    }
+
+    final class Controller: UIViewController, UITabBarControllerDelegate {
+        var onClick: () -> Void
+        private weak var installedOn: UITabBarController?
+
+        init(onClick: @escaping () -> Void) {
+            self.onClick = onClick
+            super.init(nibName: nil, bundle: nil)
+        }
+
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
         private var attemptsLeft = 20
 
-        override func didMoveToWindow() {
-            super.didMoveToWindow()
+        override func didMove(toParent parent: UIViewController?) {
+            super.didMove(toParent: parent)
+            installIfNeeded()
+        }
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
             installIfNeeded()
         }
 
         private func installIfNeeded() {
             guard installedOn == nil else { return }
-            guard let window else { return }
-            if let bar = Self.findTabBar(in: window) {
-                let press = UITapGestureRecognizer(target: self, action: #selector(barClicked))
-                press.allowedPressTypes = [NSNumber(value: UIPress.PressType.select.rawValue)]
-                press.cancelsTouchesInView = false
-                bar.addGestureRecognizer(press)
-                installedOn = bar
-            } else if attemptsLeft > 0 {
-                // The tab bar may not be in the window yet on first layout;
-                // retry briefly rather than assuming it never appears.
+            var candidate = parent
+            while let current = candidate {
+                if let tabBarController = current as? UITabBarController {
+                    tabBarController.delegate = self
+                    installedOn = tabBarController
+                    return
+                }
+                candidate = current.parent
+            }
+            // The full ancestor chain may not be assembled yet at this exact
+            // point in SwiftUI's own child-controller bookkeeping; retry
+            // briefly rather than assuming the tab bar controller never
+            // shows up.
+            if attemptsLeft > 0 {
                 attemptsLeft -= 1
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
                     self?.installIfNeeded()
@@ -150,14 +178,14 @@ private struct TabBarClickCatcher: UIViewRepresentable {
             }
         }
 
-        @objc private func barClicked() { onClick?() }
-
-        private static func findTabBar(in view: UIView) -> UITabBar? {
-            if let bar = view as? UITabBar { return bar }
-            for sub in view.subviews {
-                if let bar = findTabBar(in: sub) { return bar }
+        // Always allows the selection through; only reports the reselect
+        // case, where the clicked item is the one already showing.
+        func tabBarController(_ tabBarController: UITabBarController,
+                              shouldSelect viewController: UIViewController) -> Bool {
+            if tabBarController.selectedViewController === viewController {
+                onClick()
             }
-            return nil
+            return true
         }
     }
 }

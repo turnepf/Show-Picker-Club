@@ -116,6 +116,10 @@ struct GroupDetailViewTV: View {
             }
             .padding(.vertical, 20)
         }
+        // Let focus climb out of this grid to the Members shelf above or the
+        // Trending grid below instead of wandering inside it, the same
+        // treatment MemberView's shelves get.
+        .focusSection()
     }
 
     private var trendingSection: some View {
@@ -140,6 +144,10 @@ struct GroupDetailViewTV: View {
                     }
                 }
                 .padding(.vertical, 20)
+                // Same reason as watchNextSection: keep focus from wandering
+                // inside the grid instead of moving on to a neighboring
+                // section.
+                .focusSection()
             }
         }
     }
@@ -170,6 +178,11 @@ struct GroupDetailViewTV: View {
                 .padding(.vertical, 20)
             }
         }
+        // Let the tvOS focus engine move up/down between sections (and up to
+        // the tab bar) instead of snagging inside this shelf — the same
+        // treatment MemberView's own shelves get, and Watch Next/Trending
+        // below get too.
+        .focusSection()
     }
 
     private func sectionHeader(_ text: String) -> some View {
