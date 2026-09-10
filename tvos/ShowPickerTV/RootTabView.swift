@@ -72,18 +72,29 @@ struct RootTabView: View {
         // from a pushed show card produces no selection change at all — the
         // selection binding never fires and the card stays put. And popping
         // merely when the bar takes focus is too eager (bringing up the bar
-        // to glance at it would lose your place). `shouldSelect` on the
-        // underlying UITabBarController catches the actual click, reselects
-        // included — unlike SwiftUI's own selection binding, it fires every
-        // time a tab item is clicked, not only when the selection changes.
+        // to glance at it would lose your place). A window-level select-press
+        // listener catches the actual click and asks the focus system whether
+        // the bar was what got clicked — see TabBarClickCatcher.
         .background(TabBarClickCatcher {
-            // Focusing a *different* tab already switched sections and reset
-            // its path via the selection binding, so by click time the
-            // clicked tab is always the selected one: just pop the stacks.
-            if !minePath.isEmpty { minePath = NavigationPath() }
-            if !homePath.isEmpty { homePath = NavigationPath() }
-            if !groupsPath.isEmpty { groupsPath = NavigationPath() }
-            if !searchPath.isEmpty { searchPath = NavigationPath() }
+            // Only the section actually on screen: a tab the user is leaving
+            // gets reset by the selection binding on the way back into it, and
+            // popping it here churns other stacks mid-transition.
+            //
+            // Unanimated on purpose. The click has already moved focus into
+            // the detail by the time this runs, so an animated pop reads as a
+            // late slide — a clean cut is what "the tab took me back" should
+            // look like.
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                switch selection {
+                case .mine: if !minePath.isEmpty { minePath = NavigationPath() }
+                case .home: if !homePath.isEmpty { homePath = NavigationPath() }
+                case .groups: if !groupsPath.isEmpty { groupsPath = NavigationPath() }
+                case .search: if !searchPath.isEmpty { searchPath = NavigationPath() }
+                case .account: break
+                }
+            }
         })
         // Land on My Shows right after signing in; fall back to Home on logout.
         .onChange(of: auth.memberSlug) { _, slug in
@@ -108,17 +119,24 @@ struct RootTabView: View {
 
 }
 
-// Invisible helper that finds the ancestor UITabBarController (SwiftUI's
-// tvOS TabView is backed by one) and becomes its delegate so it can catch a
-// click on the tab that's already selected.
+// Invisible helper that reports a click on a tab-bar item — including a click
+// on the tab that is ALREADY selected, which is the case SwiftUI surfaces no
+// event for at all.
 //
-// This used to hunt the view hierarchy for a UITabBar and attach a
-// select-press gesture recognizer to it directly — fragile, since the bar's
-// own focus-select handling can consume the press before an ancestor
-// recognizer ever sees it, and depends on the bar being that exact concrete
-// UIKit class. `shouldSelect` is the documented hook for this instead: it
-// fires on every attempted tab selection, including a reselect of the
-// current tab, regardless of how the bar itself is drawn.
+// Two earlier attempts failed on the device, both for the same reason: they
+// guessed at where the tab bar sits. Attaching a select-press recognizer to
+// the UITabBar itself never fired, and walking UP the view-controller chain
+// for a UITabBarController never found one — from a `.background()`
+// representable the chain is only ever the root UIHostingController, because
+// the TabView's tab bar controller is a DESCENDANT of that host, not an
+// ancestor.
+//
+// What is actually true on tvOS, confirmed by logging the live hierarchy: a
+// select-press recognizer on the WINDOW does see every remote click, and at
+// the moment of a tab click the focus system's focused item is a
+// UITabBarButton inside a UITabBar. A click on content focuses something else
+// entirely (a SwiftUI focus item, not a UIView in the bar), so the focused
+// item is what separates the two cases. Hook the window, then ask focus.
 private struct TabBarClickCatcher: UIViewControllerRepresentable {
     let onClick: () -> Void
 
@@ -130,9 +148,21 @@ private struct TabBarClickCatcher: UIViewControllerRepresentable {
         uiViewController.onClick = onClick
     }
 
-    final class Controller: UIViewController, UITabBarControllerDelegate {
+    final class Controller: UIViewController, UIGestureRecognizerDelegate {
         var onClick: () -> Void
-        private weak var installedOn: UITabBarController?
+        private var installed = false
+        private var attemptsLeft = 20
+        private var focusWasInTabBar = false
+        private var focusLeftBarAt: Date?
+
+        // How long after the bar loses focus a select press still counts as
+        // that bar click. Measured on an Apple TV 4K: a real tab click lands
+        // 0.10–0.19s behind the focus move, while the soonest press that was
+        // a content click rather than a tab click came 0.66s behind it. This
+        // sits between the two, near the fast end — the cost of missing a
+        // click is a click that does nothing, the cost of catching a stray one
+        // is throwing away the screen someone was reading.
+        private static let clickWindow: TimeInterval = 0.3
 
         init(onClick: @escaping () -> Void) {
             self.onClick = onClick
@@ -143,49 +173,75 @@ private struct TabBarClickCatcher: UIViewControllerRepresentable {
             fatalError("init(coder:) has not been implemented")
         }
 
-        private var attemptsLeft = 20
-
-        override func didMove(toParent parent: UIViewController?) {
-            super.didMove(toParent: parent)
-            installIfNeeded()
-        }
-
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
             installIfNeeded()
         }
 
         private func installIfNeeded() {
-            guard installedOn == nil else { return }
-            var candidate = parent
-            while let current = candidate {
-                if let tabBarController = current as? UITabBarController {
-                    tabBarController.delegate = self
-                    installedOn = tabBarController
-                    return
+            guard !installed else { return }
+            guard let window = view.window else {
+                // The background view may not be in the window on the first
+                // pass; retry briefly rather than giving up on the first miss.
+                if attemptsLeft > 0 {
+                    attemptsLeft -= 1
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                        self?.installIfNeeded()
+                    }
                 }
-                candidate = current.parent
+                return
             }
-            // The full ancestor chain may not be assembled yet at this exact
-            // point in SwiftUI's own child-controller bookkeeping; retry
-            // briefly rather than assuming the tab bar controller never
-            // shows up.
-            if attemptsLeft > 0 {
-                attemptsLeft -= 1
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-                    self?.installIfNeeded()
-                }
-            }
+            installed = true
+            let press = UITapGestureRecognizer(target: self, action: #selector(selectPressed))
+            press.allowedPressTypes = [NSNumber(value: UIPress.PressType.select.rawValue)]
+            // Observe the press; never swallow it. The bar still does its own
+            // job with the same click.
+            press.cancelsTouchesInView = false
+            press.delegate = self
+            window.addGestureRecognizer(press)
+            focusWasInTabBar = focusIsInTabBar
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(focusChanged),
+                name: UIFocusSystem.didUpdateNotification, object: nil)
         }
 
-        // Always allows the selection through; only reports the reselect
-        // case, where the clicked item is the one already showing.
-        func tabBarController(_ tabBarController: UITabBarController,
-                              shouldSelect viewController: UIViewController) -> Bool {
-            if tabBarController.selectedViewController === viewController {
-                onClick()
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+
+        // Clicking a tab item moves focus out of the bar and into the content
+        // BEFORE the press recognizer runs, so asking "is the bar focused?"
+        // at press time answers no. Look back instead: the bar losing focus a
+        // few milliseconds earlier is what a click looks like from here. A
+        // user who merely swipes down out of the bar produces the same focus
+        // move with no press behind it, and so is left alone.
+        @objc private func selectPressed() {
+            let sinceLeft = focusLeftBarAt.map { Date().timeIntervalSince($0) }
+            let inBar = focusIsInTabBar
+            guard inBar || (sinceLeft ?? .greatestFiniteMagnitude) < Self.clickWindow else { return }
+            onClick()
+        }
+
+        @objc private func focusChanged() {
+            let nowInBar = focusIsInTabBar
+            if focusWasInTabBar && !nowInBar {
+                focusLeftBarAt = Date()
             }
-            return true
+            focusWasInTabBar = nowInBar
+        }
+
+        // The click means "a tab item" only when the focus system says the
+        // focused item is a view inside the bar. Content items are SwiftUI
+        // focus items rather than UIViews, so they fall out here.
+        private var focusIsInTabBar: Bool {
+            guard let window = view.window,
+                  let system = UIFocusSystem.focusSystem(for: window),
+                  let focused = system.focusedItem as? UIView else { return false }
+            var current: UIView? = focused
+            while let view = current {
+                if view is UITabBar { return true }
+                current = view.superview
+            }
+            return false
         }
     }
 }
@@ -239,3 +295,4 @@ struct MyShowsView: View {
         me = members.first { $0.slug == slug }
     }
 }
+
