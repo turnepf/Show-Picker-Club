@@ -532,12 +532,24 @@ struct ShowDetailView: View {
         "Apple TV+",
     ]
 
-    // True when we can land the user on the actual show page. Only the two
-    // services above manage it; every other app we can reach opens to its own
-    // home screen, and the button says "Open" rather than "Watch on" to stay
-    // honest about that.
+    // Prime Video reaches the show too, but only from a watch.amazon.com URL —
+    // verified on device 9/10/2026, where the club's other three Amazon shapes
+    // (amazon.com/gp/video, amazon.com/.../dp, primevideo.com/detail) all
+    // failed to. So this is a property of the stored URL rather than of the
+    // service, and it is asked of the URL.
+    private static func urlLandsOnShow(_ url: URL) -> Bool {
+        url.host?.lowercased().hasSuffix("watch.amazon.com") == true
+    }
+
+    // True when we can land the user on the actual show page. Everything else
+    // we can reach opens to its own home screen, and the button says "Open"
+    // rather than "Watch on" to stay honest about that — so two shows on the
+    // same service can legitimately read differently, because two members'
+    // rows can carry different links.
     private var canDeepLink: Bool {
-        Self.deepLinksToShow.contains(network ?? "")
+        if Self.deepLinksToShow.contains(network ?? "") { return true }
+        guard let stored = show?.networkUrl, let url = URL(string: stored) else { return false }
+        return Self.urlLandsOnShow(url)
     }
 
     private var buttonLabel: String {
@@ -561,7 +573,8 @@ struct ShowDetailView: View {
     //  3. The plain https URL last, as a backstop.
     private func openTargets(serviceUrl: URL) -> [URL] {
         let isHBOSearch = show?.isHBOMaxSearchFallback == true
-        if Self.deepLinksToShow.contains(network ?? "") || isHBOSearch {
+        if Self.deepLinksToShow.contains(network ?? "") || isHBOSearch
+            || Self.urlLandsOnShow(serviceUrl) {
             return [serviceUrl]
         }
         return StreamingApps.schemes(for: serviceUrl) + [serviceUrl]

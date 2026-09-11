@@ -15,7 +15,35 @@ first two or three lines before "more", so the most useful change goes first.
 
 ---
 
-## Unreleased — the update after 1.4.1
+## 1.4.2 (build 25) — Apple TV only
+
+**A tvOS-only release.** The version record in App Store Connect is Apple TV's
+alone: iPhone/iPad and Mac are not part of it, so the text below describes only
+what an Apple TV owner gets. The iPhone/iPad work sitting in *Unreleased* below
+stays there and ships with the next release that includes those platforms.
+
+Both projects still carry the same `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION`
+(1.4.2 / 25) because the repo keeps them in lockstep — iOS simply isn't
+archived from this one.
+
+The block below is the What's New text, ~490 characters against Apple's 4,000
+cap.
+
+```
+Getting back to your lists is one click again. From a show, click the tab
+you're already on — My Shows, or Home — and you land back where you were
+instead of nothing happening.
+
+Moving around a group screen with the remote no longer snags between the
+members row and the shows below it.
+
+Prime Video shows open on the show itself now, rather than dropping you on
+the Prime Video home screen, for titles where we have a direct link to them.
+```
+
+---
+
+## Unreleased — the update after 1.4.2
 
 **Anyone in the group can rename it or change its icon**, not just whoever
 started it — the option simply wasn't there for anyone else before. If
@@ -38,10 +66,8 @@ required. Listed so the story is complete; the member-facing halves are in
   you can only rent still shows none, because it streams nowhere — as does one
   whose service the film isn't actually listed on, rather than showing the
   wrong company's logo.
-- Apple TV: clicking My Shows in the top bar while looking at a show now takes
-  you back to your lists, the way clicking any other tab already did. Also
-  smoothed out moving around a group's screen with the remote — the focus
-  could get stuck moving between the members row and the show grids below it.
+*(The Apple TV navigation and Prime Video items that were here moved up into
+1.4.2 — they shipped in it.)*
 
 ---
 

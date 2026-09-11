@@ -516,6 +516,26 @@ to find out." The scheme table lives in `StreamingApps.swift` so the check and
 the Watch button read the same source — a diagnostic that reports schemes
 production no longer tries is worse than none.
 
+A second section, **"Does it open on the show?"**, asks the question the scheme
+rows structurally can't: a bare `scheme://` has nowhere to put a show id, so a
+green row up there only ever meant "the app launched". Each row here is a real
+title with the real `network_url` the club stored for it, so a red row means
+the link is dead rather than that the sample was mistyped. Apple TV+ and HBO
+Max double as **controls** — they are known to land on the show, so if either
+fails the device or the build is at fault, not the vendor. Read the dot
+narrowly on this section: it records that the device *accepted* the URL, which
+Prime Video proved is not the same as landing on the show (it accepts, then
+says it can't stream the title).
+
+**What it found, 9/10/2026: Prime Video deep links are alive.** The club stores
+Amazon links in four shapes and only one reaches the show —
+`watch.amazon.com/detail?gti=…` opens Prime Video *on the title*, while
+`amazon.com/gp/video/detail/<ASIN>`, `amazon.com/<slug>/dp/<ASIN>` and
+`primevideo.com/detail/<id>` all fail. Of 110 Prime rows carrying a URL, 32
+were the working shape, 31 `gp/video`, 28 retail `/dp/`, 19 `primevideo.com`.
+That reframes a dead Watch button on Prime from "the vendor blocks us" to "the
+row holds the wrong shape", which is ours to repair.
+
 Platforms: **Apple TV only, and deliberately so** — the thing being tested is
 whether *this* tvOS device opens *this* streaming app, which no other platform
 can answer on its behalf. **iPhone and iPad don't** get it: their Watch button

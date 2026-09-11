@@ -185,6 +185,26 @@ enum StreamingApps {
                               url: "https://www.amazon.com/Saltburn-Barry-Keoghan/dp/B0CGHHFGBS"),
                  ],
                  note: "Fourth shape — Amazon's retail page, 25% of our Prime rows"),
+        // Only the gti row reaches the show, and the question these ask is
+        // WHICH PART of it matters: the watch.amazon.com host, or the
+        // amzn1.dv.gti id? Every failing shape carries an ASIN we already
+        // have, so if the host is the variable the fix is a rewrite we can do
+        // ourselves over the stored rows — no vendor, no re-enrichment.
+        // If the id is the variable, the ASINs are useless and the rows have
+        // to be re-fetched for gti ids instead.
+        //
+        // Invincible in all three, so availability is held constant: it is an
+        // Amazon Original, and its ASIN row (gp/video, above) already failed.
+        ShowLink(service: "Prime Video", title: "Invincible · shape test",
+                 candidates: [
+                    Candidate(label: "host + ?gti=ASIN",
+                              url: "https://watch.amazon.com/detail?gti=B08WJQ3XP5"),
+                    Candidate(label: "host + ?asin=",
+                              url: "https://watch.amazon.com/detail?asin=B08WJQ3XP5"),
+                    Candidate(label: "host + /dp/",
+                              url: "https://watch.amazon.com/dp/B08WJQ3XP5"),
+                 ],
+                 note: "If any is green AND lands on the show, every Amazon row is repairable"),
         ShowLink(service: "Disney+", title: "X-Men '97",
                  candidates: [
                     Candidate(label: "https",
