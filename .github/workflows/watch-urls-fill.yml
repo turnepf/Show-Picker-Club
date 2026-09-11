@@ -26,6 +26,14 @@ on:
         description: 'Max titles to process this run (~2 Watchmode calls each)'
         required: false
         default: '15'
+      mode:
+        description: "standard (missing links) or amazon-shape (one-time: Prime rows on a host tvOS can't open)"
+        required: false
+        default: 'standard'
+        type: choice
+        options:
+          - standard
+          - amazon-shape
 
 jobs:
   fill:
@@ -36,6 +44,7 @@ jobs:
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           LIMIT: ${{ github.event.inputs.limit || '15' }}
+          MODE: ${{ github.event.inputs.mode || 'standard' }}
         run: |
           if [ -z "$CRON_SECRET" ]; then
             echo "::error::CRON_SECRET repo secret is not set"
@@ -45,7 +54,7 @@ jobs:
           resp=$(curl -sS -X POST "$URL" \
             -H "Content-Type: application/json" \
             -H "X-Cron-Secret: ${CRON_SECRET}" \
-            -d "{\"limit\": ${LIMIT}}" \
+            -d "{\"limit\": ${LIMIT}, \"mode\": \"${MODE}\"}" \
             -w $'\n%{http_code}')
           http=$(printf '%s' "$resp" | tail -n1)
           body=$(printf '%s' "$resp" | sed '$d')

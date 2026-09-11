@@ -1,6 +1,7 @@
 import { canonicalNetwork } from '../_shared/networks.js';
 import { isAdmin } from '../_shared/admin.js';
 import { cronAuthorized } from '../_shared/secrets.js';
+import { normalizeAmazonUrl } from '../_shared/amazon-urls.js';
 
 // Backfills network_url for rows missing a real deep link, using Watchmode's
 // /title/{id}/sources endpoint. For each candidate row:
@@ -98,6 +99,28 @@ export async function onRequestPost(context) {
   const limit = Math.max(1, Math.min(250, parseInt(body.limit, 10) || 25));
   const region = watchmodeRegion(env);
 
+  // `mode: 'amazon-shape'` is a bounded, hand-run repair, NOT part of the
+  // standing gate — the daily job must never select on it. Amazon publishes a
+  // title under several hosts and only watch.amazon.com reaches the Prime
+  // Video app on tvOS; rows stored under another host carry a usable id often
+  // enough to be worth re-asking Watchmode for one (normalizeAmazonUrl then
+  // moves it to the host that works). It stays manual because a title whose
+  // Watchmode answer has no id at all can never satisfy this predicate, and a
+  // standing gate would re-select those rows every single day forever — the
+  // mistake invariant §19 records against the network_logo_url sweep.
+  const amazonShape = body.mode === 'amazon-shape';
+
+  const amazonSql = `
+    SELECT id, title, network, network_url, movie
+    FROM shows
+    WHERE archived = 0
+      AND network = 'Amazon Prime Video'
+      AND network_url IS NOT NULL
+      AND network_url NOT LIKE '%watch.amazon.com%'
+    GROUP BY LOWER(title)
+    LIMIT ${limit}
+  `;
+
   // Candidates: rows without a true deep-link URL. Includes NULL, search
   // placeholders, www.max.com / www.hbomax.com info-page URLs that dump
   // users at the home screen, and themoviedb.org watch pages left over
@@ -133,11 +156,14 @@ export async function onRequestPost(context) {
     GROUP BY LOWER(title)
     LIMIT ${limit}
   `;
-  const { results } = await (network
-    ? env.DB.prepare(sql).bind(network).all()
-    : env.DB.prepare(sql).all());
+  const { results } = amazonShape
+    ? await env.DB.prepare(amazonSql).all()
+    : await (network
+        ? env.DB.prepare(sql).bind(network).all()
+        : env.DB.prepare(sql).all());
 
   const summary = {
+    mode: amazonShape ? 'amazon-shape' : 'standard',
     checked: results.length,
     filled: 0,
     no_match: [],          // Watchmode couldn't find the title at all
@@ -186,6 +212,10 @@ export async function onRequestPost(context) {
     if (/^https?:\/\/play\.hbomax\.com\/video\/watch\//i.test(url)) {
       url = `https://play.hbomax.com/search?q=${encodeURIComponent(row.title)}`;
     }
+    // Amazon's www host carries the right id but reaches nothing on tvOS.
+    // Same spirit as the HBO Max rewrite above: the vendor's answer is
+    // correct about the title and wrong about the address.
+    url = normalizeAmazonUrl(url);
 
     // Only write to rows on the same service. The Watchmode match we
     // picked is scoped to row.network already (canonicalNetwork(s.name) ===

@@ -80,6 +80,8 @@ jobs:
         run: node scripts/vibe-match-test.mjs
       - name: Canonical networks and the iOS picker copy
         run: node scripts/networks-test.mjs
+      - name: Amazon links reach the show, and a bad id is never invented
+        run: node scripts/amazon-url-test.mjs
       - name: Favorite actors, and what counts as trending
         run: node scripts/favorite-actors-test.mjs
       - name: Trending is a daily snapshot served from cache

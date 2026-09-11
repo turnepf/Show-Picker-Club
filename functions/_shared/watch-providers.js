@@ -1,4 +1,5 @@
 import { canonicalNetwork } from './networks.js';
+import { normalizeAmazonUrl } from './amazon-urls.js';
 
 // Looks up a real streaming-service deep link for a (title, network) pair
 // via Watchmode's API. Used both at insert time (so new shows land with
@@ -52,7 +53,10 @@ export async function lookupWatchmodeUrl(env, title, network, isMovie) {
     const match = subs.find(s =>
       canonicalNetwork(s.name) === network && s.web_url
     );
-    return match?.web_url || null;
+    // Watchmode hands back Amazon's www host for the Prime Video source, which
+    // reaches nothing on tvOS even though it carries the right id. Normalizing
+    // on the way in is what stops new rows being born broken.
+    return match?.web_url ? normalizeAmazonUrl(match.web_url) : null;
   } catch {
     return null;
   }

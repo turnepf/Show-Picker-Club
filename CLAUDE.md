@@ -245,6 +245,23 @@ network, rating, poster) alongside the legacy bare-title `shows` array. On the T
 to 10 on junk.
 
 ```bash
+node scripts/amazon-url-test.mjs
+```
+
+The rule that decides whether the Watch button reaches a Prime Video title or
+dumps the member on its home screen. Amazon publishes one title under several
+hosts and **only `watch.amazon.com` is handed to the Prime Video app on tvOS**
+(their app-association file claims that whole host; `www.amazon.com` maps its
+paths to Amazon's *other* apps). The repair is possible because both hosts
+carry the same `amzn1.dv.gti.*` id, so `_shared/amazon-urls.js` moves the id to
+the host that works. The properties pinned are the refusals: an ASIN is **not**
+a gti and Amazon rejects it in that parameter, so a row carrying only an ASIN
+is left alone rather than rewritten into a dead link — a wrong deep link is
+worse than one that merely opens the app, because the member lands on an error
+instead of somewhere they can search. Same for a `primevideo.com` opaque id, a
+retail `/dp/` page, a lookalike host, and anything that isn't Amazon.
+
+```bash
 node scripts/trending-cache-test.mjs
 ```
 
