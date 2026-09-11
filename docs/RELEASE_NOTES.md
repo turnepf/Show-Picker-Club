@@ -15,7 +15,7 @@ first two or three lines before "more", so the most useful change goes first.
 
 ---
 
-## 1.4.2 (build 25) — Apple TV only
+## 1.4.2 (build 25) — Apple TV only, submitted for review 2026-09-10
 
 **A tvOS-only release.** The version record in App Store Connect is Apple TV's
 alone: iPhone/iPad and Mac are not part of it, so the text below describes only

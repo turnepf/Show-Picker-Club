@@ -24,7 +24,29 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 
-const KEY_ID = process.env.ASC_KEY_ID || 'AWK4N8GMQ7';
+const KEY_DIR = path.join(os.homedir(), '.appstoreconnect', 'private_keys');
+
+// The key id was hardcoded to the development Mac's key, which meant every
+// other machine died on "No private key at .../AuthKey_<that key>.p8" while
+// holding a perfectly good key of its own. Read the directory instead: one
+// key is the normal case and needs no configuration, and ASC_KEY_ID still
+// wins when a machine holds several.
+function resolveKeyId() {
+  if (process.env.ASC_KEY_ID) return process.env.ASC_KEY_ID.trim();
+  let found = [];
+  try {
+    found = fs.readdirSync(KEY_DIR)
+      .map(f => /^AuthKey_(.+)\.p8$/.exec(f)?.[1])
+      .filter(Boolean);
+  } catch { /* no directory yet — fall through to the error below */ }
+  if (found.length === 1) return found[0];
+  if (found.length > 1) {
+    die(`Several keys in ${KEY_DIR} (${found.join(', ')}). Set ASC_KEY_ID to pick one.`);
+  }
+  die(`No API key in ${KEY_DIR}. Download one from App Store Connect → Users and Access → Integrations.`);
+}
+
+const KEY_ID = resolveKeyId();
 const APP_ID = process.env.ASC_APP_ID || '6780282764';
 const API = 'https://api.appstoreconnect.apple.com';
 

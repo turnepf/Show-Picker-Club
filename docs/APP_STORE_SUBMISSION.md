@@ -198,6 +198,48 @@ broken — but clear them in the first build after the apps have shipped.
 - [ ] Verify the demo sign-in once on the **Mac** build too — Review opens
       every platform on the listing.
 
+## 6b. What a Mac needs before it can ship at all
+
+Learned the hard way on 1.4.2, the first release cut from a machine that had
+never shipped. Both gaps look like the same "credentials" problem and are not.
+
+**1. An App Store Connect API key, for `asc.mjs`.** App Store Connect → Users
+and Access → Integrations → Team Keys → ＋. The `.p8` downloads **once** and
+never again; lose it and the key is dead. It belongs at
+`~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8` with the issuer UUID in
+`~/.appstoreconnect/issuer_id` (write it with `printf`, not `echo` — a trailing
+newline breaks the JWT). `asc.mjs` finds the key by reading that directory, so
+one key needs no configuration; set `ASC_KEY_ID` only on a machine holding
+several.
+
+**Choose the App Manager role** for that key. Developer can upload a build but
+cannot edit version metadata, which is exactly what `set-notes` and `attach`
+do.
+
+**2. A distribution certificate, which the key above cannot create.** This is
+the part that surprises. `xcodebuild -exportArchive` fails on a fresh Mac with:
+
+```
+error: exportArchive Cloud signing permission error
+error: exportArchive No signing certificate "iOS Distribution" found
+```
+
+Cloud signing needs an **Admin** key; App Manager is refused. Rather than
+minting a second, more privileged key just to sign, **distribute through Xcode's
+Organizer** — it signs with the Apple ID already logged into Xcode and creates
+the certificate as part of the upload. Copy the archive into
+`~/Library/Developer/Xcode/Archives/<YYYY-MM-DD>/` and it appears in Organizer
+even when it was cut by `xcodebuild` somewhere else.
+
+Afterwards the certificate lives on Apple's servers, not in the local keychain
+(`security find-identity` still shows only the development identity). That is
+cloud-managed signing working correctly, not a failed setup.
+
+**So the split is:** archive and upload through Xcode, everything else —
+status, What's New, attaching the build — through `asc.mjs`. A fully
+command-line release would need an Admin key, and the certificate is the only
+reason.
+
 ## 6a. Run sheet: releasing from a second Mac
 
 Written for 1.4.1, but the shape is every release. The development Mac
