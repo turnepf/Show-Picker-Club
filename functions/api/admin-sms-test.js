@@ -11,7 +11,7 @@ import { isAdmin } from '../_shared/admin.js';
 //   curl -X POST https://showpicker.club/api/admin-sms-test \
 //     -H 'Content-Type: application/json' \
 //     -H 'Cookie: session=YOUR_SESSION_ID' \
-//     -d '{"to":"+15555550100","body":"hello from showpicker"}'
+//     -d '{"to":"+15555550123","body":"hello from showpicker"}'
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {

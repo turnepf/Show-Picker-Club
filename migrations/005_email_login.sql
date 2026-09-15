@@ -28,61 +28,8 @@ CREATE TABLE IF NOT EXISTS login_otps (
 CREATE INDEX IF NOT EXISTS idx_login_otps_lookup  ON login_otps(member_slug, code, used_at);
 CREATE INDEX IF NOT EXISTS idx_login_otps_expires ON login_otps(expires_at);
 
--- Seed known emails for existing members. Primary is the address most
--- likely to be checked; alternates are kept so a code request to any one
--- of them still works.
-INSERT OR IGNORE INTO member_emails (email, member_slug, is_primary) VALUES
-  ('patrick@patrickturner.net', 'patrick', 1),
-  ('member@example.com', 'brad', 1),
-  ('member@example.com',        'brad', 0),
-  ('member@example.com',      'brad', 0),
-  ('member@example.com',              'sherry', 1),
-  ('member@example.com',      'amy',    1),
-  ('member@example.com', 'leon',   1),
-  ('member@example.com', 'paula',  1),
-  ('member@example.com','paula',  0),
-  ('member@example.com',    'chuck',  1),
-  ('member@example.com',    'william', 1),
-  ('member@example.com',     'william', 0),
-  ('member@example.com', 'william', 0),
-  ('member@example.com',     'kirsten',1),
-  ('member@example.com',    'annie',    1),
-  ('member@example.com',          'fiona',    1),
-  ('member@example.com',            'fiona',    0),
-  ('member@example.com',       'jennifer', 1),
-  ('member@example.com',             'jennifer', 0),
-  ('member@example.com',       'jessica',  1),
-  ('member@example.com',        'joe',      1),
-  ('member@example.com',        'joey',     1),
-  ('member@example.com','joey',   0),
-  ('member@example.com',       'joey',     0),
-  ('member@example.com',        'kelly',    1),
-  ('member@example.com',     'laurin',   1),
-  ('member@example.com',              'mb',       1),
-  ('member@example.com',    'mb',       0),
-  ('member@example.com',        'mb',       0),
-  ('member@example.com',             'susan',    1),
-  ('member@example.com',       'susan',    0),
-  ('member@example.com',     'tori',     1),
-  ('member@example.com',         'whitt',    1);
-
--- Backfill mobile numbers for any members missing one. INSERT OR IGNORE
--- with the (phone, member_slug) UNIQUE means we never duplicate, and
--- is_primary stays 0 so we don't disturb an existing primary.
-INSERT OR IGNORE INTO member_phones (phone, member_slug, is_primary) VALUES
-  ('+15555550100', 'brad',   0),
-  ('+15555550100', 'sherry', 0),
-  ('+15555550100', 'amy',    0),
-  ('+15555550100', 'leon',   0),
-  ('+15555550100', 'paula',  0),
-  ('+15555550100', 'chuck',  0),
-  ('+15555550100', 'william',0),
-  ('+15555550100', 'kirsten',0),
-  ('+15555550100', 'annie',  0),
-  ('+15555550100', 'carter', 0),
-  ('+15555550100', 'kelly',  0),
-  ('+15555550100', 'laurin', 0),
-  ('+15555550100', 'mb',     0),
-  ('+15555550100', 'susan',  0),
-  ('+15555550100', 'tori',   0),
-  ('+15555550100', 'whitt',  0);
+-- This file originally also seeded existing members' email addresses and
+-- backfilled their phone numbers. That data was applied to production once
+-- and now lives only in the database (member_emails, member_phones); it was
+-- removed from the repo so members' contact details aren't kept in source
+-- control.

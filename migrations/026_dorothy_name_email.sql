@@ -23,7 +23,6 @@ SET first_name = 'Dorothy',
     name = REPLACE(name, 'Whitt', 'Dorothy')
 WHERE slug = 'whitt';
 
-UPDATE member_emails
-SET email = 'member@example.com'
-WHERE member_slug = 'whitt'
-  AND email = 'member@example.com';
+-- The member_emails UPDATE that ran here swapped one specific login address
+-- for another. It was applied to production once; the addresses were removed
+-- from the repo so members' contact details aren't kept in source control.
