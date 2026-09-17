@@ -45,10 +45,14 @@ sub load()
 end sub
 
 sub fetchShows()
+    m.message.text = "Loading…"
+    m.message.visible = true
+    SetBusy(m, true)
     StartApi(m, { method: "GET", path: "/api/shows?member=" + m.slug, tag: "shows" }, "onShows")
 end sub
 
 sub onShows(ev as object)
+    SetBusy(m, false)
     res = ev.getRoSGNode().result
     if res.statusCode = 401
         m.message.text = "You're logged out — sign in again from the Account screen."

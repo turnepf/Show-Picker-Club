@@ -120,6 +120,16 @@ function StartApi(host as object, req as object, callback as string) as object
     return task
 end function
 
+' Toggle the shared loading spinner (declared once on MainScene) from any
+' screen, so a slow API call has an obvious "something is happening"
+' indicator instead of looking frozen.
+sub SetBusy(host as object, v as boolean)
+    scene = host.top.getScene()
+    if scene = invalid then return
+    spinner = scene.findNode("spinner")
+    if spinner <> invalid then spinner.visible = v
+end sub
+
 function SafeStr(v as dynamic) as string
     if v = invalid then return ""
     t = Type(v)

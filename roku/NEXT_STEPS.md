@@ -89,9 +89,9 @@ the Roku and your computer must be on the **same network**, and you upload a **z
 
 ## Remaining work to ship
 
-- [ ] Sideload and get it running; fix any compile/runtime errors from the debug console.
-- [ ] Tune keyboard↔buttons↔grid focus transitions on-device.
-- [ ] Add real artwork in `roku/images/` (sizes in `roku/images/README.md`) — icons, splash,
-      `spinner.png`.
+- [x] Sideload and get it running — fixed the missing `<script>` includes that crashed every
+      screen, RowList field bugs, and an AccountScreen keyboard/button overlap. Merged.
+- [ ] Tune keyboard↔buttons↔grid focus transitions on-device (in progress).
+- [x] Add real artwork in `roku/images/` — generated from the App Store icon mark.
 - [ ] Decide on merge (the `roku` platform backend change ships with it) and, later, Roku channel
       publishing (Roku developer account → package with a signing key on-device → submit).
