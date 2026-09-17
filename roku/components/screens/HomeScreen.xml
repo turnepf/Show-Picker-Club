@@ -5,6 +5,8 @@
         <field id="navigate" type="assocarray" alwaysNotify="true" />
         <field id="didReturn" type="boolean" onChange="onReturn" />
     </interface>
+    <script type="text/brightscript" uri="pkg:/source/Globals.brs" />
+    <script type="text/brightscript" uri="pkg:/source/ContentBuilders.brs" />
     <script type="text/brightscript" uri="HomeScreen.brs" />
     <children>
         <Label id="brand" text="Show Picker Club" translation="[90,54]"
@@ -12,8 +14,8 @@
         <ButtonGroup id="nav" translation="[90,120]" layoutDirection="horiz"
                      buttonHeight="56" minWidth="180" horizAlignment="left" />
         <RowList id="rows" translation="[90,220]" itemComponentName="PosterCard"
-                 numRows="2" rowSpacing="34" rowLabelColor="0xF5F7FAFF"
-                 rowItemSize="[280,440]" rowItemSpacing="[24,0]"
+                 numRows="2" rowLabelColor="0xF5F7FAFF"
+                 rowItemSize="[[280,440],[280,440]]" rowItemSpacing="[[24,34],[24,34]]"
                  rowHeights="[440,440]"
                  vertFocusAnimationStyle="floatingFocus" />
         <Label id="footer" text="Data from TMDB" translation="[90,1020]"
