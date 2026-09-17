@@ -22,7 +22,7 @@
             <Label id="ratings" width="980" font="font:SmallSystemFont" color="0xFFFFFF99" />
         </LayoutGroup>
 
-        <ButtonGroup id="actions" translation="[840,760]" layoutDirection="horiz"
+        <ButtonGroup id="actions" translation="[90,760]" layoutDirection="horiz"
                      buttonHeight="60" minWidth="200" horizAlignment="left" />
         <Label id="status" translation="[90,560]" width="640" wrap="true"
                font="font:SmallSystemFont" color="0x33C773FF" visible="false" />
