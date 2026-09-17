@@ -10,7 +10,7 @@
     <children>
         <Label id="heading" text="Add a Show" translation="[90,54]" font="font:LargeBoldSystemFont" color="0xF5F7FAFF" />
         <Keyboard id="kb" translation="[90,140]" />
-        <ButtonGroup id="buttons" translation="[90,470]" layoutDirection="horiz"
+        <ButtonGroup id="buttons" translation="[90,770]" layoutDirection="horiz"
                      buttonHeight="56" minWidth="180" horizAlignment="left" />
         <MarkupGrid id="grid" translation="[720,140]" itemComponentName="PosterCard"
                     numColumns="3" numRows="2" itemSize="[280,440]"
