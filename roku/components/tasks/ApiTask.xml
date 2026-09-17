@@ -6,5 +6,6 @@
         <!-- result: { statusCode, ok, body, json, tag } -->
         <field id="result" type="assocarray" />
     </interface>
+    <script type="text/brightscript" uri="pkg:/source/Globals.brs" />
     <script type="text/brightscript" uri="ApiTask.brs" />
 </component>

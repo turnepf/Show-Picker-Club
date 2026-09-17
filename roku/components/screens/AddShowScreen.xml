@@ -4,6 +4,8 @@
         <field id="authState" type="assocarray" />
         <field id="navigate" type="assocarray" alwaysNotify="true" />
     </interface>
+    <script type="text/brightscript" uri="pkg:/source/Globals.brs" />
+    <script type="text/brightscript" uri="pkg:/source/ContentBuilders.brs" />
     <script type="text/brightscript" uri="AddShowScreen.brs" />
     <children>
         <Label id="heading" text="Add a Show" translation="[90,54]" font="font:LargeBoldSystemFont" color="0xF5F7FAFF" />

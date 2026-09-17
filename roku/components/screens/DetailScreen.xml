@@ -5,6 +5,7 @@
         <field id="authState" type="assocarray" onChange="onAuthChanged" />
         <field id="navigate" type="assocarray" alwaysNotify="true" />
     </interface>
+    <script type="text/brightscript" uri="pkg:/source/Globals.brs" />
     <script type="text/brightscript" uri="DetailScreen.brs" />
     <children>
         <Poster id="hero" translation="[90,80]" width="300" height="450" loadDisplayMode="scaleToFill" />

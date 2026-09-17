@@ -3,6 +3,8 @@
     <interface>
         <field id="launchArgs" type="assocarray" />
     </interface>
+    <script type="text/brightscript" uri="pkg:/source/Globals.brs" />
+    <script type="text/brightscript" uri="pkg:/source/ContentBuilders.brs" />
     <script type="text/brightscript" uri="MainScene.brs" />
     <children>
         <Rectangle id="bg" width="1920" height="1080" color="0x0D0F14FF" />

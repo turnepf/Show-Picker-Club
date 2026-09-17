@@ -4,6 +4,7 @@
         <field id="authState" type="assocarray" onChange="onAuth" />
         <field id="navigate" type="assocarray" alwaysNotify="true" />
     </interface>
+    <script type="text/brightscript" uri="pkg:/source/Globals.brs" />
     <script type="text/brightscript" uri="AccountScreen.brs" />
     <children>
         <Label id="heading" translation="[90,54]" font="font:LargeBoldSystemFont" color="0xF5F7FAFF" />

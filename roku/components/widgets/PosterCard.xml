@@ -7,6 +7,7 @@
         <field id="width" type="float" value="280" />
         <field id="height" type="float" value="420" />
     </interface>
+    <script type="text/brightscript" uri="pkg:/source/Globals.brs" />
     <script type="text/brightscript" uri="PosterCard.brs" />
     <children>
         <Rectangle id="bg" width="280" height="420" color="0x1C1F26FF" />
