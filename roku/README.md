@@ -52,11 +52,12 @@ Roku SceneGraph has no simulator — you need a real device in **Developer Mode*
 cd roku && zip -r ../showpicker-roku.zip . -x '*.DS_Store'
 ```
 
-## Placeholder assets
+## Channel artwork
 
-`images/` currently holds only a note. Before publishing, add real channel artwork referenced by
-`manifest` (`mm_icon_focus_hd/sd`, `mm_icon_side_hd/sd`, `splash_hd`, `splash_fhd`) and a
-`spinner.png`. Missing images degrade gracefully during sideload/testing.
+`images/` holds placeholder icons, splash screens, and a spinner glyph, all derived from the same
+mark as the App Store icon (`ios/ShowPickerIOS/Assets.xcassets/AppIcon.appiconset/icon-1024.png`)
+so the Home-screen tile matches the Apple apps rather than inventing new branding. Good enough to
+sideload and publish with; swap in dedicated artwork later if desired.
 
 ## Known on-device tuning
 

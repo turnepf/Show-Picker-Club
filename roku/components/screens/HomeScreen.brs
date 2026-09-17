@@ -25,6 +25,12 @@ sub onAuth()
         m.members = []
         rebuildRows()
     end if
+    ' init() calls setFocus(true) before this screen is attached to the view
+    ' stack, which doesn't reliably take — AccountScreen/MemberScreen only
+    ' grab focus after attachment (authState resolving, or data loading), and
+    ' that's the pattern that's confirmed working on-device. Re-assert here,
+    ' which runs once this screen is actually on the stack.
+    m.nav.setFocus(true)
 end sub
 
 sub onReturn()
@@ -66,7 +72,9 @@ end sub
 
 ' ---------- Data ----------
 sub loadTrending()
+    m.empty.text = "Loading…"
     m.empty.visible = true
+    SetBusy(m, true)
     StartApi(m, { method: "GET", path: "/api/popular", tag: "popular" }, "onTrending")
 end sub
 
@@ -121,6 +129,7 @@ sub rebuildRows()
     m.rows.content = root
     m.empty.visible = (m.rowMeta.Count() = 0)
     if m.rowMeta.Count() = 0 then m.empty.text = "Nothing to show yet."
+    SetBusy(m, false)
 end sub
 
 sub onRowSelected()
