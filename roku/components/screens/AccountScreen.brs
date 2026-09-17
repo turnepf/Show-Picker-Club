@@ -153,6 +153,24 @@ end sub
 
 ' ---- Delete account ----
 sub onDeleteInit(ev as object)
+    res = ev.getRoSGNode().result
+    err = ""
+    if res.json <> invalid then err = SafeStr(res.json.error)
+    if err <> ""
+        if err = "no_email"
+            setStatus("Your account has no email on file — ask an operator to delete it.")
+        else if err = "rate_limited"
+            setStatus("Too many code requests. Try again later.")
+        else if err = "admin_must_demote_first"
+            setStatus("An admin has to be demoted before the account can be deleted.")
+        else
+            setStatus("Couldn't send a deletion code. Try again.")
+        end if
+        return
+    else if not res.ok
+        setStatus("Couldn't send a deletion code. Try again.")
+        return
+    end if
     m.step = "delete-code"
     m.prompt.text = "Enter the confirmation code we emailed you to permanently delete your account."
     showKeyboard("")

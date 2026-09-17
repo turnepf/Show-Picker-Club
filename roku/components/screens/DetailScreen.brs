@@ -22,6 +22,12 @@ sub onIdSet()
     StartApi(m, { method: "GET", path: "/api/shows/" + Stri(id).Trim() + "/actors", tag: "actors" }, "onActors")
 end sub
 
+' Auth can resolve after the detail GET already rendered (checkAuth runs in
+' parallel with showing Home) — re-render so mine/logged-in actions catch up.
+sub onAuthChanged()
+    if m.show <> invalid then render()
+end sub
+
 sub onDetail(ev as object)
     res = ev.getRoSGNode().result
     m.busy.visible = false
@@ -213,8 +219,15 @@ end sub
 
 function intOf(v as dynamic) as integer
     if v = invalid then return 0
-    if v = true then return 1
-    if v = 1 then return 1
+    t = Type(v)
+    if t = "Boolean" or t = "roBoolean"
+        if v then return 1
+        return 0
+    end if
+    if t = "Integer" or t = "roInt" or t = "roInteger" or t = "LongInteger" or t = "roLongInteger"
+        if v = 1 then return 1
+        return 0
+    end if
     return 0
 end function
 
