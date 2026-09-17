@@ -11,9 +11,9 @@
         <Label id="prompt" translation="[90,150]" width="1200" wrap="true"
                font="font:MediumSystemFont" color="0xF5F7FAFF" />
         <Keyboard id="kb" translation="[90,230]" visible="false" />
-        <ButtonGroup id="actions" translation="[90,230]" layoutDirection="vert"
+        <ButtonGroup id="actions" translation="[90,560]" layoutDirection="vert"
                      buttonHeight="60" minWidth="420" />
-        <Label id="status" translation="[90,600]" width="1200" wrap="true"
+        <Label id="status" translation="[90,660]" width="1200" wrap="true"
                font="font:SmallSystemFont" color="0xF29C3DFF" visible="false" />
     </children>
 </component>
