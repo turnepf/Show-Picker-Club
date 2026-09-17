@@ -31,11 +31,15 @@ sub onAuthChecked(ev as object)
         m.auth.slug = SafeStr(j.member)
         m.auth.email = SafeStr(j.email)
         m.auth.isAdmin = (j.is_admin = true)
-    else
+    else if j <> invalid
+        ' The server actually answered "authenticated: false" — sign out for real.
         m.auth.loggedIn = false
         m.auth.slug = invalid
         ClearSessionCookie()
     end if
+    ' j = invalid means the request itself failed (timeout, dropped connection,
+    ' bad body) rather than the server saying no — leave the stored cookie and
+    ' current auth state alone so a network hiccup doesn't force a logout.
     m.auth.checked = true
     broadcastAuth()
 end sub

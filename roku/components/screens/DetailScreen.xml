@@ -2,7 +2,7 @@
 <component name="DetailScreen" extends="Group">
     <interface>
         <field id="showId" type="int" onChange="onIdSet" />
-        <field id="authState" type="assocarray" />
+        <field id="authState" type="assocarray" onChange="onAuthChanged" />
         <field id="navigate" type="assocarray" alwaysNotify="true" />
     </interface>
     <script type="text/brightscript" uri="DetailScreen.brs" />

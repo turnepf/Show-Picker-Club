@@ -16,7 +16,7 @@
                  rowItemSize="[280,440]" rowItemSpacing="[24,0]"
                  rowHeights="[440,440]"
                  vertFocusAnimationStyle="floatingFocus" />
-        <Label id="footer" text="Data from TMDB and OMDb" translation="[90,1020]"
+        <Label id="footer" text="Data from TMDB" translation="[90,1020]"
                font="font:SmallestSystemFont" color="0xFFFFFF99" />
         <Label id="empty" text="Loading…" translation="[90,240]"
                font="font:MediumSystemFont" color="0xFFFFFF99" visible="false" />
