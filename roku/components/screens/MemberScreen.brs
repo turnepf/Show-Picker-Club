@@ -1,12 +1,41 @@
 sub init()
     m.heading = m.top.findNode("heading")
+    m.nav = m.top.findNode("nav")
     m.rows = m.top.findNode("rows")
     m.message = m.top.findNode("message")
     m.rows.showRowLabel = [true, true, true, true]
     m.rows.observeField("rowItemSelected", "onRowSelected")
+    m.nav.buttons = ["< Back"]
+    m.nav.observeField("buttonSelected", "onNavButton")
     m.rowMeta = []
     m.loaded = false
+    m.zone = "nav"
+    ' nav is always present, even while shows are still loading — don't wait
+    ' on data for there to be a way back.
+    m.nav.setFocus(true)
 end sub
+
+sub onNavButton()
+    m.top.navigate = { action: "back" }
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+    if key = "down" and m.zone = "nav"
+        if m.rowMeta <> invalid and m.rowMeta.Count() > 0
+            m.zone = "rows"
+            m.rows.setFocus(true)
+            return true
+        end if
+    else if key = "up" and m.zone = "rows"
+        if m.rows.rowItemFocused <> invalid and m.rows.rowItemFocused[0] = 0
+            m.zone = "nav"
+            m.nav.setFocus(true)
+            return true
+        end if
+    end if
+    return false
+end function
 
 ' authState is set by MainScene right after the member field, so start here.
 sub onAuthReady()
@@ -96,6 +125,7 @@ sub buildRows(shows as object)
     end if
     m.message.visible = false
     m.rows.content = root
+    m.zone = "rows"
     m.rows.setFocus(true)
 end sub
 

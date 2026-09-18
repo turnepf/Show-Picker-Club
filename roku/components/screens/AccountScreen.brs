@@ -17,6 +17,7 @@ sub onAuth()
 end sub
 
 sub renderRoot()
+    clearStatus()
     if loggedIn()
         m.step = "account"
         m.heading.text = "Account"
@@ -24,8 +25,8 @@ sub renderRoot()
         if m.top.authState.isAdmin = true then info = info + "    (Operator)"
         m.prompt.text = info
         m.kb.visible = false
-        m.actionKeys = ["signout", "delete"]
-        m.actions.buttons = ["Sign Out", "Delete Account"]
+        m.actionKeys = ["signout", "delete", "back"]
+        m.actions.buttons = ["Sign Out", "Delete Account", "< Back"]
         m.actions.visible = true
         focusActions()
     else
@@ -33,8 +34,8 @@ sub renderRoot()
         m.heading.text = "Sign In"
         m.prompt.text = "Choose how you'd like to receive your one-time code."
         m.kb.visible = false
-        m.actionKeys = ["email", "phone"]
-        m.actions.buttons = ["Continue with Email", "Continue with Phone"]
+        m.actionKeys = ["email", "phone", "back"]
+        m.actions.buttons = ["Continue with Email", "Continue with Phone", "< Back"]
         m.actions.visible = true
         focusActions()
     end if
@@ -49,7 +50,9 @@ sub onAction()
     if idx < 0 or idx >= m.actionKeys.Count() then return
     key = m.actionKeys[idx]
 
-    if key = "email" or key = "phone"
+    if key = "back"
+        m.top.navigate = { action: "back" }
+    else if key = "email" or key = "phone"
         m.channel = key
         startIdentifier()
     else if key = "signout"
@@ -216,8 +219,8 @@ sub showKeyboard(text as string)
 end sub
 
 sub setSubmitButton(label as string)
-    m.actionKeys = ["submit"]
-    m.actions.buttons = [label]
+    m.actionKeys = ["submit", "back"]
+    m.actions.buttons = [label, "< Back"]
     m.actions.visible = true
 end sub
 

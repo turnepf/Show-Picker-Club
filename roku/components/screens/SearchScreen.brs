@@ -4,7 +4,7 @@ sub init()
     m.grid = m.top.findNode("grid")
     m.message = m.top.findNode("message")
 
-    m.buttons.buttons = ["Search", "Clear"]
+    m.buttons.buttons = ["< Back", "Search", "Clear"]
     m.buttons.observeField("buttonSelected", "onButton")
     m.grid.observeField("itemSelected", "onItemSelected")
 
@@ -17,8 +17,10 @@ end sub
 sub onButton()
     idx = m.buttons.buttonSelected
     if idx = 0
-        runSearch()
+        m.top.navigate = { action: "back" }
     else if idx = 1
+        runSearch()
+    else if idx = 2
         m.kb.text = ""
         m.zone = "kb"
         m.kb.setFocus(true)
