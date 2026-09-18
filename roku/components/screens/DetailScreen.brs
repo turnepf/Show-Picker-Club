@@ -142,8 +142,8 @@ end function
 
 ' Build the action buttons and remember what each one does.
 sub buildActions()
-    labels = []
-    m.actionKind = []   ' "move:<key>" | "add:<key>" | "archive" | "restore" | "watch"
+    labels = ["< Back"]
+    m.actionKind = ["back"]   ' "back" | "move:<key>" | "add:<key>" | "archive" | "restore" | "watch"
 
     mine = ownedByMe()
     archived = (m.show.archived <> invalid and m.show.archived = 1)
@@ -177,6 +177,10 @@ sub onAction()
     if idx < 0 or idx >= m.actionKind.Count() then return
     kind = m.actionKind[idx]
 
+    if kind = "back"
+        m.top.navigate = { action: "back" }
+        return
+    end if
     if kind = "watch"
         showWatchInfo()
         return
