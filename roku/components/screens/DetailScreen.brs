@@ -141,7 +141,19 @@ sub render()
     m.watch.visible = (parts.Count() > 0)
 
     m.genres.text = SafeStr(s.genres)
-    m.overview.text = SafeStr(s.overview)
+
+    ' ScrollableText does not size to its content, so a fixed box leaves a gap
+    ' under a short synopsis and clips a long one. Estimate the wrapped line
+    ' count and size to it, capped so a very long overview still scrolls
+    ' rather than pushing the cast off the screen.
+    overviewText = SafeStr(s.overview)
+    m.overview.text = overviewText
+    lines = 1 + Int(Len(overviewText) / OVERVIEW_CHARS_PER_LINE())
+    h = lines * OVERVIEW_LINE_HEIGHT()
+    if h > OVERVIEW_MAX_HEIGHT() then h = OVERVIEW_MAX_HEIGHT()
+    if h < OVERVIEW_LINE_HEIGHT() then h = OVERVIEW_LINE_HEIGHT()
+    m.overview.height = h
+    m.overview.visible = (overviewText <> "")
     m.ratings.text = ratingsLine()
 
     buildActions()
@@ -317,3 +329,17 @@ sub setBusySpinner(on as boolean)
         m.busy.control = "stop"
     end if
 end sub
+
+' Measured against SmallSystemFont at the 980px width the block is laid out in.
+' BrightScript has no `const`, so these follow the house function style.
+function OVERVIEW_CHARS_PER_LINE() as integer
+    return 62
+end function
+
+function OVERVIEW_LINE_HEIGHT() as integer
+    return 48
+end function
+
+function OVERVIEW_MAX_HEIGHT() as integer
+    return 300
+end function

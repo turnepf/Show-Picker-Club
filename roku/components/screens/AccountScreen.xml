@@ -11,15 +11,11 @@
         <Label id="prompt" translation="[90,150]" width="1200" wrap="true"
                font="font:MediumSystemFont" color="0xF5F7FAFF" />
         <Keyboard id="kb" translation="[90,230]" visible="false" />
+        <!-- itemSpacings: a 60px-tall button on ~40px pitch overlapped the label
+             below it. -->
         <ButtonGroup id="actions" translation="[90,860]" layoutDirection="vert"
-                     buttonHeight="60" minWidth="420" />
+                     buttonHeight="60" minWidth="420" itemSpacings="[14]" />
         <Label id="status" translation="[90,940]" width="1200" wrap="true"
                font="font:SmallSystemFont" color="0xF29C3DFF" visible="false" />
-        <!-- ✱ is the one key the Keyboard never claims on any firmware, so it is
-             the escape that always works. Named on screen because it is not
-             discoverable otherwise. -->
-        <Label id="hint" text="Press ✱ to switch between the keyboard and the buttons"
-               translation="[90,1020]" font="font:SmallestSystemFont" color="0xFFFFFF99"
-               visible="false" />
     </children>
 </component>

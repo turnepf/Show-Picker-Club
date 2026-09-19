@@ -14,6 +14,9 @@
 //
 //   node roku/sideload.mjs info        device model, OS, UI resolution
 //   node roku/sideload.mjs logs        stream the debug console (port 8085)
+//   node roku/sideload.mjs shot [name] screenshot the current screen
+//   node roku/sideload.mjs keys Down Select Back   drive the remote over ECP
+//   node roku/sideload.mjs type 5551234567           type into the focused field
 //   node roku/sideload.mjs logs --relaunch --seconds 15
 //   node roku/sideload.mjs             validate, package, install
 //   node roku/sideload.mjs --legacy    install a build forced to the legacy tier
@@ -158,8 +161,77 @@ async function logs(args) {
   });
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ECP key names are case-sensitive and a wrong one returns 200 while doing
+// nothing, so they are checked here rather than silently swallowed.
+const ECP_KEYS = new Set(['Home', 'Rev', 'Fwd', 'Play', 'Select', 'Left', 'Right',
+  'Down', 'Up', 'Back', 'InstantReplay', 'Info', 'Backspace', 'Search', 'Enter']);
+
+// Driving the remote needs "Control by mobile apps -> Network access" set to
+// Permissive on the device; Roku OS 14+ returns 403 by default. Launching the
+// channel and reading device info are not affected by that setting.
+async function keys(args) {
+  const wanted = args.slice(args.indexOf('keys') + 1).filter((a) => !a.startsWith('--'));
+  if (!wanted.length) die('Usage: sideload.mjs keys <Key> [Key...]  e.g. keys Down Select Back');
+  const bad = wanted.filter((k) => !ECP_KEYS.has(k));
+  if (bad.length) die(`Not ECP key names: ${bad.join(', ')}\nValid: ${[...ECP_KEYS].join(', ')}`);
+
+  for (const k of wanted) {
+    const res = await fetch(`http://${host()}:8060/keypress/${k}`, { method: 'POST' });
+    if (res.status === 403) {
+      die('403 from the device. Set Settings -> System -> Advanced system settings -> Control by mobile apps -> Network access to Permissive.');
+    }
+    if (!res.ok) die(`${k}: HTTP ${res.status}`);
+    console.log(`  ${k}`);
+    await sleep(900); // let the UI settle and any request finish
+  }
+}
+
+// ECP types a literal character with /keypress/Lit_<urlencoded char>, which
+// goes straight into the focused text field. Far faster and less error-prone
+// than walking the on-screen keyboard grid with arrow keys.
+async function typeText(args) {
+  const text = args[args.indexOf('type') + 1];
+  if (!text) die('Usage: sideload.mjs type <text>');
+  for (const ch of text) {
+    const res = await fetch(`http://${host()}:8060/keypress/Lit_${encodeURIComponent(ch)}`, { method: 'POST' });
+    if (res.status === 403) die('403 — set Control by mobile apps -> Network access to Permissive.');
+    if (!res.ok) die(`typing "${ch}": HTTP ${res.status}`);
+    await sleep(120);
+  }
+  console.log(`  typed ${text.length} character(s)`);
+}
+
+async function shot(args) {
+  const name = args[args.indexOf('shot') + 1] || 'screen';
+  const outDir = path.join(ROKU_DIR, '.out', 'shots');
+  const file = await rokuDeploy.takeScreenshot({
+    host: host(),
+    password: credential('ROKU_PASSWORD', 'password', 'developer web-server password', 'your-dev-password'),
+    outDir,
+    outFile: name,
+  });
+  console.log(file);
+}
+
 async function main() {
   const args = process.argv.slice(2);
+
+  if (args.includes('keys')) {
+    await keys(args);
+    return;
+  }
+
+  if (args.includes('type')) {
+    await typeText(args);
+    return;
+  }
+
+  if (args.includes('shot')) {
+    await shot(args);
+    return;
+  }
 
   if (args.includes('info')) {
     await info();
