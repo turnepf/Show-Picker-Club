@@ -6,6 +6,9 @@ sub init()
     m.status = m.top.findNode("status")
     m.actions.observeField("buttonSelected", "onAction")
     m.kb.observeField("text", "onKeyboardText")
+    m.rokuAccount = m.top.findNode("rokuAccount")
+    m.rokuAccount.observeField("userData", "onRokuAccountData")
+    m.askedRokuAccount = false
 
     m.step = "init"
     m.lastSubmittedCode = ""
@@ -37,6 +40,10 @@ sub renderRoot()
         m.step = "choose"
         m.heading.text = "Sign In"
         m.prompt.text = "Choose how you'd like to receive your one-time code."
+        ' Offer the member's Roku account before asking them to type anything.
+        ' Certification requires the attempt; the manual choices below are the
+        ' fallback for when they decline, which is explicitly allowed.
+        askRokuAccount()
         m.kb.visible = false
         m.actions.translation = [90, 260]
         m.status.translation = [90, 500]
@@ -71,6 +78,52 @@ sub onAction()
     end if
 end sub
 
+' ---- Roku account (Request for Information) ----
+'
+' Asks Roku to show its own consent screen offering the email and phone on the
+' member's Roku account. Certification RP 2.1 / 4.1 require an authenticated
+' app to do this rather than going straight to a keyboard. It is an offer, not
+' a sign-in: whatever comes back still has to pass the same one-time code as a
+' hand-typed address, so this shortens the typing and changes nothing about
+' who gets a session.
+sub askRokuAccount()
+    if m.askedRokuAccount then return
+    m.askedRokuAccount = true
+    m.rokuAccount.requestedUserData = "email,phone"
+    m.rokuAccount.command = "getUserData"
+end sub
+
+' Declining is normal and is not an error — the manual choices are already on
+' screen, so there is nothing to do but let the member use them.
+sub onRokuAccountData()
+    data = m.rokuAccount.userData
+    if data = invalid then return
+
+    email = ""
+    phone = ""
+    if data.email <> invalid then email = SafeStr(data.email).Trim()
+    if data.phone <> invalid then phone = SafeStr(data.phone).Trim()
+
+    if email <> ""
+        m.channel = "email"
+        m.identifier = email
+    else if phone <> ""
+        m.channel = "phone"
+        m.identifier = phone
+    else
+        return
+    end if
+
+    ' They have consented and we have an identifier — send the code straight
+    ' away rather than showing it back to them on a keyboard they did not ask
+    ' for.
+    m.step = "code-pending"
+    m.prompt.text = "Sending a code to " + m.identifier + "…"
+    m.kb.visible = false
+    m.actions.visible = false
+    sendCodeTo(m.identifier)
+end sub
+
 ' ---- Login flow ----
 sub startIdentifier()
     m.step = "identifier"
@@ -80,21 +133,30 @@ sub startIdentifier()
         m.prompt.text = "Enter your phone number."
     end if
     setSubmitButton("Send Code")
-    showKeyboard("")
+    if m.channel = "email"
+        showKeyboard("", "email")
+    else
+        showKeyboard("", "text")
+    end if
 end sub
 
-sub sendCode()
-    id = SafeStr(m.kb.text)
-    if id = "" then return
-    m.identifier = id
-    body = {}
+' Post the request for a given identifier, whether it was typed on the
+' keyboard or came back from the Roku account consent screen. One definition
+' so the two entry points cannot drift apart on the payload shape.
+sub sendCodeTo(identifier as string)
+    if identifier = "" then return
+    m.identifier = identifier
     if m.channel = "email"
-        body = { email: id, channel: "email" }
+        body = { email: identifier, channel: "email" }
     else
-        body = { phone: id, channel: "sms" }
+        body = { phone: identifier, channel: "sms" }
     end if
     setStatus("Sending code…")
     StartApi(m, { method: "POST", path: "/auth/request-code", body: FormatJson(body), tag: "requestcode" }, "onCodeSent")
+end sub
+
+sub sendCode()
+    sendCodeTo(SafeStr(m.kb.text).Trim())
 end sub
 
 sub onCodeSent(ev as object)
@@ -103,7 +165,7 @@ sub onCodeSent(ev as object)
     m.step = "code"
     m.prompt.text = "Enter the 6-digit code we just sent to " + m.identifier + "."
     setSubmitButton("Verify")
-    showKeyboard("")
+    showKeyboard("", "pin")
     clearStatus()
 end sub
 
@@ -188,7 +250,7 @@ sub onDeleteInit(ev as object)
     m.step = "delete-code"
     m.prompt.text = "Enter the confirmation code we emailed you to permanently delete your account."
     setSubmitButton("Delete Permanently")
-    showKeyboard("")
+    showKeyboard("", "pin")
 end sub
 
 sub deleteConfirm()
@@ -239,10 +301,25 @@ end sub
 ' Always call this LAST when setting up a step. setSubmitButton() assigns
 ' `buttons`, which takes focus away from whatever holds it — so focusing the
 ' keyboard first meant every character the member typed was swallowed.
-sub showKeyboard(text as string)
+' `voiceType` is what makes the voice keyboard useful rather than merely
+' present: it tells Roku what is being dictated, so "pin" takes digits and
+' "email" knows about @ and the common domains. Certification 4.12 asks for
+' the component; getting the type right is what the member actually feels.
+sub showKeyboard(text as string, voiceType = "text" as string)
     m.lastSubmittedCode = ""
     m.kb.text = text
     m.kb.visible = true
+    editBox = m.kb.textEditBox
+    if editBox <> invalid
+        editBox.voiceEntryType = voiceType
+        ' A one-time code is exactly six digits; saying so stops the member
+        ' typing a seventh and stops voice entry running on.
+        if voiceType = "pin"
+            editBox.maxTextLength = 6
+        else
+            editBox.maxTextLength = 0
+        end if
+    end if
     m.actions.translation = [90, 860]
     ' Between the keyboard and the buttons. It used to sit at a fixed y that
     ' the two-button group grew down into, so "That code didn't work" was

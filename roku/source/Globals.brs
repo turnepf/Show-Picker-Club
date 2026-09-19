@@ -92,33 +92,20 @@ function DeviceProfile() as object
     platform = LCase(SafeStr(di.GetGraphicsPlatform()))
     legacy = (platform <> "opengl")
 
+    ' Ask the device how it is doing rather than only inferring from what it
+    ' is. A current box already under memory pressure should get the cheap
+    ' treatment too, and certification expects a channel to consult this.
+    level = LCase(SafeStr(di.GetGeneralMemoryLevel()))
+    if level <> "" and level <> "normal" then legacy = true
+
     ' Build-time override — see the manifest. The Roku on hand for testing may
     ' well be a current one, and the legacy path is the half that most needs
     ' checking, so `node sideload.mjs --legacy` makes a modern device take it.
     #if FORCE_LEGACY
         legacy = true
-        platform = platform + " (FORCED legacy)"
     #end if
 
-    if legacy
-        ' Legacy: a 720p-era GPU, so a card draws at ~187px and w185 is an
-        ' almost exact match — a quarter of the texture memory of w342 and a
-        ' quarter of the bytes over the wire. The backdrop is dropped in
-        ' favour of the poster the card already warmed, and the focus scale
-        ' goes away because re-scaling a bitmap every frame is the expensive
-        ' thing on this stack.
-        return {
-            tier:        "legacy"
-            platform:    platform
-            model:       SafeStr(di.GetModelDisplayName())
-            posterWidth: 185
-            logoWidth:   92
-            useBackdrop: false
-            heroWidth:   342
-            focusScale:  false
-            maxResults:  40
-        }
-    end if
+    if legacy then return LegacyProfile()
 
     return {
         tier:        "modern"
@@ -130,6 +117,29 @@ function DeviceProfile() as object
         heroWidth:   780
         focusScale:  true
         maxResults:  100
+    }
+end function
+
+' Legacy: a 720p-era GPU, so a card draws at ~187px and w185 is an almost exact
+' match — a quarter of the texture memory of w342 and a quarter of the bytes
+' over the wire. The backdrop is dropped in favour of the poster the card
+' already warmed, and the focus scale goes away because re-scaling a bitmap
+' every frame is the expensive thing on that stack.
+'
+' Its own function because it is reached two ways: by what the hardware is, and
+' by the device reporting memory pressure while the channel is running.
+function LegacyProfile() as object
+    di = CreateObject("roDeviceInfo")
+    return {
+        tier:        "legacy"
+        platform:    LCase(SafeStr(di.GetGraphicsPlatform()))
+        model:       SafeStr(di.GetModelDisplayName())
+        posterWidth: 185
+        logoWidth:   92
+        useBackdrop: false
+        heroWidth:   342
+        focusScale:  false
+        maxResults:  40
     }
 end function
 

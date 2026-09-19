@@ -7,10 +7,17 @@
     <script type="text/brightscript" uri="pkg:/source/Globals.brs" />
     <script type="text/brightscript" uri="AccountScreen.brs" />
     <children>
+        <!-- Roku's Request for Information screen. Certification RP 2.1 / 4.1
+             require an authenticated app to offer the member's own Roku
+             account email or phone before making them type one. -->
+        <ChannelStore id="rokuAccount" />
         <Label id="heading" translation="[90,54]" font="font:LargeBoldSystemFont" color="0xF5F7FAFF" />
         <Label id="prompt" translation="[90,150]" width="1200" wrap="true"
                font="font:MediumSystemFont" color="0xF5F7FAFF" />
-        <Keyboard id="kb" translation="[90,230]" visible="false" />
+        <!-- DynamicKeyboard, not Keyboard: certification 4.12 requires a voice
+             keyboard for email, PIN and password entry. Same `text` field, so
+             nothing else in this screen changes. -->
+        <DynamicKeyboard id="kb" translation="[90,230]" visible="false" />
         <!-- itemSpacings: a 60px-tall button on ~40px pitch overlapped the label
              below it. -->
         <ButtonGroup id="actions" translation="[90,860]" layoutDirection="vert"
