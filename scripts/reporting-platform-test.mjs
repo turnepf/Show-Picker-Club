@@ -19,6 +19,11 @@
 //   4. Sessions with no member (a legacy row from before member_slug) fall
 //      back to the identity they do carry, so one person's old devices
 //      collapse into one person and two strangers stay two.
+//   5. A session reaches the breakdown under the platform it actually used.
+//      /auth/check is the only writer of sessions.platform *and* the write
+//      that makes a session visible here, so a check sent without the header
+//      counts the member in "Unknown" — and used to hold them there for an
+//      hour behind the once-an-hour throttle.
 //
 // Plus the gate: the whole endpoint is admin-only, and a logged-in non-admin
 // is not "nearly an admin" for club-wide metrics.
@@ -41,6 +46,7 @@ writeFileSync(join(sandbox, 'package.json'), '{"type":"module"}');
 
 const load = (p) => import(join(sandbox, 'functions', p));
 const reporting = await load('api/reporting.js');
+const authCheck = await load('auth/check.js');
 
 const ORIGIN = 'https://showpicker.club';
 
@@ -105,6 +111,28 @@ function addSession(env, { slug = null, platform = null, lastSeen = 'now',
         createdAt || new Date().toISOString(), seen, platform, method);
   return id;
 }
+
+// A client calling GET /auth/check, with or without naming its platform. The
+// endpoint defers its writes to waitUntil, so collect and await them — in the
+// Worker they land before the next request, and the point of these cases is
+// what the *next* read sees.
+async function authCheckAs(env, cookie, clientPlatform) {
+  const pending = [];
+  await authCheck.onRequestGet({
+    env,
+    waitUntil: (p) => pending.push(p),
+    request: new Request(`${ORIGIN}/auth/check`, {
+      headers: {
+        Cookie: `session=${cookie}`,
+        ...(clientPlatform ? { 'X-Client-Platform': clientPlatform } : {}),
+      },
+    }),
+  });
+  await Promise.all(pending);
+}
+
+const platformOf = (env, id) =>
+  env._db.prepare('SELECT platform FROM sessions WHERE id = ?').get(id).platform;
 
 const call = async (env, cookie) => reporting.onRequestGet({
   env,
@@ -281,6 +309,52 @@ console.log('\n== a missing platform lands in "unknown", and stale sessions drop
   check('a 10-day-old session is out of the week window',
         bp.week.iphone === undefined, JSON.stringify(bp.week));
   check('but inside the month window', bp.month.iphone === 1, JSON.stringify(bp.month));
+}
+
+console.log('\n== a session is stamped with the platform it actually used');
+{
+  const env = makeEnv();
+  addMember(env, 'patrick', 'Patrick Turner', { admin: true });
+  // A fresh session, never checked in: no last_seen_at, no platform.
+  const id = addSession(env, { slug: 'patrick', lastSeen: null });
+
+  // A page that forgets the header still makes the session countable, and
+  // that is exactly how a member lands in the Unknown row.
+  await authCheckAs(env, id, null);
+  check('a header-less check leaves the platform unknown',
+        platformOf(env, id) === null, `got ${platformOf(env, id)}`);
+  check('and the dashboard shows them under unknown',
+        (await body(env, id)).active_by_platform.day.unknown === 1);
+
+  // The next check names the platform. The once-an-hour throttle used to skip
+  // this write entirely, holding the member in Unknown for the rest of the
+  // hour; a session with no platform yet takes one immediately.
+  await authCheckAs(env, id, 'web-large');
+  check('a named platform backfills straight past the throttle',
+        platformOf(env, id) === 'web-large', `got ${platformOf(env, id)}`);
+  const day = (await body(env, id)).active_by_platform.day;
+  check('so they move onto the web row', day['web-large'] === 1, JSON.stringify(day));
+  check('and out of unknown', day.unknown === undefined, JSON.stringify(day));
+}
+
+console.log('\n== a stamped platform is neither erased nor rewritten every request');
+{
+  const env = makeEnv();
+  addMember(env, 'patrick', 'Patrick Turner', { admin: true });
+  const id = addSession(env, { slug: 'patrick', lastSeen: null });
+  await authCheckAs(env, id, 'iphone');
+  check('the first named check stamps it', platformOf(env, id) === 'iphone');
+
+  // A later call that omits the header keeps the last known platform.
+  await authCheckAs(env, id, null);
+  check('a header-less check does not erase it', platformOf(env, id) === 'iphone',
+        `got ${platformOf(env, id)}`);
+
+  // And once it is set, the backfill can't fire again: inside the throttle
+  // hour nothing is written at all, so a second platform doesn't churn the row.
+  await authCheckAs(env, id, 'ipad');
+  check('and the row is not rewritten inside the throttle hour',
+        platformOf(env, id) === 'iphone', `got ${platformOf(env, id)}`);
 }
 
 console.log(`\n${failed ? 'FAIL' : 'PASS'} — ${passed} passed, ${failed} failed\n`);
