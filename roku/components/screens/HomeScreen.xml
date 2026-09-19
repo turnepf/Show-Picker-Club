@@ -14,11 +14,16 @@
         <ButtonGroup id="nav" translation="[90,120]" layoutDirection="horiz"
                      buttonHeight="56" minWidth="180" horizAlignment="left" />
         <RowList id="rows" translation="[90,220]" itemComponentName="PosterCard"
-                 numRows="2" rowLabelColor="0xF5F7FAFF" itemSize="[1830,500]"
+                 numRows="2" rowLabelColor="0xF5F7FAFF" itemSize="[1830,510]"
                  rowItemSize="[[280,440],[280,440]]" rowItemSpacing="[[24,34],[24,34]]"
-                 rowHeights="[440,440]"
+                 rowHeights="[510,510]"
                  vertFocusAnimationStyle="floatingFocus" />
-        <Label id="footer" text="Data from TMDB" translation="[90,1020]"
+        <!-- TMDB attribution. It used to sit at the bottom of the screen, where
+             the second row of the RowList is drawn straight over it — the
+             rows scroll, so nothing at the bottom is ever safe. Up beside the
+             brand it is always legible and never collides. -->
+        <Label id="footer" text="Data from TMDB" translation="[1570,72]"
+               horizAlign="right" width="260"
                font="font:SmallestSystemFont" color="0xFFFFFF99" />
         <Label id="empty" text="Loading…" translation="[90,240]"
                font="font:MediumSystemFont" color="0xFFFFFF99" visible="false" />

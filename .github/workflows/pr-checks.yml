@@ -16,7 +16,8 @@ name: PR checks
 #              a real SQLite database for replay and cross-member isolation.
 #              Both decide who gets a session, so a forged assertion being
 #              accepted has to fail a test, not a code review.
-#   roku     — BrighterScript validation of the Roku channel. Roku ships no
+#   roku     — BrighterScript validation of the Roku channel, plus the manifest
+#              and artwork checks that certification would otherwise catch. Roku ships no
 #              simulator, so until this existed the only way to find a typo, a
 #              call to a function that isn't there, or an onChange handler with
 #              no handler was to sideload and read a crash over telnet. `bsc`
@@ -119,6 +120,11 @@ jobs:
       - name: Validate the Roku channel
         working-directory: roku
         run: npx bsc --project bsconfig.json
+      # bsc validates BrightScript, not the manifest. Wrong artwork sizes and
+      # missing required attributes are a certification rejection days later,
+      # and run perfectly on a sideloaded device in the meantime.
+      - name: Roku manifest and channel artwork
+        run: node scripts/roku-manifest-test.mjs
 
   listimport:
     runs-on: ubuntu-latest

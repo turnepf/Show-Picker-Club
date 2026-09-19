@@ -3,13 +3,21 @@ major_version=1
 minor_version=0
 build_version=1
 
-# Channel artwork, generated from the App Store icon mark.
+# Channel artwork, generated from the App Store icon mark. The focus icons are
+# the tile on the Roku home screen and carry the channel name, because
+# certification asks that the artwork "clearly represent the name or identity
+# of the app" and a bare glyph leaves that to chance.
+#
+# Sizes are exact and not negotiable: mm_icon_focus_fhd is 540x405 and
+# mm_icon_focus_hd is 290x218. The previous hd icon was 336x210 — a different
+# aspect ratio entirely — and there was no fhd icon at all, which is a
+# required attribute. mm_icon_focus_sd and the mm_icon_side_* pair are
+# deprecated and have been dropped rather than shipped wrong.
+mm_icon_focus_fhd=pkg:/images/icon_focus_fhd.png
 mm_icon_focus_hd=pkg:/images/icon_focus_hd.png
-mm_icon_focus_sd=pkg:/images/icon_focus_sd.png
-mm_icon_side_hd=pkg:/images/icon_side_hd.png
-mm_icon_side_sd=pkg:/images/icon_side_sd.png
-splash_screen_hd=pkg:/images/splash_hd.jpg
 splash_screen_fhd=pkg:/images/splash_fhd.jpg
+splash_screen_hd=pkg:/images/splash_hd.jpg
+splash_screen_sd=pkg:/images/splash_sd.jpg
 splash_color=#0D0F14
 splash_min_time=500
 
