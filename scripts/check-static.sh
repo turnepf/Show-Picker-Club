@@ -239,13 +239,14 @@ ok "iPhone and iPad views route session state through SessionScope"
 # by eight pages, which is how most of that row got there.
 say "Web auth checks name their platform"
 missing=""
-for f in $(grep -rl "auth/check" public 2>/dev/null); do
-  # Each fetch of /auth/check must pass a headers object naming the platform.
-  # The literal is written inline per page (no shared module on this stack), so
-  # match the call and its options together across the next few lines.
-  while read -r line; do
-    grep -A 3 -F "$line" "$f" | grep -q 'X-Client-Platform' || missing="$missing $f"
-  done < <(grep -o "fetch('/auth/check'[^)]*" "$f")
+for f in $(grep -rl "fetch('/auth/check'" public 2>/dev/null); do
+  # Each call must name the platform within its own options object — either the
+  # header literal or one of the per-page helpers that returns it. There is no
+  # shared module on this stack, so the literal is repeated per page and the
+  # options can wrap onto the following lines.
+  calls=$(grep -c "fetch('/auth/check'" "$f")
+  named=$(grep -A 3 "fetch('/auth/check'" "$f" | grep -cE "X-Client-Platform|[pP]latformHeader\(\)")
+  [ "$named" -ge "$calls" ] || missing="$missing $f"
 done
 if [ -n "$missing" ]; then
   err "these pages call /auth/check without X-Client-Platform, which lands the member in reporting's Unknown row:$missing"
