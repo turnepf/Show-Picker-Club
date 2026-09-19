@@ -22,8 +22,12 @@
 //   5. A session reaches the breakdown under the platform it actually used.
 //      /auth/check is the only writer of sessions.platform *and* the write
 //      that makes a session visible here, so a check sent without the header
-//      counts the member in "Unknown" — and used to hold them there for an
+//      left the member unattributed — and used to hold them that way for an
 //      hour behind the once-an-hour throttle.
+//   6. What couldn't be attributed is omitted, not reported as "Unknown". A
+//      row that only means "this dashboard failed to ask" is one nobody can
+//      act on, so those people count in Active members and on no platform
+//      row — which is why the rows can sum to less than it as well as more.
 //
 // Plus the gate: the whole endpoint is admin-only, and a logged-in non-admin
 // is not "nearly an admin" for club-wide metrics.
@@ -294,7 +298,7 @@ console.log('\n== sign-in windows are cut by when the session was minted');
   check('but inside the quarter', sm.quarter.sms === 1, JSON.stringify(sm.quarter));
 }
 
-console.log('\n== a missing platform lands in "unknown", and stale sessions drop out');
+console.log('\n== a session with no platform is left out, and stale sessions drop out');
 {
   const env = makeEnv();
   addMember(env, 'patrick', 'Patrick Turner', { admin: true });
@@ -304,11 +308,34 @@ console.log('\n== a missing platform lands in "unknown", and stale sessions drop
   const tenDaysAgo = new Date(Date.now() - 10 * 86400000).toISOString();
   addSession(env, { slug: 'stacy', platform: 'iphone', lastSeen: tenDaysAgo });
 
-  const bp = (await body(env, cookie)).active_by_platform;
-  check('a null platform is reported as unknown', bp.day.unknown === 1, JSON.stringify(bp.day));
+  const r = await body(env, cookie);
+  const bp = r.active_by_platform;
+  // "Unknown" said nothing except that this dashboard failed to ask, so the
+  // row is gone rather than reported as if it were a platform.
+  check('a null platform produces no row at all',
+        bp.day.unknown === undefined && Object.keys(bp.day).length === 0,
+        JSON.stringify(bp.day));
+  check('but that person is still an active member',
+        r.active_members.day === 1, `got ${r.active_members.day}`);
   check('a 10-day-old session is out of the week window',
         bp.week.iphone === undefined, JSON.stringify(bp.week));
   check('but inside the month window', bp.month.iphone === 1, JSON.stringify(bp.month));
+}
+
+console.log('\n== a sign-in method nobody recorded is left out too');
+{
+  const env = makeEnv();
+  addMember(env, 'patrick', 'Patrick Turner', { admin: true });
+  addMember(env, 'stacy', 'Stacy Kallay');
+  const cookie = addSession(env, { slug: 'patrick', platform: 'iphone', method: 'apple' });
+  // A session minted before auth_method existed: it names no channel, so it
+  // can't inform a decision about one.
+  addSession(env, { slug: 'stacy', platform: 'iphone', method: null });
+
+  const sm = (await body(env, cookie)).signin_methods;
+  check('a NULL auth_method produces no row', sm.week.unknown === undefined, JSON.stringify(sm.week));
+  check('and the methods that were recorded still report',
+        sm.week.apple === 1 && Object.keys(sm.week).length === 1, JSON.stringify(sm.week));
 }
 
 console.log('\n== a session is stamped with the platform it actually used');
@@ -323,8 +350,12 @@ console.log('\n== a session is stamped with the platform it actually used');
   await authCheckAs(env, id, null);
   check('a header-less check leaves the platform unknown',
         platformOf(env, id) === null, `got ${platformOf(env, id)}`);
-  check('and the dashboard shows them under unknown',
-        (await body(env, id)).active_by_platform.day.unknown === 1);
+  const before = await body(env, id);
+  check('so they are on no platform row',
+        Object.keys(before.active_by_platform.day).length === 0,
+        JSON.stringify(before.active_by_platform.day));
+  check('while still counting as an active member',
+        before.active_members.day === 1, `got ${before.active_members.day}`);
 
   // The next check names the platform. The once-an-hour throttle used to skip
   // this write entirely, holding the member in Unknown for the rest of the
@@ -333,8 +364,8 @@ console.log('\n== a session is stamped with the platform it actually used');
   check('a named platform backfills straight past the throttle',
         platformOf(env, id) === 'web-large', `got ${platformOf(env, id)}`);
   const day = (await body(env, id)).active_by_platform.day;
-  check('so they move onto the web row', day['web-large'] === 1, JSON.stringify(day));
-  check('and out of unknown', day.unknown === undefined, JSON.stringify(day));
+  check('so they appear on the web row', day['web-large'] === 1, JSON.stringify(day));
+  check('and nowhere else', Object.keys(day).length === 1, JSON.stringify(day));
 }
 
 console.log('\n== a stamped platform is neither erased nor rewritten every request');

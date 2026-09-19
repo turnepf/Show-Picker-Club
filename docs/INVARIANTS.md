@@ -350,6 +350,15 @@ prefix is what keeps a legacy identity from ever colliding with a real slug.
 - Counts of *events* — ratings submitted, shows added, calendar fetches — stay
   counts of events. The rule is that the label says which it is: "people who
   rated" and "ratings submitted" are two rows for a reason.
+- **What couldn't be attributed is omitted, not labelled "Unknown".** A session
+  with no `platform`, or no `auth_method`, says only that the dashboard failed
+  to ask — a fact about the instrumentation, not about anybody's viewing or
+  sign-in. Those people still count once in Active members, so the platform
+  rows can sum to *less* than it as well as more. Say that in the UI. The
+  corollary is that the fix for an unattributed session is to capture the
+  value, never to invent a bucket for it: `/auth/check` is the only writer of
+  `sessions.platform`, so every client call must carry `X-Client-Platform`
+  (gated by `scripts/check-static.sh` for the web pages).
 
 Enforcer: `scripts/reporting-platform-test.mjs`.
 

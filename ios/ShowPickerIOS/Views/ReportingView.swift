@@ -28,7 +28,7 @@ struct ReportingView: View {
                     } header: {
                         Text("Active by platform (people)")
                     } footer: {
-                        Text("Distinct people, today / this week / this month — not sessions or devices, so three Apple TVs, two Macs or four Rokus signed in as the same person count once, and so does a reinstall. Someone using two platforms counts on both rows, so these don't add up to Active members.")
+                        Text("Distinct people, today / this week / this month — not sessions or devices, so three Apple TVs, two Macs or four Rokus signed in as the same person count once, and so does a reinstall. These don't add up to Active members in either direction: someone using two platforms counts on both rows, and anyone whose client never told us its platform is counted there but on no row here.")
                     }
                 }
                 Section("New shows") { windowRows(r.newShows) }
@@ -49,7 +49,7 @@ struct ReportingView: View {
                     } header: {
                         Text("How people sign in")
                     } footer: {
-                        Text("People who signed in with each method — counted once each, however many devices they used. Sessions last 30 days, so the 90-day window is the one to read before retiring a channel. Someone who used two methods counts on both, so the rows don't sum. \"unknown\" is a session from before this was tracked.")
+                        Text("People who signed in with each method — counted once each, however many devices they used. Sessions last 30 days, so the 90-day window is the one to read before retiring a channel. Someone who used two methods counts on both, so the rows don't sum. Sessions minted before this was tracked name no channel and are left out.")
                     }
                 }
                 if let cal = r.calendarUsage {
@@ -188,10 +188,12 @@ struct ReportingView: View {
         }
     }
 
-    // Stable display order for the platform breakdown; unknown keys sort last.
-    // "ios" is a legacy value from before iPhone/iPad/Mac were told apart —
-    // kept as a fallback until every client has updated.
-    private static let platformOrder = ["iphone", "ipad", "mac", "watchos", "tvos", "roku", "web-large", "web-small", "ios", "unknown"]
+    // Stable display order for the platform breakdown; unrecognized keys sort
+    // last. "ios" is a legacy value from before iPhone/iPad/Mac were told
+    // apart — kept because rows stored before KNOWN_PLATFORMS gated the header
+    // can still carry it. There is deliberately no "unknown": the server omits
+    // sessions whose platform it never captured rather than naming them.
+    private static let platformOrder = ["iphone", "ipad", "mac", "watchos", "tvos", "roku", "web-large", "web-small", "ios"]
 
     private func platformKeys(_ bp: PlatformWindows) -> [String] {
         var keys = Set(bp.day.keys)
@@ -213,7 +215,6 @@ struct ReportingView: View {
         case "web-large": return "Web (large)"
         case "web-small": return "Web (small)"
         case "ios": return "iOS (legacy)"
-        case "unknown": return "Unknown"
         default: return key
         }
     }

@@ -115,7 +115,12 @@ user on each of those rows, and `signin_methods` reports people per method (four
 Apple sign-ins by one person is 1) rather than sessions minted. A member on
 three platforms is 1 on each row, so the rows don't sum to Active members. Every
 count groups by the same `PERSON` expression, which falls back to a legacy
-member-less session's own identity instead of counting one per device.
+member-less session's own identity instead of counting one per device. A
+session whose platform (or auth method) was never captured is **omitted**
+rather than bucketed as "Unknown" — it only ever meant the dashboard failed to
+ask — so the platform rows can sum to less than Active members as well as more.
+`/auth/check` is the only writer of `sessions.platform`, so every web call must
+send `X-Client-Platform`; `check-static.sh` fails the PR if one doesn't.
 
 ```bash
 node scripts/watching-with-test.mjs

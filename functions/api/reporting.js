@@ -92,19 +92,30 @@ export async function onRequestGet(context) {
   // Rokus is one user on that row, and a reinstall or a second sign-in on
   // the same phone is still one person. A member active on two platforms
   // counts once in each, so the rows deliberately don't sum to Active
-  // members. Defensive: the platform column arrives in migration 016, so
-  // fall back to an empty breakdown rather than 500 the whole dashboard if
-  // it's missing.
+  // members.
+  //
+  // Sessions whose platform was never captured are left out rather than
+  // gathered into an "Unknown" row. That row only ever meant "this dashboard
+  // failed to ask", which is a fact about the instrumentation and not about
+  // anybody's viewing: /auth/check is the only writer of sessions.platform,
+  // and a check sent without the header used to make a session countable
+  // while leaving the column NULL. The pages that did that were fixed, so the
+  // row is now a shrinking tail of sessions that predate the fix, and a number
+  // nobody can act on is worse than no number. Those people are still counted
+  // once in Active members, which is why these rows can also sum to *less*
+  // than it. Defensive: the platform column arrives in migration 016, so fall
+  // back to an empty breakdown rather than 500 the whole dashboard if it's
+  // missing.
   const activeByPlatform = { day: {}, week: {}, month: {} };
   const platWindows = { day: '-1 day', week: '-7 days', month: '-30 days' };
   try {
     for (const [label, interval] of Object.entries(platWindows)) {
       const { results } = await env.DB.prepare(
-        `SELECT COALESCE(platform, 'unknown') AS platform,
-                COUNT(DISTINCT ${PERSON}) AS cnt
+        `SELECT platform, COUNT(DISTINCT ${PERSON}) AS cnt
            FROM sessions
           WHERE last_seen_at >= datetime('now', ?)
-          GROUP BY COALESCE(platform, 'unknown')`
+            AND platform IS NOT NULL
+          GROUP BY platform`
       ).bind(interval).all();
       for (const row of results) activeByPlatform[label][row.platform] = row.cnt;
     }
@@ -117,19 +128,20 @@ export async function onRequestGet(context) {
   // Counting people rather than sessions is what keeps that readable: one
   // member signing in on four devices is one person who depends on Apple,
   // not four, and retiring a channel is a decision about people. Someone who
-  // used two methods counts on both rows, so these don't sum either. NULL
-  // auth_method = a session minted before the column existed; shown as
-  // 'unknown' rather than dropped.
+  // used two methods counts on both rows, so these don't sum either. A NULL
+  // auth_method — a session minted before the column existed — is left out
+  // for the same reason the platform breakdown drops its unknowns: it names
+  // no channel, so it can't inform a decision about one.
   const signinMethods = { week: {}, month: {}, quarter: {} };
   const methodWindows = { week: '-7 days', month: '-30 days', quarter: '-90 days' };
   try {
     for (const [label, interval] of Object.entries(methodWindows)) {
       const { results } = await env.DB.prepare(
-        `SELECT COALESCE(auth_method, 'unknown') AS method,
-                COUNT(DISTINCT ${PERSON}) AS cnt
+        `SELECT auth_method AS method, COUNT(DISTINCT ${PERSON}) AS cnt
            FROM sessions
           WHERE created_at >= datetime('now', ?)
-          GROUP BY COALESCE(auth_method, 'unknown')`
+            AND auth_method IS NOT NULL
+          GROUP BY auth_method`
       ).bind(interval).all();
       for (const row of results) signinMethods[label][row.method] = row.cnt;
     }
