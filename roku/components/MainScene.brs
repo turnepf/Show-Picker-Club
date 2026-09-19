@@ -20,6 +20,20 @@ sub init()
     checkAuth()
 end sub
 
+' The device says memory is tight. Drop to the legacy profile — the same
+' economies the low-end tier already makes (smaller artwork, no per-frame
+' focus scaling, a lower search cap), applied because the device asked rather
+' than because of what it is. One-way for the session: a channel that
+' oscillates between profiles would thrash the texture cache it is trying to
+' relieve.
+sub onMemoryPressure()
+    if m.top.memoryPressure <> true then return
+    p = m.global.deviceProfile
+    if p <> invalid and p.tier = "legacy" then return
+    m.global.deviceProfile = LegacyProfile()
+    print "[showpicker] profile downgraded to legacy under memory pressure"
+end sub
+
 ' ---------- Auth ----------
 sub checkAuth()
     if GetSessionCookie() = ""

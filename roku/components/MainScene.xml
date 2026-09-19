@@ -2,6 +2,8 @@
 <component name="MainScene" extends="Scene">
     <interface>
         <field id="launchArgs" type="assocarray" />
+        <!-- Set by main.brs when the device reports memory pressure. -->
+        <field id="memoryPressure" type="boolean" onChange="onMemoryPressure" />
     </interface>
     <script type="text/brightscript" uri="pkg:/source/Globals.brs" />
     <script type="text/brightscript" uri="pkg:/source/ContentBuilders.brs" />

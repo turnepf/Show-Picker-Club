@@ -9,7 +9,7 @@
     <script type="text/brightscript" uri="SearchScreen.brs" />
     <children>
         <Label id="heading" text="Search" translation="[90,54]" font="font:LargeBoldSystemFont" color="0xF5F7FAFF" />
-        <Keyboard id="kb" translation="[90,140]" />
+        <DynamicKeyboard id="kb" translation="[90,140]" />
         <ButtonGroup id="buttons" translation="[90,770]" layoutDirection="horiz"
                      buttonHeight="56" minWidth="180" horizAlignment="left" />
         <MarkupGrid id="grid" translation="[720,140]" itemComponentName="PosterCard"
