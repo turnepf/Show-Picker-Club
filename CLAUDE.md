@@ -54,9 +54,12 @@ ios/  tvos/        SwiftUI apps; open ShowPickerClub.xcworkspace at the repo roo
                    (the watch app and the widgets are targets under ios/)
 roku/              Native Roku channel (SceneGraph/BrightScript) against the same
                    /api/*. Runs on a real device via sideload (Roku has no
-                   simulator), but is not published — no Channel Store
-                   submission, so it is not a shipping platform and doesn't
-                   count for feature-parity statements; see roku/NEXT_STEPS.md
+                   simulator) and carries the only build tooling in the repo —
+                   `bsc` validation, one-command sideload, scriptable
+                   remote/typing/screenshots (roku/sideload.mjs). Manifest and
+                   artwork are certification-ready; not yet submitted to the
+                   Channel Store, so it is not a shipping platform and doesn't
+                   count for feature-parity statements. See roku/NEXT_STEPS.md
 scripts/           apply-migrations.sh, member-engagement.sh, vibe-diagnose.mjs
                    (operator tools)
 ```
