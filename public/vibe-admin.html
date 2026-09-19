@@ -7,25 +7,9 @@
   <title>Vibe trait fill</title>
   <link rel="stylesheet" href="/styles.css?v=6">
   <style>
-    label { display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: 6px; margin-top: 6px; color: var(--ink-muted); }
-    input[type=number] { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: var(--text-base); font-family: inherit; }
-    input[type=number]:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
-    button.go { width: 100%; margin-top: 16px; padding: 12px; background: var(--accent); color: #fff; border: none; border-radius: 6px; font-size: var(--text-base); font-weight: 700; cursor: pointer; }
-    button.go:hover { background: var(--accent-hover); }
-    button.go:disabled { background: var(--ink-faint); cursor: not-allowed; }
     button.secondary { width: 100%; margin-top: 10px; padding: 12px; background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); border-radius: 6px; font-size: var(--text-base); font-weight: 600; cursor: pointer; }
     button.secondary:hover { background: color-mix(in oklch, var(--accent) 8%, var(--surface-2)); }
     button.secondary:disabled { opacity: 0.5; cursor: not-allowed; }
-    .progress { margin-top: 14px; padding: 14px; border-radius: 6px; background: var(--surface-2); font-size: var(--text-sm); line-height: 1.6; }
-    .progress strong { color: var(--ink); }
-    .log-toolbar { display: flex; justify-content: flex-end; margin-top: 10px; }
-    button.copy { width: auto; margin: 0; padding: 6px 12px; font-size: var(--text-xs); background: var(--ink); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-family: inherit; }
-    button.copy:hover { background: oklch(0.18 0.025 50); }
-    .log { margin-top: 6px; max-height: 300px; overflow-y: auto; font-family: var(--font-mono); font-size: var(--text-xs); background: var(--surface); padding: 10px; border-radius: 6px; border: 1px solid var(--border-soft); }
-    .log-row { padding: 2px 0; }
-    .log-row.ok { color: oklch(0.42 0.13 150); }
-    .log-row.unknown { color: oklch(0.55 0.14 80); }
-    .log-row.error { color: var(--danger-deep); }
     .auth-warn {
       margin-bottom: 14px; padding: 10px;
       background: var(--danger-soft);
@@ -59,25 +43,15 @@
       <a href="/reporting">Reporting</a>
     </nav>
     <h1 class="admin-title">Vibe admin</h1>
-    <div class="admin-sub">Generates trait scores for any show that doesn't have them yet. Calls Claude one batch at a time until all caught up. <strong>Re-score all</strong> refreshes every existing report too — useful when the prompt or model improves. <em>Fill-missing also runs automatically in the background once a day — close the page anytime, the queue keeps draining. Re-score still needs the page open.</em></div>
+    <div class="admin-sub">Fill-missing runs automatically in the background once a day, scoring any show that doesn't have trait data yet — nothing to trigger here. <strong>Re-score all</strong> refreshes every existing report too — useful when the prompt or model improves — and also drains in the background once started, so it's safe to close the page.</div>
 
     <div id="authWarn" class="auth-warn" style="display:none;">Log in as the operator first at <a href="/patrick">showpicker.club/patrick</a> (tap Edit, enter your code), then reload this page.</div>
 
     <div class="admin-card">
       <div id="bgStatus" class="bg-status" style="display:none;"></div>
 
-      <label>Batch size (max 8)</label>
-      <input type="number" id="batchSize" value="5" min="1" max="8">
-
-      <button class="go" id="runBtn" onclick="run(false)">Fill missing</button>
       <button class="secondary" id="rescoreBtn" onclick="confirmStartRescore()">Start background re-score</button>
       <button class="secondary" id="cancelRescoreBtn" onclick="cancelRescore()" style="display:none; background: var(--danger-soft); color: var(--danger-deep); border-color: color-mix(in oklch, var(--danger) 30%, transparent);">Cancel background re-score</button>
-
-      <div class="progress" id="progress" style="display:none;">
-        <div><strong>Processed:</strong> <span id="processed">0</span> &middot; <strong>Unknown:</strong> <span id="unknown">0</span> &middot; <strong>Errors:</strong> <span id="errors">0</span> &middot; <strong>Remaining:</strong> <span id="remaining">?</span></div>
-        <div class="log-toolbar"><button type="button" class="copy" id="copyLogBtn" onclick="copyLog()">Copy summary + log</button></div>
-        <div class="log" id="log"></div>
-      </div>
     </div>
   </div>
 
@@ -92,41 +66,6 @@
         if (!d.authenticated) document.getElementById('authWarn').style.display = '';
       } catch {}
     });
-
-    let totals = { processed: 0, unknown: 0, errors: 0 };
-
-    async function copyLog() {
-      const summary = `Processed: ${document.getElementById('processed').textContent} · Unknown: ${document.getElementById('unknown').textContent} · Errors: ${document.getElementById('errors').textContent} · Remaining: ${document.getElementById('remaining').textContent}`;
-      const lines = Array.from(document.querySelectorAll('#log .log-row')).map(el => el.textContent);
-      const blob = [summary, ...lines].join('\n');
-      const btn = document.getElementById('copyLogBtn');
-      try {
-        await navigator.clipboard.writeText(blob);
-      } catch {
-        const ta = document.createElement('textarea');
-        ta.value = blob;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        ta.remove();
-      }
-      const orig = btn.textContent;
-      btn.textContent = 'Copied!';
-      setTimeout(() => { btn.textContent = orig; }, 1500);
-    }
-
-    function appendLog(rows) {
-      const log = document.getElementById('log');
-      rows.forEach(r => {
-        const div = document.createElement('div');
-        div.className = 'log-row ' + r.status;
-        let line = `${r.title}: ${r.status}`;
-        if (r.error) line += ` (${r.error})`;
-        div.textContent = line;
-        log.appendChild(div);
-      });
-      log.scrollTop = log.scrollHeight;
-    }
 
     async function refreshStatus() {
       try {
@@ -218,71 +157,6 @@
       if (!document.hidden) refreshStatus();
     });
 
-    async function run(rescore) {
-      const count = parseInt(document.getElementById('batchSize').value, 10) || 5;
-      const fillBtn = document.getElementById('runBtn');
-      const rescoreBtn = document.getElementById('rescoreBtn');
-      // Sentinel for the rescore session — every row we touch gets stamped
-      // with datetime('now'), and the server treats any row with scored_at
-      // >= this timestamp as "already done in this run." Loop ends when
-      // nothing matches.
-      const before = new Date().toISOString().replace('T', ' ').slice(0, 19);
-
-      totals = { processed: 0, unknown: 0, errors: 0 };
-      document.getElementById('log').innerHTML = '';
-      document.getElementById('progress').style.display = 'block';
-      document.getElementById('processed').textContent = '0';
-      document.getElementById('unknown').textContent = '0';
-      document.getElementById('errors').textContent = '0';
-      document.getElementById('remaining').textContent = '?';
-
-      fillBtn.disabled = true;
-      rescoreBtn.disabled = true;
-      const activeBtn = rescore ? rescoreBtn : fillBtn;
-      const origLabel = activeBtn.textContent;
-      activeBtn.textContent = rescore ? 'Re-scoring…' : 'Running…';
-
-      let consecutiveErrors = 0;
-      while (true) {
-        try {
-          const res = await fetch('/api/admin-vibe-fill', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(rescore ? { count, rescore: true, before } : { count }),
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            if (res.status === 403) document.getElementById('authWarn').style.display = '';
-            alert('Error: ' + (data.error || res.status));
-            break;
-          }
-          totals.processed += data.processed;
-          totals.unknown += data.unknown;
-          totals.errors += data.errors;
-          document.getElementById('processed').textContent = totals.processed;
-          document.getElementById('unknown').textContent = totals.unknown;
-          document.getElementById('errors').textContent = totals.errors;
-          document.getElementById('remaining').textContent = data.remaining;
-          appendLog(data.results || []);
-
-          if (!data.results || data.results.length === 0) break;
-          if (data.processed === 0 && data.unknown === 0) {
-            consecutiveErrors++;
-            if (consecutiveErrors >= 2) { alert('All recent shows errored. Check the logs above.'); break; }
-          } else {
-            consecutiveErrors = 0;
-          }
-          if (data.remaining <= 0) break;
-        } catch (e) {
-          alert('Network error: ' + e.message);
-          break;
-        }
-      }
-
-      fillBtn.disabled = false;
-      rescoreBtn.disabled = false;
-      activeBtn.textContent = origLabel;
-    }
   </script>
 </body>
 </html>
