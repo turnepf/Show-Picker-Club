@@ -5,8 +5,10 @@ sub init()
     m.actions = m.top.findNode("actions")
     m.status = m.top.findNode("status")
     m.actions.observeField("buttonSelected", "onAction")
+    m.kb.observeField("text", "onKeyboardText")
 
     m.step = "init"
+    m.lastSubmittedCode = ""
     m.channel = "email"
     m.identifier = ""
     m.zone = "actions"
@@ -26,6 +28,7 @@ sub renderRoot()
         m.prompt.text = info
         m.kb.visible = false
         m.actions.translation = [90, 260]
+        m.status.translation = [90, 500]
         m.actionKeys = ["signout", "delete", "back"]
         m.actions.buttons = ["Sign Out", "Delete Account", "< Back"]
         m.actions.visible = true
@@ -36,6 +39,7 @@ sub renderRoot()
         m.prompt.text = "Choose how you'd like to receive your one-time code."
         m.kb.visible = false
         m.actions.translation = [90, 260]
+        m.status.translation = [90, 500]
         m.actionKeys = ["email", "phone", "back"]
         m.actions.buttons = ["Continue with Email", "Continue with Phone", "< Back"]
         m.actions.visible = true
@@ -205,6 +209,19 @@ sub onDeleteDone(ev as object)
     end if
 end sub
 
+' A one-time code is a known length, so making the member leave the keyboard
+' and find a button after the last digit is pure friction — a phone just
+' accepts it. Submit as soon as six digits are in, and remember what was sent
+' so a failed code is not resubmitted on every keystroke of the correction.
+sub onKeyboardText()
+    if m.step <> "code" then return
+    code = SafeStr(m.kb.text)
+    if Len(code) <> 6 then return
+    if code = m.lastSubmittedCode then return
+    m.lastSubmittedCode = code
+    verifyCode()
+end sub
+
 ' ---- Submit routing ----
 sub onSubmit()
     if m.step = "identifier"
@@ -223,9 +240,14 @@ end sub
 ' `buttons`, which takes focus away from whatever holds it — so focusing the
 ' keyboard first meant every character the member typed was swallowed.
 sub showKeyboard(text as string)
+    m.lastSubmittedCode = ""
     m.kb.text = text
     m.kb.visible = true
     m.actions.translation = [90, 860]
+    ' Between the keyboard and the buttons. It used to sit at a fixed y that
+    ' the two-button group grew down into, so "That code didn't work" was
+    ' printed straight over "< Back".
+    m.status.translation = [90, 790]
     focusKeyboard()
 end sub
 
