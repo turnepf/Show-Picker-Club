@@ -65,7 +65,9 @@
     // Point the button at the new member's own page; anyone who lands here
     // without a session (bookmark, bot) is bounced to the landing page so
     // stray visits don't linger on the conversion URL.
-    fetch('/auth/check')
+    fetch('/auth/check', {
+      headers: { 'X-Client-Platform': window.innerWidth < 768 ? 'web-small' : 'web-large' },
+    })
       .then(r => r.json())
       .then(d => {
         if (d.authenticated && d.member) {

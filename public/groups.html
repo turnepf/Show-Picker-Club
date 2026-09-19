@@ -393,7 +393,9 @@
     // Initialize on page load
     (async () => {
       try {
-        const res = await fetch('/auth/check');
+        const res = await fetch('/auth/check', {
+          headers: { 'X-Client-Platform': window.innerWidth < 768 ? 'web-small' : 'web-large' },
+        });
         if (res.ok) {
           const data = await res.json();
           authMember = data.member;

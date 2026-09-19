@@ -16,6 +16,15 @@
 (function () {
   'use strict';
 
+  // Platform usage tracking. /auth/check is the only writer of
+  // sessions.platform, and the same write is what makes a session visible to
+  // the reporting dashboard — so a check sent without this header lands the
+  // member in the "Unknown" row. Eight pages load this file, which is why its
+  // omission accounted for most of that row. Matches index.html's breakpoint.
+  function platformHeader() {
+    return { 'X-Client-Platform': window.innerWidth < 768 ? 'web-small' : 'web-large' };
+  }
+
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -227,7 +236,7 @@
 
     // Fill in auth-dependent groups + the member roster.
     Promise.all([
-      fetch('/auth/check').then(function (r) { return r.json(); }).catch(function () { return {}; }),
+      fetch('/auth/check', { headers: platformHeader() }).then(function (r) { return r.json(); }).catch(function () { return {}; }),
       fetch('/api/members').then(function (r) { return r.json(); }).catch(function () { return {}; }),
     ]).then(function (res) {
       var auth = res[0] || {};
