@@ -428,7 +428,9 @@ a validation error becomes a crash on the device. Credentials stay out of the
 repo exactly like `scripts/asc.mjs`: `~/.roku/host` and `~/.roku/password`, or
 `ROKU_HOST` / `ROKU_PASSWORD` for a one-off.
 
-Two of the suites above — `watching-with-test.mjs` and `og-preview-test.mjs` — are **not** wired into `pr-checks.yml`; run them by hand when you touch what they cover.
+Two of the suites above — `watching-with-test.mjs` and `og-preview-test.mjs` — are **not** wired into `pr-checks.yml`. The pre-push hook runs them anyway, so in practice they run on every push from a configured machine; run them by hand if you've bypassed it.
+
+**The pre-push hook is the only gate that can actually stop a bad commit.** `.githooks/pre-push`, enabled with `git config core.hooksPath .githooks`, runs the static invariants plus every suite needing no network, container or `npm install` — about six seconds. It derives that list from `pr-checks.yml` rather than repeating it, so adding a suite to CI adds it here for free. It exists because this repo is private on a GitHub Free plan, where branch protection and rulesets return 403: nothing server-side can refuse a merge, and a PR opened and squash-merged in one breath merges *before* its checks even start (which is how a red `static` job landed on `main` on 2026-09-19). Bypass a genuinely unrelated push with `git push --no-verify`; don't bypass to skip a failure.
 
 The rules these checks enforce are written down in `docs/INVARIANTS.md`; adding a rule there also extends the advisory PR review.
 

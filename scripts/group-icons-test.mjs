@@ -245,6 +245,16 @@ console.log('\n== the change notice: once, never to the editor, never before joi
 
   // patrick changes the icon; both whitt and nico should be told once, and
   // this time the field named is 'icon', not 'name'.
+  //
+  // The pause is what makes that a *second* moment in time. The scenario needs
+  // three distinct ones — the rename, nico joining 1ms later, then this — and
+  // profile_changed_at resolves to the millisecond, which two PATCHes against
+  // an in-memory database can share. When they did, this change landed at or
+  // before nico's join and at whitt's existing high-water mark, so neither was
+  // told and the suite failed about two runs in five. Real edits are minutes
+  // apart; only the test can collapse them, so only the test has to separate
+  // them.
+  await new Promise((r) => setTimeout(r, 5));
   await patchGroup(env, patrick, group.id, { icon: 'sparkles' });
   const whittIconView = await (await getGroup(env, whitt, group.id)).json();
   check('whitt is told about the icon change', whittIconView.change_notice?.changed_by === 'patrick',
