@@ -84,6 +84,7 @@ on purpose — the web side has no build step and that stays true). `npm install
 | `npx bsc --project bsconfig.json` | Validate the whole channel — every call resolved against its real component scope, every `onChange` handler checked against the script that must define it, plus bslint for unused variables and name shadowing. Runs in CI. |
 | `node sideload.mjs info` | Device model, OS and graphics platform. The quickest way to see which tier `DeviceProfile()` will pick. |
 | `node sideload.mjs` | Validate, package and install to the device in one command. |
+| `node sideload.mjs logs` | Stream the debug console. `--relaunch` restarts the channel *after* attaching, so the launch line is captured rather than missed; `--seconds N` stops on its own. |
 | `node sideload.mjs --legacy` | The same, built with `FORCE_LEGACY=true` so a modern device takes the legacy path. Patches the **staged** manifest only — the committed one always says false. |
 
 The `--legacy` build matters because the Roku you have to hand is probably a current one, and the
@@ -97,6 +98,15 @@ first and refuses to install a channel that fails.
 
 Credentials stay out of the repo, matching `scripts/asc.mjs`: `~/.roku/host` and
 `~/.roku/password`, or `ROKU_HOST` / `ROKU_PASSWORD` for a single run.
+
+The console is read over plain TCP with `node:net` rather than shelling out to `telnet … | timeout`,
+because macOS ships neither of those.
+
+**Driving the UI remotely does not work out of the box.** Roku OS 14+ refuses ECP `/keypress`
+requests with a 403 unless *Settings → System → Advanced system settings → Control by mobile apps →
+Network access* is set to **Permissive**. Launching the channel (`/launch/dev`) and reading device
+info are unaffected, so `logs --relaunch` works regardless — only scripted button presses need that
+setting changed.
 
 ## Building / sideloading
 
