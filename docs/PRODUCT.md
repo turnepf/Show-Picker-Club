@@ -492,7 +492,7 @@ Three secret-protected admin pages (all require the `ADMIN_SECRET` value to be e
 
 - **/setup** — create a new member. Enter a name plus the phone and/or email they'll receive login codes at; the page generates a slug. New members start with an empty library — seeding a starter library of 8 popular picks was retired 2026-07; members created before then keep whatever seed rows they still have.
 - **/url-cleanup** — queue of shows missing a real network URL (still on a generic search link). Operator can paste a deep link; the page pushes it to every member's copy of that show. Also surfaces **wrong titles**: shows whose name never matched a real title (no poster after enrichment) even though their link works. Most fix themselves — the real name is recovered from the show's own streaming-page link (og:title) during enrichment and when this page loads; only the ones automation can't confidently match are listed, and renaming re-enriches every copy and pulls the right poster.
-- **/vibe-admin** — batch-score show traits using Claude. Picks shows missing a `show_traits` row, sends each title to Claude with a calibration prompt that asks for 27 trait scores (0–1), writes the result back. Used to backfill the trait data that powers Vibe.
+- **/vibe-admin** — batch-scores show traits using Claude, sending each title a calibration prompt that asks for 27 trait scores (0–1) and writing the result back. Filling missing scores runs only on the daily cron now (no button on the page); the page's own control starts or cancels a full re-score of every existing report, for when the prompt or model improves.
 
 There is no admin role in the session model — admin actions are gated purely by knowing the `ADMIN_SECRET`.
 
