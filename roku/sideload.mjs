@@ -12,15 +12,24 @@
 // the device address comes from $ROKU_HOST or ~/.roku/host, and the developer
 // web-server password from $ROKU_PASSWORD or ~/.roku/password.
 //
-//   node roku/sideload.mjs info        device model, OS, graphics platform
+//   node roku/sideload.mjs info        device model, OS, UI resolution
+//   node roku/sideload.mjs logs        stream the debug console (port 8085)
+//   node roku/sideload.mjs logs --relaunch --seconds 15
 //   node roku/sideload.mjs             validate, package, install
 //   node roku/sideload.mjs --legacy    install a build forced to the legacy tier
 //   node roku/sideload.mjs --skip-check   install without validating
 //
-// `info` is the quickest way to confirm which tier DeviceProfile() will pick:
-// graphics "opengl" is the modern tier, anything else is legacy.
+// `logs --relaunch` is the quickest way to confirm which tier DeviceProfile()
+// picked: it attaches to the console first, then restarts the channel, so the
+// launch line is captured rather than missed. Attaching afterwards shows only
+// what the channel prints next, which for a startup line is nothing.
+//
+// The console is a plain TCP stream, handled here with node:net rather than
+// `telnet <ip> 8085 | timeout`, because macOS ships neither `timeout` nor
+// `telnet` and the loop should not depend on installing either.
 
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -115,11 +124,50 @@ function forceLegacyInStaging(stagingDir) {
   fs.writeFileSync(manifest, after);
 }
 
+// ECP: restart the sideloaded channel. 204 is success and carries no body.
+async function relaunchDevChannel() {
+  const res = await fetch(`http://${host()}:8060/launch/dev`, { method: 'POST' });
+  if (!res.ok) die(`Could not relaunch the channel (HTTP ${res.status}). Is it installed?`);
+}
+
+function flagValue(args, name, fallback) {
+  const i = args.indexOf(name);
+  if (i === -1) return fallback;
+  const v = Number(args[i + 1]);
+  return Number.isFinite(v) && v > 0 ? v : fallback;
+}
+
+async function logs(args) {
+  const seconds = flagValue(args, '--seconds', 0);
+  const address = host();
+
+  await new Promise((resolve, reject) => {
+    const socket = net.createConnection({ host: address, port: 8085 }, async () => {
+      console.log(`--- ${address}:8085 ${seconds ? `(${seconds}s)` : '(ctrl-c to stop)'} ---`);
+      // Attached: now it is safe to restart, and the launch prints will land
+      // on this stream instead of being missed.
+      if (args.includes('--relaunch')) {
+        await relaunchDevChannel().catch(reject);
+      }
+    });
+    socket.setEncoding('utf8');
+    socket.on('data', (chunk) => process.stdout.write(chunk));
+    socket.on('error', (e) => reject(new Error(`Debug console: ${e.message}`)));
+    socket.on('close', resolve);
+    if (seconds) setTimeout(() => socket.destroy(), seconds * 1000).unref?.();
+  });
+}
+
 async function main() {
   const args = process.argv.slice(2);
 
   if (args.includes('info')) {
     await info();
+    return;
+  }
+
+  if (args.includes('logs')) {
+    await logs(args);
     return;
   }
 
