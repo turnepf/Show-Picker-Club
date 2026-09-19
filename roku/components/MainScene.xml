@@ -9,8 +9,9 @@
     <children>
         <Rectangle id="bg" width="1920" height="1080" color="0x0D0F14FF" />
         <Group id="viewHolder" />
-        <BusySpinner id="spinner" translation="[930,500]" visible="false">
-            <Poster width="60" height="60" uri="pkg:/images/spinner.png" />
-        </BusySpinner>
+        <!-- BusySpinner draws its own internal poster from `uri`. A nested
+             <Poster> is just an extra static child and never spins. -->
+        <BusySpinner id="spinner" translation="[930,500]" visible="false"
+                     uri="pkg:/images/spinner.png" control="stop" />
     </children>
 </component>

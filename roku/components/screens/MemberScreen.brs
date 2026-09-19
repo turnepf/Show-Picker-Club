@@ -81,6 +81,7 @@ sub fetchShows()
 end sub
 
 sub onShows(ev as object)
+    FinishApi(m, ev)
     SetBusy(m, false)
     res = ev.getRoSGNode().result
     if res.statusCode = 401

@@ -110,6 +110,8 @@ end function
 
 ' Create + run an ApiTask. `req` is { method, path, body, tag }.
 ' `callback` is a function name in `host`'s scope observing the task's `result`.
+' The host has to keep a reference or the node is collected mid-flight, so
+' every callback must hand the task back via FinishApi().
 function StartApi(host as object, req as object, callback as string) as object
     task = CreateObject("roSGNode", "ApiTask")
     task.observeField("result", callback)
@@ -120,6 +122,25 @@ function StartApi(host as object, req as object, callback as string) as object
     return task
 end function
 
+' Release a finished task. Call this from the top of every API callback: the
+' callback is running, so the response has already been delivered and dropping
+' the reference is safe. Without it, m.apiTasks grows for the life of the
+' screen and each entry pins a whole response body — which is why repeatedly
+' returning to Home (each visit re-fetches /api/members) kept climbing.
+' Sweeping on the next StartApi instead would race: a task can reach state
+' "done" before its callback is dispatched, and dropping it there loses the
+' response.
+sub FinishApi(host as object, ev as object)
+    if host.apiTasks = invalid then return
+    task = ev.getRoSGNode()
+    task.unobserveField("result")
+    keep = []
+    for each t in host.apiTasks
+        if not t.isSameNode(task) then keep.push(t)
+    end for
+    host.apiTasks = keep
+end sub
+
 ' Toggle the shared loading spinner (declared once on MainScene) from any
 ' screen, so a slow API call has an obvious "something is happening"
 ' indicator instead of looking frozen.
@@ -127,7 +148,14 @@ sub SetBusy(host as object, v as boolean)
     scene = host.top.getScene()
     if scene = invalid then return
     spinner = scene.findNode("spinner")
-    if spinner <> invalid then spinner.visible = v
+    if spinner = invalid then return
+    spinner.visible = v
+    ' `control` drives the rotation; visibility alone leaves it a still image.
+    if v
+        spinner.control = "start"
+    else
+        spinner.control = "stop"
+    end if
 end sub
 
 function SafeStr(v as dynamic) as string
