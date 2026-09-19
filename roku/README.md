@@ -32,6 +32,19 @@ stores it in the registry (`roRegistrySection "showpicker"`), and replays it as 
 request also sends `X-Client-Platform: roku`. The client sends **no `Origin` header**, so the
 backend treats it as a native client and never issues a Turnstile challenge.
 
+## RowList needs an `itemSize`
+
+A `RowList` with no `itemSize` has **zero area**. It accepts content without complaint, reports the
+right child count, and draws nothing at all — no rows, no row labels, and it never instantiates the
+item component, so a `print` in that component's `init()` never fires. There is no error on the
+console. Both `RowList`s shipped without it for months, which is why Home looked like Trending had
+failed to load when it had loaded fine.
+
+`rowItemSize` is the size of an item *within* a row and is not a substitute. `MarkupGrid` had
+`itemSize` from the start, which is why Search and Add rendered while Home and My Shows did not.
+
+If a list renders nothing, check `itemSize` before suspecting the data.
+
 ## Device tiers — the channel adapts to the hardware it lands on
 
 The channel has to stay usable on Rokus going back about eight years, and a 2017 box is a
