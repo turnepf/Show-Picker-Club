@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+#
+# Run the deterministic half of CI before anything leaves this machine.
+#
+# Why this exists: on 2026-09-19 a PR was opened and squash-merged in one
+# breath, and its checks run was created two seconds AFTER the merge — so CI
+# reported a real failure on a commit that was already on main. Branch
+# protection would normally refuse that merge, but this repo is private on a
+# Free plan and GitHub gates protection and rulesets behind a paid one, so
+# there is no server-side gate to fall back on. A local gate is the whole
+# defense, and it has to run before the push rather than before the commit:
+# a blocked commit strands work in the tree, where a second session's
+# `git add -A` can sweep it into an unrelated PR. That also happened.
+#
+# It runs everything in pr-checks.yml that needs neither a network, a
+# container, nor an npm install — which is every suite except the Roku
+# BrighterScript validation (`npx bsc`) and the Swift package tests.
+#
+# Bypass for a genuinely unrelated push: git push --no-verify
+#
+# Enable in a fresh clone: git config core.hooksPath .githooks
+#
+# Written for bash 3.2, which is what macOS ships. No mapfile, no associative
+# arrays — the first draft of this hook used mapfile, found it missing, and
+# reported "2 checks passed" instead of failing, which is the exact shape of
+# the problem it is meant to catch.
+
+set -u
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "pre-push: node not found — install Node 22 or push with --no-verify" >&2
+  exit 1
+fi
+
+# The list is READ FROM pr-checks.yml rather than repeated here, so the local
+# gate cannot quietly fall behind the one that actually blocks a PR. Adding a
+# suite to CI adds it here for free; the `npx bsc` and `swift test` jobs name
+# no script and so select themselves out.
+workflow=.github/workflows/pr-checks.yml
+checks=()
+while IFS= read -r line; do
+  [ -n "$line" ] && checks+=("$line")
+done <<EOF
+$(grep -oE '(bash|node) scripts/[A-Za-z0-9._-]+\.(sh|mjs)' "$workflow" | sort -u)
+EOF
+
+# A parse that silently finds nothing would pass every push. Any real version
+# of that workflow has well over a dozen; treat a collapse as a broken hook
+# rather than a clean run.
+derived=${#checks[@]}
+if [ "$derived" -lt 10 ]; then
+  echo "pre-push: only parsed $derived checks out of $workflow — the hook is broken, not the tree" >&2
+  exit 1
+fi
+
+# Plus the suites CI deliberately doesn't run (see CLAUDE.md). They cost about
+# a second between them, which is cheaper than remembering to run them by hand.
+checks+=("node scripts/watching-with-test.mjs")
+checks+=("node scripts/og-preview-test.mjs")
+
+failed=()
+for check in "${checks[@]}"; do
+  if ! out=$(eval "$check" 2>&1); then
+    failed+=("$check")
+    printf '\n\033[31m%s FAILED\033[0m\n%s\n' "$check" "$out"
+  fi
+done
+
+if [ "${#failed[@]}" -gt 0 ]; then
+  printf '\n\033[31mpre-push blocked: %d of %d checks failed.\033[0m\n' \
+    "${#failed[@]}" "${#checks[@]}" >&2
+  printf '  %s\n' "${failed[@]}" >&2
+  printf '\nFix them, or push anyway with --no-verify if they are unrelated.\n' >&2
+  exit 1
+fi
+
+printf '\033[32mpre-push: %d checks passed (%d from CI, 2 it does not run)\033[0m\n' \
+  "${#checks[@]}" "$derived"

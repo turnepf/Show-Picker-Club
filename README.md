@@ -174,6 +174,12 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 6. **(Optional) Add a custom domain** via the Cloudflare dashboard → Pages → your project → Custom domains.
 
+7. **Turn on the pre-push hook.**
+   ```bash
+   git config core.hooksPath .githooks
+   ```
+   Runs the deterministic half of `pr-checks.yml` — the static invariants and every suite that needs no network, container, or `npm install` — before anything leaves the machine, in about six seconds. It reads its list straight out of the workflow, so it can't fall behind CI, and it adds the two suites CI deliberately skips. This matters because the repo is private on a Free plan, where GitHub gates branch protection and rulesets behind a paid one: there is no server-side rule that can refuse a merge, so the local gate is the only one. A push that should skip it: `git push --no-verify`.
+
 ## Deploys and backups
 
 - **Production deploy** is automatic on push to `main` via `.github/workflows/deploy.yml`. The workflow runs `wrangler pages deploy`, then probes a few endpoints to confirm secrets aren't leaking and auth gates are still in place.
