@@ -74,6 +74,100 @@ function IsRealUrl(u as dynamic) as boolean
     return true
 end function
 
+' ---- Device capability tiering ----
+'
+' The channel has to stay usable on Rokus going back about eight years, and
+' that is a genuinely different machine from a current box: the 2016-2018
+' models draw through DirectFB with a small texture budget, anything current
+' uses OpenGL. GetGraphicsPlatform() is Roku's own signal for that split — it
+' has been available since OS 6, so it is safe to call on everything we
+' support — and it is what picks the tier here.
+'
+' Everything that scales with device capability reads from this one profile,
+' so there is a single place to change and a single place to look. The values
+' are deliberately about *cost per pixel drawn*, not about features: no tier
+' loses a screen, a list or an action.
+function DeviceProfile() as object
+    di = CreateObject("roDeviceInfo")
+    platform = LCase(SafeStr(di.GetGraphicsPlatform()))
+
+    if platform <> "opengl"
+        ' Legacy: a 720p-era GPU, so a card draws at ~187px and w185 is an
+        ' almost exact match — a quarter of the texture memory of w342 and a
+        ' quarter of the bytes over the wire. The backdrop is dropped in
+        ' favour of the poster the card already warmed, and the focus scale
+        ' goes away because re-scaling a bitmap every frame is the expensive
+        ' thing on this stack.
+        return {
+            tier:        "legacy"
+            platform:    platform
+            model:       SafeStr(di.GetModelDisplayName())
+            posterWidth: 185
+            logoWidth:   92
+            useBackdrop: false
+            heroWidth:   342
+            focusScale:  false
+            maxResults:  40
+        }
+    end if
+
+    return {
+        tier:        "modern"
+        platform:    platform
+        model:       SafeStr(di.GetModelDisplayName())
+        posterWidth: 342
+        logoWidth:   154
+        useBackdrop: true
+        heroWidth:   780
+        focusScale:  true
+        maxResults:  100
+    }
+end function
+
+' Read the profile MainScene cached on the global node, recomputing only if we
+' are somewhere it never got set. Cheap enough to call per screen, too costly
+' to call per card — pass the result down instead.
+function Profile(node as object) as object
+    if node <> invalid and node.global <> invalid
+        p = node.global.deviceProfile
+        if p <> invalid and p.tier <> invalid then return p
+    end if
+    return DeviceProfile()
+end function
+
+' TMDB serves one image at several widths and the URL names the width
+' (".../t/p/w500/abc.jpg"). The stored URLs are sized for the Apple apps,
+' where a poster can fill an iPad; a Roku card draws at 280px and the oldest
+' devices we support are texture-memory bound, so a 500px source costs real
+' memory and real download time for pixels nobody sees.
+'
+' Only ever downsizes. A URL already smaller than the target is left alone —
+' /api/title-search hands back w92 thumbnails, and rewriting those upward
+' would make the Add screen slower to serve worse-looking art. Anything that
+' is not a TMDB sized-image URL is returned untouched.
+function TmdbWidth(url as string, want as integer) as string
+    marker = "image.tmdb.org/t/p/w"
+    idx = Instr(1, url, marker)
+    if idx = 0 then return url
+
+    start = idx + Len(marker)
+    digits = ""
+    i = start
+    while i <= Len(url)
+        ch = Mid(url, i, 1)
+        if ch >= "0" and ch <= "9"
+            digits = digits + ch
+            i = i + 1
+        else
+            exit while
+        end if
+    end while
+
+    if digits = "" then return url
+    if digits.ToInt() <= want then return url
+    return Left(url, start - 1) + Stri(want).Trim() + Mid(url, i)
+end function
+
 ' ---- Session cookie persistence (registry works on any thread) ----
 function GetSessionCookie() as string
     cfg = Config()

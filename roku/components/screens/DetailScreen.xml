@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <component name="DetailScreen" extends="Group">
     <interface>
+        <!-- The row/grid card the viewer came from. Enough to paint the
+             screen before the detail request returns. -->
+        <field id="seed" type="assocarray" onChange="onSeedSet" />
         <field id="showId" type="int" onChange="onIdSet" />
         <field id="authState" type="assocarray" onChange="onAuthChanged" />
         <field id="navigate" type="assocarray" alwaysNotify="true" />

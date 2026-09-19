@@ -7,6 +7,14 @@ sub init()
     m.apiTasks = []
     m.auth = { loggedIn: false, slug: invalid, email: invalid, isAdmin: false, checked: false }
 
+    ' Resolve the device tier once, before any screen is built, and park it on
+    ' the global node so every component reads the same answer. The print is
+    ' the only way to see which tier a device landed in — it shows up on the
+    ' telnet debug console during sideload testing.
+    profile = DeviceProfile()
+    m.global.addFields({ deviceProfile: profile })
+    print "[showpicker] device tier="; profile.tier; " graphics="; profile.platform; " model="; profile.model
+
     ' Show Home immediately (Trending is public); confirm any stored session in parallel.
     showHome()
     checkAuth()
@@ -98,6 +106,9 @@ sub onChildNavigate(ev as object)
         pushView(node)
     else if action = "openDetail"
         node = CreateObject("roSGNode", "DetailScreen")
+        ' Seed before showId: setting showId fires the request, and the seed is
+        ' what lets the screen draw while that request is in flight.
+        if msg.data.seed <> invalid then node.seed = msg.data.seed
         node.showId = msg.data.id
         pushView(node)
     else if action = "openSearch"

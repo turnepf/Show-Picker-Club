@@ -57,11 +57,12 @@ sub onResults(ev as object)
     m.message.visible = false
     m.grid.visible = true
     root = CreateObject("roSGNode", "ContentNode")
+    profile = Profile(m.top)
     for each r in m.results
         yr = SafeStr(r.year)
         root.appendChild(MakeCardContent({
             title: SafeStr(r.title) + iif(yr <> "", Chr(10) + "(" + yr + ")", "")
-            posterUrl: SafeStr(r.poster_url)
+            posterUrl: TmdbWidth(SafeStr(r.poster_url), profile.posterWidth)
             fallbackColor: FallbackColor(r.title)
             payload: r
         }))

@@ -86,9 +86,10 @@ sub applyFilter(q as string)
     ' we render — well past what anyone scrolls — and say so in the heading
     ' rather than truncating silently.
     m.totalMatches = m.results.Count()
-    if m.totalMatches > MaxResults()
+    cap = MaxResults()
+    if m.totalMatches > cap
         trimmed = []
-        for i = 0 to MaxResults() - 1
+        for i = 0 to cap - 1
             trimmed.push(m.results[i])
         end for
         m.results = trimmed
@@ -131,8 +132,9 @@ sub renderResults()
     m.message.visible = false
     m.grid.visible = true
     root = CreateObject("roSGNode", "ContentNode")
+    profile = Profile(m.top)
     for each s in m.results
-        root.appendChild(ShowCardNode(s))
+        root.appendChild(ShowCardNode(s, profile))
     end for
     m.grid.content = root
     focusGrid()
@@ -149,7 +151,7 @@ sub onItemSelected()
     if idx = invalid then return
     item = m.grid.content.getChild(idx)
     if item = invalid then return
-    m.top.navigate = { action: "openDetail", data: { id: item.payload.id } }
+    m.top.navigate = { action: "openDetail", data: { id: item.payload.id, seed: item.payload } }
 end sub
 
 ' Move focus: keyboard <-> buttons <-> grid.
@@ -202,8 +204,8 @@ sub focusGrid()
     m.grid.setFocus(true)
 end sub
 
-' Cap on rendered matches — see applyFilter(). BrightScript has no `const`,
-' so this follows the same function-returning-a-constant style as Globals.brs.
+' Cap on rendered matches — see applyFilter(). Lower on legacy hardware, where
+' each card is texture memory the device has much less of.
 function MaxResults() as integer
-    return 100
+    return Profile(m.top).maxResults
 end function

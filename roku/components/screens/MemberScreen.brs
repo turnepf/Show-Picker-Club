@@ -101,6 +101,7 @@ end sub
 sub buildRows(shows as object)
     root = CreateObject("roSGNode", "ContentNode")
     m.rowMeta = []
+    profile = Profile(m.top)
 
     for each listDef in ShowLists()
         inList = []
@@ -112,7 +113,7 @@ sub buildRows(shows as object)
             row = root.createChild("ContentNode")
             row.title = listDef.title + tallySuffix(inList)
             for each s in inList
-                row.appendChild(ShowCardNode(s))
+                row.appendChild(ShowCardNode(s, profile))
             end for
             m.rowMeta.push(listDef.key)
         end if
@@ -154,19 +155,44 @@ function tallySuffix(shows as object) as string
 end function
 
 ' Sort in place, mirroring tvOS MemberView.sorted.
+'
+' The comparison runs O(n^2) times under the insertion sort below, so each key
+' is computed once up front rather than inside the comparison. It used to
+' re-read `rating` and re-parse it to a float on every comparison — on a
+' 200-title list that is ~20,000 string-to-float conversions for a screen the
+' viewer is waiting on, which is plainly slow on a 2017 Roku and free to avoid.
+' The ordering is unchanged.
 sub sortShows(arr as object, listKey as string)
     hasManual = false
     for each s in arr
         if s.sort_order <> invalid then hasManual = true
     end for
-    for i = 1 to arr.Count() - 1
-        cur = arr[i]
+
+    rows = []
+    for each s in arr
+        order = 999999
+        if s.sort_order <> invalid then order = s.sort_order
+        rows.push({
+            show:   s
+            order:  order
+            rating: ratingOf(s)
+            date:   SafeStr(s.next_season_date)
+        })
+    end for
+
+    byDate = (listKey = "watching" or listKey = "waiting")
+    for i = 1 to rows.Count() - 1
+        cur = rows[i]
         j = i - 1
-        while j >= 0 and compareShows(arr[j], cur, listKey, hasManual) > 0
-            arr[j + 1] = arr[j]
+        while j >= 0 and compareRows(rows[j], cur, byDate, hasManual) > 0
+            rows[j + 1] = rows[j]
             j = j - 1
         end while
-        arr[j + 1] = cur
+        rows[j + 1] = cur
+    end for
+
+    for i = 0 to rows.Count() - 1
+        arr[i] = rows[i].show
     end for
 end sub
 
@@ -175,34 +201,29 @@ function ratingOf(s as object) as float
     return SafeStr(s.rating).ToFloat()
 end function
 
-function ratingCompareDesc(a as object, b as object) as integer
-    ra = ratingOf(a) : rb = ratingOf(b)
-    if ra > rb then return -1
-    if ra < rb then return 1
-    return 0
-end function
-
-function compareShows(a as object, b as object, listKey as string, hasManual as boolean) as integer
+' Compare two decorated rows. Reads precomputed fields only — no parsing.
+function compareRows(a as object, b as object, byDate as boolean, hasManual as boolean) as integer
     if hasManual
-        oa = 999999 : ob = 999999
-        if a.sort_order <> invalid then oa = a.sort_order
-        if b.sort_order <> invalid then ob = b.sort_order
-        if oa <> ob then return oa - ob
+        if a.order <> b.order then return a.order - b.order
         return ratingCompareDesc(a, b)
     end if
 
-    if listKey = "watching" or listKey = "waiting"
-        da = SafeStr(a.next_season_date)
-        db = SafeStr(b.next_season_date)
-        if da <> "" and db = "" then return -1
-        if da = "" and db <> "" then return 1
-        if da <> "" and db <> ""
-            if da < db then return -1
-            if da > db then return 1
+    if byDate
+        if a.date <> "" and b.date = "" then return -1
+        if a.date = "" and b.date <> "" then return 1
+        if a.date <> "" and b.date <> ""
+            if a.date < b.date then return -1
+            if a.date > b.date then return 1
         end if
         return ratingCompareDesc(a, b)
     end if
     return ratingCompareDesc(a, b)
+end function
+
+function ratingCompareDesc(a as object, b as object) as integer
+    if a.rating > b.rating then return -1
+    if a.rating < b.rating then return 1
+    return 0
 end function
 
 sub onRowSelected()
@@ -210,5 +231,5 @@ sub onRowSelected()
     if sel = invalid then return
     item = m.rows.content.getChild(sel[0]).getChild(sel[1])
     if item = invalid then return
-    m.top.navigate = { action: "openDetail", data: { id: item.payload.id } }
+    m.top.navigate = { action: "openDetail", data: { id: item.payload.id, seed: item.payload } }
 end sub

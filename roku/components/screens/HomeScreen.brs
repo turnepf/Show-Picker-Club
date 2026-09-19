@@ -109,12 +109,13 @@ end sub
 sub rebuildRows()
     root = CreateObject("roSGNode", "ContentNode")
     m.rowMeta = []  ' parallel: "trending" / "members"
+    profile = Profile(m.top)
 
     if m.trending.Count() > 0
         row = root.createChild("ContentNode")
         row.title = "Trending"
         for each s in m.trending
-            row.appendChild(ShowCardNode(s))
+            row.appendChild(ShowCardNode(s, profile))
         end for
         m.rowMeta.push("trending")
     end if
@@ -146,7 +147,7 @@ sub onRowSelected()
     payload = item.payload
 
     if kind = "trending"
-        m.top.navigate = { action: "openDetail", data: { id: payload.id } }
+        m.top.navigate = { action: "openDetail", data: { id: payload.id, seed: payload } }
     else if kind = "members"
         m.top.navigate = { action: "openMember", data: payload }
     end if
