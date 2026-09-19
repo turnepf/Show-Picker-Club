@@ -4,7 +4,6 @@ sub init()
     m.kb = m.top.findNode("kb")
     m.actions = m.top.findNode("actions")
     m.status = m.top.findNode("status")
-    m.hint = m.top.findNode("hint")
     m.actions.observeField("buttonSelected", "onAction")
 
     m.step = "init"
@@ -26,7 +25,7 @@ sub renderRoot()
         if m.top.authState.isAdmin = true then info = info + "    (Operator)"
         m.prompt.text = info
         m.kb.visible = false
-        m.hint.visible = false
+        m.actions.translation = [90, 260]
         m.actionKeys = ["signout", "delete", "back"]
         m.actions.buttons = ["Sign Out", "Delete Account", "< Back"]
         m.actions.visible = true
@@ -36,7 +35,7 @@ sub renderRoot()
         m.heading.text = "Sign In"
         m.prompt.text = "Choose how you'd like to receive your one-time code."
         m.kb.visible = false
-        m.hint.visible = false
+        m.actions.translation = [90, 260]
         m.actionKeys = ["email", "phone", "back"]
         m.actions.buttons = ["Continue with Email", "Continue with Phone", "< Back"]
         m.actions.visible = true
@@ -223,7 +222,7 @@ end sub
 sub showKeyboard(text as string)
     m.kb.text = text
     m.kb.visible = true
-    m.hint.visible = true
+    m.actions.translation = [90, 860]
     focusKeyboard()
 end sub
 
@@ -231,11 +230,18 @@ sub setSubmitButton(label as string)
     m.actionKeys = ["submit", "back"]
     m.actions.buttons = [label, "< Back"]
     m.actions.visible = true
+    ' Deliberately NOT setting focusButton here: assigning it takes focus away
+    ' from whatever has it, and this runs while the keyboard is meant to be
+    ' focused — which silently swallowed everything the member typed.
+    ' focusActions() sets it instead, at the moment focus actually moves.
 end sub
 
 sub focusActions()
     m.zone = "actions"
     m.actions.setFocus(true)
+    ' After setFocus, not before: a focusButton set on an unfocused group is
+    ' overridden when focus arrives.
+    m.actions.focusButton = 0
 end sub
 
 sub setStatus(msg as string)
@@ -251,7 +257,8 @@ end sub
 '
 ' That only works if the Keyboard *declines* Down so it bubbles up here, and
 ' Roku firmware differs on whether the bottom row passes it along. ✱ is the
-' backup — no build claims it — which is why the on-screen hint names it.
+' backup. Down is confirmed working on a Streaming Stick 4K (OS 15.3), and ✱
+' stays for the older hardware this channel targets.
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
     if m.zone = "kb"
@@ -260,7 +267,14 @@ function onKeyEvent(key as string, press as boolean) as boolean
             return true
         end if
     else if m.zone = "actions" and m.kb.visible
-        if key = "up" or key = "options"
+        ' Only leave for the keyboard from the top button. This group is
+        ' vertical, so swallowing every Up made the button above the focused
+        ' one unreachable — with "Send Code" above "< Back", the whole point
+        ' of the screen could not be selected.
+        if key = "options"
+            focusKeyboard()
+            return true
+        else if key = "up" and m.actions.focusButton = 0
             focusKeyboard()
             return true
         end if

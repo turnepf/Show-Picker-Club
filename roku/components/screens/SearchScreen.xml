@@ -17,10 +17,5 @@
                     itemSpacing="[24,30]" vertFocusAnimationStyle="floatingFocus" />
         <Label id="message" translation="[720,140]" width="1100" wrap="true"
                font="font:MediumSystemFont" color="0xFFFFFF99" visible="false" />
-        <!-- ✱ is the one key the Keyboard never claims on any firmware, so it is
-             the escape that always works. Named on screen because it is not
-             discoverable otherwise. -->
-        <Label id="hint" text="Press ✱ to switch between the keyboard and the buttons"
-               translation="[90,1020]" font="font:SmallestSystemFont" color="0xFFFFFF99" />
     </children>
 </component>

@@ -144,8 +144,9 @@ end sub
 '
 ' Leaving the Keyboard depends on the Keyboard *declining* the key so it bubbles
 ' up to here, and Roku firmware differs on whether the bottom row passes Down
-' along. Right and ✱ are the backups; ✱ is the only one no build claims, which
-' is why the on-screen hint names it.
+' along. Right and the ✱/options key are the backups. Down is confirmed
+' working on a Streaming Stick 4K (OS 15.3); the others stay for the older
+' hardware this channel targets, where the firmware may differ.
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
     hasResults = (m.results.Count() > 0)
@@ -182,7 +183,12 @@ end sub
 
 sub focusButtons()
     m.zone = "buttons"
+    ' Land on the search action rather than wherever the group was last left —
+    ' leaving the keyboard means "I've typed it", and Clear is a trap there.
+    ' focusButton has to be set *after* setFocus: assigning it to a group that
+    ' does not yet hold focus is overridden when focus arrives.
     m.buttons.setFocus(true)
+    m.buttons.focusButton = 1
 end sub
 
 sub focusGrid()
