@@ -18,10 +18,10 @@
              is 2040px of content on a 1080px screen, which crushed every row
              instead of scrolling between them. -->
         <RowList id="rows" translation="[90,150]" itemComponentName="PosterCard"
-                 numRows="2" rowLabelColor="0xF5F7FAFF" itemSize="[1830,510]"
+                 numRows="2" rowLabelColor="0xF5F7FAFF" itemSize="[1830,560]"
                  rowItemSize="[[280,440],[280,440],[280,440],[280,440]]"
                  rowItemSpacing="[[24,30],[24,30],[24,30],[24,30]]"
-                 rowHeights="[510,510,510,510]"
+                 rowHeights="[560,560,560,560]"
                  vertFocusAnimationStyle="floatingFocus" />
         <Label id="message" translation="[90,160]" width="1600" wrap="true"
                font="font:MediumSystemFont" color="0xFFFFFF99" visible="false" />
