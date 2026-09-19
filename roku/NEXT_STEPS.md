@@ -107,6 +107,40 @@ without changing anything.
   seam to build against. A public Channel Store submission needs this: Roku certification requires
   a channel that declares deep-link support to honour `contentId`/`mediaType`.
 
+## Publishing to the Roku Channel Store
+
+The channel is **certification-ready as code**: the manifest and artwork match the current criteria
+(`scripts/roku-manifest-test.mjs` pins it), there is no cross-app linking, Back exits from the home
+screen, sign-in is on-device, and launch is well under the 15-second limit at ~700ms. Deep linking
+is not required because the app plays no media.
+
+What remains is account work, and it is deliberately not automated — there is **no API for store
+submission**, only the developer dashboard.
+
+**1. Signing key (one-time, on the device).** A package must be signed by a key generated *on* a
+Roku in developer mode. `telnet <roku-ip> 8080` → `genkey` → it prints a dev ID and a password.
+Keep the password; it is the only way to sign an update that the Store will accept as the same
+channel. Put it in 1Password next to the developer account.
+
+**2. Package.** `roku-deploy` can do this once the key exists — `rekeyDevice`, then
+`createPackage` / `signExistingPackage`, producing a `.pkg`. Worth adding to `sideload.mjs` as a
+`package` subcommand when the key exists.
+
+**3. Submit.** developer.roku.com → Manage My Channels → upload the `.pkg`, then fill the listing:
+name, description, category, screenshots (captured with `node sideload.mjs shot`), content rating,
+support contact and a privacy policy URL (showpicker.club/privacy already exists).
+
+**Choose the distribution mode deliberately:**
+
+| | review | who can install |
+|---|---|---|
+| **Public** | full certification | anyone, listed in the Channel Store |
+| **Beta** | none | up to ~100 invited testers |
+| **Private / unlisted** | none | anyone with the link or code |
+
+Private is the low-friction way to get the channel onto a club member's Roku without a review
+cycle. Public is the one that needs everything above to hold.
+
 ## Device tiers
 
 The channel adapts to the hardware — see the table in `roku/README.md`. `DeviceProfile()` in
