@@ -147,10 +147,11 @@
     }
 
     // Friendly labels + a stable display order for the platform breakdown.
-    // 'ios' is a legacy value from before iPhone/iPad/Mac were told apart —
-    // kept because rows stored before KNOWN_PLATFORMS gated the header can
-    // still carry it. There is deliberately no 'unknown': the server omits
-    // sessions whose platform it never captured rather than naming them.
+    // Only values the server can actually emit: it omits sessions whose
+    // platform it never captured rather than naming them, and every key here
+    // is one some client sends today (_shared/platform.js#KNOWN_PLATFORMS,
+    // which is also what rejects anything else). An unlisted key still renders
+    // under its own name, so a new platform shows up before this map learns it.
     const PLATFORM_LABELS = {
       'iphone': 'iPhone',
       'ipad': 'iPad',
@@ -160,9 +161,8 @@
       'roku': 'Roku',
       'web-large': 'Web (large)',
       'web-small': 'Web (small)',
-      'ios': 'iOS (legacy)',
     };
-    const PLATFORM_ORDER = ['iphone', 'ipad', 'mac', 'watchos', 'tvos', 'roku', 'web-large', 'web-small', 'ios'];
+    const PLATFORM_ORDER = ['iphone', 'ipad', 'mac', 'watchos', 'tvos', 'roku', 'web-large', 'web-small'];
 
     function platformSection(byPlatform) {
       const bp = byPlatform || {};

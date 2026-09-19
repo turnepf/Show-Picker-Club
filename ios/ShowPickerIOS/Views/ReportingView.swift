@@ -189,11 +189,11 @@ struct ReportingView: View {
     }
 
     // Stable display order for the platform breakdown; unrecognized keys sort
-    // last. "ios" is a legacy value from before iPhone/iPad/Mac were told
-    // apart — kept because rows stored before KNOWN_PLATFORMS gated the header
-    // can still carry it. There is deliberately no "unknown": the server omits
-    // sessions whose platform it never captured rather than naming them.
-    private static let platformOrder = ["iphone", "ipad", "mac", "watchos", "tvos", "roku", "web-large", "web-small", "ios"]
+    // last and render under their own name, so a new platform shows up before
+    // this list learns it. Only values the server can emit: it omits sessions
+    // whose platform it never captured rather than naming them, and every key
+    // here is one some client sends today (_shared/platform.js).
+    private static let platformOrder = ["iphone", "ipad", "mac", "watchos", "tvos", "roku", "web-large", "web-small"]
 
     private func platformKeys(_ bp: PlatformWindows) -> [String] {
         var keys = Set(bp.day.keys)
@@ -214,7 +214,6 @@ struct ReportingView: View {
         case "roku": return "Roku"
         case "web-large": return "Web (large)"
         case "web-small": return "Web (small)"
-        case "ios": return "iOS (legacy)"
         default: return key
         }
     }
