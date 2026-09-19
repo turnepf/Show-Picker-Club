@@ -22,7 +22,6 @@
                  rowItemSize="[[280,440],[280,440],[280,440],[280,440]]"
                  rowItemSpacing="[[24,30],[24,30],[24,30],[24,30]]"
                  rowHeights="[510,510,510,510]"
-                 rowLabelOffset="[[0,0],[0,0],[0,0],[0,0]]"
                  vertFocusAnimationStyle="floatingFocus" />
         <Label id="message" translation="[90,160]" width="1600" wrap="true"
                font="font:MediumSystemFont" color="0xFFFFFF99" visible="false" />

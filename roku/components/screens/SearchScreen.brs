@@ -166,6 +166,11 @@ function onKeyEvent(key as string, press as boolean) as boolean
         else if key = "right" and hasResults
             focusGrid()
             return true
+        else if key = "down"
+            ' Swallow it. This group is horizontal, so Down has no business
+            ' moving between buttons — and the button it moved onto was Clear,
+            ' which throws away what was just typed. Left/Right navigate.
+            return true
         end if
     else if m.zone = "grid"
         if key = "left" or key = "options"
