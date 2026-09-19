@@ -90,8 +90,17 @@ end function
 function DeviceProfile() as object
     di = CreateObject("roDeviceInfo")
     platform = LCase(SafeStr(di.GetGraphicsPlatform()))
+    legacy = (platform <> "opengl")
 
-    if platform <> "opengl"
+    ' Build-time override — see the manifest. The Roku on hand for testing may
+    ' well be a current one, and the legacy path is the half that most needs
+    ' checking, so `node sideload.mjs --legacy` makes a modern device take it.
+    #if FORCE_LEGACY
+        legacy = true
+        platform = platform + " (FORCED legacy)"
+    #end if
+
+    if legacy
         ' Legacy: a 720p-era GPU, so a card draws at ~187px and w185 is an
         ' almost exact match — a quarter of the texture memory of w342 and a
         ' quarter of the bytes over the wire. The backdrop is dropped in

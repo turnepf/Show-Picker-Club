@@ -14,7 +14,11 @@ splash_color=#0D0F14
 splash_min_time=500
 
 ui_resolutions=fhd
-bs_const=DEBUG=false
+# FORCE_LEGACY is a build-time override, never shipped true. `node
+# sideload.mjs --legacy` flips it in the STAGED copy only, so the legacy tier
+# can be exercised on a modern device — a tier nobody can run is a tier nobody
+# has checked.
+bs_const=DEBUG=false;FORCE_LEGACY=false
 
 # No supports_input_launch until deep linking is actually implemented. main.brs
 # hands `input` to MainScene.launchArgs and nothing reads it, so declaring the
