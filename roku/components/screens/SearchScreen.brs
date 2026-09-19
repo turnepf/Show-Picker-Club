@@ -9,9 +9,9 @@ sub init()
     m.buttons.observeField("buttonSelected", "onButton")
     m.grid.observeField("itemSelected", "onItemSelected")
 
-    m.allShows = invalid
     m.results = []
-    m.totalMatches = 0
+    m.requested = 0
+    m.truncated = false
     m.zone = "kb"
     m.kb.setFocus(true)
 end sub
@@ -24,24 +24,29 @@ sub onButton()
         runSearch()
     else if idx = 2
         m.kb.text = ""
+        m.heading.text = "Search"
         focusKeyboard()
     end if
 end sub
 
+' The server does the filtering. This screen used to GET /api/shows/all in
+' full, parse it and hold the whole club library in memory to filter locally —
+' by far the heaviest thing the channel did, and the first thing that would
+' fall over on a 512MB 2017 box as the club grows. `?q=` was added to that
+' endpoint for exactly this; the device now receives matches instead of
+' everything, and holds nothing between searches.
 sub runSearch()
-    q = LCase(SafeStr(m.kb.text))
-    if q = "" then return
+    q = SafeStr(m.kb.text)
+    if q.Trim() = "" then return
     if m.top.authState = invalid or m.top.authState.loggedIn <> true
         showMessage("Sign in from the Account screen to search the club library.")
         return
     end if
-    m.pendingQuery = q
-    if m.allShows = invalid
-        showMessage("Searching…")
-        StartApi(m, { method: "GET", path: "/api/shows/all", tag: "all" }, "onAll")
-    else
-        applyFilter(q)
-    end if
+    showMessage("Searching…")
+    m.requested = MaxResults()
+    enc = CreateObject("roUrlTransfer").Escape(q)
+    path = "/api/shows/all?q=" + enc + "&limit=" + Stri(m.requested).Trim()
+    StartApi(m, { method: "GET", path: path, tag: "search" }, "onAll")
 end sub
 
 sub onAll(ev as object)
@@ -51,28 +56,31 @@ sub onAll(ev as object)
         showMessage("You're logged out — sign in again from the Account screen.")
         return
     end if
-    m.allShows = []
+
+    rows = []
     if res.json <> invalid and res.json.shows <> invalid
         for each s in res.json.shows
-            m.allShows.push(s)
+            rows.push(s)
         end for
     end if
-    applyFilter(m.pendingQuery)
+    ' The server returns one row per member copy; a title two group-mates both
+    ' hold comes back twice. Collapse to one card per title, keeping the
+    ' richest copy. Bounded by the server's limit, so this is a short list.
+    m.truncated = (rows.Count() >= m.requested)
+    applyResults(rows)
 end sub
 
-sub applyFilter(q as string)
-    ' De-dupe by title, keeping the richest copy (poster, else higher rating).
+' De-dupe by title, keeping the richest copy (poster, else higher rating).
+sub applyResults(rows as object)
     best = {}
     order = []
-    for each s in m.allShows
-        if matches(s, q)
-            key = LCase(SafeStr(s.title))
-            if best[key] = invalid
-                best[key] = s
-                order.push(key)
-            else
-                best[key] = richer(best[key], s)
-            end if
+    for each s in rows
+        key = LCase(SafeStr(s.title))
+        if best[key] = invalid
+            best[key] = s
+            order.push(key)
+        else
+            best[key] = richer(best[key], s)
         end if
     end for
 
@@ -80,32 +88,8 @@ sub applyFilter(q as string)
     for each key in order
         m.results.push(best[key])
     end for
-
-    ' A one-letter query matches most of the club library, and every match
-    ' becomes a ContentNode the grid holds for the life of the screen. Cap what
-    ' we render — well past what anyone scrolls — and say so in the heading
-    ' rather than truncating silently.
-    m.totalMatches = m.results.Count()
-    cap = MaxResults()
-    if m.totalMatches > cap
-        trimmed = []
-        for i = 0 to cap - 1
-            trimmed.push(m.results[i])
-        end for
-        m.results = trimmed
-    end if
     renderResults()
 end sub
-
-function matches(s as object, q as string) as boolean
-    if Instr(1, LCase(SafeStr(s.title)), q) > 0 then return true
-    if Instr(1, LCase(SafeStr(s.network)), q) > 0 then return true
-    if Instr(1, LCase(SafeStr(s.genres)), q) > 0 then return true
-    ' actors is a JSON string on /api/shows(/all).
-    actors = SafeStr(s.actors)
-    if actors <> "" and Instr(1, LCase(actors), q) > 0 then return true
-    return false
-end function
 
 function richer(a as object, b as object) as object
     aHas = (SafeStr(a.poster_url) <> "")
@@ -124,15 +108,17 @@ sub renderResults()
         showMessage("No matches.")
         return
     end if
-    if m.totalMatches > m.results.Count()
-        m.heading.text = "Search — first " + Stri(m.results.Count()).Trim() + " of " + Stri(m.totalMatches).Trim() + " matches"
+    ' The server caps the response, so a full page means "there may be more"
+    ' rather than a count we can state. Say the true thing.
+    if m.truncated
+        m.heading.text = "Search — first " + Stri(m.results.Count()).Trim() + " matches, narrow your search for more"
     else
         m.heading.text = "Search"
     end if
     m.message.visible = false
     m.grid.visible = true
     root = CreateObject("roSGNode", "ContentNode")
-    profile = Profile(m.top)
+    profile = ActiveProfile(m.top)
     for each s in m.results
         root.appendChild(ShowCardNode(s, profile))
     end for
@@ -207,5 +193,5 @@ end sub
 ' Cap on rendered matches — see applyFilter(). Lower on legacy hardware, where
 ' each card is texture memory the device has much less of.
 function MaxResults() as integer
-    return Profile(m.top).maxResults
+    return ActiveProfile(m.top).maxResults
 end function

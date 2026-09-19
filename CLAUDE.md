@@ -63,7 +63,7 @@ scripts/           apply-migrations.sh, member-engagement.sh, vibe-diagnose.mjs
 
 ## Commands
 
-There is **no package.json or linter** — the web side has no build step. Verification is by reading, local preview, and the checks below, most of which run in CI (`.github/workflows/pr-checks.yml`) and all of which run fine from a laptop:
+**The web side still has no package.json, no build step and no linter** — verification there is by reading, local preview, and the checks below. The one exception is `roku/`, which carries its own `package.json` for BrighterScript and roku-deploy (see *Roku tooling* below); it is scoped to that directory on purpose, and nothing it installs is deployed. Most of these checks run in CI (`.github/workflows/pr-checks.yml`) and all of them run fine from a laptop:
 
 ```bash
 bash scripts/check-static.sh
@@ -341,6 +341,22 @@ section heading surviving the seam between slices), duplicate handling, and the
 import's own daily ceiling.
 
 ```bash
+node scripts/shows-all-search-test.mjs
+```
+
+`?q=` on `/api/shows/all` — server-side cross-library search. The parameter is
+**additive**: with no `q` the response is exactly the shape it has always been,
+so the web and Apple clients that filter locally are untouched. It exists for
+Roku, which cannot hold the club library in memory. The properties pinned are
+the ones that make it safe to bolt a filter onto an endpoint that already had a
+privacy rule: group scoping survives the filter (a stranger's matching row
+stays invisible even when their title is typed exactly), the query is **text
+rather than a pattern** (a bare `%` returns nothing, not everything, and a real
+`%` in a title is still findable), a filtered response is bounded while an
+unfiltered one stays unbounded, and a blank `q` reads as "no filter" rather
+than "match nothing".
+
+```bash
 node scripts/og-preview-test.mjs
 ```
 
@@ -368,6 +384,38 @@ cd ShowPickerCore && swift test
 ```
 
 Unit tests for the shared core (macOS, or Linux with a Swift toolchain — the package is deliberately Foundation-only so CI needs no macOS runner). `SessionScopeTests` guards the rule that session-derived UI state dies with the session.
+
+### Roku tooling
+
+Roku ships no simulator, so `roku/` carries the only build tooling in the repo.
+Run these from `roku/` after `npm install`:
+
+```bash
+npx bsc --project bsconfig.json
+```
+
+BrighterScript validation of the whole channel — every call resolved against
+its real component scope, every `onChange` handler checked against the script
+that must define it, plus bslint for unused variables and name shadowing. This
+runs in CI (the `roku` job). Before it existed, the only way to find a typo or
+a missing function was to sideload and read the crash over telnet, so treat a
+`bsc` failure as a compile error, because that is what it is. Two rules are
+deliberately off: `aa-comma-style` (newline-separated associative arrays are
+valid BrightScript and the style this channel is written in) and `no-print`
+(the launch line that reports the device tier is load-bearing for testing).
+
+```bash
+node sideload.mjs info
+node sideload.mjs
+```
+
+Device info, then validate-package-install in one command. `info` prints the
+model, OS and graphics platform — the quickest way to see which tier
+`DeviceProfile()` will pick (`opengl` = modern, anything else = legacy).
+A sideload validates first and refuses to install a channel that fails, since
+a validation error becomes a crash on the device. Credentials stay out of the
+repo exactly like `scripts/asc.mjs`: `~/.roku/host` and `~/.roku/password`, or
+`ROKU_HOST` / `ROKU_PASSWORD` for a one-off.
 
 Two of the suites above — `watching-with-test.mjs` and `og-preview-test.mjs` — are **not** wired into `pr-checks.yml`; run them by hand when you touch what they cover.
 

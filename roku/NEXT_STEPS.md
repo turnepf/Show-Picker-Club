@@ -65,6 +65,11 @@ the Roku and your computer must be on the **same network**, and you upload a **z
 5. **Watch the logs.** `telnet <roku-ip> 8085` streams the debug console (`print`/runtime errors)
    — the fastest way to spot a compile or field error.
 
+**Or skip all of that:** `cd roku && npm install`, put the device address in `~/.roku/host` and
+the dev web-server password in `~/.roku/password`, then `node sideload.mjs` validates, packages
+and installs in one command. `node sideload.mjs info` prints the model, OS and graphics platform
+without changing anything.
+
 ## What to verify first (most likely to need tuning)
 
 - **Focus hops** between the on-screen `Keyboard`, action `ButtonGroup`, and result grids on
@@ -92,14 +97,11 @@ the Roku and your computer must be on the **same network**, and you upload a **z
   ripples through `PosterCard.xml`'s internal geometry and every grid/RowList that sizes against
   it, and those layouts were hand-tuned on device across #451–#455. Do it in a session with a Roku
   attached, where the result is visible.
-- **Search fetches the whole library — the biggest remaining risk on old hardware.**
-  `/api/shows/all` comes down in full, is parsed into memory, and is filtered on the device.
-  Rendering is capped (`MaxResults()`, 40 on legacy / 100 on modern, with the true total named in
-  the heading), which bounds the *grid* — but the download, the `ParseJson` and the retained array
-  still scale with the club, and none of that is capped. On a 512MB 2017 box that is the thing most
-  likely to fall over as the library grows. The real fix is a server-side search: a `q=` parameter
-  on `/api/shows/all` (or a new endpoint) so the device receives matches instead of everything.
-  That is a backend change, not a Roku one, and it is the next thing worth doing here.
+- ~~**Search fetches the whole library.**~~ **Fixed.** `/api/shows/all` now takes `?q=` and
+  `?limit=`, so the device receives matches instead of the club library and holds nothing between
+  searches. The parameter is additive — without `q` the endpoint is unchanged, so the web and Apple
+  clients are untouched. Covered by `scripts/shows-all-search-test.mjs`, which pins that group
+  scoping survives the filter.
 - **Deep linking is unimplemented**, and `supports_input_launch` was removed from the manifest to
   stop claiming otherwise. `main.brs` still parks the launch args on `MainScene.launchArgs` as the
   seam to build against. A public Channel Store submission needs this: Roku certification requires
@@ -131,7 +133,9 @@ focus zoom doesn't make the rows feel dead.
       screen, RowList field bugs, and an AccountScreen keyboard/button overlap. Merged.
 - [ ] Tune keyboard↔buttons↔grid focus transitions on-device (in progress — ✱ fallback added).
 - [ ] FHD geometry divisible by three (see *Known, deliberately deferred*).
-- [ ] Server-side search, so Search stops downloading the whole library (see above).
+- [x] Server-side search — `?q=` on `/api/shows/all`; the channel no longer downloads the library.
+- [ ] Sideload and confirm on a real device: the tier print line, `w185` posters at card size, and
+      that dropping the focus zoom on legacy doesn't make the rows feel dead.
 - [x] Add real artwork in `roku/images/` — generated from the App Store icon mark.
 - [ ] Decide on merge (the `roku` platform backend change ships with it) and, later, Roku channel
       publishing (Roku developer account → package with a signing key on-device → submit).

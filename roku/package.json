@@ -1,0 +1,16 @@
+{
+  "name": "showpicker-roku",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tooling for the Show Picker Club Roku channel. Scoped to roku/ on purpose: the web side of this repo has no build step and no package.json, and that stays true.",
+  "scripts": {
+    "check": "bsc --project bsconfig.json",
+    "sideload": "node sideload.mjs",
+    "info": "node sideload.mjs info"
+  },
+  "devDependencies": {
+    "@rokucommunity/bslint": "^0.8.46",
+    "brighterscript": "^0.69.0",
+    "roku-deploy": "^3.12.1"
+  }
+}

@@ -109,7 +109,7 @@ end sub
 sub rebuildRows()
     root = CreateObject("roSGNode", "ContentNode")
     m.rowMeta = []  ' parallel: "trending" / "members"
-    profile = Profile(m.top)
+    profile = ActiveProfile(m.top)
 
     if m.trending.Count() > 0
         row = root.createChild("ContentNode")

@@ -1,0 +1,26 @@
+{
+  "rootDir": ".",
+  "files": [
+    "manifest",
+    "source/**/*.brs",
+    "components/**/*.brs",
+    "components/**/*.xml",
+    "images/**/*"
+  ],
+  "createPackage": false,
+  "copyToStaging": false,
+  "retainStagingDir": false,
+  "plugins": [
+    "@rokucommunity/bslint"
+  ],
+  "rules": {
+    "no-print": "off",
+    "consistent-return": "error",
+    "unused-variable": "error",
+    "case-sensitivity": "error",
+    "unsafe-path-loop": "error",
+    "unsafe-iterators": "error",
+    "name-shadowing": "error",
+    "aa-comma-style": "off"
+  }
+}

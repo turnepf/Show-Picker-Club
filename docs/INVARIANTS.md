@@ -746,6 +746,39 @@ an answer of theirs.
 
 Enforced by `scripts/enrich-movie-detail-test.mjs`.
 
+## 21. A filter narrows a scoped query; it never widens it
+
+Several endpoints answer "what may this session see" with a `WHERE` clause —
+group membership, ownership, `archived = 0`. When a convenience filter is
+bolted onto one of those, the privacy rule and the search rule end up in the
+same `WHERE`, and the failure mode is a filter that reaches *past* the
+boundary it was meant to search within. Nothing about the feature looks wrong:
+results appear, they match the query, and they belong to someone the viewer
+was never supposed to see.
+
+`?q=` on `/api/shows/all` is the live case. It exists so Roku, which runs on
+hardware going back about eight years, receives matches instead of the whole
+club library.
+
+- **The scope clause is not optional and not conditional.** The group-scoping
+  `AND` is part of the query whether or not a filter is present, and a filter
+  is only ever `AND`-ed alongside it. A filter that can be expressed as an
+  `OR` at the top level is a bug.
+- **The filtered and unfiltered paths obey the same boundary.** Whatever a
+  search can return is a subset of what the unfiltered endpoint would have
+  returned for that session — never a row that was not already visible.
+- **A query string is text, not a pattern.** `LIKE` reads `%` and `_` as
+  wildcards, so user input is escaped before it becomes one. A bare `%` must
+  return nothing rather than the entire library, which is precisely the
+  request a filter like this exists to prevent.
+- **A filtered response is bounded.** An unbounded filter is the problem it
+  was added to solve, wearing a parameter.
+- **Blank means "no filter", not "match nothing".** An empty search box should
+  not look like an empty library.
+
+Enforcer: `scripts/shows-all-search-test.mjs` — in particular the case that
+types a stranger's title exactly and gets nothing back.
+
 ## Adding an invariant
 
 Add a section here, then decide which enforcer covers it. Prefer a deterministic
