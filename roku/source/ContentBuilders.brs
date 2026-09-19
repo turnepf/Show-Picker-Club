@@ -32,11 +32,15 @@ function PremiereBadge(show as object) as string
 end function
 
 ' Turn a /api/shows show object into a PosterCard ContentNode.
-function ShowCardNode(show as object) as object
+'
+' `profile` comes from Profile(m.top) — read it once per screen and pass it in;
+' a row can hold hundreds of these and re-deriving the device tier per card
+' would cost more than the sizing saves.
+function ShowCardNode(show as object, profile as object) as object
     return MakeCardContent({
         title:          SafeStr(show.title)
-        posterUrl:      SafeStr(show.poster_url)
-        networkLogoUrl: SafeStr(show.network_logo_url)
+        posterUrl:      TmdbWidth(SafeStr(show.poster_url), profile.posterWidth)
+        networkLogoUrl: TmdbWidth(SafeStr(show.network_logo_url), profile.logoWidth)
         fallbackColor:  FallbackColor(show.title)
         badge:          PremiereBadge(show)
         payload:        show

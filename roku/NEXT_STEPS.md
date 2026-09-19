@@ -87,17 +87,35 @@ the Roku and your computer must be on the **same network**, and you upload a **z
 - **FHD geometry not divisible by three.** Roku scales the `fhd` graphics plane by 2/3 on HD
   devices, so FHD dimensions that aren't multiples of three land on fractional HD pixels and soften
   edges — the 280px poster card and the 440px row height are the main offenders (also 34px row
-  spacing, several translations). Not fixed here: it ripples through `PosterCard.xml`'s internal
-  geometry and every grid/RowList that sizes against it, and those layouts were just hand-tuned on
-  device across #451–#455. Do it in a session with a Roku attached, where the result is visible.
-- **Search fetches the whole library.** `/api/shows/all` comes down in full and is filtered on the
-  device. Rendering is now capped (`MaxResults()` in `SearchScreen.brs`, with the total named in the
-  heading), which bounds the grid, but the fetch and the in-memory copy still scale with the club.
-  A server-side search endpoint is the real fix if the library keeps growing.
+  spacing, several translations). This matters *more* now that legacy devices are an explicit
+  target, since those are exactly the 720p boxes doing the 2/3 scale. Still not fixed here: it
+  ripples through `PosterCard.xml`'s internal geometry and every grid/RowList that sizes against
+  it, and those layouts were hand-tuned on device across #451–#455. Do it in a session with a Roku
+  attached, where the result is visible.
+- **Search fetches the whole library — the biggest remaining risk on old hardware.**
+  `/api/shows/all` comes down in full, is parsed into memory, and is filtered on the device.
+  Rendering is capped (`MaxResults()`, 40 on legacy / 100 on modern, with the true total named in
+  the heading), which bounds the *grid* — but the download, the `ParseJson` and the retained array
+  still scale with the club, and none of that is capped. On a 512MB 2017 box that is the thing most
+  likely to fall over as the library grows. The real fix is a server-side search: a `q=` parameter
+  on `/api/shows/all` (or a new endpoint) so the device receives matches instead of everything.
+  That is a backend change, not a Roku one, and it is the next thing worth doing here.
 - **Deep linking is unimplemented**, and `supports_input_launch` was removed from the manifest to
   stop claiming otherwise. `main.brs` still parks the launch args on `MainScene.launchArgs` as the
   seam to build against. A public Channel Store submission needs this: Roku certification requires
   a channel that declares deep-link support to honour `contentId`/`mediaType`.
+
+## Device tiers
+
+The channel adapts to the hardware — see the table in `roku/README.md`. `DeviceProfile()` in
+`source/Globals.brs` reads `roDeviceInfo.GetGraphicsPlatform()` once at launch and everything
+cost-sensitive (image widths, detail hero art, focus animation, search result cap) reads from that
+one profile. The tier is printed to the debug console at launch, so `telnet <roku-ip> 8085` tells
+you immediately which one a device landed in.
+
+Worth confirming on a real legacy box: that the tier is detected as `legacy` at all (the print
+line), that `w185` posters still look acceptable at the card's draw size, and that dropping the
+focus zoom doesn't make the rows feel dead.
 
 ## Platform parity gaps (Roku limits, intentional)
 
@@ -113,6 +131,7 @@ the Roku and your computer must be on the **same network**, and you upload a **z
       screen, RowList field bugs, and an AccountScreen keyboard/button overlap. Merged.
 - [ ] Tune keyboard↔buttons↔grid focus transitions on-device (in progress — ✱ fallback added).
 - [ ] FHD geometry divisible by three (see *Known, deliberately deferred*).
+- [ ] Server-side search, so Search stops downloading the whole library (see above).
 - [x] Add real artwork in `roku/images/` — generated from the App Store icon mark.
 - [ ] Decide on merge (the `roku` platform backend change ships with it) and, later, Roku channel
       publishing (Roku developer account → package with a signing key on-device → submit).

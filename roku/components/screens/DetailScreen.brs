@@ -14,6 +14,27 @@ sub init()
     m.actions.observeField("buttonSelected", "onAction")
 end sub
 
+' Draw what the card already told us — title and its artwork — before the
+' detail request comes back. The poster URI is sized with posterWidth, not
+' heroWidth, on purpose: that is the exact URL the card just loaded, so it is
+' already in the image cache and paints in the same frame instead of costing a
+' second download. render() replaces it with the full-size hero afterwards.
+sub onSeedSet()
+    seed = m.top.seed
+    if seed = invalid then return
+    m.title.text = SafeStr(seed.title)
+
+    poster = TmdbWidth(SafeStr(seed.poster_url), Profile(m.top).posterWidth)
+    if poster <> ""
+        m.hero.width = 300 : m.hero.height = 450
+        m.hero.uri = poster
+        m.heroFallback.visible = false
+    else
+        m.heroFallback.color = FallbackColor(seed.title)
+        m.heroFallback.visible = true
+    end if
+end sub
+
 sub onIdSet()
     id = m.top.showId
     if id = 0 then return
@@ -62,15 +83,21 @@ end sub
 sub render()
     s = m.show
 
+    ' A 720x405 backdrop is the nicest version of this screen and the most
+    ' expensive single bitmap in the channel. Legacy devices get the poster
+    ' instead — smaller, and usually already cached from the card that was
+    ' just on screen — rather than a backdrop that competes with the row of
+    ' posters still held behind this view.
+    profile = Profile(m.top)
     backdrop = SafeStr(s.backdrop_url)
     poster = SafeStr(s.poster_url)
-    if backdrop <> ""
+    if backdrop <> "" and profile.useBackdrop
         m.hero.width = 720 : m.hero.height = 405
-        m.hero.uri = backdrop
+        m.hero.uri = TmdbWidth(backdrop, profile.heroWidth)
         m.heroFallback.visible = false
     else if poster <> ""
         m.hero.width = 300 : m.hero.height = 450
-        m.hero.uri = poster
+        m.hero.uri = TmdbWidth(poster, profile.heroWidth)
         m.heroFallback.visible = false
     else
         m.hero.uri = ""

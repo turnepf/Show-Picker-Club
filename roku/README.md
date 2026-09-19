@@ -28,6 +28,40 @@ stores it in the registry (`roRegistrySection "showpicker"`), and replays it as 
 request also sends `X-Client-Platform: roku`. The client sends **no `Origin` header**, so the
 backend treats it as a native client and never issues a Turnstile challenge.
 
+## Device tiers — the channel adapts to the hardware it lands on
+
+The channel has to stay usable on Rokus going back about eight years, and a 2017 box is a
+genuinely different machine from a current one: the older models draw through **DirectFB** with a
+small texture budget, anything current uses **OpenGL**. `roDeviceInfo.GetGraphicsPlatform()` is
+Roku's own signal for that split, so `DeviceProfile()` in `source/Globals.brs` reads it once at
+launch, caches the result on the global node, and every cost-sensitive decision reads from that
+one profile.
+
+| | legacy (DirectFB) | modern (OpenGL) |
+|---|---|---|
+| Card poster | TMDB `w185` | TMDB `w342` |
+| Network logo | `w92` | `w154` |
+| Detail hero | poster, `w342` | backdrop, `w780` |
+| Focus zoom | off | 1.06× scale |
+| Search results rendered | 40 | 100 |
+
+Nothing in that table removes a screen, a list or an action — the tiers differ in **cost per pixel
+drawn**, not in what the channel can do. The tier a device landed in is printed to the debug
+console at launch (`[showpicker] device tier=…`), which is the quickest way to confirm it on a
+sideload.
+
+Two rules that hold everywhere, regardless of tier:
+
+- **Images are sized by the client, not the server.** The stored `poster_url` is `w500` because it
+  is shared with the Apple apps, where a poster can fill an iPad. `TmdbWidth()` rewrites the width
+  in the URL and **only ever downsizes** — `/api/title-search` already returns `w92` thumbnails,
+  and rewriting those upward would make the Add screen slower for worse art.
+- **Text is drawn before images.** `PosterCard.onContentSet()` sets the title, background, fallback
+  and badge first and assigns the image `uri`s last, so a card is readable before its artwork
+  arrives. `DetailScreen` goes further: it paints the title and poster from the card you selected
+  (`seed`) while the detail request is still in flight, reusing the exact URL the card already
+  loaded so it comes from the image cache rather than costing a second download.
+
 ## Platform parity notes (Roku limits, not omissions)
 
 - **Watch / deep links** — Roku does not let a channel launch other streaming apps to a specific
