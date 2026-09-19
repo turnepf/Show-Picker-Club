@@ -84,6 +84,12 @@ on purpose — the web side has no build step and that stays true). `npm install
 | `npx bsc --project bsconfig.json` | Validate the whole channel — every call resolved against its real component scope, every `onChange` handler checked against the script that must define it, plus bslint for unused variables and name shadowing. Runs in CI. |
 | `node sideload.mjs info` | Device model, OS and graphics platform. The quickest way to see which tier `DeviceProfile()` will pick. |
 | `node sideload.mjs` | Validate, package and install to the device in one command. |
+| `node sideload.mjs --legacy` | The same, built with `FORCE_LEGACY=true` so a modern device takes the legacy path. Patches the **staged** manifest only — the committed one always says false. |
+
+The `--legacy` build matters because the Roku you have to hand is probably a current one, and the
+legacy tier is the half that most needs checking. A tier nobody can run is a tier nobody has
+verified. Note that it forces the *decisions* (smaller art, no focus zoom, lower search cap), not
+the hardware — it shows you what a 2017 box would be asked to draw, not how fast it would draw it.
 
 A `bsc` failure is a compile error — before this existed, the only way to find a typo or a call to
 a function that isn't there was to sideload and read the crash over telnet, so a sideload validates

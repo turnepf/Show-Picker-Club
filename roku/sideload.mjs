@@ -14,6 +14,7 @@
 //
 //   node roku/sideload.mjs info        device model, OS, graphics platform
 //   node roku/sideload.mjs             validate, package, install
+//   node roku/sideload.mjs --legacy    install a build forced to the legacy tier
 //   node roku/sideload.mjs --skip-check   install without validating
 //
 // `info` is the quickest way to confirm which tier DeviceProfile() will pick:
@@ -32,7 +33,13 @@ const CONFIG_DIR = path.join(os.homedir(), '.roku');
 // Only the channel itself goes to the device. The tooling that builds it
 // (node_modules, package.json, bsconfig.json) and the docs must stay out of
 // the zip — node_modules alone is larger than the entire channel.
-const CHANNEL_FILES = ['manifest', 'source/**/*', 'components/**/*', 'images/**/*'];
+const CHANNEL_FILES = [
+  'manifest',
+  'source/**/*',
+  'components/**/*',
+  'images/**/*',
+  '!**/*.md', // images/README.md documents the artwork; the device has no use for it
+];
 
 function die(msg) {
   console.error(`\n${msg}\n`);
@@ -50,9 +57,13 @@ function credential(envVar, fileName, label, hint) {
   die(`No ${label}.\n\nSet it once:\n    mkdir -p ${CONFIG_DIR}\n    printf '%s' '${hint}' > ${file}\n\nOr pass it for a single run with ${envVar}=...`);
 }
 
-function options() {
+const host = () => credential('ROKU_HOST', 'host', 'Roku address', '192.168.1.50');
+
+// `info` reads the device over ECP (port 8060), which is unauthenticated — so
+// it must not demand the developer password. Only an install needs that.
+function deployOptions() {
   return {
-    host: credential('ROKU_HOST', 'host', 'Roku address', '192.168.1.50'),
+    host: host(),
     password: credential('ROKU_PASSWORD', 'password', 'developer web-server password', 'your-dev-password'),
     rootDir: ROKU_DIR,
     files: CHANNEL_FILES,
@@ -72,32 +83,68 @@ function validate() {
   if (r.status !== 0) die('Validation failed — not sideloading. Fix the errors above, or pass --skip-check to install anyway.');
 }
 
-async function info(opts) {
-  const d = await rokuDeploy.getDeviceInfo({ host: opts.host, remotePort: 8060 });
-  const graphics = d['graphics-platform'] ?? '(not reported)';
+// ECP reports what the device IS, not how it draws: there is no
+// graphics-platform field in /query/device-info. Only the channel can answer
+// that, via roDeviceInfo.GetGraphicsPlatform() at launch — so this prints the
+// facts ECP has and points at the log line for the tier, rather than guessing
+// a tier from a field that is always absent.
+async function info() {
+  const d = await rokuDeploy.getDeviceInfo({ host: host(), remotePort: 8060 });
   console.log(`
-  Model     ${d['model-number']}  ${d['friendly-model-name'] ?? d['user-device-name'] ?? ''}
-  OS        ${d['software-version']}.${d['software-build']}
-  Display   ${d['ui-resolution'] ?? '?'}  (${d['display-type'] ?? '?'})
-  Graphics  ${graphics}
-  Tier      ${String(graphics).toLowerCase() === 'opengl' ? 'modern' : 'legacy'}  <- what DeviceProfile() will pick
+  Model      ${d['model-number']}  ${d['friendly-model-name'] ?? d['model-name'] ?? ''}
+  Form       ${d['is-tv'] === true || d['is-tv'] === 'true' ? 'Roku TV' : d['is-stick'] === true || d['is-stick'] === 'true' ? 'streaming stick' : 'set-top box'}
+  OS         ${d['software-version']}.${d['software-build']}
+  UI output  ${d['ui-resolution'] ?? '?'}
+
+  Tier is decided on the device, not here — ECP does not report the graphics
+  platform. Sideload and read the launch line:
+
+      telnet ${host()} 8085     ->  [showpicker] device tier=... graphics=...
+
+  To exercise the legacy path on a modern device: node sideload.mjs --legacy
 `);
+}
+
+// Flip a bs_const in the STAGED manifest. The committed manifest is never
+// touched, so an interrupted run cannot leave the repo holding a debug build.
+function forceLegacyInStaging(stagingDir) {
+  const manifest = path.join(stagingDir, 'manifest');
+  const before = fs.readFileSync(manifest, 'utf8');
+  const after = before.replace(/FORCE_LEGACY=false/, 'FORCE_LEGACY=true');
+  if (after === before) die('Could not find FORCE_LEGACY=false in the staged manifest.');
+  fs.writeFileSync(manifest, after);
 }
 
 async function main() {
   const args = process.argv.slice(2);
-  const opts = options();
 
   if (args.includes('info')) {
-    await info(opts);
+    await info();
     return;
   }
 
+  const opts = deployOptions();
+  const legacy = args.includes('--legacy');
   if (!args.includes('--skip-check')) validate();
 
-  console.log(`Packaging and installing to ${opts.host} …`);
-  await rokuDeploy.deploy(opts);
-  console.log('Installed. Channel should be running on the TV now.');
+  if (legacy) {
+    // Staged build: copy, patch the constant, zip, upload. Same steps
+    // rokuDeploy.deploy() runs, with one edit in the middle.
+    const stagingDir = path.join(opts.outDir, 'staging');
+    const staged = { ...opts, stagingDir };
+    console.log('Building with FORCE_LEGACY=true …');
+    await rokuDeploy.prepublishToStaging(staged);
+    forceLegacyInStaging(stagingDir);
+    await rokuDeploy.zipPackage(staged);
+    console.log(`Installing to ${opts.host} …`);
+    await rokuDeploy.publish(staged);
+    console.log('Installed a FORCED LEGACY build — re-run without --legacy to go back.');
+  } else {
+    console.log(`Packaging and installing to ${opts.host} …`);
+    await rokuDeploy.deploy(opts);
+    console.log('Installed.');
+  }
+
   console.log(`Logs: telnet ${opts.host} 8085`);
 }
 
