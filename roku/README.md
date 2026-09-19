@@ -14,7 +14,11 @@ own navigation conventions rather than mimicking Apple's tab bar.
 - **Detail** — hero art, overview, cast, rating, club-rating summary, and action buttons to move
   a show between lists / archive / restore (your own copy) or add another member's / trending
   show to one of your lists.
-- **Search** — cross-library search over `/api/shows/all` (title, network, genre, cast).
+- **Search** — cross-library search over `/api/shows/all?q=` (title, network, genre, cast),
+  filtered **server-side**. The channel used to download the whole club library and filter it on
+  the device; that was the heaviest thing it did and the first thing that would fall over on an
+  older box, so the filtering moved to the server and the device now holds nothing between
+  searches.
 - **Add** — TMDB title search (`/api/title-search`) → pick a list → `POST /api/shows`.
 - **Account** — email/phone one-time-code sign-in, self-enroll name step, sign out, and the
   two-step delete-account flow.
@@ -69,6 +73,24 @@ Two rules that hold everywhere, regardless of tier:
 - **Trailers** — YouTube keys aren't directly playable on Roku, so trailers are omitted for now.
 - **Sign in with Apple / Google** — not available on Roku; email/phone OTP only.
 - **Ratings** — display-only, same as tvOS.
+
+## Tooling
+
+Roku ships no simulator, so this directory carries the only build tooling in the repo (scoped here
+on purpose — the web side has no build step and that stays true). `npm install` once, then:
+
+| Command | What it does |
+|---|---|
+| `npx bsc --project bsconfig.json` | Validate the whole channel — every call resolved against its real component scope, every `onChange` handler checked against the script that must define it, plus bslint for unused variables and name shadowing. Runs in CI. |
+| `node sideload.mjs info` | Device model, OS and graphics platform. The quickest way to see which tier `DeviceProfile()` will pick. |
+| `node sideload.mjs` | Validate, package and install to the device in one command. |
+
+A `bsc` failure is a compile error — before this existed, the only way to find a typo or a call to
+a function that isn't there was to sideload and read the crash over telnet, so a sideload validates
+first and refuses to install a channel that fails.
+
+Credentials stay out of the repo, matching `scripts/asc.mjs`: `~/.roku/host` and
+`~/.roku/password`, or `ROKU_HOST` / `ROKU_PASSWORD` for a single run.
 
 ## Building / sideloading
 

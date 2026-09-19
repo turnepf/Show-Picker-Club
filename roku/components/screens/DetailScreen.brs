@@ -24,7 +24,7 @@ sub onSeedSet()
     if seed = invalid then return
     m.title.text = SafeStr(seed.title)
 
-    poster = TmdbWidth(SafeStr(seed.poster_url), Profile(m.top).posterWidth)
+    poster = TmdbWidth(SafeStr(seed.poster_url), ActiveProfile(m.top).posterWidth)
     if poster <> ""
         m.hero.width = 300 : m.hero.height = 450
         m.hero.uri = poster
@@ -88,7 +88,7 @@ sub render()
     ' instead — smaller, and usually already cached from the card that was
     ' just on screen — rather than a backdrop that competes with the row of
     ' posters still held behind this view.
-    profile = Profile(m.top)
+    profile = ActiveProfile(m.top)
     backdrop = SafeStr(s.backdrop_url)
     poster = SafeStr(s.poster_url)
     if backdrop <> "" and profile.useBackdrop

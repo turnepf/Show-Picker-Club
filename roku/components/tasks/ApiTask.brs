@@ -2,10 +2,10 @@
 ' Reads/writes the session cookie (registry) and replays it as a Cookie header.
 
 sub init()
-    m.top.functionName = "run"
+    m.top.functionName = "runRequest"
 end sub
 
-sub run()
+sub runRequest()
     req = m.top.request
     cfg = Config()
 

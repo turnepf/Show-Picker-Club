@@ -101,7 +101,7 @@ end sub
 sub buildRows(shows as object)
     root = CreateObject("roSGNode", "ContentNode")
     m.rowMeta = []
-    profile = Profile(m.top)
+    profile = ActiveProfile(m.top)
 
     for each listDef in ShowLists()
         inList = []

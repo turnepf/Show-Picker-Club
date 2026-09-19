@@ -127,7 +127,11 @@ end function
 ' Read the profile MainScene cached on the global node, recomputing only if we
 ' are somewhere it never got set. Cheap enough to call per screen, too costly
 ' to call per card — pass the result down instead.
-function Profile(node as object) as object
+'
+' Named ActiveProfile rather than Profile because BrightScript identifiers are
+' case-insensitive: a global Profile() and a local `profile` are the same name,
+' and the local silently wins inside that function.
+function ActiveProfile(node as object) as object
     if node <> invalid and node.global <> invalid
         p = node.global.deviceProfile
         if p <> invalid and p.tier <> invalid then return p

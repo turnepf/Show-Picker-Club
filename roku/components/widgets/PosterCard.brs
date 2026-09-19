@@ -10,7 +10,7 @@ sub init()
     ' Re-scaling a bitmap every frame is the expensive operation on the legacy
     ' graphics stack, and a row of these animates together. The card still
     ' reveals its title on focus — only the zoom goes away.
-    m.focusScale = Profile(m.top).focusScale
+    m.focusScale = ActiveProfile(m.top).focusScale
 end sub
 
 ' Everything a card can draw without a network round trip is set first, and

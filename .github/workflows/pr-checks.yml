@@ -1,7 +1,7 @@
 name: PR checks
 
 # The gate that runs BEFORE a change ships — which the post-deploy smoke test,
-# by definition, cannot. Two deterministic jobs:
+# by definition, cannot. Deterministic jobs only:
 #
 #   static   — repo-shape invariants (scripts/check-static.sh): every API
 #              endpoint gated, redirects present, AASA well-formed, no retired
@@ -16,6 +16,12 @@ name: PR checks
 #              a real SQLite database for replay and cross-member isolation.
 #              Both decide who gets a session, so a forged assertion being
 #              accepted has to fail a test, not a code review.
+#   roku     — BrighterScript validation of the Roku channel. Roku ships no
+#              simulator, so until this existed the only way to find a typo, a
+#              call to a function that isn't there, or an onChange handler with
+#              no handler was to sideload and read a crash over telnet. `bsc`
+#              resolves every call against its real component scope, which is
+#              the whole class of bug that used to reach the device.
 #   authcodes — the email login/signup code flow, same harness, with a fake
 #              Resend that refuses reserved domains the way the real one does.
 #              App Review rejected tvOS 1.2 over a code that never arrived;
@@ -94,6 +100,25 @@ jobs:
         run: node scripts/enrich-identity-test.mjs
       - name: Movie enrichment selects on every field it writes
         run: node scripts/enrich-movie-detail-test.mjs
+      - name: Cross-library search filters server-side without widening scope
+        run: node scripts/shows-all-search-test.mjs
+
+  roku:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      # roku/ carries its own package.json on purpose — the web side of this
+      # repo has no build step and that stays true.
+      - name: Install Roku tooling
+        working-directory: roku
+        run: npm ci
+      - name: Validate the Roku channel
+        working-directory: roku
+        run: npx bsc --project bsconfig.json
 
   listimport:
     runs-on: ubuntu-latest

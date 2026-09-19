@@ -57,7 +57,7 @@ sub onResults(ev as object)
     m.message.visible = false
     m.grid.visible = true
     root = CreateObject("roSGNode", "ContentNode")
-    profile = Profile(m.top)
+    profile = ActiveProfile(m.top)
     for each r in m.results
         yr = SafeStr(r.year)
         root.appendChild(MakeCardContent({
