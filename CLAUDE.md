@@ -108,11 +108,14 @@ membership (names, rosters, creator) but never the group's shows.
 node scripts/reporting-platform-test.mjs
 ```
 
-`/api/reporting`'s admin gate and the unit its platform breakdown is counted
-in. It counts **people, not sessions**: four iPhone sessions across two members
-read as 2, a member on three platforms is 1 on each row (so the rows don't sum
-to Active members), and a member-less tvOS session still counts as one device
-rather than collapsing into a phantom person.
+`/api/reporting`'s admin gate and the unit its people numbers are counted in.
+They count **people, not sessions or devices**: four iPhone sessions across two
+members read as 2, one member's three Apple TVs / two Macs / four Rokus are one
+user on each of those rows, and `signin_methods` reports people per method (four
+Apple sign-ins by one person is 1) rather than sessions minted. A member on
+three platforms is 1 on each row, so the rows don't sum to Active members. Every
+count groups by the same `PERSON` expression, which falls back to a legacy
+member-less session's own identity instead of counting one per device.
 
 ```bash
 node scripts/watching-with-test.mjs

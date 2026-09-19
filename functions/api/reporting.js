@@ -12,6 +12,15 @@ async function countOver(env, sql, ...binds) {
   return row ? row.cnt : 0;
 }
 
+// One person, counted once — the unit every "people" number on this dashboard
+// is in. Sessions are per device and plural by design: signing in on three
+// Apple TVs, two Macs or four Rokus mints three, two and four rows, and a
+// reinstall mints another. Grouping by the member the session belongs to is
+// what turns those back into one user. A row predating member_slug (nothing
+// mints one now, and a session lives 30 days) falls back to the identity it
+// does carry, prefixed so it can never collide with a real slug.
+const PERSON = "COALESCE(member_slug, 'email:' || email)";
+
 export async function onRequestGet(context) {
   const { env, request } = context;
   // Operator-only: aggregate metrics (member counts, login coverage) shouldn't
@@ -65,35 +74,34 @@ export async function onRequestGet(context) {
       `SELECT COUNT(*) as cnt FROM (SELECT DISTINCT tmdb_id, tmdb_type FROM show_ratings)`);
   } catch (_) { /* show_ratings not migrated yet */ }
 
-  // Active members = distinct logged-in members whose session pinged within
+  // Active members = distinct logged-in people whose session pinged within
   // the window. last_seen_at is bumped (throttled to 1/hour) on every
   // /auth/check, so this approximates DAU/WAU/MAU for authenticated visits.
   const activeMembers = {
     day: await countOver(env,
-      `SELECT COUNT(DISTINCT member_slug) as cnt FROM sessions WHERE last_seen_at >= datetime('now', '-1 day')`),
+      `SELECT COUNT(DISTINCT ${PERSON}) as cnt FROM sessions WHERE last_seen_at >= datetime('now', '-1 day')`),
     week: await countOver(env,
-      `SELECT COUNT(DISTINCT member_slug) as cnt FROM sessions WHERE last_seen_at >= datetime('now', '-7 days')`),
+      `SELECT COUNT(DISTINCT ${PERSON}) as cnt FROM sessions WHERE last_seen_at >= datetime('now', '-7 days')`),
     month: await countOver(env,
-      `SELECT COUNT(DISTINCT member_slug) as cnt FROM sessions WHERE last_seen_at >= datetime('now', '-30 days')`),
+      `SELECT COUNT(DISTINCT ${PERSON}) as cnt FROM sessions WHERE last_seen_at >= datetime('now', '-30 days')`),
   };
 
   // Active *people* broken down by client platform (see
-  // _shared/platform.js#KNOWN_PLATFORMS). Counts distinct members, not
-  // sessions: one member signed in on a phone, a reinstall of that phone and
-  // a browser tab is one person on iPhone and one on the web, not three
-  // iPhones. A member active on two platforms counts once in each, so the
-  // rows deliberately don't sum to Active members. Sessions with no member
-  // (an anonymous tvOS device) have nobody to dedupe by, so each one counts
-  // as its own user rather than collapsing into a single phantom person.
-  // Defensive: the platform column arrives in migration 016, so fall back to
-  // an empty breakdown rather than 500 the whole dashboard if it's missing.
+  // _shared/platform.js#KNOWN_PLATFORMS). Counts distinct people, not
+  // sessions or devices: one member on three Apple TVs, two Macs or four
+  // Rokus is one user on that row, and a reinstall or a second sign-in on
+  // the same phone is still one person. A member active on two platforms
+  // counts once in each, so the rows deliberately don't sum to Active
+  // members. Defensive: the platform column arrives in migration 016, so
+  // fall back to an empty breakdown rather than 500 the whole dashboard if
+  // it's missing.
   const activeByPlatform = { day: {}, week: {}, month: {} };
   const platWindows = { day: '-1 day', week: '-7 days', month: '-30 days' };
   try {
     for (const [label, interval] of Object.entries(platWindows)) {
       const { results } = await env.DB.prepare(
         `SELECT COALESCE(platform, 'unknown') AS platform,
-                COUNT(DISTINCT COALESCE(member_slug, 'session:' || id)) AS cnt
+                COUNT(DISTINCT ${PERSON}) AS cnt
            FROM sessions
           WHERE last_seen_at >= datetime('now', ?)
           GROUP BY COALESCE(platform, 'unknown')`
@@ -102,17 +110,23 @@ export async function onRequestGet(context) {
     }
   } catch (_) { /* platform column not migrated yet */ }
 
-  // How members actually sign in (migration 059): sessions minted per method
-  // over each window, plus how every account was created. This is what says
-  // whether an auth channel still earns what it costs to run — Twilio SMS
-  // bills per message, email codes need Resend. NULL auth_method = a session
-  // minted before the column existed; shown as 'unknown' rather than dropped.
+  // How members actually sign in (migration 059): distinct *people* who
+  // minted a session per method over each window, plus how every account was
+  // created. This is what says whether an auth channel still earns what it
+  // costs to run — Twilio SMS bills per message, email codes need Resend.
+  // Counting people rather than sessions is what keeps that readable: one
+  // member signing in on four devices is one person who depends on Apple,
+  // not four, and retiring a channel is a decision about people. Someone who
+  // used two methods counts on both rows, so these don't sum either. NULL
+  // auth_method = a session minted before the column existed; shown as
+  // 'unknown' rather than dropped.
   const signinMethods = { week: {}, month: {}, quarter: {} };
   const methodWindows = { week: '-7 days', month: '-30 days', quarter: '-90 days' };
   try {
     for (const [label, interval] of Object.entries(methodWindows)) {
       const { results } = await env.DB.prepare(
-        `SELECT COALESCE(auth_method, 'unknown') AS method, COUNT(*) AS cnt
+        `SELECT COALESCE(auth_method, 'unknown') AS method,
+                COUNT(DISTINCT ${PERSON}) AS cnt
            FROM sessions
           WHERE created_at >= datetime('now', ?)
           GROUP BY COALESCE(auth_method, 'unknown')`

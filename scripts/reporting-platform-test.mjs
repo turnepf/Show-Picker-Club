@@ -1,20 +1,24 @@
-// Tests for GET /api/reporting's "Active by platform" breakdown — the one
-// number on that dashboard that is easy to read as bigger than it is.
+// Tests for GET /api/reporting's people numbers — Active members, "Active by
+// platform" and "How people sign in", the three that are easy to read as
+// bigger than they are.
 //
 //   node scripts/reporting-platform-test.mjs
 //
-// It used to count sessions. Sessions are cheap and plural: a reinstall, a
-// second sign-in, a browser tab and a phone all mint their own row, so a
-// two-member club could read "13 iPhone" and look like thirteen people. It
-// counts distinct members now, and three things have to hold for that to
-// mean anything:
+// They used to count sessions. Sessions are per device and plural: a
+// reinstall, a second sign-in, a browser tab and a phone all mint their own
+// row, so a two-member club could read "13 iPhone" and look like thirteen
+// people. Every one of them counts distinct *people* now — one member on
+// three Apple TVs, two Macs or four Rokus is one user, not three, two or
+// four — and these things have to hold for that to mean anything:
 //
 //   1. Several sessions for one member on one platform are one person.
 //   2. A member on two platforms is one person on each row — the rows
 //      deliberately don't sum to Active members.
-//   3. Sessions with no member (an anonymous tvOS device) have nothing to
-//      dedupe by, so each still counts as one, rather than collapsing into a
-//      single phantom person or vanishing from the breakdown entirely.
+//   3. Sign-in methods count people too: four devices signed in with Apple
+//      is one person who depends on Apple.
+//   4. Sessions with no member (a legacy row from before member_slug) fall
+//      back to the identity they do carry, so one person's old devices
+//      collapse into one person and two strangers stay two.
 //
 // Plus the gate: the whole endpoint is admin-only, and a logged-in non-admin
 // is not "nearly an admin" for club-wide metrics.
@@ -83,19 +87,22 @@ function addMember(env, slug, name, { admin = false } = {}) {
   ).run(slug, name, name.split(' ')[0], admin ? 1 : 0);
 }
 
-// `slug` may be null: that is an anonymous device (tvOS signs in without
-// carrying a member on the session row).
+// `slug` may be null: that is a session from before member_slug existed, which
+// carries only the identity in `email`. `identity` sets that column; it
+// defaults to something unique per row, so a test that doesn't care about it
+// gets two distinct strangers rather than an accidental match.
 let sessionSeq = 0;
-function addSession(env, { slug = null, platform = null, lastSeen = 'now' } = {}) {
+function addSession(env, { slug = null, platform = null, lastSeen = 'now',
+                           identity = null, method = null, createdAt = null } = {}) {
   const id = `session-${++sessionSeq}`;
   const seen = lastSeen === 'now'
     ? new Date().toISOString()
     : lastSeen; // an explicit timestamp, or null for "never checked in"
   env._db.prepare(
-    `INSERT INTO sessions (id, email, member_slug, expires_at, created_at, last_seen_at, platform)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, slug || `anon-${id}`, slug, new Date(Date.now() + 86400000).toISOString(),
-        new Date().toISOString(), seen, platform);
+    `INSERT INTO sessions (id, email, member_slug, expires_at, created_at, last_seen_at, platform, auth_method)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, identity || slug || `anon-${id}`, slug, new Date(Date.now() + 86400000).toISOString(),
+        createdAt || new Date().toISOString(), seen, platform, method);
   return id;
 }
 
@@ -165,17 +172,98 @@ console.log('\n== one person on two platforms counts on both rows');
         JSON.stringify(day));
 }
 
-console.log('\n== sessions with no member each count as one');
+console.log('\n== one person\'s pile of devices is one person');
+{
+  const env = makeEnv();
+  addMember(env, 'patrick', 'Patrick Turner', { admin: true });
+  addMember(env, 'stacy', 'Stacy Kallay');
+  const cookie = addSession(env, { slug: 'patrick', platform: 'iphone' });
+  // Three Apple TVs, two Macs and four Rokus — all Patrick's.
+  for (let i = 0; i < 3; i++) addSession(env, { slug: 'patrick', platform: 'tvos' });
+  for (let i = 0; i < 2; i++) addSession(env, { slug: 'patrick', platform: 'mac' });
+  for (let i = 0; i < 4; i++) addSession(env, { slug: 'patrick', platform: 'roku' });
+  // Stacy has one of each, so every row should read 2, never 10.
+  addSession(env, { slug: 'stacy', platform: 'tvos' });
+  addSession(env, { slug: 'stacy', platform: 'mac' });
+  addSession(env, { slug: 'stacy', platform: 'roku' });
+
+  const r = await body(env, cookie);
+  const day = r.active_by_platform.day;
+  check('three Apple TVs and one are two people', day.tvos === 2, JSON.stringify(day));
+  check('two Macs and one are two people', day.mac === 2, JSON.stringify(day));
+  check('four Rokus and one are two people', day.roku === 2, JSON.stringify(day));
+  check('and the club is two active members, not ten',
+        r.active_members.day === 2, `got ${r.active_members.day}`);
+}
+
+console.log('\n== legacy sessions with no member dedupe on the identity they carry');
 {
   const env = makeEnv();
   addMember(env, 'patrick', 'Patrick Turner', { admin: true });
   const cookie = addSession(env, { slug: 'patrick', platform: 'iphone' });
-  // Two Apple TVs in two houses, neither carrying a member slug.
-  addSession(env, { slug: null, platform: 'tvos' });
-  addSession(env, { slug: null, platform: 'tvos' });
+  // Two Apple TVs in one house, from before member_slug: same identity.
+  addSession(env, { slug: null, identity: 'jc@example.com', platform: 'tvos' });
+  addSession(env, { slug: null, identity: 'jc@example.com', platform: 'tvos' });
+  // A third in someone else's house.
+  addSession(env, { slug: null, identity: 'whitt@example.com', platform: 'tvos' });
 
   const day = (await body(env, cookie)).active_by_platform.day;
-  check('two anonymous devices are two, not one', day.tvos === 2, JSON.stringify(day));
+  check('one person\'s two old devices are one, the stranger\'s is another',
+        day.tvos === 2, JSON.stringify(day));
+}
+
+console.log('\n== a slug can never collide with a legacy identity');
+{
+  const env = makeEnv();
+  addMember(env, 'patrick', 'Patrick Turner', { admin: true });
+  const cookie = addSession(env, { slug: 'patrick', platform: 'iphone' });
+  // A member-less row whose identity happens to read exactly like a slug.
+  addSession(env, { slug: null, identity: 'patrick', platform: 'tvos' });
+
+  const r = await body(env, cookie);
+  check('the member and the lookalike stay two people',
+        r.active_members.day === 2, `got ${r.active_members.day}`);
+}
+
+console.log('\n== sign-in methods count people, not sessions');
+{
+  const env = makeEnv();
+  addMember(env, 'patrick', 'Patrick Turner', { admin: true });
+  addMember(env, 'stacy', 'Stacy Kallay');
+  const cookie = addSession(env, { slug: 'patrick', platform: 'iphone', method: 'apple' });
+  // Patrick signs in with Apple on three more devices.
+  addSession(env, { slug: 'patrick', platform: 'tvos', method: 'apple' });
+  addSession(env, { slug: 'patrick', platform: 'mac', method: 'apple' });
+  addSession(env, { slug: 'patrick', platform: 'ipad', method: 'apple' });
+  // ...and once by email, which is a second row for the same person.
+  addSession(env, { slug: 'patrick', platform: 'web-large', method: 'email' });
+  addSession(env, { slug: 'stacy', platform: 'iphone', method: 'sms' });
+
+  const sm = (await body(env, cookie)).signin_methods;
+  check('four Apple sign-ins by one person read as 1',
+        sm.week.apple === 1, JSON.stringify(sm.week));
+  check('his email sign-in is the same person on the other row',
+        sm.week.email === 1, JSON.stringify(sm.week));
+  check('and Stacy is the only one on SMS', sm.week.sms === 1, JSON.stringify(sm.week));
+  check('so the rows do not sum to the session count (3 vs 6)',
+        Object.values(sm.week).reduce((a, b) => a + b, 0) === 3, JSON.stringify(sm.week));
+  check('the 30- and 90-day windows agree',
+        sm.month.apple === 1 && sm.quarter.apple === 1, JSON.stringify(sm));
+}
+
+console.log('\n== sign-in windows are cut by when the session was minted');
+{
+  const env = makeEnv();
+  addMember(env, 'patrick', 'Patrick Turner', { admin: true });
+  addMember(env, 'stacy', 'Stacy Kallay');
+  const cookie = addSession(env, { slug: 'patrick', platform: 'iphone', method: 'apple' });
+  const fortyDaysAgo = new Date(Date.now() - 40 * 86400000).toISOString();
+  addSession(env, { slug: 'stacy', platform: 'iphone', method: 'sms', createdAt: fortyDaysAgo });
+
+  const sm = (await body(env, cookie)).signin_methods;
+  check('a 40-day-old sign-in is outside the month window',
+        sm.month.sms === undefined, JSON.stringify(sm.month));
+  check('but inside the quarter', sm.quarter.sms === 1, JSON.stringify(sm.quarter));
 }
 
 console.log('\n== a missing platform lands in "unknown", and stale sessions drop out');

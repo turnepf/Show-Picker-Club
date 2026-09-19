@@ -12,7 +12,7 @@ catch different classes of mistake:
 | Auth code tests (`scripts/auth-code-flow-test.mjs`) | every PR | The email login/signup code flow: codes that arrive, and failures that are reported |
 | Activity feed tests (`scripts/activity-feed-test.mjs`) | every PR | `/api/activity` stays session-gated, `?member=` shows only what that member chose, bulk adds collapse per list |
 | Admin member detail tests (`scripts/admin-member-detail-test.mjs`) | every PR | `/api/admin-member-emails` stays admin-only, and `?member=` returns that member and nobody else |
-| Reporting platform tests (`scripts/reporting-platform-test.mjs`) | every PR | `/api/reporting` stays admin-only, and the platform breakdown counts people rather than sessions |
+| Reporting platform tests (`scripts/reporting-platform-test.mjs`) | every PR | `/api/reporting` stays admin-only, and its people numbers count people rather than sessions or devices |
 | List import tests (`scripts/import-list-test.mjs`) | every PR | The paste-a-list path: what a model may and may not put in the database, paging, and the commit-side validation |
 | Network tests (`scripts/networks-test.mjs`) | every PR | The canonical table: a name claimed by two services, and the catalog `/api/networks` serves to the apps |
 | Enrichment identity tests (`scripts/enrich-identity-test.mjs`) | every PR | A stored `tmdb_id` is the row's identity: enrichment never re-guesses a pinned row by title, and propagation never crosses two entries sharing one title |
@@ -323,7 +323,7 @@ never decide who is allowed to look at something.
 
 Enforcer: `scripts/vibe-scope-test.mjs`.
 
-## 11. Reporting counts people, not rows
+## 11. Reporting counts people, not rows or devices
 
 Every activity number on `/api/reporting` answers "how many people", not "how
 many database rows happened to exist". Sessions are the wrong unit and always
@@ -332,15 +332,24 @@ all mint their own `sessions` row, so a two-member club read "13 iPhone / 22 /
 31" on the platform breakdown — thirteen phones' worth of activity from one
 person and a spare device.
 
-- Active-by-platform counts distinct `member_slug` per platform. A member on
-  two platforms counts once on each row, so the rows deliberately don't sum to
-  Active members — say so in the UI rather than letting a reader add them up.
-- A session with no member (an anonymous tvOS device) has nothing to dedupe by
-  and counts as one, rather than collapsing every anonymous device in the club
-  into a single phantom person or dropping out of the breakdown entirely.
-- Counts of *events* — ratings submitted, shows added, sessions minted per
-  sign-in method — stay counts of events. The rule is that the label says which
-  it is: "people who rated" and "ratings submitted" are two rows for a reason.
+**Devices are the wrong unit too, and for the same reason.** One member signed
+in on three Apple TVs, two Macs or four Rokus is one user. Every per-person
+count groups by the same expression — `COALESCE(member_slug, 'email:' ||
+email)`, defined once as `PERSON` in `functions/api/reporting.js` — so a person
+is a person on every row of the dashboard rather than per query. The fallback
+is for rows that predate `member_slug` (nothing mints one now, and a session
+lives 30 days): they dedupe on the identity they do carry, so one household's
+old devices collapse into one person and two strangers stay two. The `email:`
+prefix is what keeps a legacy identity from ever colliding with a real slug.
+
+- Active members, Active-by-platform and How-people-sign-in all count distinct
+  people. Someone on two platforms — or using two sign-in methods — counts once
+  on each row, so those rows deliberately don't sum to Active members. Say so
+  in the UI rather than letting a reader add them up, and don't print a total
+  over rows that can double-count a person.
+- Counts of *events* — ratings submitted, shows added, calendar fetches — stay
+  counts of events. The rule is that the label says which it is: "people who
+  rated" and "ratings submitted" are two rows for a reason.
 
 Enforcer: `scripts/reporting-platform-test.mjs`.
 

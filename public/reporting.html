@@ -155,12 +155,13 @@
       'mac': 'Mac',
       'watchos': 'Apple Watch',
       'tvos': 'Apple TV',
+      'roku': 'Roku',
       'web-large': 'Web (large)',
       'web-small': 'Web (small)',
       'ios': 'iOS (legacy)',
       'unknown': 'Unknown',
     };
-    const PLATFORM_ORDER = ['iphone', 'ipad', 'mac', 'watchos', 'tvos', 'web-large', 'web-small', 'ios', 'unknown'];
+    const PLATFORM_ORDER = ['iphone', 'ipad', 'mac', 'watchos', 'tvos', 'roku', 'web-large', 'web-small', 'ios', 'unknown'];
 
     function platformSection(byPlatform) {
       const bp = byPlatform || {};
@@ -194,7 +195,7 @@
           <thead><tr><th>Platform</th><th class="num">Day</th><th class="num">Week</th><th class="num">Month</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
-        <div class="footer">Distinct active sessions in each window (a member can use more than one platform).</div>
+        <div class="footer">Distinct people in each window, not devices or sessions — three Apple TVs, two Macs or four Rokus signed in as the same person count once. Someone who uses two platforms counts on both rows, so these don't add up to Active members.</div>
       </div>`;
     }
 
