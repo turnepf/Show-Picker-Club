@@ -1,7 +1,7 @@
 # Roku channel — status & pick-up notes
 
-A place to resume from. The Roku app is **written and committed** on branch
-`claude/roku-app-plan-7tu9w3`; what's left is on-device testing, artwork, and tuning.
+A place to resume from. The Roku channel is **on `main` and running on a device**; what's left is
+focus tuning, HD-scaling polish, and the decision about publishing.
 
 ## Where things stand
 
@@ -10,13 +10,12 @@ A place to resume from. The Roku app is **written and committed** on branch
   `ButtonGroup`, `Dialog`, `BusySpinner`) with Roku-idiomatic navigation.
 - **Feature scope:** full parity with the current tvOS app — sign in, browse Trending + members +
   the four lists + detail + search, plus add / move / archive / restore and delete account.
-- **Backend change (in this branch):** added `roku` to `KNOWN_PLATFORMS` in
-  `functions/_shared/platform.js` so Roku sessions get recorded. Deploys automatically on the next
-  merge to `main`; no migration.
-- **Docs updated:** `README.md`, `docs/ARCHITECTURE.md` (Native clients + platform value),
-  `public/whats-new.json` (coming-soon entry), and `roku/README.md`.
-- **NOT done:** never compiled or run — Roku SceneGraph has no simulator, so it needs a real
-  device. Not merged. No PR opened. No placeholder artwork yet.
+- **Backend:** `roku` is in `KNOWN_PLATFORMS` (`functions/_shared/platform.js`), so Roku sessions
+  get recorded like any other platform.
+- **Run on a real device.** Roku SceneGraph has no simulator, so every change is verified by
+  sideloading (below). Artwork is in place, generated from the App Store icon mark.
+- **NOT done:** not published — no Roku developer account, no signed package, no Channel Store
+  submission. Sideload-only.
 
 ## Screens (mirrors `tvos/ShowPickerTV`)
 
@@ -71,6 +70,10 @@ the Roku and your computer must be on the **same network**, and you upload a **z
 - **Focus hops** between the on-screen `Keyboard`, action `ButtonGroup`, and result grids on
   Search / Add / Account. Handled manually in each screen's `onKeyEvent`; Roku firmware varies in
   whether the keyboard bubbles edge key presses, so a hop may feel sticky and need adjusting.
+  There are now three ways out of the keyboard, because the parent only sees a key the `Keyboard`
+  itself declines: **Down** (the intended one), **Right** on Search/Add when there are results,
+  and **✱** (`options`), which no firmware claims and which the on-screen hint names. Confirm Down
+  works on device; if it does, the ✱ hint could come back out.
 - **Sign-in end to end:** email OTP → confirm the `session` cookie is captured, persisted, and
   replayed so `/api/shows?member=<me>` returns 200 (not 401). Kill & relaunch → session persists.
   (If `DEMO_LOGIN_EMAIL`/`DEMO_LOGIN_CODE` secrets are set, that account avoids needing a real
@@ -78,6 +81,23 @@ the Roku and your computer must be on the **same network**, and you upload a **z
 - **Writes:** move between lists, archive/restore, add from TMDB search — each should succeed and
   update the UI.
 - **Row labels / colors / sort** match tvOS on the member screen.
+
+## Known, deliberately deferred
+
+- **FHD geometry not divisible by three.** Roku scales the `fhd` graphics plane by 2/3 on HD
+  devices, so FHD dimensions that aren't multiples of three land on fractional HD pixels and soften
+  edges — the 280px poster card and the 440px row height are the main offenders (also 34px row
+  spacing, several translations). Not fixed here: it ripples through `PosterCard.xml`'s internal
+  geometry and every grid/RowList that sizes against it, and those layouts were just hand-tuned on
+  device across #451–#455. Do it in a session with a Roku attached, where the result is visible.
+- **Search fetches the whole library.** `/api/shows/all` comes down in full and is filtered on the
+  device. Rendering is now capped (`MaxResults()` in `SearchScreen.brs`, with the total named in the
+  heading), which bounds the grid, but the fetch and the in-memory copy still scale with the club.
+  A server-side search endpoint is the real fix if the library keeps growing.
+- **Deep linking is unimplemented**, and `supports_input_launch` was removed from the manifest to
+  stop claiming otherwise. `main.brs` still parks the launch args on `MainScene.launchArgs` as the
+  seam to build against. A public Channel Store submission needs this: Roku certification requires
+  a channel that declares deep-link support to honour `contentId`/`mediaType`.
 
 ## Platform parity gaps (Roku limits, intentional)
 
@@ -91,7 +111,8 @@ the Roku and your computer must be on the **same network**, and you upload a **z
 
 - [x] Sideload and get it running — fixed the missing `<script>` includes that crashed every
       screen, RowList field bugs, and an AccountScreen keyboard/button overlap. Merged.
-- [ ] Tune keyboard↔buttons↔grid focus transitions on-device (in progress).
+- [ ] Tune keyboard↔buttons↔grid focus transitions on-device (in progress — ✱ fallback added).
+- [ ] FHD geometry divisible by three (see *Known, deliberately deferred*).
 - [x] Add real artwork in `roku/images/` — generated from the App Store icon mark.
 - [ ] Decide on merge (the `roku` platform backend change ships with it) and, later, Roku channel
       publishing (Roku developer account → package with a signing key on-device → submit).

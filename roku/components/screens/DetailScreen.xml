@@ -26,8 +26,7 @@
                      buttonHeight="60" minWidth="200" horizAlignment="left" />
         <Label id="status" translation="[90,560]" width="640" wrap="true"
                font="font:SmallSystemFont" color="0x33C773FF" visible="false" />
-        <BusySpinner id="busy" translation="[930,500]" visible="true">
-            <Poster width="60" height="60" uri="pkg:/images/spinner.png" />
-        </BusySpinner>
+        <BusySpinner id="busy" translation="[930,500]" visible="true"
+                     uri="pkg:/images/spinner.png" control="start" />
     </children>
 </component>

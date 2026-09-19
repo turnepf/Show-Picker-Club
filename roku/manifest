@@ -3,7 +3,7 @@ major_version=1
 minor_version=0
 build_version=1
 
-# Channel artwork — replace these placeholders with real assets before publishing.
+# Channel artwork, generated from the App Store icon mark.
 mm_icon_focus_hd=pkg:/images/icon_focus_hd.png
 mm_icon_focus_sd=pkg:/images/icon_focus_sd.png
 mm_icon_side_hd=pkg:/images/icon_side_hd.png
@@ -14,5 +14,10 @@ splash_color=#0D0F14
 splash_min_time=500
 
 ui_resolutions=fhd
-supports_input_launch=1
 bs_const=DEBUG=false
+
+# No supports_input_launch until deep linking is actually implemented. main.brs
+# hands `input` to MainScene.launchArgs and nothing reads it, so declaring the
+# support made external launches look broken rather than unsupported — and a
+# channel that claims it has to honour contentId/mediaType to pass Roku
+# certification. Re-add it with the handler, not before.

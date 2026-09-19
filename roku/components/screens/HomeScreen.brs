@@ -79,6 +79,7 @@ sub loadTrending()
 end sub
 
 sub onTrending(ev as object)
+    FinishApi(m, ev)
     res = ev.getRoSGNode().result
     m.trending = []
     if res.json <> invalid and res.json.shows <> invalid
@@ -94,6 +95,7 @@ sub loadMembers()
 end sub
 
 sub onMembers(ev as object)
+    FinishApi(m, ev)
     res = ev.getRoSGNode().result
     m.members = []
     if res.json <> invalid and res.json.members <> invalid

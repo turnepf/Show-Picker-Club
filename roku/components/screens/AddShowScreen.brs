@@ -21,8 +21,7 @@ sub onButton()
         runSearch()
     else if idx = 2
         m.kb.text = ""
-        m.zone = "kb"
-        m.kb.setFocus(true)
+        focusKeyboard()
     end if
 end sub
 
@@ -39,6 +38,7 @@ sub runSearch()
 end sub
 
 sub onResults(ev as object)
+    FinishApi(m, ev)
     res = ev.getRoSGNode().result
     if res.statusCode = 401
         showMessage("You're logged out — sign in again from the Account screen.")
@@ -67,8 +67,7 @@ sub onResults(ev as object)
         }))
     end for
     m.grid.content = root
-    m.zone = "grid"
-    m.grid.setFocus(true)
+    focusGrid()
 end sub
 
 function iif(cond as boolean, a as string, b as string) as string
@@ -127,6 +126,7 @@ function iifi(cond as boolean, a as integer, b as integer) as integer
 end function
 
 sub onAdded(ev as object)
+    FinishApi(m, ev)
     res = ev.getRoSGNode().result
     dialog = CreateObject("roSGNode", "Dialog")
     if res.ok
@@ -149,16 +149,52 @@ sub showMessage(text as string)
     m.grid.visible = false
 end sub
 
+' Move focus: keyboard <-> buttons <-> grid.
+'
+' Leaving the Keyboard depends on the Keyboard *declining* the key so it bubbles
+' up to here, and Roku firmware differs on whether the bottom row passes Down
+' along. Right and ✱ are the backups; ✱ is the only one no build claims, which
+' is why the on-screen hint names it.
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
-    if m.zone = "kb" and key = "down"
-        m.zone = "buttons" : m.buttons.setFocus(true) : return true
-    else if m.zone = "buttons" and key = "up"
-        m.zone = "kb" : m.kb.setFocus(true) : return true
-    else if m.zone = "buttons" and key = "right" and m.results.Count() > 0
-        m.zone = "grid" : m.grid.setFocus(true) : return true
-    else if m.zone = "grid" and key = "left"
-        m.zone = "buttons" : m.buttons.setFocus(true) : return true
+    hasResults = (m.results.Count() > 0)
+
+    if m.zone = "kb"
+        if key = "down" or key = "options"
+            focusButtons()
+            return true
+        else if key = "right" and hasResults
+            focusGrid()
+            return true
+        end if
+    else if m.zone = "buttons"
+        if key = "up" or key = "options"
+            focusKeyboard()
+            return true
+        else if key = "right" and hasResults
+            focusGrid()
+            return true
+        end if
+    else if m.zone = "grid"
+        if key = "left" or key = "options"
+            focusButtons()
+            return true
+        end if
     end if
     return false
 end function
+
+sub focusKeyboard()
+    m.zone = "kb"
+    m.kb.setFocus(true)
+end sub
+
+sub focusButtons()
+    m.zone = "buttons"
+    m.buttons.setFocus(true)
+end sub
+
+sub focusGrid()
+    m.zone = "grid"
+    m.grid.setFocus(true)
+end sub

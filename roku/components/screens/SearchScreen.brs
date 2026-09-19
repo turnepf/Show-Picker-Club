@@ -3,6 +3,7 @@ sub init()
     m.buttons = m.top.findNode("buttons")
     m.grid = m.top.findNode("grid")
     m.message = m.top.findNode("message")
+    m.heading = m.top.findNode("heading")
 
     m.buttons.buttons = ["< Back", "Search", "Clear"]
     m.buttons.observeField("buttonSelected", "onButton")
@@ -10,6 +11,7 @@ sub init()
 
     m.allShows = invalid
     m.results = []
+    m.totalMatches = 0
     m.zone = "kb"
     m.kb.setFocus(true)
 end sub
@@ -22,8 +24,7 @@ sub onButton()
         runSearch()
     else if idx = 2
         m.kb.text = ""
-        m.zone = "kb"
-        m.kb.setFocus(true)
+        focusKeyboard()
     end if
 end sub
 
@@ -44,6 +45,7 @@ sub runSearch()
 end sub
 
 sub onAll(ev as object)
+    FinishApi(m, ev)
     res = ev.getRoSGNode().result
     if res.statusCode = 401
         showMessage("You're logged out — sign in again from the Account screen.")
@@ -78,6 +80,19 @@ sub applyFilter(q as string)
     for each key in order
         m.results.push(best[key])
     end for
+
+    ' A one-letter query matches most of the club library, and every match
+    ' becomes a ContentNode the grid holds for the life of the screen. Cap what
+    ' we render — well past what anyone scrolls — and say so in the heading
+    ' rather than truncating silently.
+    m.totalMatches = m.results.Count()
+    if m.totalMatches > MaxResults()
+        trimmed = []
+        for i = 0 to MaxResults() - 1
+            trimmed.push(m.results[i])
+        end for
+        m.results = trimmed
+    end if
     renderResults()
 end sub
 
@@ -104,8 +119,14 @@ end function
 
 sub renderResults()
     if m.results.Count() = 0
+        m.heading.text = "Search"
         showMessage("No matches.")
         return
+    end if
+    if m.totalMatches > m.results.Count()
+        m.heading.text = "Search — first " + Stri(m.results.Count()).Trim() + " of " + Stri(m.totalMatches).Trim() + " matches"
+    else
+        m.heading.text = "Search"
     end if
     m.message.visible = false
     m.grid.visible = true
@@ -114,8 +135,7 @@ sub renderResults()
         root.appendChild(ShowCardNode(s))
     end for
     m.grid.content = root
-    m.zone = "grid"
-    m.grid.setFocus(true)
+    focusGrid()
 end sub
 
 sub showMessage(text as string)
@@ -133,24 +153,57 @@ sub onItemSelected()
 end sub
 
 ' Move focus: keyboard <-> buttons <-> grid.
+'
+' Leaving the Keyboard depends on the Keyboard *declining* the key so it bubbles
+' up to here, and Roku firmware differs on whether the bottom row passes Down
+' along. Right and ✱ are the backups; ✱ is the only one no build claims, which
+' is why the on-screen hint names it.
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
-    if m.zone = "kb" and key = "down"
-        m.zone = "buttons"
-        m.buttons.setFocus(true)
-        return true
-    else if m.zone = "buttons" and key = "up"
-        m.zone = "kb"
-        m.kb.setFocus(true)
-        return true
-    else if m.zone = "buttons" and key = "right" and m.results.Count() > 0
-        m.zone = "grid"
-        m.grid.setFocus(true)
-        return true
-    else if m.zone = "grid" and key = "left"
-        m.zone = "buttons"
-        m.buttons.setFocus(true)
-        return true
+    hasResults = (m.results.Count() > 0)
+
+    if m.zone = "kb"
+        if key = "down" or key = "options"
+            focusButtons()
+            return true
+        else if key = "right" and hasResults
+            focusGrid()
+            return true
+        end if
+    else if m.zone = "buttons"
+        if key = "up" or key = "options"
+            focusKeyboard()
+            return true
+        else if key = "right" and hasResults
+            focusGrid()
+            return true
+        end if
+    else if m.zone = "grid"
+        if key = "left" or key = "options"
+            focusButtons()
+            return true
+        end if
     end if
     return false
+end function
+
+sub focusKeyboard()
+    m.zone = "kb"
+    m.kb.setFocus(true)
+end sub
+
+sub focusButtons()
+    m.zone = "buttons"
+    m.buttons.setFocus(true)
+end sub
+
+sub focusGrid()
+    m.zone = "grid"
+    m.grid.setFocus(true)
+end sub
+
+' Cap on rendered matches — see applyFilter(). BrightScript has no `const`,
+' so this follows the same function-returning-a-constant style as Globals.brs.
+function MaxResults() as integer
+    return 100
 end function

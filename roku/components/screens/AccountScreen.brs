@@ -4,6 +4,7 @@ sub init()
     m.kb = m.top.findNode("kb")
     m.actions = m.top.findNode("actions")
     m.status = m.top.findNode("status")
+    m.hint = m.top.findNode("hint")
     m.actions.observeField("buttonSelected", "onAction")
 
     m.step = "init"
@@ -25,6 +26,7 @@ sub renderRoot()
         if m.top.authState.isAdmin = true then info = info + "    (Operator)"
         m.prompt.text = info
         m.kb.visible = false
+        m.hint.visible = false
         m.actionKeys = ["signout", "delete", "back"]
         m.actions.buttons = ["Sign Out", "Delete Account", "< Back"]
         m.actions.visible = true
@@ -34,6 +36,7 @@ sub renderRoot()
         m.heading.text = "Sign In"
         m.prompt.text = "Choose how you'd like to receive your one-time code."
         m.kb.visible = false
+        m.hint.visible = false
         m.actionKeys = ["email", "phone", "back"]
         m.actions.buttons = ["Continue with Email", "Continue with Phone", "< Back"]
         m.actions.visible = true
@@ -92,6 +95,7 @@ sub sendCode()
 end sub
 
 sub onCodeSent(ev as object)
+    FinishApi(m, ev)
     ' request-code always returns success (anti-enumeration).
     m.step = "code"
     m.prompt.text = "Enter the 6-digit code we just sent to " + m.identifier + "."
@@ -110,6 +114,7 @@ sub verifyCode()
 end sub
 
 sub onLogin(ev as object)
+    FinishApi(m, ev)
     res = ev.getRoSGNode().result
     j = res.json
     if j <> invalid and j.needs_name = true
@@ -137,6 +142,7 @@ sub finishName()
 end sub
 
 sub onEnroll(ev as object)
+    FinishApi(m, ev)
     res = ev.getRoSGNode().result
     if res.ok
         finishAuth()
@@ -150,12 +156,14 @@ sub finishAuth()
 end sub
 
 sub onLogout(ev as object)
+    FinishApi(m, ev)
     ClearSessionCookie()
     m.top.navigate = { action: "authChanged" }
 end sub
 
 ' ---- Delete account ----
 sub onDeleteInit(ev as object)
+    FinishApi(m, ev)
     res = ev.getRoSGNode().result
     err = ""
     if res.json <> invalid then err = SafeStr(res.json.error)
@@ -188,6 +196,7 @@ sub deleteConfirm()
 end sub
 
 sub onDeleteDone(ev as object)
+    FinishApi(m, ev)
     res = ev.getRoSGNode().result
     if res.ok
         ClearSessionCookie()
@@ -214,8 +223,8 @@ end sub
 sub showKeyboard(text as string)
     m.kb.text = text
     m.kb.visible = true
-    m.zone = "kb"
-    m.kb.setFocus(true)
+    m.hint.visible = true
+    focusKeyboard()
 end sub
 
 sub setSubmitButton(label as string)
@@ -238,16 +247,28 @@ sub clearStatus()
     m.status.visible = false
 end sub
 
+' While entering text, Down leaves the keyboard for the submit button.
+'
+' That only works if the Keyboard *declines* Down so it bubbles up here, and
+' Roku firmware differs on whether the bottom row passes it along. ✱ is the
+' backup — no build claims it — which is why the on-screen hint names it.
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
-    ' While entering text, Down leaves the keyboard for the submit button.
-    if m.zone = "kb" and key = "down"
-        focusActions()
-        return true
-    else if m.zone = "actions" and key = "up" and m.kb.visible
-        m.zone = "kb"
-        m.kb.setFocus(true)
-        return true
+    if m.zone = "kb"
+        if key = "down" or key = "options"
+            focusActions()
+            return true
+        end if
+    else if m.zone = "actions" and m.kb.visible
+        if key = "up" or key = "options"
+            focusKeyboard()
+            return true
+        end if
     end if
     return false
 end function
+
+sub focusKeyboard()
+    m.zone = "kb"
+    m.kb.setFocus(true)
+end sub

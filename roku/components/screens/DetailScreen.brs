@@ -17,7 +17,7 @@ end sub
 sub onIdSet()
     id = m.top.showId
     if id = 0 then return
-    m.busy.visible = true
+    setBusySpinner(true)
     StartApi(m, { method: "GET", path: "/api/shows/" + Stri(id).Trim(), tag: "detail" }, "onDetail")
     StartApi(m, { method: "GET", path: "/api/shows/" + Stri(id).Trim() + "/actors", tag: "actors" }, "onActors")
 end sub
@@ -29,8 +29,9 @@ sub onAuthChanged()
 end sub
 
 sub onDetail(ev as object)
+    FinishApi(m, ev)
     res = ev.getRoSGNode().result
-    m.busy.visible = false
+    setBusySpinner(false)
     if res.json = invalid or res.json.show = invalid
         m.title.text = "Not found"
         return
@@ -41,6 +42,7 @@ sub onDetail(ev as object)
 end sub
 
 sub onActors(ev as object)
+    FinishApi(m, ev)
     res = ev.getRoSGNode().result
     if res.json = invalid or res.json.actors = invalid then return
     names = []
@@ -236,6 +238,7 @@ function intOf(v as dynamic) as integer
 end function
 
 sub onWriteDone(ev as object)
+    FinishApi(m, ev)
     res = ev.getRoSGNode().result
     tag = SafeStr(res.tag)
     if res.statusCode = 401
@@ -284,4 +287,15 @@ sub showWatchInfo()
     dialog.message = joinList(lines, Chr(10))
     dialog.buttons = ["OK"]
     m.top.getScene().dialog = dialog
+end sub
+
+' The spinner only animates while its `control` is "start" — toggling
+' visibility alone leaves a frozen image on screen.
+sub setBusySpinner(on as boolean)
+    m.busy.visible = on
+    if on
+        m.busy.control = "start"
+    else
+        m.busy.control = "stop"
+    end if
 end sub

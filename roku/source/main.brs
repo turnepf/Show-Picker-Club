@@ -9,7 +9,9 @@ sub Main(input as dynamic)
     scene = screen.CreateScene("MainScene")
     screen.show()
 
-    ' Support deep-link / re-launch input if the channel is relaunched.
+    ' Park the launch args on the scene. Nothing reads them yet — deep linking
+    ' is unimplemented and the manifest no longer claims it — but this is the
+    ' seam a contentId/mediaType handler would hang off.
     if input <> invalid and type(input) = "roAssociativeArray"
         scene.launchArgs = input
     end if

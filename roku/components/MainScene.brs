@@ -23,6 +23,7 @@ sub checkAuth()
 end sub
 
 sub onAuthChecked(ev as object)
+    FinishApi(m, ev)
     task = ev.getRoSGNode()
     res = task.result
     j = res.json
