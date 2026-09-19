@@ -13,11 +13,16 @@
         <Label id="heading" translation="[90,54]" font="font:LargeBoldSystemFont" color="0xF5F7FAFF" />
         <ButtonGroup id="nav" translation="[1680,44]" layoutDirection="horiz"
                      buttonHeight="48" minWidth="150" horizAlignment="left" />
+        <!-- rowHeights must leave room for the row label above the posters, or
+             the label is drawn over them. numRows is 2, not 4: four 510px rows
+             is 2040px of content on a 1080px screen, which crushed every row
+             instead of scrolling between them. -->
         <RowList id="rows" translation="[90,150]" itemComponentName="PosterCard"
-                 numRows="4" rowLabelColor="0xF5F7FAFF" itemSize="[1830,500]"
+                 numRows="2" rowLabelColor="0xF5F7FAFF" itemSize="[1830,510]"
                  rowItemSize="[[280,440],[280,440],[280,440],[280,440]]"
                  rowItemSpacing="[[24,30],[24,30],[24,30],[24,30]]"
-                 rowHeights="[440,440,440,440]"
+                 rowHeights="[510,510,510,510]"
+                 rowLabelOffset="[[0,0],[0,0],[0,0],[0,0]]"
                  vertFocusAnimationStyle="floatingFocus" />
         <Label id="message" translation="[90,160]" width="1600" wrap="true"
                font="font:MediumSystemFont" color="0xFFFFFF99" visible="false" />

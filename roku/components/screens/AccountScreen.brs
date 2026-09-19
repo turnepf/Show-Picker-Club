@@ -75,8 +75,8 @@ sub startIdentifier()
     else
         m.prompt.text = "Enter your phone number."
     end if
-    showKeyboard("")
     setSubmitButton("Send Code")
+    showKeyboard("")
 end sub
 
 sub sendCode()
@@ -98,8 +98,8 @@ sub onCodeSent(ev as object)
     ' request-code always returns success (anti-enumeration).
     m.step = "code"
     m.prompt.text = "Enter the 6-digit code we just sent to " + m.identifier + "."
-    showKeyboard("")
     setSubmitButton("Verify")
+    showKeyboard("")
     clearStatus()
 end sub
 
@@ -120,8 +120,8 @@ sub onLogin(ev as object)
         m.enrollCode = SafeStr(m.kb.text)
         m.step = "name"
         m.prompt.text = "Almost there — enter your first and last name."
-        showKeyboard("")
         setSubmitButton("Finish")
+        showKeyboard("")
         clearStatus()
         return
     end if
@@ -183,8 +183,8 @@ sub onDeleteInit(ev as object)
     end if
     m.step = "delete-code"
     m.prompt.text = "Enter the confirmation code we emailed you to permanently delete your account."
-    showKeyboard("")
     setSubmitButton("Delete Permanently")
+    showKeyboard("")
 end sub
 
 sub deleteConfirm()
@@ -219,6 +219,9 @@ sub onSubmit()
 end sub
 
 ' ---- UI helpers ----
+' Always call this LAST when setting up a step. setSubmitButton() assigns
+' `buttons`, which takes focus away from whatever holds it — so focusing the
+' keyboard first meant every character the member typed was swallowed.
 sub showKeyboard(text as string)
     m.kb.text = text
     m.kb.visible = true

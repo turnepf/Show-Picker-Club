@@ -17,6 +17,7 @@
 //   node roku/sideload.mjs shot [name] screenshot the current screen
 //   node roku/sideload.mjs keys Down Select Back   drive the remote over ECP
 //   node roku/sideload.mjs type 5551234567           type into the focused field
+//   node roku/sideload.mjs launch                    (re)start and wait for it
 //   node roku/sideload.mjs logs --relaunch --seconds 15
 //   node roku/sideload.mjs             validate, package, install
 //   node roku/sideload.mjs --legacy    install a build forced to the legacy tier
@@ -215,8 +216,27 @@ async function shot(args) {
   console.log(file);
 }
 
+// Restart the channel and wait for it to be interactive. Scripted keypresses
+// sent too soon land on whatever the previous screen was — or on the Roku home
+// screen — so everything that drives the UI should start here.
+async function launch() {
+  // /launch/dev on a channel that is already running RESUMES it — Roku keeps
+  // it alive and brings it forward with its screen stack intact. Pressing Home
+  // first is what actually ends the process, so this is a real cold start.
+  await fetch(`http://${host()}:8060/keypress/Home`, { method: 'POST' });
+  await sleep(1500);
+  await relaunchDevChannel();
+  await sleep(4000);
+  console.log('  launched (cold)');
+}
+
 async function main() {
   const args = process.argv.slice(2);
+
+  if (args.includes('launch')) {
+    await launch();
+    return;
+  }
 
   if (args.includes('keys')) {
     await keys(args);
