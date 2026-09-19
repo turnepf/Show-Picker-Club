@@ -45,6 +45,24 @@ failed to load when it had loaded fine.
 
 If a list renders nothing, check `itemSize` before suspecting the data.
 
+## The debug console is the only place field errors appear
+
+SceneGraph does not fail on a bad XML attribute — it logs a warning at channel launch and carries
+on with the field unset. `bsc` will not catch these either: it validates BrightScript and component
+wiring, not the field list of a built-in node. `DetailScreen` was setting `maxWidth` and `numLines`
+on a `ScrollableText`, which has neither (it sizes with `width`/`height`), so the overview block ran
+unsized for months with the reason printed to a console nobody was reading.
+
+So: **read the console after any XML change.** `node sideload.mjs logs --relaunch` and look for
+`Warnings occurred while creating XML component`. When in doubt about which fields a built-in node
+really has, ask the device rather than the documentation:
+
+```brightscript
+for each k in CreateObject("roSGNode", "ScrollableText").getFields()
+    print k
+end for
+```
+
 ## Device tiers — the channel adapts to the hardware it lands on
 
 The channel has to stay usable on Rokus going back about eight years, and a 2017 box is a
