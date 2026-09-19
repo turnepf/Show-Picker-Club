@@ -26,9 +26,21 @@ export async function onRequestGet(context) {
   // The WHERE clause does the throttling so we never need a read-then-write.
   // When the client tells us its platform, stamp it on the same write;
   // COALESCE keeps the last known platform if a later ping omits the header.
+  //
+  // The third disjunct is what keeps the throttle from stranding a session in
+  // reporting's "Unknown" row. This write is the only writer of
+  // sessions.platform *and* the write that makes a session visible to the
+  // dashboard, so a header-less check — a bot, an old client, a page that
+  // forgot the header — makes the row countable while leaving its platform
+  // NULL, and then blocks the header-carrying check behind it for an hour.
+  // A session that still has no platform accepts one immediately instead of
+  // waiting out that hour. It can only fire while platform IS NULL, so it
+  // costs at most one extra write per session, ever.
   context.waitUntil(env.DB.prepare(
     `UPDATE sessions SET last_seen_at = datetime('now'), platform = COALESCE(?2, platform)
-     WHERE id = ?1 AND (last_seen_at IS NULL OR last_seen_at < datetime('now', '-1 hour'))`
+     WHERE id = ?1 AND (last_seen_at IS NULL
+                        OR last_seen_at < datetime('now', '-1 hour')
+                        OR (?2 IS NOT NULL AND platform IS NULL))`
   ).bind(match[1], platform).run().catch(() => {}));
   if (platform) context.waitUntil(recordPlatformUsage(env, session.member_slug, platform));
 

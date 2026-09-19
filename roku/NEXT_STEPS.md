@@ -1,7 +1,17 @@
 # Roku channel — status & pick-up notes
 
-A place to resume from. The Roku channel is **on `main` and running on a device**; what's left is
-focus tuning, HD-scaling polish, and the decision about publishing.
+**Submitted to the Roku Channel Store on 2026-09-19. Scheduled to publish Tuesday 2026-09-22,
+10:00 AM PT.** Channel ID 882851, access code CV92LVL.
+
+⚠️ **Do not edit the channel in the dashboard before it publishes.** Roku cancels the scheduled
+release on any change: *"Any changes you make to the app until it is published will automatically
+cancel the scheduled release."*
+
+The signing key was generated on the device (`genkey`) and its password is the channel's identity
+forever — every future update must be signed with the same one. It is in 1Password; it cannot be
+recovered from Roku or the device.
+
+A place to resume from for the work after that.
 
 ## Where things stand
 
@@ -107,36 +117,30 @@ without changing anything.
   seam to build against. A public Channel Store submission needs this: Roku certification requires
   a channel that declares deep-link support to honour `contentId`/`mediaType`.
 
-## Certification static analysis — run 2026-09-19, NOT yet passing
+## Certification static analysis — passing as of 2026-09-19
 
-Roku's dashboard runs a static analysis against the uploaded package. Channel 882851 carries the
-signed build and came back with **two errors and nine warnings**. The errors block a public
-submission; they are real work, not paperwork.
+The submitted build has **zero errors**. What follows is the history, because the two errors were
+real architectural work and the warnings that remain are deliberate.
 
-**Errors**
+### Fixed
 
-1. **Voice keyboards are required for email, PIN and password entry** (criterion 4.12). Every
-   text-entry screen uses the plain `Keyboard` node. Roku wants the voice-enabled entry component
-   on the sign-in fields.
-2. **Authenticated apps must call `ChannelStore.getUserData()`** to obtain the member's email
-   during sign-up/sign-in (RP 2.1, RP 4.1, and warning 2.2 repeats it). Our flow is a one-time code
-   to an email or phone the member types in. Roku expects the on-device account API to supply the
-   email instead. This is an architectural requirement, not a setting.
+1. **Voice keyboards for email, PIN and password entry** (4.12) — `DynamicKeyboard` throughout,
+   with the entry type declared per step so dictation knows what it is hearing.
+2. **`ChannelStore.getUserData()`** (RP 2.1 / RP 4.1) — Sign In offers the member's own Roku
+   account before showing a keyboard. Declining falls back to manual entry, which the criteria
+   explicitly allow. It shortened sign-in to two button presses and changed nothing about who gets
+   a session.
+3. **Five memory APIs** — both monitors run in the main event loop and the channel reacts to
+   pressure by dropping to the legacy profile.
 
-**Warnings worth acting on**
+### Deliberately not fixed
 
-3. *Customer Account Requirement selected without enrolling in Roku Partner Payouts.* A consequence
-   of answering "yes" to "can users sign in"; check whether enrollment is actually required for a
-   free app or whether the answer needs qualifying.
-4. **RSG 1.3 wants a minimum firmware of 15.1** — and this cuts directly against the reason the
-   device-tiering in `Globals.brs` exists. Roku OS 15.1 is 2025 hardware and recent updates; a
-   2017 box cannot run it. Adopting `rsg_version=1.3` buys the current SceneGraph at the cost of
-   every old device we deliberately built for. **Decide which goal wins before setting it.**
-5. Five memory APIs unused: `EnableMemoryWarningEvent`, `EnableLowGeneralMemoryEvent`,
-   `GetChannelAvailableMemory`, `GetMemoryLimitPercent`, `GetChannelMemoryLimit`. These are exactly
-   the tools for the low-memory devices the tiering targets — the channel currently guesses at
-   device capability from the graphics platform when it could *ask* about memory directly, and
-   react when the device says it is under pressure. Worth doing on its own merits.
+- **RSG 1.3 / minimum firmware 15.1** (two warnings). Adopting it would abandon every device older
+  than about a year, which is the opposite of this channel's stated target and would make the
+  device tiering pointless. Warnings do not block certification. Revisit only if old hardware stops
+  mattering.
+- **Roku Partner Payouts not enrolled** (one warning). It fires because the app has sign-in; it is
+  a payments program and this app is free and monetizes nothing.
 
 ## Publishing to the Roku Channel Store
 

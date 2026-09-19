@@ -112,7 +112,9 @@
     async function load() {
       const content = document.getElementById('content');
       try {
-        const check = await fetch('/auth/check');
+        const check = await fetch('/auth/check', {
+          headers: { 'X-Client-Platform': window.innerWidth < 768 ? 'web-small' : 'web-large' },
+        });
         const checkData = await check.json();
         if (!checkData.authenticated || !checkData.member) {
           content.innerHTML = `<div class="empty-card">

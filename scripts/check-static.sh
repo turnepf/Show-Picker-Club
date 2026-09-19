@@ -232,6 +232,27 @@ grep -q 'session.clear()' ios/ShowPickerIOS/Views/IPadHomeView.swift \
   || err "IPadHomeView must call session.clear() on logout"
 ok "iPhone and iPad views route session state through SessionScope"
 
+# Every web /auth/check must carry X-Client-Platform. That endpoint is the only
+# writer of sessions.platform, and the same write is what makes a session
+# visible to the reporting dashboard — so a call without the header counts the
+# member in the "Unknown" row instead of on a web row. shell.js alone is loaded
+# by eight pages, which is how most of that row got there.
+say "Web auth checks name their platform"
+missing=""
+for f in $(grep -rl "auth/check" public 2>/dev/null); do
+  # Each fetch of /auth/check must pass a headers object naming the platform.
+  # The literal is written inline per page (no shared module on this stack), so
+  # match the call and its options together across the next few lines.
+  while read -r line; do
+    grep -A 3 -F "$line" "$f" | grep -q 'X-Client-Platform' || missing="$missing $f"
+  done < <(grep -o "fetch('/auth/check'[^)]*" "$f")
+done
+if [ -n "$missing" ]; then
+  err "these pages call /auth/check without X-Client-Platform, which lands the member in reporting's Unknown row:$missing"
+else
+  ok "every web /auth/check sends X-Client-Platform"
+fi
+
 # The mirror of the same bug, shipped in 1.2 (build 21): a brand-new member is
 # not in the roster the app fetched before they had an account, so `myMember`
 # resolved to nil and Home lost My Shows, Groups, Calendar, Rate My Shows,
