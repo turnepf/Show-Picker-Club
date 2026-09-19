@@ -314,11 +314,12 @@ sub showKeyboard(text as string, voiceType = "text" as string)
         editBox.voiceEntryType = voiceType
         ' A one-time code is exactly six digits; saying so stops the member
         ' typing a seventh and stops voice entry running on.
-        if voiceType = "pin"
-            editBox.maxTextLength = 6
-        else
-            editBox.maxTextLength = 0
-        end if
+        '
+        ' Only ever SET for the code. maxTextLength = 0 does not mean
+        ' "unlimited" — it means zero characters, which silently made the email
+        ' and phone fields refuse every keystroke. Anything that is not the
+        ' code keeps the component's own default.
+        if voiceType = "pin" then editBox.maxTextLength = 6
     end if
     m.actions.translation = [90, 860]
     ' Between the keyboard and the buttons. It used to sit at a fixed y that
