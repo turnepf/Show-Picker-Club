@@ -185,15 +185,15 @@
         const label = PLATFORM_LABELS[k] || k;
         return `<tr>
           <td>${escapeHtml(label)}</td>
-          <td class="num">${fmt((bp.day || {})[k])}</td>
-          <td class="num">${fmt((bp.week || {})[k])}</td>
           <td class="num">${fmt((bp.month || {})[k])}</td>
+          <td class="num">${fmt((bp.week || {})[k])}</td>
+          <td class="num">${fmt((bp.day || {})[k])}</td>
         </tr>`;
       }).join('');
       return `<div class="section">
         <h2>Active by platform</h2>
         <table>
-          <thead><tr><th>Platform</th><th class="num">Day</th><th class="num">Week</th><th class="num">Month</th></tr></thead>
+          <thead><tr><th>Platform</th><th class="num">Month</th><th class="num">Week</th><th class="num">Day</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
         <div class="footer">Distinct people in each window, not devices or sessions — three Apple TVs, two Macs or four Rokus signed in as the same person count once. These don't add up to Active members in either direction: someone who uses two platforms counts on both rows, and anyone whose client never told us its platform is counted there but on no row here.</div>

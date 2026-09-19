@@ -28,7 +28,7 @@ struct ReportingView: View {
                     } header: {
                         Text("Active by platform (people)")
                     } footer: {
-                        Text("Distinct people, today / this week / this month — not sessions or devices, so three Apple TVs, two Macs or four Rokus signed in as the same person count once, and so does a reinstall. These don't add up to Active members in either direction: someone using two platforms counts on both rows, and anyone whose client never told us its platform is counted there but on no row here.")
+                        Text("Distinct people, this month / this week / today — not sessions or devices, so three Apple TVs, two Macs or four Rokus signed in as the same person count once, and so does a reinstall. These don't add up to Active members in either direction: someone using two platforms counts on both rows, and anyone whose client never told us its platform is counted there but on no row here.")
                     }
                 }
                 Section("New shows") { windowRows(r.newShows) }
@@ -222,7 +222,7 @@ struct ReportingView: View {
         HStack {
             Text(label)
             Spacer()
-            Text("\(day) / \(week) / \(month)")
+            Text("\(month) / \(week) / \(day)")
                 .foregroundStyle(.secondary).monospacedDigit()
         }
     }
