@@ -8,6 +8,7 @@ sub init()
     m.overview = m.top.findNode("overview")
     m.cast = m.top.findNode("cast")
     m.ratings = m.top.findNode("ratings")
+    m.watch = m.top.findNode("watch")
     m.actions = m.top.findNode("actions")
     m.status = m.top.findNode("status")
     m.busy = m.top.findNode("busy")
@@ -114,7 +115,9 @@ sub render()
     if SafeStr(s.rating) <> "" then metaBits.push("★ " + SafeStr(s.rating))
     m.meta.text = joinList(metaBits, "  ·  ")
 
-    ' List / archived chip.
+    ' The chip is list status and nothing else now — the network used to double
+    ' as the chip for a show you don't own, which meant an owned show never
+    ' said where it streamed at all.
     if ownedByMe()
         if s.archived <> invalid and s.archived = 1
             m.chip.text = "Archived"
@@ -122,10 +125,20 @@ sub render()
             m.chip.text = "On " + ListTitle(SafeStr(s.list))
         end if
         m.chip.color = ListColor(SafeStr(s.list))
+        m.chip.visible = true
     else
-        m.chip.text = SafeStr(s.network)
-        m.chip.color = "0xFFFFFF99"
+        m.chip.visible = false
     end if
+
+    ' Where to watch, on the card. Blank when we genuinely do not know, rather
+    ' than a line asserting something nobody checked.
+    parts = []
+    net = SafeStr(s.network)
+    if net <> "" then parts.push("Watch on " + net)
+    note = StreamingNote(s)
+    if note <> "" then parts.push(note)
+    m.watch.text = joinList(parts, "    ·    ")
+    m.watch.visible = (parts.Count() > 0)
 
     m.genres.text = SafeStr(s.genres)
     m.overview.text = SafeStr(s.overview)
@@ -172,7 +185,7 @@ end function
 ' Build the action buttons and remember what each one does.
 sub buildActions()
     labels = ["< Back"]
-    m.actionKind = ["back"]   ' "back" | "move:<key>" | "add:<key>" | "archive" | "restore" | "watch"
+    m.actionKind = ["back"]   ' "back" | "move:<key>" | "add:<key>" | "archive" | "restore"
 
     mine = ownedByMe()
     archived = (m.show.archived <> invalid and m.show.archived = 1)
@@ -197,7 +210,6 @@ sub buildActions()
         end if
     end if
 
-    labels.push("Where to Watch") : m.actionKind.push("watch")
     m.actions.buttons = labels
 end sub
 
@@ -208,10 +220,6 @@ sub onAction()
 
     if kind = "back"
         m.top.navigate = { action: "back" }
-        return
-    end if
-    if kind = "watch"
-        showWatchInfo()
         return
     end if
     if not loggedIn()
@@ -298,23 +306,6 @@ sub setStatus(msg as string)
     m.status.visible = true
 end sub
 
-sub showWatchInfo()
-    s = m.show
-    net = SafeStr(s.network)
-    dialog = CreateObject("roSGNode", "Dialog")
-    dialog.title = "Where to Watch"
-    lines = []
-    if net <> "" then lines.push(net)
-    if IsRealUrl(s.network_url)
-        lines.push(SafeStr(s.network_url))
-    else if IsRealUrl(s.watch_link)
-        lines.push(SafeStr(s.watch_link))
-    end if
-    if lines.Count() = 0 then lines.push("No streaming info available yet.")
-    dialog.message = joinList(lines, Chr(10))
-    dialog.buttons = ["OK"]
-    m.top.getScene().dialog = dialog
-end sub
 
 ' The spinner only animates while its `control` is "start" — toggling
 ' visibility alone leaves a frozen image on screen.

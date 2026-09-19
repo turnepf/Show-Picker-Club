@@ -18,12 +18,19 @@
             <Label id="title" width="980" wrap="true" maxLines="2" font="font:LargeBoldSystemFont" color="0xF5F7FAFF" />
             <Label id="meta" width="980" font="font:MediumSystemFont" color="0xFFFFFF99" />
             <Label id="chip" font="font:SmallBoldSystemFont" color="0xF29C3DFF" />
+            <!-- Where it streams, stated on the card itself. This used to be a
+                 "Where to Watch" button that opened a dialog printing a raw
+                 URL, which is neither readable nor actionable on a TV — Roku
+                 forbids launching another app, so there was never anything for
+                 that button to do. -->
+            <Label id="watch" width="980" wrap="true" maxLines="2"
+                   font="font:SmallSystemFont" color="0xF5F7FAFF" />
             <Label id="genres" width="980" font="font:SmallSystemFont" color="0xFFFFFF99" />
             <!-- ScrollableText sizes with width/height. It has no maxWidth and no
                  numLines — setting those logged a warning and left the block
                  unsized. 190px is about seven lines of SmallSystemFont, which
                  is what numLines was reaching for. -->
-            <ScrollableText id="overview" width="980" height="190"
+            <ScrollableText id="overview" width="980" height="300"
                             font="font:SmallSystemFont" color="0xF5F7FAFF" />
             <Label id="cast" width="980" wrap="true" maxLines="2" font="font:SmallSystemFont" color="0xFFFFFF99" />
             <Label id="ratings" width="980" font="font:SmallSystemFont" color="0xFFFFFF99" />
