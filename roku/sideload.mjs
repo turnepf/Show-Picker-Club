@@ -18,6 +18,7 @@
 //   node roku/sideload.mjs keys Down Select Back   drive the remote over ECP
 //   node roku/sideload.mjs type 5551234567           type into the focused field
 //   node roku/sideload.mjs launch                    (re)start and wait for it
+//   node roku/sideload.mjs package                   signed .pkg for the Store
 //   node roku/sideload.mjs logs --relaunch --seconds 15
 //   node roku/sideload.mjs             validate, package, install
 //   node roku/sideload.mjs --legacy    install a build forced to the legacy tier
@@ -230,8 +231,30 @@ async function launch() {
   console.log('  launched (cold)');
 }
 
+// Build the signed package the Channel Store accepts. The signing key lives on
+// the device (generated once with `genkey` over the dev console on port 8080),
+// and its password is the channel's identity: every future update has to be
+// signed with the same one or the Store treats it as a different channel. It
+// is kept out of the repo like every other credential here.
+async function packageChannel() {
+  validate();
+  const signingPassword = credential(
+    'ROKU_SIGNING_PASSWORD', 'signing-password', 'channel signing password',
+    'the password genkey printed');
+  // roku-deploy appends .pkg itself, so the name here carries no extension.
+  const opts = { ...deployOptions(), outFile: 'showpicker-roku' };
+  console.log('Packaging and signing …');
+  const pkg = await rokuDeploy.deployAndSignPackage({ ...opts, signingPassword });
+  console.log(`\n  ${pkg}\n\nUpload this at developer.roku.com -> Manage My Channels.`);
+}
+
 async function main() {
   const args = process.argv.slice(2);
+
+  if (args.includes('package')) {
+    await packageChannel();
+    return;
+  }
 
   if (args.includes('launch')) {
     await launch();
