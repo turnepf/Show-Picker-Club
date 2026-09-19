@@ -26,17 +26,11 @@ struct UrlCleanupView: View {
                     Label("Adopt networks from club copies", systemImage: "arrow.triangle.merge")
                 }
                 .disabled(working)
-                Button {
-                    Task { await runEnrichPasses() }
-                } label: {
-                    Label("Run enrichment passes", systemImage: "sparkles")
-                }
-                .disabled(working)
                 if let b = banner {
                     Text(b).font(.caption).foregroundStyle(b.hasPrefix("✓") ? .green : .red)
                 }
             } footer: {
-                Text("Adopting copies the real link a sibling copy already has onto rows stuck on a placeholder. Enrichment runs up to five club-wide passes for posters, logos, seasons and dates.")
+                Text("Adopts the real link a sibling copy already has onto rows stuck on a placeholder.")
             }
 
             Section {
@@ -155,22 +149,6 @@ struct UrlCleanupView: View {
         await load()
     }
 
-    // Five passes, the same cap the web button uses: one call covers a batch,
-    // and the queue rotates oldest-enriched-first, so repeats reach further.
-    private func runEnrichPasses() async {
-        working = true
-        defer { working = false }
-        var passes = 0
-        for _ in 0..<5 {
-            guard (try? await API.enrich()) != nil else { break }
-            passes += 1
-            banner = "Running enrichment… pass \(passes) of 5"
-        }
-        banner = passes > 0
-            ? "✓ Ran \(passes) enrichment pass\(passes == 1 ? "" : "es")."
-            : "⚠︎ Enrichment didn't run — try again."
-        await load()
-    }
 }
 
 // One title nothing has a poster for. Re-enrich it as-is, flip the media type
