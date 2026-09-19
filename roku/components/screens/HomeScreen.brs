@@ -5,6 +5,7 @@ sub init()
 
     m.trending = []
     m.members = []
+    m.trendingAnswered = false
     m.focusZone = "nav"
 
     m.rows.showRowLabel = [true, true]
@@ -80,6 +81,7 @@ end sub
 
 sub onTrending(ev as object)
     FinishApi(m, ev)
+    m.trendingAnswered = true
     res = ev.getRoSGNode().result
     m.trending = []
     if res.json <> invalid and res.json.shows <> invalid
@@ -130,8 +132,17 @@ sub rebuildRows()
     end if
 
     m.rows.content = root
+    ' Until Trending has answered, an empty screen means "still loading", not
+    ' "nothing here" — signing in used to flash "Nothing to show yet." at a
+    ' member with a full library.
     m.empty.visible = (m.rowMeta.Count() = 0)
-    if m.rowMeta.Count() = 0 then m.empty.text = "Nothing to show yet."
+    if m.rowMeta.Count() = 0
+        if m.trendingAnswered
+            m.empty.text = "Nothing to show yet."
+        else
+            m.empty.text = "Loading…"
+        end if
+    end if
     SetBusy(m, false)
 end sub
 
