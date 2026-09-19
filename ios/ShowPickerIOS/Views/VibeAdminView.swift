@@ -1,9 +1,11 @@
 import SwiftUI
 import UIKit
 
-// Operator tool: generate Claude-based taste traits for shows that lack them,
-// or refresh existing scores. POST /api/admin-vibe-fill. Foreground fill runs
-// batches in a loop; re-score can also run in the background via the cron.
+// Operator tool: refresh Claude-based taste traits for shows that already
+// have them, via POST /api/admin-vibe-fill. Filling scores for shows that
+// have none yet is no longer a screen action — it runs on its own once a
+// day via the cron. Re-score can run here in the foreground (this screen's
+// loop, log visible) or in the background via the same daily cron.
 struct VibeAdminView: View {
     @State private var status: VibeFillStatus?
     @State private var running = false
@@ -28,17 +30,12 @@ struct VibeAdminView: View {
                 }
             }
 
-            Section {
-                if running {
+            if running {
+                Section {
                     Button("Stop", role: .destructive) { running = false }
-                } else {
-                    Button("Fill missing scores") { Task { await fillLoop() } }
-                        .disabled((status?.fillRemaining ?? 0) == 0 || busy)
+                } footer: {
+                    Text("Stops the foreground re-score below. Missing scores still fill on their own once a day in the background.")
                 }
-            } header: {
-                Text("Fill")
-            } footer: {
-                Text("Scores every title with no traits yet, one batch at a time. Safe to stop and resume.")
             }
 
             Section {
@@ -62,7 +59,7 @@ struct VibeAdminView: View {
                     // Foreground: same loop as Fill, but re-scoring titles
                     // that already have traits. Stays on this screen so the
                     // per-title log is visible while it runs.
-                    Button("Re-score here, now") { Task { await fillLoop(rescore: true) } }
+                    Button("Re-score here, now") { Task { await fillLoop() } }
                         .disabled(busy || running)
                 }
             } header: {
@@ -120,11 +117,11 @@ struct VibeAdminView: View {
         status = try? await API.vibeFillStatus()
     }
 
-    private func fillLoop(rescore: Bool = false) async {
+    private func fillLoop() async {
         running = true
         while running {
             do {
-                let r = try await API.vibeFill(count: batchSize, rescore: rescore)
+                let r = try await API.vibeFill(count: batchSize, rescore: true)
                 if let e = r.error {
                     log.insert("Error: \(e)", at: 0)
                     break
