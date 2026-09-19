@@ -107,6 +107,37 @@ without changing anything.
   seam to build against. A public Channel Store submission needs this: Roku certification requires
   a channel that declares deep-link support to honour `contentId`/`mediaType`.
 
+## Certification static analysis — run 2026-09-19, NOT yet passing
+
+Roku's dashboard runs a static analysis against the uploaded package. Channel 882851 carries the
+signed build and came back with **two errors and nine warnings**. The errors block a public
+submission; they are real work, not paperwork.
+
+**Errors**
+
+1. **Voice keyboards are required for email, PIN and password entry** (criterion 4.12). Every
+   text-entry screen uses the plain `Keyboard` node. Roku wants the voice-enabled entry component
+   on the sign-in fields.
+2. **Authenticated apps must call `ChannelStore.getUserData()`** to obtain the member's email
+   during sign-up/sign-in (RP 2.1, RP 4.1, and warning 2.2 repeats it). Our flow is a one-time code
+   to an email or phone the member types in. Roku expects the on-device account API to supply the
+   email instead. This is an architectural requirement, not a setting.
+
+**Warnings worth acting on**
+
+3. *Customer Account Requirement selected without enrolling in Roku Partner Payouts.* A consequence
+   of answering "yes" to "can users sign in"; check whether enrollment is actually required for a
+   free app or whether the answer needs qualifying.
+4. **RSG 1.3 wants a minimum firmware of 15.1** — and this cuts directly against the reason the
+   device-tiering in `Globals.brs` exists. Roku OS 15.1 is 2025 hardware and recent updates; a
+   2017 box cannot run it. Adopting `rsg_version=1.3` buys the current SceneGraph at the cost of
+   every old device we deliberately built for. **Decide which goal wins before setting it.**
+5. Five memory APIs unused: `EnableMemoryWarningEvent`, `EnableLowGeneralMemoryEvent`,
+   `GetChannelAvailableMemory`, `GetMemoryLimitPercent`, `GetChannelMemoryLimit`. These are exactly
+   the tools for the low-memory devices the tiering targets — the channel currently guesses at
+   device capability from the graphics platform when it could *ask* about memory directly, and
+   react when the device says it is under pressure. Worth doing on its own merits.
+
 ## Publishing to the Roku Channel Store
 
 The channel is **certification-ready as code**: the manifest and artwork match the current criteria
