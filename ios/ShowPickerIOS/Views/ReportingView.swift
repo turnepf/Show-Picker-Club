@@ -15,7 +15,7 @@ struct ReportingView: View {
                 } header: {
                     Text("Active members")
                 } footer: {
-                    Text("Distinct people whose session checked in during the window, on any platform.")
+                    Text("Distinct people whose session checked in during the window, on any platform. Counted per person, not per device — every Apple TV, Mac and Roku someone signs in on is still one of them.")
                 }
                 if let bp = r.activeByPlatform, !platformKeys(bp).isEmpty {
                     Section {
@@ -28,7 +28,7 @@ struct ReportingView: View {
                     } header: {
                         Text("Active by platform (people)")
                     } footer: {
-                        Text("Distinct people, today / this week / this month — not sessions, so a reinstall or a second sign-in on the same phone is still one person. Someone using two platforms counts on both rows, so these don't add up to Active members.")
+                        Text("Distinct people, today / this week / this month — not sessions or devices, so three Apple TVs, two Macs or four Rokus signed in as the same person count once, and so does a reinstall. Someone using two platforms counts on both rows, so these don't add up to Active members.")
                     }
                 }
                 Section("New shows") { windowRows(r.newShows) }
@@ -49,7 +49,7 @@ struct ReportingView: View {
                     } header: {
                         Text("How people sign in")
                     } footer: {
-                        Text("Sessions minted per method. Sessions last 30 days, so the 90-day window is the one to read before retiring a channel. \"unknown\" is a session from before this was tracked.")
+                        Text("People who signed in with each method — counted once each, however many devices they used. Sessions last 30 days, so the 90-day window is the one to read before retiring a channel. Someone who used two methods counts on both, so the rows don't sum. \"unknown\" is a session from before this was tracked.")
                     }
                 }
                 if let cal = r.calendarUsage {
@@ -129,21 +129,20 @@ struct ReportingView: View {
     }
 
     // One window of sign-in methods: "Last 30 days — Apple 14 · Email 3".
+    // The counts are people per method, and someone who used two methods is on
+    // both rows, so there is no total to show: summing them would count that
+    // person twice, which is the whole thing these numbers are trying not to
+    // do. The window shows its breakdown or says it saw nobody.
     @ViewBuilder private func methodRows(_ label: String, _ counts: [String: Int]) -> some View {
-        let total = counts.values.reduce(0, +)
+        let used = counts.filter { $0.value > 0 }.sorted { $0.value > $1.value }
         VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(label)
-                Spacer()
-                Text("\(total)").foregroundStyle(.secondary).monospacedDigit()
-            }
-            if total > 0 {
-                Text(counts.sorted { $0.value > $1.value }
-                        .map { "\(Self.methodLabel($0.key)) \($0.value)" }
-                        .joined(separator: " · "))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text(label)
+            Text(used.isEmpty
+                 ? "No sign-ins"
+                 : used.map { "\(Self.methodLabel($0.key)) \($0.value)" }.joined(separator: " · "))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
         }
     }
 
@@ -192,7 +191,7 @@ struct ReportingView: View {
     // Stable display order for the platform breakdown; unknown keys sort last.
     // "ios" is a legacy value from before iPhone/iPad/Mac were told apart —
     // kept as a fallback until every client has updated.
-    private static let platformOrder = ["iphone", "ipad", "mac", "watchos", "tvos", "web-large", "web-small", "ios", "unknown"]
+    private static let platformOrder = ["iphone", "ipad", "mac", "watchos", "tvos", "roku", "web-large", "web-small", "ios", "unknown"]
 
     private func platformKeys(_ bp: PlatformWindows) -> [String] {
         var keys = Set(bp.day.keys)
@@ -210,6 +209,7 @@ struct ReportingView: View {
         case "mac": return "Mac"
         case "watchos": return "Apple Watch"
         case "tvos": return "Apple TV"
+        case "roku": return "Roku"
         case "web-large": return "Web (large)"
         case "web-small": return "Web (small)"
         case "ios": return "iOS (legacy)"
