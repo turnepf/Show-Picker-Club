@@ -947,36 +947,6 @@ struct ActivityItem: Codable, Identifiable {
     }
 }
 
-// /api/admin-dupe-ignores — operator-dismissed duplicate matches. Pairs are
-// stored sorted (slug_a <= slug_b); a self-pair silences the hidden-email-
-// only flag for that account.
-struct DupeIgnore: Codable, Identifiable {
-    let slugA: String
-    let slugB: String
-    var id: String { "\(slugA)|\(slugB)" }
-
-    enum CodingKeys: String, CodingKey {
-        case slugA = "slug_a"
-        case slugB = "slug_b"
-    }
-}
-
-struct DupeIgnoresResponse: Codable { let ignores: [DupeIgnore] }
-
-// /api/admin-member-merge result (success or {error}).
-struct MergeResult: Codable {
-    let ok: Bool?
-    let showsMoved: Int?
-    let duplicateShowsDropped: Int?
-    let error: String?
-
-    enum CodingKeys: String, CodingKey {
-        case ok, error
-        case showsMoved = "shows_moved"
-        case duplicateShowsDropped = "duplicate_shows_dropped"
-    }
-}
-
 // MARK: - Admin: vibe trait scoring (/api/admin-vibe-fill)
 
 struct VibeFillStatus: Codable {

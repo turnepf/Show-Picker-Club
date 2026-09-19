@@ -524,26 +524,6 @@ enum API {
                                body: ["slug": slug, "action": admin ? "promote" : "demote"])
     }
 
-    // Merge a duplicate account into the kept one: shows, contacts,
-    // Apple/Google sign-in, and live sessions move; the duplicate is deleted.
-    // Irreversible — callers confirm first.
-    static func mergeMember(source: String, target: String) async throws -> MergeResult {
-        try await postDecoding("/api/admin-member-merge",
-                               body: ["source": source, "target": target])
-    }
-
-    // Operator-dismissed duplicate matches ([slug, slug] pairs; a self-pair
-    // silences the hidden-email-only flag for that account).
-    static func dupeIgnores() async throws -> [DupeIgnore] {
-        let r: DupeIgnoresResponse = try await get("/api/admin-dupe-ignores")
-        return r.ignores
-    }
-
-    static func setDupeIgnores(pairs: [[String]], ignoring: Bool) async throws -> AdminActionResult {
-        try await postDecoding("/api/admin-dupe-ignores",
-                               body: ["action": ignoring ? "ignore" : "unignore", "pairs": pairs])
-    }
-
     // MARK: Admin: vibe trait scoring
 
     static func vibeFillStatus() async throws -> VibeFillStatus {

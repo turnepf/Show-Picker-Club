@@ -4,18 +4,21 @@ import SwiftUI
 // /members page capability-for-capability. The new-members queue (pending
 // /join requests via /api/admin-signup-requests + held self-enrolled
 // members via /api/admin-member-approve) sits at the top and disappears
-// once everything is processed and hidden; then the Possible-duplicates
-// panel (same heuristics as the web: private-relay-only accounts and shared
-// first names; merge via /api/admin-member-merge, dismissals via
-// /api/admin-dupe-ignores); below it, the full roster — rename, edit login
-// emails/phones, disable/enable, approve held members, and hand off the
-// admin role (GET/POST /api/admin-member-emails, /api/admin-member-disable,
-// /api/admin-member-approve, /api/admin-member-role). Reached from
-// AdminView → Manage members.
+// once everything is processed and hidden; then the full roster — rename,
+// edit login emails/phones, disable/enable, approve held members, and hand
+// off the admin role (GET/POST /api/admin-member-emails,
+// /api/admin-member-disable, /api/admin-member-approve,
+// /api/admin-member-role). Reached from AdminView → Manage members.
+//
+// The "Possible duplicates" panel (heuristic detection + merge/ignore UI)
+// was removed here and on the web — Patrick decided not to keep worrying
+// about it. A monthly GitHub Action now emails him if it finds anything;
+// the merge and ignore endpoints (/api/admin-member-merge,
+// /api/admin-dupe-ignores) still exist server-side for manual use if a
+// real duplicate turns up, just with no UI trigger anywhere.
 struct ManageMembersView: View {
     @State private var members: [AdminMember] = []
     @State private var requests: [SignupRequest] = []
-    @State private var ignores: [DupeIgnore] = []
     @State private var loading = true
     @State private var working: Int?
     @State private var workingSlug: String?
@@ -24,18 +27,6 @@ struct ManageMembersView: View {
     // Tap a platform badge above the roster to show only members who've
     // ever used it; tap the active one again to clear. nil = no filter.
     @State private var platformFilter: String?
-
-    // Duplicates panel state: which account each group keeps, the merge
-    // target for lone hidden-email accounts, the manual-merge picks, and
-    // the pending confirmation (merges and ignores both confirm first,
-    // like the web).
-    @State private var keepChoice: [String: String] = [:]
-    @State private var loneTarget: [String: String] = [:]
-    @State private var manualSource = ""
-    @State private var manualTarget = ""
-    @State private var mergePlan: MergePlan?
-    @State private var ignorePlan: IgnorePlan?
-    @State private var merging = false
 
     // Reject-with-note (the web's prompt() equivalent).
     @State private var rejectTarget: SignupRequest?
@@ -69,7 +60,6 @@ struct ManageMembersView: View {
                     ForEach(reviewed) { reviewedRow($0) }
                 }
             }
-            dupeSections
             Section {
                 platformFilterRow
             } header: {
@@ -94,28 +84,6 @@ struct ManageMembersView: View {
         .overlay { if loading && members.isEmpty { ProgressView() } }
         .task { await load() }
         .refreshable { await load() }
-        .confirmationDialog(
-            "Merge accounts?",
-            isPresented: Binding(get: { mergePlan != nil }, set: { if !$0 { mergePlan = nil } }),
-            titleVisibility: .visible,
-            presenting: mergePlan
-        ) { plan in
-            Button("Merge \(plan.sources.joined(separator: ", ")) into \(plan.target)", role: .destructive) {
-                Task { await runMerge(plan) }
-            }
-        } message: { plan in
-            Text("Their shows, emails, phones, and Apple/Google sign-in move to \(plan.target) (untouched starter shows and exact duplicate titles are dropped); signed-in devices switch over; the duplicate account is deleted. This cannot be undone.")
-        }
-        .confirmationDialog(
-            "Not duplicates?",
-            isPresented: Binding(get: { ignorePlan != nil }, set: { if !$0 { ignorePlan = nil } }),
-            titleVisibility: .visible,
-            presenting: ignorePlan
-        ) { plan in
-            Button("Ignore this match") { Task { await runIgnore(plan) } }
-        } message: { plan in
-            Text(plan.message)
-        }
         .alert(
             "Reject \(rejectTarget?.fullName ?? "request")?",
             isPresented: Binding(get: { rejectTarget != nil }, set: { if !$0 { rejectTarget = nil } }),
@@ -281,300 +249,6 @@ struct ManageMembersView: View {
         }
     }
 
-    // ---- Possible duplicates (mirrors the web panel) ----
-    //
-    // Two heuristics: (1) accounts reachable only through an Apple private-
-    // relay address (the "Hide My Email" signup path — near-certain
-    // duplicates), and (2) two members sharing a first name. Anything the
-    // heuristics miss can be merged with the manual picker.
-
-    struct MergePlan: Identifiable {
-        let sources: [String]
-        let target: String
-        var id: String { sources.joined(separator: ",") + ">" + target }
-    }
-
-    struct IgnorePlan: Identifiable {
-        let pairs: [[String]]
-        let message: String
-        var id: String { pairs.flatMap { $0 }.joined(separator: "|") }
-    }
-
-    private func isRelayOnly(_ m: AdminMember) -> Bool {
-        if !m.emails.isEmpty {
-            return m.emails.allSatisfy { $0.lowercased().hasSuffix("@privaterelay.appleid.com") }
-        }
-        // No email at all only happens for external-identity signups.
-        return (m.enrolledVia?.isEmpty == false) && m.phones.isEmpty
-    }
-
-    private func pairKey(_ a: String, _ b: String) -> String {
-        [a, b].sorted().joined(separator: "|")
-    }
-
-    private var ignoredPairs: Set<String> {
-        Set(ignores.map { pairKey($0.slugA, $0.slugB) })
-    }
-
-    private func pairIgnored(_ a: String, _ b: String) -> Bool {
-        ignoredPairs.contains(pairKey(a, b))
-    }
-
-    // Same-first-name groups (minus fully-ignored pairings) and lone
-    // hidden-email-only accounts, ordered stably by name.
-    private var dupeGroups: (groups: [[AdminMember]], loneRelays: [AdminMember]) {
-        var byFirst: [String: [AdminMember]] = [:]
-        for m in members {
-            let key = (m.firstName ?? m.slug).trimmingCharacters(in: .whitespaces).lowercased()
-            byFirst[key, default: []].append(m)
-        }
-        let groups = byFirst.sorted { $0.key < $1.key }.map(\.value)
-            .map { g in g.filter { m in g.contains { o in o.slug != m.slug && !pairIgnored(m.slug, o.slug) } } }
-            .filter { $0.count > 1 }
-        let grouped = Set(groups.flatMap { $0 }.map(\.slug))
-        // A self-pair ignore silences the "hidden email only" flag.
-        let loneRelays = members.filter {
-            isRelayOnly($0) && !grouped.contains($0.slug) && !pairIgnored($0.slug, $0.slug)
-        }
-        return (groups, loneRelays)
-    }
-
-    // Ignores whose members still exist (merges/deletions leave stale rows).
-    private var shownIgnores: [DupeIgnore] {
-        let slugs = Set(members.map(\.slug))
-        return ignores.filter { slugs.contains($0.slugA) && slugs.contains($0.slugB) }
-    }
-
-    // Default keeper: a real (non-relay) account, preferring the bigger
-    // library, then the older login history.
-    private func defaultKeep(_ group: [AdminMember]) -> String {
-        let ranked = group.sorted { a, b in
-            let ra = isRelayOnly(a) ? 1 : 0, rb = isRelayOnly(b) ? 1 : 0
-            if ra != rb { return ra < rb }
-            if (a.showCount ?? 0) != (b.showCount ?? 0) { return (a.showCount ?? 0) > (b.showCount ?? 0) }
-            return (a.lastLogin ?? "~") < (b.lastLogin ?? "~")
-        }
-        return ranked.first?.slug ?? ""
-    }
-
-    private func groupKey(_ group: [AdminMember]) -> String {
-        group.map(\.slug).sorted().joined(separator: "|")
-    }
-
-    @ViewBuilder private var dupeSections: some View {
-        let (groups, loneRelays) = dupeGroups
-        if !groups.isEmpty || !loneRelays.isEmpty || !shownIgnores.isEmpty {
-            Section {
-                Group {
-                    ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
-                        groupBlock(group)
-                    }
-                    ForEach(loneRelays) { loneRelayBlock($0) }
-                    manualMergeRow
-                    if !shownIgnores.isEmpty { ignoredBlock }
-                }
-                .disabled(merging)
-            } header: {
-                Text("Possible duplicates")
-            } footer: {
-                Text("Merging moves the duplicate's shows, emails, phones, and Apple/Google sign-in to the kept account, switches their signed-in devices over, and deletes the duplicate. It cannot be undone. Ignoring a match hides it permanently (until un-ignored).")
-            }
-        }
-    }
-
-    @ViewBuilder private func groupBlock(_ group: [AdminMember]) -> some View {
-        let key = groupKey(group)
-        let keep = keepChoice[key] ?? defaultKeep(group)
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(group) { m in
-                Button {
-                    keepChoice[key] = m.slug
-                } label: {
-                    dupeCandidateRow(m, selected: m.slug == keep)
-                }
-                .buttonStyle(.plain)
-            }
-            HStack(spacing: 14) {
-                Button("Merge the other\(group.count > 2 ? "s" : "") into kept", role: .destructive) {
-                    let sources = group.map(\.slug).filter { $0 != keep }
-                    mergePlan = MergePlan(sources: sources, target: keep)
-                }
-                Button("Not duplicates") {
-                    let slugs = group.map(\.slug)
-                    var pairs: [[String]] = []
-                    for a in slugs.indices {
-                        for b in slugs.indices where b > a { pairs.append([slugs[a], slugs[b]]) }
-                    }
-                    ignorePlan = IgnorePlan(
-                        pairs: pairs,
-                        message: "Ignore the match between \(slugs.joined(separator: " and "))? They won't be flagged as possible duplicates of each other again.")
-                }
-            }
-            .font(.callout.weight(.semibold))
-            .buttonStyle(.borderless)
-        }
-        .padding(.vertical, 4)
-    }
-
-    @ViewBuilder private func dupeCandidateRow(_ m: AdminMember, selected: Bool) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-                .padding(.top, 2)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text("Keep \(m.personName)").fontWeight(selected ? .semibold : .regular)
-                    Text("@\(m.slug)").font(.caption).foregroundStyle(.secondary)
-                }
-                Text(dupeDetail(m)).font(.caption).foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    // Library size + last login: a hidden-email duplicate that logged in
-    // yesterday next to a real account with a stale login is exactly how
-    // the operator tells which is which.
-    private func dupeDetail(_ m: AdminMember) -> String {
-        var parts: [String] = []
-        if let via = m.enrolledVia, !via.isEmpty { parts.append("via \(via)") }
-        if m.emails.isEmpty { parts.append("no email") }
-        else if isRelayOnly(m) { parts.append("hidden email") }
-        else { parts.append(m.emails.joined(separator: ", ")) }
-        let c = m.showCount ?? 0
-        parts.append("\(c) own show\(c == 1 ? "" : "s")")
-        parts.append(lastLoginText(m.lastLogin, method: m.lastLoginMethod))
-        return parts.joined(separator: " · ")
-    }
-
-    @ViewBuilder private func loneRelayBlock(_ m: AdminMember) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(m.personName)
-                    Text("@\(m.slug)").font(.caption).foregroundStyle(.secondary)
-                    Text("hidden email only")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.red)
-                }
-                Text(dupeDetail(m)).font(.caption).foregroundStyle(.secondary)
-            }
-            memberPickerRow("Merge into", selection: Binding(
-                get: { loneTarget[m.slug] ?? "" },
-                set: { loneTarget[m.slug] = $0 }
-            ), excluding: m.slug)
-            HStack(spacing: 14) {
-                Button("Merge", role: .destructive) {
-                    guard let target = loneTarget[m.slug], !target.isEmpty else { return }
-                    mergePlan = MergePlan(sources: [m.slug], target: target)
-                }
-                .disabled((loneTarget[m.slug] ?? "").isEmpty)
-                Button("Not a duplicate") {
-                    ignorePlan = IgnorePlan(
-                        pairs: [[m.slug, m.slug]],
-                        message: "Stop flagging \(m.slug) as a hidden-email-only account?")
-                }
-            }
-            .font(.callout.weight(.semibold))
-            .buttonStyle(.borderless)
-        }
-        .padding(.vertical, 4)
-    }
-
-    // Manual fallback for pairs the heuristics don't spot. Each picker gets a
-    // full-width labeled row — a single horizontal row truncates the pickers
-    // to a few characters on iPhone widths.
-    @ViewBuilder private var manualMergeRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Manual merge").font(.caption).foregroundStyle(.secondary)
-            memberPickerRow("Duplicate", selection: $manualSource)
-            memberPickerRow("Merge into", selection: $manualTarget)
-            Button("Merge duplicate into kept account", role: .destructive) {
-                mergePlan = MergePlan(sources: [manualSource], target: manualTarget)
-            }
-            .font(.callout.weight(.semibold))
-            .buttonStyle(.borderless)
-            .disabled(manualSource.isEmpty || manualTarget.isEmpty || manualSource == manualTarget)
-        }
-        .padding(.vertical, 2)
-    }
-
-    // A labeled, full-width picker row listing every member by name + slug.
-    // The menu keeps the trailing value readable because it owns the whole
-    // row width instead of sharing one line with buttons and other pickers.
-    @ViewBuilder private func memberPickerRow(
-        _ label: String, selection: Binding<String>, excluding: String? = nil
-    ) -> some View {
-        HStack {
-            Text(label).font(.callout)
-            Spacer()
-            Picker(label, selection: selection) {
-                Text("choose member…").tag("")
-                ForEach(members.filter { $0.slug != excluding }) {
-                    Text("\($0.personName) (@\($0.slug))").tag($0.slug)
-                }
-            }
-            .labelsHidden()
-        }
-    }
-
-    @ViewBuilder private var ignoredBlock: some View {
-        DisclosureGroup("\(shownIgnores.count) ignored match\(shownIgnores.count == 1 ? "" : "es")") {
-            ForEach(shownIgnores) { r in
-                HStack {
-                    Text(r.slugA == r.slugB
-                         ? "\(r.slugA) (hidden-email flag)"
-                         : "\(r.slugA) ↔ \(r.slugB)")
-                        .font(.caption)
-                    Spacer()
-                    Button("Un-ignore") {
-                        Task { await runIgnore(IgnorePlan(pairs: [[r.slugA, r.slugB]], message: ""), ignoring: false) }
-                    }
-                    .font(.caption.weight(.semibold))
-                    .buttonStyle(.borderless)
-                }
-            }
-        }
-        .font(.callout)
-    }
-
-    private func runMerge(_ plan: MergePlan) async {
-        merging = true
-        defer { merging = false }
-        banner = nil
-        var done: [String] = []
-        do {
-            for source in plan.sources {
-                let r = try await API.mergeMember(source: source, target: plan.target)
-                if let e = r.error {
-                    banner = "Merging \(source) failed: \(friendlyAdminError(e))"
-                    break
-                }
-                let moved = r.showsMoved ?? 0
-                var line = "\(source) → \(plan.target): \(moved) show\(moved == 1 ? "" : "s") moved"
-                if let d = r.duplicateShowsDropped, d > 0 {
-                    line += ", \(d) duplicate title\(d == 1 ? "" : "s") dropped"
-                }
-                done.append(line)
-            }
-            if !done.isEmpty { banner = "Merged. " + done.joined(separator: " · ") }
-        } catch {
-            banner = "Network error. Try again."
-        }
-        manualSource = ""; manualTarget = ""
-        await load()
-    }
-
-    private func runIgnore(_ plan: IgnorePlan, ignoring: Bool = true) async {
-        banner = nil
-        do {
-            let r = try await API.setDupeIgnores(pairs: plan.pairs, ignoring: ignoring)
-            if let e = r.error { banner = friendlyAdminError(e) }
-            await load()
-        } catch {
-            banner = "Network error. Try again."
-        }
-    }
-
     // ---- Roster ----
 
     @ViewBuilder private func memberRow(_ m: AdminMember) -> some View {
@@ -671,7 +345,6 @@ struct ManageMembersView: View {
         defer { loading = false }
         members = (try? await API.adminMembers()) ?? []
         requests = (try? await API.signupRequests()) ?? []
-        ignores = (try? await API.dupeIgnores()) ?? []
     }
 }
 
@@ -685,8 +358,6 @@ func friendlyAdminError(_ code: String) -> String {
     case "last_admin": return "They're the only admin — make someone else an admin first."
     case "same_member": return "Pick two different accounts."
     case "unknown_member": return "One of those accounts no longer exists — pull to refresh."
-    case "cannot_merge_admin": return "The duplicate is an admin — remove their admin role first."
-    case "cannot_merge_demo": return "The demo account can't be part of a merge."
     default: return code
     }
 }

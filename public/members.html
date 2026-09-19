@@ -94,58 +94,6 @@
     button.save:hover { background: var(--accent-hover); }
     button.save:disabled { background: var(--ink-faint); cursor: not-allowed; }
     button.save.saved { background: var(--list-watching); }
-    .dupes {
-      background: color-mix(in oklch, var(--accent) 8%, var(--surface));
-      border: 1px solid color-mix(in oklch, var(--accent) 30%, transparent);
-      border-radius: 10px;
-      padding: 14px 16px;
-      margin-bottom: 16px;
-    }
-    .dupes h2 { font-size: 14px; margin: 0 0 4px; color: var(--ink); }
-    .dupes .hint { font-size: 12px; color: var(--ink-muted); margin: 0 0 10px; }
-    .dupe-group {
-      background: var(--surface);
-      border: 1px solid var(--border-soft);
-      border-radius: 8px;
-      padding: 10px 12px;
-      margin-bottom: 10px;
-    }
-    .dupe-group:last-child { margin-bottom: 0; }
-    .dupe-row {
-      display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
-      padding: 4px 0; font-size: 13px;
-    }
-    .dupe-row .who { font-weight: 600; }
-    .dupe-row .detail { color: var(--ink-muted); font-size: 12px; }
-    .relay-badge {
-      display: inline-block; padding: 1px 7px; border-radius: 999px;
-      background: color-mix(in oklch, var(--danger) 14%, var(--surface));
-      border: 1px solid color-mix(in oklch, var(--danger) 35%, transparent);
-      color: var(--danger-deep); font-size: 11px; font-weight: 600;
-    }
-    .merge-controls {
-      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-      margin-top: 8px; font-size: 13px; color: var(--ink-muted);
-    }
-    .merge-controls select {
-      padding: 6px 10px; font-size: 13px; font-family: inherit;
-      border: 1px solid var(--border); border-radius: 6px; background: var(--surface);
-    }
-    button.merge {
-      padding: 6px 14px; background: var(--danger); color: #fff;
-      border: none; border-radius: 6px; font-size: 13px; font-weight: 700;
-      cursor: pointer;
-    }
-    button.merge:disabled { background: var(--ink-faint); cursor: not-allowed; }
-    button.ghost {
-      padding: 6px 14px; background: transparent; color: var(--ink-muted);
-      border: 1px solid var(--border); border-radius: 6px; font-size: 13px;
-      font-weight: 600; cursor: pointer;
-    }
-    button.ghost:hover { color: var(--ink); border-color: var(--ink-muted); }
-    .ignored-list { margin-top: 10px; font-size: 13px; color: var(--ink-muted); }
-    .ignored-list summary { cursor: pointer; }
-    .ignored-list .dupe-row { justify-content: flex-start; }
     .err {
       background: var(--danger-soft);
       color: var(--danger-deep);
@@ -187,12 +135,8 @@
     <div class="admin-sub">
       Emails and phones are comma-separated; the first in each list is the
       primary. Saving replaces the existing set for that member, and saves
-      any name change (renames keep the member's slug and URL). Accounts that
-      look like duplicates (Apple &ldquo;Hide My Email&rdquo; signups, repeated
-      first names) surface in the Possible duplicates panel below, where
-      they can be merged into the member's real account.
+      any name change (renames keep the member's slug and URL).
     </div>
-    <div id="dupes" style="display:none;"></div>
     <div class="section-title" style="margin-top:0;">Filter by platform</div>
     <div class="platforms" id="platformFilter"></div>
     <div id="list"></div>
@@ -200,271 +144,17 @@
 
   <script>
     let allMembers = [];
-    let ignoredRows = [];
-    let ignoredPairs = new Set();
     let platformFilter = null;
 
     async function load() {
-      const [res, igRes] = await Promise.all([
-        fetch('/api/admin-member-emails'),
-        fetch('/api/admin-dupe-ignores'),
-      ]);
+      const res = await fetch('/api/admin-member-emails');
       if (res.status === 403) {
         document.getElementById('authWarn').style.display = '';
         return;
       }
       const data = await res.json();
       allMembers = data.members || [];
-      try {
-        ignoredRows = (await igRes.json()).ignores || [];
-      } catch { ignoredRows = []; }
-      ignoredPairs = new Set(ignoredRows.map(r => pairKey(r.slug_a, r.slug_b)));
       renderSorted();
-      renderDupes();
-    }
-
-    // ---- Duplicate detection + merge ----
-    // Two heuristics: (1) accounts reachable only through an Apple private-
-    // relay address (the "Hide My Email" signup path — near-certain
-    // duplicates), and (2) two members sharing a first name. Anything the
-    // heuristics miss can be merged with the manual picker.
-    const RELAY_RE = /@privaterelay\.appleid\.com$/i;
-
-    function isRelayOnly(m) {
-      if (m.emails.length) return m.emails.every(e => RELAY_RE.test(e));
-      // No email at all only happens for external-identity signups.
-      return !!m.enrolled_via && m.phones.length === 0;
-    }
-
-    function pairKey(a, b) {
-      return [a, b].sort().join('|');
-    }
-    function pairIgnored(a, b) {
-      return ignoredPairs.has(pairKey(a, b));
-    }
-
-    function dupeGroups() {
-      const byFirst = new Map();
-      for (const m of allMembers) {
-        const key = (m.first_name || m.slug).trim().toLowerCase();
-        if (!byFirst.has(key)) byFirst.set(key, []);
-        byFirst.get(key).push(m);
-      }
-      // Drop members whose every pairing within the group has been ignored;
-      // a group that shrinks below two is no longer a match.
-      const groups = [...byFirst.values()]
-        .map(g => g.filter(m => g.some(o => o.slug !== m.slug && !pairIgnored(m.slug, o.slug))))
-        .filter(g => g.length > 1);
-      const grouped = new Set(groups.flat().map(m => m.slug));
-      // A self-pair ignore silences the "hidden email only" flag.
-      const loneRelays = allMembers.filter(m =>
-        isRelayOnly(m) && !grouped.has(m.slug) && !pairIgnored(m.slug, m.slug));
-      return { groups, loneRelays };
-    }
-
-    // Default keeper: a real (non-relay) account, preferring the bigger
-    // library, then the older login history.
-    function defaultKeep(group) {
-      const ranked = [...group].sort((a, b) =>
-        (isRelayOnly(a) - isRelayOnly(b)) ||
-        ((b.show_count || 0) - (a.show_count || 0)) ||
-        String(a.last_login || '~').localeCompare(String(b.last_login || '~')));
-      return ranked[0].slug;
-    }
-
-    function dupeRowHtml(m, groupIdx, keepSlug) {
-      const emails = m.emails.length
-        ? m.emails.map(e => RELAY_RE.test(e)
-            ? `<span class="relay-badge" title="${escapeHtml(e)}">hidden email</span>`
-            : escapeHtml(e)).join(', ')
-        : '<em>no email</em>';
-      return `
-        <label class="dupe-row">
-          <input type="radio" name="keep-${groupIdx}" value="${escapeHtml(m.slug)}"
-            ${m.slug === keepSlug ? 'checked' : ''}> Keep
-          <span class="who">${escapeHtml(m.first_name || m.slug)}${m.last_name ? ' ' + escapeHtml(m.last_name) : ''}</span>
-          <span class="meta">${escapeHtml(m.slug)}</span>
-          ${m.enrolled_via ? `<span class="detail">via ${escapeHtml(m.enrolled_via)}</span>` : ''}
-          <span class="detail">${emails}</span>
-          <span class="detail">${m.show_count || 0} own show${m.show_count === 1 ? '' : 's'}</span>
-          <span class="detail">${formatLastLogin(m.last_login)}</span>
-        </label>`;
-    }
-
-    function renderDupes() {
-      const panel = document.getElementById('dupes');
-      const { groups, loneRelays } = dupeGroups();
-      // Only list ignores whose members still exist (merges and deletions
-      // can leave stale rows behind; they're harmless but confusing to show).
-      const slugs = new Set(allMembers.map(m => m.slug));
-      const shownIgnores = ignoredRows.filter(r => slugs.has(r.slug_a) && slugs.has(r.slug_b));
-      if (!groups.length && !loneRelays.length && !shownIgnores.length) {
-        panel.style.display = 'none';
-        return;
-      }
-      panel.className = 'dupes';
-      panel.style.display = '';
-      let html = `<h2>Possible duplicates</h2>
-        <p class="hint">Merging moves the duplicate's shows, emails, phones, and
-        Apple/Google sign-in to the kept account (untouched starter shows and
-        exact duplicate titles are dropped), switches their signed-in devices
-        over, and deletes the duplicate. It cannot be undone. Ignoring a match
-        hides it from this panel permanently (until un-ignored below).</p>`;
-      groups.forEach((g, i) => {
-        const keep = defaultKeep(g);
-        html += `<div class="dupe-group" data-group="${i}">
-          ${g.map(m => dupeRowHtml(m, i, keep)).join('')}
-          <div class="merge-controls">
-            <button class="merge merge-group" data-group="${i}">Merge the other${g.length > 2 ? 's' : ''} into the kept account</button>
-            <button class="ghost ignore-group" data-group="${i}">Not duplicates — ignore this match</button>
-          </div>
-        </div>`;
-      });
-      for (const m of loneRelays) {
-        const options = allMembers
-          .filter(o => o.slug !== m.slug)
-          .map(o => `<option value="${escapeHtml(o.slug)}">${escapeHtml(o.first_name || o.slug)}${o.last_name ? ' ' + escapeHtml(o.last_name) : ''} (${escapeHtml(o.slug)})</option>`)
-          .join('');
-        html += `<div class="dupe-group">
-          <div class="dupe-row">
-            <span class="who">${escapeHtml(m.first_name || m.slug)}${m.last_name ? ' ' + escapeHtml(m.last_name) : ''}</span>
-            <span class="meta">${escapeHtml(m.slug)}</span>
-            <span class="relay-badge">hidden email only</span>
-            ${m.enrolled_via ? `<span class="detail">via ${escapeHtml(m.enrolled_via)}</span>` : ''}
-            <span class="detail">${m.show_count || 0} own show${m.show_count === 1 ? '' : 's'}</span>
-            <span class="detail">${formatLastLogin(m.last_login)}</span>
-          </div>
-          <div class="merge-controls">
-            <label>Merge into</label>
-            <select class="lone-target"><option value="">choose member…</option>${options}</select>
-            <button class="merge merge-lone" data-source="${escapeHtml(m.slug)}">Merge</button>
-            <button class="ghost ignore-lone" data-source="${escapeHtml(m.slug)}">Not a duplicate — ignore</button>
-          </div>
-        </div>`;
-      }
-      // Manual fallback for pairs the heuristics don't spot.
-      const all = allMembers
-        .map(o => `<option value="${escapeHtml(o.slug)}">${escapeHtml(o.first_name || o.slug)}${o.last_name ? ' ' + escapeHtml(o.last_name) : ''} (${escapeHtml(o.slug)})</option>`)
-        .join('');
-      html += `<div class="merge-controls" style="margin-top:10px;">
-        <label>Manual merge:</label>
-        <select id="manualSource"><option value="">duplicate…</option>${all}</select>
-        <span>into</span>
-        <select id="manualTarget"><option value="">kept account…</option>${all}</select>
-        <button class="merge" id="manualMerge">Merge</button>
-      </div>`;
-      if (shownIgnores.length) {
-        const label = (r) => r.slug_a === r.slug_b
-          ? `${escapeHtml(r.slug_a)} (hidden-email flag)`
-          : `${escapeHtml(r.slug_a)} &harr; ${escapeHtml(r.slug_b)}`;
-        html += `<details class="ignored-list">
-          <summary>${shownIgnores.length} ignored match${shownIgnores.length === 1 ? '' : 'es'}</summary>
-          ${shownIgnores.map(r => `<div class="dupe-row">
-            <span>${label(r)}</span>
-            <button class="ghost unignore" data-a="${escapeHtml(r.slug_a)}" data-b="${escapeHtml(r.slug_b)}">Un-ignore</button>
-          </div>`).join('')}
-        </details>`;
-      }
-      panel.innerHTML = html;
-
-      panel.querySelectorAll('button.merge-group').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const i = btn.dataset.group;
-          const keep = panel.querySelector(`input[name="keep-${i}"]:checked`)?.value;
-          if (!keep) return alert('Pick which account to keep first.');
-          const { groups } = dupeGroups();
-          const dups = groups[i].map(m => m.slug).filter(s => s !== keep);
-          mergeAll(btn, dups, keep);
-        });
-      });
-      panel.querySelectorAll('button.merge-lone').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const target = btn.parentElement.querySelector('select.lone-target').value;
-          if (!target) return alert('Pick the member to merge into first.');
-          mergeAll(btn, [btn.dataset.source], target);
-        });
-      });
-      panel.querySelector('#manualMerge').addEventListener('click', () => {
-        const source = panel.querySelector('#manualSource').value;
-        const target = panel.querySelector('#manualTarget').value;
-        if (!source || !target) return alert('Pick both accounts first.');
-        mergeAll(panel.querySelector('#manualMerge'), [source], target);
-      });
-      panel.querySelectorAll('button.ignore-group').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const { groups } = dupeGroups();
-          const g = groups[btn.dataset.group].map(m => m.slug);
-          // Every pairing in the group, so it stays hidden even if a third
-          // same-named member appears in a different combination later.
-          const pairs = [];
-          for (let a = 0; a < g.length; a++)
-            for (let b = a + 1; b < g.length; b++) pairs.push([g[a], g[b]]);
-          setIgnored(btn, pairs, true,
-            `Ignore the match between ${g.join(' and ')}? They won't be flagged as possible duplicates of each other again.`);
-        });
-      });
-      panel.querySelectorAll('button.ignore-lone').forEach(btn => {
-        const s = btn.dataset.source;
-        btn.addEventListener('click', () => setIgnored(btn, [[s, s]], true,
-          `Stop flagging ${s} as a hidden-email-only account?`));
-      });
-      panel.querySelectorAll('button.unignore').forEach(btn => {
-        btn.addEventListener('click', () =>
-          setIgnored(btn, [[btn.dataset.a, btn.dataset.b]], false, null));
-      });
-    }
-
-    async function setIgnored(btn, pairs, ignoring, confirmMsg) {
-      if (confirmMsg && !confirm(confirmMsg)) return;
-      btn.disabled = true;
-      try {
-        const res = await fetch('/api/admin-dupe-ignores', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: ignoring ? 'ignore' : 'unignore', pairs }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          alert(friendlyError(data.error) || `Failed (${res.status})`);
-          return;
-        }
-        load();
-      } catch (e) {
-        alert('Network error: ' + e.message);
-      } finally {
-        btn.disabled = false;
-      }
-    }
-
-    async function mergeAll(btn, sources, target) {
-      const msg = sources.length === 1
-        ? `Merge ${sources[0]} into ${target}?`
-        : `Merge ${sources.join(', ')} into ${target}?`;
-      if (!confirm(`${msg}\n\nTheir shows, emails, phones, and Apple/Google sign-in move to ${target}; signed-in devices switch over; the duplicate account is deleted. This cannot be undone.`)) return;
-      btn.disabled = true;
-      btn.textContent = 'Merging…';
-      const done = [];
-      try {
-        for (const source of sources) {
-          const res = await fetch('/api/admin-member-merge', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ source, target }),
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            alert(`Merging ${source} failed: ${friendlyError(data.error) || res.status}`);
-            break;
-          }
-          done.push(`${source} → ${target}: ${data.shows_moved} show${data.shows_moved === 1 ? '' : 's'} moved` +
-            (data.duplicate_shows_dropped ? `, ${data.duplicate_shows_dropped} duplicate title${data.duplicate_shows_dropped === 1 ? '' : 's'} dropped` : ''));
-        }
-        if (done.length) alert('Merged.\n' + done.join('\n'));
-      } catch (e) {
-        alert('Network error: ' + e.message);
-      } finally {
-        load();
-      }
     }
 
     // ---- Roster ----
@@ -561,16 +251,6 @@
       return `last activity: ${relTime(d)}`;
     }
 
-    // The duplicates panel shows last login instead: a hidden-email
-    // duplicate that logged in yesterday next to a real account with a
-    // stale login is exactly how the operator tells which is which.
-    function formatLastLogin(iso) {
-      if (!iso) return '<span class="never">never logged in</span>';
-      const d = new Date(iso);
-      if (isNaN(d)) return 'last login: ' + escapeHtml(iso);
-      return `last login: ${relTime(d)}`;
-    }
-
     function render(members) {
       const list = document.getElementById('list');
       list.innerHTML = '';
@@ -640,8 +320,6 @@
         last_admin: "They're the only admin — make someone else an admin first.",
         same_member: 'Pick two different accounts.',
         unknown_member: 'One of those accounts no longer exists — reload the page.',
-        cannot_merge_admin: 'The duplicate is an admin — remove their admin role first.',
-        cannot_merge_demo: "The demo account can't be part of a merge.",
       }[code] || code;
     }
 

@@ -1,8 +1,10 @@
-// Operator-dismissed duplicate-account matches for the /members "Possible
-// duplicates" panel. The detection heuristics (shared first names, private-
-// relay-only accounts) produce false positives — e.g. the demo account
-// sharing a first name with a real member — and those can't be merged away,
-// so a dismissal has to stick.
+// Raw accessor for the dupe_ignores table. Originally backed the interactive
+// /members "Possible duplicates" panel (removed 2026-09, along with the
+// panel's merge UI — Patrick decided not to keep worrying about it there);
+// now it's the ledger admin-dupe-check.js writes to so its monthly email
+// doesn't repeat the same pair, and this endpoint is what's left to inspect
+// or hand-clear a row (curl with an admin session cookie — no UI button
+// anywhere calls it).
 //
 //   GET  → { ignores: [{ slug_a, slug_b }] }
 //   POST { action: 'ignore'|'unignore', pairs: [[a, b], ...] }

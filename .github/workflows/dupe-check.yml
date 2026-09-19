@@ -1,0 +1,63 @@
+name: Monthly duplicate-account check
+
+# Replaces the interactive /members "Possible duplicates" panel (removed
+# 2026-09 on both web and iOS — Patrick decided not to keep worrying about
+# it there). Same two heuristics (shared first names, Apple "Hide My Email"
+# private-relay-only accounts), but run headlessly once a month and emailed
+# instead of surfaced as a UI to click through. A pair already recorded in
+# dupe_ignores (by a previous month's run, or by hand) never repeats — see
+# functions/api/admin-dupe-check.js.
+#
+# Required repo secret (must equal the Pages CRON_SECRET):
+#   CRON_SECRET — Settings → Secrets and variables → Actions.
+
+on:
+  schedule:
+    # 11:11 UTC on the 1st of the month — off the hour, clear of every other
+    # scheduled job in this repo.
+    - cron: '11 11 1 * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Report what it would find and email nothing.'
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check for possible duplicate members
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repo secret is not set"
+            exit 1
+          fi
+          BODY='{}'
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            BODY='{"dry_run": true}'
+          fi
+          resp=$(curl -sS -X POST https://showpicker.club/api/admin-dupe-check \
+            -H "Content-Type: application/json" \
+            -H "X-Cron-Secret: ${CRON_SECRET}" \
+            -d "$BODY" \
+            -w $'\n%{http_code}')
+          http=$(printf '%s' "$resp" | tail -n1)
+          body=$(printf '%s' "$resp" | sed '$d')
+          echo "HTTP $http: $body"
+          if [ "$http" != "200" ]; then
+            if printf '%s' "$body" | grep -q '_cf_chl_opt\|Just a moment'; then
+              echo "::error::Cloudflare served a bot challenge to the GitHub runner — the request never reached the Function. Fix is in the zone's Security settings (dashboard), not the secret."
+            else
+              echo "::error::admin-dupe-check returned HTTP $http (CRON_SECRET rejected, or endpoint error)"
+            fi
+            exit 1
+          fi
+          if printf '%s' "$body" | grep -q '"error"'; then
+            echo "::error::admin-dupe-check returned an error body"
+            exit 1
+          fi
