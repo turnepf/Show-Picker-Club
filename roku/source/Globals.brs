@@ -181,6 +181,60 @@ function TmdbWidth(url as string, want as integer) as string
     return Left(url, start - 1) + Stri(want).Trim() + Mid(url, i)
 end function
 
+' The line that says where a title streams *now*, or "" when there is nothing
+' worth saying. A direct port of ShowPickerCore's `streamingNote` so the Roku
+' card says the same thing the Apple clients say — see docs/INVARIANTS.md §20.
+'
+' A member's `network` is their own record and is never overwritten, so it
+' drifts as licensing moves. Rather than correct their answer, state TMDB's:
+'
+'   - their network is among the services  -> "Also on Hulu" (the others)
+'   - it is not, but TMDB names services   -> "Now on Paramount+"
+'   - TMDB names nothing, or was never asked -> "" (no line)
+'
+' The last two cases must read alike: an empty `streaming_on` means TMDB was
+' asked and found no subscription service, which is ordinary for a rental,
+' while a missing one means nobody looked. Claiming the former on the latter
+' asserts a fact never checked.
+function StreamingNote(show as object) as string
+    raw = SafeStr(show.streaming_on)
+    if raw = "" then return ""
+
+    services = []
+    for each part in raw.Split(",")
+        v = part.Trim()
+        if v <> "" then services.push(v)
+    end for
+    if services.Count() = 0 then return ""
+
+    mine = SafeStr(show.network).Trim()
+    if mine <> ""
+        others = []
+        mineFound = false
+        for each v in services
+            if LCase(v) = LCase(mine)
+                mineFound = true
+            else
+                others.push(v)
+            end if
+        end for
+        if mineFound
+            if others.Count() = 0 then return ""
+            return "Also on " + joinStrings(others, ", ")
+        end if
+    end if
+    return "Now on " + joinStrings(services, ", ")
+end function
+
+function joinStrings(arr as object, sep as string) as string
+    if arr.Count() = 0 then return ""
+    out = arr[0]
+    for i = 1 to arr.Count() - 1
+        out = out + sep + arr[i]
+    end for
+    return out
+end function
+
 ' ---- Session cookie persistence (registry works on any thread) ----
 function GetSessionCookie() as string
     cfg = Config()

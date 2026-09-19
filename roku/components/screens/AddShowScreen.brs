@@ -141,7 +141,16 @@ sub onAdded(ev as object)
         dialog.message = "Please try again."
     end if
     dialog.buttons = ["OK"]
+    ' A Dialog does not dismiss itself. Without an observer, OK is a button
+    ' that visibly does nothing — which is exactly how this one behaved.
+    dialog.observeField("buttonSelected", "onDialogDismissed")
+    dialog.observeField("wasClosed", "onDialogDismissed")
     m.top.getScene().dialog = dialog
+end sub
+
+sub onDialogDismissed()
+    m.top.getScene().dialog = invalid
+    focusKeyboard()
 end sub
 
 sub showMessage(text as string)

@@ -99,8 +99,14 @@ Two rules that hold everywhere, regardless of tier:
 
 ## Platform parity notes (Roku limits, not omissions)
 
-- **Watch / deep links** — Roku does not let a channel launch other streaming apps to a specific
-  title, so the "Where to Watch" button shows the network + link rather than launching it.
+- **Watch / deep links** — a Roku app may not launch or deep link into another app **at all**.
+  Roku's certification criteria prohibit "deep links to other applications, or any cross-app
+  functionality" (confirmed against the current criteria, Sept 2026). There is a known trick —
+  calling the device's own ECP `/launch/<channelId>` from a Task — but a channel that does it fails
+  certification, so it is not an option for anything publishable. This is a harder limit than
+  tvOS, where custom URL schemes at least reach the app (see the vendor notes in
+  `docs/` and the Apple clients). So the detail screen **states** where a title streams and does
+  not pretend to be a launcher: there is no Watch button, because there is nothing it could do.
 - **Trailers** — YouTube keys aren't directly playable on Roku, so trailers are omitted for now.
 - **Sign in with Apple / Google** — not available on Roku; email/phone OTP only.
 - **Ratings** — display-only, same as tvOS.
