@@ -1,5 +1,6 @@
 import { getSession } from '../_shared/auth.js';
 import { demoMemberSlug } from '../_shared/demo.js';
+import { networkFromUrl } from '../_shared/networks.js';
 
 export async function onRequestPost(context) {
   const { env, request } = context;
@@ -22,7 +23,7 @@ export async function onRequestPost(context) {
   // serve members a streaming-app URL that didn't match their stored
   // network.
   const { results: withUrls } = await env.DB.prepare(
-    `SELECT LOWER(title) as ltitle, network, network_url FROM shows
+    `SELECT LOWER(title) as ltitle, network, network_url, tmdb_id FROM shows
      WHERE archived = 0
        AND network IS NOT NULL
        AND network_url IS NOT NULL
@@ -30,7 +31,7 @@ export async function onRequestPost(context) {
        AND network_url NOT LIKE '%/search%'
        AND network_url NOT LIKE '%/s?%'
        AND (?1 IS NULL OR member_slug != ?1)
-     GROUP BY LOWER(title), network`
+     GROUP BY LOWER(title), network, tmdb_id`
   ).bind(demoSlug).all();
 
   if (withUrls.length === 0) {
@@ -40,16 +41,32 @@ export async function onRequestPost(context) {
   }
 
   let synced = 0;
+  let skipped = 0;
   for (const source of withUrls) {
+    // Provenance gate. network_url has two writers with very different trust:
+    // Watchmode/TMDB enrichment, and a member's own request body (api/shows.js
+    // accepts a pasted network_url, and safeNetworkUrl only checks the scheme
+    // and the character class — any host passes). Signup is open and
+    // self-service, so "another member" is not a trusted source, and the
+    // demo-account exclusion above is a one-account denylist that a newly
+    // registered account walks straight around. Only a URL whose host
+    // canonicalizes to this row's own service may be pushed onto everybody
+    // else's rows; anything else stays on the row that already has it.
+    // `skipped` is reported so a provider host missing from the domain index
+    // in _shared/networks.js shows up as a number to go fix, rather than as
+    // this feature quietly narrowing.
+    if (networkFromUrl(source.network_url) !== source.network) { skipped++; continue; }
+
     const result = await env.DB.prepare(
       `UPDATE shows SET network_url = ?, enriched_at = datetime('now')
        WHERE LOWER(title) = ? AND network = ? AND archived = 0
+         AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)
          AND (network_url IS NULL OR network_url LIKE '%/search%' OR network_url LIKE '%/s?%')`
-    ).bind(source.network_url, source.ltitle, source.network).run();
+    ).bind(source.network_url, source.ltitle, source.network, source.tmdb_id, source.tmdb_id).run();
     synced += result.meta.changes;
   }
 
-  return new Response(JSON.stringify({ synced }), {
+  return new Response(JSON.stringify({ synced, skipped }), {
     headers: { 'Content-Type': 'application/json' },
   });
 }

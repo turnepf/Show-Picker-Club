@@ -145,6 +145,14 @@ export async function onRequestPost(context) {
   if (network_url && !safeNetworkUrl(network_url)) {
     return new Response(JSON.stringify({ error: 'invalid network_url' }), { status: 400, headers: corsHeaders() });
   }
+  // The network name is rendered as markup on the member page's service-count
+  // footer and in the admin URL-cleanup console, and canonicalNetwork() echoes
+  // a name it doesn't recognize, so an unrecognized value is stored verbatim.
+  // Reject markup at the writer rather than trusting every present and future
+  // read path to escape it. The edit handler carries the same check.
+  if (network && /[<>"'&]/.test(String(network))) {
+    return new Response(JSON.stringify({ error: 'invalid network' }), { status: 400, headers: corsHeaders() });
+  }
 
   // When the member picked the show from type-ahead search, the client sends
   // the exact TMDB id — enrich that entry directly instead of re-guessing

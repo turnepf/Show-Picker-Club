@@ -103,6 +103,8 @@ jobs:
         run: node scripts/enrich-movie-detail-test.mjs
       - name: Cross-library search filters server-side without widening scope
         run: node scripts/shows-all-search-test.mjs
+      - name: A row you may not write is a row you may not read
+        run: node scripts/shows-authz-test.mjs
 
   roku:
     runs-on: ubuntu-latest
