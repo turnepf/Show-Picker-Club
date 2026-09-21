@@ -901,6 +901,40 @@ roughly 23 hours out of every 24, from the day it was written.
 
 Enforcer: `scripts/auth-code-flow-test.mjs`.
 
+## 26. An invitation is bounded, revocable, and not redeemable cross-site
+
+Group membership is what scopes vibe reads, `GET /api/shows/all`, Also
+watching, Group Trending, the recommendation board, and who Watching With may
+name. A `group_members` row is therefore the most valuable write in the
+product, and an invite token is the only credential that produces one.
+
+- **Redeeming is a write, so it obeys write rules.** It is reached by a
+  cookie-authenticated `GET`, which means a cross-site top-level navigation
+  carries the victim's session into it; `SameSite=Lax` permits exactly that
+  navigation and is not a defence. The write is refused when `Sec-Fetch-Site`
+  says cross-site, falling back to an `Origin` check. Native clients send
+  neither header and are unaffected — a header an attacker's browser cannot
+  suppress is what does the work, and a client that omits it is not a browser.
+  Refusing with a *preview* rather than an error keeps the refusal from
+  confirming anything.
+- **A credential that is never consumed is not a credential.** Redemptions are
+  counted against a ceiling, and the claim is an atomic
+  `UPDATE ... WHERE use_count < max_uses` — a guard evaluated in JavaScript
+  lets two racing redemptions both read the same count and both proceed.
+- **Every credential has a way to be destroyed.** Deleting the group was not
+  an acceptable answer for a leaked link.
+- **An invite is somebody vouching, so it dies with their membership.**
+  Leaving deletes your outstanding invites, and redemption re-checks the
+  issuer's membership for rows removed some other way.
+- **Dead is dead in one uniform way.** Revoked, exhausted, expired and
+  issuer-departed answer identically, and the unauthenticated link-preview
+  card goes generic for all of them. A dead link must not name the group it
+  used to open, or confirm it was ever real — which is the same rule §20-era
+  link previews already follow.
+
+Enforcer: `scripts/group-invite-lifecycle-test.mjs`, plus the preview cases in
+`scripts/og-preview-test.mjs`.
+
 ## Adding an invariant
 
 Add a section here, then decide which enforcer covers it. Prefer a deterministic

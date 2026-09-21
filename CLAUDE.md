@@ -166,6 +166,30 @@ was already in the group when it happened, never to the editor, and never to
 someone who joined afterward.
 
 ```bash
+node scripts/group-invite-lifecycle-test.mjs
+```
+
+The group invite's lifecycle (migration 070) and the cross-site gate on
+redemption, from the 2026-09 security audit. Group membership is the privacy
+unit, so both ways a membership row could be written without the group
+agreeing are pinned here. **Redemption is a write riding a cookie-authenticated
+GET**, so a cross-site top-level navigation used to join a signed-in member to
+a stranger's group — `SameSite=Lax` permits exactly that navigation. The write
+is refused when `Sec-Fetch-Site` says cross-site (falling back to `Origin`),
+while native clients that send neither header are unaffected; the refusal is a
+*preview*, so a cross-site caller learns nothing it didn't already hold. The
+verb is still wrong — the write belongs on a POST — but both shipped clients
+call it as a GET, so that split waits for a build. **A token was never
+consumed, counted or cancellable**: the link stays shareable to several people
+(10 uses), claimed by an atomic `UPDATE ... WHERE use_count < max_uses` so a
+race can't overshoot, revocable by the issuer or the group's creator, deleted
+when its issuer leaves, and dead if their membership ends some other way.
+Revoked, exhausted, expired and issuer-departed all answer alike, and the
+link-preview card in `functions/groups/join.js` goes generic for all of them —
+a dead link never names the group it used to open. See `docs/INVARIANTS.md`
+§26.
+
+```bash
 node scripts/vibe-scope-test.mjs
 ```
 

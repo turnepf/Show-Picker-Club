@@ -105,6 +105,8 @@ jobs:
         run: node scripts/shows-all-search-test.mjs
       - name: A row you may not write is a row you may not read
         run: node scripts/shows-authz-test.mjs
+      - name: A group invite is bounded, revocable, and not cross-site redeemable
+        run: node scripts/group-invite-lifecycle-test.mjs
 
   roku:
     runs-on: ubuntu-latest

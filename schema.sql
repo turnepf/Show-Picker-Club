@@ -368,7 +368,14 @@ CREATE TABLE IF NOT EXISTS group_invites (
   token TEXT NOT NULL UNIQUE,
   expires_at TEXT NOT NULL,
   created_by TEXT NOT NULL REFERENCES members(slug),
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT (datetime('now')),
+  -- Migration 070. A link is shareable to several people but bounded: the
+  -- claim is an atomic UPDATE guarded on use_count < max_uses, so concurrent
+  -- redemptions can't overshoot. revoked_at kills a leaked link without
+  -- taking the group down with it.
+  use_count INTEGER NOT NULL DEFAULT 0,
+  max_uses INTEGER NOT NULL DEFAULT 10,
+  revoked_at TEXT
 );
 
 -- Migration 065: a title recommended to a group. The row belongs to the

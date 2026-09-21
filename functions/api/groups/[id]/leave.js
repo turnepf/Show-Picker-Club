@@ -57,6 +57,15 @@ export async function onRequestPost(context) {
     ).bind(session.member_slug, groupId).run();
   } catch (e) { /* pre-065 database */ }
 
+  // Your outstanding invites go with you, for the same reason. An invite is
+  // one member vouching for someone; once you've left there is nobody behind
+  // it, and a link you shared last week would otherwise keep admitting
+  // strangers to a group you're no longer in. join.js re-checks the issuer's
+  // membership as well, so a row that predates this still stops working.
+  await env.DB.prepare(
+    'DELETE FROM group_invites WHERE group_id = ? AND created_by = ?'
+  ).bind(groupId, session.member_slug).run();
+
   await env.DB.prepare(
     'DELETE FROM group_members WHERE group_id = ? AND member_slug = ?'
   ).bind(groupId, session.member_slug).run();
