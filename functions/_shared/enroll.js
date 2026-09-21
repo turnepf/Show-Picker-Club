@@ -48,13 +48,18 @@ export async function turnstileOk(env, token, ip) {
 export async function enrollmentThrottled(env, ip) {
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const maxPerDay = parseInt(env.SELF_ENROLL_MAX_PER_DAY, 10) || DEFAULT_MAX_SIGNUPS_PER_DAY;
+  // datetime() on both sides: members.created_at is SQLite's
+  // 'YYYY-MM-DD HH:MM:SS' column default and `dayAgo` is a JavaScript ISO
+  // string, so compared raw the rolling 24-hour window silently collapsed to
+  // "since midnight UTC" — and to nothing at all in the first hours of a day.
   const { cnt: globalCnt } = (await env.DB.prepare(
-    `SELECT COUNT(*) AS cnt FROM members WHERE enrolled_via IS NOT NULL AND created_at > ?`
+    `SELECT COUNT(*) AS cnt FROM members
+       WHERE enrolled_via IS NOT NULL AND datetime(created_at) > datetime(?)`
   ).bind(dayAgo).first().catch(() => ({ cnt: 0 }))) || { cnt: 0 };
   if (globalCnt >= maxPerDay) return 'signups_paused';
 
   const { cnt: ipCnt } = (await env.DB.prepare(
-    'SELECT COUNT(*) AS cnt FROM members WHERE enroll_ip = ? AND created_at > ?'
+    'SELECT COUNT(*) AS cnt FROM members WHERE enroll_ip = ? AND datetime(created_at) > datetime(?)'
   ).bind(ip, dayAgo).first().catch(() => ({ cnt: 0 }))) || { cnt: 0 };
   if (ipCnt >= MAX_PER_IP_PER_DAY) return 'too_many_from_ip';
   return null;
@@ -115,10 +120,13 @@ export async function enrollMember(env, ctx, { full_name, email, via, appleSub, 
 }
 
 async function notifySignup(env, { full_name, email, via, slug }) {
-  // Cap instant emails so a flood can't weaponize the notifier.
+  // Cap instant emails so a flood can't weaponize the notifier. datetime() on
+  // both sides for the same reason as enrollmentThrottled above — this cap
+  // reads the same column, and raw it counted zero for every member row
+  // created on the current UTC day.
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { cnt } = (await env.DB.prepare(
-    'SELECT COUNT(*) AS cnt FROM members WHERE enrolled_via IS NOT NULL AND created_at > ?'
+    'SELECT COUNT(*) AS cnt FROM members WHERE enrolled_via IS NOT NULL AND datetime(created_at) > datetime(?)'
   ).bind(hourAgo).first().catch(() => ({ cnt: 0 }))) || { cnt: 0 };
   if (cnt > MAX_NOTIFY_EMAILS_PER_HOUR) return;
 

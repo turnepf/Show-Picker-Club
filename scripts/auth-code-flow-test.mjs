@@ -299,5 +299,80 @@ console.log('\n== a member address that bounces reports the same way');
   check('member and stranger fail identically', res.status === 502, `got ${res.status}`);
 }
 
+// These three blocks use @dummy-mailbox.net rather than the @example.com the
+// rest of the suite prefers: the fake Resend above refuses reserved domains
+// exactly like the real one, and a cap test has to count messages that were
+// actually accepted.
+console.log('\n== the hourly caps actually fire');
+{
+  // Every one of these windows compared a JavaScript ISO string against a
+  // column carrying SQLite's own datetime('now') format. TEXT comparison is
+  // byte-wise and ' ' sorts below 'T', so the predicate was false for every
+  // row written on the same UTC day: the caps counted zero and never fired
+  // for roughly 23 hours out of every 24. These cases fail against the raw
+  // comparison and pass against datetime() on both sides.
+  const env = makeEnv();
+  addMember(env, 'patrick', 'patrick@patrickturner.net');
+
+  let lastStatus = 0;
+  for (let i = 0; i < 6; i++) {
+    const res = await requestCode.onRequestPost(
+      context(env, post('/auth/request-code', { email: 'patrick@patrickturner.net', channel: 'email' })));
+    lastStatus = res.status;
+  }
+  check('a sixth code inside the hour is refused', lastStatus === 429, `got ${lastStatus}`);
+  check('and five is what was actually mailed', mail.sent.length === 5, `sent ${mail.sent.length}`);
+  check('the refused request minted no row',
+    rows(env, 'SELECT id FROM login_otps').length === 5);
+}
+
+console.log('\n== the per-IP cap covers signup codes, not just member codes');
+{
+  // The signup branch writes enroll_otps and returned before reaching the
+  // shared per-IP check, so one source could spend the whole allowance on
+  // member codes and then spend it again on signup codes to addresses of
+  // its choosing. Both paths now draw on one budget.
+  const env = makeEnv();
+  addMember(env, 'patrick', 'patrick@patrickturner.net');
+
+  // Ten strangers from one IP exhausts the per-IP hourly budget.
+  for (let i = 0; i < 10; i++) {
+    await requestCode.onRequestPost(
+      context(env, post('/auth/request-code', { email: `stranger${i}@dummy-mailbox.net`, channel: 'email' })));
+  }
+  check('ten signup codes went out', mail.sent.length === 10, `sent ${mail.sent.length}`);
+
+  const before = mail.sent.length;
+  const eleventh = await requestCode.onRequestPost(
+    context(env, post('/auth/request-code', { email: 'stranger99@dummy-mailbox.net', channel: 'email' })));
+  check('an eleventh signup code from the same IP mails nothing',
+    mail.sent.length === before, `sent ${mail.sent.length - before} more`);
+  check('and still answers success, so it cannot be used to probe membership',
+    eleventh.status === 200, `got ${eleventh.status}`);
+
+  // The member path draws on the same budget rather than a fresh one.
+  const memberRes = await requestCode.onRequestPost(
+    context(env, post('/auth/request-code', { email: 'patrick@patrickturner.net', channel: 'email' })));
+  check('a member code from the exhausted IP is refused too',
+    memberRes.status === 429, `got ${memberRes.status}`);
+
+  // A different source is unaffected — the cap is per-IP, not global.
+  const other = await requestCode.onRequestPost(
+    context(env, post('/auth/request-code', { email: 'patrick@patrickturner.net', channel: 'email' }, { ip: '198.51.100.7' })));
+  check('another IP is unaffected', other.status === 200, `got ${other.status}`);
+}
+
+console.log('\n== the per-address signup cap fires');
+{
+  const env = makeEnv();
+  for (let i = 0; i < 4; i++) {
+    await requestCode.onRequestPost(
+      context(env, post('/auth/request-code', { email: 'newcomer@dummy-mailbox.net', channel: 'email' })));
+  }
+  check('a fourth code to one address is not sent', mail.sent.length === 3, `sent ${mail.sent.length}`);
+  check('and only three rows exist',
+    rows(env, 'SELECT id FROM enroll_otps').length === 3);
+}
+
 console.log(`\n${failed === 0 ? 'PASS' : 'FAILED'} — ${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

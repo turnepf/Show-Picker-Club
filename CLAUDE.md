@@ -339,6 +339,15 @@ The email login/signup code flow on the same harness, with a fake Resend that
 refuses reserved domains the way the real one does — the demo account sending
 no mail, native signup codes not being gated on a captcha no app can pass, and
 a delivery failure surfacing instead of hiding behind `{success: true}`.
+Also pins that **the hourly caps actually refuse**, which none of them did
+until 2026-09: every window query compared a JavaScript ISO string against a
+column carrying SQLite's `datetime('now')` format, and TEXT comparison is
+byte-wise, so a same-day row always read as older than the bound and the
+`COUNT(*)` came back zero. A cap that has never fired looks identical to a cap
+that is working, so the cases assert the 429 and the un-sent message rather
+than the count. The per-IP budget now also covers the signup branch, which
+wrote a different table and returned before the shared check — one source
+could spend the same allowance twice. See `docs/INVARIANTS.md` §25.
 
 ```bash
 node scripts/import-list-test.mjs

@@ -870,6 +870,37 @@ Watch button under a real service's name.
 
 Enforcer: `scripts/shows-authz-test.mjs`.
 
+## 25. A time window compares like with like
+
+SQLite has no date type. Every timestamp in this schema is TEXT, and there are
+two formats in play: `datetime('now')` from a column default writes
+`YYYY-MM-DD HH:MM:SS`, and JavaScript's `toISOString()` writes
+`YYYY-MM-DDTHH:MM:SS.sssZ`. Comparison is byte-wise, and `' '` (0x20) sorts
+below `'T'` (0x54) — so a same-day row compared against an ISO bound is always
+"older", and `created_at > since` is unsatisfiable. It fails silently: the
+query runs, returns zero, and the cap it feeds reads as "nobody is near the
+limit". Every hourly quota on `/auth/request-code` was inert this way, for
+roughly 23 hours out of every 24, from the day it was written.
+
+- **Know which format the column holds.** It is decided by the writer, not the
+  schema: `login_otps`, `enroll_otps` and `members` take the SQLite default,
+  while `failed_logins.created_at` is `NOT NULL` and written by JS as ISO. The
+  login throttle works precisely because both of its sides are ISO.
+- **Normalize both sides at the comparison.** `datetime(created_at) >
+  datetime(?)` is correct for a column holding either format, needs no
+  migration, and leaves no rows behind. Changing a column default instead
+  fixes new rows and silently keeps the bug for every old one.
+- **A cap that has never fired is not evidence that it works.** Nothing in the
+  product tells you a `COUNT(*)` came back zero because the limit was
+  respected rather than because the predicate was unsatisfiable. That is why
+  the enforcer asserts the refusal, not the query.
+- **A quota is only as wide as the paths it counts.** The signup branch wrote
+  a different table and returned before the shared check, so one source could
+  spend the same hourly allowance twice. A budget has to cover every path that
+  spends it.
+
+Enforcer: `scripts/auth-code-flow-test.mjs`.
+
 ## Adding an invariant
 
 Add a section here, then decide which enforcer covers it. Prefer a deterministic
