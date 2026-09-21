@@ -71,4 +71,4 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           wrangler d1 execute shows-db --remote \
-            --command "DELETE FROM failed_logins WHERE created_at < datetime('now', '-7 days');"
+            --command "DELETE FROM failed_logins WHERE datetime(created_at) < datetime('now', '-7 days');"

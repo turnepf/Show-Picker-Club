@@ -136,6 +136,15 @@ export async function onRequestPost(context) {
       // thing worth reporting, and it's safe to: whether Resend accepts an
       // address doesn't depend on whether it's a member, so both branches
       // 502 alike.
+      //
+      // The per-IP budget is checked HERE rather than only at the shared
+      // check below, because this branch returns before reaching it. Leaving
+      // it outside meant one source could mint unlimited signup codes to
+      // addresses of its choosing. The reply stays { success: true } so a
+      // throttled caller still can't tell a member from a stranger.
+      if (await overIpRateLimit(env, ip)) {
+        return json({ success: true });
+      }
       const sent = await maybeSendSignupCode(context, emailInput, ip);
       return sent === 'send_failed' ? json({ error: 'send_failed' }, 502) : json({ success: true });
     }
@@ -208,10 +217,13 @@ async function maybeSendSignupCode(context, email, ip) {
   // 2026-08. Enumeration is unaffected: a caller that got past the front door
   // gets the same reply for a member and a stranger.
   if (await enrollmentThrottled(env, ip)) return;
-  // Per-email cap: 3 signup codes per hour.
+  // Per-email cap: 3 signup codes per hour. datetime() on BOTH sides — see
+  // the note on overRateLimit below; enroll_otps.created_at is written by the
+  // column default, the bound is a JavaScript ISO string, and compared raw
+  // this counted zero for every row minted on the same UTC day.
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { cnt } = (await env.DB.prepare(
-    'SELECT COUNT(*) AS cnt FROM enroll_otps WHERE email = ? AND created_at > ?'
+    'SELECT COUNT(*) AS cnt FROM enroll_otps WHERE email = ? AND datetime(created_at) > datetime(?)'
   ).bind(email, hourAgo).first().catch(() => ({ cnt: 99 }))) || { cnt: 99 };
   if (cnt >= 3) return;
 
@@ -227,8 +239,17 @@ async function maybeSendSignupCode(context, email, ip) {
 
 async function overRateLimit(env, memberSlug) {
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  // datetime() on BOTH sides. login_otps.created_at carries SQLite's own
+  // 'YYYY-MM-DD HH:MM:SS' from the column default, while `since` is a
+  // JavaScript ISO-8601 string with a 'T' separator. SQLite compares TEXT
+  // byte-wise, and ' ' (0x20) sorts below 'T' (0x54), so `created_at > since`
+  // was unsatisfiable for every row written on the same UTC day — this cap
+  // counted zero and never fired for roughly 23 hours out of every 24.
+  // Normalizing both sides is correct for rows written in either format and
+  // needs no migration; changing the column default would leave every
+  // existing row behind.
   const { cnt } = (await env.DB.prepare(
-    'SELECT COUNT(*) AS cnt FROM login_otps WHERE member_slug = ? AND created_at > ?'
+    'SELECT COUNT(*) AS cnt FROM login_otps WHERE member_slug = ? AND datetime(created_at) > datetime(?)'
   ).bind(memberSlug, since).first()) || { cnt: 0 };
   return cnt >= MAX_PER_HOUR;
 }
@@ -241,8 +262,15 @@ async function overRateLimit(env, memberSlug) {
 async function overIpRateLimit(env, ip) {
   if (ip === 'unknown') return false;
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  // Counts BOTH mint paths. The signup branch writes enroll_otps, so counting
+  // login_otps alone let one source spend the whole hourly allowance twice —
+  // once on member codes and again on signup codes. datetime() on both sides
+  // for the same reason as overRateLimit.
   const { cnt } = (await env.DB.prepare(
-    'SELECT COUNT(*) AS cnt FROM login_otps WHERE ip = ? AND created_at > ?'
+    `SELECT (SELECT COUNT(*) FROM login_otps
+               WHERE ip = ?1 AND datetime(created_at) > datetime(?2))
+          + (SELECT COUNT(*) FROM enroll_otps
+               WHERE ip = ?1 AND datetime(created_at) > datetime(?2)) AS cnt`
   ).bind(ip, since).first()) || { cnt: 0 };
   return cnt >= MAX_PER_IP_PER_HOUR;
 }

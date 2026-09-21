@@ -63,7 +63,7 @@ export async function onRequestPost(context) {
 
     const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const { cnt } = (await env.DB.prepare(
-      "SELECT COUNT(*) AS cnt FROM login_otps WHERE member_slug = ? AND channel = 'delete' AND created_at > ?"
+      "SELECT COUNT(*) AS cnt FROM login_otps WHERE member_slug = ? AND channel = 'delete' AND datetime(created_at) > datetime(?)"
     ).bind(slug, hourAgo).first()) || { cnt: 0 };
     if (cnt >= MAX_CODES_PER_HOUR) return json({ error: 'rate_limited' }, 429);
 
