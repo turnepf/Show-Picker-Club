@@ -29,15 +29,21 @@ export async function onRequestGet(context) {
   if (!token) return ogPage(generic);
 
   const invite = await env.DB.prepare(
-    `SELECT gi.expires_at, g.name
+    `SELECT gi.expires_at, gi.use_count, gi.max_uses, gi.revoked_at, g.name
        FROM group_invites gi
        INNER JOIN groups g ON g.id = gi.group_id
       WHERE gi.token = ?`
   ).bind(token).first();
 
-  // Unknown and expired render the same card. A live invite is the only thing
-  // that gets a group name.
-  if (!invite || new Date(invite.expires_at) < new Date()) return ogPage(generic);
+  // Unknown, expired, revoked and exhausted all render the same card. A live
+  // invite is the only thing that gets a group name — a dead link must not
+  // name the group it used to open, or confirm that it was ever real. This
+  // page has no session, so the card is what anyone holding the URL sees.
+  const dead = !invite
+    || new Date(invite.expires_at) < new Date()
+    || invite.revoked_at
+    || (invite.use_count ?? 0) >= (invite.max_uses ?? 10);
+  if (dead) return ogPage(generic);
 
   const name = (invite.name || '').trim() || 'a group';
 
