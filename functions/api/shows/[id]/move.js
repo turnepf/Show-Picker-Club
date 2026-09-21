@@ -18,11 +18,24 @@ export async function onRequestPut(context) {
     return new Response(JSON.stringify({ error: 'Invalid list' }), { status: 400, headers: corsHeaders() });
   }
 
-  await env.DB.prepare(
+  const res = await env.DB.prepare(
     "UPDATE shows SET list = ?, updated_at = datetime('now') WHERE id = ? AND member_slug = ?"
   ).bind(list, params.id, session.member_slug).run();
 
-  const show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(params.id).first();
+  // The read-back carries the same owner predicate as the write above, and a
+  // write that matched nothing answers 404 instead of falling through to it.
+  // Re-reading by id alone returned another member's whole row — notes,
+  // watching_with, recommended_by and added_by (their login email) — to any
+  // logged-in member who guessed the id, even though the UPDATE changed
+  // nothing. A row this session may not write is a row it may not read, and
+  // 404 also keeps an unallocated id indistinguishable from a foreign one.
+  if (!res.meta || res.meta.changes === 0) {
+    return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: corsHeaders() });
+  }
+
+  const show = await env.DB.prepare(
+    'SELECT * FROM shows WHERE id = ? AND member_slug = ?'
+  ).bind(params.id, session.member_slug).first();
   return new Response(JSON.stringify({ show }), { headers: corsHeaders() });
 }
 

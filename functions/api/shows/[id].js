@@ -149,6 +149,11 @@ export async function onRequestPut(context) {
   if (body.network_url !== undefined && body.network_url && !safeNetworkUrl(body.network_url)) {
     return new Response(JSON.stringify({ error: 'invalid network_url' }), { status: 400, headers: corsHeaders() });
   }
+  // Same constraint as the add path — this is the second unguarded writer of
+  // the network column, so validating only on insert leaves the field open.
+  if (body.network !== undefined && body.network && /[<>"'&]/.test(String(body.network))) {
+    return new Response(JSON.stringify({ error: 'invalid network' }), { status: 400, headers: corsHeaders() });
+  }
   const val = (key) => body[key] !== undefined ? body[key] : existing[key];
   const title = val('title');
   const network_url = body.network_url !== undefined ? body.network_url : existing.network_url;

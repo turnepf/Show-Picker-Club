@@ -149,7 +149,7 @@ function renderShowList(shows, options = {}) {
     });
     const countsHtml = Object.entries(networkCounts)
       .sort((a, b) => b[1] - a[1])
-      .map(([n, c]) => `${n} (${c})`)
+      .map(([n, c]) => `${escapeHtml(n)} (${c})`)
       .join(' &middot; ');
     const legendParts = [];
     if (hasFullSeries) legendParts.push('🎬 Series Complete');

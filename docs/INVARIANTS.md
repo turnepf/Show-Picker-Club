@@ -797,6 +797,79 @@ club library.
 Enforcer: `scripts/shows-all-search-test.mjs` — in particular the case that
 types a stranger's title exactly and gets nothing back.
 
+## 22. A row you may not write is a row you may not read
+
+A handler that scopes its write by owner and then re-reads the row by primary
+key alone has two different answers to "whose row is this" three lines apart.
+The write is refused, which looks like the control worked — and then the
+response hands back the row anyway. `/api/shows/:id/move` did exactly that,
+and because `added_by` carries a login email address, the leak was PII and not
+only a memo.
+
+- **The read-back carries the write's predicate.** Not a weaker one, and not
+  none. If the `UPDATE` says `AND member_slug = ?`, so does the `SELECT` that
+  follows it.
+- **A write that matched nothing does not fall through into a read.** Check the
+  change count and answer 404. Letting control continue is how the disagreement
+  stays invisible.
+- **A refused row and a row that does not exist answer alike.** Otherwise the
+  404 is an existence oracle and the id space is walkable, which is the
+  difference between guessing an id and enumerating them.
+- **But a no-op write is still a write.** SQLite counts a matched row as
+  changed even when no column value differs, and `updated_at` moves on every
+  call — so moving a row onto the list it already sits on must not read as
+  "matched nothing".
+
+This is the read half of the rule §3 states for personal fields: the four
+owner-only columns are redacted on every *listing* path, and the reason the
+audit found this one is that a single-row response never went through them.
+
+Enforcer: `scripts/shows-authz-test.mjs`.
+
+## 23. A stored string is markup by the time somebody reads it
+
+`canonicalNetwork()` echoes a name it doesn't recognize rather than rejecting
+it, which is the right call for a catalog that gains services faster than the
+table does — and it means an arbitrary member-supplied string reaches the
+`network` column intact. That column is then rendered into the member page's
+service-count footer and into the admin URL-cleanup console.
+
+- **Escape at the sink, but close the source.** A sink-only fix leaves every
+  future read path — a new page, an export, an email body — trusted to
+  remember. The write is the one place that is not repeated.
+- **Every writer of a column, not the one you found.** `network` has two:
+  the add handler and the edit handler. Guarding only the insert leaves the
+  field open.
+- **A fix at the sink does not clean stored rows.** Anything already persisted
+  needs a backfill or it stays dangerous to any reader that forgets.
+
+Enforcer: `scripts/shows-authz-test.mjs`.
+
+## 24. Provenance decides what may be copied onto another member's row
+
+`network_url` has two writers with very different trust: provider enrichment
+(Watchmode, TMDB), and a member's own request body. `safeNetworkUrl` checks
+the scheme and the character class, not the host, so the member-supplied value
+is safe to *render* and says nothing about whether it is safe to *propagate*.
+`/api/sync-urls` copied whichever it found onto every member's copy of the
+title, which turned one self-enrolled member into the author of everybody's
+Watch button under a real service's name.
+
+- **A club-wide write needs a provider-grade source.** Today that is the host
+  check: a URL only propagates when `networkFromUrl()` maps it to the row's own
+  service. A `network_url_source` column would say it directly and is the
+  better long-term answer.
+- **A denylist is not the control.** Excluding the demo account was correct and
+  insufficient — open signup means the next untrusted row is one registration
+  away.
+- **A narrowing check reports what it narrowed.** `skipped` is in the response
+  so a provider host missing from the domain index surfaces as a number to go
+  fix, rather than as the feature quietly doing less.
+- **And it still stops at a different show.** §17 applies here like everywhere
+  else: a copy pinned to another `tmdb_id` is a different title sharing a name.
+
+Enforcer: `scripts/shows-authz-test.mjs`.
+
 ## Adding an invariant
 
 Add a section here, then decide which enforcer covers it. Prefer a deterministic

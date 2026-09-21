@@ -368,6 +368,26 @@ unfiltered one stays unbounded, and a blank `q` reads as "no filter" rather
 than "match nothing".
 
 ```bash
+node scripts/shows-authz-test.mjs
+```
+
+Three rules on the `shows` row that a session gate alone doesn't enforce, all
+three from the 2026-09 security audit and all three live when it ran. **A row
+you may not write is a row you may not read** — `/api/shows/:id/move` scoped
+its `UPDATE` by owner and then re-read by primary key alone, handing any
+logged-in member somebody else's `notes`, `watching_with`, `recommended_by`
+and `added_by` (a login email address); a refused move is now 404 and is
+indistinguishable from an unallocated id, while the owner's own move — including
+a re-move onto the list the row already sits on — still answers 200. **The
+network name is markup by the time anyone reads it**, and `canonicalNetwork()`
+echoes what it doesn't recognize, so both writers reject markup rather than
+leaving every present and future read path to escape it. **A URL one member
+pasted is not evidence for anybody else's row** — `sync-urls` only propagates a
+`network_url` whose host canonicalizes to that row's own service, counts every
+refusal in `skipped` so a missing domain shows up as a number to fix, and stops
+at a copy pinned to a different `tmdb_id`.
+
+```bash
 node scripts/og-preview-test.mjs
 ```
 

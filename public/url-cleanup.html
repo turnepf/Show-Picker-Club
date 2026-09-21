@@ -597,7 +597,7 @@
               <span class="show-meta">${c.rows} rows · ${escapeHtml(c.networks.join(', '))}</span>
             </div>
             <div class="row-form">
-              <select class="conflict-net">${[''].concat(c.networks, networks.filter(n => !c.networks.includes(n))).map(n => `<option value="${escapeAttr(n)}">${n || '— pick canonical —'}</option>`).join('')}</select>
+              <select class="conflict-net">${[''].concat(c.networks, networks.filter(n => !c.networks.includes(n))).map(n => `<option value="${escapeAttr(n)}">${escapeHtml(n) || '— pick canonical —'}</option>`).join('')}</select>
               <button class="btn-update conflict-save" type="button">Unify</button>
             </div>
           </div>
