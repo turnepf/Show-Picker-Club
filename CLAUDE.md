@@ -190,6 +190,24 @@ a dead link never names the group it used to open. See `docs/INVARIANTS.md`
 §26.
 
 ```bash
+node scripts/show-edit-network-test.mjs
+```
+
+Who wins when the member and the stored link disagree about what service a
+show is on. `PUT /api/shows/:id` read the network off the row's existing
+`network_url` and let it beat the dropdown — fine when members pasted their
+own links, but since Watchmode those arrive from a machine, so it let a
+machine outrank a person: a row holding a `tv.apple.com` deep link **could
+not be moved off Apple TV+ at all**, because every save read the old link and
+put the network back, with no error to explain it. Pins that the member's
+pick now wins, that a URL pasted *in the same edit* still decides (that one
+is the member talking), that moving a row drops the link belonging to its old
+service rather than pointing the Watch button into the wrong app, and that
+the replacement link reaches only copies naming the new service — one member
+moving their copy must not relink anybody else's. See `docs/INVARIANTS.md`
+§20.
+
+```bash
 node scripts/url-cleanup-authz-test.mjs
 ```
 
