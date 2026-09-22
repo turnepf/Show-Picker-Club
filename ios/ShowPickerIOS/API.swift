@@ -342,12 +342,6 @@ enum API {
         try await postDecoding("/api/enrich", body: [:])
     }
 
-    // Bulk: give every row with a placeholder URL the real link a sibling copy
-    // already has. Cheap, and clears most of the queue before any manual work.
-    static func inheritNetworks() async throws -> AdminActionResult {
-        try await postDecoding("/api/admin-url-cleanup", body: ["action": "inherit_networks"])
-    }
-
     // Drop a title out of the URL queue for good — no good deep link exists.
     static func dismissUrlTitle(_ title: String) async throws -> AdminActionResult {
         try await postDecoding("/api/admin-url-cleanup", body: ["action": "dismiss", "title": title])

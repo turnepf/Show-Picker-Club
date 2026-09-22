@@ -9,18 +9,6 @@
   <style>
     .remaining { font-size: var(--text-sm); color: var(--ink-muted); margin-bottom: 20px; }
 
-    .tools {
-      display: flex; flex-direction: column; gap: 12px;
-      background: var(--surface);
-      border: 1px solid var(--border-soft);
-      border-radius: 8px;
-      padding: 12px 16px;
-      margin-bottom: 16px;
-    }
-    .tool-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .tool-row .btn-update { flex-shrink: 0; min-width: 240px; }
-    .tools-msg { font-size: 12px; color: var(--ink-muted); line-height: 1.5; flex: 1; min-width: 200px; }
-
     .login {
       background: var(--surface);
       padding: 24px;
@@ -183,12 +171,6 @@
     </div>
 
     <div id="bannerErr"></div>
-    <div class="tools" id="tools" style="display:none;">
-      <div class="tool-row">
-        <button class="btn-update" id="inheritBtn" type="button">Adopt networks from club copies</button>
-        <span class="tools-msg" id="inheritMsg">Shows with no service set adopt the network the rest of the club uses for that title, then pick up their siblings' URLs. Titles where members disagree are skipped — resolve those below.</span>
-      </div>
-    </div>
     <div id="needsPoster"></div>
     <div id="conflicts"></div>
     <div id="mismatches"></div>
@@ -208,37 +190,6 @@
     // Auth is the operator's session cookie — no secret to enter. Load
     // straight away; a 403 surfaces the login hint.
     loadList();
-
-    // On-demand rescue for rows with no network: adopt the club's network
-    // for the title (unambiguous titles only), propagate sibling URLs onto
-    // them, then reload the queue to show what's left.
-    const inheritBtn = el('inheritBtn');
-    const inheritMsg = el('inheritMsg');
-    inheritBtn.addEventListener('click', async () => {
-      inheritBtn.disabled = true;
-      const oldText = inheritBtn.textContent;
-      inheritBtn.textContent = 'Adopting…';
-      try {
-        const res = await fetch('/api/admin-url-cleanup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'inherit_networks' }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          inheritMsg.textContent = data.error || `Error (${res.status})`;
-        } else {
-          inheritMsg.textContent =
-            `Adopted a network on ${data.networks_set} show${data.networks_set === 1 ? '' : 's'}, ` +
-            `filled ${data.urls_filled} URL${data.urls_filled === 1 ? '' : 's'}. Reloading queue…`;
-          await loadList();
-        }
-      } catch (e) {
-        inheritMsg.textContent = 'Network error: ' + e.message;
-      }
-      inheritBtn.disabled = false;
-      inheritBtn.textContent = oldText;
-    });
 
     function escapeHtml(s) {
       return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -688,7 +639,6 @@
           return;
         }
         login.style.display = 'none';
-        el('tools').style.display = 'flex';
         networks = data.networks || [];
         const shows = data.shows || [];
         const conflicts = data.conflicts || [];

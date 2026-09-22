@@ -107,6 +107,8 @@ jobs:
         run: node scripts/shows-authz-test.mjs
       - name: A group invite is bounded, revocable, and not cross-site redeemable
         run: node scripts/group-invite-lifecycle-test.mjs
+      - name: The cron secret reaches two url-cleanup actions, and they decide nothing
+        run: node scripts/url-cleanup-authz-test.mjs
 
   roku:
     runs-on: ubuntu-latest
