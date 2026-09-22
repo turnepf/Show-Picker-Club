@@ -105,12 +105,15 @@ struct ShowDetailView: View {
                         LabeledContent("Also watching", value: groupWatchersLine)
                     }
                     if let n = network, !n.isEmpty {
-                        // Spell the affordance out — a bare network name reads as
-                        // a label, so nobody realized it was the way to the show.
+                        // The service name alone, so this row and the "Also on"
+                        // / "Now on" row below it read in parallel: relationship
+                        // on the left, service on the right. It used to read
+                        // "Watch on MGM+" to make the affordance obvious — the
+                        // tinted link colour is carrying that now.
                         if let urlStr = show?.networkUrl ?? initialNetworkUrl,
                            isRealUrl(urlStr), let url = URL(string: urlStr) {
                             LabeledContent("Network") {
-                                Link("Watch on \(n)", destination: url)
+                                Link(n, destination: url)
                             }
                         } else if let wl = show?.whereToWatchURL {
                             // No deep link for this service, only the
@@ -147,10 +150,24 @@ struct ShowDetailView: View {
                     // own network. The network above is the member's record and
                     // is never overwritten, so it drifts as licensing moves —
                     // this states the current answer without correcting theirs.
+                    //
+                    // The label is "Also on" or "Now on" rather than a fixed
+                    // "Streaming", so the relationship reads on the left and
+                    // the service on the right, in parallel with Network. The
+                    // two are not interchangeable: "Also on" means the member's
+                    // own service still carries it, "Now on" means it doesn't.
+                    //
+                    // No link. TMDB names providers but gives no per-provider
+                    // deep link, only the aggregator page — which is already
+                    // the "Where to watch" affordance on the row above when
+                    // that row has nothing better. A tappable "Apple TV+" that
+                    // opened TMDB would be the promise this card keeps
+                    // refusing to make.
+                    //
                     // Silent when TMDB names nothing or was never asked; see
                     // Show.streamingNote.
-                    if let note = show?.streamingNote {
-                        LabeledContent("Streaming", value: note)
+                    if let row = show?.streamingRow {
+                        LabeledContent(row.label, value: row.services)
                     }
                     if let turl = show?.trailerURL {
                         LabeledContent("Trailer") { Link("▶ Watch trailer", destination: turl) }

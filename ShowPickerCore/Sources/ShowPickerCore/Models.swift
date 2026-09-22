@@ -325,6 +325,26 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         return "Now on \(services.joined(separator: ", "))"
     }
 
+    // The same answer, split for a two-column row: the relationship belongs in
+    // the label and the services in the value, so it reads in parallel with
+    // the Network row above it rather than repeating "on" inside its own text.
+    //
+    //   Network      MGM+
+    //   Now on       Apple TV+
+    //
+    // `label` is the part that must not be flattened to one word. "Also on"
+    // means the member's own service still carries it and these are extra;
+    // "Now on" means it doesn't carry it any more and these are where it went.
+    // Calling the second one "Also on" would assert the member's service still
+    // has it, which is the opposite of what TMDB just said.
+    public var streamingRow: (label: String, services: String)? {
+        guard let note = streamingNote else { return nil }
+        for prefix in ["Also on ", "Now on "] where note.hasPrefix(prefix) {
+            return (String(prefix.dropLast()), String(note.dropFirst(prefix.count)))
+        }
+        return nil
+    }
+
     // "3 seasons" / "1 season" — total seasons released, when known.
     public var seasonsText: String? {
         guard let n = seasonsReleased, n > 0 else { return nil }

@@ -104,4 +104,30 @@ final class StreamingOnTests: XCTestCase {
         XCTAssertNil(without.streamingOn)
         XCTAssertNil(without.streamingNote)
     }
+
+    // The split the detail card's two-column row needs: the relationship in
+    // the label, the services in the value. Splitting on the text rather than
+    // recomputing keeps one source for the rule — but the two labels must
+    // stay distinct, because "Also on" asserts the member's own service still
+    // carries it and "Now on" asserts it doesn't.
+    func testStreamingRowSplitsRelationshipFromServices() {
+        let alsoOn = show(network: "Netflix", streamingOn: "Netflix, Hulu")
+        XCTAssertEqual(alsoOn.streamingRow?.label, "Also on")
+        XCTAssertEqual(alsoOn.streamingRow?.services, "Hulu")
+
+        let nowOn = show(network: "MGM+", streamingOn: "Apple TV+")
+        XCTAssertEqual(nowOn.streamingRow?.label, "Now on")
+        XCTAssertEqual(nowOn.streamingRow?.services, "Apple TV+")
+
+        // Several services stay one value, comma-joined, rather than becoming
+        // several rows.
+        let many = show(network: "MGM+", streamingOn: "Hulu, Peacock")
+        XCTAssertEqual(many.streamingRow?.label, "Now on")
+        XCTAssertEqual(many.streamingRow?.services, "Hulu, Peacock")
+
+        // The two silent cases stay silent — nothing to label.
+        XCTAssertNil(show(network: "Netflix", streamingOn: nil).streamingRow)
+        XCTAssertNil(show(network: "Netflix", streamingOn: "").streamingRow)
+        XCTAssertNil(show(network: "Netflix", streamingOn: "Netflix").streamingRow)
+    }
 }
