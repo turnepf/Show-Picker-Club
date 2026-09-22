@@ -43,16 +43,38 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## Unreleased — the update after 1.4.2
+## Unreleased — the update after 1.4.3
 
-Applies to **iPhone and iPad** (and Mac, which gets what iPad gets). **Apple
-TV** and the **watch** are unchanged — neither can create a group invite.
-The **web app** predates group invites entirely and stays that way
+*Nothing yet.*
+
+---
+
+## 1.4.3 (build 26) — iPhone, iPad and Mac only
+
+**The mirror image of 1.4.2.** That release was Apple TV's alone; this one is
+iPhone/iPad/Mac's. Everything in it is Swift work on those targets, and
+**Apple TV needs no new binary** — the server-side fixes below reached it, and
+every installed copy of every platform, the moment they deployed. The **watch**
+is unchanged. The **web app** is frozen at its restored state
 (`docs/PRODUCT.md#web-app-status`).
 
-The block below is the What's New text.
+Both projects carry 1.4.3 / 26 because the repo keeps them in lockstep; only
+iOS is archived from it.
+
+Found by testing the build on a phone before submitting: the two invite-link
+bugs and the backwards service line were all caught that way, and the network
+bug below was caught by trying to move a real show to a real service.
+
+The block below is the What's New text, 972 characters against Apple's
+4,000 cap.
 
 ```
+The service a show is on now reads clearly. The show screen names your
+service on one line, and on the next what's actually carrying the show today
+when that's different — "Now on Apple TV+" — instead of running the two
+together. Shows with no direct link to their service used to read backwards
+entirely.
+
 Your invite links now say what they're good for. The screen that hands you a
 group link tells you how many people it will let in and when it stops
 working, instead of only the date. The limits themselves haven't changed —
@@ -67,12 +89,6 @@ Fixed:
 
 • Tapping an invite link while the app was still starting up could ask you to
   sign in when you already were signed in. It waits for the answer now.
-
-• The two service lines on a show now read as a pair: the service is on the
-  right where you'd expect it, and the line underneath says "Also on" or
-  "Now on" rather than burying which one it means inside the text. On a show
-  with no direct link to its service, the top line used to read backwards
-  entirely, with the service name sitting where the label goes.
 ```
 
 *(Server-side, already live for everyone — listed so the story is complete,
