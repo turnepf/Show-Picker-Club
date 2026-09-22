@@ -49,7 +49,7 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## 1.4.3 (build 26) — iPhone, iPad and Mac, staged 2026-09-22
+## 1.4.3 (build 26) — iPhone, iPad and Mac, submitted for review 2026-09-22
 
 **The mirror image of 1.4.2.** That release was Apple TV's alone; this one is
 iPhone/iPad/Mac's. Everything in it is Swift work on those targets, and
@@ -64,9 +64,9 @@ iOS is archived from it.
 Archived, exported and uploaded from the development Mac with `xcodebuild`
 rather than Xcode's Organizer — PaddyMac now runs a release Xcode (27.0), so
 §6a's reason for cutting the archive on a second machine no longer applies.
-Both records sit in PREPARE_FOR_SUBMISSION with build 26 attached and the text
-below verified byte-identical across them. Change this heading to *submitted
-for review <date>* when it goes.
+Both records went to Waiting for Review on 2026-09-22 with build 26 attached
+and the text below verified byte-identical across them. Change this heading to
+*released on the App Store <date>* when it ships.
 
 Found by testing the build on a phone before submitting: the two invite-link
 bugs and the backwards service line were all caught that way, and the network
