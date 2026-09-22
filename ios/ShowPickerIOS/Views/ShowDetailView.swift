@@ -113,8 +113,23 @@ struct ShowDetailView: View {
                                 Link("Watch on \(n)", destination: url)
                             }
                         } else if let wl = show?.whereToWatchURL {
-                            LabeledContent(n) {
-                                Link("Where to watch", destination: wl)
+                            // No deep link for this service, only the
+                            // aggregator page. The label stays "Network" like
+                            // the other two states and the service keeps its
+                            // place in the value — it used to trade places
+                            // with the label, so this one row read backwards.
+                            //
+                            // The link text says where it goes rather than
+                            // naming the service: tapping it lands on TMDB's
+                            // watch page, and a link that reads "MGM+" and
+                            // opens something else is the same broken promise
+                            // the Amazon URL rule exists to prevent.
+                            LabeledContent("Network") {
+                                HStack(spacing: 6) {
+                                    Text(n)
+                                    Text("·").foregroundStyle(.secondary)
+                                    Link("Where to watch", destination: wl)
+                                }
                             }
                         } else {
                             LabeledContent("Network", value: n)

@@ -67,6 +67,10 @@ Fixed:
 
 • Tapping an invite link while the app was still starting up could ask you to
   sign in when you already were signed in. It waits for the answer now.
+
+• On a show with no direct link to its service, the Network line read
+  backwards — the service name sat where the label goes. It now reads like
+  every other line on the card.
 ```
 
 *(Server-side, already live for everyone — listed so the story is complete,
