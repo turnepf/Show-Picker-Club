@@ -1,9 +1,25 @@
 name: Background streaming deep-link fill
 
-# Drains shows that still lack a real streaming deep link by calling
-# /api/admin-fill-watch-urls (Watchmode). The endpoint is idempotent — it only
-# touches rows whose network_url is missing or a placeholder/search page — so
-# once the backlog clears these runs find nothing and cost ~0.
+# Two passes over the same problem — rows with no usable streaming link —
+# cheapest first.
+#
+# 1. Adopt networks from club copies (/api/admin-url-cleanup,
+#    action: inherit_networks). A row with no network at all can't be reached
+#    by URL propagation, which is scoped by (title, network). Where every
+#    other active copy of the title agrees on a service, the answer is
+#    unambiguous, so the row adopts it and then picks up its siblings' URLs.
+#    Titles whose copies disagree are skipped — that conflict is a human call
+#    and stays on the Show Cleanup page. Free: D1 only, no third party.
+# 2. Drain shows that still lack a real deep link via
+#    /api/admin-fill-watch-urls (Watchmode).
+#
+# Order matters: step 1 is what makes a row eligible for step 2, so a title
+# rescued tonight can get its link tonight rather than tomorrow.
+#
+# Both endpoints are idempotent — the fill only touches rows whose network_url
+# is missing or a placeholder/search page, and the adopt only touches rows
+# with no network — so once the backlog clears these runs find nothing and
+# cost ~0.
 #
 # Budget: Watchmode's free tier is ~1000 requests/month and each candidate
 # costs ~2 calls (search + sources). We run once a day with a small cap
@@ -40,6 +56,38 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # Free and fast, and it feeds the Watchmode step below. A failure here
+      # is reported but doesn't stop the fill: the two passes are independent,
+      # and losing the cheap one is no reason to skip the one on a quota.
+      - name: Adopt networks from club copies
+        continue-on-error: true
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repo secret is not set"
+            exit 1
+          fi
+          resp=$(curl -sS --max-time 120 -X POST "https://showpicker.club/api/admin-url-cleanup" \
+            -H "Content-Type: application/json" \
+            -H "X-Cron-Secret: ${CRON_SECRET}" \
+            -d '{"action": "inherit_networks"}' \
+            -w $'\n%{http_code}' || true)
+          http=$(printf '%s' "$resp" | tail -n1)
+          body=$(printf '%s' "$resp" | sed '$d')
+          echo "HTTP $http: $body"
+          if [ "$http" != "200" ]; then
+            if printf '%s' "$body" | grep -q '_cf_chl_opt\|Just a moment'; then
+              echo "::error::Cloudflare served a bot challenge to the GitHub runner — the request never reached the Function. Fix is in the zone's Security settings (dashboard), not the secret."
+            else
+              echo "::error::adopt networks returned HTTP $http (CRON_SECRET rejected, or endpoint error)"
+            fi
+            exit 1
+          fi
+          set_count=$(printf '%s' "$body" | python3 -c "import sys,json;print(json.load(sys.stdin).get('networks_set',0))" 2>/dev/null || echo 0)
+          url_count=$(printf '%s' "$body" | python3 -c "import sys,json;print(json.load(sys.stdin).get('urls_filled',0))" 2>/dev/null || echo 0)
+          echo "Done. Networks adopted: $set_count · URLs filled: $url_count"
+
       - name: Fill streaming deep links
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}

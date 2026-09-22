@@ -9,8 +9,6 @@ struct UrlCleanupView: View {
     @State private var mismatches: [UrlMismatch] = []
     @State private var needsPoster: [NeedsPosterItem] = []
     @State private var loading = true
-    @State private var working = false
-    @State private var banner: String?
 
     var body: some View {
         List {
@@ -20,17 +18,6 @@ struct UrlCleanupView: View {
                 Text(remainingLine)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                Button {
-                    Task { await runInherit() }
-                } label: {
-                    Label("Adopt networks from club copies", systemImage: "arrow.triangle.merge")
-                }
-                .disabled(working)
-                if let b = banner {
-                    Text(b).font(.caption).foregroundStyle(b.hasPrefix("✓") ? .green : .red)
-                }
-            } footer: {
-                Text("Adopts the real link a sibling copy already has onto rows stuck on a placeholder.")
             }
 
             Section {
@@ -137,17 +124,6 @@ struct UrlCleanupView: View {
         }
     }
 
-    private func runInherit() async {
-        working = true
-        defer { working = false }
-        do {
-            let r = try await API.inheritNetworks()
-            banner = r.error.map { "⚠︎ \($0)" } ?? "✓ Adopted links from club copies."
-        } catch {
-            banner = "⚠︎ " + API.failureLine(error, action: "adopt networks")
-        }
-        await load()
-    }
 
 }
 

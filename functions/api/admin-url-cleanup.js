@@ -83,9 +83,15 @@ const QUEUE_FILTER = `
 // scoped to (title, network). But when every other active copy of the title
 // agrees on a service, the answer is unambiguous: adopt it. Titles whose
 // copies disagree are left alone; picking a winner there is the conflict
-// queue's job. Runs on demand from the Show Cleanup page's "Adopt networks"
-// button, followed by a propagation pass so the newly-scoped rows pick up
-// their siblings' URLs in the same click.
+// queue's job — the one part of this that needs a human, and the reason the
+// Show Cleanup page still exists.
+//
+// Runs nightly from watch-urls-fill.yml, ahead of the Watchmode pass in the
+// same job: URL propagation is scoped by (title, network), so a row with no
+// network can't be reached by it until this has given the row one. It used to
+// be a button on the Show Cleanup page, clicked every time the page was
+// opened — which is a description of a routine sweep, not of operator
+// judgment.
 async function inheritNetworks(env) {
   const result = await env.DB.prepare(`
     UPDATE shows
@@ -461,15 +467,21 @@ export async function onRequestPost(context) {
 
   const action = body.action || 'list';
 
-  // Admin session, or — for the storefront reclassification alone — a matching
-  // X-Cron-Secret, so the one-off Actions workflow can drive it without a
-  // session. The narrowness is the point: that action only re-derives a
-  // network from what TMDB says about a title, and is idempotent. Every other
-  // action here writes something an operator has to be trusted with —
-  // dismissing a title out of the queue, overwriting a link, resolving a
-  // mismatch — and stays admin-session-only, so a leaked cron secret cannot
-  // reach them.
-  const cronOk = action === 'reclassify_storefronts'
+  // Admin session, or — for two actions only — a matching X-Cron-Secret, so a
+  // scheduled workflow can drive them without one. Both qualify on the same
+  // two counts: they are idempotent, and they decide nothing. A storefront
+  // reclassification re-derives a network from what TMDB says about a title;
+  // adopting a network only fills rows that have none, and only where every
+  // other copy in the club already agrees on one, which is why titles whose
+  // copies disagree are skipped rather than resolved.
+  //
+  // The narrowness is still the point. Every other action here writes
+  // something an operator has to be trusted with — dismissing a title out of
+  // the queue, overwriting a link, picking a winner among networks members
+  // disagree about — and stays admin-session-only, so a leaked cron secret
+  // cannot reach them.
+  const CRON_ACTIONS = ['reclassify_storefronts', 'inherit_networks'];
+  const cronOk = CRON_ACTIONS.includes(action)
     && await cronAuthorized(request, env);
   if (!cronOk && !(await isAdmin(request, env))) {
     return json({ error: 'Forbidden' }, 403);

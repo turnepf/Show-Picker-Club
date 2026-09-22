@@ -190,6 +190,25 @@ a dead link never names the group it used to open. See `docs/INVARIANTS.md`
 §26.
 
 ```bash
+node scripts/url-cleanup-authz-test.mjs
+```
+
+Who may drive `/api/admin-url-cleanup`, and what the scheduled action on it
+is allowed to decide. The page is the operator's — dismissing a title,
+overwriting a link, renaming a show, picking the winner among networks
+members disagree about — and all of that stays admin-session-only. Exactly
+two actions also accept an `X-Cron-Secret`, `reclassify_storefronts` and
+`inherit_networks`, because they are the two that **decide nothing**:
+adopting a network only fills rows that have none, and only where every
+other copy in the club already agrees, so a contested title is skipped
+rather than resolved. The suite pins that skip, the idempotence, and that a
+leaked secret reaches neither `dismiss`, `resolve_conflict`, `update`,
+`rename` nor `list`. `inherit_networks` runs nightly as the first step of
+`watch-urls-fill.yml` — it used to be a button on the page, clicked every
+time the page was opened, which is a routine sweep rather than operator
+judgment.
+
+```bash
 node scripts/vibe-scope-test.mjs
 ```
 
