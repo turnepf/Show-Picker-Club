@@ -72,6 +72,15 @@ Fixed:
 *(Server-side, already live for everyone — listed so the story is complete,
 no app update required.)*
 
+- **You can change what service a show is on again.** Picking a different
+  service didn't take on any show whose watch link had already been found for
+  it — the save quietly put the old service back, with nothing to say why.
+  The link was outvoting the picker: those links come from a lookup rather
+  than from you, and one of them was overruling your own answer. Your pick
+  wins now, and the show's watch link is refreshed for the service you chose
+  rather than left pointing at the old one. (Paste a link yourself in the
+  same edit and that still decides — that one *is* your answer.) Changing
+  your copy also no longer relinks anyone else's copy of the same title.
 - **Group invite links are bounded, and can be killed** (#484, migration 070).
   A link used to be minted and then never counted, never spent and never
   cancellable: every invite anyone had issued in the previous week was

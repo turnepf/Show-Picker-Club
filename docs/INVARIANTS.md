@@ -732,6 +732,21 @@ passes. Fill-only, on purpose: the member picks a network when they add a
 title, and enrichment supplies one only when they didn't. It is the same rule
 `updated_at` encodes — member intent outranks a background job.
 
+**A link a machine fetched is still the machine talking.** `PUT /api/shows/:id`
+derived the network from the row's existing `network_url` and let that beat the
+dropdown — a rule written when members pasted their own links, where the URL
+really was the member's answer. Since Watchmode nobody pastes them, so what it
+did was let a machine outrank a person: a row holding a `tv.apple.com` deep
+link could not be moved off Apple TV+ at all, because every save read the old
+link and put the network back, silently and with no error. A URL supplied *in
+that same request* still decides, because that one is the member talking. The
+row's own URL is now only a last resort, for an edit that names no service at
+all. Moving a row also drops the link that belonged to its old service —
+pointing the Watch button confidently into the wrong app is worse than
+dropping to a search page until the lookup refills it — and the replacement
+reaches only copies naming the new service, the same scoping §24 puts on
+`sync-urls`. Enforcer: `scripts/show-edit-network-test.mjs`.
+
 The cost is staleness. Once set, `network` is never revisited, and licensing
 moves: **61 of 137 unarchived films (45%) carry a network TMDB no longer lists
 as a US flatrate provider.** Conclave reads Apple TV+ where TMDB now says

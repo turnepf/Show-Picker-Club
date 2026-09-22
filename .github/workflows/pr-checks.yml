@@ -109,6 +109,8 @@ jobs:
         run: node scripts/group-invite-lifecycle-test.mjs
       - name: The cron secret reaches two url-cleanup actions, and they decide nothing
         run: node scripts/url-cleanup-authz-test.mjs
+      - name: A member's service pick outranks the link a machine fetched
+        run: node scripts/show-edit-network-test.mjs
 
   roku:
     runs-on: ubuntu-latest
