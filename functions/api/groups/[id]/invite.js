@@ -1,18 +1,8 @@
 import { getSession } from '../../../_shared/auth.js';
+import { mintInvite } from '../../../_shared/group-invites.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
-}
-
-function generateToken() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let token = '';
-  const arr = new Uint8Array(24);
-  crypto.getRandomValues(arr);
-  for (let i = 0; i < 24; i++) {
-    token += chars[arr[i] % chars.length];
-  }
-  return token;
 }
 
 async function checkGroupMembership(env, groupId, memberSlug) {
@@ -45,17 +35,8 @@ export async function onRequestPost(context) {
   }
 
   // Generate invite link
-  const token = generateToken();
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  await env.DB.prepare(
-    'INSERT INTO group_invites (group_id, token, expires_at, created_by) VALUES (?, ?, ?, ?)'
-  ).bind(groupId, token, expiresAt, session.member_slug).run();
-
-  return new Response(JSON.stringify({
-    token,
-    expires_at: expiresAt,
-    url: `https://showpicker.club/groups/join?token=${token}`
-  }), { status: 201, headers: corsHeaders() });
+  const invite = await mintInvite(env, groupId, session.member_slug);
+  return new Response(JSON.stringify(invite), { status: 201, headers: corsHeaders() });
 }
 
 // What links are live for this group, so a member can see what is

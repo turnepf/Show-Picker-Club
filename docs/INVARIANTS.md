@@ -931,6 +931,13 @@ product, and an invite token is the only credential that produces one.
   card goes generic for all of them. A dead link must not name the group it
   used to open, or confirm it was ever real — which is the same rule §20-era
   link previews already follow.
+- **A bound the member can't see is a trap.** The ceiling is stated to
+  whoever is about to share the link, so "good for up to 10 people" is a
+  promise rather than something they discover when the eleventh person is
+  refused. That means the number travels in the mint response
+  (`_shared/group-invites.js` is the one place it is written down) instead of
+  being copied into each client, where the stated bound and the enforced one
+  would drift apart.
 
 Enforcer: `scripts/group-invite-lifecycle-test.mjs`, plus the preview cases in
 `scripts/og-preview-test.mjs`.

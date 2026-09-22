@@ -262,6 +262,27 @@ struct GroupDetailView: View {
 
     // The server stamps expires_at with Date#toISOString, so it carries
     // fractional seconds that a default ISO8601DateFormatter won't parse.
+    // What the link actually promises, in the member's words. The server
+    // bounds it on both axes — ten redemptions since migration 070, seven
+    // days since the beginning — and until now this sheet mentioned only the
+    // expiry. Someone sharing the link had no way to know whether they were
+    // handing out one seat or a dozen, which is a poor way to learn that the
+    // eleventh person can't get in.
+    //
+    // Either half may be missing: an unparseable date, or a server that
+    // didn't report max_uses. Whatever is known gets said and the rest is
+    // left out, rather than the line disappearing because one half did.
+    private static func limitsLine(_ invite: GroupInvite) -> String? {
+        var parts: [String] = []
+        if let maxUses = invite.maxUses {
+            parts.append("Good for up to \(maxUses) \(maxUses == 1 ? "person" : "people")")
+        }
+        if let expiry = expiryLine(invite.expiresAt) {
+            parts.append("Expires on \(expiry)")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     private static func expiryLine(_ iso: String) -> String? {
         let parser = ISO8601DateFormatter()
         parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -423,10 +444,11 @@ struct GroupDetailView: View {
                     .background(Color(.secondarySystemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                    if let expiry = Self.expiryLine(invite.expiresAt) {
-                        Text("Expires on \(expiry)")
+                    if let limits = Self.limitsLine(invite) {
+                        Text(limits)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
                     }
                 }
                 .padding()

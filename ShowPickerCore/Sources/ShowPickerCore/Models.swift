@@ -693,17 +693,24 @@ public struct GroupInvite: Codable, Identifiable, Sendable {
     public let token: String
     public let expiresAt: String
     public let url: String
+    // How many people the link will let in — ten, set by the server since
+    // migration 070. Optional because a response minted before the server
+    // reported it (a cached one, an older deployment) must still decode: the
+    // sheet drops that half of its line rather than naming a number nobody
+    // sent.
+    public let maxUses: Int?
 
     public var id: String { token }
 
-    public init(token: String, expiresAt: String, url: String) {
+    public init(token: String, expiresAt: String, url: String, maxUses: Int? = nil) {
         self.token = token
         self.expiresAt = expiresAt
         self.url = url
+        self.maxUses = maxUses
     }
 
     enum CodingKeys: String, CodingKey {
-        case token, expiresAt = "expires_at", url
+        case token, expiresAt = "expires_at", url, maxUses = "max_uses"
     }
 }
 
