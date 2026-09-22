@@ -57,6 +57,16 @@ Your invite links now say what they're good for. The screen that hands you a
 group link tells you how many people it will let in and when it stops
 working, instead of only the date. The limits themselves haven't changed —
 they were just never stated.
+
+Fixed:
+
+• Tapping a group invite link now always lands on the group. If you're
+  already a member it opens the group instead of dropping you on your list of
+  groups, and if the link has expired or been used up it tells you so instead
+  of quietly doing nothing.
+
+• Tapping an invite link while the app was still starting up could ask you to
+  sign in when you already were signed in. It waits for the answer now.
 ```
 
 *(Server-side, already live for everyone — listed so the story is complete,
