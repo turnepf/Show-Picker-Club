@@ -48,6 +48,7 @@ writeFileSync(join(sandbox, 'package.json'), '{"type":"module"}');
 
 const load = (p) => import(join(sandbox, 'functions', p));
 const inviteApi = await load('api/groups/[id]/invite.js');
+const groupsApi = await load('api/groups.js');
 const joinApi = await load('api/groups/join.js');
 const leaveApi = await load('api/groups/[id]/leave.js');
 
@@ -338,6 +339,31 @@ console.log('\n== an existing member redeeming again changes nothing');
   const res = await redeem(env, addSession(env, 'whitt'), token);
   check('a member who is already in gets 409', res.status === 409, `got ${res.status}`);
   check('and it does not burn a use', (inviteRow(env, token).use_count ?? 0) === 0);
+}
+
+// The invite sheet in the app now tells the member how many people the link
+// will let in, and it can only do that honestly if the number travels in the
+// response. A mint that enforces one ceiling while reporting another — or
+// reporting none, which drops the line from the sheet — is the drift this
+// pins. Both mint sites answer from the same constant.
+console.log('\n== a new link reports the ceiling it enforces');
+{
+  const { env, gid } = club();
+  const res = await mintInvite(env, addSession(env, 'patrick'), gid);
+  const body = await res.json();
+  check('the mint reports a ceiling', Number.isInteger(body.max_uses) && body.max_uses > 0,
+    JSON.stringify(body));
+  check('and it is the one written on the row',
+    inviteRow(env, body.token).max_uses === body.max_uses,
+    `reported ${body.max_uses}, stored ${inviteRow(env, body.token).max_uses}`);
+
+  // Creating a group mints its first link through the same helper, so the
+  // sheet shown straight after "Create group" says the same thing.
+  const created = await groupsApi.onRequestPost(
+    ctx(env, req('/api/groups', { cookie: addSession(env, 'stacy'), method: 'POST', body: { name: 'Movie Night' } })));
+  const first = (await created.json()).invite;
+  check('the group-creation invite reports it too', first.max_uses === body.max_uses,
+    JSON.stringify(first));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

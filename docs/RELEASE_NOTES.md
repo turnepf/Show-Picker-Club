@@ -45,14 +45,50 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ## Unreleased — the update after 1.4.2
 
-**Anyone in the group can rename it or change its icon**, not just whoever
-started it — the option simply wasn't there for anyone else before. If
-someone else renames the group or picks a new icon, you'll see a quick note
-about it the next time you open the group. On iPhone and iPad.
+Applies to **iPhone and iPad** (and Mac, which gets what iPad gets). **Apple
+TV** and the **watch** are unchanged — neither can create a group invite.
+The **web app** predates group invites entirely and stays that way
+(`docs/PRODUCT.md#web-app-status`).
 
-*(Server-side, live for everyone the moment it deploys — no app update
-required. Listed so the story is complete; the member-facing halves are in
-1.4.1 below.)*
+The block below is the What's New text.
+
+```
+Your invite links now say what they're good for. The screen that hands you a
+group link tells you how many people it will let in and when it stops
+working, instead of only the date. The limits themselves haven't changed —
+they were just never stated.
+```
+
+*(Server-side, already live for everyone — listed so the story is complete,
+no app update required.)*
+
+- **Group invite links are bounded, and can be killed** (#484, migration 070).
+  A link used to be minted and then never counted, never spent and never
+  cancellable: every invite anyone had issued in the previous week was
+  simultaneously live, unlimited and uncancellable, and it kept working after
+  the member who sent it had left the group. The only way to stop a leaked
+  link was to delete the group. A link is now good for 10 people and 7 days,
+  can be revoked by whoever issued it or by the group's creator, and dies when
+  its issuer leaves. It stays shareable to several people, which is what the
+  invite screen has always promised — it's bounded now rather than open-ended.
+  A link that has expired, been used up, been revoked or lost its issuer all
+  answer the same way, and the preview card never names the group a dead link
+  used to open. `scripts/group-invite-lifecycle-test.mjs`, invariant §26.
+- Redeeming an invite can no longer be triggered from another site (#484).
+  Joining a group is a write performed by a cookie-carrying GET, so a link on
+  a stranger's page could quietly join a signed-in member to that stranger's
+  private group — and group membership is what the whole product's privacy
+  rests on. The apps are unaffected.
+- The hourly limits on login and signup codes actually refuse now (#483).
+  Every one of them had been comparing two different date formats as text
+  since they were written, so the count always came back zero and no cap had
+  ever fired. Members won't notice; this only bites someone requesting codes
+  in bulk.
+- Three access-control fixes on show rows (#482): a show you're not allowed to
+  move can no longer be read back through the move endpoint (it carried the
+  owner's private notes and the email address of whoever added it), a network
+  name can't carry markup, and a link one member pasted is no longer treated
+  as evidence for another member's row.
 
 - Movies have genres again. The background pass that fills a film's details
   was only ever reaching films missing their artwork, so 125 of 137 movies
@@ -66,8 +102,11 @@ required. Listed so the story is complete; the member-facing halves are in
   you can only rent still shows none, because it streams nowhere — as does one
   whose service the film isn't actually listed on, rather than showing the
   wrong company's logo.
+
 *(The Apple TV navigation and Prime Video items that were here moved up into
-1.4.2 — they shipped in it.)*
+1.4.2 — they shipped in it. The group rename/icon item that was here shipped
+in 1.4.1: its What's New text is the "Give your groups a face" paragraph
+below.)*
 
 ---
 
