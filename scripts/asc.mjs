@@ -185,8 +185,19 @@ async function cmdAttach(versionString, buildNumber) {
 // must go up as `appletvos`, and sending it as `ios` is rejected. Read the
 // platform out of the bundle instead of guessing.
 function ipaPlatform(file) {
+  // Name the ONE top-level app rather than globbing for it. unzip's `*`
+  // crosses `/`, so `Payload/*.app/Info.plist` also matched the embedded
+  // watch app — `unzip -p` then concatenated two plists and `plutil` parsed
+  // neither, so every iOS upload died on "Could not read a supported
+  // platform ... (got [])". A .ipa holding no nested .app never hit it, which
+  // is why this survived: the GUI's Organizer did the uploading until now.
+  const listing = spawnSync('unzip', ['-Z1', file], { encoding: 'utf8' }).stdout || '';
+  const entry = listing.split('\n')
+    .map(l => l.trim())
+    .find(l => /^Payload\/[^/]+\.app\/Info\.plist$/.test(l));
+  if (!entry) die(`No top-level app Info.plist in ${file}`);
   const raw = spawnSync('sh', ['-c',
-    `unzip -p ${JSON.stringify(file)} 'Payload/*.app/Info.plist' | ` +
+    `unzip -p ${JSON.stringify(file)} ${JSON.stringify(entry)} | ` +
     `plutil -extract CFBundleSupportedPlatforms json -o - -`], { encoding: 'utf8' });
   let declared = [];
   try { declared = JSON.parse(raw.stdout.trim()); } catch { /* fall through */ }
