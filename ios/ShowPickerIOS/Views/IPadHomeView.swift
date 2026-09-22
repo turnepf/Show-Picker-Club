@@ -638,8 +638,18 @@ struct IPadHomeView: View {
                 Task {
                     // A dead invite otherwise left you sitting on the Groups
                     // tab with no sign the link had failed.
-                    do { detailPath = [.groupDetail(try await API.joinGroup(token: token).groupId)] }
-                    catch { ErrorCenter.shared.report("join the group") }
+                    do {
+                        switch try await API.joinGroup(token: token) {
+                        case .joined(let id), .alreadyMember(let id):
+                            detailPath = [.groupDetail(id)]
+                        case .dead:
+                            ErrorCenter.shared.explain("That invite link has expired or been used up. Ask whoever sent it for a new one.")
+                        case .notSignedIn:
+                            ErrorCenter.shared.explain("Sign in from Home, then tap the invite link again.")
+                        case .failed:
+                            ErrorCenter.shared.report("join the group")
+                        }
+                    } catch { ErrorCenter.shared.report("join the group") }
                 }
             }
             return

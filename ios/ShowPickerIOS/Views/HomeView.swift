@@ -316,6 +316,15 @@ struct HomeView: View {
                 // moves inside it rather than racing the stale copy.
                 Task { await load() }
             }
+            // The other half of the parked-link rule: a link that arrived
+            // before auth resolved has been waiting. If the answer turns out
+            // to be "logged out", ask now — nothing else will, because
+            // memberSlug never changed.
+            .onChange(of: auth.resolved) { _, done in
+                if done && auth.memberSlug == nil && pendingLink != nil {
+                    showingLogin = true
+                }
+            }
             // Universal links (a shared showpicker.club/<member> URL tapped in
             // Messages, Mail, etc.) arrive one of two ways depending on launch
             // state, so handle both.
@@ -395,15 +404,38 @@ struct HomeView: View {
     @MainActor
     private func joinFromInvite(_ token: String, link: URL) async {
         guard auth.memberSlug != nil else {
+            // Park it either way. Prompt only once we actually know there is
+            // no session: on a cold launch this runs before auth.refresh()
+            // lands, and the onChange below replays the link the moment it
+            // does — or prompts, if it resolves to logged-out.
             pendingLink = link
-            showingLogin = true
+            if auth.resolved { showingLogin = true }
             return
         }
         do {
-            let result = try await API.joinGroup(token: token)
-            path = [.groups, .groupDetail(result.groupId)]
+            switch try await API.joinGroup(token: token) {
+            // Already in it is not a failure: the link still means "look at
+            // this group", so it still lands there.
+            case .joined(let id), .alreadyMember(let id):
+                path = [.groups, .groupDetail(id)]
+            case .dead:
+                path = [.groups]
+                ErrorCenter.shared.explain("That invite link has expired or been used up. Ask whoever sent it for a new one.")
+            // The session expired between opening the link and redeeming it.
+            // Park the link and replay it after signing in, the same as
+            // tapping one while logged out.
+            case .notSignedIn:
+                pendingLink = link
+                showingLogin = true
+            case .failed:
+                path = [.groups]
+                ErrorCenter.shared.report("join the group")
+            }
         } catch {
+            // Transport failure — offline, most likely. Not a dead link, so
+            // don't say it is.
             path = [.groups]
+            ErrorCenter.shared.report("join the group")
         }
     }
 
@@ -414,7 +446,7 @@ struct HomeView: View {
     private func joinHousehold(_ code: String, link: URL) async {
         guard let me = myMember else {
             pendingLink = link
-            if !auth.isLoggedIn { showingLogin = true }
+            if auth.resolved && !auth.isLoggedIn { showingLogin = true }
             return
         }
         // A dead or already-used invite used to land on the "you're in!"

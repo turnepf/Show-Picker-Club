@@ -14,6 +14,13 @@ final class AuthStore: ObservableObject {
 
     var isLoggedIn: Bool { memberSlug != nil }
 
+    // Whether refresh() has finished at least once. Until it has,
+    // `memberSlug == nil` does not mean "nobody is signed in" — it means
+    // nobody has asked yet. A universal link tapped on a cold launch arrives
+    // while that is still true (the app's root .task and .onOpenURL race),
+    // and treating it as logged-out asks a signed-in member to sign in again.
+    private(set) var resolved = false { willSet { objectWillChange.send() } }
+
     @MainActor
     func refresh() async {
         let r = await API.checkAuth()
@@ -24,6 +31,7 @@ final class AuthStore: ObservableObject {
             SharedSession.sync(memberSlug: slug)
             WatchBridge.shared.send(memberSlug: slug, cookie: WatchBridge.currentCookieHeader())
         }
+        resolved = true
         // The Upcoming widget reads the App Group session we just wrote (or
         // cleared) — have it redraw against the new state.
         WidgetCenter.shared.reloadAllTimelines()

@@ -22,6 +22,18 @@ final class ErrorCenter: ObservableObject {
         }
     }
 
+    // A failure whose cause is known and whose answer is not "try again" —
+    // a dead invite link is the case this exists for. `report` phrases every
+    // message as a retry, which is wrong when retrying cannot help.
+    func explain(_ text: String) {
+        message = text
+        dismissTask?.cancel()
+        dismissTask = Task {
+            try? await Task.sleep(for: .seconds(5))
+            if !Task.isCancelled { message = nil }
+        }
+    }
+
     // Run a user-initiated mutation, surfacing any thrown error as a toast.
     // Returns true on success so callers can skip follow-up work on failure.
     @discardableResult

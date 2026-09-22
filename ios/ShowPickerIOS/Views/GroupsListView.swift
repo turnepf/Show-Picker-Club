@@ -227,11 +227,21 @@ struct GroupsListView: View {
         guard !token.isEmpty else { return }
 
         do {
-            let result = try await API.joinGroup(token: token)
-            joinToken = ""
-            showingJoin = false
-            await load()
-            path.append(.groupDetail(result.groupId))
+            switch try await API.joinGroup(token: token) {
+            case .joined(let id), .alreadyMember(let id):
+                joinToken = ""
+                showingJoin = false
+                await load()
+                path.append(.groupDetail(id))
+            // The sheet stays open on a bad code, with the token still in the
+            // field — the member may have mistyped it.
+            case .dead:
+                self.errorText = "That invite link has expired or been used up. Ask whoever sent it for a new one."
+            case .notSignedIn:
+                self.errorText = "You're logged out — sign in again from Home."
+            case .failed:
+                self.errorText = "Couldn't join group. Try again."
+            }
         } catch {
             self.errorText = API.failureLine(error, action: "join group")
         }

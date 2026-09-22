@@ -629,11 +629,52 @@ enum API {
         try await postJSON("/api/groups/\(groupId)/invite", body: [:])
     }
 
-    @discardableResult
-    static func joinGroup(token: String) async throws -> (ok: Bool, groupId: Int) {
-        struct JoinResponse: Decodable { let ok: Bool; let group_id: Int }
-        let r: JoinResponse = try await get("/api/groups/join?token=\(token)")
-        return (r.ok, r.group_id)
+    // What redeeming an invite actually ended in. The generic GET helper
+    // throws on any non-2xx and never reads the body, which threw away the
+    // two answers worth acting on: a 409 carries the group you are already
+    // in (so the link can still take you there), and a 410 means the link is
+    // dead — expired, used up, revoked, or its sender left the group. Those
+    // four are deliberately indistinguishable on the wire, so there is one
+    // case for them here.
+    enum GroupJoinOutcome {
+        case joined(groupId: Int)
+        case alreadyMember(groupId: Int)
+        case dead
+        case notSignedIn
+        case failed
+    }
+
+    // Answers a server rejection as an outcome rather than an error; still
+    // throws for transport failures, so an offline tap is not reported as a
+    // dead link.
+    static func joinGroup(token: String) async throws -> GroupJoinOutcome {
+        let encoded = token.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? token
+        guard let url = URL(string: baseString + "/api/groups/join?token=\(encoded)") else {
+            throw APIError.badURL
+        }
+        var req = URLRequest(url: url)
+        req.cachePolicy = .reloadRevalidatingCacheData
+        req.setValue(currentPlatform, forHTTPHeaderField: "X-Client-Platform")
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse else { throw APIError.badResponse(-1) }
+
+        struct JoinBody: Decodable { let group_id: Int? }
+        let body = try? JSONDecoder().decode(JoinBody.self, from: data)
+
+        switch http.statusCode {
+        case 200..<300:
+            guard let id = body?.group_id else { return .failed }
+            return .joined(groupId: id)
+        case 409:
+            guard let id = body?.group_id else { return .failed }
+            return .alreadyMember(groupId: id)
+        case 410:
+            return .dead
+        case 401:
+            return .notSignedIn
+        default:
+            return .failed
+        }
     }
 
     @discardableResult
