@@ -237,7 +237,7 @@ ok "iPhone and iPad views route session state through SessionScope"
 # visible to the reporting dashboard — so a call without the header counts the
 # member in the "Unknown" row instead of on a web row. shell.js alone is loaded
 # by eight pages, which is how most of that row got there.
-say "Web auth checks name their platform"
+note "Web auth checks name their platform"
 missing=""
 for f in $(grep -rl "fetch('/auth/check'" public 2>/dev/null); do
   # Each call must name the platform within its own options object — either the
