@@ -15,6 +15,11 @@ export async function onRequestGet(context) {
   // count — only owning a real (self-added, suggested-in, or shared-in)
   // show registers as activity. NULL added_by predates the column and is
   // treated as engaged since only member-added shows ever had NULL there.
+  // Opening an app counts too: /auth/check stamps sessions.last_seen_at, and
+  // the member's latest one joins in — truncated to the day, because this
+  // endpoint is public and an exact stamp would tell anyone on the internet
+  // who had the app open within the hour. A day-level open ties with nobody
+  // who edited a show that day (the edit's time-of-day sorts above midnight).
   // If members.calendar_token (migration 029) doesn't exist yet, retry with
   // a simpler shape so the home page keeps rendering.
   const query = (withToken) => env.DB.prepare(
@@ -27,13 +32,27 @@ export async function onRequestGet(context) {
             MAX(
               CASE WHEN COALESCE(s.added_by, '') != 'seed'
                    THEN COALESCE(s.updated_at, s.created_at) END
-            ) as last_activity_at
+            ) as library_activity_at,
+            MAX(o.opened_on) as opened_on
      FROM members h
      LEFT JOIN shows s ON s.member_slug = h.slug
-     GROUP BY h.slug, h.name, h.first_name, h.last_initial
-     ORDER BY last_activity_at DESC NULLS LAST, h.name`
+     LEFT JOIN (SELECT member_slug, date(MAX(last_seen_at)) || ' 00:00:00' as opened_on
+                FROM sessions WHERE member_slug IS NOT NULL
+                GROUP BY member_slug) o ON o.member_slug = h.slug
+     GROUP BY h.slug, h.name, h.first_name, h.last_initial`
   ).all();
   const { results } = await query(true).catch(() => query(false));
+  // SQLite's two-argument MAX() is NULL if either side is, so the pick and
+  // the sort happen here rather than in the query.
+  for (const m of results) {
+    const a = m.library_activity_at, b = m.opened_on;
+    m.last_activity_at = a && b ? (a > b ? a : b) : (a || b || null);
+  }
+  results.sort((x, y) => {
+    const a = x.last_activity_at, b = y.last_activity_at;
+    if (a !== b) return !a ? 1 : !b ? -1 : a > b ? -1 : 1;
+    return x.name.localeCompare(y.name);
+  });
 
   const firstNameCounts = {};
   for (const m of results) {
