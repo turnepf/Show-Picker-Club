@@ -618,7 +618,15 @@ the club doesn't control, so its per-request read cost must not scale with
 the size of the library. A public endpoint whose cost grows with the data is
 a resource-exhaustion outage waiting for one crawler.
 
-Enforced by `scripts/trending-cache-test.mjs`.
+- **`/api/members` is the other public read, and it tiers instead of caching.**
+  A logged-out caller gets names from one read of `members` — no join to
+  `shows` or `sessions` — because nothing it needs lives there. The per-list
+  counts wait for a session, and `last_activity_at` (when somebody last used
+  the app) for an admin one; the order is alphabetical below admin, since an
+  activity order would publish the same fact without the field.
+
+Enforced by `scripts/trending-cache-test.mjs` and
+`scripts/members-order-test.mjs`.
 
 ## 19. A background pass selects on everything it writes
 
