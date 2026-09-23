@@ -61,9 +61,11 @@ watch rides along in the same universal build unchanged.
 The block below is the What's New text.
 
 ```
-The members list on Home now puts the people who've been in the app lately
-up top — not just the ones who've been changing their lists.
+Security improvements under the hood to keep your account and your lists safe.
 ```
+
+(The roster change isn't named: only admins see the member list, so it isn't
+news to members.)
 
 ---
 
