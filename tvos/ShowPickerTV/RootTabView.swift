@@ -10,6 +10,7 @@ import UIKit
 // you on your lists, but a session restored at launch does not.
 struct RootTabView: View {
     @EnvironmentObject private var auth: AuthStore
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selection = Tab.home
     // Each tab owns its navigation stack here so tab selection (and clicking
     // a tab-bar item — see below) can reset it to the section root.
@@ -67,6 +68,12 @@ struct RootTabView: View {
                 .tag(Tab.account)
         }
         .task { await auth.refresh() }
+        // Waking the Apple TV back into the app is using it too: the check
+        // stamps the session's last_seen_at, which the member roster sorts on.
+        // The answer is discarded so an offline wake can't read as a sign-out.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { _ = await API.checkAuth() } }
+        }
         // Pop every tab to its section root when a tab-bar item is CLICKED.
         // tvOS tab bars select on focus, so clicking the already-selected tab
         // from a pushed show card produces no selection change at all — the

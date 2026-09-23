@@ -31,6 +31,14 @@ struct ShowPickerIOSApp: App {
                         // can stay resident for days, so a launch-only refresh
                         // would leave this phone on a stale list all week.
                         Task { await NetworkCatalogStore.shared.refresh() }
+                        // Coming back from the background is using the app, so
+                        // tell the server: /auth/check stamps the session's
+                        // last_seen_at, which the member roster sorts on. The
+                        // answer is discarded on purpose — an offline wake must
+                        // not read as a sign-out. (The first .active of a cold
+                        // launch duplicates the .task's check; the server
+                        // throttles the write to one an hour, so it's free.)
+                        Task { _ = await API.checkAuth() }
                     }
                     // Leaving is when list edits made this session should reach
                     // the home-screen widgets (Upcoming reads the member's lists).

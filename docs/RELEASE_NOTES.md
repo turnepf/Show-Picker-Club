@@ -43,9 +43,27 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## Unreleased — the update after 1.4.3
+## Unreleased — the update after 1.4.4
 
 *Nothing yet.*
+
+---
+
+## 1.4.4 (build 27) — iPhone, iPad, Mac and Apple TV, archived 2026-09-23
+
+Cut while 1.4.3 (build 26) was still in App Review, so it waits for 1.4.3 to
+clear before its version records can be created and submitted. One change: the
+apps check in with the server when they come back from the background, not
+only on a cold launch, so the member roster ranks people who are *using* the
+app, not only people editing their lists (the server half is #495). The
+watch rides along in the same universal build unchanged.
+
+The block below is the What's New text.
+
+```
+The members list on Home now puts the people who've been in the app lately
+up top — not just the ones who've been changing their lists.
+```
 
 ---
 
