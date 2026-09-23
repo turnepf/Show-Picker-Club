@@ -49,12 +49,13 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## 1.4.4 (build 27) — iPhone, iPad and Apple TV submitted for review 2026-09-23; Mac unblocked 2026-09-23, not yet submitted
+## 1.4.4 (build 27) — iPhone, iPad, Mac and Apple TV submitted for review 2026-09-23
 
 Cut while 1.4.3 (build 26) was still in App Review, so it waited for 1.4.3 to
 clear before its version records could be created and submitted. Mac 1.4.3
-was accepted on 2026-09-23, so the Mac 1.4.4 record can now be created and
-submitted with build 27 and the same text. One change: the
+was accepted on 2026-09-23, and the Mac 1.4.4 record went to review the same
+day with build 27 attached and the text below verified byte-identical on all
+three platforms. One change: the
 apps check in with the server when they come back from the background, not
 only on a cold launch, so the member roster ranks people who are *using* the
 app, not only people editing their lists (the server half is #495). The
