@@ -1,7 +1,12 @@
 # Roku channel — status & pick-up notes
 
-**Submitted to the Roku Channel Store on 2026-09-19. Scheduled to publish Tuesday 2026-09-22,
-10:00 AM PT.** Channel ID 882851, access code CV92LVL.
+**Live in the Roku Channel Store** (1.0 build 1, submitted 2026-09-19, published 2026-09-22).
+Channel ID 882851, access code CV92LVL.
+
+**1.1 build 2** — search is how you add a show (Find a Show; the separate Add Show screen is
+gone). Packaged and signed 2026-09-24 with `node sideload.mjs package`; upload it from the
+developer dashboard. Bump `minor_version`/`build_version` in `manifest` for every submission —
+the Store refuses a package whose version isn't higher than the live one.
 
 ⚠️ **Do not edit the channel in the dashboard before it publishes.** Roku cancels the scheduled
 release on any change: *"Any changes you make to the app until it is published will automatically
