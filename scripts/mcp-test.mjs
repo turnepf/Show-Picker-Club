@@ -53,6 +53,7 @@ const token = await load('oauth/token.js');
 const revoke = await load('oauth/revoke.js');
 const prm = await load('.well-known/oauth-protected-resource/[[path]].js');
 const asMeta = await load('.well-known/oauth-authorization-server/[[path]].js');
+const oidcMeta = await load('.well-known/openid-configuration/[[path]].js');
 const connectedApps = await load('api/connected-apps.js');
 const disableApi = await load('api/admin-member-disable.js');
 const reportingApi = await load('api/reporting.js');
@@ -238,6 +239,9 @@ console.log('\n== discovery documents');
   check('the resource is the /mcp URL', p.resource === `${ORIGIN}/mcp`);
   check('it names this origin as the authorization server', p.authorization_servers[0] === ORIGIN);
   const a = await (await asMeta.onRequestGet({ request: new Request(`${ORIGIN}/.well-known/oauth-authorization-server`), env })).json();
+  const oidc = oidcMeta.onRequestGet();
+  check('OpenID discovery is a JSON 404, not the home page', oidc.status === 404
+    && (oidc.headers.get('Content-Type') || '').includes('application/json'));
   check('S256 is the only PKCE method', JSON.stringify(a.code_challenge_methods_supported) === '["S256"]');
   check('dynamic registration is advertised', a.registration_endpoint === `${ORIGIN}/oauth/register`);
   check('only the code flow is offered', JSON.stringify(a.response_types_supported) === '["code"]');
