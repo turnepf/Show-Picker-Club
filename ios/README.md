@@ -266,13 +266,13 @@ Offline/
 | Show detail (title, network, rating, genres, recommender, notes, cast, dates) | ✅ |
 | Log in with one-time code (text or email) | ✅ (auto-submits on the 6th digit) |
 | Sign in with Apple | ✅ (maps the Apple ID email → existing member; see note) |
-| Add show | ✅ |
+| Add show | ✅ (starts from Find a Show — the 🔍 on Home and My Shows; there is no separate "+") |
 | Edit show | ✅ |
 | Archive show (swipe action) | ✅ |
 | Quick-list promotions (leading swipe + detail "Move" section) | ✅ (Watched it / Season done / Watching / Start) |
 | Suggest a show to another member | ❌ Retired 2026-07 (all cross-member writes) |
 | Send an existing show to another member's Next Up | ❌ Retired 2026-07 (all cross-member writes) |
-| Cross-library search (title + actor, across all members) | ✅ (home-screen 🔍, add results to your lists) |
+| Find a Show (TMDB title search → add; your own copies incl. archived, and which group-mates have each result) | ✅ (🔍 on Home and My Shows, ⌘F) |
 | Watch on streaming service (deep link) | ✅ for services that support it |
 | Share from Netflix / Apple TV / etc. → Next Up | ✅ (Share Extension) |
 | Calendar feed (Subscribe in Calendar) | ✅ (per-member webcal:// button at the bottom of their list) |
@@ -307,13 +307,13 @@ On the Xcode side, the **Sign in with Apple** capability is already declared in 
 
 ## One show row, one nav
 
-Every show row in the app — Trending, a member's four lists, cross-library
-search, in-library search, Rate my backlog — is `ShowRow` (`Views/ShowRow.swift`),
+Every show row in the app — Trending, a member's four lists, Find a Show's
+"On your lists", in-library search, Rate my backlog — is `ShowRow` (`Views/ShowRow.swift`),
 the SwiftUI counterpart of `renderShowCard()` in `public/show-renderer.js`. Same
 anatomy in the same order: poster, title with the 🎬 series badge and `(Movie)`
 tag, a caption line, the premiere/season line, then the star rating. A screen's
-own additions go through `leading` (an accessory before the poster, e.g. search's
-"+") and `extra` (content under the text, e.g. the backlog's rating tap-row),
+own additions go through `leading` (an accessory before the poster, e.g. a
+quick-add button) and `extra` (content under the text, e.g. the backlog's rating tap-row),
 mirroring the web renderer's `prefixHtml`/`extraHtml`. Models opt in by
 conforming to `ShowRowDisplayable` — `Show`, `AllShow`, `PopularShow` and
 `RateBacklogShow` all do. Add a show row anywhere else by calling `ShowRow`, not
@@ -321,7 +321,8 @@ by rebuilding an `HStack` around `PosterThumb`: five screens each had their own
 and they had drifted (different badges, only one showed premiere dates).
 
 `TitleHitRow` is deliberately not a `ShowRow` — it renders TMDB type-ahead
-search hits (title + year + media type), not shows in anybody's library.
+search hits (title + year + media type), not shows in anybody's library. Find a
+Show's TMDB results are the same kind of thing and follow the same rule.
 
 The discovery nav is in the same order everywhere it appears (iPhone `HomeView`,
 iPad sidebar `IPadHomeView`, the web's `index.html` and `shell.js`): Groups,
