@@ -121,6 +121,19 @@ export async function onRequestGet(context) {
     }
   } catch (_) { /* platform column not migrated yet */ }
 
+  // Connected AI apps (migration 071) are a platform too, but they hold an
+  // OAuth grant rather than a session, so they're counted from the grant's
+  // last use — still people, not connections: one member with Claude and
+  // ChatGPT both connected is 1.
+  try {
+    for (const [label, interval] of Object.entries(platWindows)) {
+      const cnt = await countOver(env,
+        `SELECT COUNT(DISTINCT member_slug) AS cnt FROM oauth_grants
+          WHERE last_used_at >= datetime('now', ?)`, interval);
+      if (cnt) activeByPlatform[label].mcp = cnt;
+    }
+  } catch (_) { /* pre-071 database */ }
+
   // How members actually sign in (migration 059): distinct *people* who
   // minted a session per method over each window, plus how every account was
   // created. This is what says whether an auth channel still earns what it

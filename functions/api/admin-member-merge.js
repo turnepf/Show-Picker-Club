@@ -150,6 +150,16 @@ export async function onRequestPost(context) {
     env.DB.prepare('DELETE FROM members WHERE slug = ?1').bind(source),
   ];
 
+  // Connected AI apps (migration 071) follow the member to the kept account,
+  // like their signed-in devices do. Before the batch, which deletes the
+  // source row the grants would otherwise cascade away with; best-effort so
+  // a database without the tables can still merge.
+  await env.DB.batch([
+    env.DB.prepare('UPDATE oauth_grants SET member_slug = ?2 WHERE member_slug = ?1').bind(source, target),
+    env.DB.prepare('UPDATE oauth_codes SET member_slug = ?2 WHERE member_slug = ?1').bind(source, target),
+    env.DB.prepare('DELETE FROM mcp_usage WHERE member_slug = ?1').bind(source),
+  ]).catch(() => {});
+
   // member_google_ids (migration 031) and member_passkeys (062) postdate the
   // original merge — repoint them too, and retry without on a database that
   // hasn't taken those migrations (batch is all-or-nothing). Credential ids

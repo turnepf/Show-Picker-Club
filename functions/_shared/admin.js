@@ -1,4 +1,4 @@
-import { getSession } from './auth.js';
+import { getSession, isDelegated } from './auth.js';
 
 // Admin rights live in the database (members.is_admin, migration 029), not
 // in source. Admin tools (member setup, URL cleanup, vibe fill, SMS test,
@@ -10,6 +10,9 @@ import { getSession } from './auth.js';
 // Use this when the endpoint also needs to know WHICH admin is acting
 // (e.g. to stamp reviewed_by).
 export async function getAdminSession(request, env) {
+  // An AI app acting through /mcp never carries admin rights, even for an
+  // admin's own token (docs/INVARIANTS.md §27).
+  if (isDelegated(request)) return null;
   const session = await getSession(request, env);
   if (!session || !session.member_slug) return null;
   try {

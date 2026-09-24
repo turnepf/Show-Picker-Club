@@ -45,6 +45,13 @@ export async function onRequestPost(context) {
       env.DB.prepare('UPDATE members SET disabled = 1 WHERE slug = ?').bind(slug),
       env.DB.prepare('DELETE FROM sessions WHERE member_slug = ?').bind(slug),
     ]);
+    // Connected AI apps too (migration 071). Token checks already refuse a
+    // disabled member; revoking means re-enabling doesn't quietly bring the
+    // connections back.
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM oauth_tokens WHERE grant_id IN (SELECT id FROM oauth_grants WHERE member_slug = ?)').bind(slug),
+      env.DB.prepare("UPDATE oauth_grants SET revoked_at = datetime('now') WHERE member_slug = ? AND revoked_at IS NULL").bind(slug),
+    ]).catch(() => {});
     return json({ ok: true, slug, disabled: true });
   }
 

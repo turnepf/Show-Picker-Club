@@ -45,7 +45,14 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ## Unreleased — the update after 1.4.4
 
-*Nothing yet.*
+```
+Use Show Picker Club from Claude or ChatGPT. Connect your AI app at showpicker.club/connect, then just ask: "what's on my Next Up that's under an hour?", "add The Bear to Watching", "I finished Severance, move it to Loved". It works with your lists and your groups, with the same access you have in the app, and you choose whether it can make changes. See and disconnect connected apps any time in Settings.
+```
+
+(The connection itself is a server feature and goes live the moment it merges —
+members can use it before this update ships. The *Settings* line is the iOS Connected apps screen,
+which lands in a follow-up PR; drop that sentence if the update ships without
+it.)
 
 ---
 

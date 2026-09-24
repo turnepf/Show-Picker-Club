@@ -2000,7 +2000,7 @@
       } catch (e) {
         detailStatus.textContent = 'Failed to load trending shows.';
       }
-      checkAuth().then(maybeShowJoinCta);
+      checkAuth().then(maybeShowJoinCta).then(maybeResumeOAuth);
     }
 
     async function showMember(slug) {
@@ -2329,6 +2329,38 @@
       updateLoginBtnLabel();
       updateSideListsHeader();
       updateHeaderTitle();
+    }
+
+    // Connecting an AI app (functions/oauth/authorize.js): a signed-out
+    // member's consent screen sends them to /?login=1&return_to=/oauth/…,
+    // they sign in with the usual sheet, and land back on the consent screen.
+    // Held in sessionStorage so it survives a sign-in that leaves the page.
+    // Only those paths (and /connected-apps, whose sign-in link uses the
+    // same hand-off) are honoured — anything else would make ?return_to an
+    // open redirect.
+    const OAUTH_RETURN_KEY = 'oauth_return_to';
+    function safeOAuthReturn(v) {
+      return typeof v === 'string' && (v.startsWith('/oauth/authorize?') || v === '/connected-apps') ? v : null;
+    }
+    try {
+      const r = safeOAuthReturn(new URLSearchParams(location.search).get('return_to'));
+      if (r) sessionStorage.setItem(OAUTH_RETURN_KEY, r);
+    } catch (e) {}
+    function takeOAuthReturn() {
+      try {
+        const r = safeOAuthReturn(sessionStorage.getItem(OAUTH_RETURN_KEY));
+        sessionStorage.removeItem(OAUTH_RETURN_KEY);
+        return r;
+      } catch (e) { return null; }
+    }
+    function maybeResumeOAuth() {
+      if (!new URLSearchParams(location.search).has('login')) return;
+      if (authMember) {
+        const back = takeOAuthReturn();
+        if (back) window.location.href = back;
+        return;
+      }
+      openLoginModal();
     }
 
     function login() {
@@ -2742,6 +2774,13 @@
     async function finishLogin(enrolled = false) {
       closeLoginModal();
       await checkAuth();
+      // Mid-way through connecting an AI app: go back to its consent screen
+      // rather than to /welcome or the member's lists.
+      const oauthBack = takeOAuthReturn();
+      if (oauthBack) {
+        window.location.href = oauthBack;
+        return;
+      }
       // Fresh signups land on /welcome — a stable confirmation URL that
       // Google Ads' page-based conversion tracking watches (member pages are
       // per-slug, so they can't serve that role). It forwards to their page.

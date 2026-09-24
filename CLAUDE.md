@@ -458,6 +458,27 @@ refusal in `skipped` so a missing domain shows up as a number to fix, and stops
 at a copy pinned to a different `tmdb_id`.
 
 ```bash
+node scripts/mcp-test.mjs
+```
+
+The MCP server at `/mcp` and the OAuth 2.1 server in front of it (migration
+071, `docs/INVARIANTS.md` §27) — how a member's AI app (Claude, ChatGPT,
+Claude Code) reads and changes their lists. **A connection gets the member's
+permissions and no more**, because every tool calls the existing `/api`
+handler in process with the member's session attached (`actingAs()` in
+`_shared/auth.js`) instead of re-implementing the rules. Pins: only an access
+token opens `/mcp` (a session cookie is a 401 — the endpoint takes writes);
+the consent screen never redirects for an unknown client or unregistered
+redirect, refuses a cross-site or wrong-session POST, and shows the real
+redirect host beside the client's self-chosen name; PKCE S256 is mandatory and
+a replayed code or rotated refresh token revokes the grant; a read-only grant
+isn't shown write tools and can't call one; owner-only memos, group scoping,
+another member's row and Watching With behave exactly as in the app; even an
+admin's token never passes an admin gate; revoke, ban and the daily caps take
+effect on the next call. Connected apps (`/api/connected-apps`) is
+cookie-session only, so an AI can't list or cut connections.
+
+```bash
 node scripts/og-preview-test.mjs
 ```
 
@@ -565,6 +586,7 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 - **Feature flags via secrets:** `DEMO_LOGIN_EMAIL`/`DEMO_LOGIN_CODE` (App Review demo account with auto-reset), inert when unset. Signup is always open — there is no kill switch and no approval step.
 - **Retired 2026-07:** the open cross-member writes (suggest-a-show, share-to-member) — those endpoints still return 410, and the reason they're gone is that anyone could push a row onto anyone. **Watching With (2026-08) is the one cross-member write that exists now**, and it's the shape a new one would have to take: only a group-mate can be named, an existing copy is linked where it already sits rather than moved or duplicated, and unlinking touches only your own row (`_shared/watchers.js`, `scripts/watching-with-test.mjs`). "Picks for You" (`/api/recommendations`) is no longer called by any client but kept for compatibility.
 - **The home page does not list members.** `/api/members` is still the roster source for the member-page sidebar, cross-library search, household, and the calendar-feed link — just not the landing page.
+- **MCP server (2026-09):** `/mcp` lets a member's AI app act on their lists; OAuth under `/oauth/*` with the club as its own authorization server; `/connect` and `/connected-apps` are the web pages (OAuth is a browser flow — the one deliberate exception to the frozen web). New tools must call an existing handler through `_shared/mcp-tools.js`, never query around it, and account-shaped actions (invite redemption, household, account, passkeys, admin) stay out. See `docs/ARCHITECTURE.md#mcp-server`.
 - **Native apps** call the same `/api/*` endpoints; shared models live in the repo-root `ShowPickerCore` package. tvOS is view-only. watchOS gets its session from the iPhone via WatchConnectivity. iOS has offline caching + a queued-write sync layer (`ios/ShowPickerIOS/Offline/`).
 
 ## Non-obvious conventions (violating these breaks features)

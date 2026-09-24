@@ -177,7 +177,12 @@ if "NQ6AJVVBBJ.net.patrickturner.showpickerios" not in d.get("webcredentials", {
 
 # Anything the app can't render must stay excluded, or iOS swallows the URL and
 # shows the user nothing.
-required = ["/api/*", "/auth/*", "/calendar/*", "/.well-known/*"]
+# /oauth/* and /mcp matter more than most: the consent screen is reached by a
+# redirect from another app, and if iOS hands that URL to Show Picker instead
+# of the browser, connecting an AI app dead-ends in a screen that can't render
+# it. /connect and /connected-apps are web pages the app has no view for.
+required = ["/api/*", "/auth/*", "/calendar/*", "/.well-known/*", "/oauth/*", "/mcp",
+            "/connect", "/connected-apps"]
 excluded = {c.get("/") for c in comps if c.get("exclude")}
 missing = [p for p in required if p not in excluded]
 if missing:

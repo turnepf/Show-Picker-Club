@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connect an AI app — Show Picker Club</title>
+  <meta name="description" content="Use Show Picker Club from Claude, ChatGPT or Claude Code: ask what to watch next, add shows, and keep your lists up to date by chatting.">
+  <meta property="og:title" content="Connect Show Picker Club to your AI app">
+  <meta property="og:description" content="Ask Claude what's on your Next Up list, add shows by chatting, and more.">
+  <meta property="og:image" content="https://showpicker.club/og-default.png">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css?v=6">
+  <style>
+    /* Connecting an AI app, for people who have never heard the word "MCP".
+       The server URL is the only thing a member has to hand over, so it's
+       the thing every section is built around — a button that fills it in
+       where one exists, a copy button everywhere else. */
+    body { padding: 24px 16px 60px; }
+    .wrap { max-width: 640px; margin: 0 auto; }
+    .topbar { margin-bottom: 20px; }
+    .topbar a { color: var(--accent); text-decoration: none; }
+    h1 { font-family: var(--font-display); font-size: var(--text-2xl); line-height: 1.15; margin: 0 0 10px; color: var(--ink); }
+    .lede { color: var(--ink-muted); font-size: var(--text-md); line-height: 1.5; margin: 0 0 26px; }
+    .card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: 14px; padding: 22px; margin-bottom: 18px; box-shadow: var(--shadow-card); }
+    .card h2 { font-family: var(--font-sans); font-size: var(--text-md); font-weight: 700; margin: 0 0 6px; color: var(--ink); }
+    .card p, .card li { color: var(--ink); line-height: 1.55; font-size: 15px; }
+    .card p { margin: 0 0 12px; }
+    .card ol { margin: 0 0 12px; padding-left: 20px; }
+    .muted { color: var(--ink-muted); font-size: 14px; }
+    .cta { display: block; text-align: center; background: var(--accent); color: #fff; font-weight: 700; font-size: 17px;
+           border-radius: 12px; padding: 14px 18px; text-decoration: none; margin: 14px 0 12px; }
+    .cta:hover { background: var(--accent-hover); }
+    .copy-row { display: flex; gap: 8px; align-items: stretch; margin: 8px 0 12px; }
+    .copy-row code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; background: var(--surface-2); border: 1px solid var(--border-soft);
+                     border-radius: 8px; padding: 10px 12px; font-family: var(--font-mono); font-size: 14px; color: var(--ink); }
+    .copy-row button { flex: none; border: 1px solid var(--border); background: var(--surface); color: var(--ink); border-radius: 8px;
+                       padding: 0 14px; font: 600 14px var(--font-sans); cursor: pointer; }
+    .examples { list-style: none; padding: 0; margin: 0; }
+    .examples li { padding: 8px 0; border-top: 1px solid var(--border-soft); color: var(--ink); font-style: italic; }
+    .examples li:first-child { border-top: none; }
+    .fine { font-size: 13px; color: var(--ink-muted); line-height: 1.5; }
+    .fine a, .card a:not(.cta) { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar"><a href="/">← Show Picker Club</a></div>
+
+    <h1>Use Show Picker Club from your AI app</h1>
+    <p class="lede">Connect Claude, ChatGPT or Claude Code to your lists. Then just ask — “what's on my Next Up that's under an hour?” — or tell it to add a show, and it happens in the app.</p>
+
+    <section class="card">
+      <h2>Claude</h2>
+      <p>Tap the button, then <strong>Add</strong>. Claude sends you here to sign in and choose what it's allowed to do.</p>
+      <a class="cta" id="claudeLink" href="https://claude.ai/customize/connectors?modal=add-custom-connector&amp;connectorName=Show%20Picker%20Club&amp;connectorUrl=https%3A%2F%2Fshowpicker.club%2Fmcp" rel="noopener">Add to Claude</a>
+      <p class="muted">Needs a paid Claude plan (Pro or higher). Button not working? In Claude, open <strong>Settings → Connectors → Add custom connector</strong>, name it Show Picker Club and paste this URL:</p>
+      <div class="copy-row"><code class="mcp-url">https://showpicker.club/mcp</code><button type="button" data-copy="url">Copy</button></div>
+      <p class="muted">On iPhone, add it on claude.ai in a browser once — it then works in the Claude app too.</p>
+    </section>
+
+    <section class="card">
+      <h2>ChatGPT</h2>
+      <ol>
+        <li>In ChatGPT's settings, find <strong>Developer mode</strong> (under Apps or Connectors, then Advanced) and turn it on.</li>
+        <li>Choose <strong>Create</strong>, name it Show Picker Club, paste the URL below and pick <strong>OAuth</strong>.</li>
+        <li>Sign in here when ChatGPT asks.</li>
+      </ol>
+      <div class="copy-row"><code class="mcp-url">https://showpicker.club/mcp</code><button type="button" data-copy="url">Copy</button></div>
+      <p class="muted">Needs ChatGPT Plus or higher.</p>
+    </section>
+
+    <section class="card">
+      <h2>Claude Code</h2>
+      <p>Run this once in a terminal, then use <code>/mcp</code> in Claude Code to sign in:</p>
+      <div class="copy-row"><code id="cliCmd">claude mcp add --transport http showpicker https://showpicker.club/mcp</code><button type="button" data-copy="cli">Copy</button></div>
+    </section>
+
+    <section class="card">
+      <h2>Things to try</h2>
+      <ul class="examples">
+        <li>“What's on my Next Up list? Pick me something funny.”</li>
+        <li>“Add The Bear to my Watching list.”</li>
+        <li>“I finished Severance — move it to Loved and rate it a 9.”</li>
+        <li>“What are people in my groups watching that I'm not?”</li>
+        <li>“Recommend Slow Horses to my book club group.”</li>
+      </ul>
+    </section>
+
+    <p class="fine">The app acts as you, with the same access you have in Show Picker Club — your private notes stay between you and it, and it only sees other people's lists through groups you share. It can't join groups for you, change your household or touch your account. You can make it read-only when you connect, and disconnect it any time from <a href="/connected-apps">Connected apps</a>.</p>
+  </div>
+
+  <script>
+    // Previews and local dev serve this from another origin; point every
+    // copy of the URL at wherever this page actually came from.
+    (function () {
+      var url = location.origin + '/mcp';
+      document.querySelectorAll('.mcp-url').forEach(function (el) { el.textContent = url; });
+      var cli = 'claude mcp add --transport http showpicker ' + url;
+      document.getElementById('cliCmd').textContent = cli;
+      document.getElementById('claudeLink').href =
+        'https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=' +
+        encodeURIComponent('Show Picker Club') + '&connectorUrl=' + encodeURIComponent(url);
+      document.querySelectorAll('[data-copy]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var text = btn.dataset.copy === 'cli' ? cli : url;
+          var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1600); };
+          if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () {});
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

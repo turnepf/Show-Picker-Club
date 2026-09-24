@@ -472,6 +472,46 @@ doesn't** — it's read-only and has no room for the trait bars. **The web
 has it** — `vibe.html` came back with the 2026-08 restore (see
 [Web app status](#web-app-status)), on the same `/api/vibe`.
 
+## Connect an AI app (MCP)
+
+Members can connect **Claude, ChatGPT or Claude Code** to their account and
+use Show Picker Club by chatting: "what's on my Next Up that's under an
+hour?", "add The Bear to Watching", "I finished Severance — move it to Loved
+and rate it a 9", "what are people in my groups watching that I'm not?".
+
+- **Connecting.** `showpicker.club/connect` has an **Add to Claude** button
+  (Claude's add-connector dialog, pre-filled), the server URL to copy for
+  ChatGPT, and the one-line command for Claude Code. The AI app then sends
+  the member to a Show Picker sign-in and consent screen: it names the app and
+  the site it will return to, and **Make changes** can be unticked to connect
+  read-only. Signing up there works too — it's the normal sign-in sheet.
+- **What it can do** is what the member can do in the app, through the same
+  rules: read their own lists (notes included), see group-mates' lists and
+  the group board, search the catalog and their groups' libraries, Trending;
+  and — if allowed to make changes — add, edit, move, reorder, rate, archive,
+  restore and delete their own shows, name group-mates in Watching With,
+  recommend to a group and answer recommendations, create a group, make an
+  invite link and leave a group.
+- **What it can't:** join a group (invite links are opened by people), rename
+  or delete a group, anything household, account settings, passkeys, import,
+  admin tools — even on an admin's account. It sees other people's lists only
+  through shared groups, never their private notes.
+- **Limits.** 500 actions, 100 changes and 100 catalog searches per member per
+  day from connected apps, resetting at midnight UTC; the AI app is told when
+  a limit is hit.
+- **Disconnecting.** `showpicker.club/connected-apps` lists each connected app
+  (where it lives, read-only or not, last used) with **Disconnect**, which
+  takes effect immediately. Removing the connector inside the AI app does the
+  same. A connection left unused for 90 days expires on its own.
+
+Platforms: it's a server feature, so it works for **every member regardless
+of device** — it runs inside their AI app, not ours. The connect, consent and
+Connected apps screens are **web pages** because OAuth sign-in is a browser
+flow; that's the one deliberate exception to the frozen web, not a web
+feature. **iPhone/iPad** (and Mac via Catalyst) get a Connected apps screen in
+Settings in the next build. **Apple TV and the watch don't** — nothing to
+manage from there.
+
 ## Suggestions to non-members
 
 Not currently supported — the suggest button is only available to logged-in members. Outside guests would need to be added as a member first.

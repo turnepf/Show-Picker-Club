@@ -1,6 +1,28 @@
 import { platformOf, recordPlatformUsage } from './platform.js';
 
+// Requests the MCP endpoint builds to call an existing handler on a member's
+// behalf (functions/mcp.js). The session rides on the Request object itself,
+// in a WeakMap nothing outside this module can write, so there is no header
+// or cookie a caller on the network could forge to land here. It exists so an
+// AI app gets exactly the permissions the member has in the app — every
+// handler's own owner/group checks run unchanged — rather than a second copy
+// of those rules. See docs/INVARIANTS.md §27.
+const delegated = new WeakMap();
+
+export function actingAs(request, session) {
+  delegated.set(request, { ...session, via: 'mcp' });
+  return request;
+}
+
+// True for a request built by actingAs(). Admin gates refuse these: an
+// OAuth token is a member's lists, never the operator's tools.
+export function isDelegated(request) {
+  return delegated.has(request);
+}
+
 export async function getSession(request, env) {
+  const onBehalf = delegated.get(request);
+  if (onBehalf) return onBehalf;
   const cookie = request.headers.get('Cookie') || '';
   const match = cookie.match(/session=([^;]+)/);
   if (!match) return null;

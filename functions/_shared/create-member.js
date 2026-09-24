@@ -11,6 +11,8 @@ export const RESERVED_SLUGS = new Set([
   'whats-new', 'requests',
   // routing prefixes and assets
   'api', 'auth', 'calendar', 'favicon', 'manifest', 'styles', 'shell', 'sw',
+  // the MCP server and its OAuth screens (migration 071)
+  'mcp', 'oauth', 'connect', 'connected-apps',
   // likely future routes / confusing names
   'about', 'account', 'app', 'delete', 'demo', 'help', 'login', 'logout',
   'me', 'new', 'settings', 'signup', 'support', 'test', 'www',
