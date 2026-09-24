@@ -350,6 +350,10 @@ struct HomeView: View {
     // roster (a stale bookmark, a typo) gives up instead of looping.
     @MainActor
     private func route(url: URL, allowRefetch: Bool = true) {
+        // A page the website owns (Claude's sign-in, the privacy policy)
+        // reaching the app through a stale universal-link cache: give it back
+        // to the browser instead of silently staying on Home.
+        if WebOnlyLinks.isWebOnly(url) { BrowserHandoff.open(url); return }
         guard let first = url.path.split(separator: "/").first.map({ String($0).lowercased() }) else { return }
         if let show = Route.showLink(url) { path = [show]; return }
         // A household invite (/household/join?code=…). Same shape as a group
