@@ -21,6 +21,7 @@ struct HomeView: View {
     @State private var showingLogin = false
     @State private var showingDeleteAccount = false
     @State private var showingPasskeys = false
+    @State private var showingConnectedApps = false
     @State private var showingExport = false
     @State private var showingSearch = false
     @State private var shakePick: Show?
@@ -266,6 +267,9 @@ struct HomeView: View {
             .sheet(isPresented: $showingPasskeys) {
                 PasskeysView().environmentObject(auth)
             }
+            .sheet(isPresented: $showingConnectedApps) {
+                ConnectedAppsView()
+            }
             .sheet(isPresented: $showingExport) {
                 ExportListsView().environmentObject(auth)
             }
@@ -494,6 +498,13 @@ struct HomeView: View {
                         showingPasskeys = true
                     } label: {
                         Label("Passkeys…", systemImage: "person.badge.key")
+                    }
+                    // AI apps connected through the MCP server, and the
+                    // in-app way to disconnect one (ConnectedAppsView).
+                    Button {
+                        showingConnectedApps = true
+                    } label: {
+                        Label("Connected Apps…", systemImage: "link")
                     }
                     // The permanent way in. The Home card and the My Shows
                     // nudges are onboarding prompts that retire themselves once

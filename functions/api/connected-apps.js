@@ -7,8 +7,8 @@
 // nobody else's, and a foreign or unknown id is the same 404. Session-cookie
 // only — a connected app can't list or revoke connections, which is what
 // keeps "disconnect" something the member does rather than something an AI
-// can be talked into. Read by public/connected-apps.html and, from the next
-// build, the iOS Settings screen.
+// can be talked into. Read by public/connected-apps.html and the iOS/iPad/Mac
+// ConnectedAppsView (account menu → Connected Apps…).
 
 import { getSession, isDelegated } from '../_shared/auth.js';
 import { revokeGrant, redirectLabel, parseScope } from '../_shared/oauth.js';

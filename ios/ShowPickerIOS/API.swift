@@ -818,6 +818,30 @@ enum API {
         return true
     }
 
+    // MARK: Connected AI apps (MCP)
+    //
+    // The AI apps (Claude, ChatGPT, Claude Code) this member has connected to
+    // showpicker.club/mcp. Session-cookie only on the server, so only the
+    // member — never a connected app — can list or disconnect them.
+
+    static func connectedApps() async throws -> [ConnectedApp] {
+        struct Wrapper: Decodable { let apps: [ConnectedApp] }
+        let r: Wrapper = try await get("/api/connected-apps")
+        return r.apps
+    }
+
+    static func disconnectApp(id: Int) async throws {
+        guard let url = URL(string: baseString + "/api/connected-apps?id=\(id)") else {
+            throw APIError.badURL
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        let (_, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw APIError.badResponse((resp as? HTTPURLResponse)?.statusCode ?? -1)
+        }
+    }
+
     // MARK: Account deletion (App Store 5.1.1(v))
     //
     // Two-step hard delete, decoded regardless of HTTP status so the UI can

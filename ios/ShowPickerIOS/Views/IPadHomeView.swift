@@ -55,6 +55,7 @@ struct IPadHomeView: View {
     @State private var showingLogin = false
     @State private var showingDeleteAccount = false
     @State private var showingPasskeys = false
+    @State private var showingConnectedApps = false
     @State private var showingSearch = false
     @State private var showingExport = false
     @State private var showingImport = false
@@ -125,6 +126,7 @@ struct IPadHomeView: View {
         .onAppCommand(.showSearchCommand) { showingSearch = true }
         .onAppCommand(.refreshCommand) { Task { await load() } }
         .sheet(isPresented: $showingPasskeys) { PasskeysView().environmentObject(auth) }
+        .sheet(isPresented: $showingConnectedApps) { ConnectedAppsView() }
         .sheet(isPresented: $showingExport) { ExportListsView().environmentObject(auth) }
         // Reload on dismiss so the sidebar's show counts reflect the import.
         .sheet(isPresented: $showingImport, onDismiss: { Task { await load() } }) {
@@ -359,6 +361,13 @@ struct IPadHomeView: View {
                         showingPasskeys = true
                     } label: {
                         Label("Passkeys…", systemImage: "person.badge.key")
+                    }
+                    // AI apps connected through the MCP server, and the
+                    // in-app way to disconnect one (ConnectedAppsView).
+                    Button {
+                        showingConnectedApps = true
+                    } label: {
+                        Label("Connected Apps…", systemImage: "link")
                     }
                     // Same permanent entry point as iPhone Home. The iPad and
                     // Mac layout had no import route whatsoever before this —
