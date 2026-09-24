@@ -213,7 +213,8 @@ Offline/
   `OfflineCache`; when a later GET fails *because the device is offline* (a
   `URLError` like `.notConnectedToInternet`), the last good copy is served
   instead of throwing. Members, popular, a member's shows, a show's detail,
-  cast, and cross-library search are all cached. Real server
+  cast, and the group libraries Find a Show names people from are all
+  cached (its TMDB results are not — offline it offers "Add by hand"). Real server
   errors (4xx/5xx, decode failures) still propagate as before.
 
 - **Artwork and whole-list prefetch.** Posters and backdrops load through
@@ -248,8 +249,7 @@ Offline/
 ### Limits
 
 - Only edits to *your own* library queue offline — add / edit / move / archive /
-  delete / rate, including adding a cached search result onto
-  one of your lists and rating from either the show detail screen or the
+  delete / rate, including an "Add by hand" from Find a Show, and rating from either the show detail screen or the
   "Rate my backlog" bulk screen. Suggesting or sending a show to *another*
   member, login, and the admin tools still need a connection and surface
   their usual errors offline.
@@ -272,7 +272,7 @@ Offline/
 | Quick-list promotions (leading swipe + detail "Move" section) | ✅ (Watched it / Season done / Watching / Start) |
 | Suggest a show to another member | ❌ Retired 2026-07 (all cross-member writes) |
 | Send an existing show to another member's Next Up | ❌ Retired 2026-07 (all cross-member writes) |
-| Find a Show (TMDB title search → add; your own copies incl. archived, and which group-mates have each result) | ✅ (🔍 on Home and My Shows, ⌘F) |
+| Find a Show (TMDB title search → add; your own copies incl. archived, and which group-mates have each result) | ✅ (🔍 on Home and every member page, ⌘F) |
 | Watch on streaming service (deep link) | ✅ for services that support it |
 | Share from Netflix / Apple TV / etc. → Next Up | ✅ (Share Extension) |
 | Calendar feed (Subscribe in Calendar) | ✅ (per-member webcal:// button at the bottom of their list) |
@@ -308,7 +308,7 @@ On the Xcode side, the **Sign in with Apple** capability is already declared in 
 ## One show row, one nav
 
 Every show row in the app — Trending, a member's four lists, Find a Show's
-"On your lists", in-library search, Rate my backlog — is `ShowRow` (`Views/ShowRow.swift`),
+"On your lists", Rate my backlog — is `ShowRow` (`Views/ShowRow.swift`),
 the SwiftUI counterpart of `renderShowCard()` in `public/show-renderer.js`. Same
 anatomy in the same order: poster, title with the 🎬 series badge and `(Movie)`
 tag, a caption line, the premiere/season line, then the star rating. A screen's
