@@ -410,6 +410,24 @@ console.log('\n== scopes decide which tools exist');
   check('every tool carries annotations and a closed schema',
     all.every((t) => t.annotations && t.inputSchema.type === 'object' && t.inputSchema.additionalProperties === false));
   check('delete is marked destructive', all.find((t) => t.name === 'delete_show').annotations.destructiveHint === true);
+  // Anthropic's connector-directory review: every tool has a title and the
+  // hint that decides whether Claude asks first; anything that changes or
+  // removes existing data is destructive; descriptions describe rather than
+  // instruct.
+  check('every tool has a title', all.every((t) => typeof t.title === 'string' && t.title.length > 0));
+  check('every tool name is at most 64 characters', all.every((t) => t.name.length <= 64));
+  const readOnly = all.filter((t) => t.annotations.readOnlyHint === true).map((t) => t.name);
+  check('read tools are marked read-only', ['list_my_shows', 'get_show', 'search_titles', 'get_group'].every((n) => readOnly.includes(n)));
+  const destructive = new Set(all.filter((t) => t.annotations.destructiveHint === true).map((t) => t.name));
+  for (const n of ['update_show', 'move_show', 'reorder_list', 'rate_show', 'archive_show', 'restore_show', 'delete_show', 'remove_recommendation', 'leave_group']) {
+    check(`${n} is marked destructive`, destructive.has(n));
+  }
+  check('every write tool states destructiveHint explicitly',
+    all.filter((t) => !t.annotations.readOnlyHint).every((t) => typeof t.annotations.destructiveHint === 'boolean'));
+  const bossy = all.filter((t) => /\b(confirm with|prefer |you must|always |never |call [a-z_]+ first)/i.test(t.description));
+  check('no tool description tells the model how to behave', bossy.length === 0, bossy.map((t) => t.name).join(', '));
+  const init = (await rpc(env, rw.access, 'initialize', {})).body.result.instructions;
+  check('the server instructions describe rather than direct', !/confirm|prefer|you must/i.test(init));
   const names = all.map((t) => t.name);
   for (const absent of ['join_group', 'delete_group', 'rename_group', 'delete_account', 'household']) {
     check(`no ${absent} tool`, !names.some((n) => n.includes(absent)));
@@ -431,6 +449,13 @@ console.log('\n== the tools carry the app\'s own privacy rules');
   const own = await tool(env, access, 'list_my_shows');
   check('your own list carries your notes', own.text.includes('PAT-NOTE') && own.text.includes('REC-PAT-NOTE'));
   check('list names use the member vocabulary', own.data.shows[0].list === 'watching');
+  for (let i = 0; i < 5; i++) addShow(env, { slug: 'patrick', title: `Filler ${i}`, list: 'next' });
+  const p1 = await tool(env, access, 'list_my_shows', { limit: 4 });
+  check('a list comes a page at a time', p1.data.shows.length === 4 && p1.data.total === 6 && p1.data.next_offset === 4);
+  const p2 = await tool(env, access, 'list_my_shows', { limit: 4, offset: p1.data.next_offset });
+  check('and the last page has no next_offset', p2.data.shows.length === 2 && p2.data.next_offset === undefined);
+  const capped = await tool(env, access, 'list_my_shows', { limit: 100000 });
+  check('an oversized limit is capped, not refused', !capped.isError && capped.data.shows.length === 6);
 
   const mate = await tool(env, access, 'list_member_shows', { member_slug: 'whitt' });
   check("a group-mate's titles are readable", mate.text.includes('Slow Horses') && mate.data.shows[0].list === 'loved');

@@ -156,6 +156,27 @@ async function ownsShow(ctx, id) {
 }
 
 const listSchema = { type: 'string', enum: LIST_NAMES, description: 'watching, awaiting (between seasons), loved (finished and recommended), or next_up (want to watch)' };
+// A page of a list: `limit` rows starting at `offset`, plus what's needed to
+// ask for the next one. A keen member's library runs to hundreds of titles,
+// and the directory review asks for responses sized to the request.
+const PAGE_DEFAULT = 100;
+const PAGE_MAX = 250;
+const pageSchema = {
+  limit: { type: 'integer', minimum: 1, maximum: PAGE_MAX, description: `Shows per page. Default ${PAGE_DEFAULT}.` },
+  offset: { type: 'integer', minimum: 0, description: 'Skip this many shows (for the next page). Default 0.' },
+};
+function page(rows, args) {
+  const limit = Math.min(Math.max(intArg(args, 'limit', { required: false }) || PAGE_DEFAULT, 1), PAGE_MAX);
+  const offset = Math.max(intArg(args, 'offset', { required: false }) || 0, 0);
+  const slice = rows.slice(offset, offset + limit);
+  return {
+    total: rows.length,
+    offset,
+    ...(offset + slice.length < rows.length ? { next_offset: offset + slice.length } : {}),
+    shows: slice.map((s) => compactShow(s)),
+  };
+}
+
 const R = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
 
 // ---- the tools ---------------------------------------------------------
@@ -186,7 +207,7 @@ export const TOOLS = [
   {
     name: 'list_my_shows',
     title: 'List my shows',
-    description: 'Your own shows, optionally one list only. Includes your private notes, who recommended each show, and who you watch it with.',
+    description: 'Your own shows in list order, optionally one list only, a page at a time (next_offset is present when there are more). Includes your private notes, who recommended each show, and who you watch it with.',
     scope: 'shows:read',
     annotations: R,
     inputSchema: {
@@ -194,6 +215,7 @@ export const TOOLS = [
       properties: {
         list: listSchema,
         include_archived: { type: 'boolean', description: 'Also include shows you archived. Default false.' },
+        ...pageSchema,
       },
     },
     async run(ctx, args) {
@@ -204,7 +226,7 @@ export const TOOLS = [
       });
       const rows = (shows || []).filter((s) => !want || s.list === want)
         .sort((a, b) => (a.sort_order ?? 1e9) - (b.sort_order ?? 1e9) || String(a.title).localeCompare(String(b.title)));
-      return { count: rows.length, shows: rows.map((s) => compactShow(s)) };
+      return page(rows, args);
     },
   },
   {
@@ -228,17 +250,17 @@ export const TOOLS = [
   {
     name: 'list_member_shows',
     title: "A group-mate's shows",
-    description: "The shows on a group-mate's lists (titles and catalog facts only — never their private notes). Only works for people you share a private group with; use get_group to find their slug.",
+    description: "The shows on a group-mate's lists, a page at a time: titles and catalog facts, without their private notes. Available only for people you share a private group with; get_group lists their slugs.",
     scope: 'shows:read',
     annotations: R,
     inputSchema: {
       type: 'object',
-      properties: { member_slug: { type: 'string' }, list: listSchema },
+      properties: { member_slug: { type: 'string' }, list: listSchema, ...pageSchema },
       required: ['member_slug'],
     },
     async run(ctx, args) {
       const slug = strArg(args, 'member_slug', { required: true, max: 64 }).toLowerCase();
-      if (slug === ctx.session.member_slug) return TOOLS_BY_NAME.list_my_shows.run(ctx, { list: args.list });
+      if (slug === ctx.session.member_slug) return TOOLS_BY_NAME.list_my_shows.run(ctx, { list: args.list, limit: args.limit, offset: args.offset });
       // Narrower than the app on purpose: a connection gets no roster, so the
       // only people it can name are the ones it can see through groups.
       const mates = await groupMates(ctx.env, ctx.session.member_slug);
@@ -248,7 +270,7 @@ export const TOOLS = [
       const want = args.list ? apiList(args.list) : null;
       const { shows } = await ok(ctx, showsApi.onRequestGet, { path: '/api/shows', query: { member: slug } });
       const rows = (shows || []).filter((s) => !want || s.list === want);
-      return { member: slug, count: rows.length, shows: rows.map((s) => compactShow(s)) };
+      return { member: slug, ...page(rows, args) };
     },
   },
   {
@@ -267,7 +289,7 @@ export const TOOLS = [
   {
     name: 'search_titles',
     title: 'Find a show or movie',
-    description: 'Search the TMDB catalog for a TV show or movie. Use this before add_show to get the exact tmdb_id, so the right version (not a remake) is added.',
+    description: 'Searches the TMDB catalog for TV shows and movies and returns each match with its tmdb_id, type and year — the identifiers add_show takes to add an exact title rather than a same-named remake.',
     scope: 'shows:read',
     search: true,
     annotations: { ...R, openWorldHint: true },
@@ -367,7 +389,7 @@ export const TOOLS = [
   {
     name: 'add_show',
     title: 'Add a show',
-    description: 'Add a show or movie to one of your lists. Call search_titles first and pass its tmdb_id and media_type so the exact title is added. Naming group-mates in watching_with_members also puts the show on their list, linked to yours.',
+    description: 'Adds a show or movie to one of your lists. With a tmdb_id and media_type from search_titles it adds that exact title; with a title alone it adds the best catalog match. Naming group-mates in watching_with_members also puts the show on their list, linked to yours.',
     scope: 'shows:write',
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     inputSchema: {
@@ -412,7 +434,7 @@ export const TOOLS = [
     title: 'Edit a show',
     description: "Edit one of your shows: private notes, who recommended it, who you watch it with. Only the fields you pass change. watching_with_members replaces the full set of linked group-mates.",
     scope: 'shows:write',
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -441,7 +463,7 @@ export const TOOLS = [
     title: 'Move a show',
     description: 'Move one of your shows to another list (e.g. next_up → watching when you start it, watching → loved when you finish).',
     scope: 'shows:write',
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     inputSchema: { type: 'object', properties: { show_id: { type: 'integer' }, list: listSchema }, required: ['show_id', 'list'] },
     async run(ctx, args) {
       const id = intArg(args, 'show_id');
@@ -454,7 +476,7 @@ export const TOOLS = [
     title: 'Reorder a list',
     description: "Set the order of one of your lists. Pass that list's show ids top to bottom; ids not on the list are ignored.",
     scope: 'shows:write',
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     inputSchema: {
       type: 'object',
       properties: { list: listSchema, show_ids: { type: 'array', items: { type: 'integer' } } },
@@ -473,7 +495,7 @@ export const TOOLS = [
     title: 'Rate a show',
     description: "Rate one of your shows 1–10, overall or for one season. Not available for Next Up shows (you haven't watched them yet).",
     scope: 'shows:write',
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -498,9 +520,9 @@ export const TOOLS = [
   {
     name: 'archive_show',
     title: 'Archive a show',
-    description: 'Take one of your shows off your lists but keep it in your history (restore_show brings it back). Prefer this over delete_show.',
+    description: 'Takes one of your shows off your lists but keeps it in your history; restore_show brings it back.',
     scope: 'shows:write',
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     inputSchema: { type: 'object', properties: { show_id: { type: 'integer' } }, required: ['show_id'] },
     async run(ctx, args) {
       const id = intArg(args, 'show_id');
@@ -515,7 +537,7 @@ export const TOOLS = [
     title: 'Restore an archived show',
     description: 'Bring one of your archived shows back, onto the list it was on or the one you name.',
     scope: 'shows:write',
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     inputSchema: { type: 'object', properties: { show_id: { type: 'integer' }, list: listSchema }, required: ['show_id'] },
     async run(ctx, args) {
       const id = intArg(args, 'show_id');
@@ -528,7 +550,7 @@ export const TOOLS = [
   {
     name: 'delete_show',
     title: 'Delete a show',
-    description: 'Permanently delete one of your shows, including its notes and ratings links. Cannot be undone — confirm with the member first, and prefer archive_show.',
+    description: 'Permanently deletes one of your shows and its notes. Cannot be undone; archive_show is the reversible alternative.',
     scope: 'shows:write',
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     inputSchema: { type: 'object', properties: { show_id: { type: 'integer' } }, required: ['show_id'] },
@@ -619,7 +641,7 @@ export const TOOLS = [
   {
     name: 'create_group_invite',
     title: 'Invite to a group',
-    description: 'A new invite link for one of your groups (good for 10 people, 7 days). Share it with the people you want to add.',
+    description: 'Creates a new invite link for one of your groups, good for 10 people over 7 days. Anyone who opens it can join.',
     scope: 'shows:write',
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     inputSchema: { type: 'object', properties: { group_id: { type: 'integer' } }, required: ['group_id'] },
@@ -632,7 +654,7 @@ export const TOOLS = [
   {
     name: 'leave_group',
     title: 'Leave a group',
-    description: 'Leave one of your groups. Your recommendations and invite links in it go with you, and group-mates lose access to your lists through it. Confirm with the member first.',
+    description: 'Leaves one of your groups. Your recommendations and invite links in it are removed, and its members lose access to your lists through it.',
     scope: 'shows:write',
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     inputSchema: { type: 'object', properties: { group_id: { type: 'integer' } }, required: ['group_id'] },

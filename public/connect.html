@@ -42,6 +42,10 @@
     .examples li:first-child { border-top: none; }
     .fine { font-size: 13px; color: var(--ink-muted); line-height: 1.5; }
     .fine a, .card a:not(.cta) { color: var(--accent); }
+    .tool-list { list-style: none; padding: 0; margin: 0 0 12px; }
+    .tool-list li { padding: 6px 0; border-top: 1px solid var(--border-soft); font-size: 14px; line-height: 1.5; }
+    .tool-list li:first-child { border-top: none; }
+    .tool-list code { font-family: var(--font-mono); font-size: 13px; }
   </style>
 </head>
 <body>
@@ -86,6 +90,31 @@
         <li>“What are people in my groups watching that I'm not?”</li>
         <li>“Recommend Slow Horses to my book club group.”</li>
       </ul>
+    </section>
+
+    <section class="card" id="tools">
+      <h2>What it can do</h2>
+      <p>The connection acts as you, with the access you have in the app. When you connect, you choose read-only or read-and-change.</p>
+      <p><strong>Read</strong></p>
+      <ul class="tool-list">
+        <li><code>get_profile</code> — who the connection acts as, list counts, groups</li>
+        <li><code>list_my_shows</code> — your lists, with your notes (paged)</li>
+        <li><code>get_show</code> — one show: overview, cast, where it streams, ratings</li>
+        <li><code>list_member_shows</code> — a group-mate's lists, without their notes</li>
+        <li><code>search_libraries</code> — search your and your group-mates' lists</li>
+        <li><code>search_titles</code> — search the TV and movie catalog</li>
+        <li><code>get_trending</code> — what the club or one of your groups is adding</li>
+        <li><code>list_groups</code>, <code>get_group</code>, <code>get_group_recommendations</code> — your groups and their Watch Next boards</li>
+      </ul>
+      <p><strong>Change</strong> (only if you allow it)</p>
+      <ul class="tool-list">
+        <li><code>add_show</code>, <code>update_show</code>, <code>move_show</code>, <code>reorder_list</code>, <code>rate_show</code> — your own shows</li>
+        <li><code>archive_show</code>, <code>restore_show</code>, <code>delete_show</code> — take shows off your lists or bring them back</li>
+        <li><code>recommend_to_group</code>, <code>respond_to_recommendation</code>, <code>remove_recommendation</code> — group Watch Next boards</li>
+        <li><code>create_group</code>, <code>create_group_invite</code>, <code>leave_group</code> — your groups</li>
+      </ul>
+      <p class="muted">It can't join a group for you, rename or delete a group, change your household or touch your account. Connected apps get up to 500 actions, 100 changes and 100 catalog searches a day, resetting at midnight UTC.</p>
+      <p class="muted">What's shared and how it's handled: <a href="/privacy">Privacy Policy</a>. Questions or problems: <a href="mailto:patrick@patrickturner.net">patrick@patrickturner.net</a>.</p>
     </section>
 
     <p class="fine">The app acts as you, with the same access you have in Show Picker Club — your private notes stay between you and it, and it only sees other people's lists through groups you share. It can't join groups for you, change your household or touch your account. You can make it read-only when you connect, and disconnect it any time from <a href="/connected-apps">Connected apps</a>.</p>
