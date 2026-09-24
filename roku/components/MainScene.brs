@@ -127,8 +127,6 @@ sub onChildNavigate(ev as object)
         pushView(node)
     else if action = "openSearch"
         pushView(CreateObject("roSGNode", "SearchScreen"))
-    else if action = "openAdd"
-        pushView(CreateObject("roSGNode", "AddShowScreen"))
     else if action = "openAccount"
         pushView(CreateObject("roSGNode", "AccountScreen"))
     else if action = "back"

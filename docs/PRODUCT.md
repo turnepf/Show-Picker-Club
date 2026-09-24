@@ -178,7 +178,7 @@ The landing page (`/`) shows:
 3. **No member list.** Home doesn't list members; the roster is an admin view in the apps, ordered most recently active first, where *active* means using the app, not only changing a list: adding or editing a (non-seed) show, or opening an app or bringing it back from the background (to the hour). Only admins get that order or those times — a logged-out caller gets names alone, a member gets names and list counts, both alphabetical. Mechanics in `docs/ARCHITECTURE.md` (`last_activity_at`).
 
    Platforms: the **order** is server-side, so every roster gets it. What **counts as an open** differs: **iPhone/iPad and Mac** (Catalyst) check in on launch and on every return to the foreground (from 1.4.4); **Apple TV** the same (from 1.4.4); the **web** on every page load. **The watch doesn't** — it takes its session from the iPhone and never calls the check. Older app versions count cold launches only until members update.
-4. **Search** — in the apps, the magnifying glass opens **Find a Show** (see [Search](#search)): search any title and add it. On the web it's still "Search all libraries", across your groups' libraries, with a + to copy a pick onto your own list.
+4. **Search** — the magnifying glass opens **Find a Show** everywhere — apps, web and Roku (see [Search](#search)): search any title and add it.
 
 ## Favorite Actors
 
@@ -373,7 +373,9 @@ The sheet stays open after an add — the show moves up into *On your lists*, wh
 
 **Apple TV** gets the same thing in its **Search** tab: TMDB results as poster cards, your own copies (archived included) in an *On your lists* row above them, and the group-mates who have a title under its poster when it's focused. Picking a result asks which list, adds it, and returns to the results. There is no "Add a Show" button on My Shows any more — the empty state points to Search. "Add … as typed" covers titles TMDB doesn't know; the TV can't set network, notes or Movie on those, same as it never could — edit on the phone.
 
-**Web (frozen):** still the two older searches — per-member search in the member-page header (that member's library, archived rows too, title and actor filters) and cross-library search across your groups' libraries with a + to copy a pick. Adding a show on the web is the + button. It doesn't have Find a Show.
+**Web:** the same Find a Show, in the search modal behind the magnifying glass (home, sidebar and every member page; `/` or `n` on a member page). The + beside the page title is gone, as are the old per-member and all-libraries searches. Picking a result on your own page opens the full Add Show form seeded with the tab in view; anywhere else it opens the short "add to my list" form, since the page's lists aren't yours. Unlike the apps, the modal closes when you pick a result.
+
+**Roku:** the same, in the channel's Search screen — see `roku/README.md`.
 
 ## Calendar feed
 

@@ -56,10 +56,9 @@ roku/              Native Roku channel (SceneGraph/BrightScript) against the sam
                    /api/*. Runs on a real device via sideload (Roku has no
                    simulator) and carries the only build tooling in the repo —
                    `bsc` validation, one-command sideload, scriptable
-                   remote/typing/screenshots (roku/sideload.mjs). Manifest and
-                   artwork are certification-ready; not yet submitted to the
-                   Channel Store, so it is not a shipping platform and doesn't
-                   count for feature-parity statements. See roku/NEXT_STEPS.md
+                   remote/typing/screenshots (roku/sideload.mjs). Live in the
+                   Roku Channel Store (2026-09), so it is a shipping platform
+                   and counts for feature-parity statements. See roku/NEXT_STEPS.md
 scripts/           apply-migrations.sh, member-engagement.sh, vibe-diagnose.mjs
                    (operator tools)
 ```
@@ -601,12 +600,12 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 
 - **Feature requests still name their platforms.** The product ships on
   iPhone/iPad, Mac (Catalyst — it runs the iPad split view and gets what iPad
-  gets), tvOS and watchOS, under one universal App Store listing. When a feature
+  gets), tvOS and watchOS, under one universal App Store listing, plus a Roku
+  channel in the Roku Channel Store. When a feature
   is requested, state which get it and which don't (tvOS is view-only, watch is
   read-only and has no groups at all) — parity gaps between the Apple targets
   are still expensive to rediscover, and the web is a further surface to name
-  now that it's back. Don't count Roku: the channel in `roku/` has never run on
-  a device. There is no in-app What's New — release
+  now that it's back, and so is Roku. There is no in-app What's New — release
   notes go in the App Store update text instead (retired 2026-08, along with
   `whats-new.json`, `whats-new.html` and `WhatsNewView`). Collect that text in
   `docs/RELEASE_NOTES.md` under *Unreleased* as user-facing work merges, so
