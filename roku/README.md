@@ -8,18 +8,18 @@ own navigation conventions rather than mimicking Apple's tab bar.
 ## What it does
 
 - **Home** — Trending shelf (`/api/popular`, public) plus a Members shelf (logged-in only), with
-  a nav bar for My Shows / Search / Add Show / Account.
+  a nav bar for My Shows / Search / Account.
 - **Member** — the four lists as horizontal rows: **Watching, Awaiting, Loved, Next Up**, each
   with a per-network tally in the row header, sorted the same way as the iOS/tvOS apps.
 - **Detail** — hero art, overview, cast, rating, club-rating summary, and action buttons to move
   a show between lists / archive / restore (your own copy) or add another member's / trending
   show to one of your lists.
-- **Search** — cross-library search over `/api/shows/all?q=` (title, network, genre, cast),
-  filtered **server-side**. The channel used to download the whole club library and filter it on
-  the device; that was the heaviest thing it did and the first thing that would fall over on an
-  older box, so the filtering moved to the server and the device now holds nothing between
-  searches.
-- **Add** — TMDB title search (`/api/title-search`) → pick a list → `POST /api/shows`.
+- **Search** — "Find a Show", and the one way to add a show (there is no separate Add screen,
+  matching the Apple apps). Typing searches TMDB (`/api/title-search`, debounced); pick a result,
+  pick a list, `POST /api/shows`. Above the results, an "On your lists" row shows your own
+  matching copies (archived included) and opens their detail screen; a focused result names the
+  group-mates who have it, from `/api/shows/all?q=` filtered **server-side** so the device never
+  holds the club library. An "as typed" card adds a title TMDB doesn't have.
 - **Account** — email/phone one-time-code sign-in, self-enroll name step, sign out, and the
   two-step delete-account flow.
 
@@ -90,7 +90,7 @@ Two rules that hold everywhere, regardless of tier:
 - **Images are sized by the client, not the server.** The stored `poster_url` is `w500` because it
   is shared with the Apple apps, where a poster can fill an iPad. `TmdbWidth()` rewrites the width
   in the URL and **only ever downsizes** — `/api/title-search` already returns `w92` thumbnails,
-  and rewriting those upward would make the Add screen slower for worse art.
+  and rewriting those upward would make Search slower for worse art.
 - **Text is drawn before images.** `PosterCard.onContentSet()` sets the title, background, fallback
   and badge first and assigns the image `uri`s last, so a card is readable before its artwork
   arrives. `DetailScreen` goes further: it paints the title and poster from the card you selected
@@ -171,6 +171,6 @@ sideload and publish with; swap in dedicated artwork later if desired.
 ## Known on-device tuning
 
 Focus transitions between the on-screen `Keyboard`, the action `ButtonGroup`, and result grids
-are handled manually in `onKeyEvent` (Search/Add/Account screens). Roku's keyboard may consume
+are handled manually in `onKeyEvent` (Search/Account screens). Roku's keyboard may consume
 edge key presses differently across firmware; verify these transitions on a real device and
 adjust the zone logic if a hop feels sticky.

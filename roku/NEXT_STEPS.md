@@ -31,11 +31,10 @@ A place to resume from for the work after that.
 
 | Screen | File | Notes |
 |---|---|---|
-| Home | `components/screens/HomeScreen.*` | Trending shelf (public) + Members shelf (logged-in); nav bar for My Shows / Search / Add / Account |
+| Home | `components/screens/HomeScreen.*` | Trending shelf (public) + Members shelf (logged-in); nav bar for My Shows / Search / Account |
 | Member | `components/screens/MemberScreen.*` | Four rows — Watching, Awaiting, Loved, Next Up — per-network tally in the header, tvOS sort parity |
 | Detail | `components/screens/DetailScreen.*` | Art, overview, cast, rating + club rating; move/archive/restore own copy, or add others' shows |
-| Search | `components/screens/SearchScreen.*` | Client-side filter over `/api/shows/all` (title/network/genre/cast) |
-| Add | `components/screens/AddShowScreen.*` | TMDB title search → list picker → `POST /api/shows` |
+| Search | `components/screens/SearchScreen.*` | Find a Show: TMDB title search → list picker → `POST /api/shows`; "On your lists" row of own copies; group-mates via `/api/shows/all?q=`. No separate Add screen |
 | Account | `components/screens/AccountScreen.*` | Email/phone OTP sign-in, self-enroll name step, sign out, 2-step delete account |
 
 Supporting: `MainScene.*` (view stack + auth + routing), `tasks/ApiTask.*` (all networking),
@@ -83,10 +82,10 @@ without changing anything.
 ## What to verify first (most likely to need tuning)
 
 - **Focus hops** between the on-screen `Keyboard`, action `ButtonGroup`, and result grids on
-  Search / Add / Account. Handled manually in each screen's `onKeyEvent`; Roku firmware varies in
+  Search / Account. Handled manually in each screen's `onKeyEvent`; Roku firmware varies in
   whether the keyboard bubbles edge key presses, so a hop may feel sticky and need adjusting.
   There are now three ways out of the keyboard, because the parent only sees a key the `Keyboard`
-  itself declines: **Down** (the intended one), **Right** on Search/Add when there are results,
+  itself declines: **Down** (the intended one), **Right** on Search when there are results,
   and **✱** (`options`), which no firmware claims and which the on-screen hint names. Confirm Down
   works on device; if it does, the ✱ hint could come back out.
 - **Sign-in end to end:** email OTP → confirm the `session` cookie is captured, persisted, and

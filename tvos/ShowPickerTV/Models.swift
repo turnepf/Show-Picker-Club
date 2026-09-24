@@ -106,6 +106,27 @@ struct TitleHit: Codable, Identifiable, Hashable {
 
 struct TitleSearchResponse: Codable { let results: [TitleHit] }
 
+// One row of /api/shows/all — a copy of a show on somebody's list in one of
+// my groups (or mine). Find a Show uses it only to say who else has a title.
+struct GroupCopy: Codable, Hashable {
+    let title: String
+    let movie: Int?
+    let list: String
+    let memberSlug: String
+    let memberName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case title, movie, list
+        case memberSlug = "member_slug"
+        case memberName = "member_name"
+    }
+
+    var isMovie: Bool { (movie ?? 0) == 1 }
+    var listLabel: String { ShowList(rawValue: list)?.title ?? list.capitalized }
+}
+
+struct GroupCopiesResponse: Codable { let shows: [GroupCopy] }
+
 struct PopularShow: Codable, Identifiable, Hashable {
     let id: Int
     let title: String

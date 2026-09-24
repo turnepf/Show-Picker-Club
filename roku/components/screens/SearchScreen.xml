@@ -1,21 +1,33 @@
 <?xml version="1.0" encoding="utf-8" ?>
+<!-- Find a Show — the one way to add a show (mirrors tvos/ShowPickerTV/SearchView). -->
 <component name="SearchScreen" extends="Group">
     <interface>
-        <field id="authState" type="assocarray" />
+        <field id="authState" type="assocarray" onChange="onAuth" />
         <field id="navigate" type="assocarray" alwaysNotify="true" />
+        <field id="didReturn" type="boolean" onChange="onReturn" />
     </interface>
     <script type="text/brightscript" uri="pkg:/source/Globals.brs" />
     <script type="text/brightscript" uri="pkg:/source/ContentBuilders.brs" />
     <script type="text/brightscript" uri="SearchScreen.brs" />
     <children>
-        <Label id="heading" text="Search" translation="[90,54]" font="font:LargeBoldSystemFont" color="0xF5F7FAFF" />
+        <Label id="heading" text="Find a Show" translation="[90,54]" font="font:LargeBoldSystemFont" color="0xF5F7FAFF" />
         <DynamicKeyboard id="kb" translation="[90,140]" />
         <ButtonGroup id="buttons" translation="[90,770]" layoutDirection="horiz"
                      buttonHeight="56" minWidth="180" horizAlignment="left" />
-        <MarkupGrid id="grid" translation="[720,140]" itemComponentName="PosterCard"
-                    numColumns="3" numRows="2" itemSize="[280,440]"
-                    itemSpacing="[24,30]" vertFocusAnimationStyle="floatingFocus" />
-        <Label id="message" translation="[720,140]" width="1100" wrap="true"
+        <!-- What the focused card is, and which group-mates have it. A poster
+             card has no room for a second line, so it lives up here. -->
+        <Label id="caption" translation="[720,50]" width="1110" height="90" wrap="true" maxLines="2"
+               font="font:SmallSystemFont" color="0xFFFFFF99" visible="false" />
+        <!-- Row 0 "On your lists" (only when something matches), then the TMDB
+             results with the "as typed" card at the end. -->
+        <RowList id="rows" translation="[720,150]" itemComponentName="PosterCard"
+                 numRows="2" rowLabelColor="0xF5F7FAFF" itemSize="[1110,500]"
+                 rowItemSize="[[280,440],[280,440]]" rowItemSpacing="[[24,30],[24,30]]"
+                 rowHeights="[500,500]"
+                 vertFocusAnimationStyle="floatingFocus" />
+        <Label id="message" translation="[720,150]" width="1100" wrap="true"
                font="font:MediumSystemFont" color="0xFFFFFF99" visible="false" />
+        <!-- Debounce: the search runs once typing pauses, not per keystroke. -->
+        <Timer id="debounce" duration="0.8" repeat="false" />
     </children>
 </component>

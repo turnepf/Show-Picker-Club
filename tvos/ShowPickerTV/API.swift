@@ -188,10 +188,10 @@ enum API {
         return r.shows
     }
 
-    // Every active show across all members — backs cross-library search. The
-    // rows carry extra member columns the Show model simply ignores.
-    static func allShows() async throws -> [Show] {
-        let r: ShowsResponse = try await get("/api/shows/all")
+    // Every active show in my groups' libraries (and mine), reduced to who
+    // has which title where — Find a Show names the group-mates with a result.
+    static func groupCopies() async throws -> [GroupCopy] {
+        let r: GroupCopiesResponse = try await get("/api/shows/all")
         return r.shows
     }
 

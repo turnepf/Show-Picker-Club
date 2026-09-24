@@ -166,7 +166,7 @@ end function
 '
 ' Only ever downsizes. A URL already smaller than the target is left alone —
 ' /api/title-search hands back w92 thumbnails, and rewriting those upward
-' would make the Add screen slower to serve worse-looking art. Anything that
+' would make Search slower to serve worse-looking art. Anything that
 ' is not a TMDB sized-image URL is returned untouched.
 function TmdbWidth(url as string, want as integer) as string
     marker = "image.tmdb.org/t/p/w"

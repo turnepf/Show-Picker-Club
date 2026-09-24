@@ -10,6 +10,11 @@ struct AddEditShowView: View {
     // while looking at Awaiting adds to Awaiting — not silently to Watching.
     // Ignored when editing: an existing row seeds from its own list.
     var initialList: ShowList = .watching
+    // Opened from Find a Show: the title typed there, and the TMDB entry the
+    // member tapped (pinned, exactly as if picked from the type-ahead here).
+    // Ignored when editing.
+    var initialTitle: String? = nil
+    var initialPick: TitleHit? = nil
     let onSave: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -259,7 +264,18 @@ struct AddEditShowView: View {
     }
 
     private func prefill() {
-        guard let s = existing else { list = initialList; return }
+        guard let s = existing else {
+            list = initialList
+            // Seed once: a title already in the field is the member's.
+            if title.isEmpty {
+                if let hit = initialPick {
+                    pick(hit)
+                } else if let t = initialTitle {
+                    title = t
+                }
+            }
+            return
+        }
         title = s.title
         let existingNetwork = s.network ?? ""
         if !existingNetwork.isEmpty && !catalog.contains(existingNetwork) {

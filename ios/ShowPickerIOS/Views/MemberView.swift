@@ -53,7 +53,6 @@ struct MemberView: View {
     @State private var currentList: ShowList
     @State private var loading = true
     @State private var showingLogin = false
-    @State private var showingAdd = false
     @State private var showingImport = false
     @State private var showingSearch = false
     @State private var editingShow: Show?
@@ -242,28 +241,22 @@ struct MemberView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                // Member-scoped search (includes archived — the restore path).
+                // Find a Show, on every member page — the one way to add, and
+                // it turns up your archived copies too (the restore path).
                 Button { showingSearch = true } label: { Image(systemName: "magnifyingglass") }
+                    .accessibilityLabel("Find a show to add")
             }
             ToolbarItem(placement: .topBarTrailing) { sortMenu }
-            // Sits left of the "+" so the one-tap Add stays in the corner it
-            // has always been in. Own lists only — importing writes to the
-            // signed-in member, so it would be a lie on someone else's page.
+            // Own lists only — importing writes to the signed-in member, so
+            // it would be a lie on someone else's page. There is no separate
+            // "+": adding a show starts from the search above.
             ToolbarItem(placement: .topBarTrailing) {
                 if isMine {
                     Button { showingImport = true } label: {
                         Image(systemName: "doc.on.clipboard")
                     }
                     .accessibilityLabel("Paste a list")
-                }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                if isMine {
-                    Button { showingAdd = true } label: { Image(systemName: "plus") }
-                        .accessibilityLabel("Add show")
-                } else if auth.isLoggedIn {
-                    EmptyView()
-                } else {
+                } else if !auth.isLoggedIn {
                     Button("Log in") { showingLogin = true }
                 }
             }
@@ -312,17 +305,13 @@ struct MemberView: View {
         .sheet(isPresented: $showingLogin) {
             LoginView().environmentObject(auth)
         }
-        // Reload on dismiss: a restore from the search sheet's detail screen
-        // should show up in the list immediately.
+        // Reload on dismiss: a show added, or restored from the search
+        // sheet's detail screen, should show up in the list immediately.
         .sheet(isPresented: $showingSearch, onDismiss: { Task { await load() } }) {
-            MemberSearchView(member: member).environmentObject(auth)
-        }
-        .sheet(isPresented: $showingAdd) {
-            if isMine {
-                // Seed the picker with the list being viewed — "+" from
-                // Awaiting adds to Awaiting.
-                AddEditShowView(memberSlug: member.slug, existing: nil, initialList: currentList) { await load() }
-            }
+            // On your own page, seeded with the list being viewed —
+            // searching from Awaiting adds to Awaiting. On someone else's,
+            // their list says nothing about yours, so it starts on Watching.
+            SearchView(initialList: isMine ? currentList : .watching).environmentObject(auth)
         }
         .sheet(item: $editingShow) { show in
             AddEditShowView(memberSlug: member.slug, existing: show) { await load() }
@@ -643,7 +632,7 @@ struct MemberView: View {
                     .multilineTextAlignment(.center)
             }
             if isMine && (currentList == .watching || currentList == .next) {
-                Button("Add a show") { showingAdd = true }
+                Button("Find a show to add") { showingSearch = true }
                     .buttonStyle(.borderedProminent)
                     .padding(.top, 4)
             }
