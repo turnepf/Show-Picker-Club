@@ -178,7 +178,7 @@ The landing page (`/`) shows:
 3. **No member list.** Home doesn't list members; the roster is an admin view in the apps, ordered most recently active first, where *active* means using the app, not only changing a list: adding or editing a (non-seed) show, or opening an app or bringing it back from the background (to the hour). Only admins get that order or those times — a logged-out caller gets names alone, a member gets names and list counts, both alphabetical. Mechanics in `docs/ARCHITECTURE.md` (`last_activity_at`).
 
    Platforms: the **order** is server-side, so every roster gets it. What **counts as an open** differs: **iPhone/iPad and Mac** (Catalyst) check in on launch and on every return to the foreground (from 1.4.4); **Apple TV** the same (from 1.4.4); the **web** on every page load. **The watch doesn't** — it takes its session from the iPhone and never calls the check. Older app versions count cold launches only until members update.
-4. **Search all libraries** — opens a modal that searches every active show across every member by title or actor. Each result shows the owning member and the list it's on; logged-in users can tap + to add to their own list.
+4. **Search** — in the apps, the magnifying glass opens **Find a Show** (see [Search](#search)): search any title and add it. On the web it's still "Search all libraries", across your groups' libraries, with a + to copy a pick onto your own list.
 
 ## Favorite Actors
 
@@ -360,12 +360,18 @@ Footer of each list:
 
 ## Search
 
-Two search experiences:
+**Apps (iPhone, iPad, Mac): one search, and it's how you add a show.** The magnifying glass on Home, on My Shows (and ⌘F) opens **Find a Show**. What you type goes to TMDB, so every show or movie that exists turns up — not just the ones somebody in the club already has. Tapping a result opens Add Show with that exact entry pinned (poster, rating and cast come with it) on the list you were looking at; "Add “…” by hand" covers anything TMDB doesn't know. There is no separate **+** any more.
 
-- **Per-member search** (button in the member-page header) — searches *that member's* library, including archived rows. Title and actor filters.
-- **Cross-library search** (button below the members list on the landing page) — searches every active show across every member. Each result shows the owning member and list. Logged-in users can add picks to their own list directly.
+Why: a new member reached for the magnifying glass, which then searched only the shows their group-mates already had, found nothing, and concluded the show couldn't be added — the **+** that could add it looked like a different job. With libraries private to groups, what someone else has is context, not the thing being searched for.
 
-Both use the same modal in two modes.
+The club still rides along as context:
+
+- **On your lists** — your own copies whose title or cast matches, archived ones included (in orange). Tapping one opens its card, which is where Restore lives. A title you already have shows once, as your copy, not again as a TMDB result.
+- **Who in your groups has it** — each result names the group-mates with that title and the list it's on ("Whitt · Watching, Amy · Loved"), matched by title and movie-vs-series. Nobody outside your groups is ever named.
+
+The sheet stays open after an add — the show moves up into *On your lists*, which is the confirmation — so several can be added in a row. On another member's page the magnifying glass still searches **their** library (title or actor), since adding there would be to your own lists anyway.
+
+**Web (frozen):** still the two older searches — per-member search in the member-page header (that member's library, archived rows too, title and actor filters) and cross-library search across your groups' libraries with a + to copy a pick. Adding a show on the web is the + button. It doesn't have Find a Show.
 
 ## Calendar feed
 

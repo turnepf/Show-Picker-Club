@@ -45,7 +45,11 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ## Unreleased — the update after 1.4.4
 
-*Nothing yet.*
+**Search is now how you add a show.** Tap the magnifying glass, type any show
+or movie, and tap it to add it — no more wondering whether you wanted search or
+the + (the + is gone). Results also tell you which friends in your groups have
+it and on which list, and shows already on your own lists, archived ones
+included, turn up at the top.
 
 ---
 

@@ -11,7 +11,7 @@ import ShowPickerCore
 // so a title reads the same on the phone as it does on the web.
 //
 // A screen's own additions go through `leading` (an accessory before the
-// poster, e.g. search's "+") and `extra` (content under the text lines, e.g.
+// poster, e.g. a quick-add button) and `extra` (content under the text lines, e.g.
 // the backlog's rating tap-row), mirroring the web renderer's prefixHtml and
 // extraHtml options.
 

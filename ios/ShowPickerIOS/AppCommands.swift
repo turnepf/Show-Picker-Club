@@ -13,7 +13,7 @@ struct AppCommands: Commands {
     var body: some Commands {
         // Slot the app's actions after File > New, the conventional spot.
         CommandGroup(after: .newItem) {
-            Button("Search Shows…") {
+            Button("Find a Show…") {
                 NotificationCenter.default.post(name: .showSearchCommand, object: nil)
             }
             .keyboardShortcut("f", modifiers: .command)

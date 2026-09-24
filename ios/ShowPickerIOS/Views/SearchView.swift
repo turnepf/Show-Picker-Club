@@ -1,173 +1,240 @@
 import SwiftUI
 
-// Cross-library search: every active show across every member, filtered by
-// title and/or actor (mirrors the web landing-page "Search all libraries").
-// Logged-in members can copy a result onto one of their own lists.
+// Find a show — the one way to add a show, and the one search.
+//
+// It used to be two things that looked like one: a magnifying glass that only
+// searched shows your group-mates already had, and a separate "+" that could
+// add anything. A new member reached for the magnifying glass, found nothing
+// because nobody they knew had the show yet, and concluded it couldn't be
+// added. Now what you type goes to TMDB, and every result can be added.
+//
+// What's already in the club rides along as context rather than being the
+// result set: your own copies (archived too — tapping one opens its card,
+// which is where Restore lives) come first, and each TMDB hit names the
+// group-mates who have that title.
 struct SearchView: View {
+    // The list a new show starts on. My Shows passes the list on screen, so
+    // searching from Awaiting adds to Awaiting; Home leaves it at Watching.
+    var initialList: ShowList = .watching
+
     @EnvironmentObject private var auth: AuthStore
     @Environment(\.dismiss) private var dismiss
 
-    @State private var all: [AllShow] = []
-    @State private var loading = true
-    // The library fetch threw — "No matches" must not show over a failed load.
-    @State private var loadFailed = false
-    @State private var titleQuery = ""
-    @State private var actorQuery = ""
-    @State private var addingId: Int?
-    @State private var addAlert: SearchAlert?
+    @State private var query = ""
+    @FocusState private var fieldFocused: Bool
 
-    private var hasQuery: Bool {
-        !titleQuery.trimmingCharacters(in: .whitespaces).isEmpty ||
-        !actorQuery.trimmingCharacters(in: .whitespaces).isEmpty
+    // My whole library, archived rows included, and my groups' active shows.
+    // Both are context for the TMDB hits, so a failure on either just leaves
+    // that context out rather than blocking the search.
+    @State private var mine: [Show] = []
+    @State private var groupShows: [AllShow] = []
+
+    @State private var hits: [TitleHit] = []
+    @State private var searching = false
+    @State private var searchFailed = false
+
+    @State private var adding: AddTarget?
+
+    private var trimmed: String { query.trimmingCharacters(in: .whitespaces) }
+
+    // My copies whose title or cast matches — the in-library actor search
+    // the old per-member search had, kept for your own shows.
+    private var myMatches: [Show] {
+        let q = trimmed.lowercased()
+        guard q.count >= 2 else { return [] }
+        return mine.filter { s in
+            s.title.lowercased().contains(q) || s.castMembers.contains { $0.name.lowercased().contains(q) }
+        }
     }
 
-    private var results: [AllShow] {
-        let t = titleQuery.trimmingCharacters(in: .whitespaces).lowercased()
-        let a = actorQuery.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !t.isEmpty || !a.isEmpty else { return [] }
-        return all.filter { s in
-            let titleHit = t.isEmpty || s.title.lowercased().contains(t)
-            let actorHit = a.isEmpty || s.actorNamesText.lowercased().contains(a)
-            return titleHit && actorHit
+    // TMDB hits not already listed above: a title you have is one row (your
+    // copy), not two. Movie-ness is part of the match so owning Fargo the
+    // series doesn't hide Fargo the film.
+    private var newHits: [TitleHit] {
+        hits.filter { hit in
+            !myMatches.contains { sameTitle($0.title, $0.isMovie, hit) }
         }
+    }
+
+    private func sameTitle(_ title: String, _ isMovie: Bool, _ hit: TitleHit) -> Bool {
+        isMovie == hit.isMovie && title.lowercased() == hit.title.lowercased()
     }
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    TextField("Title — e.g. Fargo", text: $titleQuery)
-                        .autocorrectionDisabled()
-                    TextField("Actor — e.g. Billy Bob Thornton", text: $actorQuery)
-                        .autocorrectionDisabled()
+                    HStack {
+                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                        TextField("Show or movie title", text: $query)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.words)
+                            .submitLabel(.search)
+                            .focused($fieldFocused)
+                    }
                 }
-                if loading {
-                    Section { HStack { Spacer(); ProgressView(); Spacer() } }
-                } else if loadFailed {
+                if !auth.isLoggedIn {
                     Section {
-                        Text("Couldn't load the club libraries.")
-                            .foregroundStyle(.secondary)
-                        Button("Try again") { Task { await load() } }
-                    }
-                } else if !hasQuery {
-                    Section {
-                        Text("Type to search across every member's library.")
+                        Text("Sign in to find shows and add them to your lists.")
                             .foregroundStyle(.secondary)
                     }
-                } else if results.isEmpty {
+                } else if trimmed.count < 2 {
                     Section {
-                        Text("No matches across club libraries.")
+                        Text("Type a title to find any show or movie and add it to your lists.")
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    Section("\(results.count) match\(results.count == 1 ? "" : "es")") {
-                        ForEach(results) { resultRow($0) }
+                    if !myMatches.isEmpty {
+                        Section("On your lists") {
+                            ForEach(myMatches) { myRow($0) }
+                        }
+                    }
+                    Section {
+                        if searching && hits.isEmpty {
+                            HStack { Spacer(); ProgressView(); Spacer() }
+                        } else if searchFailed {
+                            Text("Couldn't reach the show catalog.")
+                                .foregroundStyle(.secondary)
+                        } else if newHits.isEmpty && myMatches.isEmpty {
+                            Text("No shows found for “\(trimmed)”.")
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(newHits) { hitRow($0) }
+                        // TMDB doesn't know everything (a regional channel, a
+                        // brand-new special), and it can be unreachable.
+                        // Typing it in is always the way out.
+                        Button {
+                            adding = AddTarget(hit: nil, title: trimmed)
+                        } label: {
+                            Label("Add “\(trimmed)” by hand", systemImage: "square.and.pencil")
+                        }
+                    } header: {
+                        Text("Add a show")
+                    } footer: {
+                        if !newHits.isEmpty {
+                            Text("Tap a show to add it — poster, rating and cast come with it.")
+                        }
                     }
                 }
             }
-            .navigationTitle("Search")
+            .navigationTitle("Find a Show")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .task { await load() }
-            .alert(addAlert?.title ?? "",
-                   isPresented: Binding(get: { addAlert != nil }, set: { if !$0 { addAlert = nil } }),
-                   presenting: addAlert) { _ in
-                Button("OK", role: .cancel) { }
-            } message: { Text($0.message) }
+            .task { await loadLibraries() }
+            .task(id: trimmed) { await searchTitles() }
+            .onAppear { fieldFocused = true }
+            .sheet(item: $adding) { target in
+                if let slug = auth.memberSlug {
+                    AddEditShowView(memberSlug: slug, existing: nil, initialList: initialList,
+                                    initialTitle: target.title, initialPick: target.hit) {
+                        // Stay open: the show moves up into "On your lists",
+                        // which is the confirmation, and the next one can be
+                        // searched without reopening anything.
+                        await loadLibraries()
+                    }
+                }
+            }
         }
     }
 
-    // Tapping the row opens the full show card; the plus stays as a
-    // quick-add shortcut (Menu swallows its own taps, so it doesn't navigate).
-    @ViewBuilder private func resultRow(_ s: AllShow) -> some View {
+    // One of my own copies. Opens its card — edit, move, or (archived) Restore.
+    @ViewBuilder private func myRow(_ s: Show) -> some View {
         NavigationLink {
             ShowDetailView(id: s.id, initialTitle: s.title,
                            initialNetwork: s.network, initialRating: s.rating,
                            initialPoster: s.posterUrl, initialNetworkUrl: s.networkUrl)
         } label: {
-            resultRowLabel(s)
-        }
-    }
-
-    @ViewBuilder private func resultRowLabel(_ s: AllShow) -> some View {
-        // Cross-library search adds two things to a plain row: the "+" that
-        // copies a show onto one of my lists, and a caption naming which list
-        // the copy is on and whose it is.
-        ShowRow(
-            s,
-            caption: [s.network, "\(s.listLabel) · \(s.ownerLabel)"].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
-            alignment: .top,
-            leading: {
-                if auth.isLoggedIn {
-                    Menu {
-                        ForEach(ShowList.allCases) { l in
-                            Button(l.title) { Task { await addToMine(s, list: l) } }
-                        }
-                    } label: {
-                        Image(systemName: "plus.circle.fill").foregroundStyle(Color.accentColor)
-                    }
-                    // Borderless so the plus keeps its own tap target inside
-                    // the NavigationLink row instead of the tap navigating.
-                    .buttonStyle(.borderless)
-                    .disabled(addingId == s.id)
-                }
-            },
-            extra: {
-                if !s.genreList.isEmpty {
-                    Text(s.genreList.joined(separator: " · "))
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
-            }
-        )
-    }
-
-    private func load() async {
-        loading = true
-        defer { loading = false }
-        do {
-            all = try await API.allShows()
-            loadFailed = false
-        } catch {
-            loadFailed = true
-        }
-    }
-
-    // Copy a search result onto one of my lists. Session-scoped POST, so it
-    // lands on my library regardless of whose show this originally was.
-    private func addToMine(_ s: AllShow, list: ShowList) async {
-        guard let mine = auth.memberSlug else { return }
-        addingId = s.id
-        defer { addingId = nil }
-        do {
-            _ = try await API.addShow(
-                memberSlug: mine,
-                title: s.title,
-                network: s.network,
-                networkUrl: s.networkUrl,
-                list: list.rawValue,
-                notes: nil,
-                recommendedBy: nil,
-                movie: s.isMovie,
-                fullSeries: s.isFullSeries,
-                watchingWith: nil
+            ShowRow(
+                s,
+                caption: [s.network, s.isArchived ? "Archived" : (ShowList(rawValue: s.list)?.title ?? s.list)]
+                    .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
+                captionTint: s.isArchived ? .orange : nil,
+                alignment: .top
             )
-            addAlert = SearchAlert(title: "Added",
-                                   message: "“\(s.title)” was added to your \(list.title) list.")
-        } catch let e as API.APIError where e.status == 409 {
-            addAlert = SearchAlert(title: "Already on a list",
-                                   message: "“\(s.title)” is already on one of your lists.")
-        } catch let e as API.APIError where e.status == 401 {
-            addAlert = SearchAlert(title: "Logged out",
-                                   message: "Your session expired — sign in again from Home.")
-        } catch {
-            addAlert = SearchAlert(title: "Couldn’t add",
-                                   message: "Something went wrong. Please try again.")
         }
+    }
+
+    // A TMDB hit. Tapping opens Add Show with this exact entry pinned.
+    @ViewBuilder private func hitRow(_ hit: TitleHit) -> some View {
+        Button {
+            adding = AddTarget(hit: hit, title: hit.title)
+        } label: {
+            HStack(spacing: 12) {
+                PosterThumb(url: hit.posterUrl, width: 40, height: 60)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(hit.title)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Text(hit.metaText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let who = groupLine(for: hit) {
+                        Label(who, systemImage: "person.2.fill")
+                            .font(.caption)
+                            .foregroundStyle(.tint)
+                    }
+                }
+                Spacer()
+                Image(systemName: "plus.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.tint)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Adds this show to your lists")
+    }
+
+    // "Whitt · Watching, Amy · Loved" — group-mates with this title, and
+    // where they keep it. Matched on title and movie-ness (the group feed
+    // carries no TMDB id); three names, then a count.
+    private func groupLine(for hit: TitleHit) -> String? {
+        var seen = Set<String>()
+        let people = groupShows
+            .filter { $0.memberSlug != auth.memberSlug && sameTitle($0.title, $0.isMovie, hit) }
+            .filter { seen.insert($0.memberSlug).inserted }
+            .map { "\($0.ownerLabel) · \($0.listLabel)" }
+        guard !people.isEmpty else { return nil }
+        let shown = people.prefix(3).joined(separator: ", ")
+        return people.count > 3 ? "\(shown) +\(people.count - 3)" : shown
+    }
+
+    private func loadLibraries() async {
+        guard let slug = auth.memberSlug else { return }
+        async let myShows = try? API.shows(member: slug, includeArchived: true)
+        async let groups = try? API.allShows()
+        if let m = await myShows { mine = m }
+        if let g = await groups { groupShows = g }
+    }
+
+    // Debounced TMDB lookup. .task(id:) cancels the in-flight one on every
+    // keystroke, so only the pause after typing reaches the network.
+    private func searchTitles() async {
+        let q = trimmed
+        guard auth.isLoggedIn, q.count >= 2 else {
+            hits = []; searching = false; searchFailed = false
+            return
+        }
+        searching = true
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        if Task.isCancelled { return }
+        do {
+            let result = try await API.titleSearch(q)
+            if Task.isCancelled { return }
+            hits = result
+            searchFailed = false
+        } catch {
+            if Task.isCancelled { return }
+            hits = []
+            searchFailed = true
+        }
+        searching = false
     }
 }
 
-private struct SearchAlert: Identifiable {
+// What the Add sheet opens with: a pinned TMDB pick, or just typed text.
+private struct AddTarget: Identifiable {
     let id = UUID()
+    let hit: TitleHit?
     let title: String
-    let message: String
 }
