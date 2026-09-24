@@ -49,7 +49,8 @@ the Prime Video home screen, for titles where we have a direct link to them.
 or movie, and tap it to add it — no more wondering whether you wanted search or
 the + (the + is gone). Results also tell you which friends in your groups have
 it and on which list, and shows already on your own lists, archived ones
-included, turn up at the top.
+included, turn up at the top. Same on Apple TV: the Search tab now finds any
+show or movie and adds it in a click.
 
 ---
 

@@ -371,6 +371,8 @@ The club still rides along as context:
 
 The sheet stays open after an add — the show moves up into *On your lists*, which is the confirmation — so several can be added in a row. On another member's page the magnifying glass still searches **their** library (title or actor), since adding there would be to your own lists anyway.
 
+**Apple TV** gets the same thing in its **Search** tab: TMDB results as poster cards, your own copies (archived included) in an *On your lists* row above them, and the group-mates who have a title under its poster when it's focused. Picking a result asks which list, adds it, and returns to the results. There is no "Add a Show" button on My Shows any more — the empty state points to Search. "Add … as typed" covers titles TMDB doesn't know; the TV can't set network, notes or Movie on those, same as it never could — edit on the phone.
+
 **Web (frozen):** still the two older searches — per-member search in the member-page header (that member's library, archived rows too, title and actor filters) and cross-library search across your groups' libraries with a + to copy a pick. Adding a show on the web is the + button. It doesn't have Find a Show.
 
 ## Calendar feed
