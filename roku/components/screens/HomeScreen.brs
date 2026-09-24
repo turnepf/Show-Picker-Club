@@ -46,7 +46,6 @@ sub buildNavButtons()
     if loggedIn
         buttons.push("My Shows") : m.navActions.push("myshows")
         buttons.push("Search")   : m.navActions.push("search")
-        buttons.push("Add Show") : m.navActions.push("add")
         buttons.push("Account")  : m.navActions.push("account")
     else
         buttons.push("Search")  : m.navActions.push("search")
@@ -61,8 +60,6 @@ sub onNavButton()
     action = m.navActions[idx]
     if action = "search"
         m.top.navigate = { action: "openSearch" }
-    else if action = "add"
-        m.top.navigate = { action: "openAdd" }
     else if action = "account"
         m.top.navigate = { action: "openAccount" }
     else if action = "myshows"

@@ -120,7 +120,12 @@ sub buildRows(shows as object)
     end for
 
     if m.rowMeta.Count() = 0
-        m.message.text = "No shows in any list yet."
+        ' On your own lists, point at where adding lives now.
+        if m.slug = SafeStr(m.top.authState.slug)
+            m.message.text = "Nothing on your lists yet. Use Search on the Home screen to find a show and add it."
+        else
+            m.message.text = "No shows in any list yet."
+        end if
         m.message.visible = true
         m.rows.content = CreateObject("roSGNode", "ContentNode")
         return
