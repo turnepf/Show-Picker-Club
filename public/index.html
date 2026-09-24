@@ -309,20 +309,13 @@
     a.actor-tag:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
     a.actor-tag:hover::after { opacity: 1; }
 
-    /* "+" add-to-my-list button on club-wide search result rows. */
-    .search-add-btn {
-      background: none;
-      border: none;
-      color: var(--ink-quiet);
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      padding: 0 6px;
-      line-height: 1;
-      font-family: inherit;
-      transition: color 0.2s;
-    }
-    .search-add-btn:hover { color: var(--accent); }
+    /* Find a Show: TMDB results under "Add a show". */
+    .search-meta.find-section { margin-top: 14px; }
+    .find-hit { border-bottom: 1px solid var(--border-soft); }
+    .find-hit-text { flex: 1 1 auto; min-width: 0; }
+    .find-hit-who { font-size: 12px; color: var(--accent); margin-top: 2px; }
+    .find-hit-add { color: var(--accent); font-size: 20px; font-weight: 600; padding: 0 6px; }
+    .find-by-hand { margin-top: 12px; width: 100%; }
 
 
     /* "My Order" drag-to-reorder */
@@ -1138,7 +1131,7 @@
       <aside class="home-side">
         <div class="home-titlebar">
           <h1 class="home-title">Show Picker Club</h1>
-          <button class="icon-btn" title="Search all libraries" aria-label="Search all libraries" onclick="openLandingSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
+          <button class="icon-btn" title="Find a show to add" aria-label="Find a show to add" onclick="openFindModal()"><svg class="ic"><use href="#i-search"/></svg></button>
           <button class="icon-btn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
         </div>
 
@@ -1269,7 +1262,7 @@
     <aside class="split-side" id="memberSideNav">
       <div class="home-titlebar">
         <h1 class="home-title"><a href="/?home">Show Picker Club</a></h1>
-        <button class="icon-btn" title="Search all libraries" aria-label="Search all libraries" onclick="openLandingSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
+        <button class="icon-btn" title="Find a show to add" aria-label="Find a show to add" onclick="openFindModal()"><svg class="ic"><use href="#i-search"/></svg></button>
         <button class="icon-btn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
       </div>
       <p class="nav-announce">★ New: rate any show and see the club's average.</p>
@@ -1358,14 +1351,13 @@
             <a href="/?home" class="back-link" title="All members" aria-label="Back to all members"><svg class="ic"><use href="#i-chevron-left"/></svg>Home</a>
           </div>
           <div class="header-actions">
-            <button class="icon-btn" id="searchBtn" title="Search this member's shows" aria-label="Search this member's shows" onclick="openSearchModal()"><svg class="ic"><use href="#i-search"/></svg></button>
+            <button class="icon-btn" id="searchBtn" title="Find a show to add" aria-label="Find a show to add" onclick="openFindModal()"><svg class="ic"><use href="#i-search"/></svg></button>
             <button class="btn-nav-text" id="loginBtn" title="Log in to edit your shows" onclick="login()">Log in</button>
             <button class="icon-btn hidden" id="logoutBtn" title="Account" aria-label="Account" onclick="accountTapped(event)"><svg class="ic"><use href="#i-person"/></svg></button>
           </div>
         </div>
         <div class="header-title-row">
           <h1 class="header-title" id="appTitle"></h1>
-          <button class="icon-btn hidden" id="addBtn" title="Add a new show" aria-label="Add a new show" onclick="openAddModal()"><svg class="ic"><use href="#i-plus"/></svg></button>
           <div class="list-controls hidden" id="listControls"></div>
         </div>
         <div class="tabs" id="tabs">
@@ -1501,12 +1493,8 @@
 
   <div class="modal-overlay hidden" id="searchOverlay" onclick="closeSearchModal(event)">
     <div class="modal" onclick="event.stopPropagation()">
-      <h2 id="searchModalTitle">Search Shows</h2>
-      <label for="searchTitleInput">Title</label>
-      <input type="text" id="searchTitleInput" placeholder="e.g. Fargo" oninput="renderSearchResults()" autocomplete="off">
-
-      <label for="searchActorInput">Actor</label>
-      <input type="text" id="searchActorInput" placeholder="e.g. Billy Bob Thornton" oninput="renderSearchResults()" autocomplete="off">
+      <h2>Find a Show</h2>
+      <input type="text" id="searchTitleInput" placeholder="Show or movie title" aria-label="Show or movie title" oninput="onFindInput()" autocomplete="off">
 
       <div id="searchResults" class="search-results"></div>
 
@@ -1638,7 +1626,6 @@
     let memberLabel = '';
     let editorName = '';
     let authMember = null;
-    let searchMode = 'member';
     let owners = '';
 
     // Global click handler for show-renderer.js: when a show card is clicked
@@ -1744,7 +1731,7 @@
         watching: {
           headline: "You're not watching anything yet.",
           help: "Add a show you're actively watching so the club knows what you're into.",
-          cta: { label: 'Add a show', action: 'openAddModal()' },
+          cta: { label: 'Find a show to add', action: 'openFindModal()' },
         },
         waiting: {
           headline: "Nothing awaiting a next season.",
@@ -1757,7 +1744,7 @@
         next: {
           headline: "Your Next Up is empty.",
           help: "Add shows you want to watch later, or wait for picks and suggestions from other members.",
-          cta: { label: 'Add a show', action: 'openAddModal()' },
+          cta: { label: 'Find a show to add', action: 'openFindModal()' },
         },
       },
       guest: {
@@ -2193,9 +2180,8 @@
     }
 
     // Keyboard shortcuts (member page only):
-    //   /    focus search
+    //   /    Find a Show (search is how you add; n is the same thing)
     //   1-4  switch tabs in order (Watching, Waiting, Loved, Next Up)
-    //   n    open Add Show modal (own page, logged in)
     //   Esc  close any open modal
     document.addEventListener('keydown', (e) => {
       // Esc works even from inside inputs — that's the universal "get me out" key.
@@ -2219,16 +2205,9 @@
       // Don't fire when any modal is open.
       if (document.querySelector('.modal-overlay:not(.hidden)')) return;
 
-      if (e.key === '/') {
-        openSearchModal();
+      if (e.key === '/' || e.key === 'n' || e.key === 'N') {
+        openFindModal();
         e.preventDefault();
-        return;
-      }
-      if (e.key === 'n' || e.key === 'N') {
-        if (authMember && authMember === memberSlug) {
-          openAddModal();
-          e.preventDefault();
-        }
         return;
       }
       if (['1', '2', '3', '4'].includes(e.key)) {
@@ -2307,11 +2286,7 @@
           }
           const homeLoginRow = document.getElementById('homeLoginRow');
           if (homeLoginRow && authMember) homeLoginRow.classList.add('hidden');
-          // On the user's own member page, expose the Add button immediately —
-          // no need to enter edit mode just to add a show.
           if (authMember && typeof memberSlug !== 'undefined' && authMember === memberSlug) {
-            const addBtn = document.getElementById('addBtn');
-            if (addBtn) addBtn.classList.remove('hidden');
             // Subscription audit and Rate my backlog are personal — only on
             // your own page. Shown both under the list (mobile) and in the
             // sidebar (split view).
@@ -2356,8 +2331,6 @@
       closeAccountMenu();
       const logoutBtn = document.getElementById('logoutBtn');
       if (logoutBtn) logoutBtn.classList.add('hidden');
-      const addBtn = document.getElementById('addBtn');
-      if (addBtn) addBtn.classList.add('hidden');
       const myShowsLink = document.getElementById('myShowsLink');
       if (myShowsLink) myShowsLink.classList.add('hidden');
       const listsHeader = document.getElementById('homeListsHeader');
@@ -3364,54 +3337,35 @@
       }
     }
 
-    let searchableShows = [];
+    // ── Find a Show ─────────────────────────────────────────────────────
+    // The one search, and the way to add a show — same as the apps. What's
+    // typed goes to TMDB (/api/title-search), so any show or movie turns up,
+    // not only ones somebody in the club already has; that gap is how a new
+    // member concluded a show couldn't be added. The club rides along as
+    // context: your own copies (archived too — their card is where Restore
+    // lives) come first, and each TMDB hit names the group-mates who have it.
+    const find = { mine: [], group: [], hits: [], seq: 0, timer: null, searching: false, failed: false };
 
-    async function openSearchModal() {
-      searchMode = 'member';
-      const overlay = document.getElementById('searchOverlay');
-      document.getElementById('searchTitleInput').value = '';
-      document.getElementById('searchActorInput').value = '';
-      document.getElementById('searchModalTitle').textContent = `Search ${memberName || 'these shows'}`;
-      document.getElementById('searchResults').innerHTML = '<div class="search-empty">Loading…</div>';
-      overlay.classList.remove('hidden');
-
-      try {
-        const res = await fetch(`/api/shows?member=${encodeURIComponent(memberSlug)}&include_archived=1`);
-        if (res.status === 401) {
-          document.getElementById('searchResults').innerHTML = '<div class="search-empty">Log in to search show lists.</div>';
-          return;
-        }
-        const data = await res.json();
-        searchableShows = data.shows || [];
-        renderSearchResults();
-      } catch (e) {
-        document.getElementById('searchResults').innerHTML = '<div class="search-empty" style="color:var(--danger);">Failed to load shows.</div>';
-      }
-      setTimeout(() => document.getElementById('searchTitleInput').focus(), 50);
+    function findQuery() {
+      return document.getElementById('searchTitleInput').value.trim();
     }
 
-    async function openLandingSearchModal() {
-      searchMode = 'all';
-      const overlay = document.getElementById('searchOverlay');
+    async function openFindModal() {
       document.getElementById('searchTitleInput').value = '';
-      document.getElementById('searchActorInput').value = '';
-      document.getElementById('searchModalTitle').textContent = 'Search all libraries';
-      document.getElementById('searchResults').innerHTML = '<div class="search-empty">Loading…</div>';
-      overlay.classList.remove('hidden');
-
-      try {
-        const res = await fetch('/api/shows/all');
-        if (res.status === 401) {
-          document.getElementById('searchResults').innerHTML = '<div class="search-empty">Log in to search show lists.</div>';
-          return;
-        }
-        const data = await res.json();
-        searchableShows = data.shows || [];
-        renderSearchResults();
-      } catch (e) {
-        document.getElementById('searchResults').innerHTML = '<div class="search-empty" style="color:var(--danger);">Failed to load shows.</div>';
-      }
+      find.hits = []; find.searching = false; find.failed = false;
+      document.getElementById('searchOverlay').classList.remove('hidden');
+      renderFindResults();
       setTimeout(() => document.getElementById('searchTitleInput').focus(), 50);
+      if (!authMember) return;
+      // Context only — a failure on either just leaves it out.
+      const [mine, group] = await Promise.all([
+        fetch(`/api/shows?member=${encodeURIComponent(authMember)}&include_archived=1`)
+          .then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('/api/shows/all').then(r => r.ok ? r.json() : null).catch(() => null),
+      ]);
+      find.mine = (mine && mine.shows) || [];
+      find.group = (group && group.shows) || [];
+      renderFindResults();
     }
 
     function closeSearchModal(event) {
@@ -3419,68 +3373,133 @@
       document.getElementById('searchOverlay').classList.add('hidden');
     }
 
-    function renderSearchResults() {
-      const titleQ = document.getElementById('searchTitleInput').value.trim().toLowerCase();
-      const actorQ = document.getElementById('searchActorInput').value.trim().toLowerCase();
+    function onFindInput() {
+      clearTimeout(find.timer);
+      const q = findQuery();
+      find.failed = false;
+      if (q.length < 2 || !authMember) {
+        find.hits = []; find.searching = false;
+        renderFindResults();
+        return;
+      }
+      find.searching = true;
+      renderFindResults();
+      find.timer = setTimeout(() => searchFind(q), 300);
+    }
+
+    async function searchFind(q) {
+      const seq = ++find.seq;
+      try {
+        const res = await fetch(`/api/title-search?q=${encodeURIComponent(q)}`);
+        if (!res.ok) throw new Error(String(res.status));
+        const data = await res.json();
+        // Stale response (member kept typing) — a newer search owns the box.
+        if (seq !== find.seq) return;
+        find.hits = data.results || [];
+        find.failed = false;
+      } catch {
+        if (seq !== find.seq) return;
+        find.hits = [];
+        find.failed = true;
+      }
+      find.searching = false;
+      renderFindResults();
+    }
+
+    // Title plus movie-ness, so owning Fargo the series doesn't hide (or
+    // borrow group-mates for) Fargo the film.
+    function sameTitle(show, hit) {
+      return !!show.movie === (hit.media_type === 'movie')
+        && (show.title || '').toLowerCase() === (hit.title || '').toLowerCase();
+    }
+
+    // "Whitt · Watching, Amy · Loved" — three names, then a count.
+    function findGroupLine(hit) {
+      const seen = new Set();
+      const people = find.group
+        .filter(s => s.member_slug !== authMember && sameTitle(s, hit))
+        .filter(s => !seen.has(s.member_slug) && seen.add(s.member_slug))
+        .map(s => `${s.member_name || s.member_slug} · ${LIST_LABELS[s.list] || s.list}`);
+      if (!people.length) return '';
+      const shown = people.slice(0, 3).join(', ');
+      return people.length > 3 ? `${shown} +${people.length - 3}` : shown;
+    }
+
+    function renderFindResults() {
       const container = document.getElementById('searchResults');
-
-      if (!titleQ && !actorQ) {
-        container.innerHTML = '<div class="search-empty">Type to search.</div>';
+      const q = findQuery();
+      if (!authMember) {
+        container.innerHTML = '<div class="search-empty">Log in to find shows and add them to your lists.</div>';
         return;
       }
-
-      const matches = searchableShows.filter(show => {
-        const titleHit = !titleQ || (show.title || '').toLowerCase().includes(titleQ);
-        const actorHit = !actorQ || actorNamesText(show.actors).toLowerCase().includes(actorQ);
-        return titleHit && actorHit;
-      });
-
-      if (matches.length === 0) {
-        const where = searchMode === 'all' ? 'across club libraries' : 'in this library';
-        container.innerHTML = `<div class="search-empty">No matches ${where}.</div>`;
+      if (q.length < 2) {
+        container.innerHTML = '<div class="search-empty">Type a title to find any show or movie and add it to your lists.</div>';
         return;
       }
+      const ql = q.toLowerCase();
+      const mine = find.mine.filter(s =>
+        (s.title || '').toLowerCase().includes(ql) || actorNamesText(s.actors).toLowerCase().includes(ql));
+      // A title you already have shows once, as your copy.
+      const hits = find.hits.filter(h => !mine.some(s => sameTitle(s, h)));
 
-      const labelFor = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved', next: 'Next Up' };
-
-      const meta = `<div class="search-meta">${matches.length} match${matches.length === 1 ? '' : 'es'}</div>`;
-      container.innerHTML = meta + matches.map(show => {
-        const list = show.archived ? 'Archived' : (labelFor[show.list] || show.list);
-        const memberTag = searchMode === 'all'
-          ? ` · ${escapeHtml(show.member_first_name || (show.member_name || '').split(' ')[0] || show.member_slug)}`
-          : '';
-        // The caption carries what search adds over a plain list row: which
-        // list the copy is on, and (in all-libraries mode) whose it is.
-        const captionParts = [];
-        if (show.network) captionParts.push(escapeHtml(show.network));
-        captionParts.push(`${escapeHtml(list)}${memberTag}`);
-        const addBtn = searchMode === 'all'
-          ? `<button class="search-add-btn" data-add-idx="${show.id}" title="Add to my list">+</button>`
-          : '';
-        return renderShowCard(show, {
-          onClickId: openDetail,
-          showRating: true,
-          showChevron: false,
-          caption: captionParts.join(' · '),
-          prefixHtml: addBtn,
-        });
+      let html = '';
+      if (mine.length) {
+        html += '<div class="search-meta">On your lists</div>' + mine.map(show => {
+          const list = show.archived ? 'Archived' : (LIST_LABELS[show.list] || show.list);
+          const caption = [show.network ? escapeHtml(show.network) : '', escapeHtml(list)].filter(Boolean).join(' · ');
+          return renderShowCard(show, { onClickId: openDetail, showRating: true, showChevron: false, caption });
+        }).join('');
+      }
+      html += '<div class="search-meta find-section">Add a show</div>';
+      if (find.searching && !find.hits.length) {
+        html += '<div class="search-empty">Searching…</div>';
+      } else if (find.failed) {
+        html += '<div class="search-empty">Couldn’t reach the show catalog.</div>';
+      } else if (!hits.length && !mine.length) {
+        html += `<div class="search-empty">No shows found for “${escapeHtml(q)}”.</div>`;
+      }
+      html += hits.map(h => {
+        const who = findGroupLine(h);
+        return `
+          <div class="title-suggest-item find-hit" data-find-hit="${find.hits.indexOf(h)}" role="button" tabindex="0">
+            ${h.poster_url ? `<img src="${safeUrl(h.poster_url)}" alt="" loading="lazy">` : '<div class="title-suggest-empty-poster">🎬</div>'}
+            <div class="find-hit-text">
+              <div class="title-suggest-name">${escapeHtml(h.title)}</div>
+              <div class="title-suggest-meta">${h.year ? `${escapeHtml(h.year)} · ` : ''}${h.media_type === 'movie' ? 'Movie' : 'TV series'}</div>
+              ${who ? `<div class="find-hit-who">${escapeHtml(who)}</div>` : ''}
+            </div>
+            <span class="find-hit-add" aria-hidden="true">+</span>
+          </div>`;
       }).join('');
+      // TMDB doesn't know everything, and it can be unreachable.
+      html += `<button class="btn btn-cancel find-by-hand" data-find-hand="1">Add “${escapeHtml(q)}” by hand</button>`;
+      container.innerHTML = html;
 
-      if (searchMode === 'all') {
-        container.querySelectorAll('button[data-add-idx]').forEach(btn => {
-          const id = parseInt(btn.dataset.addIdx, 10);
-          btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (!authMember) {
-              showToast('Log in on your member page first to add shows', { tone: 'error' });
-              return;
-            }
-            const s = searchableShows.find(x => x.id === id);
-            if (!s) return;
-            closeSearchModal();
-            openAddMyList(s.title, s.network || '', s.network_url || '', s.movie || 0);
-          });
-        });
+      container.querySelectorAll('[data-find-hit]').forEach(el => {
+        const go = () => addFromFind(find.hits[parseInt(el.dataset.findHit, 10)]);
+        el.addEventListener('click', go);
+        el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+      });
+      container.querySelector('[data-find-hand]').addEventListener('click', () => addFromFind(null, q));
+    }
+
+    // On your own page this is the full Add Show form, seeded with the list
+    // on screen; anywhere else the short "add to my list" form, since the
+    // page's lists aren't yours.
+    function addFromFind(hit, typed) {
+      closeSearchModal();
+      const title = hit ? hit.title : typed;
+      const pick = hit ? { tmdb_id: hit.tmdb_id, tmdb_type: hit.media_type } : null;
+      const movie = hit ? (hit.media_type === 'movie' ? 1 : 0) : 0;
+      const onOwnPage = typeof memberSlug !== 'undefined' && authMember === memberSlug
+        && !document.getElementById('showPage').classList.contains('hidden');
+      if (onOwnPage) {
+        openAddModal();
+        document.getElementById('inputTitle').value = title;
+        document.getElementById('inputMovie').checked = !!movie;
+        titlePickers.inputTitle.pick = pick;
+      } else {
+        openAddMyList(title, '', '', movie, pick);
       }
     }
 
@@ -3492,8 +3511,11 @@
 
     let addMyListData = null;
 
-    async function openAddMyList(title, network, networkUrl, movie) {
+    async function openAddMyList(title, network, networkUrl, movie, pick) {
       addMyListData = { title, network, network_url: networkUrl, movie };
+      // A Find a Show pick is the exact TMDB entry; the suggestion below may
+      // still fill the network, but never re-guesses the identity.
+      if (pick) { addMyListData.tmdb_id = pick.tmdb_id; addMyListData.tmdb_type = pick.tmdb_type; }
       document.getElementById('addMyTitle').value = title;
       document.getElementById('addMyList').value = 'watching';
       document.getElementById('addMyNotes').value = '';
@@ -3510,8 +3532,10 @@
             const data = await res.json();
             if (data.suggestedNetwork) {
               addMyListData.network = data.suggestedNetwork;
-              addMyListData.tmdb_id = data.tmdbId;
-              addMyListData.tmdb_type = data.tmdbType;
+              if (!pick) {
+                addMyListData.tmdb_id = data.tmdbId;
+                addMyListData.tmdb_type = data.tmdbType;
+              }
             }
           }
         } catch (e) {
