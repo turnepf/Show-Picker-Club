@@ -797,7 +797,7 @@ block the consent screen from ever handing the member back to Claude.
 Show Picker Club is a remote MCP server at `/mcp` (Streamable HTTP, stateless,
 JSON responses only), so a member can connect Claude, ChatGPT or Claude Code
 and read or change their lists by chatting. `/connect` walks members through
-it; `/connected-apps` (and, from the next iOS build, a Settings screen) lists
+it; `/connected-apps` (and **Connected Apps…** in the iOS/iPad/Mac account menu, `ConnectedAppsView.swift`) lists
 and revokes connections. The rules are `docs/INVARIANTS.md` §27; the tests are
 `scripts/mcp-test.mjs`.
 

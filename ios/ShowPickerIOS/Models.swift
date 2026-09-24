@@ -1062,6 +1062,26 @@ struct Passkey: Decodable, Identifiable {
     }
 }
 
+// One AI app connected to this account through the MCP server, as
+// /api/connected-apps lists them. `host` is where the app lives (claude.ai,
+// "an app on this computer"), which is what tells two entries both called
+// "Claude" apart — the name is whatever the app called itself.
+struct ConnectedApp: Decodable, Identifiable {
+    let id: Int
+    let name: String
+    let host: String?
+    let canWrite: Bool
+    let connectedAt: String?
+    let lastUsedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, host
+        case canWrite = "can_write"
+        case connectedAt = "connected_at"
+        case lastUsedAt = "last_used_at"
+    }
+}
+
 // /api/account-delete response — `sent` for the send-a-code step, `deleted`
 // for the confirm step; `error` carries no_email / admin_must_demote_first /
 // invalid / rate_limited on failure.
