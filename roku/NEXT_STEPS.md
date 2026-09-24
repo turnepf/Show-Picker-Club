@@ -4,8 +4,17 @@
 Channel ID 882851, access code CV92LVL.
 
 **1.1 build 2** — search is how you add a show (Find a Show; the separate Add Show screen is
-gone). Packaged and signed 2026-09-24 with `node sideload.mjs package`; upload it from the
-developer dashboard. Bump `minor_version`/`build_version` in `manifest` for every submission —
+gone). Packaged and signed 2026-09-24 with `node sideload.mjs package`, uploaded and
+submitted the same day. Release notes as submitted:
+
+> Search is now how you add a show. Type any show or movie, pick it, choose a list, and you're
+> done. The separate Add Show screen is gone. Shows already on your lists appear first, and each
+> result shows which friends in your groups have it and on which list.
+
+Static analysis passed with three warnings, none blocking: Roku Partner Payouts not enrolled
+(unchanged since 1.0), and two new ones asking for RSG 1.3 (`rsg_version=1.3` in the manifest,
+minimum firmware 15.1). Those were left alone for 1.1 — adopting RSG 1.3 drops older devices and
+needs testing on them first. Bump `minor_version`/`build_version` in `manifest` for every submission —
 the Store refuses a package whose version isn't higher than the live one.
 
 ⚠️ **Do not edit the channel in the dashboard before it publishes.** Roku cancels the scheduled
