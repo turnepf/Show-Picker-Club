@@ -113,6 +113,8 @@ jobs:
         run: node scripts/url-cleanup-authz-test.mjs
       - name: A member's service pick outranks the link a machine fetched
         run: node scripts/show-edit-network-test.mjs
+      - name: MCP server and OAuth give an AI app the member's permissions, no more
+        run: node scripts/mcp-test.mjs
 
   roku:
     runs-on: ubuntu-latest

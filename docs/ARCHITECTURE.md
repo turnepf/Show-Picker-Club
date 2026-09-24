@@ -483,6 +483,14 @@ drained once, so it deliberately has no button in the app.
 | `POST /api/admin-fill-watch-urls`      | `functions/api/admin-fill-watch-urls.js`   | POST    | admin session or `CRON_SECRET` header |
 | `POST /api/admin-demo-reset`           | `functions/api/admin-demo-reset.js`        | POST    | admin session or `CRON_SECRET` header |
 | `GET /calendar/[slug].ics`             | `functions/calendar/[slug].js`             | GET     | `?key=<calendar_token>` (per-member secret) |
+| `POST /mcp`                            | `functions/mcp.js`                         | POST (GET/DELETE → 405) | OAuth access token only — a session cookie is ignored. See [MCP server](#mcp-server) |
+| `GET /.well-known/oauth-protected-resource[/mcp]` | `functions/.well-known/oauth-protected-resource/[[path]].js` | GET | none (RFC 9728 metadata) |
+| `GET /.well-known/oauth-authorization-server` | `functions/.well-known/oauth-authorization-server/[[path]].js` | GET | none (RFC 8414 metadata) |
+| `POST /oauth/register`                 | `functions/oauth/register.js`              | POST    | none — dynamic client registration, 20 per IP per hour |
+| `GET/POST /oauth/authorize`            | `functions/oauth/authorize.js`             | GET, POST | session cookie (consent screen); POST same-origin + session-bound form value |
+| `POST /oauth/token`                    | `functions/oauth/token.js`                 | POST    | client_id (+ secret for confidential clients), PKCE |
+| `POST /oauth/revoke`                   | `functions/oauth/revoke.js`                | POST    | client_id (+ secret) |
+| `GET/DELETE /api/connected-apps`       | `functions/api/connected-apps.js`          | GET, DELETE | session cookie only (a delegated MCP request is refused) — the member's own grants |
 
 The public (no-session) surface is deliberately small: the member roster
 (first names + counts), Trending, catalog-level show detail + cast for the
@@ -600,6 +608,7 @@ before the teardown. The marketing page moved to `public/download.html`.
 | `/groups`, `/vibe`, `/rate-backlog`, `/subscriptions`, `/welcome` | their own pages |
 | `/members`, `/reporting`, `/url-cleanup`, `/vibe-admin` | the four admin tools |
 | `/privacy`, `/terms`, `/sms` | legal pages, linked from the App Store listing |
+| `/connect`, `/connected-apps` | connecting an AI app to the MCP server, and disconnecting one |
 
 ### The catch-all can only point at `/index.html`
 
@@ -775,6 +784,68 @@ The web app is no longer installable. `public/manifest.json` is gone, along with
 - **Permissions-Policy:** disables camera, microphone, geolocation, payment, USB, accelerometer, gyroscope, magnetometer, interest-cohort.
 
 The deploy smoke test verifies these headers are present after each push.
+
+`_headers` covers static assets only — Pages Functions responses don't pick it
+up. The OAuth screens (`functions/oauth/authorize.js`, via
+`_shared/plain-page.js`) set their own headers, including a per-page CSP whose
+`form-action` names the requesting app's redirect origin: `form-action`
+governs the redirect that follows a form POST, so the site-wide policy would
+block the consent screen from ever handing the member back to Claude.
+
+## MCP server
+
+Show Picker Club is a remote MCP server at `/mcp` (Streamable HTTP, stateless,
+JSON responses only), so a member can connect Claude, ChatGPT or Claude Code
+and read or change their lists by chatting. `/connect` walks members through
+it; `/connected-apps` (and, from the next iOS build, a Settings screen) lists
+and revokes connections. The rules are `docs/INVARIANTS.md` §27; the tests are
+`scripts/mcp-test.mjs`.
+
+**Auth is OAuth 2.1, and the club is its own authorization server**
+(`_shared/oauth.js`, migration 071). A client discovers everything from the
+401's `WWW-Authenticate` header → protected-resource metadata →
+authorization-server metadata, registers itself at `/oauth/register` (RFC 7591;
+Claude does this on first connect), sends the member to `/oauth/authorize`,
+and redeems the code at `/oauth/token` with PKCE S256. Signed out, the consent
+screen links to `/?login=1&return_to=/oauth/authorize?…`; `index.html` opens
+the normal sign-in sheet and returns there afterwards (only `/oauth/authorize?`
+and `/connected-apps` are accepted as `return_to`). Tokens: access 1 hour,
+refresh 90 days and rotated on every use, both stored as SHA-256 only. One
+grant per member per client, which is what Connected apps lists.
+
+| Table | Holds |
+|---|---|
+| `oauth_clients` | registered apps: self-declared name, redirect URIs, secret hash for confidential clients, registering IP |
+| `oauth_codes` | one-time codes, 10 minutes, bound to client, redirect URI, PKCE challenge and member |
+| `oauth_grants` | a member's consent to a client: scope, `last_used_at`, `revoked_at` |
+| `oauth_tokens` | access/refresh token hashes per grant; `rotated_at` marks a spent refresh token so a replay can be detected |
+| `mcp_usage` | per-member per-UTC-day counters behind `DAILY_CAPS` |
+
+Scopes are `shows:read` and `shows:write`; the consent screen lets the member
+untick write. Expired codes and tokens and week-old usage rows are pruned
+opportunistically from the token endpoint.
+
+**Tools call the existing handlers.** `_shared/mcp-tools.js` builds a
+`Request`, attaches the member's session with `actingAs()` (a module-private
+`WeakMap` in `_shared/auth.js` that `getSession()` checks first) and calls the
+handler's `onRequest*` directly, so permissions are the app's own. Tools speak
+the member vocabulary (`watching`, `awaiting`, `loved`, `next_up`) and return
+compact rows. Read: `get_profile`, `list_my_shows`, `get_show`,
+`list_member_shows` (group-mates only), `search_libraries`, `search_titles`,
+`get_trending`, `list_groups`, `get_group`, `get_group_recommendations`.
+Write: `add_show`, `update_show`, `move_show`, `reorder_list`, `rate_show`,
+`archive_show`, `restore_show`, `delete_show`, `recommend_to_group`,
+`respond_to_recommendation`, `remove_recommendation`, `create_group`,
+`create_group_invite`, `leave_group`. Deliberately absent: invite redemption,
+group rename/delete, household, account, passkeys, import/export, admin.
+
+**Bookkeeping.** A call stamps `oauth_grants.last_used_at` (throttled to every
+five minutes) and records `mcp` in `member_platforms`; `/api/reporting` counts
+distinct members by grant use as an `mcp` platform row. Account deletion
+deletes grants, a ban revokes them, and an account merge moves them to the
+kept member. The AASA file excludes `/oauth/*`, `/mcp`, `/connect` and
+`/connected-apps` so iOS never swallows the consent redirect, and those four
+are reserved slugs.
 
 ## External APIs
 

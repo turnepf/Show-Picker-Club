@@ -150,7 +150,7 @@
     // Only values the server can actually emit: it omits sessions whose
     // platform it never captured rather than naming them, and every key here
     // is one some client sends today (_shared/platform.js#KNOWN_PLATFORMS,
-    // which is also what rejects anything else). An unlisted key still renders
+    // which is also what rejects anything else), plus 'mcp'. An unlisted key still renders
     // under its own name, so a new platform shows up before this map learns it.
     const PLATFORM_LABELS = {
       'iphone': 'iPhone',
@@ -161,8 +161,10 @@
       'roku': 'Roku',
       'web-large': 'Web (large)',
       'web-small': 'Web (small)',
+      // Connected AI apps — counted from OAuth grants, not sessions.
+      'mcp': 'AI apps (MCP)',
     };
-    const PLATFORM_ORDER = ['iphone', 'ipad', 'mac', 'watchos', 'tvos', 'roku', 'web-large', 'web-small'];
+    const PLATFORM_ORDER = ['iphone', 'ipad', 'mac', 'watchos', 'tvos', 'roku', 'web-large', 'web-small', 'mcp'];
 
     function platformSection(byPlatform) {
       const bp = byPlatform || {};

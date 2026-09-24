@@ -965,6 +965,54 @@ product, and an invite token is the only credential that produces one.
 Enforcer: `scripts/group-invite-lifecycle-test.mjs`, plus the preview cases in
 `scripts/og-preview-test.mjs`.
 
+## 27. A connected AI app gets the member's permissions, no more
+
+Members can connect an AI app (Claude, ChatGPT, Claude Code) to `/mcp`, and it
+reads and changes their lists on their behalf. The app is steered by text the
+member doesn't control (a group-mate's show title or recommendation note ends
+up in the model's context), so everything it can do has to be something the
+member could do anyway, and nothing it does may widen what anyone can see.
+
+- **One set of rules, not two.** Every tool calls an existing `/api` handler
+  in process, with the member's session riding on the `Request` object
+  (`actingAs()` in `_shared/auth.js`, a module-private `WeakMap` — there is no
+  header or cookie a network caller could forge to get there). Owner-only
+  memos, group scoping and the Watching With rule are enforced by the code the
+  apps already call, so a fix to one is a fix to both. Where a handler answers
+  "success" for a row it didn't touch (archive, delete), the tool checks
+  ownership first rather than tell the model something false.
+- **Narrower than the app where the app leans on a person looking.** A
+  connection gets no roster, so `list_member_shows` reaches group-mates only.
+  Account-shaped actions stay in the app: no redeeming invites, no household,
+  no group rename/delete, no account deletion, passkeys, import or export.
+  Creating a group, minting an invite and leaving are allowed.
+- **Never admin.** `getAdminSession()` refuses a delegated request, so even an
+  admin's own token can't reach an operator tool.
+- **Only a token opens `/mcp`.** A session cookie is ignored there: the
+  endpoint takes writes, and a cookie rides along from any page the member
+  visits. Tokens are opaque and only their SHA-256 is stored.
+- **Consent is the member's and only theirs.** An unknown client or an
+  unregistered redirect gets an error page and no redirect, so the endpoint is
+  never an open redirector. The consent POST must be same-origin and carries a
+  value derived from the session that rendered it. The screen names the
+  redirect host beside the client's self-chosen name, because registration is
+  open and anybody can register an app called "Claude".
+- **A replay costs the connection.** PKCE S256 is mandatory; a code redeemed
+  twice, or a rotated refresh token presented again, revokes the grant.
+- **Scopes decide what exists.** A read-only grant isn't shown the write tools
+  and can't call one by name.
+- **Stopping is immediate.** Revoking from Connected apps, the app's own
+  RFC 7009 revoke, a ban and account deletion all end the grant on the next
+  call; a ban revokes rather than merely suspending, so re-enabling a member
+  doesn't quietly bring their connections back. Connected apps accepts only a
+  cookie session — an AI can't be talked into listing or cutting connections.
+- **Caps that have been seen to refuse.** Per-member daily ceilings on calls,
+  writes and TMDB searches (`DAILY_CAPS` in `_shared/mcp-tools.js`), counted in
+  SQL on the SQLite clock (§25), with tests that assert the refusal.
+
+Enforcer: `scripts/mcp-test.mjs`, plus the AASA exclusions for `/oauth/*`,
+`/mcp`, `/connect` and `/connected-apps` in `check-static.sh`.
+
 ## Adding an invariant
 
 Add a section here, then decide which enforcer covers it. Prefer a deterministic

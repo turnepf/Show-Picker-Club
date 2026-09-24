@@ -111,6 +111,18 @@ export async function onRequestPost(context) {
     await forgetMemberAsWatcher(env, slug);
   } catch (e) { /* a database without migration 064 has nothing to forget */ }
 
+  // Connected AI apps (migration 071): every token dies with the account.
+  // Separate and best-effort for the same reason as the block below — a
+  // database without the tables must still be able to delete an account.
+  try {
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM oauth_tokens WHERE grant_id IN (SELECT id FROM oauth_grants WHERE member_slug = ?)').bind(slug),
+      env.DB.prepare('DELETE FROM oauth_grants WHERE member_slug = ?').bind(slug),
+      env.DB.prepare('DELETE FROM oauth_codes WHERE member_slug = ?').bind(slug),
+      env.DB.prepare('DELETE FROM mcp_usage WHERE member_slug = ?').bind(slug),
+    ]);
+  } catch (e) { /* pre-071 database */ }
+
   const statements = [
     env.DB.prepare('DELETE FROM actors WHERE show_id IN (SELECT id FROM shows WHERE member_slug = ?)').bind(slug),
     env.DB.prepare('DELETE FROM shows WHERE member_slug = ?').bind(slug),

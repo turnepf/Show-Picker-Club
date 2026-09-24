@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Connected apps — Show Picker Club</title>
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css?v=6">
+  <style>
+    /* The AI apps connected to this account, and the way to cut one off.
+       Deliberately calls only /api/connected-apps — no /auth/check — so a
+       401 there is the whole signed-out story. */
+    body { padding: 24px 16px 60px; }
+    .wrap { max-width: 640px; margin: 0 auto; }
+    .topbar { margin-bottom: 20px; display: flex; justify-content: space-between; }
+    .topbar a { color: var(--accent); text-decoration: none; }
+    h1 { font-family: var(--font-display); font-size: var(--text-xl); margin: 0 0 8px; color: var(--ink); }
+    .lede { color: var(--ink-muted); margin: 0 0 22px; line-height: 1.5; }
+    .app { background: var(--surface); border: 1px solid var(--border-soft); border-radius: 12px; padding: 16px; margin-bottom: 10px;
+           display: flex; gap: 12px; align-items: center; }
+    .app .meta { flex: 1; min-width: 0; }
+    .app .name { font-weight: 700; color: var(--ink); }
+    .app .sub { font-size: 13px; color: var(--ink-muted); margin-top: 2px; line-height: 1.45; }
+    .app button { flex: none; border: 1px solid var(--border); background: var(--surface); color: var(--danger-deep);
+                  border-radius: 8px; padding: 8px 12px; font: 600 14px var(--font-sans); cursor: pointer; }
+    .empty, .status { background: var(--surface); border-radius: 12px; padding: 20px; color: var(--ink-muted); line-height: 1.5; }
+    .empty a, .status a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar"><a href="/">← Show Picker Club</a><a href="/connect">Connect an app</a></div>
+    <h1>Connected apps</h1>
+    <p class="lede">AI apps that can use your Show Picker Club account. Disconnecting one takes effect immediately.</p>
+    <div id="list"><div class="status">Loading…</div></div>
+  </div>
+
+  <script>
+    (function () {
+      var list = document.getElementById('list');
+
+      function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+      // Server timestamps are SQLite's 'YYYY-MM-DD HH:MM:SS' in UTC.
+      function when(ts) {
+        if (!ts) return 'never';
+        var d = new Date(ts.replace(' ', 'T') + 'Z');
+        if (isNaN(d)) return ts;
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+
+      function render(apps) {
+        if (!apps.length) {
+          list.innerHTML = '<div class="empty">No apps are connected. <a href="/connect">Connect Claude, ChatGPT or Claude Code</a>.</div>';
+          return;
+        }
+        list.innerHTML = apps.map(function (a) {
+          return '<div class="app"><div class="meta"><div class="name">' + esc(a.name) + '</div>' +
+            '<div class="sub">' + esc(a.host ? 'via ' + a.host : '') + ' · ' + (a.can_write ? 'Can read and make changes' : 'Read-only') +
+            '<br>Connected ' + esc(when(a.connected_at)) + ' · Last used ' + esc(when(a.last_used_at)) + '</div></div>' +
+            '<button type="button" data-id="' + esc(a.id) + '">Disconnect</button></div>';
+        }).join('');
+      }
+
+      function load() {
+        fetch('/api/connected-apps', { credentials: 'same-origin' }).then(function (res) {
+          if (res.status === 401) {
+            list.innerHTML = '<div class="status"><a href="/?login=1&return_to=%2Fconnected-apps">Sign in</a> to see the apps connected to your account.</div>';
+            return null;
+          }
+          return res.json();
+        }).then(function (data) {
+          if (data) render(data.apps || []);
+        }).catch(function () {
+          list.innerHTML = '<div class="status">Couldn’t load your connected apps. Try again.</div>';
+        });
+      }
+
+      list.addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-id]');
+        if (!btn) return;
+        if (!confirm('Disconnect this app? It will stop working until you connect it again.')) return;
+        btn.disabled = true;
+        fetch('/api/connected-apps?id=' + encodeURIComponent(btn.dataset.id), { method: 'DELETE', credentials: 'same-origin' })
+          .then(load, load);
+      });
+
+      load();
+    })();
+  </script>
+</body>
+</html>
