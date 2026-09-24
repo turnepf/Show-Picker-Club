@@ -142,9 +142,10 @@ tracking, so no App Tracking Transparency prompt is presented.
       file** — re-paste whenever `public/privacy.html` has changed since the
       last submission. `git log -1 --format=%as public/privacy.html` gives
       the date it last changed; the policy's own "Last updated" line should
-      match what you paste. **Outstanding: it changed 2026-08-03** (retired
-      OMDB dropped from the third-party list; the operator-adds-you signup
-      path removed) and has not been re-pasted since.
+      match what you paste. Last re-pasted 2026-09-24 for 1.5 (the "AI apps
+      you connect" section). Paste it from the clipboard (`pbcopy` a
+      plain-text rendering, then Cmd-V): typed into the field key by key,
+      4,000 characters times out.
 - [ ] **Version Number field on each platform's version page** matches
       `MARKETING_VERSION` — a page created as 1.0 keeps saying 1.0 until
       edited, even with a 1.0.1 build attached.
@@ -239,6 +240,14 @@ cloud-managed signing working correctly, not a failed setup.
 status, What's New, attaching the build — through `asc.mjs`. A fully
 command-line release would need an Admin key, and the certificate is the only
 reason.
+
+**Update, 1.5 (2026-09-24):** once that certificate exists, the upload no
+longer needs Organizer. On PaddyMac (release Xcode 27) `xcodebuild archive
+... -allowProvisioningUpdates` for all three, then `xcodebuild -exportArchive`
+with an ExportOptions plist of `method = app-store-connect`, `destination =
+upload`, `signingStyle = automatic`, `teamID = NQ6AJVVBBJ` uploaded all three
+builds. It signs with the Apple ID logged into Xcode — pass no
+`-authenticationKey`, which is what triggered the cloud-signing refusal.
 
 ## 6a. Run sheet: releasing from a second Mac
 

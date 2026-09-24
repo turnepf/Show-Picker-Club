@@ -49,7 +49,7 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## 1.5 (build 28) — iPhone, iPad, Mac and Apple TV, prepared 2026-09-24
+## 1.5 (build 28) — iPhone, iPad, Mac and Apple TV, submitted for review 2026-09-24
 
 Two changes members will notice: search became the way to add a show
 (#505–#507, Apple TV #506), and the apps gained a Connected Apps screen for
