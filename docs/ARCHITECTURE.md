@@ -850,6 +850,17 @@ kept member. The AASA file excludes `/oauth/*`, `/mcp`, `/connect` and
 `/connected-apps` so iOS never swallows the consent redirect, and those four
 are reserved slugs.
 
+**The exclusion alone isn't enough, because devices cache the AASA file.** A
+phone or Mac holding a copy from before `/oauth/*` was excluded kept opening
+Claude's sign-in in the app, which dropped any URL it couldn't route — so
+connecting did nothing at all. Two backstops: the apps mirror the exclusion
+list in `ShowPickerCore/WebOnlyLinks.swift` and hand any such URL back to the
+browser (`BrowserHandoff.swift`; a link that bounces straight back is copied
+with a sentence saying where to paste it, never reopened), and
+`check-static.sh` fails the PR if that list and the AASA file disagree. A
+browser that opens `/mcp` itself is redirected to `/connect` rather than shown
+the transport's 405.
+
 ## External APIs
 
 ### OMDB (retired 2026-07)

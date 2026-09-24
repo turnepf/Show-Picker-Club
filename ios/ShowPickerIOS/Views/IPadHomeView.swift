@@ -617,6 +617,9 @@ struct IPadHomeView: View {
 
     @MainActor
     private func route(url: URL, allowRefetch: Bool = true) {
+        // Website-only pages arriving through a stale universal-link cache go
+        // back to the browser (see BrowserHandoff).
+        if WebOnlyLinks.isWebOnly(url) { BrowserHandoff.open(url); return }
         guard let first = url.path.split(separator: "/").first.map({ String($0).lowercased() }) else { return }
         // Widget taps: push the show's card onto the detail column. Needs no
         // roster, and leaves the sidebar selection alone.

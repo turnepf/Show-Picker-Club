@@ -171,10 +171,20 @@ export async function onRequestPost(context) {
 }
 
 // No server-initiated stream and no sessions to end (transport spec: 405).
-export function onRequestGet() {
+// A person who pastes the connector URL into a browser gets the page that
+// explains how to connect, not a JSON error (charset set so the apostrophe
+// survives for anyone who does see it).
+export function onRequestGet(context) {
+  const accept = context?.request?.headers?.get('Accept') || '';
+  if (accept.includes('text/html')) {
+    return new Response(null, { status: 302, headers: { Location: '/connect', 'Cache-Control': 'no-store' } });
+  }
+  return notAllowed();
+}
+export const onRequestDelete = () => notAllowed();
+function notAllowed() {
   return new Response(JSON.stringify({ error: 'Use POST. Show Picker Club’s MCP server is stateless.' }), {
-    status: 405, headers: { Allow: 'POST', 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    status: 405, headers: { Allow: 'POST', 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
   });
 }
-export const onRequestDelete = onRequestGet;
 export const onRequestOptions = () => preflight('POST, GET, DELETE');

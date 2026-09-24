@@ -254,8 +254,12 @@ console.log('\n== /mcp opens for a token and nothing else');
   check('a session cookie alone is 401', cookieOnly.status === 401);
   const junk = await rpc(env, 'not-a-real-token', 'tools/list', {});
   check('an unknown token is 401 with invalid_token', junk.status === 401 && (junk.www || '').includes('invalid_token'));
-  const get = mcp.onRequestGet();
+  const get = mcp.onRequestGet({ request: new Request(`${ORIGIN}/mcp`, { headers: { Accept: 'text/event-stream' } }) });
   check('GET /mcp is 405 (stateless, no stream)', get.status === 405);
+  check('the 405 declares utf-8 so its apostrophe renders', (get.headers.get('Content-Type') || '').includes('charset=utf-8'));
+  const browse = mcp.onRequestGet({ request: new Request(`${ORIGIN}/mcp`, { headers: { Accept: 'text/html,application/xhtml+xml' } }) });
+  check('a browser opening /mcp is sent to /connect', browse.status === 302 && browse.headers.get('Location') === '/connect');
+  check('DELETE /mcp is still 405', mcp.onRequestDelete().status === 405);
 
   const c = await connect(env, 'patrick');
   check('the full dance mints tokens', !!c.access && !!c.refresh && c.tok.data.token_type === 'Bearer', JSON.stringify(c.tok.data));

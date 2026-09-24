@@ -188,7 +188,22 @@ missing = [p for p in required if p not in excluded]
 if missing:
     print(f"::error::{path} must exclude {', '.join(missing)}")
     sys.exit(1)
+# The app keeps the same list (WebOnlyLinks.swift) to hand these URLs back to
+# the browser when a device's cached copy of this file still sends them to the
+# app. A path excluded here but not there is dropped by the app for as long as
+# any device holds the old file — how "Connect Claude" dead-ended in 2026-09.
+import re
+swift = open("ShowPickerCore/Sources/ShowPickerCore/WebOnlyLinks.swift").read()
+body = swift.split("patterns: [String] = [", 1)[1].split("]", 1)[0]
+app_list = set(re.findall(r'"([^"]+)"', body))
+if app_list != excluded:
+    only_web = sorted(excluded - app_list)
+    only_app = sorted(app_list - excluded)
+    print(f"::error::WebOnlyLinks.swift and {path} disagree — "
+          f"missing from Swift: {only_web or 'none'}; missing from AASA: {only_app or 'none'}")
+    sys.exit(1)
 print("  ok  AASA claims /*, excludes API/auth/calendar, carries the app ID")
+print("  ok  the app's WebOnlyLinks matches the AASA exclusions")
 print("  ok  AASA carries the webcredentials block passkeys need")
 PY
 
