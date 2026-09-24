@@ -18,6 +18,7 @@ Read these before making non-trivial changes — they are detailed and current:
 - **`docs/PRODUCT.md`** — product behavior and user-facing rules (the four lists, quick actions, auth flows).
 - **`docs/INVARIANTS.md`** — the rules that must hold across the product, each with the enforcer that checks it. Read before adding an endpoint or session-derived UI state.
 - **`docs/APP_STORE_SUBMISSION.md`** — Apple review/submission checklist.
+- **`docs/CONNECTOR_DIRECTORY.md`** — listing the MCP server in Anthropic's Connectors Directory: who can submit, the pre-submit checks, and every portal answer.
 - **`docs/RELEASE_NOTES.md`** — the What's New text for the next App Store update. Add user-facing changes to its *Unreleased* section as they merge.
 - **`README.md`** — setup from scratch, secrets list, deploy/backup overview.
 - **`ios/README.md`** / **`tvos/README.md`** — building, TestFlight, share extension, offline support.

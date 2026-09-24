@@ -27,11 +27,13 @@ const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05
 
 const SERVER_INFO = { name: 'show-picker-club', title: 'Show Picker Club', version: '1.0.0' };
 
-const INSTRUCTIONS = `Show Picker Club is the member's TV and movie tracker. They keep four lists:
-watching, awaiting (finished the current season, waiting for the next), loved (finished and would recommend), and next_up (want to watch).
-Shows are identified by show_id. To add something, call search_titles first and pass its tmdb_id and media_type to add_show.
-Notes, recommended_by and watching_with are the member's private memos. Group-mates (people in the member's private groups) can be seen with list_member_shows and named in watching_with_members.
-Prefer archive_show over delete_show, and confirm with the member before delete_show, leave_group or remove_recommendation.`;
+// Descriptive only: what the server is and how its data fits together. The
+// directory rejects servers that tell the model how to behave, and the
+// confirmation before a destructive call comes from destructiveHint, not
+// from prose here.
+const INSTRUCTIONS = `Show Picker Club is the member's TV and movie tracker. Each member keeps four lists: watching, awaiting (finished the current season, waiting for the next), loved (finished and would recommend), and next_up (want to watch).
+Shows are identified by show_id. search_titles returns the catalog tmdb_id that add_show accepts.
+Notes, recommended_by and watching_with are the member's private memos. Group-mates are the people in the member's private groups; their lists are readable with list_member_shows, and they can be named in watching_with_members.`;
 
 function unauthorized(request, presented) {
   const meta = `${issuerFor(request)}/.well-known/oauth-protected-resource/mcp`;

@@ -799,7 +799,10 @@ JSON responses only), so a member can connect Claude, ChatGPT or Claude Code
 and read or change their lists by chatting. `/connect` walks members through
 it; `/connected-apps` (and **Connected Apps…** in the iOS/iPad/Mac account menu, `ConnectedAppsView.swift`) lists
 and revokes connections. The rules are `docs/INVARIANTS.md` §27; the tests are
-`scripts/mcp-test.mjs`.
+`scripts/mcp-test.mjs`. Listing it in Anthropic's Connectors Directory is
+`docs/CONNECTOR_DIRECTORY.md`, and the directory's review rules are why every
+write tool that changes existing data is `destructiveHint: true`, tool text
+describes rather than instructs, and the list tools page.
 
 **Auth is OAuth 2.1, and the club is its own authorization server**
 (`_shared/oauth.js`, migration 071). A client discovers everything from the
