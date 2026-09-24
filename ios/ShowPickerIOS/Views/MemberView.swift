@@ -241,11 +241,10 @@ struct MemberView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                // On your own lists this is Find a Show — the one way to add,
-                // and it turns up your archived copies too (the restore path).
-                // On someone else's it searches their library.
+                // Find a Show, on every member page — the one way to add, and
+                // it turns up your archived copies too (the restore path).
                 Button { showingSearch = true } label: { Image(systemName: "magnifyingglass") }
-                    .accessibilityLabel(isMine ? "Find a show to add" : "Search \(member.label)'s shows")
+                    .accessibilityLabel("Find a show to add")
             }
             ToolbarItem(placement: .topBarTrailing) { sortMenu }
             // Own lists only — importing writes to the signed-in member, so
@@ -309,13 +308,10 @@ struct MemberView: View {
         // Reload on dismiss: a show added, or restored from the search
         // sheet's detail screen, should show up in the list immediately.
         .sheet(isPresented: $showingSearch, onDismiss: { Task { await load() } }) {
-            if isMine {
-                // Seeded with the list being viewed — searching from Awaiting
-                // adds to Awaiting.
-                SearchView(initialList: currentList).environmentObject(auth)
-            } else {
-                MemberSearchView(member: member).environmentObject(auth)
-            }
+            // On your own page, seeded with the list being viewed —
+            // searching from Awaiting adds to Awaiting. On someone else's,
+            // their list says nothing about yours, so it starts on Watching.
+            SearchView(initialList: isMine ? currentList : .watching).environmentObject(auth)
         }
         .sheet(item: $editingShow) { show in
             AddEditShowView(memberSlug: member.slug, existing: show) { await load() }
