@@ -43,25 +43,29 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## Unreleased — the update after 1.4.4
+## Unreleased — the update after 1.5
 
-**Search is now how you add a show.** Tap the magnifying glass, type any show
-or movie, and tap it to add it — no more wondering whether you wanted search or
-the + (the + is gone). Results also tell you which friends in your groups have
-it and on which list, and shows already on your own lists, archived ones
-included, turn up at the top. Same on Apple TV: the Search tab now finds any
-show or movie and adds it in a click.
+*Nothing yet.*
 
-**Use Show Picker Club from Claude or ChatGPT.** Connect your AI app at
-showpicker.club/connect, then just ask: "what's on my Next Up that's under an
-hour?", "add The Bear to Watching", "I finished Severance, move it to Loved".
-It works with your lists and your groups, with the same access you have in the
-app, and you choose whether it can make changes. See and disconnect connected
-apps any time from your account menu.
+---
 
-(The connection itself is a server feature and went live when it merged —
-members can use it before this update ships. The account-menu line is the
-Connected Apps screen on iPhone, iPad and Mac.)
+## 1.5 (build 28) — iPhone, iPad, Mac and Apple TV, prepared 2026-09-24
+
+Two changes members will notice: search became the way to add a show
+(#505–#507, Apple TV #506), and the apps gained a Connected Apps screen for
+the MCP server (#509, #510) — the server itself went live when it merged, so
+members could connect before this shipped. Also in the build: links the
+website owns (Claude's sign-in above all) are handed back to the browser
+instead of being dropped when a device's cached universal-link list is stale
+(#513). The watch rides along unchanged.
+
+The block below is the What's New text.
+
+```
+Search is now how you add a show. Tap the magnifying glass, type any show or movie, and tap it to add it — no more wondering whether you wanted search or the + button (the + is gone). Results show which friends in your groups already have it and on which list, and shows already on your own lists, archived ones included, turn up at the top. On Apple TV, the Search tab now finds any show or movie and adds it in a click.
+
+Use Show Picker Club from Claude or ChatGPT. Connect your AI app at showpicker.club/connect, then just ask: "What's on my Next Up that's under an hour?", "Add The Bear to Watching", "I finished Severance, move it to Loved." It works with your lists and your groups, with the same access you have in the app, and you choose whether it can make changes. See and disconnect connected apps any time from your account menu.
+```
 
 ---
 
