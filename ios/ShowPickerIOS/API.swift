@@ -278,7 +278,28 @@ enum API {
     }
 
     static func checkAuth() async -> AuthCheckResponse {
-        (try? await get("/auth/check")) ?? AuthCheckResponse(authenticated: false, email: nil, member: nil, isAdmin: nil)
+        (try? await checkAuthOrCached()) ?? AuthCheckResponse(authenticated: false, email: nil, member: nil, isAdmin: nil)
+    }
+
+    // /auth/check, falling back to the last signed-in answer when the device
+    // is offline. "Couldn't reach the server" is not "signed out": the session
+    // cookie is still in the Keychain and the lists are still cached, so a cold
+    // launch on a plane must come up signed in rather than on the logged-out
+    // Home. Only an authenticated answer is remembered, and logout wipes it
+    // with the rest of OfflineCache. Throws when offline with nothing cached.
+    static func checkAuthOrCached() async throws -> AuthCheckResponse {
+        do {
+            let r: AuthCheckResponse = try await get("/auth/check")
+            if r.authenticated { OfflineCache.save(r, for: "auth_check") } else { OfflineCache.remove(for: "auth_check") }
+            return r
+        } catch {
+            if isOffline(error),
+               let cached = OfflineCache.load(AuthCheckResponse.self, for: "auth_check"),
+               cached.authenticated {
+                return cached
+            }
+            throw error
+        }
     }
 
     // Operator-only dashboard metrics (gated server-side on the session).
