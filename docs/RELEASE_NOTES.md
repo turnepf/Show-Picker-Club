@@ -45,7 +45,7 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ## Unreleased — the update after 1.5
 
-*Nothing yet.*
+- **Your shows are there on a plane.** Opening the app with no connection used to land you on the signed-out screen; it now opens signed in, with your saved lists. (iPhone, iPad and Mac.)
 
 ---
 
