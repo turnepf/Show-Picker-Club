@@ -1,0 +1,8 @@
+# Show Picker Club vulnerability disclosure (RFC 9116).
+# Expires must stay under a year out; scripts/check-static.sh fails the PR gate
+# once it is within 30 days, so bump it when that happens.
+Contact: mailto:patrick@patrickturner.net
+Expires: 2027-09-27T00:00:00Z
+Preferred-Languages: en
+Canonical: https://showpicker.club/.well-known/security.txt
+Policy: https://github.com/turnepf/Show-Picker-Club/security/policy

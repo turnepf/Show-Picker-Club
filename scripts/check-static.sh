@@ -221,6 +221,25 @@ grep -A2 '^/\.well-known/apple-app-site-association' public/_headers | grep -qi 
   && ok "AASA has its application/json rule" \
   || err "public/_headers must serve the AASA file as application/json"
 
+note "security.txt (RFC 9116)"
+
+# Contact and Expires are the two required fields; a file past its Expires is
+# treated as absent by scanners, so fail a month early rather than on the day.
+sectxt=public/.well-known/security.txt
+if [ ! -f "$sectxt" ]; then
+  err "$sectxt is missing"
+else
+  grep -q '^Contact: ' "$sectxt" || err "$sectxt has no Contact field"
+  expires=$(sed -n 's/^Expires: //p' "$sectxt")
+  if [ -z "$expires" ]; then
+    err "$sectxt has no Expires field"
+  elif ! python3 -c 'import sys,datetime as d; e=d.datetime.fromisoformat(sys.argv[1].replace("Z","+00:00")); sys.exit(0 if e - d.datetime.now(d.timezone.utc) > d.timedelta(days=30) else 1)' "$expires"; then
+    err "$sectxt expires $expires — move Expires out to a year from today"
+  else
+    ok "security.txt has Contact and an Expires more than 30 days out"
+  fi
+fi
+
 note "Every API endpoint is gated"
 
 # A new endpoint that forgets its session check is the highest-cost mistake in
