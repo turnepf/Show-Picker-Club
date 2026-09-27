@@ -107,7 +107,7 @@ function makeEnv() {
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
   return {
-    DB: { prepare: (sql) => new Stmt(db, sql), batch: async (stmts) => { for (const s of stmts) await s.run(); } },
+    DB: { prepare: (sql) => new Stmt(db, sql), batch: async (stmts) => { const out = []; for (const s of stmts) out.push(await s.run()); return out; } },
     _db: db,
   };
 }
@@ -162,8 +162,14 @@ const postShow = (env, cookie, body) =>
   showsApi.onRequestPost(ctx(env, req('/api/shows', { cookie, method: 'POST', body })));
 const putShow = (env, cookie, id, body) =>
   showApi.onRequestPut(ctx(env, req(`/api/shows/${id}`, { cookie, method: 'PUT', body }), { id: String(id) }));
-const syncUrls = (env, cookie) =>
-  syncUrlsApi.onRequestPost(ctx(env, req('/api/sync-urls', { cookie, method: 'POST' })));
+// The sweep runs from the nightly job since 2026-09 (a member session is a
+// no-op — see spend-limits-test.mjs), so drive it the way the job does.
+const syncUrls = (env) => {
+  env.CRON_SECRET = 'test-cron-secret';
+  const request = req('/api/sync-urls', { method: 'POST' });
+  request.headers.set('X-Cron-Secret', 'test-cron-secret');
+  return syncUrlsApi.onRequestPost(ctx(env, request));
+};
 
 // A row with an explicit network + URL, which is what the propagation reads
 // and writes. Kept separate from addPrivateShow so the memo fields stay out
@@ -292,7 +298,7 @@ console.log('\n== a URL one member pasted is never pushed onto anyone else');
     slug: 'stacy', title: 'Severance', network: 'Netflix', url: 'https://www.netflix.com/search?q=Severance',
   });
 
-  const res = await syncUrls(env, addSession(env, 'stacy'));
+  const res = await syncUrls(env);
   const body = await res.json();
   check('the foreign host is refused', body.synced === 0, `synced ${body.synced}`);
   check('and counted rather than swallowed', body.skipped >= 1, `skipped ${body.skipped}`);
@@ -312,7 +318,7 @@ console.log('\n== a real provider link still propagates');
     slug: 'stacy', title: 'Severance', network: 'Netflix', url: 'https://www.netflix.com/search?q=Severance',
   });
 
-  const body = await (await syncUrls(env, addSession(env, 'stacy'))).json();
+  const body = await (await syncUrls(env)).json();
   check('the provider link is propagated', body.synced === 1, `synced ${body.synced}`);
   check('and lands on the placeholder row',
     rowById(env, theirs).network_url === 'https://www.netflix.com/title/81244942');
@@ -333,7 +339,7 @@ console.log('\n== propagation stops at a copy pinned to a different show');
   });
   env._db.prepare('UPDATE shows SET tmdb_id = 2996 WHERE id = ?').run(other);
 
-  await syncUrls(env, addSession(env, 'stacy'));
+  await syncUrls(env);
   check('a differently-pinned copy keeps its own URL',
     rowById(env, other).network_url.includes('/search'));
 }

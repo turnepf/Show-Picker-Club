@@ -1,4 +1,5 @@
-import { fetchEnrichment, fetchEnrichmentById, fallbackNetwork } from '../../_shared/enrichment.js';
+import { fetchEnrichment, fetchEnrichmentById, fallbackNetwork, emptyEnrichment } from '../../_shared/enrichment.js';
+import { chargeSpend } from '../../_shared/spend-meter.js';
 import { getSession } from '../../_shared/auth.js';
 import { canonicalNetwork, networkFromUrl } from '../../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../../_shared/watch-providers.js';
@@ -190,12 +191,18 @@ export async function onRequestPut(context) {
   const watching_with = val('watching_with');
   const archived = val('archived');
 
+  // Every edit re-enriches, so owning the row is not a budget: an edit past
+  // the member's daily lookup ceiling still saves what they typed, it just
+  // skips TMDB and the Watchmode refresh below. Refusing the edit outright
+  // would cost a member their note to protect a poster refresh.
+  const mayLookUp = await chargeSpend(env, session.member_slug, 'lookups');
+
   // Exact pick from type-ahead search (edit flow): enrich the chosen TMDB
   // entry directly; fall back to the title search when absent or failed.
   const tmdbId = parseInt(body.tmdb_id, 10);
   const tmdbType = body.tmdb_type === 'movie' || body.tmdb_type === 'tv' ? body.tmdb_type : null;
-  let enriched = null;
-  if (Number.isInteger(tmdbId) && tmdbType) {
+  let enriched = mayLookUp ? null : emptyEnrichment();
+  if (!enriched && Number.isInteger(tmdbId) && tmdbType) {
     const byId = await fetchEnrichmentById(tmdbId, tmdbType, env);
     if (byId.canonicalTitle) enriched = byId;
   }
@@ -250,7 +257,7 @@ export async function onRequestPut(context) {
   const onPlaceholder = !finalUrl ||
     finalUrl.includes('/search') || finalUrl.includes('/s?') ||
     finalUrl.includes('?q=') || finalUrl.includes('?query=');
-  if (finalNetwork && (networkChanged || onPlaceholder)) {
+  if (mayLookUp && finalNetwork && (networkChanged || onPlaceholder)) {
     // Propagates only to copies of the same TMDB entry (or unpinned ones) —
     // a same-titled row pinned to a different entry streams a different show.
     const rowTmdbId = enriched.tmdbId || existing.tmdb_id || null;

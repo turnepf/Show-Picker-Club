@@ -1,5 +1,6 @@
 import { fetchEnrichment, fetchEnrichmentById } from '../../_shared/enrichment.js';
 import { getSession } from '../../_shared/auth.js';
+import { chargeSpend } from '../../_shared/spend-meter.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -17,6 +18,12 @@ export async function onRequestPost(context) {
   const session = await getSession(request, env);
   if (!session) {
     return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: corsHeaders() });
+  }
+  // A session is an identity, not a spend bound: signup is open, so one
+  // account could otherwise drive this proxy forever. The web caller treats
+  // any non-200 as "no suggestion" and the form still works.
+  if (!(await chargeSpend(env, session.member_slug, 'lookups'))) {
+    return new Response(JSON.stringify({ error: 'rate_limited' }), { status: 429, headers: corsHeaders() });
   }
 
   try {

@@ -19,9 +19,12 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ error: 'member_slug is required' }), { status: 400, headers: corsHeaders() });
   }
 
-  // Remove the member from caller's household
+  // Either side can end it. Take someone out of your household, or take
+  // yourself out of theirs — a row somebody else wrote about you is still
+  // about you, and joining by invite must not be a door that only opens in.
   await env.DB.prepare(
-    'DELETE FROM household_members WHERE member_slug = ? AND other_slug = ?'
+    `DELETE FROM household_members
+      WHERE (member_slug = ?1 AND other_slug = ?2) OR (member_slug = ?2 AND other_slug = ?1)`
   ).bind(session.member_slug, member_slug).run();
 
   return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders() });

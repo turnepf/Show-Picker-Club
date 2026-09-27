@@ -274,14 +274,14 @@ Per-member subscription decisions for the Subscription Audit (`/subscriptions`).
 | `created_at`, `updated_at` | TEXT | |
 
 ### `household_members`
-Members a person shares streaming services with, so the audit pools everyone's shows. Added by `migrations/045_household_members.sql`. Directed and per-member: `member_slug`'s household includes `other_slug` (A adding B doesn't change B's own audit). PK `(member_slug, other_slug)`; the PUT endpoint replaces the whole set. Managed via `GET/PUT /api/household` (`functions/api/household.js`).
+Members a person shares streaming services with, so the audit pools everyone's shows. Added by `migrations/045_household_members.sql`. Directed and per-member: `member_slug`'s household includes `other_slug` (A adding B doesn't change B's own audit). PK `(member_slug, other_slug)`. Rows are written by `POST /api/household/join` (the joining member's own session); `PUT /api/household` replaces the set but may only narrow it (403 `household_invite_required` for anyone new), and `POST /api/household/remove` deletes from either end. `GET` also returns `member_of`, the households that include the caller. See `docs/INVARIANTS.md` §28.
 
 ## Subscription audit
 
 `GET/PUT /api/subscriptions` (`functions/api/subscriptions.js`), read by both `subscriptions.html` on the web and the iOS Subscription audit. Both verbs require a session and operate on the logged-in member.
 
 - **Household pooling.** Before grouping, the GET reads the member's `household_members` and pools active shows across the member + those members. The same title appearing on more than one household member's list is deduped per network, keeping the most-active list (watching > waiting > next up > loved) so the verdict reflects whoever's furthest along. The response includes `household` (the pooled members' slugs + display names) for the "including …" line.
-- **Who's watching.** When (and only when) a household is pooled, every show in a service's `shows` array carries `viewers`: `[{ slug, name, list }]` — each household member who has that title and the list it sits on *for them*, so a title deduped to `watching` still shows that it's only `next up` for you. `name` is the first-name label (`You` for the caller), disambiguated by last initial exactly as `/api/members` and `/api/household` do — one members lookup now serves both the viewer labels and the `household` array. A solo audit omits `viewers` entirely: with one person pooled, naming them says nothing. iOS renders it under each row of a service's "Why?" list and in the `keep` reason line ("Active now: Severance (Dorothy)"), which is the case where the verdict can rest on somebody else's show. Household is invite-based on iOS, the same shape as groups: `POST /api/household/invite` mints a 7-day link (`/household/join?code=…`), the recipient's app accepts it via `POST /api/household/join`, and `POST /api/household/remove` drops someone. You can't add a person to your household from a roster any more than you can add them to a group. `GET /api/household` still returns the current set; `PUT` (whole-set replace) remains for the web modal.
+- **Who's watching.** When (and only when) a household is pooled, every show in a service's `shows` array carries `viewers`: `[{ slug, name, list }]` — each household member who has that title and the list it sits on *for them*, so a title deduped to `watching` still shows that it's only `next up` for you. `name` is the first-name label (`You` for the caller), disambiguated by last initial exactly as `/api/members` and `/api/household` do — one members lookup now serves both the viewer labels and the `household` array. A solo audit omits `viewers` entirely: with one person pooled, naming them says nothing. iOS renders it under each row of a service's "Why?" list and in the `keep` reason line ("Active now: Severance (Dorothy)"), which is the case where the verdict can rest on somebody else's show. Household is invite-based on iOS, the same shape as groups: `POST /api/household/invite` mints a 7-day link (`/household/join?code=…`), the recipient's app accepts it via `POST /api/household/join`, and `POST /api/household/remove` drops someone. You can't add a person to your household from a roster any more than you can add them to a group. `GET /api/household` still returns the current set; `PUT` (whole-set replace) remains for the web modal, which now lists only the current household and can only take people out.
 - **GET** groups the (pooled) active shows by canonical network and assigns each service a **verdict**:
   - `keep` — ≥1 show in `watching`.
   - `pause` — nothing watching, but a `waiting` show has a future `next_season_date`; the soonest such date is the suggested resubscribe target.
@@ -457,7 +457,7 @@ drained once, so it deliberately has no button in the app.
 | `DELETE /api/groups/[id]/suggestions/[sid]` | `functions/api/groups/[id]/suggestions/[sid].js` | DELETE | session + (recommender or group creator) |
 | `GET /api/groups/join?token=`          | `functions/api/groups/join.js`             | GET     | session joins; without one, returns a name-only preview |
 | `POST /api/enrich`                     | `functions/api/enrich.js`                  | POST    | session or `CRON_SECRET` header |
-| `POST /api/sync-urls`                  | `functions/api/sync-urls.js`               | POST    | session (demo member's rows excluded as URL sources) |
+| `POST /api/sync-urls`                  | `functions/api/sync-urls.js`               | POST    | admin session or `X-Cron-Secret` (a member session is a no-op `{synced: 0}`); demo member's rows excluded as URL sources |
 | `GET /api/reporting`                   | `functions/api/reporting.js`               | GET     | admin session |
 | `POST /api/account-delete`             | `functions/api/account-delete.js`          | POST    | session; hard-deletes the caller's account after an emailed code confirms |
 | `POST /auth/enroll`                    | `functions/auth/enroll.js`                 | POST    | signup code from `enroll_otps` |
@@ -936,7 +936,7 @@ A logged-in member's page calls this fire-and-forget on load. TMDB-only since OM
 
 `updated_at` is **not** touched by enrichment — only by member-initiated writes. This is what lets `updated_at != created_at` cleanly distinguish "the member touched it" from "we auto-enriched it."
 
-`POST /api/sync-urls` is a separate maintenance call also triggered from the member page (throttled to 1/day per browser via `localStorage`). It finds shows where one member has a real `network_url` for a title and another member's copy has only a search-URL placeholder, and copies the good URL over.
+`POST /api/sync-urls` is a separate maintenance sweep, run nightly by `watch-urls-fill.yml` (between the network-adopt step and the Watchmode fill) or by an admin. The web member page still calls it once a day, which is now a no-op: it costs one write per distinct title club-wide, so it isn't a member action (`docs/INVARIANTS.md` §28). It finds shows where one member has a real `network_url` for a title and another member's copy has only a search-URL placeholder, and copies the good URL over.
 
 ## List import
 
@@ -947,7 +947,7 @@ Two endpoints and a shared module, and **no schema change**: imported rows are o
 | Piece | What it does |
 |---|---|
 | `functions/_shared/list-parse.js` | Slice the paste at a line boundary, one Claude call per slice, then one TMDB search per extracted title. Also the dupe-check query and the four-list constants. |
-| `POST /api/import/parse` | Session-gated. Body `{ text, cursor?, section?, default_list? }` → `{ items, next_cursor, section, default_list, total_chars }`. **Writes nothing.** |
+| `POST /api/import/parse` | Session-gated. Body `{ text, cursor?, section?, default_list? }` → `{ items, next_cursor, section, default_list, total_chars }`. **Writes nothing** to `shows`; charges one `claude` unit per slice to `member_spend` (100/day, then 429 `rate_limited`). |
 | `POST /api/import/commit` | Session-gated. Body `{ items }` → `{ added, skipped, titles, skipped_titles }`. Inserts into `shows`, always for the caller's own `member_slug`. |
 
 ### Why it pages

@@ -486,5 +486,12 @@ export async function fetchEnrichment(title, env, isMovie) {
     }
   }
 
+  return emptyEnrichment();
+}
+
+// What fetchEnrichment answers when it learned nothing. Also used directly by
+// a caller that has decided not to spend the lookup at all (the edit path past
+// its daily ceiling), so a skipped lookup and a failed one read identically.
+export function emptyEnrichment() {
   return { canonicalTitle: null, rating: null, actors: [], posterUrl: null, networkLogoUrl: null, directorImdbId: null, tmdbId: null, tmdbType: null, ...EMPTY_DETAIL };
 }

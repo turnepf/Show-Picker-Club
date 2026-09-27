@@ -72,3 +72,13 @@ jobs:
         run: |
           wrangler d1 execute shows-db --remote \
             --command "DELETE FROM failed_logins WHERE datetime(created_at) < datetime('now', '-7 days');"
+
+      # member_spend (migration 072) is a per-day ledger; nothing reads past
+      # today, so a week is plenty to look back on.
+      - name: Prune D1 member_spend older than 7 days
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          wrangler d1 execute shows-db --remote \
+            --command "DELETE FROM member_spend WHERE day < date('now', '-7 days');"

@@ -22,6 +22,7 @@
 
 import { getSession } from '../../_shared/auth.js';
 import { extractItems, resolveItems, existingTitles, sliceChunk, normalizeList } from '../../_shared/list-parse.js';
+import { chargeSpend } from '../../_shared/spend-meter.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -57,6 +58,13 @@ export async function onRequestPost(context) {
   const { chunk, nextCursor } = sliceChunk(text, cursor);
   if (!chunk) {
     return json({ items: [], next_cursor: null, section: carriedSection, default_list: defaultList });
+  }
+
+  // One Claude call per slice, on the operator's key, and parse writes no row
+  // that commit's 300-a-day cap could count — so it carries its own ceiling.
+  // Charged only once a slice is actually headed to the model.
+  if (!(await chargeSpend(env, session.member_slug, 'claude'))) {
+    return json({ error: 'rate_limited' }, 429);
   }
 
   let extracted;
