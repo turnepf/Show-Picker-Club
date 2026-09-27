@@ -3,6 +3,7 @@ import { getSession } from '../_shared/auth.js';
 import { canonicalNetwork, networkFromUrl, networkSearchUrl } from '../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../_shared/watch-providers.js';
 import { safeNetworkUrl } from '../_shared/url-utils.js';
+import { chargeSpend } from '../_shared/spend-meter.js';
 import { syncWatchers, watchersForShows, attachAddedByMembers } from '../_shared/watchers.js';
 
 
@@ -152,6 +153,26 @@ export async function onRequestPost(context) {
   // read path to escape it. The edit handler carries the same check.
   if (network && /[<>"'&]/.test(String(network))) {
     return new Response(JSON.stringify({ error: 'invalid network' }), { status: 400, headers: corsHeaders() });
+  }
+
+  // A title the member already has is refused before anything is spent
+  // upstream. The canonical title is only known after enrichment, so this
+  // matches what the caller sent; the check after enrichment below stays the
+  // authoritative one for a title TMDB spells differently.
+  const preExisting = await env.DB.prepare(
+    'SELECT id, list, archived FROM shows WHERE LOWER(title) = LOWER(?) AND member_slug = ?'
+  ).bind(title, session.member_slug).first();
+  if (preExisting) {
+    if (preExisting.archived) {
+      return new Response(JSON.stringify({ error: 'exists_archived', id: preExisting.id, title }), { status: 409, headers: corsHeaders() });
+    }
+    return new Response(JSON.stringify({ error: 'exists_active', list: preExisting.list, title }), { status: 409, headers: corsHeaders() });
+  }
+
+  // The 50-a-day cap above counts rows; this counts the TMDB/Watchmode
+  // fan-out itself, which the edit and suggest paths spend too.
+  if (!(await chargeSpend(env, session.member_slug, 'lookups'))) {
+    return new Response(JSON.stringify({ error: 'rate_limited' }), { status: 429, headers: corsHeaders() });
   }
 
   // When the member picked the show from type-ahead search, the client sends

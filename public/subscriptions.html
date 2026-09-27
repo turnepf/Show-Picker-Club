@@ -169,7 +169,7 @@
     <div class="modal-card" onclick="event.stopPropagation()">
       <h2>Your household</h2>
       <p style="font-size:13px;color:var(--ink-muted);line-height:1.5;margin-bottom:4px;">
-        Check the members you share streaming services with. Your audit pools everyone's shows, so a service someone in the household is watching counts as one to keep.
+        The members you share streaming services with. Untick someone to take them out. Your audit pools everyone's shows, so a service someone in the household is watching counts as one to keep.
       </p>
       <div id="householdList" style="display:flex;flex-direction:column;gap:2px;margin:10px 0;max-height:50vh;overflow:auto;">Loading&hellip;</div>
       <div class="modal-actions">
@@ -399,8 +399,9 @@
       if (hhBtn) hhBtn.addEventListener('click', openHousehold);
     }
 
-    // Household picker: load the roster + current selection, let the member
-    // check who they share services with, save, and re-run the audit.
+    // Household editor: lists who is already in the member's household so they
+    // can untick someone and save. Adding happens by invite link from the app;
+    // the server refuses a save that names anyone new.
     async function openHousehold() {
       const list = document.getElementById('householdList');
       list.innerHTML = 'Loading&hellip;';
@@ -410,12 +411,13 @@
         if (!res.ok) throw new Error();
         const data = await res.json();
         const selected = new Set(data.household || []);
-        const rows = (data.members || []).map(m => `
+        const rows = (data.members || []).filter(m => selected.has(m.slug)).map(m => `
           <label style="display:flex;align-items:center;gap:10px;padding:9px 4px;cursor:pointer;border-bottom:1px solid var(--border-soft,#eee);">
             <input type="checkbox" value="${escapeHtml(m.slug)}" ${selected.has(m.slug) ? 'checked' : ''} style="width:18px;height:18px;">
             <span>${escapeHtml(m.name)}</span>
           </label>`).join('');
-        list.innerHTML = rows || '<div style="color:var(--ink-muted);font-size:13px;padding:8px 0;">No other members to add yet.</div>';
+        const hint = '<div style="color:var(--ink-muted);font-size:13px;padding:8px 0;">To add someone, send them a household invite from the Show Picker Club app on iPhone or iPad.</div>';
+        list.innerHTML = rows + hint;
       } catch {
         list.innerHTML = '<div style="color:var(--danger-deep,#c0392b);font-size:13px;padding:8px 0;">Couldn\'t load members — try again.</div>';
       }

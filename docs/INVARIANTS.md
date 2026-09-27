@@ -293,6 +293,10 @@ A paste has no length limit, but every request it turns into does.
 - `/api/import/commit` has its own daily ceiling (300 rows/member, imports and
   hand-adds together) rather than borrowing or bypassing the 50/day human-pace
   cap on `/api/shows`.
+- `/api/import/parse` has its own daily ceiling too — 100 slices (Claude
+  calls) per member, counted in `member_spend` (§28) — because parse writes no
+  row that commit's cap could count. Bounding each invocation bounds nothing
+  about how many invocations one member makes.
 - A failure surfaces. A Claude outage returns 502, not an empty list — an empty
   list means "no titles in that text", and the two must never look alike.
 
@@ -1012,6 +1016,39 @@ member could do anyway, and nothing it does may widen what anyone can see.
 
 Enforcer: `scripts/mcp-test.mjs`, plus the AASA exclusions for `/oauth/*`,
 `/mcp`, `/connect` and `/connected-apps` in `check-static.sh`.
+
+## 28. Spend is metered where it happens, and nobody joins a household uninvited
+
+Signup is open and self-service, so a session is an identity, not a budget.
+Anything that spends on an operator-held key is bounded per member per day,
+counted where the money goes rather than inferred from rows that happen to be
+written.
+
+- **Count the call, not the row.** `member_spend` (migration 072,
+  `_shared/spend-meter.js`) charges before the upstream call: `claude` for
+  `/api/import/parse` slices, `lookups` for the TMDB/Watchmode fan-out behind
+  add, edit and suggest, `searches` for type-ahead. The 50-add and 300-import
+  row caps stay as the product rules they are; they never saw the paths that
+  spend without inserting.
+- **A refusal costs nothing upstream.** A duplicate add is refused *before*
+  enrichment, and every metered path checks the ledger before its first
+  fetch. A refused request still counts, so a loop stays refused.
+- **Degrade the way clients already handle.** Parse, add and suggest answer
+  429 `rate_limited`; type-ahead answers the empty `{results: []}` clients
+  already treat as "no suggestions"; an edit past the ceiling still saves what
+  the member typed and skips only the re-enrichment.
+- **The meter fails open.** A ledger error must never stop a member adding a
+  show; the ceilings are there for a script, not for a person.
+- **A club-wide sweep is not a member action.** `/api/sync-urls` costs one
+  write per distinct title in the whole club. It runs nightly from
+  `watch-urls-fill.yml` and for admins; a member session gets the old answer
+  with nothing done.
+- **A household is joined, not claimed.** `PUT /api/household` may only narrow
+  the caller's own set — anyone new comes in through an invite they redeem
+  under their own session. `GET` reports `member_of` so a claim on you is
+  visible, and `POST /api/household/remove` works from either end.
+
+Enforcer: `scripts/spend-limits-test.mjs`.
 
 ## Adding an invariant
 

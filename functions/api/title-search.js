@@ -1,4 +1,5 @@
 import { getSession } from '../_shared/auth.js';
+import { chargeSpend } from '../_shared/spend-meter.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -27,6 +28,10 @@ export async function onRequestGet(context) {
   const q = (url.searchParams.get('q') || '').trim();
   const type = url.searchParams.get('type');
   if (q.length < 2 || !env.TMDB_TOKEN) return json({ results: [] });
+  // One TMDB search per request on the operator's token. Past the day's
+  // ceiling this answers the same empty shape as an unconfigured server, so
+  // every client degrades to free-text entry rather than showing an error.
+  if (!(await chargeSpend(env, session.member_slug, 'searches'))) return json({ results: [] });
 
   const path = (type === 'tv' || type === 'movie') ? `/search/${type}` : '/search/multi';
   try {

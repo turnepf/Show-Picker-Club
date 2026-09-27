@@ -458,6 +458,23 @@ refusal in `skipped` so a missing domain shows up as a number to fix, and stops
 at a copy pinned to a different `tmdb_id`.
 
 ```bash
+node scripts/spend-limits-test.mjs
+```
+
+Per-member daily ceilings on upstream spend (migration 072, `member_spend`),
+the URL sweep's gate, and household consent — from the 2026-09 audit, ahead
+of the repo going public. The row caps only ever saw paths that insert, so an
+edit, the suggest proxy, type-ahead, a duplicate add and the import's Claude
+parse all spent on operator keys with no ceiling. Pins that a refusal makes
+zero upstream calls, that each path degrades the way its clients already cope
+(429 for parse/add/suggest, empty results for search, an edit that saves but
+skips the lookup), that a duplicate add is refused before enrichment, that
+`/api/sync-urls` is a no-op for a member session and runs for the nightly job
+and admins, and that `PUT /api/household` can only narrow your set — nobody
+joins a household without redeeming an invite, and the claimed side can see
+the claim (`member_of`) and leave it. See `docs/INVARIANTS.md` §28.
+
+```bash
 node scripts/mcp-test.mjs
 ```
 

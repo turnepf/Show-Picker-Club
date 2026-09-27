@@ -1,13 +1,34 @@
 import { getSession } from '../_shared/auth.js';
 import { demoMemberSlug } from '../_shared/demo.js';
 import { networkFromUrl } from '../_shared/networks.js';
+import { isAdmin } from '../_shared/admin.js';
+import { cronAuthorized } from '../_shared/secrets.js';
+
+// Copies a real deep link from one member's copy of a title onto every other
+// active copy on the same service that has only a placeholder.
+//
+// This is a club-wide sweep: its cost grows with the whole library, one UPDATE
+// per distinct (title, service), whoever asks. It used to run for any member
+// session, paced only by a localStorage timer in the web app, so one account
+// could run it in a loop. It now runs nightly from watch-urls-fill.yml
+// (X-Cron-Secret) or by an admin. A member session still gets the old
+// `{synced, skipped}` answer with nothing done, so the web app's
+// once-a-day call keeps working unchanged. New rows don't wait for the
+// nightly run: /api/shows inherits a sibling's link on insert.
+const BATCH = 50;
 
 export async function onRequestPost(context) {
   const { env, request } = context;
   const session = await getSession(request, env);
-  if (!session) {
+  const cron = await cronAuthorized(request, env);
+  if (!session && !cron) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (!cron && !(await isAdmin(request, env))) {
+    return new Response(JSON.stringify({ synced: 0, skipped: 0 }), {
       headers: { 'Content-Type': 'application/json' },
     });
   }
@@ -42,6 +63,7 @@ export async function onRequestPost(context) {
 
   let synced = 0;
   let skipped = 0;
+  const updates = [];
   for (const source of withUrls) {
     // Provenance gate. network_url has two writers with very different trust:
     // Watchmode/TMDB enrichment, and a member's own request body (api/shows.js
@@ -57,13 +79,19 @@ export async function onRequestPost(context) {
     // this feature quietly narrowing.
     if (networkFromUrl(source.network_url) !== source.network) { skipped++; continue; }
 
-    const result = await env.DB.prepare(
+    updates.push(env.DB.prepare(
       `UPDATE shows SET network_url = ?, enriched_at = datetime('now')
        WHERE LOWER(title) = ? AND network = ? AND archived = 0
          AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)
          AND (network_url IS NULL OR network_url LIKE '%/search%' OR network_url LIKE '%/s?%')`
-    ).bind(source.network_url, source.ltitle, source.network, source.tmdb_id, source.tmdb_id).run();
-    synced += result.meta.changes;
+    ).bind(source.network_url, source.ltitle, source.network, source.tmdb_id, source.tmdb_id));
+  }
+
+  // Batched so a growing library costs round trips in fiftieths rather than
+  // one per title.
+  for (let i = 0; i < updates.length; i += BATCH) {
+    const results = await env.DB.batch(updates.slice(i, i + BATCH));
+    for (const r of results || []) synced += r?.meta?.changes || 0;
   }
 
   return new Response(JSON.stringify({ synced, skipped }), {

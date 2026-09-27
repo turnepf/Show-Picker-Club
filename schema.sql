@@ -512,6 +512,17 @@ CREATE TABLE IF NOT EXISTS mcp_usage (
   PRIMARY KEY (member_slug, day)
 );
 
+-- Per-member daily ledger of upstream spend (Claude, TMDB/Watchmode). See
+-- migration 072 and _shared/spend-meter.js.
+CREATE TABLE IF NOT EXISTS member_spend (
+  member_slug TEXT NOT NULL,
+  day TEXT NOT NULL,
+  claude INTEGER NOT NULL DEFAULT 0,
+  lookups INTEGER NOT NULL DEFAULT 0,
+  searches INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (member_slug, day)
+);
+
 CREATE INDEX IF NOT EXISTS idx_oauth_clients_ip ON oauth_clients(registered_ip, created_at);
 CREATE INDEX IF NOT EXISTS idx_oauth_codes_expires ON oauth_codes(expires_at);
 CREATE INDEX IF NOT EXISTS idx_oauth_grants_member ON oauth_grants(member_slug);

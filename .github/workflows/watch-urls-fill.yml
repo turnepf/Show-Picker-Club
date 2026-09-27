@@ -88,6 +88,28 @@ jobs:
           url_count=$(printf '%s' "$body" | python3 -c "import sys,json;print(json.load(sys.stdin).get('urls_filled',0))" 2>/dev/null || echo 0)
           echo "Done. Networks adopted: $set_count · URLs filled: $url_count"
 
+      # Free, D1 only: copy a real deep link from one member's copy of a title
+      # onto every other copy on the same service still holding a placeholder.
+      # Used to be triggered by any member's web session; it's a club-wide
+      # sweep, so it runs here now. After the adopt step (which gives rows a
+      # network to match on) and before Watchmode, so no quota is spent on a
+      # link the club already has.
+      - name: Share deep links across club copies
+        continue-on-error: true
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          resp=$(curl -sS --max-time 120 -X POST "https://showpicker.club/api/sync-urls" \
+            -H "X-Cron-Secret: ${CRON_SECRET}" \
+            -w $'\n%{http_code}' || true)
+          http=$(printf '%s' "$resp" | tail -n1)
+          body=$(printf '%s' "$resp" | sed '$d')
+          echo "HTTP $http: $body"
+          if [ "$http" != "200" ]; then
+            echo "::error::sync-urls returned HTTP $http"
+            exit 1
+          fi
+
       - name: Fill streaming deep links
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
