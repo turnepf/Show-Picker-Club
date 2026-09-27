@@ -286,6 +286,15 @@ for path in /download /welcome /groups /rate-backlog /subscriptions /vibe \
   fi
 done
 
+note "security.txt"
+
+# A static file must beat the SPA catch-all; getting index.html back here means
+# _redirects is swallowing /.well-known/.
+sectxt=$(get "$(cb "$BASE/.well-known/security.txt")")
+grep -q '^Contact: ' <<< "$sectxt" \
+  && ok "security.txt served with a Contact field" \
+  || err "/.well-known/security.txt is missing or not the real file"
+
 note "Universal links (apple-app-site-association)"
 
 # A broken AASA silently breaks every universal link on every device, and
