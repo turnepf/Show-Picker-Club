@@ -155,7 +155,7 @@ struct SearchView: View {
         .buttonStyle(PushButtonStyle())
     }
 
-    // "Whitt · Watching, Amy · Loved" — group-mates with this title and where
+    // "Quinn · Watching, Amy · Loved" — group-mates with this title and where
     // they keep it; two names, then a count, to fit under a poster.
     private func groupLine(for hit: TitleHit) -> String? {
         var seen = Set<String>()

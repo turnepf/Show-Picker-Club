@@ -24,13 +24,13 @@ final class ShowWatchersTests: XCTestCase {
     func testWatchersDecodeAlongsideTheDisplayString() throws {
         let show = try decode("""
         {"id": 1, "title": "The Bear", "list": "watching",
-         "watching_with": "my sister, Whitt",
-         "watchers": [{"slug": "whitt", "name": "Whitt"}]}
+         "watching_with": "my sister, Quinn",
+         "watchers": [{"slug": "quinn", "name": "Quinn"}]}
         """)
-        XCTAssertEqual(show.watchingWith, "my sister, Whitt")
+        XCTAssertEqual(show.watchingWith, "my sister, Quinn")
         XCTAssertEqual(show.watchers?.count, 1)
-        XCTAssertEqual(show.watchers?.first?.slug, "whitt")
-        XCTAssertEqual(show.watchers?.first?.name, "Whitt")
+        XCTAssertEqual(show.watchers?.first?.slug, "quinn")
+        XCTAssertEqual(show.watchers?.first?.name, "Quinn")
     }
 
     /// Another member's copy carries neither field. Both come back nil and the
@@ -67,7 +67,7 @@ final class ShowWatchersTests: XCTestCase {
     /// decoder's whole reason for existing.
     func testMalformedWatchersDoesNotFailTheWholeShow() throws {
         let show = try decode("""
-        {"id": 5, "title": "Fargo", "list": "watching", "watchers": "Whitt"}
+        {"id": 5, "title": "Fargo", "list": "watching", "watchers": "Quinn"}
         """)
         XCTAssertNil(show.watchers)
         XCTAssertEqual(show.title, "Fargo")
@@ -108,13 +108,13 @@ final class ShowWatchersTests: XCTestCase {
     /// whole `Show` values.
     func testRoundTrip() throws {
         let original = Show(id: 6, title: "Dune", list: "watching",
-                            watchingWith: "Amy, Whitt",
+                            watchingWith: "Amy, Quinn",
                             watchers: [ShowWatcher(slug: "amy", name: "Amy"),
-                                       ShowWatcher(slug: "whitt", name: "Whitt")],
+                                       ShowWatcher(slug: "quinn", name: "Quinn")],
                             addedByMember: ShowWatcher(slug: "amy", name: "Amy"))
         let back = try JSONDecoder().decode(Show.self, from: JSONEncoder().encode(original))
         XCTAssertEqual(back.watchers, original.watchers)
-        XCTAssertEqual(back.watchingWith, "Amy, Whitt")
+        XCTAssertEqual(back.watchingWith, "Amy, Quinn")
         XCTAssertEqual(back.addedByMember, original.addedByMember)
     }
 }

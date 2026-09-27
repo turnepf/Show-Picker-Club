@@ -666,7 +666,7 @@ struct IPadHomeView: View {
             }
             return
         }
-        let slug = first == "dorothy" ? "whitt" : first // mirror the web's 301
+        let slug = first
         // Same rule as iPhone: an admin following a link to someone else gets
         // that member's admin screen. The sidebar goes to Manage members so
         // Back lands somewhere that makes sense, and the screen itself opens

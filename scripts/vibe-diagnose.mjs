@@ -3,7 +3,7 @@
 // Everything the vibe pipeline knows about one member, end to end.
 //
 //   node scripts/vibe-diagnose.mjs            (defaults to paula)
-//   node scripts/vibe-diagnose.mjs whitt
+//   node scripts/vibe-diagnose.mjs quinn
 //   node scripts/vibe-diagnose.mjs paula --snapshot /tmp/paula.json
 //   node scripts/vibe-diagnose.mjs paula --from /tmp/paula.json
 //

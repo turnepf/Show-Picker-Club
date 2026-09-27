@@ -162,9 +162,9 @@ console.log('\n== Yesterday\'s snapshot is replaced, and the table stays at one 
 console.log('\n== Names come from the session, never the cache');
 {
   const env = makeEnv();
-  for (const slug of ['patrick', 'whitt', 'stranger']) addMember(env, slug);
-  addGroup(env, 'Family', 'patrick', ['patrick', 'whitt']);
-  addShow(env, { slug: 'whitt', title: 'Poker Face' });
+  for (const slug of ['patrick', 'quinn', 'stranger']) addMember(env, slug);
+  addGroup(env, 'Family', 'patrick', ['patrick', 'quinn']);
+  addShow(env, { slug: 'quinn', title: 'Poker Face' });
   const sPatrick = addSession(env, 'patrick');
   const sStranger = addSession(env, 'stranger');
 
@@ -178,7 +178,7 @@ console.log('\n== Names come from the session, never the cache');
   const mate = await body(await popular.onRequestGet({ env, request: req('/api/popular', sPatrick) }));
   const mateRow = mate.shows.find(s => s.title === 'Poker Face');
   check('a group-mate is named, resolved fresh from the cached snapshot',
-        mateRow.members.join(',') === 'whitt', JSON.stringify(mateRow.members));
+        mateRow.members.join(',') === 'quinn', JSON.stringify(mateRow.members));
   check('member_slugs stripped for group-mates too', !('member_slugs' in mateRow));
 
   const out = await body(await popular.onRequestGet({ env, request: req('/api/popular', sStranger) }));

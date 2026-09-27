@@ -116,11 +116,11 @@ console.log('\n== the scheduled action runs on a cron secret alone');
 {
   const env = makeEnv();
   addMember(env, 'patrick');
-  addMember(env, 'whitt');
+  addMember(env, 'quinn');
   addMember(env, 'stacy');
   // Two members agree the show is on Max; a third copy has no network at all.
   addShow(env, { title: 'Hacks', member: 'patrick', network: 'Max', url: 'https://play.max.com/show/hacks' });
-  addShow(env, { title: 'Hacks', member: 'whitt', network: 'Max' });
+  addShow(env, { title: 'Hacks', member: 'quinn', network: 'Max' });
   addShow(env, { title: 'Hacks', member: 'stacy' });
 
   const res = await post(env, 'inherit_networks', { cron: SECRET });
@@ -143,11 +143,11 @@ console.log('\n== it decides nothing a member disagrees about');
 {
   const env = makeEnv();
   addMember(env, 'patrick');
-  addMember(env, 'whitt');
+  addMember(env, 'quinn');
   addMember(env, 'stacy');
   // The club disagrees: one copy says Netflix, one says Hulu, one is empty.
   addShow(env, { title: 'The Bear', member: 'patrick', network: 'Netflix' });
-  addShow(env, { title: 'The Bear', member: 'whitt', network: 'Hulu' });
+  addShow(env, { title: 'The Bear', member: 'quinn', network: 'Hulu' });
   addShow(env, { title: 'The Bear', member: 'stacy' });
 
   const body = await (await post(env, 'inherit_networks', { cron: SECRET })).json();

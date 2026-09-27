@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Show Picker Club — a multi-tenant TV-show/movie tracker, live at [showpicker.club](https://showpicker.club) and publicly listed on the App Store. Each member has a slug (`/patrick`, `/whitt`, …) and keeps four ranked lists (Watching, Awaiting, Loved, Next Up). The native SwiftUI apps for iPhone/iPad/Mac, Apple TV and Apple Watch are the product members actually use; the browser app is back as a secondary surface (see `docs/PRODUCT.md#web-app-status`) and the Cloudflare backend in this repo serves both.
+Show Picker Club — a multi-tenant TV-show/movie tracker, live at [showpicker.club](https://showpicker.club) and publicly listed on the App Store. Each member has a slug (`/patrick`, `/amy`, …) and keeps four ranked lists (Watching, Awaiting, Loved, Next Up). The native SwiftUI apps for iPhone/iPad/Mac, Apple TV and Apple Watch are the product members actually use; the browser app is back as a secondary surface (see `docs/PRODUCT.md#web-app-status`) and the Cloudflare backend in this repo serves both.
 
 **Despite the name, this is not a small private club any more — don't design as if it were.** Signup is open and self-service (email code / Apple / Google), the universal app is on the public App Store, and the membership is dozens of people rather than a couple of friends. Privacy moved *inside* the product: **private groups** and **households** are joined by invite link only, and group membership — not club membership — is what lets two members see or touch each other's libraries. So "another member" is not a synonym for "a friend": private memos (notes, watching-with text, recommended-by) stay owner-only, the social features (Also watching, vibe, cross-library reads) are group-scoped, and the one cross-member *write* that exists, Watching With, is allowed precisely because a group is a relationship both people opted into. The word *club* in the name and the UI is branding, not an access model.
 
@@ -558,7 +558,9 @@ repo exactly like `scripts/asc.mjs`: `~/.roku/host` and `~/.roku/password`, or
 
 Two of the suites above — `watching-with-test.mjs` and `og-preview-test.mjs` — are **not** wired into `pr-checks.yml`. The pre-push hook runs them anyway, so in practice they run on every push from a configured machine; run them by hand if you've bypassed it.
 
-**The pre-push hook is the only gate that can actually stop a bad commit.** `.githooks/pre-push`, enabled with `git config core.hooksPath .githooks`, runs the static invariants plus every suite needing no network, container or `npm install` — about six seconds. It derives that list from `pr-checks.yml` rather than repeating it, so adding a suite to CI adds it here for free. It exists because this repo is private on a GitHub Free plan, where branch protection and rulesets return 403: nothing server-side can refuse a merge, and a PR opened and squash-merged in one breath merges *before* its checks even start (which is how a red `static` job landed on `main` on 2026-09-19). Bypass a genuinely unrelated push with `git push --no-verify`; don't bypass to skip a failure.
+**`main` is branch-protected (since the repo went public, 2026-09-27).** The six `pr-checks.yml` jobs — `static`, `webauthn`, `authcodes`, `roku`, `listimport`, `swift` — are required, admins included, and nothing reaches `main` except through a PR: no direct pushes, no force pushes. The advisory `review` job is deliberately not required. Merge with `gh pr merge <n> --squash --auto`, which merges once the checks go green; a plain `--squash` is refused while they're pending. Before this the repo was private on GitHub Free, where protection returns 403, and a PR squash-merged in one breath merged before its checks started (a red `static` job landed on `main` that way on 2026-09-19). A job renamed in `pr-checks.yml` must be renamed in the protection settings too, or every PR waits forever on a check that no longer exists.
+
+**The pre-push hook is the fast local gate.** `.githooks/pre-push`, enabled with `git config core.hooksPath .githooks`, runs the static invariants plus every suite needing no network, container or `npm install` — about six seconds — so a failure shows up before the push rather than minutes later in CI. It derives that list from `pr-checks.yml` rather than repeating it, so adding a suite to CI adds it here for free. Bypass a genuinely unrelated push with `git push --no-verify`; don't bypass to skip a failure.
 
 The rules these checks enforce are written down in `docs/INVARIANTS.md`; adding a rule there also extends the advisory PR review.
 
@@ -613,7 +615,6 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 - **Network URLs containing `/search`, `/s?`, or `/?q=` are placeholders**, not real deep links — the frontend, sync-urls, and calendar feed all treat them as missing.
 - **Fresh versus existing databases.** `schema.sql` creates the current complete schema for a new database. `migrations/` upgrades existing databases only; never apply the historical migration set after loading `schema.sql`.
 - **Secrets are set with `printf`, never `echo`** (trailing newlines break runtime API calls).
-- **Slug `dorothy` 301s to `whitt`** and the member displays as Dorothy; don't "fix" either side.
 - **Delete feature branches once merged and live** — local and remote. In the Claude-Code-on-the-web environment the git proxy rejects remote branch deletion (403); the user deletes merged branches themselves from GitHub's post-merge screen.
 
 ## Working preferences
@@ -673,8 +674,8 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
   and let the user watch it themselves.
 
 - **Open and merge the PR yourself — don't wait to be asked.** Finished work
-  goes: commit → push → open the PR → squash-merge it → tell the user it's on
-  `main` and ready to pull into Xcode. No "want me to merge?" round trip, and
+  goes: commit → push → open the PR → `gh pr merge --squash --auto` → tell
+  the user it merges into `main` once checks pass, ready to pull into Xcode. No "want me to merge?" round trip, and
   no reminders that the user has to compile the Apple targets — they know.
 
 - **Whether you can build the Apple targets depends on where you're running.**
@@ -696,7 +697,7 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
   in the background — even warm it outlasts a foreground timeout. Signing needs
   no keychain setup. **Ask first** — it's his physical device — and be clear
   that this is a debug install to his phone only: it is NOT TestFlight, it
-  doesn't reach Whitt, and it touches nothing Apple reviews.
+  doesn't reach other testers, and it touches nothing Apple reviews.
 
 - **SourceKit "Cannot find type 'Show' / 'Theme' / 'AuthStore' in scope" on
   files under `ios/` or `tvos/` is noise, not a real error.** The tell is that

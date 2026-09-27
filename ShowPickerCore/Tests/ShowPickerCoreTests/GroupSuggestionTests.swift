@@ -25,7 +25,7 @@ final class GroupSuggestionTests: XCTestCase {
          "created_at": "2026-08-25 12:00:00",
          "suggested_by": "jc", "suggested_by_name": "JC",
          "is_yours": 0, "your_response": null,
-         "added_count": 2, "added_names": ["Amy", "Whitt"],
+         "added_count": 2, "added_names": ["Amy", "Quinn"],
          "on_your_list": null}
         """)
         XCTAssertEqual(s.title, "Lanterns")
@@ -33,7 +33,7 @@ final class GroupSuggestionTests: XCTestCase {
         XCTAssertEqual(s.showId, 42)
         XCTAssertFalse(s.isMovie)
         XCTAssertFalse(s.isYours)
-        XCTAssertEqual(s.addedNames, ["Amy", "Whitt"])
+        XCTAssertEqual(s.addedNames, ["Amy", "Quinn"])
         XCTAssertTrue(s.needsResponse, "unanswered, not mine — the pop-up should ask")
     }
 
@@ -51,7 +51,7 @@ final class GroupSuggestionTests: XCTestCase {
         let s = try decode("""
         {"id": 2, "title": "Severance", "is_yours": 0,
          "your_response": "dismissed",
-         "suggested_by": "whitt", "suggested_by_name": "Whitt"}
+         "suggested_by": "quinn", "suggested_by_name": "Quinn"}
         """)
         XCTAssertEqual(s.yourResponse, "dismissed")
         XCTAssertFalse(s.needsResponse)

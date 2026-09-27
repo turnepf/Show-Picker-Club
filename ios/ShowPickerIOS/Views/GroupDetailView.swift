@@ -9,7 +9,7 @@ struct GroupDetailView: View {
     @State private var group: ShowPickerCore.Group?
     @State private var members: [GroupMember] = []
     // The club roster, by slug. The group payload carries first names only, so
-    // this is what gives a member row the same display name ("Dorothy") and
+    // this is what gives a member row the same display name ("Rosa") and
     // the same Member value the rest of the app navigates with.
     @State private var roster: [String: Member] = [:]
     @State private var trending: [PopularShow] = []

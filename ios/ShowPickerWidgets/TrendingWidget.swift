@@ -11,11 +11,11 @@ struct TrendingEntry: TimelineEntry {
     static func placeholder(_ date: Date) -> TrendingEntry {
         TrendingEntry(date: date, shows: [
             WidgetShow(id: 1, title: "House of the Dragon", network: "HBO Max", rating: "8.4",
-                       membersText: "Watching: Patrick, Whitt", eventDate: nil, eventKind: nil, posterData: nil),
+                       membersText: "Watching: Patrick, Quinn", eventDate: nil, eventKind: nil, posterData: nil),
             WidgetShow(id: 2, title: "Slow Horses", network: "Apple TV+", rating: "8.2",
                        membersText: "Watching: Patrick", eventDate: nil, eventKind: nil, posterData: nil),
             WidgetShow(id: 3, title: "The Bear", network: "Hulu", rating: "8.5",
-                       membersText: "Watching: Whitt", eventDate: nil, eventKind: nil, posterData: nil),
+                       membersText: "Watching: Quinn", eventDate: nil, eventKind: nil, posterData: nil),
         ])
     }
 }

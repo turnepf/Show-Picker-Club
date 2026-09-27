@@ -224,7 +224,7 @@ struct AddEditShowView: View {
         Set(groupMates.flatMap { $0.groups ?? [] }).count > 1
     }
 
-    // "Whitt's", "Amy and Whitt's" — whose lists this save is about to touch,
+    // "Quinn's", "Amy and Quinn's" — whose lists this save is about to touch,
     // in the order the pickers are drawn.
     private var watcherNames: String {
         let names = groupMates.filter { selectedWatchers.contains($0.slug) }.map(\.name)

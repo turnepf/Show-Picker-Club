@@ -107,12 +107,12 @@ const body = async (res) => JSON.parse(await res.text());
 console.log('\n== /api/favorite-actors is owner-only');
 {
   const env = makeEnv();
-  addMember(env, 'patrick'); addMember(env, 'whitt');
+  addMember(env, 'patrick'); addMember(env, 'quinn');
   const s = addSession(env, 'patrick');
 
   const mine = addShow(env, { slug: 'patrick', title: 'Severance' });
   addActor(env, mine, { name: 'Adam Scott', imdbId: 'nm0794014', personId: 1 });
-  const theirs = addShow(env, { slug: 'whitt', title: 'Poker Face' });
+  const theirs = addShow(env, { slug: 'quinn', title: 'Poker Face' });
   addActor(env, theirs, { name: 'Natasha Lyonne', imdbId: 'nm0530879', personId: 2 });
 
   const anon = await favoriteActors.onRequestGet({ env, request: req('/api/favorite-actors') });
@@ -124,7 +124,7 @@ console.log('\n== /api/favorite-actors is owner-only');
   check("another member's actor never appears", !actors.some(a => a.name === 'Natasha Lyonne'));
 
   // No ?member= route in or out.
-  const spoof = await favoriteActors.onRequestGet({ env, request: req('/api/favorite-actors?member=whitt', s) });
+  const spoof = await favoriteActors.onRequestGet({ env, request: req('/api/favorite-actors?member=quinn', s) });
   const spoofed = await body(spoof);
   check('?member= is ignored, not honoured',
     !spoofed.actors.some(a => a.name === 'Natasha Lyonne'));

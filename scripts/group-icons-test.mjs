@@ -123,10 +123,10 @@ const storedIcon = (env, id) =>
 function club() {
   const env = makeEnv();
   addMember(env, 'patrick', 'Patrick Turner');
-  addMember(env, 'whitt', 'Whitt Dorothy');
+  addMember(env, 'quinn', 'Quinn Rosa');
   const patrick = addSession(env, 'patrick');
-  const whitt = addSession(env, 'whitt');
-  return { env, patrick, whitt };
+  const quinn = addSession(env, 'quinn');
+  return { env, patrick, quinn };
 }
 
 console.log('\n== the curated sets are the gate');
@@ -143,16 +143,16 @@ console.log('\n== the curated sets are the gate');
 
 console.log('\n== create stores the choice and every payload carries it');
 {
-  const { env, patrick, whitt } = club();
+  const { env, patrick, quinn } = club();
   const created = await createGroup(env, patrick, { name: 'Thursday Night', icon: 'flame.fill', color: 'orange' });
   check('create with a valid icon and color is 201', created.status === 201, `got ${created.status}`);
   const { group } = await created.json();
   check('the create payload carries them back', group.icon === 'flame.fill' && group.color === 'orange');
 
-  env._db.prepare('INSERT INTO group_members (group_id, member_slug) VALUES (?, ?)').run(group.id, 'whitt');
-  const list = await (await listGroups(env, whitt)).json();
+  env._db.prepare('INSERT INTO group_members (group_id, member_slug) VALUES (?, ?)').run(group.id, 'quinn');
+  const list = await (await listGroups(env, quinn)).json();
   check('the list payload carries them', list.groups[0].icon === 'flame.fill' && list.groups[0].color === 'orange');
-  const detail = await (await getGroup(env, whitt, group.id)).json();
+  const detail = await (await getGroup(env, quinn, group.id)).json();
   check('the detail payload carries them', detail.group.icon === 'flame.fill' && detail.group.color === 'orange');
 
   const plain = await createGroup(env, patrick, { name: 'No Icon' });
@@ -162,9 +162,9 @@ console.log('\n== create stores the choice and every payload carries it');
 
 console.log('\n== PATCH: absent keeps, null clears, any member');
 {
-  const { env, patrick, whitt } = club();
+  const { env, patrick, quinn } = club();
   const { group } = await (await createGroup(env, patrick, { name: 'Movie Night', icon: 'film.fill', color: 'purple' })).json();
-  env._db.prepare('INSERT INTO group_members (group_id, member_slug) VALUES (?, ?)').run(group.id, 'whitt');
+  env._db.prepare('INSERT INTO group_members (group_id, member_slug) VALUES (?, ?)').run(group.id, 'quinn');
 
   const renamed = await patchGroup(env, patrick, group.id, { name: 'Film Night' });
   check('a plain rename is 200', renamed.status === 200, `got ${renamed.status}`);
@@ -189,7 +189,7 @@ console.log('\n== PATCH: absent keeps, null clears, any member');
   const empty = await patchGroup(env, patrick, group.id, {});
   check('an empty PATCH is still 400', empty.status === 400, `got ${empty.status}`);
 
-  const mate = await patchGroup(env, whitt, group.id, { icon: 'star.fill' });
+  const mate = await patchGroup(env, quinn, group.id, { icon: 'star.fill' });
   check('a group-mate who is not the creator can still re-icon', mate.status === 200, `got ${mate.status}`);
   row = storedIcon(env, group.id);
   check('and it stuck', row.icon === 'star.fill', JSON.stringify(row));
@@ -204,30 +204,30 @@ console.log('\n== PATCH: absent keeps, null clears, any member');
 
 console.log('\n== the change notice: once, never to the editor, never before joining');
 {
-  const { env, patrick, whitt } = club();
+  const { env, patrick, quinn } = club();
   const { group } = await (await createGroup(env, patrick, { name: 'Queen Jelena 2026', icon: 'crown.fill', color: 'purple' })).json();
-  env._db.prepare('INSERT INTO group_members (group_id, member_slug) VALUES (?, ?)').run(group.id, 'whitt');
+  env._db.prepare('INSERT INTO group_members (group_id, member_slug) VALUES (?, ?)').run(group.id, 'quinn');
 
-  const beforeRename = await (await getGroup(env, whitt, group.id)).json();
-  check('nothing to tell whitt before anything changed', beforeRename.change_notice === null,
+  const beforeRename = await (await getGroup(env, quinn, group.id)).json();
+  check('nothing to tell quinn before anything changed', beforeRename.change_notice === null,
         JSON.stringify(beforeRename.change_notice));
 
-  // whitt — not the creator — renames it.
-  const renamed = await patchGroup(env, whitt, group.id, { name: 'Queen Jelena Fan Club' });
+  // quinn — not the creator — renames it.
+  const renamed = await patchGroup(env, quinn, group.id, { name: 'Queen Jelena Fan Club' });
   check('a group-mate who is not the creator can rename it', renamed.status === 200, `got ${renamed.status}`);
 
   const patrickView = await (await getGroup(env, patrick, group.id)).json();
-  check('patrick is told whitt renamed it', patrickView.change_notice?.changed_by === 'whitt',
+  check('patrick is told quinn renamed it', patrickView.change_notice?.changed_by === 'quinn',
         JSON.stringify(patrickView.change_notice));
-  check('by first name', patrickView.change_notice?.changed_by_name === 'Whitt');
+  check('by first name', patrickView.change_notice?.changed_by_name === 'Quinn');
   check('naming what changed', JSON.stringify(patrickView.change_notice?.changed_fields) === JSON.stringify(['name']));
 
   const patrickAgain = await (await getGroup(env, patrick, group.id)).json();
   check('and not a second time', patrickAgain.change_notice === null, JSON.stringify(patrickAgain.change_notice));
 
-  const whittView = await (await getGroup(env, whitt, group.id)).json();
-  check('whitt never gets told about her own change', whittView.change_notice === null,
-        JSON.stringify(whittView.change_notice));
+  const quinnView = await (await getGroup(env, quinn, group.id)).json();
+  check('quinn never gets told about her own change', quinnView.change_notice === null,
+        JSON.stringify(quinnView.change_notice));
 
   // A new member joins after the rename — nothing to tell them either.
   // joined_at is pinned to 1ms after the rename's own (millisecond-precision)
@@ -243,23 +243,23 @@ console.log('\n== the change notice: once, never to the editor, never before joi
   check('a member who joined after the rename sees nothing about it', nicoView.change_notice === null,
         JSON.stringify(nicoView.change_notice));
 
-  // patrick changes the icon; both whitt and nico should be told once, and
+  // patrick changes the icon; both quinn and nico should be told once, and
   // this time the field named is 'icon', not 'name'.
   //
   // The pause is what makes that a *second* moment in time. The scenario needs
   // three distinct ones — the rename, nico joining 1ms later, then this — and
   // profile_changed_at resolves to the millisecond, which two PATCHes against
   // an in-memory database can share. When they did, this change landed at or
-  // before nico's join and at whitt's existing high-water mark, so neither was
+  // before nico's join and at quinn's existing high-water mark, so neither was
   // told and the suite failed about two runs in five. Real edits are minutes
   // apart; only the test can collapse them, so only the test has to separate
   // them.
   await new Promise((r) => setTimeout(r, 5));
   await patchGroup(env, patrick, group.id, { icon: 'sparkles' });
-  const whittIconView = await (await getGroup(env, whitt, group.id)).json();
-  check('whitt is told about the icon change', whittIconView.change_notice?.changed_by === 'patrick',
-        JSON.stringify(whittIconView.change_notice));
-  check('naming icon, not name', JSON.stringify(whittIconView.change_notice?.changed_fields) === JSON.stringify(['icon']));
+  const quinnIconView = await (await getGroup(env, quinn, group.id)).json();
+  check('quinn is told about the icon change', quinnIconView.change_notice?.changed_by === 'patrick',
+        JSON.stringify(quinnIconView.change_notice));
+  check('naming icon, not name', JSON.stringify(quinnIconView.change_notice?.changed_fields) === JSON.stringify(['icon']));
   const nicoIconView = await (await getGroup(env, nico, group.id)).json();
   check('nico — a member at the time — is told too', nicoIconView.change_notice?.changed_by === 'patrick');
 }

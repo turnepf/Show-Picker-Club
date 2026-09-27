@@ -162,15 +162,15 @@ const removeCard = (env, cookie, groupId, sid) =>
 const leaveGroup = (env, cookie, groupId) =>
   leaveApi.onRequestPost(ctx(env, req(`/api/groups/${groupId}/leave`, { cookie, method: 'POST' }), { id: String(groupId) }));
 
-// Patrick, Whitt and Amy share a group (Patrick created it). Stacy is a club
+// Patrick, Quinn and Amy share a group (Patrick created it). Stacy is a club
 // member in no group with them — the outsider every gate is measured against.
 function club() {
   const env = makeEnv();
   addMember(env, 'patrick', 'Patrick Turner');
-  addMember(env, 'whitt', 'Whitt Dorothy');
+  addMember(env, 'quinn', 'Quinn Rosa');
   addMember(env, 'amy', 'Amy Turner');
   addMember(env, 'stacy', 'Stacy Kallay');
-  const groupId = addGroup(env, 'Show Picker Club', ['patrick', 'whitt', 'amy']);
+  const groupId = addGroup(env, 'Show Picker Club', ['patrick', 'quinn', 'amy']);
   return { env, groupId };
 }
 
@@ -208,10 +208,10 @@ console.log('\n== recommending puts a card on the board and rows on no list');
   check('and the recommender’s copy id, for navigation', suggestion.show_id === mine);
   check('it is marked as yours to you', suggestion.is_yours === 1);
 
-  check('nothing lands on anyone’s list', rowsFor(env, 'whitt').length === 0 && rowsFor(env, 'amy').length === 0);
+  check('nothing lands on anyone’s list', rowsFor(env, 'quinn').length === 0 && rowsFor(env, 'amy').length === 0);
 
-  const whitt = addSession(env, 'whitt');
-  const board = await (await getBoard(env, whitt, groupId)).json();
+  const quinn = addSession(env, 'quinn');
+  const board = await (await getBoard(env, quinn, groupId)).json();
   check('a group-mate sees the card', board.suggestions.length === 1, `got ${board.suggestions.length}`);
   check('unanswered, so their pop-up queue holds it',
     board.suggestions[0].is_yours === 0 && board.suggestions[0].your_response === null);
@@ -221,7 +221,7 @@ console.log('\n== you can only recommend a copy you own');
 {
   const { env, groupId } = club();
   const jc = addSession(env, 'patrick');
-  const theirs = addShow(env, { slug: 'whitt', title: 'Severance', tmdbId: 222 });
+  const theirs = addShow(env, { slug: 'quinn', title: 'Severance', tmdbId: 222 });
   const notMine = await recommend(env, jc, groupId, { show_id: theirs });
   check('someone else’s row is 404', notMine.status === 404, `got ${notMine.status}`);
   const junk = await recommend(env, jc, groupId, { show_id: 'nope' });
@@ -263,17 +263,17 @@ console.log('\n== a list they already made is not rearranged');
   const mine = addShow(env, { slug: 'patrick', title: 'Lanterns', tmdbId: 111 });
   const { suggestion } = await (await recommend(env, jc, groupId, { show_id: mine })).json();
 
-  const existing = addShow(env, { slug: 'whitt', title: 'Lanterns', list: 'watching', tmdbId: 111, notes: 'ep 3 is where it clicks' });
-  const whitt = addSession(env, 'whitt');
-  await respond(env, whitt, groupId, suggestion.id, { response: 'add' });
+  const existing = addShow(env, { slug: 'quinn', title: 'Lanterns', list: 'watching', tmdbId: 111, notes: 'ep 3 is where it clicks' });
+  const quinn = addSession(env, 'quinn');
+  await respond(env, quinn, groupId, suggestion.id, { response: 'add' });
 
-  const theirRows = rowsFor(env, 'whitt');
+  const theirRows = rowsFor(env, 'quinn');
   check('no duplicate row is created', theirRows.length === 1, `got ${theirRows.length}`);
   check('their placement is untouched — not moved to Next Up', theirRows[0].list === 'watching', theirRows[0].list);
   check('the existing row is the one linked', theirRows[0].id === existing);
   check('their own memos are not overwritten', theirRows[0].recommended_by === null && theirRows[0].notes === 'ep 3 is where it clicks');
 
-  const board = await (await getBoard(env, whitt, groupId)).json();
+  const board = await (await getBoard(env, quinn, groupId)).json();
   check('they still count as in', board.suggestions[0].your_response === 'added');
 }
 
@@ -284,11 +284,11 @@ console.log('\n== an archived copy is revived onto Next Up, not duplicated');
   const mine = addShow(env, { slug: 'patrick', title: 'Poker Face', tmdbId: 333 });
   const { suggestion } = await (await recommend(env, jc, groupId, { show_id: mine })).json();
 
-  const shelved = addShow(env, { slug: 'whitt', title: 'Poker Face', list: 'loved', archived: 1, tmdbId: 333 });
-  const whitt = addSession(env, 'whitt');
-  await respond(env, whitt, groupId, suggestion.id, { response: 'add' });
+  const shelved = addShow(env, { slug: 'quinn', title: 'Poker Face', list: 'loved', archived: 1, tmdbId: 333 });
+  const quinn = addSession(env, 'quinn');
+  await respond(env, quinn, groupId, suggestion.id, { response: 'add' });
 
-  const theirRows = rowsFor(env, 'whitt');
+  const theirRows = rowsFor(env, 'quinn');
   check('still one row', theirRows.length === 1, `got ${theirRows.length}`);
   check('the same row', theirRows[0].id === shelved);
   check('unarchived onto Next Up', theirRows[0].archived === 0 && theirRows[0].list === 'next', theirRows[0].list);
@@ -301,12 +301,12 @@ console.log('\n== Dismiss is a per-member mark and nothing more');
   const mine = addShow(env, { slug: 'patrick', title: 'Lanterns', tmdbId: 111 });
   const { suggestion } = await (await recommend(env, jc, groupId, { show_id: mine })).json();
 
-  const whitt = addSession(env, 'whitt');
-  const res = await respond(env, whitt, groupId, suggestion.id, { response: 'dismiss' });
+  const quinn = addSession(env, 'quinn');
+  const res = await respond(env, quinn, groupId, suggestion.id, { response: 'dismiss' });
   check('the dismiss succeeds', res.status === 200, `got ${res.status}`);
-  check('nothing lands on their list', rowsFor(env, 'whitt').length === 0);
+  check('nothing lands on their list', rowsFor(env, 'quinn').length === 0);
 
-  const theirBoard = await (await getBoard(env, whitt, groupId)).json();
+  const theirBoard = await (await getBoard(env, quinn, groupId)).json();
   check('their view records it', theirBoard.suggestions[0].your_response === 'dismissed');
 
   const amy = addSession(env, 'amy');
@@ -315,10 +315,10 @@ console.log('\n== Dismiss is a per-member mark and nothing more');
   check('the card itself is still on the board', herBoard.suggestions.length === 1);
 
   // Changed their mind at the board later.
-  await respond(env, whitt, groupId, suggestion.id, { response: 'add' });
-  const after = await (await getBoard(env, whitt, groupId)).json();
+  await respond(env, quinn, groupId, suggestion.id, { response: 'add' });
+  const after = await (await getBoard(env, quinn, groupId)).json();
   check('a dismiss doesn’t bar adding later', after.suggestions[0].your_response === 'added');
-  check('and the add really happened', rowFor(env, 'whitt', 'Lanterns').list === 'next');
+  check('and the add really happened', rowFor(env, 'quinn', 'Lanterns').list === 'next');
 }
 
 console.log('\n== your own recommendation never asks you to respond');
@@ -340,9 +340,9 @@ console.log('\n== a duplicate title folds into the existing card');
   const mine = addShow(env, { slug: 'patrick', title: 'Lanterns', tmdbId: 111 });
   const first = await (await recommend(env, jc, groupId, { show_id: mine })).json();
 
-  const whitt = addSession(env, 'whitt');
-  const theirs = addShow(env, { slug: 'whitt', title: 'Lanterns', tmdbId: 111 });
-  const again = await recommend(env, whitt, groupId, { show_id: theirs });
+  const quinn = addSession(env, 'quinn');
+  const theirs = addShow(env, { slug: 'quinn', title: 'Lanterns', tmdbId: 111 });
+  const again = await recommend(env, quinn, groupId, { show_id: theirs });
   check('the second recommend is a 200, not a new card', again.status === 200, `got ${again.status}`);
   const { suggestion } = await again.json();
   check('and returns the existing card', suggestion.id === first.suggestion.id);
@@ -368,18 +368,18 @@ console.log('\n== one member cannot flood a group');
 console.log('\n== taking a card down: the recommender or the creator, nobody else');
 {
   const { env, groupId } = club();
-  const whitt = addSession(env, 'whitt');
-  const theirs = addShow(env, { slug: 'whitt', title: 'Severance', tmdbId: 222 });
-  const { suggestion } = await (await recommend(env, whitt, groupId, { show_id: theirs })).json();
+  const quinn = addSession(env, 'quinn');
+  const theirs = addShow(env, { slug: 'quinn', title: 'Severance', tmdbId: 222 });
+  const { suggestion } = await (await recommend(env, quinn, groupId, { show_id: theirs })).json();
 
   const amy = addSession(env, 'amy');
   const bystander = await removeCard(env, amy, groupId, suggestion.id);
   check('a bystander cannot remove it', bystander.status === 403, `got ${bystander.status}`);
 
-  const own = await removeCard(env, whitt, groupId, suggestion.id);
+  const own = await removeCard(env, quinn, groupId, suggestion.id);
   check('the recommender can retract it', own.status === 200, `got ${own.status}`);
 
-  const { suggestion: second } = await (await recommend(env, whitt, groupId, { show_id: theirs })).json();
+  const { suggestion: second } = await (await recommend(env, quinn, groupId, { show_id: theirs })).json();
   const jc = addSession(env, 'patrick');
   const creator = await removeCard(env, jc, groupId, second.id);
   check('the group creator can tidy the board', creator.status === 200, `got ${creator.status}`);
@@ -397,30 +397,30 @@ console.log('\n== the recommender deleting their copy doesn’t strand the card'
   await showApi.onRequestDelete(ctx(env, req(`/api/shows/${mine}`, { cookie: jc, method: 'DELETE' }), { id: String(mine) }));
   check('precondition: the source row is gone', !rowFor(env, 'patrick', 'Lanterns'));
 
-  const whitt = addSession(env, 'whitt');
-  const board = await (await getBoard(env, whitt, groupId)).json();
+  const quinn = addSession(env, 'quinn');
+  const board = await (await getBoard(env, quinn, groupId)).json();
   check('the card still renders from its snapshot', board.suggestions.length === 1 && board.suggestions[0].poster_url === 'https://image.tmdb.org/lanterns.jpg');
   check('with its dangling pointer nulled, not left stale', board.suggestions[0].show_id === null, String(board.suggestions[0].show_id));
 
-  const res = await respond(env, whitt, groupId, suggestion.id, { response: 'add' });
+  const res = await respond(env, quinn, groupId, suggestion.id, { response: 'add' });
   check('and can still be added', res.status === 200, `got ${res.status}`);
-  const theirs = rowFor(env, 'whitt', 'Lanterns');
+  const theirs = rowFor(env, 'quinn', 'Lanterns');
   check('from the snapshot, onto Next Up', theirs && theirs.list === 'next' && theirs.tmdb_id === 111);
 }
 
 console.log('\n== leaving the group takes your cards with you');
 {
   const { env, groupId } = club();
-  const whitt = addSession(env, 'whitt');
-  const theirs = addShow(env, { slug: 'whitt', title: 'Severance', tmdbId: 222 });
-  await recommend(env, whitt, groupId, { show_id: theirs });
+  const quinn = addSession(env, 'quinn');
+  const theirs = addShow(env, { slug: 'quinn', title: 'Severance', tmdbId: 222 });
+  await recommend(env, quinn, groupId, { show_id: theirs });
 
   const jc = addSession(env, 'patrick');
   const mine = addShow(env, { slug: 'patrick', title: 'Lanterns', tmdbId: 111 });
   const { suggestion: patricksCard } = await (await recommend(env, jc, groupId, { show_id: mine })).json();
-  await respond(env, whitt, groupId, patricksCard.id, { response: 'dismiss' });
+  await respond(env, quinn, groupId, patricksCard.id, { response: 'dismiss' });
 
-  const res = await leaveGroup(env, whitt, groupId);
+  const res = await leaveGroup(env, quinn, groupId);
   check('the leave succeeds', res.status === 200, `got ${res.status}`);
 
   const board = await (await getBoard(env, jc, groupId)).json();
@@ -428,10 +428,10 @@ console.log('\n== leaving the group takes your cards with you');
   check('other members’ cards stay', board.suggestions.some((s) => s.title === 'Lanterns'));
   const marks = env._db.prepare(
     'SELECT COUNT(*) AS cnt FROM group_suggestion_responses WHERE member_slug = ?'
-  ).get('whitt');
+  ).get('quinn');
   check('and their marks on other cards are cleared', Number(marks.cnt) === 0, `got ${marks.cnt}`);
 
-  const gone = await getBoard(env, whitt, groupId);
+  const gone = await getBoard(env, quinn, groupId);
   check('the board is closed to them now', gone.status === 403, `got ${gone.status}`);
 }
 

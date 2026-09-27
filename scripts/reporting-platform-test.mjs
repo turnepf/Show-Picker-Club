@@ -237,7 +237,7 @@ console.log('\n== legacy sessions with no member dedupe on the identity they car
   addSession(env, { slug: null, identity: 'jc@example.com', platform: 'tvos' });
   addSession(env, { slug: null, identity: 'jc@example.com', platform: 'tvos' });
   // A third in someone else's house.
-  addSession(env, { slug: null, identity: 'whitt@example.com', platform: 'tvos' });
+  addSession(env, { slug: null, identity: 'quinn@example.com', platform: 'tvos' });
 
   const day = (await body(env, cookie)).active_by_platform.day;
   check('one person\'s two old devices are one, the stranger\'s is another',

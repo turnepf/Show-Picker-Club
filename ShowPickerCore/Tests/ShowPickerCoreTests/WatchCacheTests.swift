@@ -50,10 +50,10 @@ final class WatchCacheTests: XCTestCase {
     /// Two members on one watch must not bleed into each other.
     func testCacheIsScopedPerMember() {
         WatchCache.save([show(1, "Severance")], for: "patrick")
-        WatchCache.save([show(2, "Ted Lasso")], for: "whitt")
+        WatchCache.save([show(2, "Ted Lasso")], for: "quinn")
 
         XCTAssertEqual(WatchCache.load(for: "patrick")?.shows.first?.title, "Severance")
-        XCTAssertEqual(WatchCache.load(for: "whitt")?.shows.first?.title, "Ted Lasso")
+        XCTAssertEqual(WatchCache.load(for: "quinn")?.shows.first?.title, "Ted Lasso")
     }
 
     func testSaveOverwritesPreviousEntry() {
@@ -86,12 +86,12 @@ final class WatchCacheTests: XCTestCase {
     /// Sign-out has to leave nothing behind for the next member.
     func testClearRemovesEveryMember() {
         WatchCache.save([show(1, "Severance")], for: "patrick")
-        WatchCache.save([show(2, "Ted Lasso")], for: "whitt")
+        WatchCache.save([show(2, "Ted Lasso")], for: "quinn")
 
         WatchCache.clear()
 
         XCTAssertNil(WatchCache.load(for: "patrick"))
-        XCTAssertNil(WatchCache.load(for: "whitt"))
+        XCTAssertNil(WatchCache.load(for: "quinn"))
     }
 
     /// Saving after a clear has to recreate the directory, not silently no-op.

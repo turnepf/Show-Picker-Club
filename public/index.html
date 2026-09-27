@@ -1439,7 +1439,7 @@
       <input type="text" id="inputNetworkOther" placeholder="Enter network name" style="display:none; margin-top: 6px;">
 
       <label for="inputRecommended">Recommended By</label>
-      <input type="text" id="inputRecommended" placeholder="e.g. Dorothy, TC">
+      <input type="text" id="inputRecommended" placeholder="e.g. Rosa, TC">
 
       <label for="inputNotes">Notes</label>
       <input type="text" id="inputNotes" placeholder="e.g. Movie, Harlan Coben">
@@ -3452,7 +3452,7 @@
         && (show.title || '').toLowerCase() === (hit.title || '').toLowerCase();
     }
 
-    // "Whitt · Watching, Amy · Loved" — three names, then a count.
+    // "Quinn · Watching, Amy · Loved" — three names, then a count.
     function findGroupLine(hit) {
       const seen = new Set();
       const people = find.group

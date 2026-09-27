@@ -185,7 +185,7 @@ struct SearchView: View {
         .accessibilityHint("Adds this show to your lists")
     }
 
-    // "Whitt · Watching, Amy · Loved" — group-mates with this title, and
+    // "Quinn · Watching, Amy · Loved" — group-mates with this title, and
     // where they keep it. Matched on title and movie-ness (the group feed
     // carries no TMDB id); three names, then a count.
     private func groupLine(for hit: TitleHit) -> String? {

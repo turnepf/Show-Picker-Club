@@ -147,20 +147,20 @@ async function getAll(env, cookie, query = '') {
 const titles = (body) => (body.shows || []).map((s) => s.title).sort();
 
 // ---- world ----
-// Patrick and Whitt share a group. Stacy is a club member in no group with
+// Patrick and Quinn share a group. Stacy is a club member in no group with
 // either — the stranger that open signup makes possible.
 function world() {
   const env = makeEnv();
   addMember(env, 'patrick', 'Patrick Turner');
-  addMember(env, 'whitt', 'Dorothy Whitt');
+  addMember(env, 'quinn', 'Rosa Quinn');
   addMember(env, 'stacy', 'Stacy Nelson');
-  addGroup(env, 'Household', ['patrick', 'whitt']);
+  addGroup(env, 'Household', ['patrick', 'quinn']);
 
   addShow(env, { slug: 'patrick', title: 'Severance', network: 'Apple TV+', genres: 'Drama, Thriller',
                  cast: ['Adam Scott', 'Britt Lower'] });
   addShow(env, { slug: 'patrick', title: 'The Bear', network: 'Hulu', genres: 'Comedy, Drama',
                  cast: ['Jeremy Allen White'] });
-  addShow(env, { slug: 'whitt', title: 'Slow Horses', network: 'Apple TV+', genres: 'Drama',
+  addShow(env, { slug: 'quinn', title: 'Slow Horses', network: 'Apple TV+', genres: 'Drama',
                  cast: ['Gary Oldman'] });
   addShow(env, { slug: 'patrick', title: 'Archived Show', network: 'Netflix', archived: 1 });
   // Stacy shares no group with Patrick. Her copies must never surface.

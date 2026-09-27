@@ -293,7 +293,7 @@ console.log('\n== the personal fields survive the round trip');
   claude.reply = {
     items: [item({
       title: 'Slow Horses', list: 'waiting', notes: 's4 in september',
-      network: 'apple tv plus', recommended_by: 'Whitt', watching_with: 'Dorothy',
+      network: 'apple tv plus', recommended_by: 'Quinn', watching_with: 'Rosa',
     })],
     trailing_section: '',
   };
@@ -304,8 +304,8 @@ console.log('\n== the personal fields survive the round trip');
   await commit.onRequestPost(context(env, post('/api/import/commit', { items: parsed.items })));
   const row = shows(env)[0];
   check('the note is stored', row.notes === 's4 in september', String(row.notes));
-  check('who recommended it is stored', row.recommended_by === 'Whitt');
-  check('who they watch it with is stored', row.watching_with === 'Dorothy');
+  check('who recommended it is stored', row.recommended_by === 'Quinn');
+  check('who they watch it with is stored', row.watching_with === 'Rosa');
   check('the list is stored', row.list === 'waiting');
   check('a search-page URL is filled in', String(row.network_url).includes('tv.apple.com'), String(row.network_url));
   check('added_by is the member, as with a hand-add', row.added_by === 'patrick@example.com');

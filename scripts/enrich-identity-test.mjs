@@ -276,7 +276,7 @@ function club() {
   const env = makeEnv();
   addMember(env, 'patrick', 'Patrick Turner');
   addMember(env, 'jennifer', 'Jennifer Turner');
-  addMember(env, 'whitt', 'Whitt Dorothy');
+  addMember(env, 'quinn', 'Quinn Rosa');
   addShow(env, {
     slug: 'patrick', title: TITLE, tmdbId: ORIGINAL_ID, tmdbType: 'tv',
     network: 'Peacock', networkUrl: 'https://www.peacocktv.com/watch/asset/tv/little-house/1974',
@@ -356,13 +356,13 @@ console.log('\n== gaps mode fetches each pinned entry, not one row per title');
 console.log('\n== a row nothing ever pinned still resolves by title search');
 {
   const env = makeEnv();
-  addMember(env, 'whitt', 'Whitt Dorothy');
-  const cookie = addSession(env, 'whitt');
-  const id = addShow(env, { slug: 'whitt', title: 'Fargo' });
+  addMember(env, 'quinn', 'Quinn Rosa');
+  const cookie = addSession(env, 'quinn');
+  const id = addShow(env, { slug: 'quinn', title: 'Fargo' });
 
   fetchLog = [];
   await runEnrich(env, cookie);
-  const row = rowFor(env, 'whitt', 'Fargo');
+  const row = rowFor(env, 'quinn', 'Fargo');
   check('title search still runs for unpinned rows', fetchLog.some((u) => u.includes('/search/tv')));
   check('the resolved id is stored', row.tmdb_id === FARGO_ID, `got ${row.tmdb_id}`);
   check('and the data lands', (row.poster_url || '').includes('/fargo.jpg') && row.release_year === 2014,
@@ -376,14 +376,14 @@ console.log('\n== a bare title means the newest version, and a "(YYYY)" suffix p
   // for each era — the shape real rows arrived in when TMDB's own entry was
   // named "Little House on the Prairie (2026)".
   const env = makeEnv();
-  addMember(env, 'whitt', 'Whitt Dorothy');
+  addMember(env, 'quinn', 'Quinn Rosa');
   addMember(env, 'patrick', 'Patrick Turner');
   addMember(env, 'jennifer', 'Jennifer Turner');
-  const bareId = addShow(env, { slug: 'whitt', title: TITLE });
+  const bareId = addShow(env, { slug: 'quinn', title: TITLE });
   const newId = addShow(env, { slug: 'jennifer', title: `${TITLE} (2026)` });
   const oldId = addShow(env, { slug: 'patrick', title: `${TITLE} (1974)` });
 
-  await runEnrich(env, addSession(env, 'whitt'));
+  await runEnrich(env, addSession(env, 'quinn'));
   const bare = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(bareId) };
   const suffNew = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(newId) };
   const suffOld = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(oldId) };
@@ -426,11 +426,11 @@ console.log('\n== the movie pass honors pins the same way');
 
   // An unpinned movie still resolves by search — and a bare title means the
   // newest version there too, not the popularity-ranked original.
-  addMember(env, 'whitt', 'Whitt Dorothy');
-  const unpinnedId = addShow(env, { slug: 'whitt', title: MOVIE_TITLE });
+  addMember(env, 'quinn', 'Quinn Rosa');
+  const unpinnedId = addShow(env, { slug: 'quinn', title: MOVIE_TITLE });
   env._db.prepare('UPDATE shows SET movie = 1 WHERE id = ?').run(unpinnedId);
   fetchLog = [];
-  await runEnrich(env, addSession(env, 'whitt'));
+  await runEnrich(env, addSession(env, 'quinn'));
   const unpinned = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(unpinnedId) };
   check('an unpinned movie resolves by search', fetchLog.some((u) => u.includes('/search/movie')));
   check('and a bare movie title means the newest version', unpinned.tmdb_id === MOVIE_REMAKE_ID, `got ${unpinned.tmdb_id}`);
@@ -442,7 +442,7 @@ console.log('\n== artwork never crosses the identity boundary');
   // An unpinned second copy of the title may borrow the original's poster;
   // a copy pinned to the remake may not.
   const unpinnedId = addShow(env, { slug: 'jennifer', title: TITLE });
-  const pinnedId = addShow(env, { slug: 'whitt', title: TITLE, tmdbId: REMAKE_ID, tmdbType: 'tv' });
+  const pinnedId = addShow(env, { slug: 'quinn', title: TITLE, tmdbId: REMAKE_ID, tmdbType: 'tv' });
   env._db.prepare('UPDATE shows SET poster_url = ? WHERE member_slug = ?').run('https://image.tmdb.org/t/p/w500/old-poster.jpg', 'patrick');
 
   const cookie = addSession(env, 'jennifer');

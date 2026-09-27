@@ -20,7 +20,7 @@ struct WidgetShow: Identifiable, Hashable, Codable {
     let title: String
     let network: String?
     let rating: String?
-    // Trending: "Watching: Patrick, Whitt". Upcoming: unused.
+    // Trending: "Watching: Patrick, Quinn". Upcoming: unused.
     let membersText: String?
     // Upcoming: the show's next calendar day — a season premiere or a season
     // finale, whichever lands first. Trending: unused.
