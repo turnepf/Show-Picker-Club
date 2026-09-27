@@ -31,7 +31,7 @@ database_id = "..."
 ### `members`
 | Column         | Type | Notes                                                 |
 |----------------|------|--------------------------------------------------------|
-| `slug`         | TEXT PRIMARY KEY | URL slug (`/whitt`).                        |
+| `slug`         | TEXT PRIMARY KEY | URL slug (`/quinn`).                        |
 | `name`         | TEXT NOT NULL    | Full name.                                  |
 | `first_name`   | TEXT             | Override for display name (rare collisions).|
 | `last_initial` | TEXT             | Suffix used to disambiguate two first-name collisions. |
@@ -141,7 +141,7 @@ PK `(show_id, member_slug)`.
 `functions/_shared/watchers.js` owns every read and write. **This is the only cross-member write in the codebase** — suggest-a-show and share-to-member were retired in 2026-07 and still return 410 — so the rules it enforces are the point:
 
 - **Only group-mates can be named.** Every slug from a client is checked against `group_members` before anything is written. A slug for someone the caller shares no group with is dropped silently (the rest of the save still succeeds), never honoured. A group is a relationship both people opted into; that gate is the entire difference between this and the writes that were retired.
-- **Links are mirrored pairs.** Naming Whitt on your row inserts `(your_show, whitt)`, ensures Whitt has a copy of the title, and inserts `(their_show, you)` on it. "Watching with" is symmetrical by construction rather than a note one person keeps about another.
+- **Links are mirrored pairs.** Naming Quinn on your row inserts `(your_show, quinn)`, ensures Quinn has a copy of the title, and inserts `(their_show, you)` on it. "Watching with" is symmetrical by construction rather than a note one person keeps about another.
 - **A list they already made is never rearranged.** An existing copy — matched by `tmdb_id`, else case-insensitively by title — is linked where it sits, on whatever list and in whatever order they put it. Only a title they don't have is created, and only then on the same list as the tagger's copy. An **archived** copy is unarchived onto that list rather than duplicated (an archived row is on no list, so there's no placement to preserve).
 - **Unlinking never deletes their row.** Dropping a link removes both directions and takes the tagger's name out of their `watching_with`. The show stays on their list — it arrived, they may have started watching it, and removing it is their call.
 - **Deleting your copy cleans up after itself.** `DELETE /api/shows/:id` calls `unlinkShow()` first. The foreign-key cascade only reaches links hanging off the deleted row; the mirrors live on *other members'* shows and point at an owner who still exists, so without that call a deleted copy would leave its owner's name on other people's lists forever.
@@ -281,7 +281,7 @@ Members a person shares streaming services with, so the audit pools everyone's s
 `GET/PUT /api/subscriptions` (`functions/api/subscriptions.js`), read by both `subscriptions.html` on the web and the iOS Subscription audit. Both verbs require a session and operate on the logged-in member.
 
 - **Household pooling.** Before grouping, the GET reads the member's `household_members` and pools active shows across the member + those members. The same title appearing on more than one household member's list is deduped per network, keeping the most-active list (watching > waiting > next up > loved) so the verdict reflects whoever's furthest along. The response includes `household` (the pooled members' slugs + display names) for the "including …" line.
-- **Who's watching.** When (and only when) a household is pooled, every show in a service's `shows` array carries `viewers`: `[{ slug, name, list }]` — each household member who has that title and the list it sits on *for them*, so a title deduped to `watching` still shows that it's only `next up` for you. `name` is the first-name label (`You` for the caller), disambiguated by last initial exactly as `/api/members` and `/api/household` do — one members lookup now serves both the viewer labels and the `household` array. A solo audit omits `viewers` entirely: with one person pooled, naming them says nothing. iOS renders it under each row of a service's "Why?" list and in the `keep` reason line ("Active now: Severance (Dorothy)"), which is the case where the verdict can rest on somebody else's show. Household is invite-based on iOS, the same shape as groups: `POST /api/household/invite` mints a 7-day link (`/household/join?code=…`), the recipient's app accepts it via `POST /api/household/join`, and `POST /api/household/remove` drops someone. You can't add a person to your household from a roster any more than you can add them to a group. `GET /api/household` still returns the current set; `PUT` (whole-set replace) remains for the web modal, which now lists only the current household and can only take people out.
+- **Who's watching.** When (and only when) a household is pooled, every show in a service's `shows` array carries `viewers`: `[{ slug, name, list }]` — each household member who has that title and the list it sits on *for them*, so a title deduped to `watching` still shows that it's only `next up` for you. `name` is the first-name label (`You` for the caller), disambiguated by last initial exactly as `/api/members` and `/api/household` do — one members lookup now serves both the viewer labels and the `household` array. A solo audit omits `viewers` entirely: with one person pooled, naming them says nothing. iOS renders it under each row of a service's "Why?" list and in the `keep` reason line ("Active now: Severance (Rosa)"), which is the case where the verdict can rest on somebody else's show. Household is invite-based on iOS, the same shape as groups: `POST /api/household/invite` mints a 7-day link (`/household/join?code=…`), the recipient's app accepts it via `POST /api/household/join`, and `POST /api/household/remove` drops someone. You can't add a person to your household from a roster any more than you can add them to a group. `GET /api/household` still returns the current set; `PUT` (whole-set replace) remains for the web modal, which now lists only the current household and can only take people out.
 - **GET** groups the (pooled) active shows by canonical network and assigns each service a **verdict**:
   - `keep` — ≥1 show in `watching`.
   - `pause` — nothing watching, but a `waiting` show has a future `next_season_date`; the soonest such date is the suggested resubscribe target.
@@ -388,7 +388,6 @@ Two routing systems combine:
 
 1. **`public/_redirects`** (handled by Cloudflare Pages):
    - `/privacy` → `/privacy.html` and `/terms` → `/terms.html` (200 rewrites, pretty URLs).
-   - `/dorothy` and `/dorothy/` → `/whitt` (301, legacy slug rename).
    - `/*` → `/index.html` (200, SPA fallback).
 
 2. **Pages Functions file routing** (takes precedence over `_redirects`):
@@ -720,7 +719,7 @@ Because they are public and session-free, the constraints are all negative ones,
 
 ## Universal links
 
-`public/.well-known/apple-app-site-association` (served as `application/json` via a `_headers` rule — it has no extension) claims showpicker.club URLs for the iOS app (`NQ6AJVVBBJ.net.patrickturner.showpickerios`): member pages and `/` open in-app when tapped from another app; API/auth/calendar/admin paths and web-only pages (`/vibe`, `/subscriptions`, legal pages) are excluded and stay in the browser. The same file's `webcredentials` block is what authorizes the app to use passkeys scoped to the domain — see [Passkeys](#passkeys-migration-062). The app side is the `applinks:showpicker.club` and `webcredentials:showpicker.club` Associated Domains entitlements (iOS + Catalyst) plus `route(url:)` handlers in `HomeView` (iPhone: pushes the member) and `IPadHomeView` (focuses the member in the sidebar, honoring the `#list` fragment web URLs carry). Cold-launch links park in `pendingLink` until the roster loads; the `dorothy` → `whitt` slug redirect is mirrored. Apple's CDN caches the AASA file (~hours), so entitlement/AASA changes take a re-install or a day to propagate to devices.
+`public/.well-known/apple-app-site-association` (served as `application/json` via a `_headers` rule — it has no extension) claims showpicker.club URLs for the iOS app (`NQ6AJVVBBJ.net.patrickturner.showpickerios`): member pages and `/` open in-app when tapped from another app; API/auth/calendar/admin paths and web-only pages (`/vibe`, `/subscriptions`, legal pages) are excluded and stay in the browser. The same file's `webcredentials` block is what authorizes the app to use passkeys scoped to the domain — see [Passkeys](#passkeys-migration-062). The app side is the `applinks:showpicker.club` and `webcredentials:showpicker.club` Associated Domains entitlements (iOS + Catalyst) plus `route(url:)` handlers in `HomeView` (iPhone: pushes the member) and `IPadHomeView` (focuses the member in the sidebar, honoring the `#list` fragment web URLs carry). Cold-launch links park in `pendingLink` until the roster loads. Apple's CDN caches the AASA file (~hours), so entitlement/AASA changes take a re-install or a day to propagate to devices.
 
 ## Native clients
 
@@ -1058,7 +1057,7 @@ The share extension has its own separate mapping: `ios/Shared/ShareTitleParser.s
 
 `functions/calendar/[slug].js` builds an RFC 5545 iCalendar document on every request. The feed authenticates with `?key=<members.calendar_token>` (calendar apps can't log in); a missing or wrong key 404s, indistinguishable from an unknown member. The web member page and the iOS app only surface the subscribe link to logged-in sessions, since `/api/members` withholds tokens otherwise.
 
-- **Slug param:** `params.slug` is the full final segment, e.g. `whitt.ics`. The handler strips `.ics`.
+- **Slug param:** `params.slug` is the full final segment, e.g. `quinn.ics`. The handler strips `.ics`.
 - **Membership check:** 404 if the slug isn't a known member.
 - **Query:** all active shows for that member with `list IN ('watching','waiting')` and `(next_season_date IS NOT NULL OR season_end_date IS NOT NULL)`.
 - **Events emitted:**
@@ -1267,6 +1266,5 @@ Two things in `smoke.sh` look like fussiness and are not. Every request carries 
 - **Seeded rows have NULL `created_at` and `updated_at`.** This is intentional — it makes the seed-only query single-sided and cheap.
 - **Network URLs that look like `/search`, `/s?`, or `/?q=` are placeholders.** The frontend renders these as plain text instead of links; sync-urls and calendar feed treat them as missing.
 - **Member display names disambiguate dynamically.** `/api/members` counts first-name collisions and appends `last_initial` only when it would otherwise be ambiguous.
-- **Slug `dorothy` was renamed to `whitt`.** A permanent 301 in `_redirects` covers the old URL. She has since gone back to displaying as Dorothy (migration 025 updated her name and login email) — the slug stays `whitt`.
 - **One renderer per platform, never hand-rolled markup per screen.** `public/show-renderer.js` renders every row and detail body on the web; `ShowRow.swift` does the same job in Swift. Both came back to that rule the hard way (five row implementations on the web in 2026-08), and it holds on either side.
 - **Always clean up branches when a chunk of work is done.** After the work is merged to `main` and pushed live, delete the feature branch — local and remote. Caveat: in the Claude-Code-on-the-web remote environment the git proxy rejects remote-branch deletion (HTTP 403) and the GitHub MCP server has no delete-branch tool, so the remote branch may have to be deleted from GitHub's UI/API outside that environment. The local branch can always be deleted.

@@ -155,9 +155,9 @@ async function tokenFor(env, cookie, groupId) {
 function club() {
   const env = makeEnv();
   addMember(env, 'patrick', 'Patrick Turner');
-  addMember(env, 'whitt', 'Whitt Dorothy');
+  addMember(env, 'quinn', 'Quinn Rosa');
   addMember(env, 'stacy', 'Stacy Kallay');
-  const gid = addGroup(env, 'Thursday Night', ['patrick', 'whitt']);
+  const gid = addGroup(env, 'Thursday Night', ['patrick', 'quinn']);
   return { env, gid };
 }
 
@@ -262,9 +262,9 @@ console.log('\n== a leaked link can be killed without deleting the group');
 console.log('\n== the group creator can revoke somebody else\'s link');
 {
   const { env, gid } = club();
-  // Whitt is in the group but did not create it; Patrick did.
-  const whittToken = await tokenFor(env, addSession(env, 'whitt'), gid);
-  const res = await revokeInvite(env, addSession(env, 'patrick'), gid, whittToken);
+  // Quinn is in the group but did not create it; Patrick did.
+  const quinnToken = await tokenFor(env, addSession(env, 'quinn'), gid);
+  const res = await revokeInvite(env, addSession(env, 'patrick'), gid, quinnToken);
   check('the creator may revoke an invite they did not issue', res.status === 200, `got ${res.status}`);
 }
 
@@ -282,10 +282,10 @@ console.log('\n== a token cannot be revoked from outside its own group');
 console.log('\n== leaving takes your outstanding invites with you');
 {
   const { env, gid } = club();
-  const whitt = addSession(env, 'whitt');
-  const token = await tokenFor(env, whitt, gid);
+  const quinn = addSession(env, 'quinn');
+  const token = await tokenFor(env, quinn, gid);
 
-  const left = await leaveGroup(env, whitt, gid);
+  const left = await leaveGroup(env, quinn, gid);
   check('the leave succeeds', left.status === 200, `got ${left.status}`);
   check('the invite row is gone', inviteRow(env, token) === undefined);
 
@@ -297,9 +297,9 @@ console.log('\n== leaving takes your outstanding invites with you');
 console.log('\n== a token whose issuer is no longer a member is dead');
 {
   const { env, gid } = club();
-  const token = await tokenFor(env, addSession(env, 'whitt'), gid);
+  const token = await tokenFor(env, addSession(env, 'quinn'), gid);
   // A membership removed some other way — a row predating the leave cleanup.
-  env._db.prepare('DELETE FROM group_members WHERE group_id = ? AND member_slug = ?').run(gid, 'whitt');
+  env._db.prepare('DELETE FROM group_members WHERE group_id = ? AND member_slug = ?').run(gid, 'quinn');
 
   const res = await redeem(env, addSession(env, 'stacy'), token);
   check('the orphaned link is refused', res.status === 410, `got ${res.status}`);
@@ -336,7 +336,7 @@ console.log('\n== an existing member redeeming again changes nothing');
 {
   const { env, gid } = club();
   const token = await tokenFor(env, addSession(env, 'patrick'), gid);
-  const res = await redeem(env, addSession(env, 'whitt'), token);
+  const res = await redeem(env, addSession(env, 'quinn'), token);
   check('a member who is already in gets 409', res.status === 409, `got ${res.status}`);
   check('and it does not burn a use', (inviteRow(env, token).use_count ?? 0) === 0);
 }

@@ -131,14 +131,14 @@ function addGroup(env, name, slugs) {
 
 const row = (env, sql, ...a) => env._db.prepare(sql).get(...a);
 
-// Patrick (an admin) and Whitt share a group. Stacy is a stranger: a full
+// Patrick (an admin) and Quinn share a group. Stacy is a stranger: a full
 // member, in no group with either of them.
 function club() {
   const env = makeEnv();
   addMember(env, 'patrick', 'Patrick Turner', { admin: 1 });
-  addMember(env, 'whitt', 'Dorothy Whitt');
+  addMember(env, 'quinn', 'Rosa Quinn');
   addMember(env, 'stacy', 'Stacy Kallay');
-  const groupId = addGroup(env, 'Couch', ['patrick', 'whitt']);
+  const groupId = addGroup(env, 'Couch', ['patrick', 'quinn']);
   return { env, groupId };
 }
 
@@ -446,7 +446,7 @@ console.log('\n== the tools carry the app\'s own privacy rules');
 {
   const { env, groupId } = club();
   const mine = addShow(env, { slug: 'patrick', title: 'Severance', list: 'watching', notes: 'PAT-NOTE' });
-  const hers = addShow(env, { slug: 'whitt', title: 'Slow Horses', list: 'recommending', notes: 'WHITT-NOTE' });
+  const hers = addShow(env, { slug: 'quinn', title: 'Slow Horses', list: 'recommending', notes: 'QUINN-NOTE' });
   const strangers = addShow(env, { slug: 'stacy', title: 'Hacks', list: 'watching', notes: 'STACY-NOTE' });
   const { access } = await connect(env, 'patrick');
 
@@ -465,15 +465,15 @@ console.log('\n== the tools carry the app\'s own privacy rules');
   const capped = await tool(env, access, 'list_my_shows', { limit: 100000 });
   check('an oversized limit is capped, not refused', !capped.isError && capped.data.shows.length === 6);
 
-  const mate = await tool(env, access, 'list_member_shows', { member_slug: 'whitt' });
+  const mate = await tool(env, access, 'list_member_shows', { member_slug: 'quinn' });
   check("a group-mate's titles are readable", mate.text.includes('Slow Horses') && mate.data.shows[0].list === 'loved');
   check("but never their notes, recommender or watching-with",
-    !mate.text.includes('WHITT-NOTE') && !mate.text.includes('REC-') && !mate.text.includes('WITH-'));
+    !mate.text.includes('QUINN-NOTE') && !mate.text.includes('REC-') && !mate.text.includes('WITH-'));
   const stranger = await tool(env, access, 'list_member_shows', { member_slug: 'stacy' });
   check("a stranger's lists are unreachable", stranger.isError && !stranger.text.includes('Hacks'));
 
   const detail = await tool(env, access, 'get_show', { show_id: hers });
-  check("another member's show has no memos", detail.data && !detail.text.includes('WHITT-NOTE') && detail.data.is_yours === false);
+  check("another member's show has no memos", detail.data && !detail.text.includes('QUINN-NOTE') && detail.data.is_yours === false);
   const ownDetail = await tool(env, access, 'get_show', { show_id: mine });
   check('your own show does', ownDetail.text.includes('PAT-NOTE') && ownDetail.data.is_yours === true);
 
@@ -482,7 +482,7 @@ console.log('\n== the tools carry the app\'s own privacy rules');
   check("and never strangers", !search.text.includes('Hacks') && !search.text.includes('STACY'));
 
   const edit = await tool(env, access, 'update_show', { show_id: hers, notes: 'OVERWRITTEN' });
-  check("another member's row can't be edited", edit.isError && row(env, 'SELECT notes FROM shows WHERE id = ?', hers).notes === 'WHITT-NOTE');
+  check("another member's row can't be edited", edit.isError && row(env, 'SELECT notes FROM shows WHERE id = ?', hers).notes === 'QUINN-NOTE');
   const mv = await tool(env, access, 'move_show', { show_id: hers, list: 'next_up' });
   check("or moved", mv.isError && row(env, 'SELECT list FROM shows WHERE id = ?', hers).list === 'recommending');
   const arch = await tool(env, access, 'archive_show', { show_id: strangers });
@@ -507,10 +507,10 @@ console.log('\n== adding a show, and Watching With stays inside groups');
 {
   const { env } = club();
   const { access } = await connect(env, 'patrick');
-  const add = await tool(env, access, 'add_show', { title: 'The Bear', list: 'next_up', notes: 'from a podcast', watching_with_members: ['whitt', 'stacy'] });
+  const add = await tool(env, access, 'add_show', { title: 'The Bear', list: 'next_up', notes: 'from a podcast', watching_with_members: ['quinn', 'stacy'] });
   check('add_show adds to your list', !add.isError && add.data.added.list === 'next_up', add.text);
   check('added_by is your name, like the app', row(env, "SELECT added_by FROM shows WHERE member_slug = 'patrick'").added_by === 'Patrick');
-  check('a named group-mate gets a linked copy', !!row(env, "SELECT id FROM shows WHERE member_slug = 'whitt' AND title = 'The Bear'"));
+  check('a named group-mate gets a linked copy', !!row(env, "SELECT id FROM shows WHERE member_slug = 'quinn' AND title = 'The Bear'"));
   check('a named stranger gets nothing', !row(env, "SELECT id FROM shows WHERE member_slug = 'stacy'"));
   const dupe = await tool(env, access, 'add_show', { title: 'The Bear', list: 'watching' });
   check('a duplicate says which list it is already on', dupe.isError && dupe.text.includes('next_up'));
@@ -522,16 +522,16 @@ console.log('\n== group actions');
 {
   const { env, groupId } = club();
   const pat = await connect(env, 'patrick');
-  const whitt = await connect(env, 'whitt');
+  const quinn = await connect(env, 'quinn');
   const mine = addShow(env, { slug: 'patrick', title: 'Severance', notes: 'n' });
 
   const rec = await tool(env, pat.access, 'recommend_to_group', { group_id: groupId, show_id: mine, note: 'so good' });
   check('you can recommend your own show to your group', !rec.isError, rec.text);
-  const board = await tool(env, whitt.access, 'get_group_recommendations', { group_id: groupId });
+  const board = await tool(env, quinn.access, 'get_group_recommendations', { group_id: groupId });
   const card = board.data.recommendations[0];
   check("a group-mate sees the card", card && card.title === 'Severance');
-  const taken = await tool(env, whitt.access, 'respond_to_recommendation', { group_id: groupId, recommendation_id: card.id, response: 'add' });
-  check('and can add it to their own Next Up', !taken.isError && row(env, "SELECT list FROM shows WHERE member_slug = 'whitt' AND title = 'Severance'").list === 'next');
+  const taken = await tool(env, quinn.access, 'respond_to_recommendation', { group_id: groupId, recommendation_id: card.id, response: 'add' });
+  check('and can add it to their own Next Up', !taken.isError && row(env, "SELECT list FROM shows WHERE member_slug = 'quinn' AND title = 'Severance'").list === 'next');
   const outsider = await connect(env, 'stacy');
   const peek = await tool(env, outsider.access, 'get_group_recommendations', { group_id: groupId });
   check("a stranger can't read the board", peek.isError);
@@ -542,9 +542,9 @@ console.log('\n== group actions');
 
   const made = await tool(env, pat.access, 'create_group', { name: 'Book Club' });
   check('create_group returns an invite link', !made.isError && made.data.invite.url.includes('/groups/join?token='));
-  const left = await tool(env, whitt.access, 'leave_group', { group_id: groupId });
-  check('leave_group leaves', !left.isError && !row(env, "SELECT 1 AS x FROM group_members WHERE group_id = ? AND member_slug = 'whitt'", groupId));
-  const gone = await tool(env, pat.access, 'list_member_shows', { member_slug: 'whitt' });
+  const left = await tool(env, quinn.access, 'leave_group', { group_id: groupId });
+  check('leave_group leaves', !left.isError && !row(env, "SELECT 1 AS x FROM group_members WHERE group_id = ? AND member_slug = 'quinn'", groupId));
+  const gone = await tool(env, pat.access, 'list_member_shows', { member_slug: 'quinn' });
   check("once you share no group, their lists close", gone.isError);
 }
 
@@ -562,14 +562,14 @@ console.log('\n== never admin');
 console.log('\n== revocation, bans and caps');
 {
   const { env } = club();
-  const c = await connect(env, 'whitt');
+  const c = await connect(env, 'quinn');
   const pat = addSession(env, 'patrick');
   const listFor = async (cookie) => (await (await connectedApps.onRequestGet(ctx(env,
     new Request(`${ORIGIN}/api/connected-apps`, { headers: { Cookie: `session=${cookie}` } })))).json());
-  const whittsApps = await listFor(c.cookie);
-  check('Connected apps lists the connection', whittsApps.apps.length === 1 && whittsApps.apps[0].name === 'Claude' && whittsApps.apps[0].host === 'claude.ai');
+  const quinnsApps = await listFor(c.cookie);
+  check('Connected apps lists the connection', quinnsApps.apps.length === 1 && quinnsApps.apps[0].name === 'Claude' && quinnsApps.apps[0].host === 'claude.ai');
   check("and nobody else's", (await listFor(pat)).apps.length === 0);
-  const grantId = whittsApps.apps[0].id;
+  const grantId = quinnsApps.apps[0].id;
   const del = (cookie) => connectedApps.onRequestDelete(ctx(env,
     new Request(`${ORIGIN}/api/connected-apps?id=${grantId}`, { method: 'DELETE', headers: { Cookie: `session=${cookie}` } })));
   check("a stranger's revoke is 404", (await del(pat)).status === 404);
@@ -579,13 +579,13 @@ console.log('\n== revocation, bans and caps');
   const r = await tokenRequest(env, { grant_type: 'refresh_token', refresh_token: c.refresh, client_id: c.clientId });
   check('and the refresh token is dead too', r.data.error === 'invalid_grant');
 
-  const again = await connect(env, 'whitt');
+  const again = await connect(env, 'quinn');
   const disable = await disableApi.onRequestPost(ctx(env, new Request(`${ORIGIN}/api/admin-member-disable`, {
-    method: 'POST', headers: { Cookie: `session=${pat}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: 'whitt', action: 'disable' }),
+    method: 'POST', headers: { Cookie: `session=${pat}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: 'quinn', action: 'disable' }),
   })));
   check('an admin can disable a member', disable.status === 200);
   check("whose connections stop at once", (await rpc(env, again.access, 'tools/list', {})).status === 401);
-  env._db.prepare("UPDATE members SET disabled = 0 WHERE slug = 'whitt'").run();
+  env._db.prepare("UPDATE members SET disabled = 0 WHERE slug = 'quinn'").run();
   check("and don't come back on re-enable", (await rpc(env, again.access, 'tools/list', {})).status === 401);
 
   const p = await connect(env, 'patrick');
@@ -614,7 +614,7 @@ console.log('\n== reporting counts connected people, not connections');
   const { env } = club();
   await connect(env, 'patrick');
   await connect(env, 'patrick');
-  await connect(env, 'whitt');
+  await connect(env, 'quinn');
   const res = await reportingApi.onRequestGet(ctx(env, new Request(`${ORIGIN}/api/reporting`, { headers: { Cookie: `session=${addSession(env, 'patrick')}` } })));
   const data = await res.json();
   check('two people with three connections read as 2', data.active_by_platform.day.mcp === 2, JSON.stringify(data.active_by_platform));

@@ -14,7 +14,7 @@ There are native iOS, tvOS, and watchOS apps. They share a `ShowPickerCore` Swif
 
 ## At a glance
 
-- **Multi-tenant.** One deployment, many members. Each member is a slug (`/whitt`, `/patrick`) with their own lists; they sign in with a one-time code (text or email), Sign in with Apple, or Sign in with Google (web). Signup is open and self-service — anyone can join and is a full member immediately.
+- **Multi-tenant.** One deployment, many members. Each member is a slug (`/quinn`, `/patrick`) with their own lists; they sign in with a one-time code (text or email), Sign in with Apple, or Sign in with Google (web). Signup is open and self-service — anyone can join and is a full member immediately.
 - **Auto-enriched.** TMDB supplies everything: audience rating, canonical titles, cast (with IMDB links), the creator/director (with an IMDB link), next-season dates, finale dates, series-ended flags, and genres.
 - **Social.** Browse every member's lists and cross-library search; add anything you see to your own lists. (Push-style "suggest to another member" was retired 2026-07 — near-zero usage.)
 - **Vibe.** `/vibe` profiles each member's taste across 27 trait dimensions and assigns one of seven cluster identities.
@@ -195,4 +195,4 @@ Both workflows require these GitHub Actions secrets:
 
 ## License
 
-MIT
+MIT — see [`LICENSE`](LICENSE).

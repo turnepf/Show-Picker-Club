@@ -171,15 +171,15 @@ const deleteShow = (env, cookie, id) =>
 const getShows = (env, cookie, member) =>
   showsApi.onRequestGet(ctx(env, req(`/api/shows?member=${member}`, { cookie })));
 
-// Patrick and Whitt share a group. Stacy is a member of the club in no group
+// Patrick and Quinn share a group. Stacy is a member of the club in no group
 // with either of them — the stranger self-enrollment made possible, and the
 // reason the gate is group membership rather than "is a member".
 function club() {
   const env = makeEnv();
   addMember(env, 'patrick', 'Patrick Turner');
-  addMember(env, 'whitt', 'Whitt Dorothy');
+  addMember(env, 'quinn', 'Quinn Rosa');
   addMember(env, 'stacy', 'Stacy Kallay');
-  addGroup(env, 'Household', ['patrick', 'whitt']);
+  addGroup(env, 'Household', ['patrick', 'quinn']);
   return env;
 }
 
@@ -192,10 +192,10 @@ console.log('\n== the picker only offers people you share a group with');
   const cookie = addSession(env, 'patrick');
   const { members } = await (await groupMembersApi.onRequestGet(
     ctx(env, req('/api/group-members', { cookie })))).json();
-  check('a group-mate is offered', members.some((m) => m.slug === 'whitt'));
+  check('a group-mate is offered', members.some((m) => m.slug === 'quinn'));
   check('a member in no shared group is not', !members.some((m) => m.slug === 'stacy'));
   check('and neither are you', !members.some((m) => m.slug === 'patrick'));
-  check('the group is named', (members.find((m) => m.slug === 'whitt').groups || []).includes('Household'));
+  check('the group is named', (members.find((m) => m.slug === 'quinn').groups || []).includes('Household'));
 
   // A disabled account can't act on anything landing on its list, so it isn't
   // offered as someone to watch with.
@@ -211,20 +211,20 @@ console.log('\n== naming a group-mate puts the show on their list, both ways');
   const env = club();
   const cookie = addSession(env, 'patrick');
   const res = await postShow(env, cookie, {
-    title: 'The Rehearsal', list: 'watching', watcher_slugs: ['whitt'],
+    title: 'The Rehearsal', list: 'watching', watcher_slugs: ['quinn'],
   });
   check('the add succeeds', res.status === 201, `got ${res.status}`);
   const { show } = await res.json();
 
-  const theirs = rowFor(env, 'whitt', 'The Rehearsal');
+  const theirs = rowFor(env, 'quinn', 'The Rehearsal');
   check('it lands on their list', !!theirs);
   check('on the same list as the tagger', theirs && theirs.list === 'watching', theirs && theirs.list);
   check('their copy names the tagger', theirs && theirs.watching_with === 'Patrick',
     theirs && theirs.watching_with);
-  check('the tagger’s copy names them', show.watching_with === 'Whitt', show.watching_with);
-  check('the link is stored on the tagger’s row', linksFor(env, show.id).includes('whitt'));
+  check('the tagger’s copy names them', show.watching_with === 'Quinn', show.watching_with);
+  check('the link is stored on the tagger’s row', linksFor(env, show.id).includes('quinn'));
   check('and mirrored on theirs', linksFor(env, theirs.id).includes('patrick'));
-  check('the response carries the watchers', (show.watchers || []).some((w) => w.slug === 'whitt'));
+  check('the response carries the watchers', (show.watchers || []).some((w) => w.slug === 'quinn'));
 }
 
 console.log('\n== a member you share no group with cannot be named');
@@ -254,12 +254,12 @@ console.log('\n== a list they already made is not rearranged');
 {
   const env = club();
   const cookie = addSession(env, 'patrick');
-  const theirsBefore = addShow(env, { slug: 'whitt', title: 'Severance', list: 'next' });
+  const theirsBefore = addShow(env, { slug: 'quinn', title: 'Severance', list: 'next' });
   const { show } = await (await postShow(env, cookie, {
-    title: 'Severance', list: 'watching', watcher_slugs: ['whitt'],
+    title: 'Severance', list: 'watching', watcher_slugs: ['quinn'],
   })).json();
 
-  const theirRows = rowsFor(env, 'whitt');
+  const theirRows = rowsFor(env, 'quinn');
   check('no duplicate row is created', theirRows.length === 1, `got ${theirRows.length}`);
   check('their placement is untouched', theirRows[0].list === 'next', theirRows[0].list);
   check('the existing row is what gets linked', theirRows[0].id === theirsBefore);
@@ -271,10 +271,10 @@ console.log('\n== an archived copy comes back rather than duplicating');
 {
   const env = club();
   const cookie = addSession(env, 'patrick');
-  const shelved = addShow(env, { slug: 'whitt', title: 'Poker Face', list: 'next', archived: 1 });
-  await postShow(env, cookie, { title: 'Poker Face', list: 'watching', watcher_slugs: ['whitt'] });
+  const shelved = addShow(env, { slug: 'quinn', title: 'Poker Face', list: 'next', archived: 1 });
+  await postShow(env, cookie, { title: 'Poker Face', list: 'watching', watcher_slugs: ['quinn'] });
 
-  const theirRows = rowsFor(env, 'whitt');
+  const theirRows = rowsFor(env, 'quinn');
   check('still one row', theirRows.length === 1, `got ${theirRows.length}`);
   check('the same row', theirRows[0].id === shelved);
   check('unarchived', theirRows[0].archived === 0);
@@ -286,16 +286,16 @@ console.log('\n== unlinking takes the name off and leaves the show');
   const env = club();
   const cookie = addSession(env, 'patrick');
   const { show } = await (await postShow(env, cookie, {
-    title: 'Slow Horses', list: 'watching', watcher_slugs: ['whitt'],
+    title: 'Slow Horses', list: 'watching', watcher_slugs: ['quinn'],
   })).json();
-  const theirs = rowFor(env, 'whitt', 'Slow Horses');
+  const theirs = rowFor(env, 'quinn', 'Slow Horses');
   check('precondition: it named them', theirs.watching_with === 'Patrick');
 
   await putShow(env, cookie, show.id, {
     title: 'Slow Horses', list: 'watching', watching_with: null, archived: 0, watcher_slugs: [],
   });
 
-  const after = rowFor(env, 'whitt', 'Slow Horses');
+  const after = rowFor(env, 'quinn', 'Slow Horses');
   check('their row survives', !!after);
   check('still on their list', after && after.list === 'watching');
   check('but no longer names the tagger', after && after.watching_with === null, String(after && after.watching_with));
@@ -310,24 +310,24 @@ console.log('\n== free text and linked names coexist');
   const env = club();
   const cookie = addSession(env, 'patrick');
   const { show } = await (await postShow(env, cookie, {
-    title: 'The Bear', list: 'watching', watching_with: 'my sister', watcher_slugs: ['whitt'],
+    title: 'The Bear', list: 'watching', watching_with: 'my sister', watcher_slugs: ['quinn'],
   })).json();
-  check('both are in the display string', show.watching_with === 'my sister, Whitt', show.watching_with);
+  check('both are in the display string', show.watching_with === 'my sister, Quinn', show.watching_with);
 
   // The client sends the composed string straight back on the next save. The
   // name must not accumulate.
   const again = await (await putShow(env, cookie, show.id, {
-    title: 'The Bear', list: 'watching', watching_with: 'my sister, Whitt',
-    archived: 0, watcher_slugs: ['whitt'],
+    title: 'The Bear', list: 'watching', watching_with: 'my sister, Quinn',
+    archived: 0, watcher_slugs: ['quinn'],
   })).json();
-  check('re-saving does not double the name', again.show.watching_with === 'my sister, Whitt', again.show.watching_with);
+  check('re-saving does not double the name', again.show.watching_with === 'my sister, Quinn', again.show.watching_with);
 
   const dropped = await (await putShow(env, cookie, show.id, {
-    title: 'The Bear', list: 'watching', watching_with: 'my sister, Whitt',
+    title: 'The Bear', list: 'watching', watching_with: 'my sister, Quinn',
     archived: 0, watcher_slugs: [],
   })).json();
   check('unlinking leaves the free text alone', dropped.show.watching_with === 'my sister', dropped.show.watching_with);
-  check('and the name is really gone', !dropped.show.watching_with.includes('Whitt'));
+  check('and the name is really gone', !dropped.show.watching_with.includes('Quinn'));
 }
 
 console.log('\n== more than one person at a time');
@@ -337,28 +337,28 @@ console.log('\n== more than one person at a time');
   addGroup(env, 'Movie Night', ['patrick', 'amy']);
   const cookie = addSession(env, 'patrick');
   const { show } = await (await postShow(env, cookie, {
-    title: 'Dune', list: 'watching', watcher_slugs: ['whitt', 'amy'],
+    title: 'Dune', list: 'watching', watcher_slugs: ['quinn', 'amy'],
   })).json();
 
-  check('both are linked', linksFor(env, show.id).join(',') === 'amy,whitt', linksFor(env, show.id).join(','));
-  check('both get the show', !!rowFor(env, 'whitt', 'Dune') && !!rowFor(env, 'amy', 'Dune'));
-  check('both names are on the tagger’s row', show.watching_with === 'Amy, Whitt', show.watching_with);
-  // Each of their copies names the tagger and nobody else: Whitt and Amy
+  check('both are linked', linksFor(env, show.id).join(',') === 'amy,quinn', linksFor(env, show.id).join(','));
+  check('both get the show', !!rowFor(env, 'quinn', 'Dune') && !!rowFor(env, 'amy', 'Dune'));
+  check('both names are on the tagger’s row', show.watching_with === 'Amy, Quinn', show.watching_with);
+  // Each of their copies names the tagger and nobody else: Quinn and Amy
   // share no group, so neither learns the other was named.
   check('their copy names the tagger only',
-    rowFor(env, 'whitt', 'Dune').watching_with === 'Patrick',
-    rowFor(env, 'whitt', 'Dune').watching_with);
+    rowFor(env, 'quinn', 'Dune').watching_with === 'Patrick',
+    rowFor(env, 'quinn', 'Dune').watching_with);
   check('and does not name the other person',
-    !rowFor(env, 'whitt', 'Dune').watching_with.includes('Amy'));
+    !rowFor(env, 'quinn', 'Dune').watching_with.includes('Amy'));
 
   // Dropping one keeps the other.
   await putShow(env, cookie, show.id, {
-    title: 'Dune', list: 'watching', watching_with: 'Amy, Whitt', archived: 0, watcher_slugs: ['amy'],
+    title: 'Dune', list: 'watching', watching_with: 'Amy, Quinn', archived: 0, watcher_slugs: ['amy'],
   });
   check('dropping one keeps the other', linksFor(env, show.id).join(',') === 'amy');
-  check('the dropped one keeps their show', !!rowFor(env, 'whitt', 'Dune'));
-  check('but stops naming the tagger', rowFor(env, 'whitt', 'Dune').watching_with === null,
-    String(rowFor(env, 'whitt', 'Dune').watching_with));
+  check('the dropped one keeps their show', !!rowFor(env, 'quinn', 'Dune'));
+  check('but stops naming the tagger', rowFor(env, 'quinn', 'Dune').watching_with === null,
+    String(rowFor(env, 'quinn', 'Dune').watching_with));
   check('the kept one still names them', rowFor(env, 'amy', 'Dune').watching_with === 'Patrick');
 }
 
@@ -386,13 +386,13 @@ console.log('\n== deleting your copy takes your name off theirs');
   const env = club();
   const cookie = addSession(env, 'patrick');
   const { show } = await (await postShow(env, cookie, {
-    title: 'Fargo', list: 'watching', watcher_slugs: ['whitt'],
+    title: 'Fargo', list: 'watching', watcher_slugs: ['quinn'],
   })).json();
-  const theirs = rowFor(env, 'whitt', 'Fargo');
+  const theirs = rowFor(env, 'quinn', 'Fargo');
   check('precondition: named', theirs.watching_with === 'Patrick');
 
   await deleteShow(env, cookie, show.id);
-  const after = rowFor(env, 'whitt', 'Fargo');
+  const after = rowFor(env, 'quinn', 'Fargo');
   check('their show survives the delete', !!after);
   check('no longer naming the deleted copy’s owner', after && after.watching_with === null,
     String(after && after.watching_with));
@@ -403,12 +403,12 @@ console.log('\n== who is named stays as private as the field it came from');
 {
   const env = club();
   const mine = addSession(env, 'patrick');
-  await postShow(env, mine, { title: 'Silo', list: 'watching', watcher_slugs: ['whitt'] });
+  await postShow(env, mine, { title: 'Silo', list: 'watching', watcher_slugs: ['quinn'] });
 
   const own = await (await getShows(env, mine, 'patrick')).json();
-  check('the owner sees their own watchers', (own.shows[0].watchers || []).some((w) => w.slug === 'whitt'));
+  check('the owner sees their own watchers', (own.shows[0].watchers || []).some((w) => w.slug === 'quinn'));
 
-  const theirs = addSession(env, 'whitt');
+  const theirs = addSession(env, 'quinn');
   const other = await (await getShows(env, theirs, 'patrick')).json();
   const row = other.shows.find((s) => s.title === 'Silo');
   check('another member gets no watchers', !row.watchers || row.watchers.length === 0);
@@ -426,13 +426,13 @@ console.log('\n== a member leaving takes their name with them');
   const env = club();
   const cookie = addSession(env, 'patrick');
   const { show } = await (await postShow(env, cookie, {
-    title: 'Deadwood', list: 'watching', watching_with: 'my sister', watcher_slugs: ['whitt'],
+    title: 'Deadwood', list: 'watching', watching_with: 'my sister', watcher_slugs: ['quinn'],
   })).json();
-  check('precondition: both are named', show.watching_with === 'my sister, Whitt', show.watching_with);
+  check('precondition: both are named', show.watching_with === 'my sister, Quinn', show.watching_with);
 
-  await forgetMemberAsWatcher(env, 'whitt');
+  await forgetMemberAsWatcher(env, 'quinn');
   const after = rowFor(env, 'patrick', 'Deadwood');
-  check('the departing member’s name is gone', !after.watching_with.includes('Whitt'), after.watching_with);
+  check('the departing member’s name is gone', !after.watching_with.includes('Quinn'), after.watching_with);
   check('and the free text is untouched', after.watching_with === 'my sister', after.watching_with);
 }
 
@@ -445,11 +445,11 @@ console.log('\n== the arriving copy says who put it there');
   const env = club();
   const cookie = addSession(env, 'patrick');
   await postShow(env, cookie, {
-    title: 'Fruitvale Station', list: 'watching', movie: 1, watcher_slugs: ['whitt'],
+    title: 'Fruitvale Station', list: 'watching', movie: 1, watcher_slugs: ['quinn'],
   });
 
-  const theirs = addSession(env, 'whitt');
-  const { shows } = await (await getShows(env, theirs, 'whitt')).json();
+  const theirs = addSession(env, 'quinn');
+  const { shows } = await (await getShows(env, theirs, 'quinn')).json();
   const arrived = shows.find((s) => s.title === 'Fruitvale Station');
   check('the recipient sees who added it',
     arrived.added_by_member && arrived.added_by_member.slug === 'patrick',
@@ -486,7 +486,7 @@ console.log('\n== a library bigger than one query’s bind limit still loads');
     addShow(env, { slug: 'patrick', title: `Filler ${i}` });
   }
   await postShow(env, cookie, {
-    title: 'Fruitvale Station', list: 'watching', movie: 1, watcher_slugs: ['whitt'],
+    title: 'Fruitvale Station', list: 'watching', movie: 1, watcher_slugs: ['quinn'],
   });
 
   const res = await getShows(env, cookie, 'patrick');
@@ -494,7 +494,7 @@ console.log('\n== a library bigger than one query’s bind limit still loads');
   const { shows } = await res.json();
   check('every row is there', shows.length === 121, `got ${shows.length}`);
   const tagged = shows.find((s) => s.title === 'Fruitvale Station');
-  check('watchers survive the chunk seams', (tagged.watchers || []).some((w) => w.slug === 'whitt'));
+  check('watchers survive the chunk seams', (tagged.watchers || []).some((w) => w.slug === 'quinn'));
 }
 
 console.log('\n== the display string is composed, not accumulated');
@@ -503,15 +503,15 @@ console.log('\n== the display string is composed, not accumulated');
   // carries the names linked *before* the change as well as after, which is
   // what lets a dropped name be removed instead of surviving as free text.
   check('names append after free text',
-    composeWatchingWith('my sister', ['Whitt']) === 'my sister, Whitt');
+    composeWatchingWith('my sister', ['Quinn']) === 'my sister, Quinn');
   check('an already-present name is not doubled',
-    composeWatchingWith('my sister, Whitt', ['Whitt']) === 'my sister, Whitt');
+    composeWatchingWith('my sister, Quinn', ['Quinn']) === 'my sister, Quinn');
   check('a dropped name is removed',
-    composeWatchingWith('my sister, Whitt', [], ['Whitt']) === 'my sister');
+    composeWatchingWith('my sister, Quinn', [], ['Quinn']) === 'my sister');
   check('an empty result is null, not an empty string',
-    composeWatchingWith('Whitt', [], ['Whitt']) === null);
+    composeWatchingWith('Quinn', [], ['Quinn']) === null);
   check('matching ignores case and padding',
-    composeWatchingWith('  whitt , my sister', ['Whitt']) === 'my sister, Whitt');
+    composeWatchingWith('  quinn , my sister', ['Quinn']) === 'my sister, Quinn');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

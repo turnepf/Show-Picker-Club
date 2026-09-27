@@ -204,9 +204,9 @@ console.log('\n== one member moving their copy does not relink anyone else\'s');
 {
   const env = makeEnv();
   const cookie = addMember(env, 'patrick');
-  addMember(env, 'whitt');
+  addMember(env, 'quinn');
   const mine = addShow(env, { member: 'patrick', network: 'Apple TV+', url: APPLE_URL });
-  const theirs = addShow(env, { member: 'whitt', network: 'Apple TV+', url: APPLE_URL });
+  const theirs = addShow(env, { member: 'quinn', network: 'Apple TV+', url: APPLE_URL });
 
   // Watchmode answers for Hulu this time, so there IS a replacement link to
   // propagate — the case where scoping matters.

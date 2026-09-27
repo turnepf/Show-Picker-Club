@@ -8,7 +8,7 @@ A shared tracker for a small private TV/movie club. Each member maintains their 
 
 ## Who it's for
 
-A group of friends and family (~20 members in production). Everyone has a member slug (e.g. `/whitt`), signs in with a one-time code (text/email), Sign in with Apple, or Sign in with Google, and has full edit rights over their own lists. Registration is open and self-service: anyone can create an account and is a full member the moment they do. There is no invite, no operator approval, and no way for the operator to create an account on someone's behalf.
+A group of friends and family (~20 members in production). Everyone has a member slug (e.g. `/quinn`), signs in with a one-time code (text/email), Sign in with Apple, or Sign in with Google, and has full edit rights over their own lists. Registration is open and self-service: anyone can create an account and is a full member the moment they do. There is no invite, no operator approval, and no way for the operator to create an account on someone's behalf.
 
 ## The four lists
 
@@ -226,7 +226,7 @@ Two pieces of metadata are **always visible** under the row (not collapsed):
 
 - **Awaiting list:** "Next episode: 5/9" — the next premiere date only (the finale date is never shown here). The label is "Next episode" rather than "Next season" because midseason episode dates can also appear here.
 - **Every list shows the premiere date when one exists** (since 2026-07): Loved and Next Up rows carry the same "📅 Next episode" line — a show you thought was done can drop a surprise season, and the date is the nudge to move it back to Watching.
-- **Next Up list:** "Recommended by Dorothy" — surfaces attribution without an expand.
+- **Next Up list:** "Recommended by Rosa" — surfaces attribution without an expand.
 
 ### The admin member screen (iPhone, iPad and Mac — admin sessions only)
 
@@ -367,7 +367,7 @@ Why: a new member reached for the magnifying glass, which then searched only the
 The club still rides along as context:
 
 - **On your lists** — your own copies whose title or cast matches, archived ones included (in orange). Tapping one opens its card, which is where Restore lives. A title you already have shows once, as your copy, not again as a TMDB result.
-- **Who in your groups has it** — each result names the group-mates with that title and the list it's on ("Whitt · Watching, Amy · Loved"), matched by title and movie-vs-series. Nobody outside your groups is ever named.
+- **Who in your groups has it** — each result names the group-mates with that title and the list it's on ("Quinn · Watching, Amy · Loved"), matched by title and movie-vs-series. Nobody outside your groups is ever named.
 
 The sheet stays open after an add — the show moves up into *On your lists*, which is the confirmation — so several can be added in a row. It's the same search on another member's page too — the magnifying glass there opens Find a Show rather than a search of their library, and an add goes to **your** lists (starting on Watching, since their list says nothing about yours). Their shows are already on screen, and a result names them if they have it.
 
@@ -415,7 +415,7 @@ How it goes:
 
 Details that matter in use:
 
-- **Notes and people come along.** "Whitt told me about this", "with Dorothy", "s4 in September" and the streaming service are pulled out into the same fields the add form fills in — not left glued to the title.
+- **Notes and people come along.** "Quinn told me about this", "with Rosa", "s4 in September" and the streaming service are pulled out into the same fields the add form fills in — not left glued to the title.
 - **Titles you already have are greyed out** and can't be ticked back on, archived ones included, so the screen never promises an add that silently doesn't happen.
 - **No length limit.** A very long paste takes longer; it isn't truncated or capped. There is a per-day ceiling of 300 rows across imports and hand-adds together.
 - **Artwork and cast fill in shortly after**, not at import time — the rows appear immediately with a poster and land fully enriched a little later.
@@ -444,7 +444,7 @@ The page reads the shows already on your lists, groups them by streaming service
 
 The top of the page sums it up: services tracked, estimated monthly spend, and roughly how much you could save right now. Each service shows a "Why?" expander listing the exact shows behind its verdict, so the recommendation is never a black box.
 
-**With a household, every show says whose it is.** Once you've invited someone to your household, the audit pools their lists with yours — so a service can be a "keep" on the strength of a show you've never started. Each row in the "Why?" list names the people who have that title, annotated with their own list when it differs from yours ("You · Dorothy (Next Up)"), and the keep verdict names the watcher outright: "Active now: Severance (Dorothy)." On a solo audit nothing changes — with only your own lists pooled, naming the viewer would say nothing.
+**With a household, every show says whose it is.** Once you've invited someone to your household, the audit pools their lists with yours — so a service can be a "keep" on the strength of a show you've never started. Each row in the "Why?" list names the people who have that title, annotated with their own list when it differs from yours ("You · Rosa (Next Up)"), and the keep verdict names the watcher outright: "Active now: Severance (Rosa)." On a solo audit nothing changes — with only your own lists pooled, naming the viewer would say nothing.
 
 You stay in control: every service has a **Subscribed / Paused / Cancelled** toggle (the verdict is only a suggestion), an editable monthly price (pre-filled with a sensible default per service), and — for paused services — a **resubscribe date**. Setting that date drops a "Resubscribe to <Service>" reminder onto your [calendar feed](#calendar-feed), right next to your premiere and finale dates. You can also **add a service** you pay for that has no tracked shows (a sports or music package) so the monthly total reflects everything.
 
@@ -802,7 +802,7 @@ A few intentional omissions:
 
 ## Shipped (formerly backlog)
 
-- **Member ratings.** (Amy Brownlee 7/16, Susan 7/22, Rob Maltzhan 7/23 —
+- **Member ratings.** (Amy 7/16, Susan 7/22, Rob 7/23 —
   2026.) Members rate shows 1-10 (whole numbers), and those ratings show up
   alongside the IMDB number — friends' stars answer "Patrick liked it, so
   I'll like it too." Amy and Susan asked for the two halves separately
@@ -922,7 +922,7 @@ A few intentional omissions:
   holds both kinds; remembered per list; ignored while reordering. Trending,
   search, tvOS, watch and web don't have it — nobody has asked there.
 
-- **Share / recommend a show within a group** (JC, via Jennifer Biggs —
+- **Share / recommend a show within a group** (JC, via Jennifer —
   8/23/2026; JC's pop-up proposal 8/25/2026), shipped 2026-08 as
   [Watch Next](#watch-next-group-recommendations). Built exactly to the
   settled direction: a group-owned board with pull-only adoption, wearing

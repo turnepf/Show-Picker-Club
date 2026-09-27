@@ -254,9 +254,9 @@ console.log('\n== challenges are bound to their purpose and their member');
 {
   const env = makeEnv();
   addMember(env, 'patrick');
-  addMember(env, 'whitt');
+  addMember(env, 'quinn');
   const patrickCookie = addSession(env, 'patrick');
-  const whittCookie = addSession(env, 'whitt');
+  const quinnCookie = addSession(env, 'quinn');
   const device = await makeDevice();
 
   // A sign-in challenge must not be usable to enroll a credential.
@@ -266,11 +266,11 @@ console.log('\n== challenges are bound to their purpose and their member');
   });
   check('an authenticate challenge cannot register a credential', crossPurpose.status === 400);
 
-  // Patrick's registration challenge, completed by Whitt's session: the
+  // Patrick's registration challenge, completed by Quinn's session: the
   // credential must not land on either account.
   const patrickOptions = await (await registerBegin.onRequestPost({ env, request: post('/auth/passkey-register-begin', {}, { cookie: patrickCookie }) })).json();
   const hijack = await registerFinish.onRequestPost({
-    env, request: post('/auth/passkey-register-finish', await device.register(patrickOptions.challenge), { cookie: whittCookie }),
+    env, request: post('/auth/passkey-register-finish', await device.register(patrickOptions.challenge), { cookie: quinnCookie }),
   });
   check('another member cannot complete your registration', hijack.status === 400);
   check('nothing was written', env._db.prepare('SELECT * FROM member_passkeys').all().length === 0);
@@ -278,9 +278,9 @@ console.log('\n== challenges are bound to their purpose and their member');
   // And a credential already owned can't be re-pointed at a second account.
   const own = await (await registerBegin.onRequestPost({ env, request: post('/auth/passkey-register-begin', {}, { cookie: patrickCookie }) })).json();
   await registerFinish.onRequestPost({ env, request: post('/auth/passkey-register-finish', await device.register(own.challenge), { cookie: patrickCookie }) });
-  const whittOptions = await (await registerBegin.onRequestPost({ env, request: post('/auth/passkey-register-begin', {}, { cookie: whittCookie }) })).json();
+  const quinnOptions = await (await registerBegin.onRequestPost({ env, request: post('/auth/passkey-register-begin', {}, { cookie: quinnCookie }) })).json();
   const steal = await registerFinish.onRequestPost({
-    env, request: post('/auth/passkey-register-finish', await device.register(whittOptions.challenge), { cookie: whittCookie }),
+    env, request: post('/auth/passkey-register-finish', await device.register(quinnOptions.challenge), { cookie: quinnCookie }),
   });
   check('a registered credential cannot be moved to another account', steal.status === 409);
   const owner = env._db.prepare('SELECT member_slug FROM member_passkeys WHERE credential_id = ?').all(device.credentialIdB64);
@@ -331,9 +331,9 @@ console.log('\n== listing and removing are scoped to the member');
 {
   const env = makeEnv();
   addMember(env, 'patrick');
-  addMember(env, 'whitt');
+  addMember(env, 'quinn');
   const patrickCookie = addSession(env, 'patrick');
-  const whittCookie = addSession(env, 'whitt');
+  const quinnCookie = addSession(env, 'quinn');
   const device = await makeDevice();
 
   const options = await (await registerBegin.onRequestPost({ env, request: post('/auth/passkey-register-begin', {}, { cookie: patrickCookie }) })).json();
@@ -350,7 +350,7 @@ console.log('\n== listing and removing are scoped to the member');
   check('the label is kept', mine.passkeys[0].label === "Patrick's iPhone");
   check('the public key is not published', !('public_key' in mine.passkeys[0]));
 
-  const otherReq = new Request(ORIGIN + '/api/passkeys', { headers: { Cookie: `session=${whittCookie}` } });
+  const otherReq = new Request(ORIGIN + '/api/passkeys', { headers: { Cookie: `session=${quinnCookie}` } });
   const theirs = await (await passkeyList.onRequestGet({ env, request: otherReq })).json();
   check('another member sees none of it', theirs.passkeys.length === 0);
 
@@ -359,7 +359,7 @@ console.log('\n== listing and removing are scoped to the member');
 
   const delReq = (cookie) => new Request(ORIGIN + '/api/passkeys/' + device.credentialIdB64,
                                          { method: 'DELETE', headers: { Cookie: `session=${cookie}` } });
-  const foreignDelete = await passkeyDelete.onRequestDelete({ env, request: delReq(whittCookie), params: { id: device.credentialIdB64 } });
+  const foreignDelete = await passkeyDelete.onRequestDelete({ env, request: delReq(quinnCookie), params: { id: device.credentialIdB64 } });
   check('another member cannot delete it', foreignDelete.status === 404);
   check('and it is still there', env._db.prepare('SELECT * FROM member_passkeys').all().length === 1);
 

@@ -128,8 +128,8 @@ console.log('\n/show/:id — the card names the show');
     network: 'Apple TV+',
     // The personal columns. None of these may reach the HTML.
     notes: 'SECRETNOTE rewatch with mom',
-    recommended_by: 'SECRETREC Whitt',
-    watching_with: 'SECRETWITH Dorothy',
+    recommended_by: 'SECRETREC Quinn',
+    watching_with: 'SECRETWITH Rosa',
   });
 
   const { res, html } = await get(showRoute, `${ORIGIN}/show/${id}`, { id: String(id) });

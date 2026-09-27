@@ -378,7 +378,7 @@ struct HomeView: View {
             }
             return
         }
-        let slug = first == "dorothy" ? "whitt" : first // mirror the web's 301
+        let slug = first
         // An admin following a link to someone else lands on that member's
         // admin screen, not their lists. The link that matters is the signup
         // notification email's, and the question it raises — who is this, and

@@ -78,8 +78,8 @@ For each title, also pull out what the person wrote around it:
 
 - notes — their own remark about the show, cleaned up but not reworded. "s2 in january", "everyone says it gets good after ep 4", "half watched". Do not invent a note, do not describe the show yourself, and do not repeat the title, the streaming service, or the section heading here.
 - network — the streaming service or channel, if they named one ("on Hulu", "Netflix", "AppleTV+").
-- recommended_by — a person they credit for the recommendation ("Whitt told me about this", "per Mom", "rec by Sarah").
-- watching_with — a person they watch it with ("with Dorothy", "me and Kate").
+- recommended_by — a person they credit for the recommendation ("Quinn told me about this", "per Mom", "rec by Sarah").
+- watching_with — a person they watch it with ("with Rosa", "me and Kate").
 - year — a release year, only when they wrote one or it is needed to tell two same-named titles apart.
 - movie — true for a film, false for a series. Guess from the title when they did not say.
 

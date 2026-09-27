@@ -153,7 +153,7 @@ console.log('\n== ?member= narrows to exactly one row');
   const env = makeEnv();
   addMember(env, 'patrick', { admin: 1, email: 'patrick@example.com' });
   addMember(env, 'stacy', { email: 'stacy@example.com', phone: '+15551234567' });
-  addMember(env, 'whitt', { email: 'whitt@example.com' });
+  addMember(env, 'quinn', { email: 'quinn@example.com' });
   const cookie = addSession(env, 'patrick');
 
   const { members } = await (await call(env, '/api/admin-member-emails?member=stacy', cookie)).json();
@@ -162,7 +162,7 @@ console.log('\n== ?member= narrows to exactly one row');
   check('with their contacts attached',
         members[0].emails[0] === 'stacy@example.com' && members[0].phones[0] === '+15551234567',
         JSON.stringify(members[0]));
-  check('and nobody else\'s', JSON.stringify(members).indexOf('whitt@example.com') === -1);
+  check('and nobody else\'s', JSON.stringify(members).indexOf('quinn@example.com') === -1);
 
   const unknown = await (await call(env, '/api/admin-member-emails?member=nobody', cookie)).json();
   check('an unknown slug returns nothing', unknown.members.length === 0);
@@ -240,11 +240,11 @@ console.log('\n== which groups, and who is in them');
   addMember(env, 'patrick', { admin: 1 });
   addMember(env, 'stacy');
   addMember(env, 'thayna');
-  addMember(env, 'whitt');
+  addMember(env, 'quinn');
   const cookie = addSession(env, 'patrick');
   addGroup(env, { name: 'Thursday Night', creator: 'stacy', members: ['thayna'], created: '2026-08-02T00:00:00Z' });
-  addGroup(env, { name: 'Movie Club', creator: 'thayna', members: ['whitt'], created: '2026-08-05T00:00:00Z' });
-  addGroup(env, { name: 'Not Hers', creator: 'whitt', created: '2026-08-06T00:00:00Z' });
+  addGroup(env, { name: 'Movie Club', creator: 'thayna', members: ['quinn'], created: '2026-08-05T00:00:00Z' });
+  addGroup(env, { name: 'Not Hers', creator: 'quinn', created: '2026-08-06T00:00:00Z' });
 
   const { groups } = await (await callGroups(env, '/api/admin-member-groups?member=thayna', cookie)).json();
   check('every group she is in comes back', groups.length === 2, JSON.stringify(groups.map((g) => g.name)));

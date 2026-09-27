@@ -105,8 +105,8 @@ export async function onRequestPost(context) {
   // Take the departing member's name off every row that named them, before
   // the rows that would identify those rows are gone. This path deletes
   // explicitly rather than leaning on cascades, and the display string isn't
-  // a foreign key at all — so without this, "watching Severance with Whitt"
-  // outlives Whitt's account on somebody else's list.
+  // a foreign key at all — so without this, "watching Severance with Quinn"
+  // outlives Quinn's account on somebody else's list.
   try {
     await forgetMemberAsWatcher(env, slug);
   } catch (e) { /* a database without migration 064 has nothing to forget */ }

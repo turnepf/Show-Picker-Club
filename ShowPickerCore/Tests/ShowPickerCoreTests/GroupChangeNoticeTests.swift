@@ -14,21 +14,21 @@ final class GroupChangeNoticeTests: XCTestCase {
     }
 
     private func notice(fields: [String]) -> GroupChangeNotice {
-        GroupChangeNotice(changedBy: "whitt", changedByName: "Whitt", changedFields: fields,
+        GroupChangeNotice(changedBy: "quinn", changedByName: "Quinn", changedFields: fields,
                            changedAt: "2026-09-08 12:00:00")
     }
 
     func testRenameOnlySummary() {
-        XCTAssertEqual(notice(fields: ["name"]).summary, "Whitt renamed the group.")
+        XCTAssertEqual(notice(fields: ["name"]).summary, "Quinn renamed the group.")
     }
 
     func testIconOnlySummary() {
-        XCTAssertEqual(notice(fields: ["icon"]).summary, "Whitt changed the group's icon.")
+        XCTAssertEqual(notice(fields: ["icon"]).summary, "Quinn changed the group's icon.")
     }
 
     func testRenameAndIconSummary() {
         XCTAssertEqual(notice(fields: ["name", "icon"]).summary,
-                        "Whitt renamed the group and changed its icon.")
+                        "Quinn renamed the group and changed its icon.")
     }
 
     func testGroupDetailDecodesWithoutAChangeNotice() throws {
@@ -47,10 +47,10 @@ final class GroupChangeNoticeTests: XCTestCase {
         {"group": {"id": 1, "name": "Queen Jelena Fan Club", "creator_slug": "patrick",
                     "created_at": "2026-08-01 00:00:00", "member_count": 3, "is_creator": 0},
          "members": [], "is_creator": false, "can_manage": false,
-         "change_notice": {"changed_by": "whitt", "changed_by_name": "Whitt",
+         "change_notice": {"changed_by": "quinn", "changed_by_name": "Quinn",
                             "changed_fields": ["name"], "changed_at": "2026-09-08 12:00:00"}}
         """)
-        XCTAssertEqual(detail.changeNotice?.changedByName, "Whitt")
-        XCTAssertEqual(detail.changeNotice?.summary, "Whitt renamed the group.")
+        XCTAssertEqual(detail.changeNotice?.changedByName, "Quinn")
+        XCTAssertEqual(detail.changeNotice?.summary, "Quinn renamed the group.")
     }
 }

@@ -340,7 +340,7 @@ function ownsHit(myMatches as object, h as object) as boolean
     return false
 end function
 
-' "Whitt · Watching, Amy · Loved" — group-mates with this title and where they
+' "Quinn · Watching, Amy · Loved" — group-mates with this title and where they
 ' keep it; two names, then a count.
 function groupLine(h as object) as string
     t = LCase(SafeStr(h.title))

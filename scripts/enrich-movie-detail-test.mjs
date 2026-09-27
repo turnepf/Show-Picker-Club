@@ -440,10 +440,10 @@ console.log('\nWhere a title streams now sits beside the network, never over it'
   // Two members, one film: the list is a fact about the title, so it reaches
   // the copy the rotation didn't pick.
   addMovie(env, { title: 'Sing Sing', tmdbId: 507, network: 'Max' });
-  env._db.prepare('INSERT INTO members (slug, name, first_name) VALUES (?, ?, ?)').run('whitt', 'Whitt D', 'Whitt');
+  env._db.prepare('INSERT INTO members (slug, name, first_name) VALUES (?, ?, ?)').run('quinn', 'Quinn D', 'Quinn');
   env._db.prepare(
     `INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, poster_url, network, genres, enriched_at, created_at, updated_at)
-     VALUES ('Sing Sing', 'next', 'whitt', 1, 507, 'movie', '/have.jpg', 'Max', 'Drama', '2026-09-01T00:00:00Z', '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z')`
+     VALUES ('Sing Sing', 'next', 'quinn', 1, 507, 'movie', '/have.jpg', 'Max', 'Drama', '2026-09-01T00:00:00Z', '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z')`
   ).run();
   await runEnrich(env);
   const copies = env._db.prepare("SELECT member_slug, streaming_on FROM shows WHERE LOWER(title)='sing sing'").all();

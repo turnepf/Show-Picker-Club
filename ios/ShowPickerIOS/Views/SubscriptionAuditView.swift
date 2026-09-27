@@ -291,7 +291,7 @@ struct SubscriptionAuditView: View {
         }
     }
 
-    // "You · Dorothy (Next Up)" — who has this title, annotated with their own
+    // "You · Rosa (Next Up)" — who has this title, annotated with their own
     // list when it differs from the headline list the verdict was computed
     // from (pooling keeps the most-active list, so those can disagree).
     // Returns nil when the audit isn't pooling a household.
@@ -304,7 +304,7 @@ struct SubscriptionAuditView: View {
         }.joined(separator: " · ")
     }
 
-    // "You", "You and Dorothy", "You, Dorothy and Sam" — for prose, where the
+    // "You", "You and Rosa", "You, Rosa and Sam" — for prose, where the
     // interpunct list above would read as noise.
     static func sentenceList(_ names: [String]) -> String {
         guard let last = names.last else { return "" }

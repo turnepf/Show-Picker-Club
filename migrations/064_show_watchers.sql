@@ -1,14 +1,14 @@
 -- Migration 064: Watching With becomes people, not just text.
 --
--- `shows.watching_with` has always been free text — "Whitt", "my sister",
+-- `shows.watching_with` has always been free text — "Quinn", "my sister",
 -- "the group chat". It still is. What this table adds is the case where the
 -- name typed in that field is a *member of the club* the owner shares a group
 -- with: then the app can do something with it rather than just print it.
 --
 -- One row = "the owner of show_id has named member_slug as someone they're
 -- watching it with". Links are written in pairs by
--- functions/_shared/watchers.js: tagging Whitt on your copy also puts the
--- title on Whitt's list and writes the mirror row pointing back at you. The
+-- functions/_shared/watchers.js: tagging Quinn on your copy also puts the
+-- title on Quinn's list and writes the mirror row pointing back at you. The
 -- pair is what makes "watching with" symmetrical instead of a note one person
 -- keeps about another.
 --

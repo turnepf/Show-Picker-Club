@@ -11,7 +11,7 @@ final class SessionScopeTests: XCTestCase {
 
     private var populated: SessionScope {
         SessionScope(focusedSlug: "patrick",
-                     groupMemberSlugs: ["whitt", "sherry"],
+                     groupMemberSlugs: ["quinn", "sherry"],
                      backlogCount: 12)
     }
 
@@ -45,7 +45,7 @@ final class SessionScopeTests: XCTestCase {
 
     func testSignedInSeesGroupMembersPlusSelf() {
         XCTAssertEqual(populated.visibleMemberSlugs(mySlug: "patrick"),
-                       ["patrick", "whitt", "sherry"])
+                       ["patrick", "quinn", "sherry"])
     }
 
     /// Signing in as someone with no groups shows only them — the roster is

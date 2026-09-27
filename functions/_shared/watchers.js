@@ -63,7 +63,7 @@ export function composeWatchingWith(rawText, linkedNames, knownNames = linkedNam
 // group-watchers list: the first_name override, else the first word of their
 // full name, else the slug. Disambiguated with a last initial only when two
 // people in the same picker would otherwise read identically — the club is
-// small enough that "Whitt" is usually the whole answer.
+// small enough that "Quinn" is usually the whole answer.
 export function displayNames(rows) {
   const counts = {};
   for (const r of rows) {
