@@ -506,7 +506,7 @@ and rate it a 9", "what are people in my groups watching that I'm not?".
   or delete a group, anything household, account settings, passkeys, import,
   admin tools — even on an admin's account. It sees other people's lists only
   through shared groups, never their private notes.
-- **Limits.** 1,000 changes and 100 catalog searches per member per day from
+- **Limits.** 1,000 changes and 1,000 catalog searches per member per day from
   connected apps, resetting at midnight UTC; the AI app is told when a limit is
   hit. Reading lists doesn't count toward either, so bulk work (rating a list
   of a hundred shows) fits in a day. The change limit is set by the

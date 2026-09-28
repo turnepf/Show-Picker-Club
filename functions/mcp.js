@@ -62,7 +62,7 @@ async function spend(env, slug, tool) {
   if (!row) return null;
   const caps = dailyCaps(env);
   if (w && row.writes > caps.writes) return `You've reached today's limit of ${caps.writes.toLocaleString('en-US')} changes from connected apps. It resets at midnight UTC.`;
-  if (s && row.searches > caps.searches) return `You've reached today's limit of ${caps.searches} catalog searches from connected apps. It resets at midnight UTC.`;
+  if (s && row.searches > caps.searches) return `You've reached today's limit of ${caps.searches.toLocaleString('en-US')} catalog searches from connected apps. It resets at midnight UTC.`;
   return null;
 }
 

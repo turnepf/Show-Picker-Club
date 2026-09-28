@@ -37,11 +37,11 @@ import { groupMates } from './watchers.js';
 // Per member per UTC day. Only changes and TMDB-backed searches are capped:
 // reads are D1-only and cost the operator nothing upstream, and a cap that
 // counts them is what stopped bulk work (rating a hundred shows reads as well
-// as writes). The write ceiling is set for that bulk work and is overridable
-// with MCP_DAILY_WRITE_LIMIT; the search ceiling stays low because every
-// search spends on the TMDB key. Adding a show carries the app's own
-// 50-a-day cap on top (functions/api/shows.js).
-export const DAILY_CAPS = { writes: 1000, searches: 100 };
+// as writes). Both ceilings are set for that bulk work; the write ceiling is
+// overridable with MCP_DAILY_WRITE_LIMIT. Searches keep their own ceiling
+// because every one spends on the TMDB key. Adding a show carries the app's
+// own 50-a-day cap on top (functions/api/shows.js).
+export const DAILY_CAPS = { writes: 1000, searches: 1000 };
 
 // The caps in force for this deployment. A missing, non-numeric or
 // non-positive MCP_DAILY_WRITE_LIMIT falls back to the default rather than
