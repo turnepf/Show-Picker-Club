@@ -596,17 +596,28 @@ console.log('\n== revocation, bans and caps');
   check('an app can disconnect itself (RFC 7009)', revoked.status === 200 && (await rpc(env, p.access, 'tools/list', {})).status === 401);
 
   const q = await connect(env, 'patrick');
-  env._db.prepare("INSERT INTO mcp_usage (member_slug, day, calls, writes, searches) VALUES ('patrick', date('now'), 0, ?, 0)").run(tools.DAILY_CAPS.writes);
-  const w = await tool(env, q.access, 'add_show', { title: 'Andor', list: 'watching' });
-  check('the daily write cap refuses a write', w.isError && w.text.includes('limit') && !row(env, "SELECT id FROM shows WHERE title = 'Andor'"));
+  check('the default write cap is 1,000 a day', tools.dailyCaps({}).writes === 1000);
+  check('MCP_DAILY_WRITE_LIMIT overrides it', tools.dailyCaps({ MCP_DAILY_WRITE_LIMIT: '250' }).writes === 250);
+  check('and junk, zero or negative falls back instead of refusing every change',
+    ['abc', '0', '-5', ''].every((v) => tools.dailyCaps({ MCP_DAILY_WRITE_LIMIT: v }).writes === 1000));
+  env._db.prepare("INSERT INTO mcp_usage (member_slug, day, calls, writes, searches) VALUES ('patrick', date('now'), 0, ?, 0)").run(tools.DAILY_CAPS.writes - 1);
+  const last = await tool(env, q.access, 'add_show', { title: 'Andor', list: 'watching' });
+  check('the last write under the cap goes through', !last.isError && row(env, "SELECT id FROM shows WHERE title = 'Andor'"));
+  const w = await tool(env, q.access, 'add_show', { title: 'Severance', list: 'watching' });
+  check('the daily write cap refuses the next write', w.isError && w.text.includes('limit of 1,000 changes') && w.text.includes('midnight UTC') && !row(env, "SELECT id FROM shows WHERE title = 'Severance'"));
   check('while reads still work', !(await tool(env, q.access, 'get_profile')).isError);
+  env._db.prepare("UPDATE mcp_usage SET calls = 100000 WHERE member_slug = 'patrick'").run();
+  check('reads never count toward a limit, however many', !(await tool(env, q.access, 'get_profile')).isError);
   env._db.prepare("UPDATE mcp_usage SET searches = ? WHERE member_slug = 'patrick'").run(tools.DAILY_CAPS.searches);
-  check('the search cap refuses a catalog search', (await tool(env, q.access, 'search_titles', { query: 'andor' })).isError);
-  env._db.prepare("UPDATE mcp_usage SET calls = ? WHERE member_slug = 'patrick'").run(tools.DAILY_CAPS.calls);
-  const over = await tool(env, q.access, 'get_profile');
-  check('the daily call cap refuses everything', over.isError && over.text.includes(String(tools.DAILY_CAPS.calls)));
+  check('the search cap is 1,000 a day', tools.DAILY_CAPS.searches === 1000);
+  const srch = await tool(env, q.access, 'search_titles', { query: 'andor' });
+  check('the search cap refuses a catalog search', srch.isError && srch.text.includes('limit of 1,000 catalog searches'));
   env._db.prepare("UPDATE mcp_usage SET day = date('now', '-1 day') WHERE member_slug = 'patrick'").run();
-  check('and resets the next day', !(await tool(env, q.access, 'get_profile')).isError);
+  check('and resets the next day', !(await tool(env, q.access, 'add_show', { title: 'Severance', list: 'watching' })).isError);
+  const e2 = { ...env, MCP_DAILY_WRITE_LIMIT: '3' };
+  env._db.prepare("UPDATE mcp_usage SET writes = 3 WHERE member_slug = 'patrick' AND day = date('now')").run();
+  const lowered = await tool(e2, q.access, 'rate_show', { show_id: row(env, "SELECT id FROM shows WHERE title = 'Andor'").id, rating: 8 });
+  check('the env limit is the one enforced', lowered.isError && lowered.text.includes('limit of 3 changes'));
 }
 
 console.log('\n== reporting counts connected people, not connections');

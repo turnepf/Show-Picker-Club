@@ -1010,9 +1010,10 @@ member could do anyway, and nothing it does may widen what anyone can see.
   call; a ban revokes rather than merely suspending, so re-enabling a member
   doesn't quietly bring their connections back. Connected apps accepts only a
   cookie session — an AI can't be talked into listing or cutting connections.
-- **Caps that have been seen to refuse.** Per-member daily ceilings on calls,
-  writes and TMDB searches (`DAILY_CAPS` in `_shared/mcp-tools.js`), counted in
-  SQL on the SQLite clock (§25), with tests that assert the refusal.
+- **Caps that have been seen to refuse.** Per-member daily ceilings on writes
+  and TMDB searches (`dailyCaps()` in `_shared/mcp-tools.js`; the write ceiling
+  is `MCP_DAILY_WRITE_LIMIT`, default 1,000), counted in SQL on the SQLite
+  clock (§25), with tests that assert the refusal. Reads count toward neither.
 
 Enforcer: `scripts/mcp-test.mjs`, plus the AASA exclusions for `/oauth/*`,
 `/mcp`, `/connect` and `/connected-apps` in `check-static.sh`.

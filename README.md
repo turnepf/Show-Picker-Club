@@ -110,6 +110,8 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    Watchmode deep-link lookups default to the US region. To target another
    country, set the non-secret `WATCHMODE_REGION` var (e.g. `GB`, `CA`) in
    the Cloudflare Pages dashboard → Settings → Environment variables.
+   `MCP_DAILY_WRITE_LIMIT` (same place, optional) sets how many changes a
+   member's connected AI apps may make per UTC day; it defaults to 1,000.
 
    **Reviewer / demo login (optional).** App Review can sign up like anyone
    else, but a fresh account has an empty library. Create a throwaway demo

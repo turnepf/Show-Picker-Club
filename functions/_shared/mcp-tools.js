@@ -34,12 +34,22 @@ import * as suggestionApi from '../api/groups/[id]/suggestions/[sid].js';
 import { actingAs } from './auth.js';
 import { groupMates } from './watchers.js';
 
-// Per member per UTC day. Far above a person asking an assistant about their
-// shows; low enough that a runaway agent stops long before it matters. Every
-// tool call counts toward CALLS; writes and TMDB-backed searches also count
-// toward their own, lower ceilings. Adding a show carries the app's own
-// 50-a-day cap on top (functions/api/shows.js).
-export const DAILY_CAPS = { calls: 500, writes: 100, searches: 100 };
+// Per member per UTC day. Only changes and TMDB-backed searches are capped:
+// reads are D1-only and cost the operator nothing upstream, and a cap that
+// counts them is what stopped bulk work (rating a hundred shows reads as well
+// as writes). Both ceilings are set for that bulk work; the write ceiling is
+// overridable with MCP_DAILY_WRITE_LIMIT. Searches keep their own ceiling
+// because every one spends on the TMDB key. Adding a show carries the app's
+// own 50-a-day cap on top (functions/api/shows.js).
+export const DAILY_CAPS = { writes: 1000, searches: 1000 };
+
+// The caps in force for this deployment. A missing, non-numeric or
+// non-positive MCP_DAILY_WRITE_LIMIT falls back to the default rather than
+// reading as zero, which would refuse every change.
+export function dailyCaps(env) {
+  const n = Number.parseInt(env && env.MCP_DAILY_WRITE_LIMIT, 10);
+  return { ...DAILY_CAPS, writes: Number.isFinite(n) && n > 0 ? n : DAILY_CAPS.writes };
+}
 
 // The API's list keys predate the names members see. Tools speak the names.
 export const LIST_TO_API = { watching: 'watching', awaiting: 'waiting', loved: 'recommending', next_up: 'next' };

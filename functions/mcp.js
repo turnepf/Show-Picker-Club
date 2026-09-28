@@ -20,7 +20,7 @@
 
 import { authenticateBearer, issuerFor, oauthJson, preflight } from './_shared/oauth.js';
 import { recordPlatformUsage } from './_shared/platform.js';
-import { toolsFor, toolNamed, ToolError, DAILY_CAPS } from './_shared/mcp-tools.js';
+import { toolsFor, toolNamed, ToolError, dailyCaps } from './_shared/mcp-tools.js';
 
 const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 
@@ -48,7 +48,8 @@ const rpcError = (id, code, message) => ({ jsonrpc: '2.0', id: id ?? null, error
 
 // Counts this call against the member's day and says whether it's allowed.
 // Counted before it runs, so a refused call still counts — a client that
-// hammers past the cap stays past it.
+// hammers past the cap stays past it. `calls` is still tallied but nothing is
+// refused on it: reads don't count toward any limit.
 async function spend(env, slug, tool) {
   const w = tool.scope === 'shows:write' ? 1 : 0;
   const s = tool.search ? 1 : 0;
@@ -59,9 +60,9 @@ async function spend(env, slug, tool) {
      RETURNING calls, writes, searches`
   ).bind(slug, w, s).first();
   if (!row) return null;
-  if (row.calls > DAILY_CAPS.calls) return `You've reached today's limit of ${DAILY_CAPS.calls} Show Picker Club actions from connected apps. It resets at midnight UTC.`;
-  if (w && row.writes > DAILY_CAPS.writes) return `You've reached today's limit of ${DAILY_CAPS.writes} changes from connected apps. It resets at midnight UTC.`;
-  if (s && row.searches > DAILY_CAPS.searches) return `You've reached today's limit of ${DAILY_CAPS.searches} catalog searches from connected apps. It resets at midnight UTC.`;
+  const caps = dailyCaps(env);
+  if (w && row.writes > caps.writes) return `You've reached today's limit of ${caps.writes.toLocaleString('en-US')} changes from connected apps. It resets at midnight UTC.`;
+  if (s && row.searches > caps.searches) return `You've reached today's limit of ${caps.searches.toLocaleString('en-US')} catalog searches from connected apps. It resets at midnight UTC.`;
   return null;
 }
 
