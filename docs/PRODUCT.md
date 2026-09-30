@@ -231,8 +231,12 @@ disappearing and quietly changing the count.
 **Platforms:** iPhone and iPad, and Mac via Catalyst (it gets the iPad sidebar
 entry). **Apple TV doesn't** — it's view-only and has no per-member reads of
 this kind. **The watch doesn't** — it's read-only and a list of links out to a
-browser is useless on a wrist. **The web doesn't** — it's frozen at its
-restored state (see [Web app status](#web-app-status)).
+browser is useless on a wrist. **The web does** (2026-09, at Patrick's
+request — an explicit exception to the [frozen web](#web-app-status)):
+`/favorite-actors`, linked from the Home and member-page sidebars and under
+the list on a phone, draws the same payload the same way — the *Rate your
+shows* card, each actor linking to IMDB, their show rows with *Archived* and
+*You rated 9* captions, and a click opening the show on your own page.
 
 Owner-only: the endpoint reads the session's own member and takes no `?member=`
 parameter. This aggregates a whole library into a sharper picture of taste than
@@ -332,6 +336,10 @@ Swift. Freezing the feature set is what stops that bill from coming back.
 So the web already trails, deliberately. It predates Watching With's member
 picker and the Also-watching line, and it will keep falling further behind as
 iOS ships. Say that plainly rather than treating each gap as a task.
+
+The exception is a feature Patrick asks for on the web by name. **Favorite
+Actors** (2026-09) is the first: it was requested for the web specifically, so
+it's there. That doesn't reopen the freeze for anything else.
 
 ## Native apps
 

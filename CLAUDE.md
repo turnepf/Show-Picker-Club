@@ -36,7 +36,7 @@ public/            Everything deployed. index.html IS the member SPA — it is
                    member's lists (see _redirects; no other shape works).
                    download.html is the App Store pitch at /download.
                    Alongside them: groups/vibe/rate-backlog/
-                   subscriptions, welcome, the four admin tools (members,
+                   favorite-actors/subscriptions, welcome, the four admin tools (members,
                    reporting, url-cleanup, vibe-admin), the shared scripts
                    (shell/nav/show-renderer/app-banner), privacy/terms/sms,
                    styles.css, favicon.svg, sw.js (tombstone — the PWA was
