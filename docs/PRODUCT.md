@@ -182,18 +182,41 @@ The landing page (`/`) shows:
 
 ## Favorite Actors
 
-A list of the people who keep turning up across your **Watching, Awaiting and
-Loved** lists, most-seen first, capped at ten. Each row names the actor, says
-how many of your shows they're in, and links out to their IMDB page for
+A list of the people who keep turning up in the shows **you rated highly,
+loved, or are watching**, capped at ten. Each row names the actor, says how
+many of your shows they're in, and links out to their IMDB page for
 everything else they've been in. Under the name, the shows that put them there
 draw as **standard show rows** — poster, network, rating — and tapping one
 opens the same show card every other screen opens; they're the member's own
 copies, just reached via the person.
 
+**Ratings lead (2026-09).** Each of your titles is worth a weight, and an
+actor ranks by the sum across their titles — so two shows you rated 10 beat
+three you never rated:
+
+| Your title | Weight |
+|---|---|
+| Rated 10 / 9 / 8 overall | 4 / 3 / 2 |
+| On **Loved**, whatever you rated it | at least 2 — Loved trumps a low rating |
+| On Watching or Awaiting, unrated | 1 |
+| Rated 7 or below (and not on Loved) | left out |
+| **Archived** and rated 8 or higher | counts, by its rating |
+| Archived otherwise, or on **Next Up** | left out |
+
+Only the **overall** rating counts — one great season doesn't make a favourite
+of the whole cast. A show copy that's archived says *Archived* under it, in
+orange, and any rated copy says *You rated 9*. The count on each actor is still
+titles, not weight.
+
+**Rate your shows.** Until you've rated **8** titles (overall, off Next Up), a
+*Rate your shows* row sits at the top of the page and opens Rate My Shows. It
+sits alongside the actors, never in place of them: the list works unrated, and
+ratings are what sharpen it. Rate My Shows lists archived shows for exactly
+this reason — see the *Member ratings* entry further down.
+
 **Nothing here is curated.** There is no "favourite" flag and no way to add
-one: the signal is already in the library, and a second list to maintain would
-only decay. That also means the page needs no onboarding — a thin library gets
-a short list, which is honest. Next Up is excluded for the same reason Trending
+one: the signal is already in the library and your ratings, and a second list
+to maintain would only decay. Next Up is excluded for the same reason Trending
 excludes it.
 
 Two credits for the same person are one person: enrichment stores a TMDB person
@@ -850,9 +873,13 @@ A few intentional omissions:
     (`tmdb_id`/`tmdb_type` on `shows`, migration 049), not any one member's
     row — see the TMDB-canonical-id work above. `show_ratings` (migration
     053) and `functions/_shared/ratings.js` own validation/aggregation.
-  - **Bulk rate-your-backlog (shipped):** `/rate-backlog` — every active
-    show not on Next Up (archived excluded — tried including it, cut it
-    after actually using the flow), overall rating only, 10-segment
+  - **Bulk rate-your-backlog (shipped):** `/rate-backlog` — every show
+    not on Next Up, **archived included** (it was left out once — "tried
+    including it, cut it after actually using the flow" — and came back
+    2026-09 because Favorite Actors now counts an archived show rated 8 or
+    higher, so the page it sends people to has to be able to rate one).
+    Archived rows say *Archived* instead of a list name, and a title held
+    twice (say, archived and live) is one row. Overall rating only, 10-segment
     tap-row, unrated shows sorted first. Each title links to its detail
     page (new
     `?show=<id>` deep link) to rate by season instead. Surfaced as "Rate my

@@ -232,14 +232,36 @@ struct FavoriteActorShow: Codable, Identifiable, Hashable {
     let rating: String?
     let posterUrl: String?
     let movie: Int?
+    // Archived copies count once rated 8+, and the member's own overall
+    // rating is what weighed the title in. Optional so an older cached
+    // payload still decodes.
+    let archived: Int?
+    let myRating: Int?
+
+    var isArchived: Bool { (archived ?? 0) == 1 }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, network, rating, movie
+        case id, title, network, rating, movie, archived
         case posterUrl = "poster_url"
+        case myRating = "my_rating"
     }
 }
 
-struct FavoriteActorsResponse: Codable { let actors: [FavoriteActor] }
+struct FavoriteActorsResponse: Codable {
+    let actors: [FavoriteActor]
+    // How many titles the member has rated, against the goal below which the
+    // screen offers Rate My Shows. Optional for older cached payloads.
+    let ratedCount: Int?
+    let ratingGoal: Int?
+    let needsRatings: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case actors
+        case ratedCount = "rated_count"
+        case ratingGoal = "rating_goal"
+        case needsRatings = "needs_ratings"
+    }
+}
 
 // Auth check response.
 struct AuthCheckResponse: Codable {

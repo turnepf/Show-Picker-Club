@@ -1,7 +1,8 @@
 import SwiftUI
 
 // The one-page "rate your backlog" bulk flow — mirrors public/rate-backlog.html.
-// Lists every show the member hasn't given an overall rating yet; tapping a
+// Lists every show the member hasn't given an overall rating yet, archived
+// ones included (Favorite Actors counts an archived show once it's rated 8+); tapping a
 // rating removes that show from the list immediately (whether it synced
 // right away or just got queued for offline replay) rather than sticking
 // around showing a score. Season ratings aren't listed here — overall
@@ -94,7 +95,10 @@ private struct RateBacklogRow: View {
         // leading-only and extra-only inits.
         ShowRow(
             show,
-            caption: ShowList(rawValue: show.list)?.title,
+            // An archived row names no list it's still on — it says
+            // Archived, in the same orange search uses for archived copies.
+            caption: show.isArchived ? "Archived" : ShowList(rawValue: show.list)?.title,
+            captionTint: show.isArchived ? .orange : nil,
             showRating: false,
             alignment: .top,
             extra: {

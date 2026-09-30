@@ -1,19 +1,40 @@
 import SwiftUI
 
-// Favourite actors — the people who keep turning up across your Watching,
-// Awaiting and Loved lists, with a way out to their IMDB page for everything
-// else they've been in.
+// Favourite actors — the people who keep turning up in the shows you rated
+// highly, loved, or are watching, with a way out to their IMDB page for
+// everything else they've been in.
 //
-// Nothing here is curated. The list is computed from the library, so it needs
-// no empty-state onboarding and no "add a favourite" affordance; a member with
-// a thin library gets a short list, which is honest.
+// Nothing here is curated. The list is computed from the library and your
+// ratings, so it needs no "add a favourite" affordance; the one nudge is Rate
+// My Shows, offered while too few titles are rated for ratings to lead.
 struct FavoriteActorsView: View {
     @State private var actors: [FavoriteActor] = []
+    @State private var ratedCount: Int?
+    @State private var ratingGoal = 8
+    @State private var needsRatings = false
     @State private var loading = true
     @State private var failed = false
 
     var body: some View {
         List {
+            // Alongside the actors, never instead of them: the list works
+            // unrated, ratings are what sharpen it.
+            if needsRatings && !loading {
+                Section {
+                    NavigationLink {
+                        RateBacklogView()
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label("Rate your shows", systemImage: "star.fill")
+                                .font(.headline)
+                            Text(ratePrompt)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
             if actors.isEmpty && !loading {
                 Section {
                     Text(failed
@@ -31,7 +52,7 @@ struct FavoriteActorsView: View {
 
             if !actors.isEmpty {
                 Section {
-                    Text("Worked out from the shows on your Watching, Awaiting and Loved lists.")
+                    Text("Worked out from your ratings — shows you rated 8 or higher count most, archived ones included — and the shows on your Watching, Awaiting and Loved lists.")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -41,7 +62,9 @@ struct FavoriteActorsView: View {
         .navigationTitle("Favorite Actors")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
-        .task { if loading { await load() } }
+        // Every appearance, not just the first: coming back from Rate My Shows
+        // should show the ratings you just gave.
+        .task { await load() }
         .overlay { if loading && actors.isEmpty { ProgressView() } }
     }
 
@@ -73,7 +96,8 @@ struct FavoriteActorsView: View {
                                    initialNetwork: card.network, initialRating: card.rating,
                                    initialPoster: card.posterUrl)
                 } label: {
-                    ShowRow(card)
+                    ShowRow(card, caption: caption(card),
+                            captionTint: card.isArchived ? .orange : nil)
                 }
             }
         } else {
@@ -85,6 +109,26 @@ struct FavoriteActorsView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    // Why this copy counts: the member's own rating, and Archived when it's
+    // off their lists. Nil keeps the standard network line.
+    private func caption(_ card: FavoriteActorShow) -> String? {
+        var parts: [String] = []
+        if card.isArchived {
+            parts.append("Archived")
+        } else if let network = card.network, !network.isEmpty {
+            parts.append(network)
+        }
+        if let mine = card.myRating { parts.append("You rated \(mine)") }
+        return card.isArchived || card.myRating != nil ? parts.joined(separator: " · ") : nil
+    }
+
+    private var ratePrompt: String {
+        let n = ratedCount ?? 0
+        return n == 0
+            ? "Shows you rate 8 or higher count most here. Rate \(ratingGoal) to get started."
+            : "You've rated \(n) of \(ratingGoal). Shows you rate 8 or higher count most here."
     }
 
     private func header(_ actor: FavoriteActor) -> some View {
@@ -103,6 +147,10 @@ struct FavoriteActorsView: View {
         let result = try? await API.favoriteActors()
         failed = (result == nil)
         // Stale beats blank, same as Home's Trending shelf.
-        actors = result ?? actors
+        guard let result else { return }
+        actors = result.actors
+        ratedCount = result.ratedCount
+        ratingGoal = result.ratingGoal ?? ratingGoal
+        needsRatings = result.needsRatings ?? false
     }
 }

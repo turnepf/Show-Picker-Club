@@ -53,7 +53,10 @@
 
     function rowMeta(show) {
       const parts = [];
-      if (LIST_LABELS[show.list]) parts.push(LIST_LABELS[show.list]);
+      // Archived rows are in the backlog too; say so rather than naming a
+      // list the show no longer appears on.
+      if (show.archived) parts.push('Archived');
+      else if (LIST_LABELS[show.list]) parts.push(LIST_LABELS[show.list]);
       let meta = escapeHtml(parts.join(' · '));
       if (!show.movie && show.seasons_released && mySlug) {
         meta += ` <a href="/${encodeURIComponent(mySlug)}?show=${show.id}">Rate seasons &rarr;</a>`;

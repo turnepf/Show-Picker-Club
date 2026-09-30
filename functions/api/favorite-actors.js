@@ -1,11 +1,36 @@
 import { getSession } from '../_shared/auth.js';
-import { TRENDING_LISTS } from '../_shared/trending-lists.js';
-
-const LISTS_SQL = TRENDING_LISTS.map(l => `'${l}'`).join(',');
-
 // How many actors the page shows. Nico's framing was "favorite actors and
 // their other shows", and a favourite you have to scroll to isn't one.
 const TOP_N = 10;
+
+// Below this many rated titles the list still works, but the ratings aren't
+// doing much yet — the client offers Rate my backlog alongside the actors.
+const RATING_GOAL = 8;
+
+// How much one title says about the people in it. Ratings lead: a show you
+// rated highly is the clearest statement of taste the library holds, so it
+// outweighs one you merely have on a list, and it counts even once archived.
+//
+//   rated 10 → 4, 9 → 3, 8 → 2
+//   Loved, whatever you rated it → at least 2 (Loved trumps a low rating)
+//   Watching / Awaiting, unrated → 1
+//   rated 7 or below (not Loved), or archived and not rated 8+ → 0, left out
+//
+// Next Up never counts — bookmarking a show is not yet a statement about who's
+// in it, the same reason Trending excludes it — and is filtered in WHERE.
+// Only the overall rating (season 0) is read: one great season shouldn't make
+// a favourite of the whole cast.
+const WEIGHT = `CASE
+       WHEN r.rating >= 8 THEN r.rating - 6
+       WHEN s.archived = 0 AND s.list = 'recommending' THEN 2
+       WHEN s.archived = 0 AND r.rating IS NULL AND s.list IN ('watching', 'waiting') THEN 1
+       ELSE 0
+     END`;
+
+const RATING_JOIN = `
+     LEFT JOIN show_ratings r
+       ON r.tmdb_id = s.tmdb_id AND r.tmdb_type = s.tmdb_type
+      AND r.season_number = 0 AND r.member_slug = s.member_slug`;
 
 // Who a credit is FOR. Grouping on the raw row split real people in half:
 // credits written before migration 060 carry no tmdb_person_id, so an actor
@@ -34,11 +59,11 @@ const PERSON_JOINS = `
 // Favourite actors, derived rather than picked.
 //
 // There is no "favourite" flag anywhere and deliberately so: the signal is
-// already in the library. An actor who keeps turning up across the shows you
-// watch, await and loved IS a favourite, and asking members to curate a
-// second list to say so would just decay. Next Up is excluded for the same
-// reason Trending excludes it — bookmarking a show is not yet a statement
-// about who's in it.
+// already in the library and in the member's ratings. An actor who keeps
+// turning up across the shows you rated highly, loved, or are watching IS a
+// favourite, and asking members to curate a second list to say so would just
+// decay. Actors rank by the summed WEIGHT of their titles, so a few 10s beat
+// a pile of unrated shows.
 //
 // Owner-only. This reads one member's whole library in aggregate, which is a
 // sharper picture of taste than the list titles a group-mate can already see,
@@ -52,24 +77,45 @@ export async function onRequestGet(context) {
     });
   }
 
-  // Counting DISTINCT title rather than rows keeps a member who holds the
-  // same show on two lists from double-counting its cast.
+  // One row per (person, title) at that title's best weight: a member holding
+  // the same show on two lists, or an archived copy beside a live one, must
+  // not double-count its cast. Titles weighing nothing drop out here.
   const { results: top } = await env.DB.prepare(
-    `SELECT
-       ${PERSON_KEY} as person_key,
-       MIN(a.name) as name,
-       MAX(a.imdb_id) as imdb_id,
-       COUNT(DISTINCT LOWER(s.title)) as show_count
-     FROM actors a
-     JOIN shows s ON s.id = a.show_id
-     ${PERSON_JOINS}
-     WHERE s.member_slug = ?1
-       AND s.archived = 0
-       AND s.list IN (${LISTS_SQL})
-     GROUP BY person_key
-     ORDER BY show_count DESC, name COLLATE NOCASE
-     LIMIT ${TOP_N}`
+    `SELECT person_key,
+            MIN(name) as name,
+            MAX(imdb_id) as imdb_id,
+            COUNT(*) as show_count,
+            SUM(w) as score
+       FROM (SELECT ${PERSON_KEY} as person_key,
+                    LOWER(s.title) as title_lower,
+                    MIN(a.name) as name,
+                    MAX(a.imdb_id) as imdb_id,
+                    MAX(${WEIGHT}) as w
+               FROM actors a
+               JOIN shows s ON s.id = a.show_id
+               ${RATING_JOIN}
+               ${PERSON_JOINS}
+              WHERE s.member_slug = ?1
+                AND s.list != 'next'
+              GROUP BY person_key, title_lower
+             HAVING w > 0)
+      GROUP BY person_key
+      ORDER BY score DESC, show_count DESC, name COLLATE NOCASE
+      LIMIT ${TOP_N}`
   ).bind(session.member_slug).all();
+
+  // How many titles the member has given an overall rating, counted the way
+  // the backlog counts them (off Next Up, one per title).
+  const rated = await env.DB.prepare(
+    `SELECT COUNT(*) as cnt FROM (
+       SELECT DISTINCT s.tmdb_id, s.tmdb_type
+         FROM shows s
+         JOIN show_ratings r
+           ON r.tmdb_id = s.tmdb_id AND r.tmdb_type = s.tmdb_type
+          AND r.season_number = 0 AND r.member_slug = s.member_slug
+        WHERE s.member_slug = ?1 AND s.list != 'next')`
+  ).bind(session.member_slug).first();
+  const ratedCount = (rated && rated.cnt) || 0;
 
   // The member's own copies behind each count — enough for a client to draw
   // its standard show row and open the show card, not just name the title.
@@ -78,21 +124,25 @@ export async function onRequestGet(context) {
   if (top.length) {
     const { results: rows } = await env.DB.prepare(
       `SELECT ${PERSON_KEY} as person_key,
-              s.id as show_id, s.title, s.network, s.rating, s.poster_url, s.movie
+              s.id as show_id, s.title, s.network, s.rating, s.poster_url, s.movie,
+              s.archived, r.rating as my_rating, ${WEIGHT} as w
          FROM actors a
          JOIN shows s ON s.id = a.show_id
+         ${RATING_JOIN}
          ${PERSON_JOINS}
         WHERE s.member_slug = ?1
-          AND s.archived = 0
-          AND s.list IN (${LISTS_SQL})
+          AND s.list != 'next'
+          AND ${WEIGHT} > 0
           AND ${PERSON_KEY} IN (${top.map(() => '?').join(',')})
-        ORDER BY s.title COLLATE NOCASE, s.id`
+        ORDER BY s.title COLLATE NOCASE, w DESC, s.archived, s.id`
     ).bind(session.member_slug, ...top.map(a => a.person_key)).all();
     for (const r of rows) {
       let entry = byActor.get(r.person_key);
       if (!entry) { entry = { seen: new Set(), cards: [] }; byActor.set(r.person_key, entry); }
       // One card per distinct title: a copy on two lists is one show, and the
-      // ORDER BY makes which copy wins deterministic (the oldest row).
+      // ORDER BY makes which copy wins deterministic — the one that earned the
+      // title its place, then a live copy over an archived one, then the
+      // oldest row.
       const t = (r.title || '').toLowerCase();
       if (entry.seen.has(t)) continue;
       entry.seen.add(t);
@@ -103,7 +153,16 @@ export async function onRequestGet(context) {
         rating: r.rating || null,
         poster_url: r.poster_url || null,
         movie: r.movie ? 1 : 0,
+        archived: r.archived ? 1 : 0,
+        my_rating: r.my_rating ?? null,
+        weight: r.w,
       });
+    }
+    // Strongest reasons first, so the 10 you gave a show leads its actor.
+    for (const entry of byActor.values()) {
+      entry.cards.sort((x, y) => y.weight - x.weight
+        || x.title.localeCompare(y.title, undefined, { sensitivity: 'base' }));
+      for (const c of entry.cards) delete c.weight;
     }
   }
 
@@ -122,7 +181,14 @@ export async function onRequestGet(context) {
     };
   });
 
-  return new Response(JSON.stringify({ actors }), {
+  // `rated_count` against `rating_goal` is how a client decides to offer Rate
+  // my backlog: the list is always returned, and ratings are what sharpen it.
+  return new Response(JSON.stringify({
+    actors,
+    rated_count: ratedCount,
+    rating_goal: RATING_GOAL,
+    needs_ratings: ratedCount < RATING_GOAL,
+  }), {
     headers: { 'Content-Type': 'application/json' },
   });
 }

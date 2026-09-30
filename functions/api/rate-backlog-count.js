@@ -1,4 +1,5 @@
 import { getSession } from '../_shared/auth.js';
+import { BACKLOG_ELIGIBLE_WHERE, BACKLOG_UNRATED_WHERE } from '../_shared/rate-backlog.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -11,11 +12,9 @@ function corsHeaders() {
 // full backlog (posters, titles, season counts) to render one integer is a lot
 // of payload for a badge.
 //
-// Eligibility matches /api/rate-backlog exactly: an active, non-Next-Up show
-// with a tmdb_id and no overall rating from this member (season ratings don't
-// count). Keep the two in step — a badge that disagrees with the page it
-// links to is worse than no badge.
-const ELIGIBLE_WHERE = `s.member_slug = ? AND s.list != 'next' AND s.archived = 0 AND s.tmdb_id IS NOT NULL`;
+// Eligibility is /api/rate-backlog's exactly — both read it from
+// _shared/rate-backlog.js, so the badge can't disagree with the page it links
+// to.
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -27,12 +26,8 @@ export async function onRequestGet(context) {
   const row = await env.DB.prepare(
     `SELECT COUNT(*) AS cnt
      FROM shows s
-     WHERE ${ELIGIBLE_WHERE}
-       AND NOT EXISTS (
-         SELECT 1 FROM show_ratings r
-         WHERE r.tmdb_id = s.tmdb_id AND r.tmdb_type = s.tmdb_type
-           AND r.season_number = 0 AND r.member_slug = s.member_slug
-       )`
+     WHERE ${BACKLOG_ELIGIBLE_WHERE}
+       AND ${BACKLOG_UNRATED_WHERE}`
   ).bind(session.member_slug).first();
 
   return new Response(JSON.stringify({ count: (row && row.cnt) || 0 }), { headers: corsHeaders() });
