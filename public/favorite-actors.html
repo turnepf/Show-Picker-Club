@@ -35,6 +35,9 @@
     .rate-card { display: block; background: var(--surface); border-radius: 10px; padding: 14px 16px; margin-bottom: 20px; text-decoration: none; }
     .rate-card strong { display: block; color: var(--tint); font-size: 15px; margin-bottom: 2px; }
     .rate-card span { color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
+    .update-card { background: var(--surface); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+    .update-card strong { display: block; color: var(--tint); font-size: 15px; margin-bottom: 2px; }
+    .update-card span { color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
     .footnote { font-size: 12px; color: var(--ink-muted); line-height: 1.5; margin-top: 8px; }
 
   </style>
@@ -50,7 +53,7 @@
   </div>
 
   <script src="/show-renderer.js?v=2"></script>
-  <script src="/shell.js?v=4" defer></script>
+  <script src="/shell.js?v=5" defer></script>
   <script>
     // Favorite Actors on the web — the same /api/favorite-actors the iOS
     // FavoriteActorsView reads, drawn the same way: a "Rate your shows" nudge
@@ -60,6 +63,17 @@
     // and the member's ratings.
 
     let mySlug = null;
+
+    // The ranking changed in 2026-09 (ratings lead). The first visit retires
+    // the "Updated" flag on the nav links and shows this card; later visits
+    // don't. The key is read before it's written, so the card stays up for
+    // the visit that retired the flag.
+    let showUpdateCard = false;
+    try {
+      showUpdateCard = localStorage.getItem('seenFavoriteActorsUpdate') !== '1';
+      localStorage.setItem('seenFavoriteActorsUpdate', '1');
+    } catch {}
+    const UPDATE_CARD = `<div class="update-card"><strong>&#10024; New algorithm!</strong><span>Shows you rate 8 or higher now count most — even ones you've archived.</span></div>`;
 
     // Clicking a show opens it on the member's own page, like Rate my shows'
     // "View" link.
@@ -104,7 +118,8 @@
 
     function render(data) {
       const actors = data.actors || [];
-      let html = data.needs_ratings ? ratePrompt(data) : '';
+      let html = showUpdateCard ? UPDATE_CARD : '';
+      if (data.needs_ratings) html += ratePrompt(data);
       if (!actors.length) {
         html += `<div class="empty-card">No actors yet. Add a few shows to Watching, Awaiting or Loved, or rate some 8 or higher, and they'll show up here.</div>`;
       } else {
