@@ -101,7 +101,7 @@ async function refreshCastFromDetail(env, show, detail, tmdbId) {
 
   const { results: copies } = await env.DB.prepare(
     `SELECT id FROM shows
-      WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?) AND archived = 0
+      WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)
         AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)`
   ).bind(show.id, tmdbId ?? null, tmdbId ?? null).all();
   const insert = env.DB.prepare(
@@ -127,24 +127,24 @@ async function syncArtworkAcrossCopies(env) {
         SELECT s2.poster_url FROM shows s2
          WHERE LOWER(s2.title) = LOWER(shows.title)
            AND (s2.tmdb_id IS NULL OR shows.tmdb_id IS NULL OR s2.tmdb_id = shows.tmdb_id)
-           AND s2.archived = 0 AND s2.poster_url IS NOT NULL LIMIT 1)
-      WHERE archived = 0 AND poster_url IS NULL
+           AND s2.poster_url IS NOT NULL LIMIT 1)
+      WHERE poster_url IS NULL
         AND EXISTS (SELECT 1 FROM shows s2
                      WHERE LOWER(s2.title) = LOWER(shows.title)
                        AND (s2.tmdb_id IS NULL OR shows.tmdb_id IS NULL OR s2.tmdb_id = shows.tmdb_id)
-                       AND s2.archived = 0 AND s2.poster_url IS NOT NULL)`
+                       AND s2.poster_url IS NOT NULL)`
   ).run();
   await env.DB.prepare(
     `UPDATE shows SET network_logo_url = (
         SELECT s2.network_logo_url FROM shows s2
          WHERE LOWER(s2.title) = LOWER(shows.title)
            AND (s2.tmdb_id IS NULL OR shows.tmdb_id IS NULL OR s2.tmdb_id = shows.tmdb_id)
-           AND s2.archived = 0 AND s2.network_logo_url IS NOT NULL LIMIT 1)
-      WHERE archived = 0 AND network_logo_url IS NULL
+           AND s2.network_logo_url IS NOT NULL LIMIT 1)
+      WHERE network_logo_url IS NULL
         AND EXISTS (SELECT 1 FROM shows s2
                      WHERE LOWER(s2.title) = LOWER(shows.title)
                        AND (s2.tmdb_id IS NULL OR shows.tmdb_id IS NULL OR s2.tmdb_id = shows.tmdb_id)
-                       AND s2.archived = 0 AND s2.network_logo_url IS NOT NULL)`
+                       AND s2.network_logo_url IS NOT NULL)`
   ).run();
 }
 
@@ -245,7 +245,13 @@ export async function onRequestPost(context) {
     // Cover everything a sibling copy already covers before spending budget.
     await syncArtworkAcrossCopies(env);
 
-    let tvWhere = `archived = 0 AND movie = 0`;
+    // Archived rows are in scope: Favorite Actors counts an archived title
+    // rated 8+, so its cast has to be there to count. Posters and gaps modes
+    // select on missing data, so an archived row joins them only until it is
+    // filled; the normal rotation below takes an archived row only while it
+    // has a gap, so the shelf of finished shows can't stretch the cycle that
+    // keeps next-season dates on live lists current.
+    let tvWhere = `movie = 0`;
     const tvBinds = [];
     if (member) { tvWhere += ` AND member_slug = ?`; tvBinds.push(member); }
     if (titles) { tvWhere += ` AND LOWER(title) IN (${titles.map(() => '?').join(',')})`; tvBinds.push(...titles); }
@@ -264,17 +270,17 @@ export async function onRequestPost(context) {
     // and each pin deserves its own fetch — one row per title would let
     // whichever copy the GROUP BY happened to keep answer for both.
     const tvSelect = skipOmdb
-      ? `SELECT id, title, movie, list, network_url, tmdb_id, tmdb_type FROM shows
+      ? `SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type FROM shows
           WHERE ${tvWhere} AND poster_url IS NULL
           GROUP BY LOWER(title), tmdb_id
           ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
       : gapsOnly
-      ? `SELECT id, title, movie, list, network_url, tmdb_id, tmdb_type FROM shows
+      ? `SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type FROM shows
           WHERE ${tvWhere} AND ${TV_GAP}
           GROUP BY LOWER(title), tmdb_id
           ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
-      : `SELECT id, title, movie, list, network_url, tmdb_id, tmdb_type FROM shows
-          WHERE ${tvWhere}
+      : `SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type FROM shows
+          WHERE ${tvWhere} AND (archived = 0 OR ${TV_GAP})
           ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`;
     const tmdbStmt = env.DB.prepare(tvSelect).bind(...tvBinds, maxTmdb);
     const { results: tmdbShows } = await tmdbStmt.all();
@@ -320,8 +326,7 @@ export async function onRequestPost(context) {
             // unstamped sibling would pin a hopeless title to the front forever.
             await env.DB.prepare(
               `UPDATE shows SET enriched_at = datetime('now')
-                WHERE archived = 0
-                  AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
+                WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
             ).bind(show.id).run();
             continue;
           }
@@ -353,10 +358,12 @@ export async function onRequestPost(context) {
         const networkLogoUrl = netLogoPath
           ? `https://image.tmdb.org/t/p/w154${netLogoPath}` : null;
 
-        // Only get dates for watching/waiting lists
+        // Only get dates for watching/waiting lists — and not for an archived
+        // row still carrying its old list, which would spend a season fetch on
+        // a show the member has put away.
         let newDate = null;
         let endDate = null;
-        if (show.list === 'watching' || show.list === 'waiting') {
+        if (!show.archived && (show.list === 'watching' || show.list === 'waiting')) {
           const nextEp = detail.next_episode_to_air;
           newDate = nextEp ? nextEp.air_date : null;
 
@@ -444,8 +451,7 @@ export async function onRequestPost(context) {
               -- rating pool uses, so a NULL here costs a member their share of
               -- the club's ratings on that title.
               tmdb_id = COALESCE(tmdb_id, ?), tmdb_type = COALESCE(tmdb_type, 'tv')
-            WHERE archived = 0
-              AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)
+            WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)
               -- Same title, different pinned id = a different show (remake
               -- vs original) — its copies keep their own catalog data.
               AND (tmdb_id IS NULL OR tmdb_id = ?)`
@@ -508,7 +514,7 @@ export async function onRequestPost(context) {
     const mvGate = skipOmdb ? "(poster_url IS NULL OR network IS NULL)"
       : logosOnly ? "(network_logo_url IS NULL OR network_logo_url = '')"
       : MOVIE_GAP;
-    let mvWhere = `archived = 0 AND movie = 1 AND ${mvGate}`;
+    let mvWhere = `movie = 1 AND ${mvGate}`;
     const mvBinds = [];
     if (member) { mvWhere += ` AND member_slug = ?`; mvBinds.push(member); }
     if (titles) { mvWhere += ` AND LOWER(title) IN (${titles.map(() => '?').join(',')})`; mvBinds.push(...titles); }
@@ -555,7 +561,7 @@ export async function onRequestPost(context) {
             // pinning the front of the grouped-by-title queue.
             await env.DB.prepare(
               `UPDATE shows SET enriched_at = datetime('now')
-                WHERE archived = 0 AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
+                WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
             ).bind(show.id).run();
             continue;
           }
@@ -628,8 +634,7 @@ export async function onRequestPost(context) {
               -- copy gets it. Fill-only, so a corrected id is never clobbered.
               tmdb_id = COALESCE(tmdb_id, ?), tmdb_type = COALESCE(tmdb_type, 'movie'),
               enriched_at = datetime('now')
-            WHERE archived = 0
-              AND LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)
+            WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)
               -- Copies pinned to a different id are a different film that
               -- shares the title — they get their own turn, not this data.
               AND (tmdb_id IS NULL OR tmdb_id = ?)`
@@ -637,6 +642,11 @@ export async function onRequestPost(context) {
           df.director, directorImdbId, df.runtime, df.releaseYear, genres, fallbackNetwork(df), df.watchLink, streamingOn(df),
           df.voteCount, df.tagline, df.originalLanguage, df.studio,
           tmdbId, show.id, tmdbId).run();
+        // The detail call already carried credits, and MOVIE_GAP selects a film
+        // for missing cast — but this pass never wrote any, so a castless film
+        // (an archived one imported bare, say) re-qualified every round and
+        // stayed out of Favorite Actors for good. Same helper as the TV pass.
+        await refreshCastFromDetail(env, show, detail, tmdbId);
         if (posterUrl) tmdbUpdated++;
       } catch (e) {
         movieErrors++;
@@ -685,8 +695,7 @@ export async function onRequestPost(context) {
     // and its same-titled original each refresh from their own entry.
     const backfillBase = `SELECT s.title, MAX(s.movie) AS movie, s.tmdb_id, MAX(s.tmdb_type) AS tmdb_type
        FROM shows s
-       WHERE s.archived = 0
-         AND EXISTS (SELECT 1 FROM actors a WHERE a.show_id = s.id AND a.imdb_id IS NULL)`;
+       WHERE EXISTS (SELECT 1 FROM actors a WHERE a.show_id = s.id AND a.imdb_id IS NULL)`;
     const backfillStmt = member
       ? env.DB.prepare(`${backfillBase} AND s.member_slug = ? GROUP BY LOWER(s.title), s.tmdb_id ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(member, maxActorImdb)
       : env.DB.prepare(`${backfillBase} GROUP BY LOWER(s.title), s.tmdb_id ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(maxActorImdb);
@@ -715,7 +724,7 @@ export async function onRequestPost(context) {
         // pinned to a different entry keeps its own cast either way.
         const castFromId = result.tmdbId ?? show.tmdb_id ?? null;
         const { results: copies } = await env.DB.prepare(
-          `SELECT id FROM shows WHERE LOWER(title) = LOWER(?) AND archived = 0
+          `SELECT id FROM shows WHERE LOWER(title) = LOWER(?)
              AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)`
         ).bind(show.title, castFromId, castFromId).all();
         const insert = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id) VALUES (?, ?, ?, ?, ?)');
@@ -737,11 +746,11 @@ export async function onRequestPost(context) {
     const row = await env.DB.prepare(
       `SELECT
          (SELECT COUNT(DISTINCT LOWER(title)) FROM shows
-           WHERE archived = 0 AND movie = 0
+           WHERE movie = 0
              AND (NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id)
                   OR episodes_released IS NULL)) AS tv,
          (SELECT COUNT(DISTINCT LOWER(title)) FROM shows
-           WHERE archived = 0 AND movie = 1
+           WHERE movie = 1
              AND (poster_url IS NULL OR network IS NULL
                   OR genres IS NULL OR genres = ''
                   OR NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id))) AS movies`
@@ -755,7 +764,7 @@ export async function onRequestPost(context) {
     // rather than on one that reaches zero.
     const row = await env.DB.prepare(
       `SELECT COUNT(DISTINCT LOWER(title)) AS movies FROM shows
-        WHERE archived = 0 AND movie = 1
+        WHERE movie = 1
           AND (network_logo_url IS NULL OR network_logo_url = '')`
     ).first().catch(() => null);
     remaining = row ? { tv: 0, movies: row.movies, total: row.movies } : null;

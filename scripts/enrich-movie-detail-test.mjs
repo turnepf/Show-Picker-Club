@@ -32,6 +32,10 @@
 //   5. The loop stops on the subrequest budget instead of running unbounded.
 //      It had no budget check at all, which was safe only while its selection
 //      was nearly always empty.
+//   6. Archived titles are in scope (Favorite Actors counts an archived title
+//      rated 8+): an archived film with gaps is filled, cast included, an
+//      archived sibling receives propagated data, and an archived series
+//      enters the TV rotation only while it has a gap.
 //
 // Same harness as scripts/enrich-identity-test.mjs: functions copied to a temp
 // dir as ES modules, schema.sql in node:sqlite behind a D1 shim, TMDB faked.
@@ -482,6 +486,73 @@ console.log('\nFilms reach the streaming list without a sweep, and only once');
   const again = await (await runEnrich(env)).json();
   check('so it cannot churn the gate', again.movieCandidates === 0,
     `movieCandidates=${again.movieCandidates}`);
+}
+
+// --------------------------------------------------------------- 12
+
+console.log('\nArchived titles are enriched too, since Favorite Actors counts them');
+{
+  const env = makeEnv();
+  // An archived film imported bare: no cast, no detail. Favorite Actors
+  // counts an archived title rated 8+, so a filter on archived = 0 here left
+  // exactly those titles contributing nobody.
+  const id = addMovie(env, { title: 'Sinners', tmdbId: 501, withCast: false });
+  env._db.prepare('UPDATE shows SET archived = 1 WHERE id = ?').run(id);
+
+  const res = await (await runEnrich(env)).json();
+  check('an archived film with gaps is selected', res.movieCandidates === 1,
+    `movieCandidates=${res.movieCandidates}`);
+  check('it gets its detail block', rowFor(env, 'Sinners').genres === 'Horror');
+  const cast = env._db.prepare('SELECT name FROM actors WHERE show_id = ?').all(id).map((r) => r.name);
+  check('and its cast, which the movie pass never used to write', cast.includes('Sinners Lead'),
+    JSON.stringify(cast));
+  const again = await (await runEnrich(env)).json();
+  check('once whole it drops out of the gate', again.movieCandidates === 0,
+    `movieCandidates=${again.movieCandidates}`);
+}
+{
+  const env = makeEnv();
+  // A live copy is the one the pass picks; an archived sibling of the same
+  // title must receive the same catalog data rather than being skipped.
+  addMovie(env, { title: 'Sinners', tmdbId: 501, withCast: false });
+  env._db.prepare('INSERT INTO members (slug, name, first_name) VALUES (?, ?, ?)').run('amy', 'Amy', 'Amy');
+  env._db.prepare(
+    `INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, archived, enriched_at)
+     VALUES ('Sinners', 'recommending', 'amy', 1, 501, 'movie', 1, '2026-09-20T00:00:00Z')`
+  ).run();
+  const archivedId = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id);
+  await runEnrich(env);
+  const r = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(archivedId) };
+  check('an archived sibling receives the propagated detail', r.genres === 'Horror' && r.poster_url,
+    `genres=${r.genres} poster=${r.poster_url}`);
+  const cast = env._db.prepare('SELECT COUNT(*) AS n FROM actors WHERE show_id = ?').get(archivedId).n;
+  check('and the cast', Number(cast) > 0, `cast=${cast}`);
+}
+{
+  const env = makeEnv();
+  const addTv = (episodes, withActor) => {
+    env._db.prepare(
+      `INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, archived, episodes_released, enriched_at)
+       VALUES ('The Rehearsal', 'watching', 'patrick', 0, 700, 'tv', 1, ?, '2026-09-01T00:00:00Z')`
+    ).run(episodes);
+    const id = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id);
+    if (withActor) env._db.prepare('INSERT INTO actors (show_id, name, imdb_id, ord) VALUES (?, ?, ?, 0)').run(id, 'Nathan Fielder', 'nm1');
+    return id;
+  };
+  // Whole, archived: the normal rotation must not spend budget refreshing it —
+  // that cycle exists to keep live lists' next-season dates current.
+  addTv(12, true);
+  let res = await (await runEnrich(env)).json();
+  check('a whole archived series stays out of the normal rotation', res.tvCandidates === 0,
+    `tvCandidates=${res.tvCandidates}`);
+  // Archived with a gap: in, until it is filled.
+  env._db.prepare('DELETE FROM shows').run();
+  const gapId = addTv(null, true);
+  res = await (await runEnrich(env)).json();
+  check('an archived series with a gap is selected', res.tvCandidates === 1,
+    `tvCandidates=${res.tvCandidates}`);
+  const ep = env._db.prepare('SELECT episodes_released FROM shows WHERE id = ?').get(gapId).episodes_released;
+  check('and filled', ep === 12, `episodes_released=${ep}`);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
