@@ -45,6 +45,7 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ## Unreleased — the update after 1.5
 
+- **Favorite Actors follows your ratings.** Shows you rate 8 or higher now count most — even ones you've archived — so the actors at the top are the ones in the shows you liked best. Rate My Shows now includes your archived shows too, and Favorite Actors points you there until you've rated a few. (iPhone, iPad and Mac.)
 - **Your shows are there on a plane.** Opening the app with no connection used to land you on the signed-out screen; it now opens signed in, with your saved lists. (iPhone, iPad and Mac.)
 
 ---

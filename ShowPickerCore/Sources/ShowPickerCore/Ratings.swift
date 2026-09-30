@@ -95,11 +95,15 @@ public struct RateBacklogShow: Codable, Identifiable, Sendable {
     public let movie: Int?
     public let list: String
     public let seasonsReleased: Int?
+    // The backlog lists archived shows too. Optional so a payload from before
+    // that still decodes.
+    public let archived: Int?
 
     public var isMovie: Bool { (movie ?? 0) == 1 }
+    public var isArchived: Bool { (archived ?? 0) == 1 }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, list, movie
+        case id, title, list, movie, archived
         case posterUrl = "poster_url"
         case seasonsReleased = "seasons_released"
     }

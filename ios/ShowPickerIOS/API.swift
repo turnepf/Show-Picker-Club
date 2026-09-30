@@ -167,12 +167,11 @@ enum API {
         return r.shows
     }
 
-    // Favourite actors, derived from the member's own Watching / Awaiting /
-    // Loved lists. Owner-only on the server, so there's no member parameter.
-    static func favoriteActors() async throws -> [FavoriteActor] {
-        let r: FavoriteActorsResponse = try await getCached("/api/favorite-actors",
-                                                           cacheKey: "favorite-actors")
-        return r.actors
+    // Favourite actors, derived from the member's own ratings and lists.
+    // Owner-only on the server, so there's no member parameter. The whole
+    // response, because the screen also reads how many titles are rated.
+    static func favoriteActors() async throws -> FavoriteActorsResponse {
+        try await getCached("/api/favorite-actors", cacheKey: "favorite-actors")
     }
 
     // Active shows for a member. Online: fetch and refresh the offline snapshot.

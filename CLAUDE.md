@@ -303,7 +303,13 @@ stays a human decision. Used by the run sheet in
 node scripts/favorite-actors-test.mjs
 ```
 
-`/api/favorite-actors` and the list rule both Trending queries share. The
+`/api/favorite-actors`, Rate my backlog, and the list rule both Trending
+queries share. Actors rank by a **rating-weighted** count: the member's overall
+rating decides a title's weight (10/9/8 → 4/3/2, Loved at least 2 whatever it
+was rated, unrated Watching/Awaiting 1, rated 7 or below off Loved dropped), an
+archived show counts only when rated 8+, and `needs_ratings` flags fewer than 8
+rated titles so the app offers Rate My Shows — whose backlog therefore lists
+archived shows, one row per title, with its badge count pinned to the page. The
 endpoint is **owner-only** — it aggregates a whole library into a sharper
 picture of taste than the list titles a group-mate can already read, so a
 session gets its own actors and `?member=` is ignored rather than honoured.
