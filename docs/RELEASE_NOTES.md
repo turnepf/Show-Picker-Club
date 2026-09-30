@@ -43,10 +43,30 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## Unreleased — the update after 1.5
+## Unreleased — the update after 1.5.1
 
-- **Favorite Actors follows your ratings.** Shows you rate 8 or higher now count most — even ones you've archived — so the actors at the top are the ones in the shows you liked best. Rate My Shows now includes your archived shows too, and Favorite Actors points you there until you've rated a few. (iPhone, iPad and Mac.)
-- **Your shows are there on a plane.** Opening the app with no connection used to land you on the signed-out screen; it now opens signed in, with your saved lists. (iPhone, iPad and Mac.)
+---
+
+## 1.5.1 (build 29) — iPhone, iPad and Mac, prepared 2026-09-30
+
+**iPhone/iPad and Mac only — no Apple TV archive.** Since 1.5 (build 28) the
+tvOS target changed only in code comments (#519), so there is nothing for an
+Apple TV owner to download. The tvOS project still carries 1.5.1 / 29 because
+the repo keeps the two in lockstep; it simply isn't archived. The watch rides
+along with the iOS archive, unchanged.
+
+In the build: Favorite Actors ranked by ratings, with archived shows in Rate My
+Shows (#522) and the UPDATED flag / "New algorithm!" card announcing it (#524);
+opening signed in when launched offline (#517); and `/dorothy` links no longer
+redirected to another member's page (#519 — too narrow for the notes).
+
+The block below is the What's New text.
+
+```
+Favorite Actors now follows your ratings. Shows you rate 8 or higher count most, even ones you've archived, so the actors at the top are the ones in the shows you liked best. Rate My Shows now includes your archived shows too, and until you've rated a few, Favorite Actors points you there.
+
+Your shows are there on a plane. Opening the app with no connection used to land you on the signed-out screen; now it opens signed in, with your saved lists.
+```
 
 ---
 
