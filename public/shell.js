@@ -264,7 +264,7 @@
       if (authMember) {
         discover += iconRow('/rate-backlog', 'Rate my shows', 'star-fill', { selected: path === '/rate-backlog', badgeId: 'shellRateBacklogBadge' });
         discover += iconRow('/subscriptions', 'Subscription audit', 'creditcard', { selected: path === '/subscriptions' });
-        discover += iconRow('/favorite-actors', 'Favorite actors', 'person', { selected: path === '/favorite-actors' });
+        discover += iconRow('/favorite-actors', 'Favorite actors', 'person', { selected: path === '/favorite-actors', badgeId: 'shellActorsUpdatedFlag' });
         discover += iconRow('/vibe?member=' + encodeURIComponent(authMember), 'Vibe', 'sparkles', { selected: path === '/vibe' });
         // Calendar feeds authenticate with a per-member token and /api/members
         // only returns your own, so whichever row has one is yours.
@@ -300,6 +300,14 @@
           .then(function (r) { return r.ok ? r.json() : null; })
           .then(function (d) { if (d && d.count > 0) badge.textContent = d.count; })
           .catch(function () {});
+      }
+      // "Updated" until the member opens Favorite actors once — same key
+      // index.html and favorite-actors.html use.
+      var actorsFlag = document.getElementById('shellActorsUpdatedFlag');
+      if (actorsFlag) {
+        var seenActors = false;
+        try { seenActors = localStorage.getItem('seenFavoriteActorsUpdate') === '1'; } catch (e) {}
+        if (!seenActors) actorsFlag.textContent = 'Updated';
       }
     });
   }

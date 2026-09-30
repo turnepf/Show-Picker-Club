@@ -61,6 +61,7 @@ struct IPadHomeView: View {
     @State private var showingImport = false
     // Same "NEW" badge as iPhone Home, cleared by opening Groups once.
     @AppStorage("seenGroups") private var seenGroups = false
+    @AppStorage(FavoriteActorsView.seenUpdateKey) private var seenFavoriteActorsUpdate = false
 
     private let memberRowHeight: CGFloat = 38
     private let memberWindowRows = 5
@@ -249,8 +250,11 @@ struct IPadHomeView: View {
                         .tag(SidebarItem.vibe)
                     // Your actors, worked out from your own lists — so it
                     // sits with the other personal reads, not near Trending.
-                    Label("Favorite Actors", systemImage: "person.2.fill")
-                        .tag(SidebarItem.favoriteActors)
+                    HStack(spacing: 8) {
+                        Label("Favorite Actors", systemImage: "person.2.fill")
+                        if !seenFavoriteActorsUpdate { NewFlag(text: "UPDATED") }
+                    }
+                    .tag(SidebarItem.favoriteActors)
                 }
                 // What's coming up on your lists, with the subscribe button
                 // on the screen itself rather than firing webcal:// from the

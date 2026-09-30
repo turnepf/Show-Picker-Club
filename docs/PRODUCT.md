@@ -208,6 +208,14 @@ of the whole cast. A show copy that's archived says *Archived* under it, in
 orange, and any rated copy says *You rated 9*. The count on each actor is still
 titles, not weight.
 
+**Announcing the change.** Until a member opens Favorite Actors once, its
+link on Home (and the iPad/web sidebars) carries an **UPDATED** pill — the
+Groups *NEW* flag, reworded — and that first visit opens on a **"New
+algorithm!"** card explaining that ratings of 8+ now count most. Both retire
+per device on that visit (`seenFavoriteActorsUpdate` in `@AppStorage` on
+Apple, `localStorage` on the web). A future ranking change can bring them back
+by using a new key.
+
 **Rate your shows.** Until you've rated **8** titles (overall, off Next Up), a
 *Rate your shows* row sits at the top of the page and opens Rate My Shows. It
 sits alongside the actors, never in place of them: the list works unrated, and

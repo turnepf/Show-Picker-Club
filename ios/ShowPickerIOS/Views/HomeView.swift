@@ -32,6 +32,9 @@ struct HomeView: View {
     // "NEW" beside Groups until the member opens it once. A badge that never
     // clears is just decoration — this one has a job and then goes away.
     @AppStorage("seenGroups") private var seenGroups = false
+    // The ranking changed in 2026-09 (ratings lead). Opening the screen once
+    // retires the flag — FavoriteActorsView writes the same key.
+    @AppStorage(FavoriteActorsView.seenUpdateKey) private var seenFavoriteActorsUpdate = false
     // Set after accepting a household invite from a link, so the app says
     // something happened rather than silently changing an audit total.
     @State private var showingHouseholdJoined = false
@@ -144,7 +147,10 @@ struct HomeView: View {
                             // rather than near Trending: these are YOUR
                             // actors, not the club's.
                             NavigationLink(value: Route.favoriteActors) {
-                                Label("Favorite Actors", systemImage: "person.2.fill")
+                                HStack(spacing: 8) {
+                                    Label("Favorite Actors", systemImage: "person.2.fill")
+                                    if !seenFavoriteActorsUpdate { NewFlag(text: "UPDATED") }
+                                }
                             }
                         }
                         // Vibe is personal: logged-in members only, opening
@@ -647,18 +653,21 @@ struct HomeView: View {
 // `.badge()` parks it at the far right in secondary grey, where it reads as a
 // count and disappears into the row; this sits it right after the word and
 // gives it the accent so it actually catches the eye. Shared by the iPhone
-// Home list and the iPad sidebar, and still governed by `seenGroups` —
-// opening Groups once retires it for good.
+// Home list and the iPad sidebar. Each use carries its own seen key —
+// `seenGroups` for Groups, `seenFavoriteActorsUpdate` for the UPDATED flag on
+// Favorite Actors — and opening that screen once retires it for good.
 struct NewFlag: View {
+    var text = "NEW"
+
     var body: some View {
-        Text("NEW")
+        Text(text)
             .font(.caption2.weight(.black))
             .kerning(0.4)
             .foregroundStyle(.white)
             .padding(.horizontal, 6)
             .padding(.vertical, 2.5)
             .background(Capsule().fill(Color.accentColor))
-            .accessibilityLabel("New")
+            .accessibilityLabel(text.capitalized)
     }
 }
 

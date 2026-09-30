@@ -8,6 +8,14 @@ import SwiftUI
 // ratings, so it needs no "add a favourite" affordance; the one nudge is Rate
 // My Shows, offered while too few titles are rated for ratings to lead.
 struct FavoriteActorsView: View {
+    // Retires the UPDATED flag on Home and the iPad sidebar. A new key for a
+    // future change to the ranking brings the flag back.
+    static let seenUpdateKey = "seenFavoriteActorsUpdate"
+    @AppStorage(seenUpdateKey) private var seenUpdate = false
+    // Captured on the visit that retires the flag, so the banner explains the
+    // UPDATED the member just tapped rather than vanishing as it's read.
+    @State private var showUpdateBanner = false
+
     @State private var actors: [FavoriteActor] = []
     @State private var ratedCount: Int?
     @State private var ratingGoal = 8
@@ -17,6 +25,19 @@ struct FavoriteActorsView: View {
 
     var body: some View {
         List {
+            if showUpdateBanner {
+                Section {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("New algorithm!", systemImage: "sparkles")
+                            .font(.headline)
+                            .foregroundStyle(Color.accentColor)
+                        Text("Shows you rate 8 or higher now count most — even ones you've archived.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
             // Alongside the actors, never instead of them: the list works
             // unrated, ratings are what sharpen it.
             if needsRatings && !loading {
@@ -65,6 +86,12 @@ struct FavoriteActorsView: View {
         // Every appearance, not just the first: coming back from Rate My Shows
         // should show the ratings you just gave.
         .task { await load() }
+        .onAppear {
+            if !seenUpdate {
+                showUpdateBanner = true
+                seenUpdate = true
+            }
+        }
         .overlay { if loading && actors.isEmpty { ProgressView() } }
     }
 
