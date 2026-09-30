@@ -41,7 +41,7 @@ note "Deployed output carries the web app and the marketing page"
 for f in index.html download.html privacy.html terms.html sms.html styles.css \
          favicon.svg og-default.png sw.js _headers _redirects \
          .well-known/apple-app-site-association \
-         welcome.html groups.html vibe.html rate-backlog.html \
+         welcome.html groups.html vibe.html rate-backlog.html favorite-actors.html \
          subscriptions.html members.html reporting.html url-cleanup.html \
          vibe-admin.html shell.js nav.js show-renderer.js app-banner.js; do
   [ -e "public/$f" ] || err "public/$f is missing"
@@ -101,7 +101,7 @@ ok "every retired path has a redirect rule"
 
 # The web-app surfaces are served by real files again, so a leftover 301 would
 # bounce a member off the page they asked for.
-for path in /welcome /groups /rate-backlog /subscriptions /vibe /members \
+for path in /welcome /groups /rate-backlog /favorite-actors /subscriptions /vibe /members \
             /reporting /url-cleanup; do
   grep -qE "^${path}[[:space:]]" public/_redirects \
     && err "public/_redirects still redirects $path — that page is served again"

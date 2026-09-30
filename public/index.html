@@ -1084,6 +1084,7 @@
          every layout now). */
       #showPage .member-extras #subscriptionsLink { display: none; }
       #showPage .member-extras #rateBacklogLink { display: none; }
+      #showPage .member-extras #favoriteActorsLink { display: none; }
       /* Pushed show detail covers the detail column, not the sidebar —
          offset by the letterbox margin plus the sidebar width. */
       #detailPage {
@@ -1200,6 +1201,11 @@
             <span class="ios-item-label">Subscription audit</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
+          <a class="ios-item hidden home-actors-row" href="/favorite-actors">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-person"/></svg></span>
+            <span class="ios-item-label">Favorite actors</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
           <a class="ios-item hidden vibe-row" href="/vibe">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
             <span class="ios-item-label">Vibe</span>
@@ -1309,6 +1315,10 @@
           <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
           <span class="ios-item-label">Subscription audit</span>
         </a>
+        <a class="ios-item hidden member-actors-row" href="/favorite-actors">
+          <span class="ios-item-icon"><svg class="ic"><use href="#i-person"/></svg></span>
+          <span class="ios-item-label">Favorite actors</span>
+        </a>
         <a class="ios-item hidden vibe-row" href="/vibe">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
           <span class="ios-item-label">Vibe</span>
@@ -1387,6 +1397,11 @@
           <a class="ios-item hidden" id="subscriptionsLink" href="/subscriptions" title="See which streaming subscriptions you actually need right now">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-creditcard"/></svg></span>
             <span class="ios-item-label">Subscription audit</span>
+            <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
+          </a>
+          <a class="ios-item hidden" id="favoriteActorsLink" href="/favorite-actors" title="The actors who keep turning up in the shows you rate highest">
+            <span class="ios-item-icon"><svg class="ic"><use href="#i-person"/></svg></span>
+            <span class="ios-item-label">Favorite actors</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
         </nav>
@@ -2283,6 +2298,7 @@
             // surfaced in the Home sidebar once you're logged in.
             document.querySelectorAll('.home-subs-row').forEach(r => r.classList.remove('hidden'));
             document.querySelectorAll('.home-ratebacklog-row').forEach(r => r.classList.remove('hidden'));
+            document.querySelectorAll('.home-actors-row').forEach(r => r.classList.remove('hidden'));
           }
           const homeLoginRow = document.getElementById('homeLoginRow');
           if (homeLoginRow && authMember) homeLoginRow.classList.add('hidden');
@@ -2296,6 +2312,9 @@
             const rateBacklogLink = document.getElementById('rateBacklogLink');
             if (rateBacklogLink) rateBacklogLink.classList.remove('hidden');
             document.querySelectorAll('.member-ratebacklog-row').forEach(r => r.classList.remove('hidden'));
+            const favoriteActorsLink = document.getElementById('favoriteActorsLink');
+            if (favoriteActorsLink) favoriteActorsLink.classList.remove('hidden');
+            document.querySelectorAll('.member-actors-row').forEach(r => r.classList.remove('hidden'));
           }
           const logoutBtn = document.getElementById('logoutBtn');
           if (logoutBtn) logoutBtn.classList.remove('hidden');
@@ -2376,6 +2395,9 @@
       const rateBacklogLink = document.getElementById('rateBacklogLink');
       if (rateBacklogLink) rateBacklogLink.classList.add('hidden');
       document.querySelectorAll('.home-ratebacklog-row, .member-ratebacklog-row').forEach(r => r.classList.add('hidden'));
+      const favoriteActorsLink = document.getElementById('favoriteActorsLink');
+      if (favoriteActorsLink) favoriteActorsLink.classList.add('hidden');
+      document.querySelectorAll('.home-actors-row, .member-actors-row').forEach(r => r.classList.add('hidden'));
       document.querySelectorAll('.vibe-row, .calendar-feed-row').forEach(r => r.classList.add('hidden'));
       document.querySelectorAll('.side-admin-reporting, .side-admin-members, .side-admin-cleanup, .side-admin-vibe').forEach(el => el.classList.add('hidden'));
       updateLoginBtnLabel();

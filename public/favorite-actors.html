@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Favorite Actors — Show Picker Club</title>
+  <meta name="apple-itunes-app" content="app-id=6780282764">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
+  <link rel="stylesheet" href="/styles.css?v=6">
+  <style>
+    :root { --tint: #6D63EB; }
+    @media (prefers-color-scheme: dark) { :root { --tint: #8D87F5; } }
+    body { padding: 24px 16px 60px; }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; position: relative; }
+    .topbar a.back { color: var(--tint); text-decoration: none; font-size: 16px; position: relative; z-index: 1; padding: 4px 8px 4px 0; }
+    .topbar h1 {
+      font-family: var(--font-sans); font-size: 17px; font-weight: 600; color: var(--ink);
+      position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap;
+    }
+    .intro { font-size: 13px; color: var(--ink-muted); line-height: 1.5; margin: 0 0 18px; }
+    .empty-card { background: var(--surface); border-radius: 10px; padding: 32px; text-align: center; color: var(--ink-muted); font-size: 14px; line-height: 1.6; }
+    .err { color: var(--danger-deep); font-size: 13px; text-align: center; padding: 20px; }
+
+    .actor { margin-bottom: 22px; }
+    .actor-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 4px 6px; }
+    .actor-name { font-size: 16px; font-weight: 600; color: var(--ink); text-decoration: none; }
+    a.actor-name:hover { text-decoration: underline; }
+    .actor-count { font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
+    .actor .show { cursor: pointer; }
+    /* SwiftUI .orange, what the iOS rows use for an archived caption. */
+    .archived { color: #FF9500; }
+    @media (prefers-color-scheme: dark) { .archived { color: #FF9F0A; } }
+    .rate-card { display: block; background: var(--surface); border-radius: 10px; padding: 14px 16px; margin-bottom: 20px; text-decoration: none; }
+    .rate-card strong { display: block; color: var(--tint); font-size: 15px; margin-bottom: 2px; }
+    .rate-card span { color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
+    .footnote { font-size: 12px; color: var(--ink-muted); line-height: 1.5; margin-top: 8px; }
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <a class="back" href="/" title="Home">&#8249; Home</a>
+      <h1>Favorite Actors</h1>
+    </div>
+    <div id="content"><div class="empty-card">Loading&hellip;</div></div>
+    <div class="footer" id="footer"></div>
+  </div>
+
+  <script src="/show-renderer.js?v=2"></script>
+  <script src="/shell.js?v=4" defer></script>
+  <script>
+    // Favorite Actors on the web — the same /api/favorite-actors the iOS
+    // FavoriteActorsView reads, drawn the same way: a "Rate your shows" nudge
+    // while too few titles are rated (alongside the actors, never instead of
+    // them), then each actor with the member's own copies behind the count.
+    // Nothing here is curated; the server works it all out from the library
+    // and the member's ratings.
+
+    let mySlug = null;
+
+    // Clicking a show opens it on the member's own page, like Rate my shows'
+    // "View" link.
+    window.__showRendererClickHandler = (id) => {
+      if (mySlug) location.href = `/${encodeURIComponent(mySlug)}?show=${id}`;
+    };
+
+    // Why this copy counts: Archived (in orange) when it's off the lists, and
+    // the member's own rating. Nothing extra keeps the standard network line.
+    function caption(card) {
+      if (!card.archived && card.my_rating == null) return undefined;
+      const parts = [];
+      if (card.archived) parts.push('<span class="archived">Archived</span>');
+      else if (card.network) parts.push(escapeHtml(card.network));
+      if (card.my_rating != null) parts.push(`You rated ${Number(card.my_rating)}`);
+      return parts.join(' · ');
+    }
+
+    function ratePrompt(data) {
+      const n = data.rated_count || 0;
+      const goal = data.rating_goal || 8;
+      const text = n === 0
+        ? `Shows you rate 8 or higher count most here. Rate ${goal} to get started.`
+        : `You've rated ${n} of ${goal}. Shows you rate 8 or higher count most here.`;
+      return `<a class="rate-card" href="/rate-backlog"><strong>&#9733; Rate your shows &rsaquo;</strong><span>${text}</span></a>`;
+    }
+
+    function actorHtml(actor) {
+      const name = escapeHtml(actor.name);
+      const nameHtml = actor.imdb_id
+        ? `<a class="actor-name" href="https://www.imdb.com/name/${encodeURIComponent(actor.imdb_id)}/" target="_blank" rel="noopener">${name} &#8599;</a>`
+        : `<span class="actor-name">${name}</span>`;
+      const count = actor.show_count === 1 ? '1 show' : `${actor.show_count} shows`;
+      const cards = actor.show_cards || [];
+      const rows = cards.length
+        ? '<div class="show-list">' + cards.map(c => renderShowCard(c, {
+            onClickId: true, caption: caption(c),
+          })).join('') + '</div>'
+        : '';
+      return `<div class="actor"><div class="actor-head">${nameHtml}<span class="actor-count">${count}</span></div>${rows}</div>`;
+    }
+
+    function render(data) {
+      const actors = data.actors || [];
+      let html = data.needs_ratings ? ratePrompt(data) : '';
+      if (!actors.length) {
+        html += `<div class="empty-card">No actors yet. Add a few shows to Watching, Awaiting or Loved, or rate some 8 or higher, and they'll show up here.</div>`;
+      } else {
+        html += actors.map(actorHtml).join('');
+        html += `<p class="footnote">Worked out from your ratings — shows you rated 8 or higher count most, archived ones included — and the shows on your Watching, Awaiting and Loved lists.</p>`;
+      }
+      document.getElementById('content').innerHTML = html;
+    }
+
+    const LOGGED_OUT = `<div class="empty-card">Log in from your member page first, then come back here to see your favorite actors.</div>`;
+
+    async function load() {
+      const content = document.getElementById('content');
+      try {
+        const check = await fetch('/auth/check', {
+          headers: { 'X-Client-Platform': window.innerWidth < 768 ? 'web-small' : 'web-large' },
+        });
+        const checkData = await check.json();
+        if (!checkData.authenticated || !checkData.member) { content.innerHTML = LOGGED_OUT; return; }
+        mySlug = checkData.member;
+
+        const res = await fetch('/api/favorite-actors');
+        if (res.status === 401) { content.innerHTML = LOGGED_OUT; return; }
+        if (!res.ok) { content.innerHTML = `<div class="err">Failed to load (${res.status}).</div>`; return; }
+        render(await res.json());
+      } catch (e) {
+        content.innerHTML = `<div class="err">Failed to load: ${escapeHtml(e.message || e)}</div>`;
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

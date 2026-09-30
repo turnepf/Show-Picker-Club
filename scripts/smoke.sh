@@ -195,6 +195,7 @@ expect_status GET  /api/recommendations 401 "picks for you"
 expect_status GET  /api/subscriptions   401 "subscription audit"
 expect_status GET  /api/groups          401 "groups"
 expect_status GET  /api/rate-backlog    401 "unrated shows"
+expect_status GET  /api/favorite-actors 401 "favorite actors"
 expect_status POST /api/shows/suggest   401 "catalog lookup (gated 2026-08: it proxies TMDB/OMDB)"
 expect_status GET  /api/passkeys        401 "registered passkeys"
 # Adding a passkey is what turns a device into a way back in, so this endpoint
@@ -276,7 +277,7 @@ note "Web-app pages are served, not redirected"
 # a member off the page they asked for; a 308 means the catch-all is rewriting
 # to something Pages canonicalizes, which is what took the site down on
 # 2026-08-13. Either way the catch-all would hide it by rendering the app.
-for path in /download /welcome /groups /rate-backlog /subscriptions /vibe \
+for path in /download /welcome /groups /rate-backlog /favorite-actors /subscriptions /vibe \
             /members /reporting /url-cleanup /vibe-admin; do
   code=$(get -o /dev/null -w "%{http_code}" "$(cb "${BASE}${path}")")
   if [ "$code" = "200" ]; then

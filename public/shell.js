@@ -255,7 +255,7 @@
       }
       // Discovery + account group, kept separate from My Shows above, in the
       // same order as index.html's sidebar: Groups, Trending, Rate my backlog,
-      // Subscription audit, Vibe, Calendar, What's New, then Admin below a
+      // Subscription audit, Favorite actors, Vibe, Calendar, What's New, then Admin below a
       // spacer. The personal rows need a session, so they're gated on
       // authMember exactly like the main app gates its own copies.
       var path = location.pathname;
@@ -264,6 +264,7 @@
       if (authMember) {
         discover += iconRow('/rate-backlog', 'Rate my shows', 'star-fill', { selected: path === '/rate-backlog', badgeId: 'shellRateBacklogBadge' });
         discover += iconRow('/subscriptions', 'Subscription audit', 'creditcard', { selected: path === '/subscriptions' });
+        discover += iconRow('/favorite-actors', 'Favorite actors', 'person', { selected: path === '/favorite-actors' });
         discover += iconRow('/vibe?member=' + encodeURIComponent(authMember), 'Vibe', 'sparkles', { selected: path === '/vibe' });
         // Calendar feeds authenticate with a per-member token and /api/members
         // only returns your own, so whichever row has one is yours.
