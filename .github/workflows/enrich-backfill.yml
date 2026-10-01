@@ -1,15 +1,30 @@
 name: Enrich backfill (posters, logos, seasons)
 
-# One-off / on-demand backfill of TMDB enrichment across the whole library —
-# posters, network logos, seasons, genres, dates, runtime, cast. /api/enrich
-# processes the oldest-enriched shows first (default 50 TV shows per call) and
-# stamps enriched_at, so looping rotates through everything. Idempotent and
-# cheap once the backlog is clear.
+# TMDB enrichment across the whole library — posters, network logos, seasons,
+# genres, next-episode dates, runtime, cast. /api/enrich processes the
+# oldest-enriched shows first and stamps enriched_at, so looping rotates
+# through everything.
 #
-# These are FULL passes. `mode: posters` exists for artwork-only catch-up and
-# selects rows with no poster at all — on a library whose artwork is already
-# complete it has nothing to do and reports 0 forever, which is exactly what
-# this workflow used to send.
+# Runs nightly (07:47 UTC — off the hour, after the 06:17 vibe fill and ahead
+# of the 09:37 watch-URL fill, which can use a network this pass names). Until
+# 2026-10 this was manual-only, and its only other callers were a web member
+# page load and an iOS list import — so once members moved to the apps,
+# nothing refreshed next-episode dates and a show that arrived before TMDB had
+# artwork sat in Missing posters indefinitely. Don't drop the schedule.
+#
+# A scheduled run is three steps, cheapest and most visible first:
+#   1. `mode: posters` — only rows with no poster. A new show is the
+#      most-recently-enriched row in the library, so the oldest-first rotation
+#      below would reach it last; this finds it by the missing artwork instead.
+#   2. The Trending titles.
+#   3. A bounded slice of the full rotation (10 rounds x 25 rows). Each row
+#      rewrites its cast across every copy, which is the bulk of D1's daily
+#      rows-written budget, so the nightly slice is deliberately smaller than
+#      a manual drain. Raise `rounds` / `max_tmdb` on a manual run instead.
+#
+# The full passes are never `mode: posters` — on a library whose artwork is
+# complete it has nothing to do and reports 0 forever, and nothing else
+# (runtime, cast depth, season data) would ever be refreshed.
 #
 # Auth: sends X-Cron-Secret, which /api/enrich accepts in place of a member
 # session. No `member` body → all members.
@@ -18,14 +33,16 @@ name: Enrich backfill (posters, logos, seasons)
 #   CRON_SECRET — Settings → Secrets and variables → Actions.
 
 on:
+  schedule:
+    - cron: '47 7 * * *'
   workflow_dispatch:
     inputs:
       rounds:
-        description: 'How many batches to run'
+        description: 'How many batches to run (nightly run uses 10)'
         required: false
         default: '40'
       max_tmdb:
-        description: 'TV rows per round. Blank uses the endpoint default (50).'
+        description: 'TV rows per round. Blank uses the endpoint default (50); the nightly run uses 25.'
         required: false
         default: ''
       sleep_seconds:
@@ -48,8 +65,10 @@ jobs:
       - name: Backfill enrichment
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          ROUNDS: ${{ github.event.inputs.rounds || '40' }}
-          MAX_TMDB: ${{ github.event.inputs.max_tmdb || '' }}
+          # A scheduled run has no inputs, so these fallbacks ARE the nightly
+          # size; a manual run gets the input defaults declared above.
+          ROUNDS: ${{ github.event.inputs.rounds || '10' }}
+          MAX_TMDB: ${{ github.event_name == 'schedule' && '25' || github.event.inputs.max_tmdb || '' }}
           SLEEP_SECONDS: ${{ github.event.inputs.sleep_seconds || '3' }}
           MAX_RETRIES: ${{ github.event.inputs.max_retries || '4' }}
         run: |
@@ -59,6 +78,36 @@ jobs:
           fi
           URL="https://showpicker.club/api/enrich"
           total=0
+
+          # Missing artwork first, found by its absence rather than its age.
+          # Small batches (the endpoint's posters default is 6 titles) and at
+          # most three of them: a title TMDB has no artwork for yet stays a
+          # candidate every night until it does, so "no candidates" is not
+          # something this loop can wait for.
+          for p in 1 2 3; do
+            presp=$(curl -sS --max-time 240 -X POST "$URL" \
+              -H "Content-Type: application/json" \
+              -H "X-Cron-Secret: ${CRON_SECRET}" \
+              -d '{"mode":"posters"}' \
+              -w $'\n%{http_code}' || true)
+            phttp=$(printf '%s' "$presp" | tail -n1)
+            pbody=$(printf '%s' "$presp" | sed '$d')
+            if [ "$phttp" = "401" ] || [ "$phttp" = "403" ]; then
+              echo "::error::posters pass returned HTTP $phttp — CRON_SECRET is missing or does not match the Pages secret (or Cloudflare challenged the runner): $pbody"
+              exit 1
+            fi
+            if [ "$phttp" != "200" ]; then
+              echo "::warning::posters pass $p returned HTTP ${phttp:-none} — moving on to the rotation: $pbody"
+              break
+            fi
+            pm=$(printf '%s' "$pbody" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('tmdbUpdated',0), d.get('tvCandidates',0)+d.get('movieCandidates',0))" 2>/dev/null || echo "0 0")
+            pup=${pm%% *}
+            pc=${pm##* }
+            total=$((total + pup))
+            echo "posters pass $p — updated: $pup · candidates: $pc"
+            [ "$pc" = "0" ] && break
+            sleep 3
+          done
 
           # Prioritise the Trending shelf first — those are the most-visible
           # shows, so populate their posters before the general rotation.
