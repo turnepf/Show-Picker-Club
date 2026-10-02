@@ -164,6 +164,19 @@ async function personImdbId(personId, env) {
 // matching `network`'s vocabulary. Empty string rather than NULL when TMDB
 // answered and named nothing — "asked, streams nowhere on a plan" is a
 // different fact from "never asked", and the UI needs to tell them apart.
+// Empty data before stale data. The rotations below order by oldest
+// enriched_at, which is the right order for refreshing but the wrong one for
+// filling: a show added yesterday with no poster or cast carries the newest
+// stamp in the library, so it waited behind the whole library's refresh. A
+// row with a gap now goes first — but only if no pass has tried it in the
+// last 20 hours. Without that window a title TMDB has nothing for (a
+// placeholder entry with no cast yet) would keep a front slot through every
+// round of every run; with it, a hopeless row is retried once a night and
+// otherwise rotates by age like everything else. 20 rather than 24 so a
+// nightly run always re-qualifies yesterday's attempt.
+const NOT_TRIED_RECENTLY =
+  `julianday(COALESCE(enriched_at, '1970-01-01')) < julianday('now', '-20 hours')`;
+
 function streamingOn(df) {
   return Array.isArray(df.flatrateNetworks) ? df.flatrateNetworks.join(', ') : '';
 }
@@ -292,7 +305,9 @@ export async function onRequestPost(context) {
           ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
       : `SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type FROM shows
           WHERE ${tvWhere} AND (archived = 0 OR ${TV_GAP})
-          ORDER BY COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`;
+          ORDER BY CASE WHEN (${TV_GAP} OR poster_url IS NULL) AND ${NOT_TRIED_RECENTLY}
+                        THEN 0 ELSE 1 END,
+                   COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`;
     const tmdbStmt = env.DB.prepare(tvSelect).bind(...tvBinds, maxTmdb);
     const { results: tmdbShows } = await tmdbStmt.all();
     tvCandidates = (tmdbShows || []).length;
@@ -540,7 +555,12 @@ export async function onRequestPost(context) {
     const movieStmt = env.DB.prepare(
       `SELECT id, title, network, network_url, tmdb_id, tmdb_type FROM shows WHERE ${mvWhere}
         GROUP BY LOWER(title), tmdb_id
-        ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
+        -- Gap-first, the same rule as the TV rotation (see NOT_TRIED_RECENTLY).
+        -- Movies mode is the one that mixes complete and incomplete films;
+        -- the gap modes select only incomplete ones, so there it changes
+        -- nothing.
+        ORDER BY MIN(CASE WHEN ${MOVIE_GAP} AND ${NOT_TRIED_RECENTLY} THEN 0 ELSE 1 END),
+                 MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
     ).bind(...mvBinds, maxTmdb);
     const { results: movieShows } = await movieStmt.all();
     movieCandidates = (movieShows || []).length;
