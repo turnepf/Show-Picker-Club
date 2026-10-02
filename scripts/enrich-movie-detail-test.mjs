@@ -555,5 +555,53 @@ console.log('\nArchived titles are enriched too, since Favorite Actors counts th
   check('and filled', ep === 12, `episodes_released=${ep}`);
 }
 
+// --------------------------------------------------------------- 12
+
+console.log('\nMovies mode refreshes complete films, oldest first');
+{
+  const env = makeEnv();
+  // Complete in every respect, so MOVIE_GAP never selects it again — which is
+  // exactly how a film's streaming services froze. It streams on Peacock as
+  // far as this row knows; TMDB now says Max.
+  const stale = addMovie(env, { title: 'Conclave', tmdbId: 502, complete: true });
+  env._db.prepare(`UPDATE shows SET streaming_on = 'Peacock', vote_count = 10, enriched_at = '2026-08-01T00:00:00Z' WHERE id = ?`).run(stale);
+  // Complete and refreshed more recently: the rotation takes the older one first.
+  addMovie(env, { title: 'Flow', tmdbId: 504, complete: true });
+  // Complete but archived: not worth a fetch to learn where it streams now.
+  const archived = addMovie(env, { title: 'Nickel Boys', tmdbId: 505, complete: true });
+  env._db.prepare('UPDATE shows SET archived = 1 WHERE id = ?').run(archived);
+  // A series, to prove the TV pass stays out of the way.
+  env._db.prepare(`INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type) VALUES ('The Rehearsal', 'watching', 'patrick', 0, 700, 'tv')`).run();
+
+  const normal = await (await runEnrich(env)).json();
+  check('the default mode still leaves complete films alone', normal.movieCandidates === 0,
+    `movieCandidates=${normal.movieCandidates}`);
+
+  fetchLog = [];
+  const res = await (await runEnrich(env, { mode: 'movies', max_tmdb: 1 })).json();
+  check('movies mode selects a complete film', res.movieCandidates === 1,
+    `movieCandidates=${res.movieCandidates}`);
+  check('the oldest-enriched one first', fetchLog.some((u) => u.includes('/3/movie/502')),
+    fetchLog.join(' '));
+  const c = rowFor(env, 'Conclave');
+  check('its streaming services are brought up to date', c.streaming_on === 'HBO Max',
+    `streaming_on=${c.streaming_on}`);
+  check('and its vote count converges', c.vote_count === 900, `vote_count=${c.vote_count}`);
+  check('the member\'s own fields are untouched', c.overview === 'already here' && c.network === 'Max',
+    `overview=${c.overview} network=${c.network}`);
+  check('the TV pass does not run', !fetchLog.some((u) => u.includes('/3/tv/')), fetchLog.join(' '));
+
+  // Conclave now carries today's stamp, so the next round moves on.
+  fetchLog = [];
+  await runEnrich(env, { mode: 'movies', max_tmdb: 1 });
+  check('the next round rotates to the next-oldest film', fetchLog.some((u) => u.includes('/3/movie/504')),
+    fetchLog.join(' '));
+
+  fetchLog = [];
+  const all = await (await runEnrich(env, { mode: 'movies' })).json();
+  check('a complete archived film is not in the rotation', all.movieCandidates === 2
+    && !fetchLog.some((u) => u.includes('/3/movie/505')), `movieCandidates=${all.movieCandidates}`);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -191,7 +191,8 @@ export async function onRequestPost(context) {
   // batch so an artwork backfill fits comfortably within budget. (`skip_omdb`
   // is kept as an alias now that OMDB is gone — it still selects posters-only.)
   const skipOmdb = body.skip_omdb === true || body.mode === 'posters';
-  const skipActors = body.skip_actors === true || body.mode === 'posters' || body.mode === 'logos';
+  const skipActors = body.skip_actors === true || body.mode === 'posters' || body.mode === 'logos'
+    || body.mode === 'movies';
   // `mode: 'gaps'` targets rows that are marked enriched but hold no data —
   // the wreckage of the rate-limit bug this file's tmdbGet comment describes.
   // Those rows carry a FRESH enriched_at (the no-match path stamped them), so
@@ -212,6 +213,16 @@ export async function onRequestPost(context) {
   // so MOVIE_GAP already selects them and the pass writes the logo on the way
   // past. This mode exists only to drain the films that predate the fix.
   const logosOnly = body.mode === 'logos';
+  // `mode: 'movies'` is the movie half of the standing rotation, and runs
+  // nightly from enrich-backfill.yml. MOVIE_GAP selects a film only while it
+  // is missing something, so a complete film was never fetched again: where
+  // it streams (streaming_on), its rating and vote count froze at whatever
+  // TMDB said the day it was first filled. The default mode can't fix that by
+  // widening its gate — the TV pass runs first and nearly always spends the
+  // subrequest budget, so the movie pass only ever gets the leftovers. This
+  // mode skips the TV pass and the actor backfill so the whole budget goes
+  // to films, oldest-enriched first, the same rotation the TV pass uses.
+  const moviesOnly = body.mode === 'movies';
   // Optional: restrict the TMDB passes to a specific set of titles (e.g. the
   // Trending shelf), so we can prioritise the most-visible shows first.
   const titles = Array.isArray(body.titles) && body.titles.length
@@ -241,7 +252,7 @@ export async function onRequestPost(context) {
   let tvErrors = 0;
   let movieErrors = 0;
   let lastError = null;
-  if (hasTmdb && !logosOnly) {
+  if (hasTmdb && !logosOnly && !moviesOnly) {
     // Cover everything a sibling copy already covers before spending budget.
     await syncArtworkAcrossCopies(env);
 
@@ -511,8 +522,12 @@ export async function onRequestPost(context) {
                         OR NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id))`;
     // Posters mode keeps the narrow artwork gate — it exists to catch artwork
     // up in a small batch (max_tmdb 6), not to fill detail.
+    // Movies mode rotates through every film, not just the incomplete ones —
+    // mirroring the TV rotation, an archived film joins only while it has a
+    // gap, since nobody is checking where a put-away film streams now.
     const mvGate = skipOmdb ? "(poster_url IS NULL OR network IS NULL)"
       : logosOnly ? "(network_logo_url IS NULL OR network_logo_url = '')"
+      : moviesOnly ? `(archived = 0 OR ${MOVIE_GAP})`
       : MOVIE_GAP;
     let mvWhere = `movie = 1 AND ${mvGate}`;
     const mvBinds = [];
