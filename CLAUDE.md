@@ -400,7 +400,11 @@ service TMDB doesn't list gets no badge rather than a wrong one. And
 was never fetched again, so its streaming services and rating froze. Pins that
 it selects complete films oldest first, skips the TV pass, leaves archived
 complete films alone, and brings `streaming_on` and `vote_count` up to date
-without touching the member's own fields. See `docs/INVARIANTS.md` §19.
+without touching the member's own fields. Both rotations fill before they
+refresh: a row with a gap goes ahead of an older complete one, unless a pass
+tried it in the last 20 hours — so a title TMDB has nothing for is retried
+nightly instead of holding the front of every round. See
+`docs/INVARIANTS.md` §19.
 
 ```bash
 node scripts/auth-code-flow-test.mjs

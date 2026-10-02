@@ -12,19 +12,25 @@ name: Enrich backfill (posters, logos, seasons)
 # nothing refreshed next-episode dates and a show that arrived before TMDB had
 # artwork sat in Missing posters indefinitely. Don't drop the schedule.
 #
-# A scheduled run is three steps, cheapest and most visible first:
+# A scheduled run is four steps, filling before refreshing:
 #   1. `mode: posters` — only rows with no poster. A new show is the
 #      most-recently-enriched row in the library, so the oldest-first rotation
 #      below would reach it last; this finds it by the missing artwork instead.
-#   2. The Trending titles.
-#   3. Three `mode: movies` calls — the movie rotation. The full pass below
+#   2. Three `mode: movies` calls — the movie rotation. The full pass below
 #      only fetches a film while it's missing something, and its TV half
 #      spends the request budget first anyway, so without this a complete
 #      film's streaming services and rating never change again.
-#   4. A bounded slice of the full rotation (10 rounds x 25 rows). Each row
+#   3. A bounded slice of the full rotation (10 rounds x 25 rows). Each row
 #      rewrites its cast across every copy, which is the bulk of D1's daily
 #      rows-written budget, so the nightly slice is deliberately smaller than
 #      a manual drain. Raise `rounds` / `max_tmdb` on a manual run instead.
+#   4. The Trending titles.
+#
+# Empty data is filled before stale data is refreshed. The endpoint orders
+# both rotations gap-first (a row missing poster, cast, episode count or
+# movie detail goes ahead of an older complete one, unless a pass already
+# tried it in the last 20 hours), and the Trending pass, which only
+# refreshes, runs last.
 #
 # The full passes are never `mode: posters` — on a library whose artwork is
 # complete it has nothing to do and reports 0 forever, and nothing else
@@ -112,27 +118,6 @@ jobs:
             [ "$pc" = "0" ] && break
             sleep 3
           done
-
-          # Prioritise the Trending shelf first — those are the most-visible
-          # shows, so populate their posters before the general rotation.
-          trending=$(curl -sS "https://showpicker.club/api/popular" \
-            | python3 -c "import sys,json; print(json.dumps([s['title'] for s in json.load(sys.stdin).get('shows',[])]))" 2>/dev/null || echo '[]')
-          if [ "$trending" != "[]" ] && [ -n "$trending" ]; then
-            # `|| true`: the step runs under `bash -e`, where a curl that fails
-            # to connect would abort the whole job from inside the command
-            # substitution. The status check below is what decides.
-            tresp=$(curl -sS --max-time 240 -X POST "$URL" \
-              -H "Content-Type: application/json" \
-              -H "X-Cron-Secret: ${CRON_SECRET}" \
-              -d "{\"titles\":${trending},\"max_tmdb\":6}" \
-              -w $'\n%{http_code}' || true)
-            thttp=$(printf '%s' "$tresp" | tail -n1)
-            tbody=$(printf '%s' "$tresp" | sed '$d')
-            tup=$(printf '%s' "$tbody" | python3 -c "import sys,json;print(json.load(sys.stdin).get('tmdbUpdated',0))" 2>/dev/null || echo 0)
-            total=$((total + tup))
-            echo "trending pass (HTTP $thttp) — tmdbUpdated: $tup"
-            sleep 3
-          fi
 
           # The movie rotation, oldest-enriched film first. Each call spends
           # its whole subrequest budget on films (roughly a dozen), so three
@@ -248,6 +233,28 @@ jobs:
             fi
             sleep "$SLEEP_SECONDS"
           done
+          # The Trending shelf — the most-visible shows, refreshed once more.
+          # Last, because by now it only refreshes: the steps above already
+          # filled what was empty, and filling comes before refreshing.
+          trending=$(curl -sS "https://showpicker.club/api/popular" \
+            | python3 -c "import sys,json; print(json.dumps([s['title'] for s in json.load(sys.stdin).get('shows',[])]))" 2>/dev/null || echo '[]')
+          if [ "$trending" != "[]" ] && [ -n "$trending" ]; then
+            # `|| true`: the step runs under `bash -e`, where a curl that fails
+            # to connect would abort the whole job from inside the command
+            # substitution. The status check below is what decides.
+            tresp=$(curl -sS --max-time 240 -X POST "$URL" \
+              -H "Content-Type: application/json" \
+              -H "X-Cron-Secret: ${CRON_SECRET}" \
+              -d "{\"titles\":${trending},\"max_tmdb\":6}" \
+              -w $'\n%{http_code}' || true)
+            thttp=$(printf '%s' "$tresp" | tail -n1)
+            tbody=$(printf '%s' "$tresp" | sed '$d')
+            tup=$(printf '%s' "$tbody" | python3 -c "import sys,json;print(json.load(sys.stdin).get('tmdbUpdated',0))" 2>/dev/null || echo 0)
+            total=$((total + tup))
+            echo "trending pass (HTTP $thttp) — tmdbUpdated: $tup"
+            sleep 3
+          fi
+
           if [ -n "$stopped_early" ]; then
             echo "Backfill stopped early at $stopped_early. Total TMDB updates: $total (all applied — re-run to continue the rotation)."
           else

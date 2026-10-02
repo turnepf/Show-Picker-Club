@@ -603,5 +603,52 @@ console.log('\nMovies mode refreshes complete films, oldest first');
     && !fetchLog.some((u) => u.includes('/3/movie/505')), `movieCandidates=${all.movieCandidates}`);
 }
 
+// --------------------------------------------------------------- 13
+
+console.log('\nEmpty data is filled before stale data is refreshed');
+{
+  const env = makeEnv();
+  // Complete and the oldest stamp in the library — plain oldest-first order
+  // would take it first.
+  env._db.prepare(`INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, poster_url,
+                     episodes_released, enriched_at) VALUES ('Old Complete', 'watching', 'patrick', 0, 700, 'tv',
+                     '/p.jpg', 12, '2026-08-01T00:00:00Z')`).run();
+  const complete = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id);
+  env._db.prepare(`INSERT INTO actors (show_id, name, imdb_id, ord) VALUES (?, 'Lead', 'nm0000001', 0)`).run(complete);
+  // Added two days ago with no poster, cast or episode count: the newest
+  // stamp, so it used to wait behind every other row in the rotation. The
+  // fake TMDB entry has no cast either, so it stays a gap after its turn —
+  // exactly the placeholder-entry case that must not hog the queue.
+  env._db.prepare(`INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, enriched_at)
+                   VALUES ('The Rehearsal', 'watching', 'patrick', 0, 700, 'tv', datetime('now', '-2 days'))`).run();
+  const stamp = (title) => env._db.prepare('SELECT enriched_at FROM shows WHERE title = ?').get(title).enriched_at;
+  const before = stamp('Old Complete');
+
+  await runEnrich(env, { max_tmdb: 1 });
+  check('a row with a gap goes ahead of an older complete one',
+    stamp('Old Complete') === before && stamp('The Rehearsal') !== null
+      && rowFor(env, 'The Rehearsal').poster_url === 'https://image.tmdb.org/t/p/w500/reh.jpg',
+    `old=${stamp('Old Complete')} new=${stamp('The Rehearsal')}`);
+
+  // Still castless after its turn. Tried minutes ago, so it waits its turn by
+  // age instead of taking the front slot again.
+  await runEnrich(env, { max_tmdb: 1 });
+  check('a gap TMDB could not fill does not take the front slot again in the same run',
+    stamp('Old Complete') !== before, `old=${stamp('Old Complete')}`);
+}
+{
+  const env = makeEnv();
+  // Movies mode: a complete film with the oldest stamp, and a film missing
+  // its detail block tried two days ago.
+  addMovie(env, { title: 'Conclave', tmdbId: 502, complete: true });
+  const gap = addMovie(env, { title: 'Sinners', tmdbId: 501 });
+  env._db.prepare(`UPDATE shows SET enriched_at = datetime('now', '-2 days') WHERE id = ?`).run(gap);
+  fetchLog = [];
+  await runEnrich(env, { mode: 'movies', max_tmdb: 1 });
+  check('movies mode fills an incomplete film before refreshing a complete one',
+    fetchLog.some((u) => u.includes('/3/movie/501')) && !fetchLog.some((u) => u.includes('/3/movie/502')),
+    fetchLog.join(' '));
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
