@@ -395,8 +395,12 @@ NULL` gate would re-select those rows on every page load forever. The test pins
 that churn is impossible, and that the badge always matches the network the
 card shows — taking TMDB's highest-priority provider instead put Amazon's logo
 on an HBO Max card, so the lookup is keyed by the row's own network and a
-service TMDB doesn't list gets no badge rather than a wrong one. See
-`docs/INVARIANTS.md` §19.
+service TMDB doesn't list gets no badge rather than a wrong one. And
+`mode: 'movies'`, the movie half of the nightly rotation: a film with no gap
+was never fetched again, so its streaming services and rating froze. Pins that
+it selects complete films oldest first, skips the TV pass, leaves archived
+complete films alone, and brings `streaming_on` and `vote_count` up to date
+without touching the member's own fields. See `docs/INVARIANTS.md` §19.
 
 ```bash
 node scripts/auth-code-flow-test.mjs

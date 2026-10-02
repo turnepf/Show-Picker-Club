@@ -17,7 +17,11 @@ name: Enrich backfill (posters, logos, seasons)
 #      most-recently-enriched row in the library, so the oldest-first rotation
 #      below would reach it last; this finds it by the missing artwork instead.
 #   2. The Trending titles.
-#   3. A bounded slice of the full rotation (10 rounds x 25 rows). Each row
+#   3. Three `mode: movies` calls — the movie rotation. The full pass below
+#      only fetches a film while it's missing something, and its TV half
+#      spends the request budget first anyway, so without this a complete
+#      film's streaming services and rating never change again.
+#   4. A bounded slice of the full rotation (10 rounds x 25 rows). Each row
 #      rewrites its cast across every copy, which is the bulk of D1's daily
 #      rows-written budget, so the nightly slice is deliberately smaller than
 #      a manual drain. Raise `rounds` / `max_tmdb` on a manual run instead.
@@ -129,6 +133,30 @@ jobs:
             echo "trending pass (HTTP $thttp) — tmdbUpdated: $tup"
             sleep 3
           fi
+
+          # The movie rotation, oldest-enriched film first. Each call spends
+          # its whole subrequest budget on films (roughly a dozen), so three
+          # calls cycle a few hundred films in about a week. Unlike posters
+          # mode this always has candidates, so it runs a fixed count.
+          for m in 1 2 3; do
+            mresp=$(curl -sS --max-time 240 -X POST "$URL" \
+              -H "Content-Type: application/json" \
+              -H "X-Cron-Secret: ${CRON_SECRET}" \
+              -d '{"mode":"movies"}' \
+              -w $'\n%{http_code}' || true)
+            mhttp=$(printf '%s' "$mresp" | tail -n1)
+            mbody=$(printf '%s' "$mresp" | sed '$d')
+            if [ "$mhttp" != "200" ]; then
+              echo "::warning::movies pass $m returned HTTP ${mhttp:-none} — moving on to the TV rotation: $mbody"
+              break
+            fi
+            mm=$(printf '%s' "$mbody" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('tmdbUpdated',0), d.get('movieCandidates',0), d.get('movieErrors',0))" 2>/dev/null || echo "0 0 0")
+            read -r mup mc merr <<< "$mm"
+            total=$((total + mup))
+            echo "movies pass $m — updated: $mup · candidates: $mc · errors: $merr"
+            [ "$mc" = "0" ] && break
+            sleep 3
+          done
 
           # Full passes, NOT mode:posters. Posters-only selects rows where
           # poster_url IS NULL and skips the TMDB detail call entirely, so on a
