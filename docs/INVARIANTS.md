@@ -17,6 +17,7 @@ catch different classes of mistake:
 | Network tests (`scripts/networks-test.mjs`) | every PR | The canonical table: a name claimed by two services, and the catalog `/api/networks` serves to the apps |
 | Enrichment identity tests (`scripts/enrich-identity-test.mjs`) | every PR | A stored `tmdb_id` is the row's identity: enrichment never re-guesses a pinned row by title, and propagation never crosses two entries sharing one title |
 | Movie enrichment tests (`scripts/enrich-movie-detail-test.mjs`) | every PR | A background pass selects on every field it writes — the movie detail pass is not gated on artwork alone, and its gaps counter matches its selection |
+| IMDb / status / free-services tests (`scripts/enrich-imdb-status-test.mjs`) | every PR | Migration 073's fields are stored from the fetch we already make, `free_on` keeps asked-vs-never-asked apart, a malformed IMDb id never reaches a URL, and Watching / Next Up rows missing them go first without starving the age rotation |
 | Streaming-services tests (`scripts/enrich-movie-detail-test.mjs`) | every PR | Enrichment never overwrites a member's `network`; TMDB's current services land in `streaming_on` beside it, refreshed authoritatively and canonicalized |
 | `scripts/smoke.sh` | after deploy, and nightly | Live behavior: auth gates, headers, leakage, redirects |
 | Invariants review (`.github/workflows/pr-review.yml`) | every PR | Judgement calls the four above can't express |

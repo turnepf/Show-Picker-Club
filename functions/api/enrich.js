@@ -1,6 +1,6 @@
 import { getSession } from '../_shared/auth.js';
 import { cronAuthorized } from '../_shared/secrets.js';
-import { fetchEnrichment, fetchEnrichmentById, extractTmdbDetailFields, fallbackNetwork, dedupeCast, CAST_DEPTH, pickBestMatch, titleSearchTerms } from '../_shared/enrichment.js';
+import { fetchEnrichment, fetchEnrichmentById, extractTmdbDetailFields, fallbackNetwork, dedupeCast, castCharacter, CAST_DEPTH, pickBestMatch, titleSearchTerms } from '../_shared/enrichment.js';
 import { fillActorIdsFromKnownPeople, knownByPersonIds, rememberPeople } from '../_shared/people.js';
 import { canonicalNetwork } from '../_shared/networks.js';
 
@@ -95,7 +95,7 @@ async function refreshCastFromDetail(env, show, detail, tmdbId) {
       imdbId = await personImdbId(person.id, env);
       if (imdbId) people.push({ tmdbPersonId: person.id, name: person.name, imdbId });
     }
-    rows.push({ name: person.name, imdb_id: imdbId, ord: i, tmdb_person_id: person.id });
+    rows.push({ name: person.name, imdb_id: imdbId, ord: i, tmdb_person_id: person.id, character: castCharacter(person) });
   }
   await rememberPeople(env, people).catch(() => {});
 
@@ -105,13 +105,13 @@ async function refreshCastFromDetail(env, show, detail, tmdbId) {
         AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)`
   ).bind(show.id, tmdbId ?? null, tmdbId ?? null).all();
   const insert = env.DB.prepare(
-    'INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?)'
   );
   for (const copy of copies || []) {
     // Replace rather than merge: the incoming list is authoritative and
     // ordered, and a partial overlay would leave the old shallow tail behind.
     await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(copy.id).run();
-    await env.DB.batch(rows.map(r => insert.bind(copy.id, r.name, r.imdb_id, r.ord, r.tmdb_person_id)));
+    await env.DB.batch(rows.map(r => insert.bind(copy.id, r.name, r.imdb_id, r.ord, r.tmdb_person_id, r.character)));
   }
 }
 
@@ -180,6 +180,29 @@ const NOT_TRIED_RECENTLY =
 function streamingOn(df) {
   return Array.isArray(df.flatrateNetworks) ? df.flatrateNetworks.join(', ') : '';
 }
+
+// free_on's stored form: same encoding as streaming_on, except that a payload
+// with no provider block at all yields NULL, so the COALESCE in the writes
+// below keeps the last answer rather than claiming TMDB named nothing.
+function freeOn(df) {
+  return Array.isArray(df.freeNetworks) ? df.freeNetworks.join(', ') : null;
+}
+
+// Watching and Next Up are the lists members actually open, so within the
+// gap tiers below they go first. Only within those tiers: putting them ahead
+// of the age rotation itself would let a long Watching list take every slot
+// in every round and starve the rest of the library of refreshes.
+const HOT_LIST = `(archived = 0 AND list IN ('watching', 'next'))`;
+
+// Migration 073's fields (imdb_id, tmdb_status, free_on, cast characters)
+// arrive with any full pass, so the ordinary rotation fills them without a
+// backfill. This only brings that forward for the hot lists: a Watching or
+// Next Up row no pass has written them for yet goes ahead of the age
+// rotation, behind real gaps. tmdb_status is the marker because every pass
+// writes it non-NULL ('' when TMDB sends no status), so a row leaves this
+// tier on its first pass and can't churn; NOT_TRIED_RECENTLY covers a title
+// TMDB can't match, which is stamped and skipped like any other.
+const HOT_UNFILLED = `(${HOT_LIST} AND tmdb_status IS NULL AND ${NOT_TRIED_RECENTLY})`;
 
 export async function onRequestPost(context) {
   const { env, request } = context;
@@ -297,16 +320,24 @@ export async function onRequestPost(context) {
       ? `SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type FROM shows
           WHERE ${tvWhere} AND poster_url IS NULL
           GROUP BY LOWER(title), tmdb_id
-          ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
+          ORDER BY MIN(CASE WHEN ${HOT_LIST} THEN 0 ELSE 1 END),
+                   MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
       : gapsOnly
       ? `SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type FROM shows
           WHERE ${tvWhere} AND ${TV_GAP}
           GROUP BY LOWER(title), tmdb_id
-          ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
-      : `SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type FROM shows
+          ORDER BY MIN(CASE WHEN ${HOT_LIST} THEN 0 ELSE 1 END),
+                   MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
+      // Tiers: 0 a real gap, 1 a hot-list row missing migration 073's fields,
+      // 2 the age rotation. Hot lists lead within tiers 0 and 1 only.
+      : `SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type,
+                CASE WHEN (${TV_GAP} OR poster_url IS NULL) AND ${NOT_TRIED_RECENTLY} THEN 0
+                     WHEN ${HOT_UNFILLED} THEN 1
+                     ELSE 2 END AS tier
+          FROM shows
           WHERE ${tvWhere} AND (archived = 0 OR ${TV_GAP})
-          ORDER BY CASE WHEN (${TV_GAP} OR poster_url IS NULL) AND ${NOT_TRIED_RECENTLY}
-                        THEN 0 ELSE 1 END,
+          ORDER BY tier,
+                   CASE WHEN tier < 2 AND ${HOT_LIST} THEN 0 ELSE 1 END,
                    COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`;
     const tmdbStmt = env.DB.prepare(tvSelect).bind(...tvBinds, maxTmdb);
     const { results: tmdbShows } = await tmdbStmt.all();
@@ -329,10 +360,11 @@ export async function onRequestPost(context) {
         let detail = null;
         if (tmdbId) {
           try {
-            // append_to_response folds videos/providers/content-ratings into
-            // the one detail call we already make — no extra subrequest budget.
+            // append_to_response folds videos/providers/content-ratings (and
+            // external_ids, for the title's IMDb id) into the one detail call
+            // we already make — no extra subrequest budget.
             detail = await tmdbGet(
-              `/tv/${tmdbId}?append_to_response=videos,watch/providers,content_ratings,credits`, env);
+              `/tv/${tmdbId}?append_to_response=videos,watch/providers,content_ratings,credits,external_ids`, env);
           } catch (e) {
             // Only a dead id (the entry was removed) falls back to the title
             // search; rate limits and outages stay real errors for the outer
@@ -358,7 +390,7 @@ export async function onRequestPost(context) {
           }
           tmdbId = first.id;
           detail = await tmdbGet(
-            `/tv/${tmdbId}?append_to_response=videos,watch/providers,content_ratings,credits`, env);
+            `/tv/${tmdbId}?append_to_response=videos,watch/providers,content_ratings,credits,external_ids`, env);
         }
         const df = extractTmdbDetailFields(detail, 'tv');
         const directorImdbId = await personImdbId(df.directorPersonId, env);
@@ -429,6 +461,12 @@ export async function onRequestPost(context) {
               tagline = COALESCE(?, tagline),
               original_language = COALESCE(?, original_language),
               studio = COALESCE(?, studio),
+              -- Migration 073. The IMDb id belongs to the entry just fetched,
+              -- so the fresh one wins; status and free services are today's
+              -- answer, refreshed every pass. All three keep the stored value
+              -- when this payload had nothing.
+              imdb_id = COALESCE(?, imdb_id), tmdb_status = COALESCE(?, tmdb_status),
+              free_on = COALESCE(?, free_on),
               -- We just resolved this id to fetch the detail above, so persist
               -- it. Only shows.js (on insert) and the separate
               -- /api/admin-tmdb-backfill pass used to write tmdb_id, which left
@@ -442,6 +480,7 @@ export async function onRequestPost(context) {
           df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey, df.director, directorImdbId,
           df.runtime, df.releaseYear, fallbackNetwork(df), df.watchLink, streamingOn(df),
           df.episodesReleased, df.voteCount, df.tagline, df.originalLanguage, df.studio,
+          df.imdbId, df.tmdbStatus, freeOn(df),
           tmdbId, show.id).run();
         // Catalog fields (artwork + the new detail fields) are the same for
         // every member's copy of a title, so push them to all copies in one
@@ -469,6 +508,10 @@ export async function onRequestPost(context) {
               -- season's answer is exactly the staleness this column exists to
               -- fix. Same value for every copy, so it propagates like the rest.
               streaming_on = ?,
+              -- Migration 073: catalog facts like the rest. Status and free
+              -- services refresh like streaming_on; the IMDb id fills.
+              imdb_id = COALESCE(imdb_id, ?), tmdb_status = COALESCE(?, tmdb_status),
+              free_on = COALESCE(?, free_on),
               -- The id is the most catalog-level thing here: every member's
               -- copy of a title is the same TMDB entry. This is the half that
               -- reaches seeded rows — they're rarely the copy the rotation
@@ -484,6 +527,7 @@ export async function onRequestPost(context) {
         ).bind(posterUrl, networkLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating,
           df.trailerKey, df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.watchLink,
           df.episodesReleased, df.voteCount, df.tagline, df.originalLanguage, df.studio, streamingOn(df),
+          df.imdbId, df.tmdbStatus, freeOn(df),
           tmdbId, show.id, tmdbId).run();
 
         // Cast comes free with the detail call we just made — this pass used
@@ -559,7 +603,13 @@ export async function onRequestPost(context) {
         -- Movies mode is the one that mixes complete and incomplete films;
         -- the gap modes select only incomplete ones, so there it changes
         -- nothing.
-        ORDER BY MIN(CASE WHEN ${MOVIE_GAP} AND ${NOT_TRIED_RECENTLY} THEN 0 ELSE 1 END),
+        --
+        -- Then, as in the TV pass, a Watching or Next Up film still missing
+        -- migration 073's fields, and hot lists first within those two tiers.
+        ORDER BY MIN(CASE WHEN ${MOVIE_GAP} AND ${NOT_TRIED_RECENTLY} THEN 0
+                          WHEN ${HOT_UNFILLED} THEN 1 ELSE 2 END),
+                 MIN(CASE WHEN ${HOT_LIST} AND ((${MOVIE_GAP} AND ${NOT_TRIED_RECENTLY}) OR ${HOT_UNFILLED})
+                          THEN 0 ELSE 1 END),
                  MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
     ).bind(...mvBinds, maxTmdb);
     const { results: movieShows } = await movieStmt.all();
@@ -664,6 +714,9 @@ export async function onRequestPost(context) {
               tagline = COALESCE(tagline, ?),
               original_language = COALESCE(original_language, ?),
               studio = COALESCE(studio, ?),
+              -- Migration 073, same rules as the TV pass.
+              imdb_id = COALESCE(imdb_id, ?), tmdb_status = COALESCE(?, tmdb_status),
+              free_on = COALESCE(?, free_on),
               -- Same as the TV pass: the id we just searched for is worth
               -- keeping, and this statement is already title-scoped so every
               -- copy gets it. Fill-only, so a corrected id is never clobbered.
@@ -676,6 +729,7 @@ export async function onRequestPost(context) {
         ).bind(posterUrl, badgeNetwork, badgeLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey,
           df.director, directorImdbId, df.runtime, df.releaseYear, genres, fallbackNetwork(df), df.watchLink, streamingOn(df),
           df.voteCount, df.tagline, df.originalLanguage, df.studio,
+          df.imdbId, df.tmdbStatus, freeOn(df),
           tmdbId, show.id, tmdbId).run();
         // The detail call already carried credits, and MOVIE_GAP selects a film
         // for missing cast — but this pass never wrote any, so a castless film
@@ -762,10 +816,10 @@ export async function onRequestPost(context) {
           `SELECT id FROM shows WHERE LOWER(title) = LOWER(?)
              AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)`
         ).bind(show.title, castFromId, castFromId).all();
-        const insert = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id) VALUES (?, ?, ?, ?, ?)');
+        const insert = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?)');
         for (const copy of copies) {
           await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(copy.id).run();
-          await env.DB.batch(actors.map((a, i) => insert.bind(copy.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null)));
+          await env.DB.batch(actors.map((a, i) => insert.bind(copy.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null, a.character ?? null)));
           actorImdbFilled++;
         }
       } catch (e) {}

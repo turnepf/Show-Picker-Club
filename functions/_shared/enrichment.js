@@ -8,6 +8,25 @@
 import { knownNetwork, storefrontFromProvider } from './networks.js';
 import { knownByPersonIds, rememberPeople } from './people.js';
 
+// Free and free-with-ads services that aren't in the network table (Pluto TV
+// is, and resolves through knownNetwork). Only for `free_on`: these are names
+// a member recognises, but they aren't networks a member can pick, so they
+// stay out of networks.js and the picker it feeds. Anything matching neither
+// is dropped rather than shown under TMDB's raw provider name.
+const FREE_SERVICES = new Map([
+  ['tubi', 'Tubi'], ['tubi tv', 'Tubi'],
+  ['the roku channel', 'The Roku Channel'], ['roku channel', 'The Roku Channel'],
+  ['plex', 'Plex'], ['plex channel', 'Plex'],
+  ['kanopy', 'Kanopy'], ['hoopla', 'Hoopla'],
+  ['crackle', 'Crackle'], ['amazon freevee', 'Prime Video'],
+]);
+
+function freeServiceName(providerName) {
+  return knownNetwork(providerName)
+    || FREE_SERVICES.get(String(providerName || '').trim().toLowerCase())
+    || null;
+}
+
 // How many cast members we store per title. Clients show the top few;
 // storing more means a search by actor can find the character actor nobody
 // bills, and re-enriching to go deeper later costs a full TMDB round trip.
@@ -109,9 +128,22 @@ export function extractTmdbDetailFields(detail, mediaType) {
   // arrived on the same payload, only one was looked at.
   let storefronts = [];
   let availability = null;
+  // Free and free-with-ads services (TMDB's `free` and `ads` lists), which
+  // were never read: a title free on Tubi looked as if it streamed nowhere.
+  // null when TMDB returned no provider block at all — the same asked/never-
+  // asked distinction streaming_on keeps.
+  let freeNetworks = null;
   const wp = detail['watch/providers']?.results?.US || null;
+  if (detail['watch/providers']) freeNetworks = [];
   if (wp) {
     watchLink = wp.link || null;
+    const free = [...(wp.free || []), ...(wp.ads || [])].sort(
+      (a, b) => (a.display_priority ?? 99) - (b.display_priority ?? 99)
+    );
+    for (const p of free) {
+      const n = freeServiceName(p.provider_name);
+      if (n && !freeNetworks.includes(n)) freeNetworks.push(n);
+    }
     const flatrate = [...(wp.flatrate || [])].sort(
       (a, b) => (a.display_priority ?? 99) - (b.display_priority ?? 99)
     );
@@ -157,11 +189,22 @@ export function extractTmdbDetailFields(detail, mediaType) {
     ? ((detail.production_companies || [])[0]?.name || null)
     : ((detail.networks || [])[0]?.name || null);
 
+  // The title's own IMDb id. A movie carries it at the top level; a series
+  // only in external_ids, which every detail fetch appends. Kept only when it
+  // has the tt… shape, since it goes straight into a URL.
+  const rawImdb = detail.imdb_id || detail.external_ids?.imdb_id || null;
+  const imdbId = rawImdb && /^tt\d+$/.test(rawImdb) ? rawImdb : null;
+
+  // TMDB's status, verbatim. '' rather than null when it sent none, so a
+  // stored NULL keeps meaning "no pass has written migration 073's fields".
+  const tmdbStatus = typeof detail.status === 'string' ? detail.status.trim() : '';
+
   return {
     overview, backdropUrl, tmdbRating, contentRating, trailerKey,
     director, directorPersonId, runtime, releaseYear, providerNetwork, providerLogoUrl, providerLogos, flatrateNetworks, watchLink,
     storefronts, availability,
     episodesReleased, voteCount, tagline, originalLanguage, studio,
+    imdbId, tmdbStatus, freeNetworks,
   };
 }
 
@@ -173,6 +216,14 @@ export function extractTmdbDetailFields(detail, mediaType) {
 // on the next pass. Keep the first (best-billed) entry per person, keyed on
 // TMDB's person id when there is one and the name otherwise, BEFORE the
 // depth cap — so the echo doesn't spend one of the CAST_DEPTH slots either.
+// The role a cast credit plays ("Mark S."), or null. TMDB sends '' for an
+// uncredited part and sometimes a slash list for a dual role; both are kept
+// as TMDB wrote them, trimmed and length-capped.
+export function castCharacter(person) {
+  const c = typeof person?.character === 'string' ? person.character.trim() : '';
+  return c ? c.slice(0, 120) : null;
+}
+
 export function dedupeCast(cast) {
   const seen = new Set();
   return (cast || []).filter((p) => {
@@ -207,6 +258,7 @@ const EMPTY_DETAIL = {
   storefronts: [], availability: null,
   episodesReleased: null, voteCount: null, tagline: null,
   originalLanguage: null, studio: null,
+  imdbId: null, tmdbStatus: null, freeNetworks: null,
 };
 
 // Retries on 429 (rate limit) with backoff — otherwise a burst of many
@@ -275,13 +327,13 @@ async function enrichFromTmdbId(tmdbId, mediaType, env, fallbackPoster = null) {
       cast.map(async (person, i) => {
         const cached = knownIds.get(person.id);
         if (cached) {
-          return { name: person.name, imdb_id: cached, tmdb_person_id: person.id, ord: i };
+          return { name: person.name, imdb_id: cached, tmdb_person_id: person.id, ord: i, character: castCharacter(person) };
         }
         try {
           const ext = await tmdbFetch(`/person/${person.id}/external_ids`, token);
-          return { name: person.name, imdb_id: ext.imdb_id || null, tmdb_person_id: person.id, ord: i };
+          return { name: person.name, imdb_id: ext.imdb_id || null, tmdb_person_id: person.id, ord: i, character: castCharacter(person) };
         } catch (_) {
-          return { name: person.name, imdb_id: null, tmdb_person_id: person.id, ord: i };
+          return { name: person.name, imdb_id: null, tmdb_person_id: person.id, ord: i, character: castCharacter(person) };
         }
       })
     ),

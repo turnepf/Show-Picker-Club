@@ -12,7 +12,9 @@ export async function onRequestGet(context) {
   // column have NULL ord and fall back to insertion order, which was the
   // same thing.
   const { results } = await env.DB.prepare(
-    'SELECT name, imdb_id FROM actors WHERE show_id = ? ORDER BY COALESCE(ord, 9999), id'
+    // `character` is the role (migration 073), null until enrichment has
+    // stored it for this title.
+    'SELECT name, imdb_id, character_name AS character FROM actors WHERE show_id = ? ORDER BY COALESCE(ord, 9999), id'
   ).bind(params.id).all().catch(() => env.DB.prepare(
     'SELECT name, imdb_id FROM actors WHERE show_id = ?'
   ).bind(params.id).all());

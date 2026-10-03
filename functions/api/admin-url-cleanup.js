@@ -332,10 +332,10 @@ async function commitTitleFix(env, oldTitle, rawNew, enriched) {
     const { results: copies } = await env.DB.prepare(
       'SELECT id FROM shows WHERE LOWER(title) = LOWER(?) AND archived = 0'
     ).bind(finalTitle).all();
-    const ins = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id) VALUES (?, ?, ?, ?, ?)');
+    const ins = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?)');
     for (const c of copies) {
       await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(c.id).run();
-      await env.DB.batch(enriched.actors.map((a, i) => ins.bind(c.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null)));
+      await env.DB.batch(enriched.actors.map((a, i) => ins.bind(c.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null, a.character ?? null)));
     }
   }
 
@@ -771,10 +771,10 @@ export async function onRequestPost(context) {
       const { results: copies } = await env.DB.prepare(
         'SELECT id FROM shows WHERE LOWER(title) = LOWER(?) AND archived = 0'
       ).bind(row.title).all();
-      const ins = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id) VALUES (?, ?, ?, ?, ?)');
+      const ins = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?)');
       for (const c of copies) {
         const have = await env.DB.prepare('SELECT COUNT(*) AS c FROM actors WHERE show_id = ?').bind(c.id).first();
-        if (have.c === 0) await env.DB.batch(enriched.actors.map((a, i) => ins.bind(c.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null)));
+        if (have.c === 0) await env.DB.batch(enriched.actors.map((a, i) => ins.bind(c.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null, a.character ?? null)));
       }
     }
 

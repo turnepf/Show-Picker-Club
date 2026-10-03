@@ -169,6 +169,16 @@ struct ShowDetailView: View {
                     if let row = show?.streamingRow {
                         LabeledContent(row.label, value: row.services)
                     }
+                    // Free and free-with-ads services (Tubi, Pluto TV…). No
+                    // link, for the same reason as the row above.
+                    if let free = show?.freeOnText {
+                        LabeledContent("Free on", value: free)
+                    }
+                    // The title's IMDb page. Absent until enrichment has
+                    // stored the id — no row rather than a search fallback.
+                    if let iurl = show?.imdbURL {
+                        LabeledContent("IMDb") { Link("View on IMDb", destination: iurl) }
+                    }
                     if let turl = show?.trailerURL {
                         LabeledContent("Trailer") { Link("▶ Watch trailer", destination: turl) }
                     }
@@ -311,6 +321,7 @@ struct ShowDetailView: View {
                             LabeledContent("Year", value: String(y))
                         }
                         if let series = s.seriesText { LabeledContent("Series", value: series) }
+                        if let status = s.statusText { LabeledContent("Status", value: status) }
                         if !s.genreList.isEmpty {
                             LabeledContent("Genres", value: s.genreList.joined(separator: " · "))
                         }
@@ -390,6 +401,7 @@ struct ShowDetailView: View {
     private var hasWatchRow: Bool {
         (network.map { !$0.isEmpty } ?? false) || show?.trailerURL != nil
             || !groupWatchers.isEmpty || show?.whereToWatchURL != nil
+            || show?.imdbURL != nil || show?.freeOnText != nil
     }
 
     // "Alex, Dana" — first names only, which is all the endpoint sends.
@@ -418,7 +430,7 @@ struct ShowDetailView: View {
         return s.isMovie || s.seriesText != nil || !s.genreList.isEmpty
             || s.seasonDatesText != nil || (s.contentRating.map { !$0.isEmpty } ?? false)
             || s.releaseYear != nil || s.runtimeText != nil
-            || s.originalLanguageText != nil
+            || s.originalLanguageText != nil || s.statusText != nil
     }
 
     // Whether the tagline/overview block has anything in it. Either alone is
@@ -565,6 +577,10 @@ struct ShowDetailView: View {
                 name.underlineStyle = .single
             }
             line += name
+            // The role, outside the link, once enrichment has stored it.
+            if let role = actor.character, !role.isEmpty {
+                line += AttributedString(" (\(role))")
+            }
         }
         return line
     }

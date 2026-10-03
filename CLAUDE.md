@@ -407,6 +407,21 @@ nightly instead of holding the front of every round. See
 `docs/INVARIANTS.md` §19.
 
 ```bash
+node scripts/enrich-imdb-status-test.mjs
+```
+
+Migration 073's four fields — the title's IMDb id, TMDB's status word, free /
+free-with-ads services (`free_on`) and cast characters — all of which arrived
+on the detail call enrichment already makes and were dropped. Pins that each is
+stored and propagated, that `free_on` keeps asked-and-none (`''`) apart from
+never-asked (NULL) the way `streaming_on` does, and that a malformed IMDb id
+never reaches a URL. Nothing backfills them, so the part worth pinning is the
+order: a **Watching or Next Up** row missing them goes ahead of the age
+rotation (behind real gaps), but a hot row that already has them waits its
+turn — otherwise a long Watching list would take every nightly slot and the
+rest of the library would never refresh.
+
+```bash
 node scripts/auth-code-flow-test.mjs
 ```
 

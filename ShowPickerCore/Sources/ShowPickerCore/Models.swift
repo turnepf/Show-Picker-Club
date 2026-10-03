@@ -7,14 +7,18 @@ import Foundation
 public struct Actor: Codable, Hashable, Sendable {
     public let name: String
     public let imdbId: String?
+    // The role played ("Mark S."), migration 073. Nil until enrichment has
+    // stored it for the title, and for an uncredited part.
+    public let character: String?
 
-    public init(name: String, imdbId: String? = nil) {
+    public init(name: String, imdbId: String? = nil, character: String? = nil) {
         self.name = name
         self.imdbId = imdbId
+        self.character = character
     }
 
     enum CodingKeys: String, CodingKey {
-        case name
+        case name, character
         case imdbId = "imdb_id"
     }
 }
@@ -106,6 +110,16 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
     // this on my list" is a real question.
     public let addedByMember: ShowWatcher?
 
+    // Migration 073. Each is nil until an enrichment pass has stored it for
+    // this title, and the detail screen shows no row until then.
+    //   imdbId     the title's IMDb id (tt…), for the IMDb link
+    //   tmdbStatus TMDB's status verbatim ("Returning Series", "Canceled"…);
+    //              see statusText for what is shown
+    //   freeOn     free / free-with-ads services, encoded like streamingOn
+    public let imdbId: String?
+    public let tmdbStatus: String?
+    public let freeOn: String?
+
     // Explicit public init so other modules (the apps, their offline queues)
     // can construct a Show — the synthesized memberwise init is internal.
     // Parameter order matches the fields as they were declared in the apps'
@@ -151,7 +165,10 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         studio: String? = nil,
         watchers: [ShowWatcher]? = nil,
         addedByMember: ShowWatcher? = nil,
-        streamingOn: String? = nil
+        streamingOn: String? = nil,
+        imdbId: String? = nil,
+        tmdbStatus: String? = nil,
+        freeOn: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -193,6 +210,9 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         self.studio = studio
         self.watchers = watchers
         self.addedByMember = addedByMember
+        self.imdbId = imdbId
+        self.tmdbStatus = tmdbStatus
+        self.freeOn = freeOn
     }
 
     enum CodingKeys: String, CodingKey {
@@ -227,6 +247,9 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         case studio
         case watchers
         case addedByMember = "added_by_member"
+        case imdbId = "imdb_id"
+        case tmdbStatus = "tmdb_status"
+        case freeOn = "free_on"
     }
 
     // Tolerant decoding. The API varies what it sends by context — `list` and
@@ -283,6 +306,9 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         studio = try? c.decode(String.self, forKey: .studio)
         watchers = try? c.decode([ShowWatcher].self, forKey: .watchers)
         addedByMember = try? c.decode(ShowWatcher.self, forKey: .addedByMember)
+        imdbId = try? c.decode(String.self, forKey: .imdbId)
+        tmdbStatus = try? c.decode(String.self, forKey: .tmdbStatus)
+        freeOn = try? c.decode(String.self, forKey: .freeOn)
     }
 
     public var isMovie: Bool { (movie ?? 0) == 1 }
@@ -459,6 +485,45 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
     public var whereToWatchURL: URL? {
         guard !hasRealUrl, let l = watchLink, !l.isEmpty else { return nil }
         return URL(string: l)
+    }
+
+    // The title's IMDb page, or nil when no id is stored yet. The server only
+    // stores the tt… shape; checked again here because it goes into a URL.
+    public var imdbURL: URL? {
+        guard let id = imdbId, id.hasPrefix("tt"), id.dropFirst(2).allSatisfy(\.isNumber),
+              id.count > 2 else { return nil }
+        return URL(string: "https://www.imdb.com/title/\(id)/")
+    }
+
+    // TMDB's status as the detail screen words it, or nil when there's
+    // nothing worth a row: not stored yet, or a released film (every film on
+    // a list is released; saying so is noise). A word we don't recognise is
+    // shown as TMDB wrote it rather than hidden.
+    public var statusText: String? {
+        guard let raw = tmdbStatus?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return nil }
+        switch raw.lowercased() {
+        case "released": return nil
+        case "returning series": return "Returning"
+        case "ended": return "Ended"
+        case "canceled", "cancelled": return "Canceled"
+        case "in production": return "In production"
+        case "post production": return "Post-production"
+        case "planned", "pilot", "rumored": return "Planned"
+        default: return raw
+        }
+    }
+
+    public var freeOnList: [String] {
+        (freeOn ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    // Free / with-ads services for the "Free on" row, minus the member's own
+    // network (already named on the row above). Nil when there are none —
+    // never asked and asked-but-none read alike, as with streamingNote.
+    public var freeOnText: String? {
+        let mine = (network ?? "").trimmingCharacters(in: .whitespaces)
+        let services = freeOnList.filter { $0.caseInsensitiveCompare(mine) != .orderedSame }
+        return services.isEmpty ? nil : services.joined(separator: ", ")
     }
 }
 
