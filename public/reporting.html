@@ -229,17 +229,17 @@
           <td>${escapeHtml(r.name)}</td>
           <td>${escapeHtml(r.app)}<div style="font-size:12px;color:var(--ink-quiet)">${access} · connected ${shortDate(r.connected_at)}</div></td>
           <td${r.revoked_at ? ' style="color:var(--ink-quiet)"' : ''}>${status}</td>
-          <td class="num">${fmt(r.calls_7d)}</td>
-          <td class="num">${fmt(r.writes_7d)}</td>
+          <td class="num">${fmt(r.calls_30d)}<div style="font-size:12px;color:var(--ink-quiet)">${fmt(r.calls_all)} all</div></td>
+          <td class="num">${fmt(r.writes_30d)}<div style="font-size:12px;color:var(--ink-quiet)">${fmt(r.writes_all)} all</div></td>
         </tr>`;
       }).join('');
       return `<div class="section">
         <h2>AI apps (MCP) <span style="color:var(--ink-quiet);font-weight:400;">(${rows.length})</span></h2>
         <table>
-          <thead><tr><th>Member</th><th>App</th><th>Status</th><th class="num">Calls</th><th class="num">Changes</th></tr></thead>
+          <thead><tr><th>Member</th><th>App</th><th>Status</th><th class="num">Calls (30d)</th><th class="num">Changes (30d)</th></tr></thead>
           <tbody>${body}</tbody>
         </table>
-        <div class="footer">Every connection made through /connect, newest first. Calls and changes are the last 7 days (the usage ledger keeps a week) and count all of that member's AI apps together.</div>
+        <div class="footer">Every connection made through /connect, newest first. Calls and changes are the last 30 days, with all time underneath (usage is kept a year, and only from 2026-10 onward), and count all of that member's AI apps together.</div>
       </div>`;
     }
 

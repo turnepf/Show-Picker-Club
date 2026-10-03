@@ -122,7 +122,8 @@ ask — so the platform rows can sum to less than Active members as well as more
 `/auth/check` is the only writer of `sessions.platform`, so every web call must
 send `X-Client-Platform`; `check-static.sh` fails the PR if one doesn't.
 Also pins the **AI apps (MCP)** list (`mcp_connections`): one row per OAuth
-grant with the person, app name, scope, dates and 7-day calls/changes —
+grant with the person, app name, scope, dates and 30-day / all-time
+calls and changes (`mcp_usage` is kept a year) —
 admin-only like the rest, and never a client secret, client id or redirect.
 
 ```bash
