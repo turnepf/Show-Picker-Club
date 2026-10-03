@@ -264,7 +264,7 @@
       // spacer. The personal rows need a session, so they're gated on
       // authMember exactly like the main app gates its own copies.
       var path = location.pathname;
-      var discover = iconRow('/groups', 'Groups', 'people', { selected: path === '/groups' || path === '/groups.html' }) +
+      var discover = iconRow('/groups', 'Groups', 'people', { selected: path === '/groups' || path === '/groups.html', badgeId: 'shellGroupsNewFlag' }) +
         iconRow('/?home', 'Trending', 'flame');
       if (authMember) {
         discover += iconRow('/rate-backlog', 'Rate my shows', 'star-fill', { selected: path === '/rate-backlog', badgeId: 'shellRateBacklogBadge' });
@@ -308,6 +308,13 @@
       }
       // "Updated" until the member opens Favorite actors once — same key
       // index.html and favorite-actors.html use.
+      // "New" on Groups until it's opened once (iOS's seenGroups).
+      var groupsFlag = document.getElementById('shellGroupsNewFlag');
+      if (groupsFlag && authMember) {
+        var seenGroups = false;
+        try { seenGroups = localStorage.getItem('seenGroups') === '1'; } catch (e) {}
+        if (!seenGroups) groupsFlag.textContent = 'New';
+      }
       var actorsFlag = document.getElementById('shellActorsUpdatedFlag');
       if (actorsFlag) {
         var seenActors = false;

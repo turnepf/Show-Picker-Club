@@ -290,6 +290,59 @@ async function shareShow(id, title) {
   }
 }
 
+/*
+ * Recommend to group — iOS's flow: pick the group (skipped when there's only
+ * one), add an optional note the whole group sees, send. Pages set
+ * window.__recommendGroups to the member's groups ([{id, name}]) and pass the
+ * same array as the `groups` option so the button only appears with one.
+ */
+function pickerDialog(title, bodyHtml, buttons) {
+  return new Promise(resolve => {
+    const d = document.createElement('dialog');
+    d.className = 'sp-dialog';
+    d.innerHTML = `<form method="dialog"><h2>${title}</h2>${bodyHtml}<div class="sp-dialog-buttons">${
+      buttons.map(b => `<button value="${escapeHtml(b.value)}"${b.primary ? ' class="primary"' : ''}>${escapeHtml(b.label)}</button>`).join('')
+    }</div></form>`;
+    document.body.appendChild(d);
+    d.addEventListener('close', () => {
+      const input = d.querySelector('input,textarea');
+      resolve({ value: d.returnValue, text: input ? input.value : '' });
+      d.remove();
+    });
+    d.showModal();
+  });
+}
+
+async function recommendToGroup(myCopyId) {
+  const groups = window.__recommendGroups || [];
+  if (!groups.length) return;
+  let group = groups[0];
+  if (groups.length > 1) {
+    const pick = await pickerDialog('Recommend to which group?', '',
+      [...groups.map(g => ({ label: g.name, value: String(g.id) })), { label: 'Cancel', value: '' }]);
+    group = groups.find(g => String(g.id) === pick.value);
+    if (!group) return;
+  }
+  const ask = await pickerDialog(`Recommend to ${escapeHtml(group.name)}`,
+    `<p>Everyone in ${escapeHtml(group.name)} gets a pop-up with Dismiss or Add to Next Up. The note is visible to the whole group.</p>
+     <input type="text" maxlength="500" placeholder="Add a note (optional)">`,
+    [{ label: 'Cancel', value: '' }, { label: 'Recommend', value: 'go', primary: true }]);
+  if (ask.value !== 'go') return;
+  const note = ask.text.trim();
+  try {
+    const res = await fetch(`/api/groups/${group.id}/suggestions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(note ? { show_id: myCopyId, note } : { show_id: myCopyId }),
+    });
+    if (res.status === 429) { alert('You’ve hit today’s limit for this group — try again tomorrow.'); return; }
+    if (res.status === 401) { alert('Your session expired — sign in again.'); return; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    alert(`It's on ${group.name}'s Watch Next board — everyone gets asked about it next time they visit the group.`);
+  } catch (e) {
+    alert('Couldn’t recommend. Please try again.');
+  }
+}
+
 const DETAIL_ALL_LISTS = ['watching', 'waiting', 'recommending', 'next'];
 const DETAIL_LIST_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved', next: 'Next Up' };
 const DETAIL_CHIP_COLORS = {
@@ -314,7 +367,7 @@ function renderShowDetailBody(show, options = {}) {
   const {
     actors = [], loggedIn = false, myCopy = null, ratings = null,
     listLabels = DETAIL_LIST_LABELS, allLists = DETAIL_ALL_LISTS, showActions = false,
-    groupWatchers = [], creators = [],
+    groupWatchers = [], creators = [], groups = [],
   } = options || {};
   if (!show) return '';
 
@@ -483,6 +536,11 @@ function renderShowDetailBody(show, options = {}) {
     if (myCopy && myCopy.notes) memberInner += `<div class="detail-prose"><strong>Notes:</strong> ${escapeHtml(myCopy.notes)}</div>`;
     // Edit / Archive live here in the member section (only for a copy I
     // actively have) — no separate actions card at the bottom.
+    // Put this show on a group's Watch Next board. It recommends MY copy, so
+    // it shows only when the title is on one of my lists and I'm in a group.
+    if (myCopy && !myCopy.archived && groups.length) {
+      memberInner += `<button class="detail-action" onclick="recommendToGroup(${Number(myCopy.id)})">Recommend to group</button>`;
+    }
     if (showActions && myCopy && !myCopy.archived) {
       memberInner += `<button class="detail-action" onclick="detailEdit(${myCopy.id})">Edit</button>`;
       memberInner += `<button class="detail-action danger" onclick="detailArchive(${myCopy.id})">Archive</button>`;

@@ -1191,7 +1191,7 @@
         <nav class="ios-group">
           <a class="ios-item" href="/groups">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-people"/></svg></span>
-            <span class="ios-item-label">Groups</span>
+            <span class="ios-item-label">Groups<span class="nav-badge groups-new-flag"></span></span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
           <span class="ios-item side-list-row selected home-side-trending hidden" id="trendingSideGroup">
@@ -1312,7 +1312,7 @@
       <nav class="ios-group">
         <a class="ios-item" href="/groups">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-people"/></svg></span>
-          <span class="ios-item-label">Groups</span>
+          <span class="ios-item-label">Groups<span class="nav-badge groups-new-flag"></span></span>
         </a>
         <a class="ios-item hidden member-ratebacklog-row" href="/rate-backlog">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-star-fill"/></svg></span>
@@ -2313,6 +2313,7 @@
         if (data.authenticated) {
           editorName = data.email || '';
           authMember = data.member;
+          updateGroupsNewFlag();
           // Vibe nav rows are personal: only for logged-in members, opening
           // their own vibe (the page's picker still reaches everyone else's).
           if (authMember) {
@@ -2381,7 +2382,10 @@
     // open redirect.
     const OAUTH_RETURN_KEY = 'oauth_return_to';
     function safeOAuthReturn(v) {
-      return typeof v === 'string' && (v.startsWith('/oauth/authorize?') || v === '/connected-apps') ? v : null;
+      // /groups?token=… is a group invite opened while signed out: sign in,
+      // then come back and redeem it (groups.html sends it here).
+      return typeof v === 'string' && (v.startsWith('/oauth/authorize?') || v === '/connected-apps'
+        || /^\/groups\?token=[A-Za-z0-9_-]{1,64}$/.test(v)) ? v : null;
     }
     try {
       const r = safeOAuthReturn(new URLSearchParams(location.search).get('return_to'));
@@ -2426,6 +2430,7 @@
       } catch {}
       authMember = null;
       editorName = '';
+      updateGroupsNewFlag();
       closeAccountMenu();
       const logoutBtn = document.getElementById('logoutBtn');
       if (logoutBtn) logoutBtn.classList.add('hidden');
@@ -2957,6 +2962,15 @@
       document.querySelectorAll('.actors-updated-flag').forEach(el => { el.textContent = seen ? '' : 'Updated'; });
     }
     updateFavoriteActorsFlag();
+
+    // "New" on the Groups row until the member opens Groups once
+    // (groups.html sets the key) — iOS's seenGroups. Signed-in only: a
+    // logged-out visitor can't open a group.
+    function updateGroupsNewFlag() {
+      let seen = false;
+      try { seen = localStorage.getItem('seenGroups') === '1'; } catch {}
+      document.querySelectorAll('.groups-new-flag').forEach(el => { el.textContent = (seen || !authMember) ? '' : 'New'; });
+    }
 
     // Update "Rate my backlog" badge with count of unrated shows
     function updateRateBacklogBadge() {
@@ -3978,8 +3992,21 @@
         if (ar.ok) { const ad = await ar.json(); actors = ad.actors || []; }
       } catch {}
       detailShow = show;
-      await resolveMyCopy();
+      await Promise.all([resolveMyCopy(), loadRecommendGroups()]);
       renderDetail(show, actors, ratings);
+    }
+
+    // My groups, for the card's Recommend to group button. Fetched once.
+    let recommendGroupsLoaded = false;
+    async function loadRecommendGroups() {
+      if (recommendGroupsLoaded || !authMember) return;
+      try {
+        const res = await fetch('/api/groups');
+        if (res.ok) {
+          window.__recommendGroups = ((await res.json()).groups || []).map(g => ({ id: g.id, name: g.name }));
+          recommendGroupsLoaded = true;
+        }
+      } catch (e) {}
     }
 
     // Find my own row for the open title (active or archived) so the detail
@@ -4018,6 +4045,7 @@
         showActions: true,
         groupWatchers: detailGroupWatchers,
         creators: detailCreators,
+        groups: window.__recommendGroups || [],
       });
     }
 
