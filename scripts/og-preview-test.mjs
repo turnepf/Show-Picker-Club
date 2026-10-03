@@ -272,6 +272,14 @@ console.log('\n/household/join — the card names whose household');
   const { html: uh } = await get(householdJoin, `${ORIGIN}/household/join?code=NOPE`);
   check('unknown and expired render the same card',
     meta(uh, 'og:title') === meta(eh, 'og:title'));
+
+  // The web accepts household invites now, so a live card offers to continue
+  // in the browser — and a dead one still offers nothing, so it can't hint
+  // the code was ever real.
+  check('a live invite offers "Continue in your browser" to the web accept',
+    html.includes('href="/subscriptions?household=LIVE1"'));
+  check('an expired or unknown invite offers no web link',
+    !eh.includes('/subscriptions?household=') && !uh.includes('/subscriptions?household='));
 }
 
 // ------------------------------------------------------------ fallback card

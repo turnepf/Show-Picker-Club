@@ -49,5 +49,8 @@ export async function onRequestGet(context) {
     heading: `Join ${whose}`,
     description: 'Pool your streaming services so the subscription audit counts each one once, not twice.',
     url: canonical,
+    // The web accepts it too (subscriptions.html handles ?household=). Only
+    // on a live invite: a dead one stays generic and offers nothing.
+    webUrl: `/subscriptions?household=${encodeURIComponent(code)}`,
   });
 }

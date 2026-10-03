@@ -167,14 +167,18 @@
 
   <div class="modal-overlay hidden" id="householdOverlay" onclick="closeHouseholdModal(event)">
     <div class="modal-card" onclick="event.stopPropagation()">
-      <h2>Your household</h2>
-      <p style="font-size:13px;color:var(--ink-muted);line-height:1.5;margin-bottom:4px;">
-        The members you share streaming services with. Untick someone to take them out. Your audit pools everyone's shows, so a service someone in the household is watching counts as one to keep.
+      <h2>Household</h2>
+      <h3 style="font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-quiet);margin:14px 0 6px;">Invite</h3>
+      <div id="householdInvite">
+        <button type="button" class="submit" style="width:100%;" onclick="makeHouseholdInvite(this)">Invite someone to your household</button>
+      </div>
+      <p style="font-size:12px;color:var(--ink-muted);line-height:1.5;margin:6px 0 0;">
+        Send the link to whoever you share streaming services with — the audit pools their shows with yours once they accept. The link works for 7 days.
       </p>
-      <div id="householdList" style="display:flex;flex-direction:column;gap:2px;margin:10px 0;max-height:50vh;overflow:auto;">Loading&hellip;</div>
+      <h3 style="font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-quiet);margin:18px 0 6px;">In your household</h3>
+      <div id="householdList" style="display:flex;flex-direction:column;gap:2px;margin:0 0 10px;max-height:50vh;overflow:auto;">Loading&hellip;</div>
       <div class="modal-actions">
-        <button type="button" class="cancel" onclick="closeHouseholdModal()">Cancel</button>
-        <button type="button" class="submit" onclick="submitHousehold()">Save</button>
+        <button type="button" class="submit" onclick="closeHouseholdModal()">Done</button>
       </div>
     </div>
   </div>
@@ -399,45 +403,112 @@
       if (hhBtn) hhBtn.addEventListener('click', openHousehold);
     }
 
-    // Household editor: lists who is already in the member's household so they
-    // can untick someone and save. Adding happens by invite link from the app;
-    // the server refuses a save that names anyone new.
+    // Household, as on iOS's HouseholdPickerView: invite by link, and the
+    // people already in it with Remove. Membership is invite-only — the
+    // server refuses any save that names someone new (INVARIANTS §28).
+    let householdChanged = false;
     async function openHousehold() {
+      document.getElementById('householdInvite').innerHTML =
+        '<button type="button" class="submit" style="width:100%;" onclick="makeHouseholdInvite(this)">Invite someone to your household</button>';
+      document.getElementById('householdOverlay').classList.remove('hidden');
+      householdChanged = false;
+      await loadHouseholdList();
+    }
+    async function loadHouseholdList() {
       const list = document.getElementById('householdList');
       list.innerHTML = 'Loading&hellip;';
-      document.getElementById('householdOverlay').classList.remove('hidden');
       try {
         const res = await fetch('/api/household');
         if (!res.ok) throw new Error();
         const data = await res.json();
-        const selected = new Set(data.household || []);
-        const rows = (data.members || []).filter(m => selected.has(m.slug)).map(m => `
-          <label style="display:flex;align-items:center;gap:10px;padding:9px 4px;cursor:pointer;border-bottom:1px solid var(--border-soft,#eee);">
-            <input type="checkbox" value="${escapeHtml(m.slug)}" ${selected.has(m.slug) ? 'checked' : ''} style="width:18px;height:18px;">
+        const mine = new Set(data.household || []);
+        const rows = (data.members || []).filter(m => mine.has(m.slug)).map(m => `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 4px;border-bottom:1px solid var(--border-soft,#eee);">
             <span>${escapeHtml(m.name)}</span>
-          </label>`).join('');
-        const hint = '<div style="color:var(--ink-muted);font-size:13px;padding:8px 0;">To add someone, send them a household invite from the Show Picker Club app on iPhone or iPad.</div>';
-        list.innerHTML = rows + hint;
+            <button type="button" data-slug="${escapeHtml(m.slug)}" data-name="${escapeHtml(m.name)}" onclick="removeFromHousehold(this)"
+              style="background:none;border:none;color:var(--danger-deep,#c0392b);font:inherit;font-size:13px;cursor:pointer;">Remove</button>
+          </div>`).join('');
+        list.innerHTML = rows || '<div style="color:var(--ink-muted);font-size:14px;padding:8px 0;">Nobody yet — your audit covers only your own shows.</div>';
       } catch {
-        list.innerHTML = '<div style="color:var(--danger-deep,#c0392b);font-size:13px;padding:8px 0;">Couldn\'t load members — try again.</div>';
+        list.innerHTML = '<div style="color:var(--danger-deep,#c0392b);font-size:13px;padding:8px 0;">Couldn\'t load your household — try again.</div>';
       }
+    }
+    async function makeHouseholdInvite(btn) {
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/household/invite', { method: 'POST' });
+        if (!res.ok) throw new Error();
+        const invite = await res.json();
+        const share = navigator.share
+          ? '<button type="button" class="submit" onclick="shareHouseholdInvite()">Share invite link</button>' : '';
+        document.getElementById('householdInvite').innerHTML = `
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="householdInviteUrl" type="text" readonly value="${escapeHtml(invite.url)}" style="flex:1;font-size:12px;font-family:monospace;">
+            ${share}
+            <button type="button" class="cancel" onclick="copyHouseholdInvite(this)">Copy</button>
+          </div>`;
+      } catch {
+        btn.disabled = false;
+        toast('Couldn’t create an invite — try again.');
+      }
+    }
+    async function shareHouseholdInvite() {
+      const url = document.getElementById('householdInviteUrl').value;
+      try {
+        await navigator.share({
+          title: 'Join my household on Show Picker Club',
+          text: 'Join my household on Show Picker Club — the subscription audit pools our shows so we’re not counted twice for the same service.',
+          url,
+        });
+      } catch {}
+    }
+    async function copyHouseholdInvite(btn) {
+      const input = document.getElementById('householdInviteUrl');
+      try { await navigator.clipboard.writeText(input.value); } catch { input.select(); document.execCommand('copy'); }
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+    }
+    async function removeFromHousehold(btn) {
+      const name = btn.dataset.name;
+      if (!confirm(`Remove ${name} from your household?\n\nTheir shows stop counting toward your audit. Nothing on either of your lists changes.`)) return;
+      try {
+        const res = await fetch('/api/household/remove', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ member_slug: btn.dataset.slug }),
+        });
+        if (!res.ok) throw new Error();
+        householdChanged = true;
+        await loadHouseholdList();
+      } catch { toast(`Couldn’t remove ${name}`); }
     }
     function closeHouseholdModal(event) {
       if (event && event.target !== event.currentTarget) return;
       document.getElementById('householdOverlay').classList.add('hidden');
+      if (householdChanged) load();
     }
-    async function submitHousehold() {
-      const checked = [...document.querySelectorAll('#householdList input[type=checkbox]:checked')].map(c => c.value);
+
+    // A household invite link opened on the web (/household/join's preview
+    // sends ?household=<code> here). Accepting is the navigation, as on iOS;
+    // signed out, sign in first and come back (index.html's return_to).
+    async function maybeJoinHousehold() {
+      const params = new URLSearchParams(location.search);
+      const code = params.get('household');
+      if (!code) return;
+      history.replaceState(null, '', location.pathname);
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(code)) { toast('That household link isn’t valid.'); return; }
       try {
-        const res = await fetch('/api/household', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ members: checked }),
+        const res = await fetch('/api/household/join', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
         });
-        if (!res.ok) { toast('Could not save household'); return; }
-        document.getElementById('householdOverlay').classList.add('hidden');
-        toast('Household saved');
-        await load();
+        if (res.status === 401) {
+          location.href = '/?login=1&return_to=' + encodeURIComponent('/subscriptions?household=' + code);
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) toast('You’re in the household — your audits now pool your shows.');
+        else if (res.status === 410 || res.status === 404) toast('That household invite has expired or was already used.');
+        else toast(data.error || 'Couldn’t join the household.');
       } catch { toast('Network error'); }
     }
 
@@ -540,7 +611,7 @@
       }
     }
 
-    load();
+    maybeJoinHousehold().then(load);
   </script>
 </body>
 </html>
