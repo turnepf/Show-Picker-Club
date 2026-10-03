@@ -179,7 +179,7 @@
     menu.appendChild(pasteItem);
     var appsItem = document.createElement('button');
     appsItem.type = 'button';
-    appsItem.textContent = 'Connected apps';
+    appsItem.textContent = 'AI MCP';
     appsItem.style.color = 'var(--ink)';
     appsItem.addEventListener('click', function () { closeMenu(); location.href = '/connected-apps'; });
     menu.appendChild(appsItem);

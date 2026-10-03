@@ -388,5 +388,41 @@ console.log('\n== a stamped platform is neither erased nor rewritten every reque
         platformOf(env, id) === 'iphone', `got ${platformOf(env, id)}`);
 }
 
+console.log('\n== AI apps (MCP): who connected what, admin-only, no secrets');
+{
+  const env = makeEnv();
+  addMember(env, 'patrick', 'Patrick Turner', { admin: true });
+  addMember(env, 'stacy', 'Stacy Kallay');
+  const db = env._db;
+  db.prepare(`INSERT INTO oauth_clients (client_id, client_secret_hash, client_name, redirect_uris)
+              VALUES ('c-claude', 'HASHED-SECRET', 'Claude', '["https://claude.ai/cb"]')`).run();
+  db.prepare(`INSERT INTO oauth_clients (client_id, client_name, redirect_uris)
+              VALUES ('c-gpt', 'ChatGPT', '["https://chatgpt.com/cb"]')`).run();
+  db.prepare(`INSERT INTO oauth_grants (member_slug, client_id, scope, created_at, last_used_at)
+              VALUES ('stacy', 'c-claude', 'read write', '2026-09-28 10:00:00', '2026-10-02 09:00:00')`).run();
+  db.prepare(`INSERT INTO oauth_grants (member_slug, client_id, scope, created_at, revoked_at)
+              VALUES ('stacy', 'c-gpt', 'read', '2026-09-29 10:00:00', '2026-09-30 10:00:00')`).run();
+  db.prepare(`INSERT INTO mcp_usage (member_slug, day, calls, writes) VALUES ('stacy', date('now'), 7, 2)`).run();
+  db.prepare(`INSERT INTO mcp_usage (member_slug, day, calls, writes) VALUES ('stacy', date('now', '-1 day'), 3, 0)`).run();
+
+  const memberCookie = addSession(env, { slug: 'stacy', platform: 'iphone' });
+  check('a member who connected an app still cannot read the list',
+        (await call(env, memberCookie)).status === 403);
+
+  const adminCookie = addSession(env, { slug: 'patrick', platform: 'iphone' });
+  const res = await call(env, adminCookie);
+  const text = await res.clone().text();
+  const r = await res.json();
+  const rows = r.mcp_connections || [];
+  check('one row per grant, newest first', rows.length === 2 && rows[0].app === 'ChatGPT' && rows[1].app === 'Claude',
+        JSON.stringify(rows.map(x => x.app)));
+  const claude = rows.find(x => x.app === 'Claude') || {};
+  check('names the person and the scope', claude.name === 'Stacy' && claude.scope === 'read write', JSON.stringify(claude));
+  check('carries last use and a disconnect date', !!claude.last_used_at && !!(rows.find(x => x.app === 'ChatGPT') || {}).revoked_at);
+  check('7-day calls and changes come from the ledger', claude.calls_7d === 10 && claude.writes_7d === 2, JSON.stringify(claude));
+  check('never carries a client secret, client id or redirect',
+        !text.includes('HASHED-SECRET') && !text.includes('c-claude') && !text.includes('claude.ai/cb'));
+}
+
 console.log(`\n${failed ? 'FAIL' : 'PASS'} — ${passed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);

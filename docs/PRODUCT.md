@@ -359,10 +359,16 @@ PWA was retired in 2026-08 and stays retired).
 5. Calendar screen; household invite and join. **Done.**
 6. Import a list. **Done.**
 7. Passkeys. **Done.**
-8. Admin — member detail, the missing Reporting sections, vibe re-score.
+8. Admin — member detail (groups and recent adds on Members), the missing
+   Reporting sections (sign-in methods, account creation, calendar, logins),
+   and the foreground vibe re-score with its per-title log. **Done.**
 
-Strike items off here as they merge, and drop the per-feature "the web
-doesn't" lines elsewhere in this file as each one lands.
+The freeze-era gap is closed. What remains different is deliberate: no
+widgets, share extension, shake to pick, watch hand-off or offline mode (none
+is a browser thing, and the PWA stays retired); group icons drawn as emoji
+rather than SF Symbols; and Find a Show on someone else's page still opens the
+short "add to my list" form. New work keeps parity from here — see
+CLAUDE.md's working preferences.
 
 ## Native apps
 
@@ -576,7 +582,7 @@ Platforms: it's a server feature, so it works for **every member regardless
 of device** — it runs inside their AI app, not ours. The connect, consent and
 Connected apps screens are **web pages** because OAuth sign-in is a browser
 flow; that's the one deliberate exception to the frozen web, not a web
-feature. **iPhone/iPad** (and Mac via Catalyst) get **Connected Apps…** in the
+feature. **iPhone/iPad** (and Mac via Catalyst) get **AI MCP…** (the Connected Apps screen) in the
 account menu, next to Passkeys: the same list with Disconnect (swipe, or
 right-click on Mac) and a link out to `/connect`. **Apple TV, the watch and
 Roku don't** — nothing to manage from there; the web page covers everyone.

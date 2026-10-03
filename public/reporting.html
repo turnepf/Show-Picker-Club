@@ -202,6 +202,92 @@
       </div>`;
     }
 
+    // How people sign in, account creation, calendar and login totals — the
+    // four sections iOS's ReportingView shows from the same payload.
+    const METHOD_LABELS = { apple: 'Apple', google: 'Google', email: 'Email code', sms: 'Text code', demo: 'Demo account', passkey: 'Passkey' };
+    const methodLabel = (k) => METHOD_LABELS[k] || (k.charAt(0).toUpperCase() + k.slice(1));
+    function methodLine(counts) {
+      const used = Object.entries(counts || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+      return used.length ? used.map(([k, n]) => `${escapeHtml(methodLabel(k))} ${fmt(n)}`).join(' · ') : 'No sign-ins';
+    }
+    // Who has connected an AI app (Claude, ChatGPT…) through the MCP server,
+    // and how much they've used it. One row per connection.
+    function shortDate(s) {
+      if (!s) return '—';
+      const d = new Date(/Z|[+-]\d\d:?\d\d$/.test(s) ? s : String(s).replace(' ', 'T') + 'Z');
+      return isNaN(d) ? '—' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+    function mcpSection(rows) {
+      if (!Array.isArray(rows)) return '';
+      if (!rows.length) {
+        return `<div class="section"><h2>AI apps (MCP)</h2><div class="empty">Nobody has connected an AI app yet.</div></div>`;
+      }
+      const body = rows.map(r => {
+        const access = /write/.test(r.scope || '') ? 'Read & change' : 'Read only';
+        const status = r.revoked_at ? `Disconnected ${shortDate(r.revoked_at)}` : `Last used ${shortDate(r.last_used_at)}`;
+        return `<tr>
+          <td>${escapeHtml(r.name)}</td>
+          <td>${escapeHtml(r.app)}<div style="font-size:12px;color:var(--ink-quiet)">${access} · connected ${shortDate(r.connected_at)}</div></td>
+          <td${r.revoked_at ? ' style="color:var(--ink-quiet)"' : ''}>${status}</td>
+          <td class="num">${fmt(r.calls_7d)}</td>
+          <td class="num">${fmt(r.writes_7d)}</td>
+        </tr>`;
+      }).join('');
+      return `<div class="section">
+        <h2>AI apps (MCP) <span style="color:var(--ink-quiet);font-weight:400;">(${rows.length})</span></h2>
+        <table>
+          <thead><tr><th>Member</th><th>App</th><th>Status</th><th class="num">Calls</th><th class="num">Changes</th></tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+        <div class="footer">Every connection made through /connect, newest first. Calls and changes are the last 7 days (the usage ledger keeps a week) and count all of that member's AI apps together.</div>
+      </div>`;
+    }
+
+    function signinSection(sm) {
+      if (!sm) return '';
+      return `<div class="section">
+        <h2>How people sign in</h2>
+        <table><tbody>
+          <tr><td>Last 7 days</td><td>${methodLine(sm.week)}</td></tr>
+          <tr><td>Last 30 days</td><td>${methodLine(sm.month)}</td></tr>
+          <tr><td>Last 90 days</td><td>${methodLine(sm.quarter)}</td></tr>
+        </tbody></table>
+        <div class="footer">People who signed in with each method — counted once each, however many devices they used. Sessions last 30 days, so the 90-day window is the one to read before retiring a channel. Someone who used two methods counts on both, so the rows don't sum. Sessions minted before this was tracked name no channel and are left out.</div>
+      </div>`;
+    }
+    function calendarSection(cal) {
+      if (!cal) return '';
+      return `<div class="section">
+        <h2>Calendar</h2>
+        <table><tbody>
+          <tr><td>Feeds fetched (7 days)</td><td class="num">${fmt(cal.week)}</td></tr>
+          <tr><td>Feeds fetched (30 days)</td><td class="num">${fmt(cal.month)}</td></tr>
+          <tr><td>Feeds ever fetched</td><td class="num">${fmt(cal.ever)}</td></tr>
+          <tr><td>Total fetches</td><td class="num">${fmt(cal.fetches)}</td></tr>
+        </tbody></table>
+        <div class="footer">A subscribed calendar polls on its own schedule, so a member whose feed is being fetched has it live somewhere. Counting started when this shipped — give it a day before reading it.</div>
+      </div>`;
+    }
+    function enrolledSection(ev) {
+      const rows = Object.entries(ev || {}).sort((a, b) => b[1] - a[1]);
+      if (!rows.length) return '';
+      return `<div class="section">
+        <h2>How accounts were created</h2>
+        <table><tbody>${rows.map(([k, n]) => `<tr><td>${escapeHtml(methodLabel(k))}</td><td class="num">${fmt(n)}</td></tr>`).join('')}</tbody></table>
+        <div class="footer">All time. Retiring a sign-in channel means the accounts created through it need another way in.</div>
+      </div>`;
+    }
+    function loginsSection(l) {
+      if (!l || (l.ever == null && l.never == null)) return '';
+      return `<div class="section">
+        <h2>Logins</h2>
+        <table><tbody>
+          ${l.ever != null ? `<tr><td>Logged in (ever)</td><td class="num">${fmt(l.ever)}</td></tr>` : ''}
+          ${l.never != null ? `<tr><td>Never logged in</td><td class="num">${fmt(l.never)}</td></tr>` : ''}
+        </tbody></table>
+      </div>`;
+    }
+
     function neverLoggedInSection(list) {
       const rows = list || [];
       const count = rows.length;
@@ -285,6 +371,12 @@
         </div>
 
         ${platformSection(d.active_by_platform)}
+
+        ${mcpSection(d.mcp_connections)}
+        ${signinSection(d.signin_methods)}
+        ${calendarSection(d.calendar_usage)}
+        ${enrolledSection(d.enrolled_via)}
+        ${loginsSection(d.members_login)}
 
         ${neverLoggedInSection(d.never_logged_in)}
 

@@ -41,6 +41,32 @@ struct ReportingView: View {
                 if let rs = r.ratingsSubmitted {
                     Section("Ratings submitted") { windowRows(rs) }
                 }
+                // Who has connected an AI app through the MCP server — the
+                // named companion to the "AI apps (MCP)" platform row.
+                if let conns = r.mcpConnections {
+                    Section {
+                        if conns.isEmpty {
+                            Text("Nobody has connected an AI app yet.")
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(conns) { c in
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack {
+                                    Text(c.name ?? c.memberSlug)
+                                    Spacer()
+                                    Text(c.app ?? "Unknown app").foregroundStyle(.secondary)
+                                }
+                                Text(mcpDetail(c))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    } header: {
+                        Text("AI apps (MCP)")
+                    } footer: {
+                        Text("Every connection made through /connect, newest first. Calls and changes are the last 7 days (the usage ledger keeps a week) and count all of that member's AI apps together.")
+                    }
+                }
                 if let sm = r.signinMethods {
                     Section {
                         methodRows("Last 7 days", sm.week)
@@ -178,6 +204,21 @@ struct ReportingView: View {
         metric("This week", w.week)
         metric("This month", w.month)
         metric("All time", w.allTime)
+    }
+
+    // "Read & change · connected 3d ago · last used today · 10 calls, 2 changes"
+    private func mcpDetail(_ c: MCPConnection) -> String {
+        var parts = [c.canWrite ? "Read & change" : "Read only"]
+        if let when = relativeServerTime(c.connectedAt) { parts.append("connected \(when)") }
+        if let gone = relativeServerTime(c.revokedAt) {
+            parts.append("disconnected \(gone)")
+        } else if let used = relativeServerTime(c.lastUsedAt) {
+            parts.append("last used \(used)")
+        } else {
+            parts.append("never used")
+        }
+        parts.append("\(c.calls7d ?? 0) calls, \(c.writes7d ?? 0) changes (7 days)")
+        return parts.joined(separator: " · ")
     }
 
     private func metric(_ label: String, _ value: Int) -> some View {

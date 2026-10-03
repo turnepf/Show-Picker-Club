@@ -134,6 +134,40 @@ export async function onRequestGet(context) {
     }
   } catch (_) { /* pre-071 database */ }
 
+  // Who has connected an AI app, and how much they use it (migration 071) —
+  // the named companion to the anonymous `mcp` platform count above. One row
+  // per grant, newest first, so a member with Claude and ChatGPT both
+  // connected appears twice. Admin-only like the rest of this endpoint, and
+  // never carries a token, client secret or redirect: the person, the app's
+  // self-chosen name, the scope, and dates. mcp_usage is pruned to 7 days
+  // (_shared/oauth.js), so calls/writes are a 7-day figure, per member rather
+  // than per app because that's how the ledger is keyed.
+  let mcpConnections = [];
+  try {
+    const { results } = await env.DB.prepare(
+      `SELECT g.id, g.member_slug, m.first_name, m.last_name, m.name,
+              c.client_name, g.scope, g.created_at, g.last_used_at, g.revoked_at,
+              (SELECT COALESCE(SUM(calls), 0) FROM mcp_usage u WHERE u.member_slug = g.member_slug) AS calls_7d,
+              (SELECT COALESCE(SUM(writes), 0) FROM mcp_usage u WHERE u.member_slug = g.member_slug) AS writes_7d
+         FROM oauth_grants g
+         LEFT JOIN members m ON m.slug = g.member_slug
+         LEFT JOIN oauth_clients c ON c.client_id = g.client_id
+        ORDER BY g.created_at DESC
+        LIMIT 200`
+    ).all();
+    mcpConnections = (results || []).map((r) => ({
+      member_slug: r.member_slug,
+      name: [r.first_name || (r.name || '').split(' ')[0], r.last_name].filter(Boolean).join(' ') || r.member_slug,
+      app: r.client_name || 'Unknown app',
+      scope: r.scope,
+      connected_at: r.created_at,
+      last_used_at: r.last_used_at,
+      revoked_at: r.revoked_at,
+      calls_7d: r.calls_7d || 0,
+      writes_7d: r.writes_7d || 0,
+    }));
+  } catch (_) { /* pre-071 database */ }
+
   // How members actually sign in (migration 059): distinct *people* who
   // minted a session per method over each window, plus how every account was
   // created. This is what says whether an auth channel still earns what it
@@ -265,6 +299,7 @@ export async function onRequestGet(context) {
     active_members: activeMembers,
     active_by_platform: activeByPlatform,
     signin_methods: signinMethods,
+    mcp_connections: mcpConnections,
     calendar_usage: calendarUsage,
     enrolled_via: enrolledVia,
     totals,

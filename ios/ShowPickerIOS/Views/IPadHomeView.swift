@@ -371,7 +371,7 @@ struct IPadHomeView: View {
                     Button {
                         showingConnectedApps = true
                     } label: {
-                        Label("Connected Apps…", systemImage: "link")
+                        Label("AI MCP…", systemImage: "link")
                     }
                     // Same permanent entry point as iPhone Home. The iPad and
                     // Mac layout had no import route whatsoever before this —

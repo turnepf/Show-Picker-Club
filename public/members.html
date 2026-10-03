@@ -115,6 +115,10 @@
       .top { flex-direction: column; align-items: flex-start; }
       .field label { width: 50px; }
     }
+    .member-detail { margin-top: 12px; border-top: 1px solid var(--border-soft, #eee); padding-top: 8px; }
+    .member-detail summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent, #6b5cff); }
+    .member-detail h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-quiet, #888); margin: 12px 0 4px; }
+    .member-detail .group-row, .member-detail .activity-row { font-size: 13px; padding: 3px 0; }
   </style>
   <script src="/shell.js?v=5" defer></script>
 </head>
@@ -296,6 +300,10 @@
             style="margin-left:8px;background:#2980B9;">
             ${m.is_admin ? 'Remove admin' : 'Make admin'}
           </button>
+          <details class="member-detail" data-slug="${escapeHtml(m.slug)}" data-name="${escapeHtml(m.first_name || m.slug)}">
+            <summary>Groups &amp; recent adds</summary>
+            <div class="member-detail-body">Loading…</div>
+          </details>
         `;
         list.appendChild(card);
       }
@@ -308,6 +316,55 @@
       list.querySelectorAll('button.toggle-admin').forEach(btn => {
         btn.addEventListener('click', () => toggleAdmin(btn));
       });
+      list.querySelectorAll('details.member-detail').forEach(d => {
+        d.addEventListener('toggle', () => { if (d.open && !d.dataset.loaded) loadMemberDetail(d); });
+      });
+    }
+
+    // iOS's MemberAdminDetail: who they share a library with, and their
+    // last few adds (a bulk import collapsed to one line per list). Both
+    // endpoints are admin-only (scripts/admin-member-detail-test.mjs).
+    const RECENT_LIMIT = 8;
+    function serverTime(s) {
+      if (!s) return null;
+      const d = new Date(/Z|[+-]\d\d:?\d\d$/.test(s) ? s : String(s).replace(' ', 'T') + 'Z');
+      return isNaN(d) ? null : d;
+    }
+    async function loadMemberDetail(d) {
+      d.dataset.loaded = '1';
+      const slug = d.dataset.slug, name = d.dataset.name;
+      const body = d.querySelector('.member-detail-body');
+      const [gRes, aRes] = await Promise.allSettled([
+        fetch('/api/admin-member-groups?member=' + encodeURIComponent(slug)).then(r => r.ok ? r.json() : Promise.reject(r.status)),
+        fetch(`/api/activity?member=${encodeURIComponent(slug)}&limit=${RECENT_LIMIT}`).then(r => r.ok ? r.json() : Promise.reject(r.status)),
+      ]);
+      let html = '<h4>Groups</h4>';
+      if (gRes.status !== 'fulfilled') {
+        html += '<div class="meta" style="color:#c47a00">Couldn’t load their groups.</div>';
+      } else if (!(gRes.value.groups || []).length) {
+        html += `<div class="meta">${escapeHtml(name)} isn’t in any groups.</div>`;
+      } else {
+        html += gRes.value.groups.map(g => {
+          const members = g.members || [];
+          const creator = members.find(m => m.is_creator);
+          let sub = `${members.length} member${members.length === 1 ? '' : 's'}`;
+          if (creator) sub += creator.slug === slug ? ' · they created it' : ` · created by ${escapeHtml(creator.name)}`;
+          const roster = members.map(m => escapeHtml(m.name) + (m.disabled ? ' (disabled)' : '')).join(', ');
+          return `<div class="group-row"><strong>${escapeHtml(g.name)}</strong> <span class="meta">${sub}</span><div class="meta">${roster}</div></div>`;
+        }).join('');
+      }
+      html += '<h4>Recent adds</h4>';
+      const feed = aRes.status === 'fulfilled' ? (aRes.value.feed || []) : [];
+      if (!feed.length) {
+        html += `<div class="meta">${aRes.status === 'fulfilled' ? `${escapeHtml(name)} hasn’t added anything yet.` : 'Couldn’t load their activity.'}</div>`;
+      } else {
+        html += feed.map(item => {
+          const t = serverTime(item.time);
+          return `<div class="activity-row">${escapeHtml(item.text)}${t ? ` <span class="meta">${escapeHtml(relTime(t))}</span>` : ''}</div>`;
+        }).join('');
+        if (feed.length >= RECENT_LIMIT) html += `<div class="meta">The ${RECENT_LIMIT} most recent. Bulk adds are collapsed into one line.</div>`;
+      }
+      body.innerHTML = html;
     }
 
     // Server error codes → operator-readable explanations. Anything not
