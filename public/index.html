@@ -665,7 +665,19 @@
     }
     .modal label:first-of-type { margin-top: 0; }
 
-    .modal input, .modal select {
+    .modal textarea { resize: vertical; min-height: 44px; line-height: 1.4; }
+    .watcher-picker { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; overflow: hidden; }
+    .watcher-picker button {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      width: 100%; padding: 9px 12px; background: var(--surface); color: var(--ink);
+      border: none; border-top: 1px solid var(--border-soft); font: inherit; font-size: 14px;
+      text-align: left; cursor: pointer;
+    }
+    .watcher-picker button:first-child { border-top: none; }
+    .watcher-picker small { display: block; color: var(--ink-muted); font-size: 12px; }
+    .watcher-picker .check { color: var(--accent); font-weight: 700; }
+    .watcher-footer { font-size: 12px; color: var(--ink-muted); margin-top: 6px; line-height: 1.4; }
+    .modal input, .modal select, .modal textarea {
       width: 100%;
       padding: 10px 12px;
       border: 1px solid var(--border);
@@ -674,7 +686,7 @@
       font-family: inherit;
     }
 
-    .modal input:focus, .modal select:focus {
+    .modal input:focus, .modal select:focus, .modal textarea:focus {
       outline: none;
       border-color: var(--accent);
       box-shadow: var(--focus-ring);
@@ -1464,13 +1476,16 @@
       <input type="text" id="inputRecommended" placeholder="e.g. Rosa, TC">
 
       <label for="inputNotes">Notes</label>
-      <input type="text" id="inputNotes" placeholder="e.g. Movie, Harlan Coben">
+      <textarea id="inputNotes" rows="2" placeholder="e.g. Movie, Harlan Coben"></textarea>
 
       <label for="inputWatchingWith">Watching With</label>
+      <div id="watcherPicker" class="watcher-picker hidden"></div>
       <input type="text" id="inputWatchingWith" placeholder="e.g. Ali, the whole family">
+      <div id="watcherFooter" class="watcher-footer hidden"></div>
 
       <label class="checkbox-label"><input type="checkbox" id="inputMovie"> Movie</label>
       <label class="checkbox-label"><input type="checkbox" id="inputFullSeries"> Series Complete</label>
+      <label class="checkbox-label hidden" id="inputArchivedRow"><input type="checkbox" id="inputArchived"> Archived</label>
 
       <label>List</label>
       <div class="list-chips" id="inputListChips">
@@ -3375,6 +3390,112 @@
     }
     attachTitlePicker('inputTitle', 'inputTitleSuggest', 'inputMovie');
 
+    // ── Network list from the server ─────────────────────────────────────
+    // GET /api/networks is the catalog the apps use, so a network added on
+    // the server reaches this picker without a deploy. The options written
+    // into the HTML are the seed: a failed or empty fetch leaves them alone
+    // rather than emptying the picker (iOS's "never render an empty picker").
+    let networkCatalogLoaded = false;
+    async function loadNetworkCatalog() {
+      if (networkCatalogLoaded) return;
+      try {
+        const res = await fetch('/api/networks');
+        if (!res.ok) return;
+        const nets = ((await res.json()).networks || []).filter(n => n && typeof n.stored === 'string' && n.stored);
+        if (!nets.length) return;
+        const select = document.getElementById('inputNetwork');
+        const current = select.value;
+        let html = '<option value="">Select…</option>';
+        let open = null;
+        for (const n of nets) {
+          const section = n.section || null;
+          if (section !== open) {
+            if (open) html += '</optgroup>';
+            if (section) html += `<optgroup label="${escapeHtml(section)}">`;
+            open = section;
+          }
+          html += `<option value="${escapeHtml(n.stored)}">${escapeHtml(n.display || n.stored)}</option>`;
+        }
+        if (open) html += '</optgroup>';
+        html += '<option value="__other">Network not listed</option>';
+        select.innerHTML = html;
+        if (current) setNetworkField(current);
+        networkCatalogLoaded = true;
+      } catch (e) {}
+    }
+    // Select a stored network, or fall back to "Network not listed" + text.
+    function setNetworkField(network) {
+      const select = document.getElementById('inputNetwork');
+      const other = document.getElementById('inputNetworkOther');
+      if (network && !Array.from(select.options).some(o => o.value === network)) {
+        select.value = '__other';
+        other.value = network;
+        other.style.display = 'block';
+      } else {
+        select.value = network || '';
+        other.value = '';
+        other.style.display = 'none';
+      }
+    }
+
+    // ── Watching With: group-mates as people ──────────────────────────────
+    // Pick anyone you share a group with and the show goes on their list too
+    // (the one cross-member write — docs/INVARIANTS.md, watching-with-test).
+    // Anyone else is typed. Same rules as iOS AddEditShowView.
+    let groupMates = null;          // [{slug, name, groups}] once fetched
+    let selectedWatchers = new Set();
+    let watchersKnown = true;       // does the row tell us who it names?
+    async function loadGroupMates() {
+      if (groupMates !== null || !authMember) return;
+      try {
+        const res = await fetch('/api/group-members');
+        groupMates = res.ok ? ((await res.json()).members || []) : [];
+      } catch (e) { groupMates = []; }
+    }
+    // The composed watching_with minus the linked names = what the member
+    // typed. Mirror of composeWatchingWith() in functions/_shared/watchers.js.
+    function watchingWithFreeText(composed, names) {
+      const linked = new Set(names.map(n => String(n).trim().toLowerCase()));
+      return String(composed || '').split(',').map(x => x.trim())
+        .filter(x => x && !linked.has(x.toLowerCase())).join(', ');
+    }
+    function renderWatcherPicker(extra) {
+      const picker = document.getElementById('watcherPicker');
+      const footer = document.getElementById('watcherFooter');
+      const input = document.getElementById('inputWatchingWith');
+      // Someone linked on this row who has since left your groups stays
+      // selectable, so an unrelated edit doesn't silently drop them.
+      const mates = (groupMates || []).slice();
+      for (const w of extra || []) if (!mates.some(m => m.slug === w.slug)) mates.push({ slug: w.slug, name: w.name, groups: null });
+      if (!mates.length) {
+        picker.classList.add('hidden'); footer.classList.add('hidden');
+        input.placeholder = 'e.g. Ali, the whole family';
+        return;
+      }
+      const multiGroup = new Set(mates.flatMap(m => m.groups || [])).size > 1;
+      picker.innerHTML = mates.map(m => `<button type="button" data-slug="${escapeHtml(m.slug)}">
+          <span>${escapeHtml(m.name)}${multiGroup && m.groups && m.groups.length ? `<small>${escapeHtml(m.groups.join(', '))}</small>` : ''}</span>
+          <span class="check">${selectedWatchers.has(m.slug) ? '✓' : ''}</span></button>`).join('');
+      picker.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+        const slug = b.dataset.slug;
+        if (selectedWatchers.has(slug)) selectedWatchers.delete(slug); else selectedWatchers.add(slug);
+        renderWatcherPicker(extra);
+      }));
+      picker.classList.remove('hidden');
+      input.placeholder = 'Someone else';
+      // Say plainly what picking someone does to their library.
+      const picked = mates.filter(m => selectedWatchers.has(m.slug)).map(m => m.name);
+      if (!picked.length) {
+        footer.textContent = 'Pick anyone you share a group with — the show goes on their list too, and their copy names you back. Anyone else, just type.';
+      } else {
+        const t = document.getElementById('inputTitle').value.trim();
+        const who = picked.length > 1 ? picked.slice(0, -1).join(', ') + ' and ' + picked[picked.length - 1] : picked[0];
+        footer.textContent = `${t ? `“${t}”` : 'This show'} will be added to ${who}’s ${picked.length > 1 ? 'lists' : 'list'} too. If they already have it, it stays where they put it.`;
+      }
+      footer.classList.remove('hidden');
+    }
+    let watcherExtra = [];
+
     function openAddModal() {
       editingId = null;
       titlePickers.inputTitle.clear();
@@ -3389,9 +3510,16 @@
       document.getElementById('inputWatchingWith').value = '';
       document.getElementById('inputMovie').checked = false;
       document.getElementById('inputFullSeries').checked = false;
+      document.getElementById('inputArchived').checked = false;
+      document.getElementById('inputArchivedRow').classList.add('hidden');
+      selectedWatchers = new Set();
+      watchersKnown = true;
+      watcherExtra = [];
       setSelectedList(currentTab);
       document.getElementById('modalOverlay').classList.remove('hidden');
       document.getElementById('inputTitle').focus();
+      loadNetworkCatalog();
+      loadGroupMates().then(() => renderWatcherPicker(watcherExtra));
     }
 
     function openEditModal(showId) {
@@ -3402,25 +3530,29 @@
       document.getElementById('modalTitle').textContent = 'Edit Show';
       document.getElementById('modalSave').textContent = 'Save Changes';
       document.getElementById('inputTitle').value = show.title;
-      const networkSelect = document.getElementById('inputNetwork');
-      const networkOther = document.getElementById('inputNetworkOther');
-      if (show.network && !Array.from(networkSelect.options).some(o => o.value === show.network)) {
-        networkSelect.value = '__other';
-        networkOther.value = show.network;
-        networkOther.style.display = 'block';
-      } else {
-        networkSelect.value = show.network || '';
-        networkOther.value = '';
-        networkOther.style.display = 'none';
-      }
+      setNetworkField(show.network);
       document.getElementById('inputRecommended').value = show.recommended_by || '';
       document.getElementById('inputNotes').value = show.notes || '';
-      document.getElementById('inputWatchingWith').value = show.watching_with || '';
+      // Linked people are pickers, so the text box holds only what was typed.
+      // A row without `watchers` predates links: we don't know who it names,
+      // so the box shows the whole string and an untouched picker sends
+      // nothing (sending [] would unlink people the member never saw).
+      const linked = Array.isArray(show.watchers) ? show.watchers : [];
+      watchersKnown = Array.isArray(show.watchers);
+      selectedWatchers = new Set(linked.map(w => w.slug));
+      watcherExtra = linked;
+      document.getElementById('inputWatchingWith').value = watchersKnown
+        ? watchingWithFreeText(show.watching_with, linked.map(w => w.name))
+        : (show.watching_with || '');
       document.getElementById('inputMovie').checked = !!show.movie;
       document.getElementById('inputFullSeries').checked = !!show.full_series;
+      document.getElementById('inputArchived').checked = !!show.archived;
+      document.getElementById('inputArchivedRow').classList.remove('hidden');
       setSelectedList(show.list);
       document.getElementById('modalOverlay').classList.remove('hidden');
       document.getElementById('inputTitle').focus();
+      loadNetworkCatalog();
+      loadGroupMates().then(() => renderWatcherPicker(watcherExtra));
     }
 
     function closeModal(event) {
@@ -3444,6 +3576,10 @@
         full_series: document.getElementById('inputFullSeries').checked ? 1 : 0,
         list: getSelectedList(),
       };
+      // The complete set of named group-mates — but only when we know the
+      // row's current set, or the member ticked someone (a real instruction).
+      if (watchersKnown || selectedWatchers.size) body.watcher_slugs = Array.from(selectedWatchers);
+      if (wasEditing) body.archived = document.getElementById('inputArchived').checked ? 1 : 0;
       // Member picked the show from type-ahead — enrich that exact entry.
       const titlePick = titlePickers.inputTitle.pick;
       if (titlePick) {
@@ -3510,7 +3646,9 @@
         closeModal();
         if (editingId) {
           const idx = shows.findIndex(s => s.id === editingId);
-          if (idx !== -1) shows[idx] = saved.show;
+          // Archived from the form: off the page's lists, like Archive.
+          if (idx !== -1 && body.archived) shows.splice(idx, 1);
+          else if (idx !== -1) shows[idx] = saved.show;
         } else {
           shows.push(saved.show);
         }
@@ -3794,17 +3932,7 @@
       }
 
       // Update network dropdown with suggestion
-      const networkSelect = document.getElementById('inputNetwork');
-      const networkOther = document.getElementById('inputNetworkOther');
-      if (addMyListData.network && !Array.from(networkSelect.options).some(o => o.value === addMyListData.network)) {
-        networkSelect.value = '__other';
-        networkOther.value = addMyListData.network;
-        networkOther.style.display = 'block';
-      } else {
-        networkSelect.value = addMyListData.network || '';
-        networkOther.value = '';
-        networkOther.style.display = 'none';
-      }
+      setNetworkField(addMyListData.network);
 
       document.getElementById('addMyListOverlay').classList.remove('hidden');
     }
