@@ -53,6 +53,23 @@
       <button class="secondary" id="rescoreBtn" onclick="confirmStartRescore()">Start background re-score</button>
       <button class="secondary" id="cancelRescoreBtn" onclick="cancelRescore()" style="display:none; background: var(--danger-soft); color: var(--danger-deep); border-color: color-mix(in oklch, var(--danger) 30%, transparent);">Cancel background re-score</button>
     </div>
+
+    <!-- iOS VibeAdminView's foreground loop: re-score batch by batch with a
+         per-title log, for watching a prompt or model change land. -->
+    <div class="admin-card">
+      <h2 style="margin:0 0 6px; font-size:15px;">Re-score here, now</h2>
+      <div class="admin-sub" style="margin-bottom:10px;">Same as the background job, but on this page so each title shows as it goes. Leaving the page stops it; the background job carries on regardless.</div>
+      <label style="font-size:13px;">Batch size
+        <input id="batchSize" type="number" min="1" max="25" value="5" style="width:64px; margin-left:6px;">
+      </label>
+      <div style="margin-top:10px;">
+        <button class="secondary" id="fgStartBtn" onclick="fgStart()">Re-score here, now</button>
+        <button class="secondary" id="fgStopBtn" onclick="fgRunning = false" style="display:none;">Stop</button>
+        <button class="secondary" id="fgCopyBtn" onclick="fgCopy()" style="display:none;">Copy log</button>
+      </div>
+      <div id="fgTotals" style="font-size:13px; margin-top:10px;"></div>
+      <pre id="fgLog" style="font-size:12px; white-space:pre-wrap; max-height:320px; overflow:auto; margin-top:8px;"></pre>
+    </div>
   </div>
 
   <script>
@@ -147,6 +164,48 @@
       } finally {
         btn.disabled = false; btn.textContent = 'Cancel background re-score';
       }
+    }
+
+    // Foreground re-score: POST {count, rescore: true} until `remaining`
+    // reaches zero, the server errors, or Stop. Newest lines on top.
+    let fgRunning = false;
+    const fg = { processed: 0, unknown: 0, errors: 0, log: [] };
+    function fgRender() {
+      document.getElementById('fgTotals').textContent = fg.processed + fg.unknown + fg.errors
+        ? `This session — scored ${fg.processed} · unknown ${fg.unknown} · errors ${fg.errors}` : '';
+      document.getElementById('fgLog').textContent = fg.log.join('\n');
+      document.getElementById('fgCopyBtn').style.display = fg.log.length ? '' : 'none';
+      document.getElementById('fgStartBtn').disabled = fgRunning;
+      document.getElementById('fgStopBtn').style.display = fgRunning ? '' : 'none';
+    }
+    async function fgStart() {
+      const n = Math.min(25, Math.max(1, parseInt(document.getElementById('batchSize').value, 10) || 5));
+      fgRunning = true; fgRender();
+      while (fgRunning) {
+        try {
+          const r = await fetch('/api/admin-vibe-fill', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ count: n, rescore: true }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok || d.error) { fg.log.unshift('Error: ' + (d.error || r.status)); break; }
+          fg.processed += d.processed || 0; fg.unknown += d.unknown || 0; fg.errors += d.errors || 0;
+          // Per-title rows under the batch line — a summary can't say which
+          // title came back unknown, which is the thing worth acting on.
+          const rows = (d.results || []).map(x => `  ${x.title}: ${x.status}${x.error ? ` (${x.error})` : ''}`);
+          fg.log.unshift(`Batch: ${d.processed || 0} ok · ${d.unknown || 0} unknown · ${d.errors || 0} err — ${d.remaining ?? 0} left`, ...rows);
+          fgRender();
+          if (!(d.remaining > 0)) break;
+        } catch (e) {
+          fg.log.unshift('Network error — stopped.');
+          break;
+        }
+      }
+      fgRunning = false; fgRender();
+      refreshStatus();
+    }
+    async function fgCopy() {
+      try { await navigator.clipboard.writeText(fg.log.slice().reverse().join('\n')); document.getElementById('fgCopyBtn').textContent = 'Copied'; } catch (e) {}
     }
 
     // Poll status every 20s so the banner reflects cron progress without
