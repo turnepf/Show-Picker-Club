@@ -514,7 +514,7 @@ struct HomeView: View {
                     Button {
                         showingConnectedApps = true
                     } label: {
-                        Label("Connected Apps…", systemImage: "link")
+                        Label("AI MCP…", systemImage: "link")
                     }
                     // The permanent way in. The Home card and the My Shows
                     // nudges are onboarding prompts that retire themselves once

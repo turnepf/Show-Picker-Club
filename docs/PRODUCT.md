@@ -582,7 +582,7 @@ Platforms: it's a server feature, so it works for **every member regardless
 of device** — it runs inside their AI app, not ours. The connect, consent and
 Connected apps screens are **web pages** because OAuth sign-in is a browser
 flow; that's the one deliberate exception to the frozen web, not a web
-feature. **iPhone/iPad** (and Mac via Catalyst) get **Connected Apps…** in the
+feature. **iPhone/iPad** (and Mac via Catalyst) get **AI MCP…** (the Connected Apps screen) in the
 account menu, next to Passkeys: the same list with Disconnect (swipe, or
 right-click on Mac) and a link out to `/connect`. **Apple TV, the watch and
 Roku don't** — nothing to manage from there; the web page covers everyone.
