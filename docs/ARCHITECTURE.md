@@ -823,7 +823,7 @@ grant per member per client, which is what Connected apps lists.
 | `oauth_codes` | one-time codes, 10 minutes, bound to client, redirect URI, PKCE challenge and member |
 | `oauth_grants` | a member's consent to a client: scope, `last_used_at`, `revoked_at` |
 | `oauth_tokens` | access/refresh token hashes per grant; `rotated_at` marks a spent refresh token so a replay can be detected |
-| `mcp_usage` | per-member per-UTC-day counters behind `DAILY_CAPS` |
+| `mcp_usage` | per-member per-UTC-day counters behind `DAILY_CAPS`, kept a year for Reporting's AI-apps section (30-day and all-time usage); pruned from the token endpoint |
 
 Scopes are `shows:read` and `shows:write`; the consent screen lets the member
 untick write. Expired codes and tokens and week-old usage rows are pruned

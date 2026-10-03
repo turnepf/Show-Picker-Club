@@ -198,7 +198,10 @@ export async function authenticateBearer(request, env) {
 export async function pruneExpired(env) {
   await env.DB.prepare("DELETE FROM oauth_codes WHERE datetime(expires_at) < datetime('now', '-1 day')").run().catch(() => {});
   await env.DB.prepare("DELETE FROM oauth_tokens WHERE datetime(expires_at) < datetime('now')").run().catch(() => {});
-  await env.DB.prepare("DELETE FROM mcp_usage WHERE day < date('now', '-7 days')").run().catch(() => {});
+  // mcp_usage drives the daily caps (only today's row is read for that) and
+  // the Reporting page's 30-day and all-time AI-app usage, so it's kept a
+  // year — one small row per member per active day.
+  await env.DB.prepare("DELETE FROM mcp_usage WHERE day < date('now', '-365 days')").run().catch(() => {});
 }
 
 export function oauthJson(data, status = 200, extra = {}) {

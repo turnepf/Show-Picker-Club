@@ -139,16 +139,21 @@ export async function onRequestGet(context) {
   // per grant, newest first, so a member with Claude and ChatGPT both
   // connected appears twice. Admin-only like the rest of this endpoint, and
   // never carries a token, client secret or redirect: the person, the app's
-  // self-chosen name, the scope, and dates. mcp_usage is pruned to 7 days
-  // (_shared/oauth.js), so calls/writes are a 7-day figure, per member rather
-  // than per app because that's how the ledger is keyed.
+  // self-chosen name, the scope, and dates. Usage is the last 30 days and all
+  // time — mcp_usage is kept a year (_shared/oauth.js), so "all time" means up
+  // to a year — per member rather than per app, because that's how the ledger
+  // is keyed.
   let mcpConnections = [];
   try {
     const { results } = await env.DB.prepare(
       `SELECT g.id, g.member_slug, m.first_name, m.last_name, m.name,
               c.client_name, g.scope, g.created_at, g.last_used_at, g.revoked_at,
-              (SELECT COALESCE(SUM(calls), 0) FROM mcp_usage u WHERE u.member_slug = g.member_slug) AS calls_7d,
-              (SELECT COALESCE(SUM(writes), 0) FROM mcp_usage u WHERE u.member_slug = g.member_slug) AS writes_7d
+              (SELECT COALESCE(SUM(calls), 0) FROM mcp_usage u
+                WHERE u.member_slug = g.member_slug AND u.day >= date('now', '-30 days')) AS calls_30d,
+              (SELECT COALESCE(SUM(writes), 0) FROM mcp_usage u
+                WHERE u.member_slug = g.member_slug AND u.day >= date('now', '-30 days')) AS writes_30d,
+              (SELECT COALESCE(SUM(calls), 0) FROM mcp_usage u WHERE u.member_slug = g.member_slug) AS calls_all,
+              (SELECT COALESCE(SUM(writes), 0) FROM mcp_usage u WHERE u.member_slug = g.member_slug) AS writes_all
          FROM oauth_grants g
          LEFT JOIN members m ON m.slug = g.member_slug
          LEFT JOIN oauth_clients c ON c.client_id = g.client_id
@@ -163,8 +168,10 @@ export async function onRequestGet(context) {
       connected_at: r.created_at,
       last_used_at: r.last_used_at,
       revoked_at: r.revoked_at,
-      calls_7d: r.calls_7d || 0,
-      writes_7d: r.writes_7d || 0,
+      calls_30d: r.calls_30d || 0,
+      writes_30d: r.writes_30d || 0,
+      calls_all: r.calls_all || 0,
+      writes_all: r.writes_all || 0,
     }));
   } catch (_) { /* pre-071 database */ }
 

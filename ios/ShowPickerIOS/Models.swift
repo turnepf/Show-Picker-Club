@@ -376,8 +376,8 @@ struct SigninMethodWindows: Codable {
 // Members whose feed a calendar client actually fetched, plus total fetches.
 // One AI-app connection (an OAuth grant) on the Reporting screen. Every field
 // but the person is optional so one odd row can't fail the whole report.
-// calls7d / writes7d are the member's last 7 days across all their AI apps —
-// the usage ledger is kept a week and keyed by member, not by app.
+// Usage is the member's last 30 days and all time (the ledger is kept a
+// year) across all their AI apps — it's keyed by member, not by app.
 struct MCPConnection: Codable, Identifiable {
     let memberSlug: String
     let name: String?
@@ -386,8 +386,10 @@ struct MCPConnection: Codable, Identifiable {
     let connectedAt: String?
     let lastUsedAt: String?
     let revokedAt: String?
-    let calls7d: Int?
-    let writes7d: Int?
+    let calls30d: Int?
+    let writes30d: Int?
+    let callsAll: Int?
+    let writesAll: Int?
 
     var id: String { "\(memberSlug)|\(app ?? "")|\(connectedAt ?? "")" }
     var canWrite: Bool { (scope ?? "").contains("write") }
@@ -398,8 +400,10 @@ struct MCPConnection: Codable, Identifiable {
         case connectedAt = "connected_at"
         case lastUsedAt = "last_used_at"
         case revokedAt = "revoked_at"
-        case calls7d = "calls_7d"
-        case writes7d = "writes_7d"
+        case calls30d = "calls_30d"
+        case writes30d = "writes_30d"
+        case callsAll = "calls_all"
+        case writesAll = "writes_all"
     }
 }
 

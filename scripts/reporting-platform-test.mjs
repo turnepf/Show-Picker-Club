@@ -404,6 +404,8 @@ console.log('\n== AI apps (MCP): who connected what, admin-only, no secrets');
               VALUES ('stacy', 'c-gpt', 'read', '2026-09-29 10:00:00', '2026-09-30 10:00:00')`).run();
   db.prepare(`INSERT INTO mcp_usage (member_slug, day, calls, writes) VALUES ('stacy', date('now'), 7, 2)`).run();
   db.prepare(`INSERT INTO mcp_usage (member_slug, day, calls, writes) VALUES ('stacy', date('now', '-1 day'), 3, 0)`).run();
+  // Outside the 30-day window, still inside the year the ledger is kept.
+  db.prepare(`INSERT INTO mcp_usage (member_slug, day, calls, writes) VALUES ('stacy', date('now', '-60 days'), 5, 4)`).run();
 
   const memberCookie = addSession(env, { slug: 'stacy', platform: 'iphone' });
   check('a member who connected an app still cannot read the list',
@@ -419,7 +421,8 @@ console.log('\n== AI apps (MCP): who connected what, admin-only, no secrets');
   const claude = rows.find(x => x.app === 'Claude') || {};
   check('names the person and the scope', claude.name === 'Stacy' && claude.scope === 'read write', JSON.stringify(claude));
   check('carries last use and a disconnect date', !!claude.last_used_at && !!(rows.find(x => x.app === 'ChatGPT') || {}).revoked_at);
-  check('7-day calls and changes come from the ledger', claude.calls_7d === 10 && claude.writes_7d === 2, JSON.stringify(claude));
+  check('30-day calls and changes count only the last 30 days', claude.calls_30d === 10 && claude.writes_30d === 2, JSON.stringify(claude));
+  check('all-time calls and changes count the whole ledger', claude.calls_all === 15 && claude.writes_all === 6, JSON.stringify(claude));
   check('never carries a client secret, client id or redirect',
         !text.includes('HASHED-SECRET') && !text.includes('c-claude') && !text.includes('claude.ai/cb'));
 }

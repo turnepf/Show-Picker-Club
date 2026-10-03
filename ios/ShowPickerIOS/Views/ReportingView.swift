@@ -64,7 +64,7 @@ struct ReportingView: View {
                     } header: {
                         Text("AI apps (MCP)")
                     } footer: {
-                        Text("Every connection made through /connect, newest first. Calls and changes are the last 7 days (the usage ledger keeps a week) and count all of that member's AI apps together.")
+                        Text("Every connection made through /connect, newest first. Calls and changes are the last 30 days and all time (usage is kept a year, and only from 2026-10 onward), and count all of that member's AI apps together.")
                     }
                 }
                 if let sm = r.signinMethods {
@@ -217,7 +217,8 @@ struct ReportingView: View {
         } else {
             parts.append("never used")
         }
-        parts.append("\(c.calls7d ?? 0) calls, \(c.writes7d ?? 0) changes (7 days)")
+        parts.append("\(c.calls30d ?? 0) calls, \(c.writes30d ?? 0) changes (30 days)")
+        parts.append("\(c.callsAll ?? 0) calls, \(c.writesAll ?? 0) changes all time")
         return parts.joined(separator: " · ")
     }
 
