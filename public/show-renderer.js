@@ -208,6 +208,25 @@ function ratingTapRow(value, season) {
   return `<div class="rating-row">${segs}</div>`;
 }
 
+/*
+ * TMDB's status as the detail card words it, or '' for no row: not stored
+ * yet, or a released film (every film on a list is). Same wording as
+ * Show.statusText in ShowPickerCore; an unrecognised word shows as written.
+ */
+function detailStatusText(raw) {
+  const s = String(raw || '').trim();
+  switch (s.toLowerCase()) {
+    case '': case 'released': return '';
+    case 'returning series': return 'Returning';
+    case 'ended': return 'Ended';
+    case 'canceled': case 'cancelled': return 'Canceled';
+    case 'in production': return 'In production';
+    case 'post production': return 'Post-production';
+    case 'planned': case 'pilot': case 'rumored': return 'Planned';
+    default: return s;
+  }
+}
+
 const DETAIL_ALL_LISTS = ['watching', 'waiting', 'recommending', 'next'];
 const DETAIL_LIST_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved', next: 'Next Up' };
 const DETAIL_CHIP_COLORS = {
@@ -218,7 +237,7 @@ const DETAIL_CHIP_COLORS = {
 /*
  * Render the whole detail body for a show.
  * Options:
- *   actors:      [{ name, imdb_id }] cast, in billing order
+ *   actors:      [{ name, imdb_id, character }] cast, in billing order
  *   loggedIn:    boolean — gates the My Lists card
  *   myCopy:      my own row for this title (active or archived), or null
  *   ratings:     { average, count, seasons, mine, mineSeasons, owner,
@@ -246,6 +265,20 @@ function renderShowDetailBody(show, options = {}) {
           ? `${escapeHtml(show.network)} · <a href="${safeUrl(show.watch_link)}" target="_blank" rel="noopener">Where to watch</a>`
           : escapeHtml(show.network))));
   }
+  // Free / free-with-ads services (migration 073), minus the member's own
+  // network, which the row above already names. No row until enrichment has
+  // stored them — '' (asked, none) and null (never asked) read alike.
+  {
+    const mine = String(show.network || '').trim().toLowerCase();
+    const free = String(show.free_on || '').split(',').map(x => x.trim())
+      .filter(x => x && x.toLowerCase() !== mine);
+    if (free.length) topRows.push(detailRow('Free on', escapeHtml(free.join(', '))));
+  }
+  // The title's IMDb page, once its id is stored. Only the tt… shape, since
+  // it goes into a URL.
+  if (/^tt\d+$/.test(show.imdb_id || '')) {
+    topRows.push(detailRow('IMDb', `<a href="https://www.imdb.com/title/${show.imdb_id}/" target="_blank" rel="noopener">View on IMDb</a>`));
+  }
   if (show.trailer_key) {
     topRows.push(detailRow('Trailer', `<a href="https://www.youtube.com/watch?v=${encodeURIComponent(show.trailer_key)}" target="_blank" rel="noopener">▶ Watch trailer</a>`));
   }
@@ -255,6 +288,7 @@ function renderShowDetailBody(show, options = {}) {
   // member specific, not catalog data.
   const rows = [];
   if (show.movie) rows.push(detailRow('Type', 'Movie'));
+  if (show.release_year) rows.push(detailRow('Year', escapeHtml(String(show.release_year))));
   {
     // "4 Seasons, Complete", or just "2 Seasons" while it's still running
     // (or just "Complete" when the count is unknown).
@@ -264,11 +298,14 @@ function renderShowDetailBody(show, options = {}) {
     if (show.full_series) seriesParts.push('Complete');
     if (seriesParts.length) rows.push(detailRow('Series', escapeHtml(seriesParts.join(', '))));
   }
+  {
+    const status = detailStatusText(show.tmdb_status);
+    if (status) rows.push(detailRow('Status', escapeHtml(status)));
+  }
   if (show.genres) rows.push(detailRow('Genres', escapeHtml(show.genres)));
   if (show.runtime) rows.push(detailRow('Runtime', escapeHtml(runtimeText(show.runtime))));
   if (show.next_season_date) rows.push(detailRow('Next episode', escapeHtml(formatSeasonRange(show))));
   if (show.content_rating) rows.push(detailRow('Rated', escapeHtml(show.content_rating)));
-  if (show.release_year) rows.push(detailRow('Year', escapeHtml(String(show.release_year))));
 
   // Creator/Director is a standard label/value row grouped in the Cast card.
   // Link a single-person credit to their IMDB page (mirrors the cast links);
@@ -298,9 +335,10 @@ function renderShowDetailBody(show, options = {}) {
   if (actors.length || creatorRow) {
     let castInner = '';
     if (actors.length) {
-      const cast = actors.map(a => a.imdb_id
+      // The role follows the name, outside the link, once it's stored.
+      const cast = actors.map(a => (a.imdb_id
         ? `<a href="https://www.imdb.com/name/${encodeURIComponent(a.imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(a.name)}</a>`
-        : escapeHtml(a.name)).join(', ');
+        : escapeHtml(a.name)) + (a.character ? ` (${escapeHtml(a.character)})` : '')).join(', ');
       castInner += detailRow('Cast', cast);
     }
     castInner += creatorRow;
