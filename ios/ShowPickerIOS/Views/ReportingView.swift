@@ -64,7 +64,7 @@ struct ReportingView: View {
                     } header: {
                         Text("AI apps (MCP)")
                     } footer: {
-                        Text("Every connection made through /connect, newest first. Calls and changes are the last 30 days and all time (usage is kept a year, and only from 2026-10 onward), and count all of that member's AI apps together.")
+                        Text("One row per member, most recently active first, combining every app and reconnect they've made through /connect. Calls and changes are the last 30 days and all time (usage is kept a year, and only from 2026-10 onward), and count all of that member's AI apps together.")
                     }
                 }
                 if let sm = r.signinMethods {
@@ -209,7 +209,8 @@ struct ReportingView: View {
     // "Read & change · connected 3d ago · last used today · 10 calls, 2 changes"
     private func mcpDetail(_ c: MCPConnection) -> String {
         var parts = [c.canWrite ? "Read & change" : "Read only"]
-        if let when = relativeServerTime(c.connectedAt) { parts.append("connected \(when)") }
+        if let when = relativeServerTime(c.connectedAt) { parts.append("since \(when)") }
+        if let n = c.connections, n > 1 { parts.append("\(n) connections") }
         if let gone = relativeServerTime(c.revokedAt) {
             parts.append("disconnected \(gone)")
         } else if let used = relativeServerTime(c.lastUsedAt) {

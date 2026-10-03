@@ -227,7 +227,7 @@
         const status = r.revoked_at ? `Disconnected ${shortDate(r.revoked_at)}` : `Last used ${shortDate(r.last_used_at)}`;
         return `<tr>
           <td>${escapeHtml(r.name)}</td>
-          <td>${escapeHtml(r.app)}<div style="font-size:12px;color:var(--ink-quiet)">${access} · connected ${shortDate(r.connected_at)}</div></td>
+          <td>${escapeHtml(r.app)}<div style="font-size:12px;color:var(--ink-quiet)">${access} · since ${shortDate(r.connected_at)}${r.connections > 1 ? ` · ${r.connections} connections` : ''}</div></td>
           <td${r.revoked_at ? ' style="color:var(--ink-quiet)"' : ''}>${status}</td>
           <td class="num">${fmt(r.calls_30d)}<div style="font-size:12px;color:var(--ink-quiet)">${fmt(r.calls_all)} all</div></td>
           <td class="num">${fmt(r.writes_30d)}<div style="font-size:12px;color:var(--ink-quiet)">${fmt(r.writes_all)} all</div></td>
@@ -239,7 +239,7 @@
           <thead><tr><th>Member</th><th>App</th><th>Status</th><th class="num">Calls (30d)</th><th class="num">Changes (30d)</th></tr></thead>
           <tbody>${body}</tbody>
         </table>
-        <div class="footer">Every connection made through /connect, newest first. Calls and changes are the last 30 days, with all time underneath (usage is kept a year, and only from 2026-10 onward), and count all of that member's AI apps together.</div>
+        <div class="footer">One row per member, most recently active first, combining every app and reconnect they've made through /connect. Calls and changes are the last 30 days, with all time underneath (usage is kept a year, and only from 2026-10 onward), and count all of that member's AI apps together.</div>
       </div>`;
     }
 
