@@ -307,6 +307,9 @@ struct ShowDetailView: View {
                 Section {
                     if let s = show {
                         if s.isMovie { LabeledContent("Type", value: "Movie") }
+                        if let y = s.releaseYear {
+                            LabeledContent("Year", value: String(y))
+                        }
                         if let series = s.seriesText { LabeledContent("Series", value: series) }
                         if !s.genreList.isEmpty {
                             LabeledContent("Genres", value: s.genreList.joined(separator: " · "))
@@ -319,9 +322,6 @@ struct ShowDetailView: View {
                         }
                         if let cr = s.contentRating, !cr.isEmpty {
                             LabeledContent("Rated", value: cr)
-                        }
-                        if let y = s.releaseYear {
-                            LabeledContent("Year", value: String(y))
                         }
                         // Only ever non-nil for non-English titles — see
                         // Show.originalLanguageText.
