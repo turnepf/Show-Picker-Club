@@ -28,6 +28,8 @@ const PUBLIC_SHOW_FIELDS = [
   // Where it streams today. A catalog fact like the rest — it says nothing
   // about whose list the title is on, only what TMDB reports about the title.
   'streaming_on',
+  // Migration 073: the title's IMDb id, TMDB's status, free services.
+  'imdb_id', 'tmdb_status', 'free_on',
 ];
 
 // Other members of the viewer's groups who have this same title on their
@@ -238,17 +240,21 @@ export async function onRequestPut(context) {
         runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
         watch_link = COALESCE(?, watch_link),
         tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type),
+        imdb_id = COALESCE(?, imdb_id), tmdb_status = COALESCE(?, tmdb_status),
+        free_on = COALESCE(?, free_on),
         updated_at = datetime('now') WHERE id = ?`
   ).bind(title, finalNetwork, finalUrl, recommended_by, list, notes, movie, full_series, watching_with, rating, archived,
     enriched.posterUrl || null, networkChanged ? 1 : 0, enriched.networkLogoUrl || null,
     enriched.overview || null, enriched.backdropUrl || null, enriched.tmdbRating || null, enriched.contentRating || null,
     enriched.trailerKey || null, enriched.director || null, enriched.directorImdbId || null, enriched.runtime || null, enriched.releaseYear || null,
-    enriched.watchLink || null, enriched.tmdbId || null, enriched.tmdbType || null, params.id).run();
+    enriched.watchLink || null, enriched.tmdbId || null, enriched.tmdbType || null,
+    enriched.imdbId || null, enriched.tmdbStatus ?? null,
+    Array.isArray(enriched.freeNetworks) ? enriched.freeNetworks.join(', ') : null, params.id).run();
 
   if (enriched.actors.length > 0) {
     await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(params.id).run();
-    const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id) VALUES (?, ?, ?, ?, ?)');
-    await env.DB.batch(enriched.actors.map((a, i) => stmt.bind(params.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null)));
+    const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?)');
+    await env.DB.batch(enriched.actors.map((a, i) => stmt.bind(params.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null, a.character ?? null)));
   }
 
   // If the network changed (or we landed on a placeholder URL), kick off

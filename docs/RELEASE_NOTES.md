@@ -45,6 +45,13 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ## Unreleased — the update after 1.5.1
 
+iPhone, iPad and Mac (detail screen; filled in show by show as the
+nightly refresh reaches them, Watching and Next Up first):
+
+```
+Show pages now link to IMDb, say whether a series is returning, ended or was canceled, list the free services it's on (Tubi, Pluto TV and more), and name the character each actor plays. They fill in over the next few days, starting with the shows you're watching and the ones up next.
+```
+
 ---
 
 ## 1.5.1 (build 29) — iPhone, iPad and Mac, prepared 2026-09-30

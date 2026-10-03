@@ -187,7 +187,13 @@ CREATE TABLE IF NOT EXISTS shows (
   -- record and is written fill-only, so it goes stale as licensing moves.
   -- Pure derived data, refreshed authoritatively by enrichment. See
   -- migrations/069_streaming_on.sql.
-  streaming_on TEXT
+  streaming_on TEXT,
+  -- Migration 073. The title's IMDb id (tt…); TMDB's status string verbatim
+  -- ('' when TMDB sent none, so NULL means "not stored yet"); and free /
+  -- free-with-ads services, encoded like streaming_on.
+  imdb_id TEXT,
+  tmdb_status TEXT,
+  free_on TEXT
 );
 
 CREATE TABLE IF NOT EXISTS actors (
@@ -199,7 +205,9 @@ CREATE TABLE IF NOT EXISTS actors (
   -- clients draw the first few, so this is what makes "the first few" mean
   -- the principals.
   ord INTEGER,
-  tmdb_person_id INTEGER
+  tmdb_person_id INTEGER,
+  -- The role played ("Mark S."), migration 073.
+  character_name TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_actors_show_ord ON actors(show_id, ord);
 

@@ -232,8 +232,9 @@ export async function ensureCopy(env, memberSlug, source, list, taggerEmail) {
         poster_url, network_logo_url, member_slug, added_by,
         overview, backdrop_url, tmdb_rating, content_rating, trailer_key, director,
         director_imdb_id, runtime, release_year, watch_link, tmdb_id, tmdb_type,
-        episodes_released, vote_count, tagline, original_language, studio)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        episodes_released, vote_count, tagline, original_language, studio,
+        imdb_id, tmdb_status, free_on)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     source.title, source.network || null, source.network_url || null, list,
     source.movie || 0, source.full_series || 0, source.rating || null,
@@ -244,18 +245,19 @@ export async function ensureCopy(env, memberSlug, source, list, taggerEmail) {
     source.director_imdb_id || null, source.runtime || null, source.release_year || null,
     source.watch_link || null, source.tmdb_id || null, source.tmdb_type || null,
     source.episodes_released ?? null, source.vote_count ?? null, source.tagline || null,
-    source.original_language || null, source.studio || null
+    source.original_language || null, source.studio || null,
+    source.imdb_id || null, source.tmdb_status ?? null, source.free_on ?? null
   ).run();
 
   const newId = result.meta.last_row_id;
   // Cast comes along too — a row with no actors renders a visibly emptier
   // detail screen than the copy it was cloned from.
   const { results: cast } = await env.DB.prepare(
-    'SELECT name, imdb_id, ord, tmdb_person_id FROM actors WHERE show_id = ?'
+    'SELECT name, imdb_id, ord, tmdb_person_id, character_name FROM actors WHERE show_id = ?'
   ).bind(source.id).all();
   if (cast && cast.length) {
-    const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id) VALUES (?, ?, ?, ?, ?)');
-    await env.DB.batch(cast.map((a, i) => stmt.bind(newId, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null)));
+    const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?)');
+    await env.DB.batch(cast.map((a, i) => stmt.bind(newId, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null, a.character_name ?? null)));
   }
   // A row cloned from a source that never got enriched (added offline, or
   // added before its enrichment landed) would otherwise stay bare forever —
