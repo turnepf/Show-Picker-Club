@@ -237,6 +237,51 @@
 
     body { background: var(--surface-2); }
 
+    /* Group icons (migration 066). The server stores SF Symbol names; a
+       browser can't draw those, so each maps to an emoji on the same tinted
+       disc the apps use. */
+    .group-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      flex: 0 0 auto; border-radius: 50%;
+      background: var(--gb, #8E8E93); color: white; line-height: 1;
+    }
+    .icon-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 12px 0; }
+    .icon-grid button {
+      min-height: 44px; border: none; border-radius: 10px; cursor: pointer;
+      background: var(--surface-2); font-size: 20px;
+    }
+    .icon-grid button.selected { background: var(--gb, #8E8E93); outline: 2px solid var(--ink); }
+    .swatches { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 16px; }
+    .swatches button {
+      width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+      border: 2px solid transparent; background: var(--sw); padding: 0;
+    }
+    .swatches button.none { background: none; border-color: var(--ink-quiet); color: var(--ink-quiet); font-size: 14px; }
+    .swatches button.selected { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .change-notice {
+      display: flex; gap: 10px; align-items: flex-start;
+      background: var(--surface); border-radius: 10px; padding: 12px; margin-bottom: 14px;
+      font-size: 14px;
+    }
+    .group-summary { display: flex; align-items: center; gap: 10px; color: var(--ink-muted); font-size: 14px; margin-bottom: 4px; }
+    .board-card {
+      display: flex; gap: 12px; align-items: flex-start;
+      padding: 12px 14px; background: var(--surface); position: relative;
+    }
+    .board-card + .board-card { border-top: 1px solid var(--border-soft); }
+    .board-card.tappable { cursor: pointer; }
+    .board-card img, .board-card .poster-empty { width: 45px; height: 68px; border-radius: 6px; object-fit: cover; flex: 0 0 auto; background: var(--surface-2); display: flex; align-items: center; justify-content: center; }
+    .board-card .t { font-weight: 600; font-size: 16px; }
+    .board-card .sub { font-size: 13px; color: var(--ink-muted); margin-top: 3px; }
+    .board-card .note { font-size: 13px; color: var(--ink-muted); font-style: italic; margin-top: 3px; }
+    .board-card .on-list { font-size: 13px; color: var(--list-watching, #2e8b57); margin-top: 6px; }
+    .board-card .act { margin-top: 6px; display: flex; gap: 12px; }
+    .board-card .act button { background: none; border: none; padding: 0; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--tint); }
+    .board-card .act button.remove { color: var(--danger, #d32f2f); font-weight: 500; }
+    .board-empty { text-align: center; color: var(--ink-muted); padding: 32px 20px; }
+    .board-empty small { display: block; margin-top: 6px; font-size: 12px; }
+    #groupMenu button { color: var(--ink); }
+
     /* iOS-style show cards — shared with index.html for consistency */
     :root {
       --ios-orange: #FF9500;
@@ -284,20 +329,23 @@
 
     <!-- Group View (members + trending) -->
     <div id="groupView">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+      <div id="changeNotice" class="change-notice" style="display: none;"></div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
         <h2 id="groupViewTitle" style="margin: 0; font-size: 22px; font-weight: 600;"></h2>
-        <button id="groupMenuBtn" onclick="toggleGroupMenu()" style="background: none; border: none; font-size: 20px; cursor: pointer; padding: 8px;">⋯</button>
+        <button id="groupMenuBtn" onclick="toggleGroupMenu()" aria-label="Group actions" style="background: none; border: none; font-size: 20px; cursor: pointer; padding: 8px; color: var(--ink);">⋯</button>
       </div>
-      <div id="groupMenu" style="display: none; background: var(--surface-2); border-radius: 8px; padding: 8px; margin-bottom: 20px;">
-        <button id="inviteBtn" onclick="showInviteModal()" style="display: block; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; margin-bottom: 8px;">Invite Members</button>
-        <button id="renameBtn" onclick="showRenameModal()" style="display: none; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; margin-bottom: 8px;">Rename Group</button>
-        <button id="leaveBtn" onclick="leaveGroup()" style="display: block; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; margin-bottom: 8px;">Leave Group</button>
-        <button id="deleteBtn" onclick="deleteGroup()" style="display: none; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; color: #d32f2f;">Delete Group</button>
+      <div id="groupMenu" style="display: none; background: var(--surface); border-radius: 8px; padding: 8px; margin-bottom: 20px;">
+        <button id="inviteBtn" onclick="showInviteModal()" style="display: block; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; margin-bottom: 8px;">Invite members</button>
+        <button id="leaveBtn" onclick="leaveGroup()" style="display: block; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; margin-bottom: 8px;">Leave</button>
+        <button id="renameBtn" onclick="showRenameModal()" style="display: block; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; margin-bottom: 8px;">Rename</button>
+        <button id="iconBtn" onclick="showIconModal()" style="display: block; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; margin-bottom: 8px;">Change icon</button>
+        <button id="deleteBtn" onclick="deleteGroup()" style="display: none; width: 100%; text-align: left; padding: 12px; background: none; border: none; cursor: pointer; font-size: 14px; color: #d32f2f !important;">Delete</button>
       </div>
-      <h3 class="ios-group-header">Members</h3>
-      <div id="groupMembersList"></div>
-      <h3 class="ios-group-header">Group Trending</h3>
-      <div id="groupTrendingList" class="show-list"></div>
+      <div id="groupSummary" class="group-summary"></div>
+      <div class="list-tabs" id="groupTabs"></div>
+      <div id="groupTrendingPane"><div id="groupTrendingList" class="show-list"></div></div>
+      <div id="groupBoardPane" style="display: none;"></div>
+      <div id="groupMembersPane" style="display: none;"><div id="groupMembersList"></div></div>
     </div>
 
     <!-- Member View (list tabs + shows) -->
@@ -332,6 +380,7 @@
     <div class="modal">
       <h2>Create a Group</h2>
       <input id="groupNameInput" type="text" placeholder="Group name" maxlength="100">
+      <div id="createIconPicker"></div>
       <div class="modal-buttons">
         <button class="btn-cancel" onclick="closeCreateGroupModal()">Cancel</button>
         <button class="btn-submit" onclick="createGroup()">Create</button>
@@ -343,9 +392,10 @@
   <div id="inviteModal" class="modal-overlay">
     <div class="modal">
       <h2>Invite to Group</h2>
-      <p style="color: var(--ink-muted); font-size: 13px; margin: 0 0 16px;">Share this link with people you want to invite:</p>
+      <p style="color: var(--ink-muted); font-size: 13px; margin: 0 0 16px;">Share this link to invite people</p>
       <div style="display: flex; gap: 8px; align-items: center;">
         <input id="inviteLinkInput" class="invite-link-input" type="text" readonly>
+        <button id="shareInviteLinkBtn" class="invite-link-btn" onclick="shareInviteLink()" style="display: none;">Share</button>
         <button id="copyInviteLinkBtn" class="invite-link-btn" onclick="copyInviteLink()">Copy</button>
       </div>
       <p id="inviteLinkExpire" style="color: var(--ink-muted); font-size: 12px; margin: 12px 0 0;"></p>
@@ -363,6 +413,30 @@
       <div class="modal-buttons">
         <button class="btn-cancel" onclick="closeRenameModal()">Cancel</button>
         <button class="btn-submit" onclick="renameGroup()">Rename</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change icon -->
+  <div id="iconModal" class="modal-overlay">
+    <div class="modal">
+      <h2 style="display: flex; align-items: center; gap: 12px;"><span id="iconModalBadge"></span><span id="iconModalName">Group icon</span></h2>
+      <div id="editIconPicker"></div>
+      <div class="modal-buttons">
+        <button class="btn-cancel" onclick="closeIconModal()">Cancel</button>
+        <button class="btn-submit" id="saveIconBtn" onclick="saveIcon()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- "X has recommended Y" — one unanswered card at a time -->
+  <div id="popupModal" class="modal-overlay">
+    <div class="modal">
+      <h2 id="popupTitle"></h2>
+      <p id="popupNote" style="color: var(--ink-muted); font-size: 14px; font-style: italic; margin: -6px 0 16px;"></p>
+      <div class="modal-buttons">
+        <button class="btn-cancel" onclick="answerPopup('dismiss')">Dismiss</button>
+        <button class="btn-submit" onclick="answerPopup('add')">Add to Next Up</button>
       </div>
     </div>
   </div>
@@ -392,6 +466,22 @@
       next: 'Next Up'
     };
 
+    // Opening Groups clears the NEW flag on the Groups nav row (index.html
+    // and shell.js read the same key), as iOS's seenGroups does.
+    try { localStorage.setItem('seenGroups', '1'); } catch (e) {}
+
+    // A logged-out visitor holding an invite link: sign in first, then come
+    // back here with the token — index.html's return_to (the same path
+    // Connected Apps uses) replays it. It used to drop the token on the floor.
+    function signInThenReturn() {
+      const token = new URLSearchParams(window.location.search).get('token');
+      if (token && /^[A-Za-z0-9_-]{1,64}$/.test(token)) {
+        window.location.href = '/?login=1&return_to=' + encodeURIComponent('/groups?token=' + token);
+      } else {
+        window.location.href = '/';
+      }
+    }
+
     // Initialize on page load
     (async () => {
       try {
@@ -402,7 +492,7 @@
           const data = await res.json();
           authMember = data.member;
           if (!authMember) {
-            window.location.href = '/';
+            signInThenReturn();
             return;
           }
           const params = new URLSearchParams(window.location.search);
@@ -413,13 +503,56 @@
             navPush('groupsList', loadGroupsList);
           }
         } else {
-          window.location.href = '/';
+          signInThenReturn();
         }
       } catch (e) {
         console.error('Auth check failed:', e);
         window.location.href = '/';
       }
     })();
+
+    // ── Group icons ──────────────────────────────────────────────────────
+    // Same curated sets as functions/_shared/group-icons.js (the server is
+    // the gate), drawn as emoji since a browser has no SF Symbols.
+    const GROUP_ICON_EMOJI = {
+      'person.2.fill': '👥', 'person.3.fill': '👨‍👩‍👧', 'house.fill': '🏠', 'sofa.fill': '🛋️',
+      'tv.fill': '📺', 'film.fill': '🎬', 'theatermasks.fill': '🎭', 'star.fill': '⭐',
+      'heart.fill': '❤️', 'flame.fill': '🔥', 'sparkles': '✨', 'moon.stars.fill': '🌙',
+      'sun.max.fill': '☀️', 'bolt.fill': '⚡', 'crown.fill': '👑', 'gamecontroller.fill': '🎮',
+      'pawprint.fill': '🐾', 'leaf.fill': '🍃', 'book.fill': '📖', 'music.note': '🎵',
+      'globe.americas.fill': '🌎', 'airplane': '✈️', 'fork.knife': '🍴', 'cup.and.saucer.fill': '☕',
+    };
+    const GROUP_COLOR_HEX = {
+      red: '#FF3B30', orange: '#FF9500', yellow: '#FFCC00', green: '#34C759', teal: '#30B0C7',
+      blue: '#007AFF', indigo: '#5856D6', purple: '#AF52DE', pink: '#FF2D55', brown: '#A2845E',
+    };
+    function groupBadge(icon, color, size) {
+      const emoji = GROUP_ICON_EMOJI[icon] || GROUP_ICON_EMOJI['person.2.fill'];
+      const bg = GROUP_COLOR_HEX[color] || '#8E8E93';
+      return `<span class="group-badge" aria-hidden="true" style="--gb:${bg}; width:${size}px; height:${size}px; font-size:${Math.round(size * 0.5)}px;">${emoji}</span>`;
+    }
+    // A picker writing into `draft` ({icon, color}); tapping the selected
+    // icon again clears it, like the app.
+    function renderIconPicker(containerId, draft, onChange) {
+      const el = document.getElementById(containerId);
+      const bg = GROUP_COLOR_HEX[draft.color] || '#8E8E93';
+      el.innerHTML = `<div class="icon-grid" style="--gb:${bg}">` +
+        Object.keys(GROUP_ICON_EMOJI).map(sym =>
+          `<button type="button" class="${draft.icon === sym ? 'selected' : ''}" data-icon="${sym}" aria-label="${sym.replace(/\./g, ' ')}" aria-pressed="${draft.icon === sym}">${GROUP_ICON_EMOJI[sym]}</button>`
+        ).join('') + '</div><div class="swatches">' +
+        `<button type="button" class="none${!draft.color ? ' selected' : ''}" data-color="" aria-label="No color">∅</button>` +
+        Object.keys(GROUP_COLOR_HEX).map(c =>
+          `<button type="button" class="${draft.color === c ? 'selected' : ''}" data-color="${c}" style="--sw:${GROUP_COLOR_HEX[c]}" aria-label="${c}"></button>`
+        ).join('') + '</div>';
+      el.querySelectorAll('[data-icon]').forEach(b => b.addEventListener('click', () => {
+        draft.icon = draft.icon === b.dataset.icon ? null : b.dataset.icon;
+        renderIconPicker(containerId, draft, onChange); if (onChange) onChange();
+      }));
+      el.querySelectorAll('[data-color]').forEach(b => b.addEventListener('click', () => {
+        draft.color = b.dataset.color || null;
+        renderIconPicker(containerId, draft, onChange); if (onChange) onChange();
+      }));
+    }
 
     // Navigation stack management
     function navPush(view, loadFn) {
@@ -489,6 +622,7 @@
         const res = await fetch('/api/groups');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        window.__recommendGroups = (data.groups || []).map(g => ({ id: g.id, name: g.name }));
         document.getElementById('pageTitle').textContent = 'Groups';
         const container = document.getElementById('groupsContainer');
         const empty = document.getElementById('emptyGroups');
@@ -500,7 +634,8 @@
         }
         empty.style.display = 'none';
         container.innerHTML = '<div class="ios-group">' + data.groups.map(g => `
-          <button type="button" class="ios-item no-icon" onclick="openGroup(${g.id})">
+          <button type="button" class="ios-item" onclick="openGroup(${g.id})">
+            ${groupBadge(g.icon, g.color, 30)}
             <span class="ios-item-label">${escapeHtml(g.name)}</span>
             <span class="ios-item-detail">${g.member_count} member${g.member_count !== 1 ? 's' : ''}</span>
             <svg class="ic ios-item-chev"><use href="#s-chevron-right"/></svg>
@@ -520,6 +655,8 @@
         currentGroupData = data;
         currentMemberSlug = null;
         currentListType = 'watching';
+        groupTab = 'trending';
+        popupQueueStarted = false;
         navPush('groupView', renderGroupView);
       } catch (e) {
         console.error('Failed to load group:', e);
@@ -527,46 +664,182 @@
       }
     }
 
+    // Trending / Watch Next / Members, as on iOS. Kept across back-navigation
+    // within the visit so returning from a show lands on the same tab.
+    let groupTab = 'trending';
+    let groupSuggestions = [];
+    let popupQueueStarted = false;
+    let pendingPopup = null;
+
+    function setGroupTab(tab) { groupTab = tab; renderGroupTabs(); }
+    function renderGroupTabs() {
+      const tabs = [['trending', 'Trending'], ['watchnext', 'Watch Next'], ['members', 'Members']];
+      document.getElementById('groupTabs').innerHTML = tabs.map(([k, label]) =>
+        `<button class="list-tab${k === groupTab ? ' active' : ''}" onclick="setGroupTab('${k}')">${label}</button>`).join('');
+      document.getElementById('groupTrendingPane').style.display = groupTab === 'trending' ? 'block' : 'none';
+      document.getElementById('groupBoardPane').style.display = groupTab === 'watchnext' ? 'block' : 'none';
+      document.getElementById('groupMembersPane').style.display = groupTab === 'members' ? 'block' : 'none';
+    }
+
+    // "Alex renamed the group and changed its icon." Same wording as
+    // GroupChangeNotice.summary. The server sends it once per member.
+    function changeNoticeText(n) {
+      const name = n.changed_by_name || n.changed_by || 'Someone';
+      const f = n.changed_fields || [];
+      const hasName = f.includes('name'), hasIcon = f.includes('icon');
+      if (hasName && hasIcon) return `${name} renamed the group and changed its icon.`;
+      if (hasName) return `${name} renamed the group.`;
+      if (hasIcon) return `${name} changed the group's icon.`;
+      return `${name} updated the group.`;
+    }
+
     async function renderGroupView() {
       if (!currentGroupData) return;
-      document.getElementById('pageTitle').textContent = currentGroupData.group.name;
-      document.getElementById('groupViewTitle').textContent = currentGroupData.group.name;
-      document.getElementById('renameBtn').style.display = currentGroupData.is_creator ? 'block' : 'none';
+      const g = currentGroupData.group;
+      document.getElementById('pageTitle').textContent = g.name;
+      document.getElementById('groupViewTitle').textContent = g.name;
+      // Rename and Change icon are open to every member (the server allows
+      // it, migration 068); the others find out from the change notice.
+      // Delete stays creator-only.
       document.getElementById('deleteBtn').style.display = currentGroupData.is_creator ? 'block' : 'none';
+
+      const notice = document.getElementById('changeNotice');
+      if (currentGroupData.change_notice) {
+        notice.innerHTML = `<span aria-hidden="true">ℹ️</span><span>${escapeHtml(changeNoticeText(currentGroupData.change_notice))}</span>`;
+        notice.style.display = 'flex';
+      } else {
+        notice.style.display = 'none';
+      }
+      const n = currentGroupData.members.length;
+      document.getElementById('groupSummary').innerHTML =
+        `${groupBadge(g.icon, g.color, 30)}<span>${n} member${n === 1 ? '' : 's'}</span>`;
+      renderGroupTabs();
 
       // Members
       const membersList = document.getElementById('groupMembersList');
       membersList.innerHTML = '<div class="ios-group">' + currentGroupData.members.map(m => `
         <button type="button" class="ios-item no-icon" onclick="openMember('${escapeHtml(m.slug)}')">
           <span class="ios-item-label">${escapeHtml(m.first_name || m.slug)}</span>
-          <span class="ios-item-detail">${m.show_count} show${m.show_count !== 1 ? 's' : ''}</span>
+          <span class="ios-item-detail">${m.show_count} show${m.show_count !== 1 ? 's' : ''} • ${m.watching_count || 0} watching</span>
           <svg class="ic ios-item-chev"><use href="#s-chevron-right"/></svg>
         </button>
       `).join('') + '</div>';
 
       // Trending
       try {
-        const res = await fetch(`/api/groups/${currentGroupData.group.id}/trending`);
+        const res = await fetch(`/api/groups/${g.id}/trending`);
         if (res.ok) {
           const data = await res.json();
           const shows = data.shows || [];
-          // Add member names as caption for each show
-          const showsWithMembers = shows.map(s => ({
-            ...s,
-            _memberCaption: s.members && s.members.length > 0 ? s.members.join(', ') : ''
-          }));
-          document.getElementById('groupTrendingList').innerHTML = showsWithMembers.map(show =>
-            renderShowCard(show, {
-              onClickId: openShowFromList,
-              showRating: true,
-              showChevron: true,
-              caption: show._memberCaption
-            })
-          ).join('');
+          document.getElementById('groupTrendingList').innerHTML = shows.length
+            ? shows.map(show => renderShowCard(show, {
+                onClickId: openShowFromList,
+                showRating: true,
+                showChevron: true,
+                // Whose lists it's on, worded as on iOS; the network line
+                // when the endpoint named nobody.
+                caption: show.members && show.members.length ? `Added by: ${escapeHtml(show.members.join(', '))}` : undefined,
+              })).join('')
+            : '<div class="board-empty">🔥<br>No shows yet</div>';
         }
       } catch (e) {
         console.error('Failed to load trending:', e);
       }
+
+      await loadBoard();
+    }
+
+    // ── Watch Next board (migration 065) ─────────────────────────────────
+    // Pull-only: recommending writes a card the group owns; Add to Next Up
+    // runs under my session onto my own list; Dismiss is a mark about me.
+    async function loadBoard() {
+      if (!currentGroupData) return;
+      try {
+        const res = await fetch(`/api/groups/${currentGroupData.group.id}/suggestions`);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        groupSuggestions = (await res.json()).suggestions || [];
+      } catch (e) {
+        // Non-fatal, like iOS: a board that fails to load shouldn't blank the group.
+        groupSuggestions = [];
+      }
+      renderBoard();
+      // Opening the group IS the delivery moment for "X has recommended Y"
+      // (there's no push). Once per visit to the group.
+      if (!popupQueueStarted) { popupQueueStarted = true; advancePopup(); }
+    }
+
+    function renderBoard() {
+      const pane = document.getElementById('groupBoardPane');
+      if (!groupSuggestions.length) {
+        pane.innerHTML = `<div class="board-empty">📣<br>No recommendations yet
+          <small>Recommend a show from its detail page and the group sees it here.</small></div>`;
+        return;
+      }
+      const isCreator = !!currentGroupData.is_creator;
+      pane.innerHTML = '<div class="ios-group">' + groupSuggestions.map(s => {
+        const poster = s.poster_url ? `<img src="${safeUrl(s.poster_url)}" alt="" loading="lazy">` : '<div class="poster-empty">🎬</div>';
+        const by = s.is_yours ? 'Your recommendation' : `Recommended by ${escapeHtml(s.suggested_by_name)}`;
+        const note = s.note ? `<div class="note">“${escapeHtml(s.note)}”</div>` : '';
+        const added = (s.added_names || []).length ? `<div class="sub">Added by ${escapeHtml(s.added_names.join(', '))}</div>` : '';
+        let status = '';
+        if (s.on_your_list) status = `<div class="on-list">✓ On your ${escapeHtml(LIST_LABELS[s.on_your_list] || s.on_your_list)} list</div>`;
+        const actions = [];
+        if (!s.on_your_list && !s.is_yours) actions.push(`<button type="button" onclick="event.stopPropagation(); respondSuggestion(${s.id}, 'add')">＋ Add to Next Up</button>`);
+        // The two hands the server allows: the recommender, or the creator.
+        if (s.is_yours || isCreator) actions.push(`<button type="button" class="remove" onclick="event.stopPropagation(); removeSuggestion(${s.id})">Remove</button>`);
+        const tap = s.show_id ? ` tappable" onclick="openShowFromList(${Number(s.show_id)})` : '';
+        return `<div class="board-card${tap}">${poster}<div style="min-width:0">
+          <div class="t">${escapeHtml(s.title)}</div><div class="sub">${by}</div>${note}${added}${status}
+          ${actions.length ? `<div class="act">${actions.join('')}</div>` : ''}</div></div>`;
+      }).join('') + '</div>';
+    }
+
+    async function respondSuggestion(sid, response) {
+      try {
+        const res = await fetch(`/api/groups/${currentGroupData.group.id}/suggestions/${sid}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ response }),
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const i = groupSuggestions.findIndex(x => x.id === data.suggestion.id);
+        if (i >= 0) groupSuggestions[i] = data.suggestion;
+        renderBoard();
+        return true;
+      } catch (e) {
+        alert('Couldn’t save that. Please try again.');
+        return false;
+      }
+    }
+
+    async function removeSuggestion(sid) {
+      if (!confirm('Remove this recommendation from the board?')) return;
+      try {
+        const res = await fetch(`/api/groups/${currentGroupData.group.id}/suggestions/${sid}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        groupSuggestions = groupSuggestions.filter(x => x.id !== sid);
+        renderBoard();
+      } catch (e) {
+        alert('Couldn’t remove the recommendation.');
+      }
+    }
+
+    // The next card I haven't answered and didn't write.
+    function advancePopup() {
+      pendingPopup = groupSuggestions.find(s => !s.is_yours && !s.your_response) || null;
+      const modal = document.getElementById('popupModal');
+      if (!pendingPopup) { modal.classList.remove('open'); return; }
+      document.getElementById('popupTitle').textContent = `${pendingPopup.suggested_by_name} has recommended ${pendingPopup.title}`;
+      document.getElementById('popupNote').textContent = pendingPopup.note ? `“${pendingPopup.note}”` : '';
+      modal.classList.add('open');
+    }
+    async function answerPopup(response) {
+      if (!pendingPopup) return;
+      const ok = await respondSuggestion(pendingPopup.id, response);
+      // A failed save ends the queue for this visit rather than re-asking;
+      // the card stays unanswered server-side, so the next visit asks again.
+      if (ok) advancePopup();
+      else { pendingPopup = null; document.getElementById('popupModal').classList.remove('open'); }
     }
 
     async function openMember(memberSlug) {
@@ -677,6 +950,7 @@
         allLists: ALL_LISTS,
         groupWatchers: detailGroupWatchers,
         creators: detailCreators,
+        groups: window.__recommendGroups || [],
       });
     }
 
@@ -799,29 +1073,60 @@
       generateNewInvite();
     }
 
+    // Every call mints a new invite server-side, so a double click must not
+    // mint two.
+    let generatingInvite = false;
     async function generateNewInvite() {
+      if (generatingInvite) return;
+      generatingInvite = true;
       try {
         const res = await fetch(`/api/groups/${currentGroupData.group.id}/invite`, { method: 'POST' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        document.getElementById('inviteLinkInput').value = data.url;
-        const expiryDate = new Date(data.expires_at).toLocaleDateString();
-        document.getElementById('inviteLinkExpire').textContent = `Link expires on ${expiryDate}`;
-        document.getElementById('inviteModal').classList.add('open');
-        document.getElementById('copyInviteLinkBtn').textContent = 'Copy';
+        openInviteSheet(await res.json(), currentGroupData.group.name);
+        toggleGroupMenu();
       } catch (e) {
         console.error('Failed to generate invite:', e);
+        alert('Couldn’t make an invite link. Please try again.');
+      } finally {
+        generatingInvite = false;
       }
+    }
+
+    // What the link promises: "Good for up to 10 people · Expires on Oct 10,
+    // 2026" — either half left out if the server didn't say it.
+    let inviteGroupName = '';
+    function openInviteSheet(invite, groupName) {
+      inviteGroupName = (groupName || '').trim() || 'my group';
+      document.getElementById('inviteLinkInput').value = invite.url;
+      const parts = [];
+      if (invite.max_uses) parts.push(`Good for up to ${invite.max_uses} ${invite.max_uses === 1 ? 'person' : 'people'}`);
+      const d = new Date(invite.expires_at);
+      if (!isNaN(d)) parts.push(`Expires on ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`);
+      document.getElementById('inviteLinkExpire').textContent = parts.join(' · ');
+      document.getElementById('shareInviteLinkBtn').style.display = navigator.share ? '' : 'none';
+      document.getElementById('copyInviteLinkBtn').textContent = 'Copy';
+      document.getElementById('inviteModal').classList.add('open');
+    }
+
+    async function shareInviteLink() {
+      const url = document.getElementById('inviteLinkInput').value;
+      try {
+        await navigator.share({
+          title: `Join ${inviteGroupName} on Show Picker Club`,
+          text: `Join ${inviteGroupName} on Show Picker Club and we'll see what each other is watching.`,
+          url,
+        });
+      } catch (e) {}
     }
 
     function closeInviteModal() {
       document.getElementById('inviteModal').classList.remove('open');
     }
 
-    function copyInviteLink() {
+    async function copyInviteLink() {
       const input = document.getElementById('inviteLinkInput');
-      input.select();
-      document.execCommand('copy');
+      try { await navigator.clipboard.writeText(input.value); }
+      catch (e) { input.select(); document.execCommand('copy'); }
       const btn = document.getElementById('copyInviteLinkBtn');
       btn.textContent = 'Copied!';
       setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
@@ -887,9 +1192,9 @@
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        currentGroupData.group = data.group;
+        currentGroupData.group = { ...currentGroupData.group, ...data.group };
         document.getElementById('groupViewTitle').textContent = currentGroupData.group.name;
-        window.updateNavLabel(currentGroupData.group.name);
+        document.getElementById('pageTitle').textContent = currentGroupData.group.name;
         closeRenameModal();
       } catch (e) {
         console.error('Failed to rename group:', e);
@@ -897,8 +1202,46 @@
       }
     }
 
+    // Change icon — drafted, then saved in one PATCH so Cancel changes nothing.
+    let iconDraft = { icon: null, color: null };
+    function refreshIconModalBadge() {
+      document.getElementById('iconModalBadge').innerHTML = groupBadge(iconDraft.icon, iconDraft.color, 44);
+    }
+    function showIconModal() {
+      if (!currentGroupData) return;
+      iconDraft = { icon: currentGroupData.group.icon || null, color: currentGroupData.group.color || null };
+      document.getElementById('iconModalName').textContent = currentGroupData.group.name;
+      renderIconPicker('editIconPicker', iconDraft, refreshIconModalBadge);
+      refreshIconModalBadge();
+      document.getElementById('iconModal').classList.add('open');
+      toggleGroupMenu();
+    }
+    function closeIconModal() { document.getElementById('iconModal').classList.remove('open'); }
+    async function saveIcon() {
+      const btn = document.getElementById('saveIconBtn');
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/api/groups/${currentGroupData.group.id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ icon: iconDraft.icon, color: iconDraft.color }),
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        currentGroupData.group = { ...currentGroupData.group, ...data.group };
+        closeIconModal();
+        renderGroupView();
+      } catch (e) {
+        alert('Couldn’t save the group icon.');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
     // Modals
+    let createDraft = { icon: null, color: null };
     function showCreateGroupModal() {
+      createDraft = { icon: null, color: null };
+      renderIconPicker('createIconPicker', createDraft);
       document.getElementById('createGroupModal').classList.add('open');
       document.getElementById('groupNameInput').focus();
     }
@@ -918,14 +1261,12 @@
         const res = await fetch('/api/groups', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name })
+          body: JSON.stringify({ name, icon: createDraft.icon, color: createDraft.color })
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         closeCreateGroupModal();
-        document.getElementById('inviteLinkInput').value = data.invite.url;
-        document.getElementById('inviteLinkExpire').textContent = `Link expires on ${new Date(data.invite.expires_at).toLocaleDateString()}`;
-        document.getElementById('inviteModal').classList.add('open');
+        openInviteSheet(data.invite, name);
         setTimeout(loadGroupsList, 500);
       } catch (e) {
         console.error('Failed to create group:', e);

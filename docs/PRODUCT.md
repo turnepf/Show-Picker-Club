@@ -93,8 +93,8 @@ a lie, and the next `mode: 'logos'` sweep refills it.
 Platforms: **iPhone/iPad** show it as a Streaming row under Network (Mac via
 Catalyst). **Apple TV** shows it in the metadata block above the watch button,
 where that screen already names the network. **The watch doesn't** — it has no
-show detail screen to put it on. **The web doesn't** — frozen at its restored
-state (see [Web app status](#web-app-status)).
+show detail screen to put it on. **The web** shows it as an "Also on" / "Now
+on" row under Network, the same rule.
 
 ### Also watching (groups)
 
@@ -119,7 +119,7 @@ Unanswered cards are asked about one at a time; your own recommendations never p
 
 Nothing about recommending touches anyone's list. Adding is each member's own tap onto their own list — the retired suggest-a-show's problem (anyone pushing rows onto anyone) structurally can't recur, because the feature contains no cross-member write at all. Watching With remains the only one.
 
-Platforms: **iPhone/iPad** get all of it — recommend, pop-up, board (Mac via Catalyst). **Apple TV** shows the board as a read-only Watch Next shelf on the group screen — a couch is where "what should we watch next" gets asked — but can't recommend or answer. **The watch doesn't** — it has no groups. **The web doesn't** — frozen at its restored state (see [Web app status](#web-app-status)).
+Platforms: **iPhone/iPad** get all of it — recommend, pop-up, board (Mac via Catalyst). **Apple TV** shows the board as a read-only Watch Next shelf on the group screen — a couch is where "what should we watch next" gets asked — but can't recommend or answer. **The watch doesn't** — it has no groups. **The web** gets all of it too: Recommend to group on the show card, the pop-up on opening a group, and the board as a Watch Next tab (Remove in place of the swipe).
 
 ### Which build am I on
 
@@ -352,7 +352,7 @@ PWA was retired in 2026-08 and stays retired).
    iOS's swipes), and "couldn't load" kept apart from "empty". **Done.**
 3. Groups — Watch Next board and pop-up, Recommend to group, icons, change
    notice, rename by any member, invite limits, invite links that survive
-   signing in.
+   signing in, and the NEW flag on Groups. **Done.**
 4. Add / edit — the Watching With member picker, the server's network list,
    the Archived toggle.
 5. Calendar screen; household invite and join.
@@ -954,8 +954,9 @@ A few intentional omissions:
   carry the fields. **iPhone/iPad** pick and render (badge on the Groups
   list rows, the group detail header, the create sheet, and a "Change icon"
   sheet); **Apple TV** renders the badge on group tiles and the detail
-  header, view-only as ever; the watch has no groups and the web is frozen
-  (its groups page stays name-only — a named gap, not work). A group that
+  header, view-only as ever; the watch has no groups. The **web** picks and
+  renders them too (2026-10), drawing each symbol as an emoji on the same
+  tinted disc, since a browser has no SF Symbols. A group that
   never picked gets a neutral default badge rather than a hole. Needs the
   next app build to be visible in the apps.
 
