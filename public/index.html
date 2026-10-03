@@ -1561,6 +1561,20 @@
     </div>
   </div>
 
+  <!-- Passkeys (iOS PasskeysView): list, add, remove. -->
+  <div class="modal-overlay hidden" id="passkeysOverlay" onclick="closePasskeys(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2>Passkeys</h2>
+      <p class="import-help">Sign in with your fingerprint, face or device PIN instead of a code. A passkey added on your iPhone works here too if your browser can reach it.</p>
+      <div id="passkeysList" class="import-rows">Loading…</div>
+      <p class="import-error hidden" id="passkeysError"></p>
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closePasskeys()">Done</button>
+        <button class="btn btn-save" id="addPasskeyBtn" onclick="addPasskeyFromManager(this)">Add a passkey</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Add to My List Modal -->
   <div class="modal-overlay hidden" id="addMyListOverlay" onclick="closeAddMyList(event)">
     <div class="modal" onclick="event.stopPropagation()">
@@ -1647,10 +1661,23 @@
         <div id="googleBtnWrap" class="hidden"></div>
         <button type="button" class="btn login-choose-btn" onclick="loginChoose('email')">Continue with email</button>
         <button type="button" class="btn login-choose-btn" onclick="loginChoose('phone')">Continue with phone</button>
+        <button type="button" class="btn login-choose-btn hidden" id="passkeySignInBtn" onclick="signInWithPasskey()">Sign in with a passkey</button>
         </div>
         <p id="loginTermsLine" class="hidden" style="margin-top:16px; font-size:12px; color:var(--ink-muted); text-align:center; line-height:1.5;">
           By continuing, you agree to the <a href="/terms" target="_blank" style="color:var(--accent);">Terms</a> and acknowledge the <a href="/privacy" target="_blank" style="color:var(--accent);">Privacy Policy</a>.
         </p>
+      </div>
+
+      <!-- After a code sign-in: "Skip the code next time" (iOS LoginView). -->
+      <div class="login-step hidden" id="loginStepPasskeyOffer">
+        <h2>You're in</h2>
+        <p style="font-weight:600; margin: 4px 0 6px;">Skip the code next time</p>
+        <p style="font-size:13px; color:var(--ink-muted); line-height:1.5; margin-bottom: 14px;">
+          A passkey signs you in with your fingerprint, face or device PIN — no code to wait for. Your browser or password manager keeps it, so it works wherever that syncs. You can add or remove one later from the account menu.
+        </p>
+        <p class="import-error hidden" id="passkeyOfferError"></p>
+        <button type="button" class="btn btn-save" style="width:100%;" onclick="acceptPasskeyOffer(this)">Add a passkey</button>
+        <button type="button" class="btn btn-cancel" style="width:100%; margin-top:8px;" onclick="declinePasskeyOffer()">Not now</button>
       </div>
 
       <div class="login-step hidden" id="loginStepEmail">
@@ -2084,9 +2111,12 @@
       const sharedShow = parseInt(new URLSearchParams(location.search).get('show'), 10);
       if (Number.isInteger(sharedShow) && sharedShow > 0) openDetail(sharedShow, false);
 
-      // "Paste a list…" from a shell page's account menu lands here.
+      // "Paste a list…" / "Passkeys…" from a shell page's account menu land here.
       if (new URLSearchParams(location.search).has('import')) {
         checkAuth().then(() => { if (authMember) openImport('watching'); });
+      }
+      if (new URLSearchParams(location.search).has('passkeys')) {
+        checkAuth().then(() => { if (authMember) openPasskeys(); });
       }
     }
 
@@ -2432,6 +2462,12 @@
       menu.className = 'account-menu';
       // The AI apps (Claude, ChatGPT…) connected to this account — same
       // screen as iOS's Connected Apps, which already lives at /connected-apps.
+      const pk = document.createElement('button');
+      pk.type = 'button';
+      pk.style.color = 'var(--ink)';
+      pk.textContent = 'Passkeys…';
+      pk.addEventListener('click', openPasskeys);
+      menu.appendChild(pk);
       const paste = document.createElement('button');
       paste.type = 'button';
       paste.style.color = 'var(--ink)';
@@ -2740,7 +2776,7 @@
       const stepEl = document.getElementById('loginStep' + step.charAt(0).toUpperCase() + step.slice(1));
       if (stepEl) stepEl.classList.remove('hidden');
       document.getElementById('loginErr').style.display = 'none';
-      document.getElementById('loginBackBtn').classList.toggle('hidden', step === 'choose');
+      document.getElementById('loginBackBtn').classList.toggle('hidden', step === 'choose' || step === 'passkeyOffer');
       const focusTarget = { email: 'loginEmail', phone: 'loginPhone', code: 'loginCode', name: 'loginFullName' }[step];
       if (focusTarget) setTimeout(() => document.getElementById(focusTarget).focus(), 50);
     }
@@ -2769,6 +2805,7 @@
         if (el) el.value = '';
       });
       loginShowStep('choose');
+      document.getElementById('passkeySignInBtn').classList.toggle('hidden', !passkeysSupported);
       const cfg = await loadAuthConfig();
       // Every visitor can sign up, so the modal always says so and always
       // carries the terms line.
@@ -2779,6 +2816,9 @@
 
     function closeLoginModal(e) {
       if (e && e.target !== e.currentTarget) return;
+      // Dismissing the passkey offer by clicking outside is "Not now": the
+      // member is already signed in and the page still has to catch up.
+      if (e && loginState.step === 'passkeyOffer') { declinePasskeyOffer(); return; }
       document.getElementById('loginOverlay').classList.add('hidden');
     }
 
@@ -2947,7 +2987,7 @@
           body: JSON.stringify(body),
         });
         const data = await res.json().catch(() => ({}));
-        if (res.ok && data.success) { await finishLogin(); return; }
+        if (res.ok && data.success) { await finishLogin(false, { viaCode: true }); return; }
         // New signup: the code checked out but there's no account yet —
         // collect a name, then /auth/enroll completes it.
         if (res.ok && data.needs_name) { loginShowStep('name'); return; }
@@ -2982,7 +3022,7 @@
         const data = await res.json().catch(() => ({}));
         if (res.ok && data.success) {
           if (data.enrolled) trackSignup(loginState.channel || 'email');
-          await finishLogin(!!data.enrolled);
+          await finishLogin(!!data.enrolled, { viaCode: true });
           return;
         }
         if (res.status === 429) { showLoginError('Signups are paused right now. Try again tomorrow.'); return; }
@@ -3067,7 +3107,196 @@
       finally { btn.disabled = false; btn.textContent = 'Permanently delete my account'; }
     }
 
-    async function finishLogin(enrolled = false) {
+    // ── Passkeys (WebAuthn) ──────────────────────────────────────────────
+    // The server half is _shared/webauthn.js + the /auth/passkey-* routes the
+    // apps already use; the relying party is showpicker.club, so a passkey is
+    // the same credential in the browser and the app. Everything crosses the
+    // wire as base64url, exactly as PasskeyAuthenticator.swift sends it.
+    const passkeysSupported = !!(window.PublicKeyCredential && navigator.credentials);
+    function b64urlToBuf(s) {
+      const b = atob(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4));
+      return Uint8Array.from(b, c => c.charCodeAt(0)).buffer;
+    }
+    function bufToB64url(buf) {
+      let str = '';
+      new Uint8Array(buf).forEach(b => { str += String.fromCharCode(b); });
+      return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+    // A name to tell two passkeys apart — "Chrome on Mac" — not to be exact.
+    function passkeyLabel() {
+      const ua = navigator.userAgent;
+      const browser = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
+      const os = /iPhone|iPad/.test(ua) ? 'iPhone/iPad' : /Mac OS X/.test(ua) ? 'Mac' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
+      return os ? `${browser} on ${os}` : browser;
+    }
+    function passkeyFailure(e, action) {
+      // Backing out of the browser's sheet is an answer, not an error.
+      if (e && (e.name === 'NotAllowedError' || e.name === 'AbortError')) return null;
+      const codes = {
+        too_many_passkeys: 'You already have the most passkeys an account can hold — remove one first.',
+        credential_in_use: 'That passkey belongs to another account.',
+        challenge_expired: 'That took too long — try again.',
+        rate_limited: 'Too many tries — wait a few minutes.',
+        unrecognized: 'That passkey isn’t registered here. Sign in another way, then add it from the account menu.',
+      };
+      return codes[e && e.message] || `Couldn’t ${action}. Try again.`;
+    }
+
+    async function registerPasskey() {
+      const begin = await fetch('/auth/passkey-register-begin', { method: 'POST' });
+      const opts = await begin.json().catch(() => ({}));
+      if (!begin.ok) throw new Error(opts.error || 'begin_failed');
+      const cred = await navigator.credentials.create({ publicKey: {
+        challenge: b64urlToBuf(opts.challenge),
+        rp: opts.rp,
+        user: { id: b64urlToBuf(opts.user.id), name: opts.user.name, displayName: opts.user.displayName },
+        pubKeyCredParams: opts.pubKeyCredParams,
+        excludeCredentials: (opts.excludeCredentials || []).map(c => ({ type: 'public-key', id: b64urlToBuf(c.id) })),
+        authenticatorSelection: opts.authenticatorSelection,
+        attestation: opts.attestation || 'none',
+        timeout: opts.timeout,
+      } });
+      const finish = await fetch('/auth/passkey-register-finish', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          challenge: opts.challenge,
+          attestation_object: bufToB64url(cred.response.attestationObject),
+          client_data_json: bufToB64url(cred.response.clientDataJSON),
+          label: passkeyLabel(),
+        }),
+      });
+      const done = await finish.json().catch(() => ({}));
+      if (!finish.ok) throw new Error(done.error || 'verification_failed');
+    }
+
+    async function signInWithPasskey() {
+      try {
+        const begin = await fetch('/auth/passkey-begin', { method: 'POST' });
+        const opts = await begin.json().catch(() => ({}));
+        if (!begin.ok) throw new Error(opts.error || 'begin_failed');
+        // No allowCredentials: the passkey is discoverable, so the browser
+        // offers whichever ones it holds for showpicker.club.
+        const cred = await navigator.credentials.get({ publicKey: {
+          challenge: b64urlToBuf(opts.challenge),
+          rpId: opts.rpId,
+          userVerification: opts.userVerification || 'required',
+          timeout: opts.timeout,
+        } });
+        const res = await fetch('/auth/passkey-finish', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            challenge: opts.challenge,
+            credential_id: bufToB64url(cred.rawId),
+            authenticator_data: bufToB64url(cred.response.authenticatorData),
+            client_data_json: bufToB64url(cred.response.clientDataJSON),
+            signature: bufToB64url(cred.response.signature),
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) { await completeLogin(false); return; }
+        throw new Error(data.error || 'verification_failed');
+      } catch (e) {
+        const msg = passkeyFailure(e, 'sign in with a passkey');
+        if (msg) showLoginError(msg);
+      }
+    }
+
+    // Offer once a code sign-in has succeeded, when the account has no
+    // passkey and the member hasn't said "Not now" in the last 30 days.
+    const PASSKEY_REOFFER_MS = 30 * 24 * 60 * 60 * 1000;
+    async function shouldOfferPasskey() {
+      if (!passkeysSupported) return false;
+      try {
+        const declined = Number(localStorage.getItem('passkeyOfferDeclinedAt') || 0);
+        if (declined && Date.now() - declined < PASSKEY_REOFFER_MS) return false;
+      } catch (e) {}
+      try {
+        const res = await fetch('/api/passkeys');
+        if (!res.ok) return false;
+        return ((await res.json()).passkeys || []).length === 0;
+      } catch (e) { return false; }
+    }
+    async function acceptPasskeyOffer(btn) {
+      const err = document.getElementById('passkeyOfferError');
+      err.classList.add('hidden');
+      btn.disabled = true;
+      try {
+        await registerPasskey();
+        showToast('Passkey added');
+        await completeLogin(pendingLoginEnrolled);
+      } catch (e) {
+        const msg = passkeyFailure(e, 'add a passkey');
+        if (msg) { err.textContent = msg; err.classList.remove('hidden'); }
+        else declinePasskeyOffer();
+      } finally { btn.disabled = false; }
+    }
+    function declinePasskeyOffer() {
+      try { localStorage.setItem('passkeyOfferDeclinedAt', String(Date.now())); } catch (e) {}
+      completeLogin(pendingLoginEnrolled);
+    }
+
+    // The account menu's Passkeys… sheet.
+    async function openPasskeys() {
+      closeAccountMenu();
+      document.getElementById('passkeysOverlay').classList.remove('hidden');
+      document.getElementById('addPasskeyBtn').classList.toggle('hidden', !passkeysSupported);
+      await loadPasskeys();
+    }
+    function closePasskeys(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('passkeysOverlay').classList.add('hidden');
+    }
+    async function loadPasskeys() {
+      const list = document.getElementById('passkeysList');
+      try {
+        const res = await fetch('/api/passkeys');
+        if (!res.ok) throw new Error();
+        const keys = (await res.json()).passkeys || [];
+        const fmt = (iso) => iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+        list.innerHTML = keys.length ? keys.map(k => `
+          <div class="import-row" style="align-items:center">
+            <div style="flex:1; min-width:0"><div class="t">${escapeHtml(k.label || 'Passkey')}</div>
+              <div class="m">Added ${escapeHtml(fmt(k.created_at) || '—')}${k.last_used_at ? ` · Last used ${escapeHtml(fmt(k.last_used_at))}` : ''}</div></div>
+            <button type="button" class="btn btn-cancel" style="color:var(--danger-deep)" data-id="${escapeHtml(k.credential_id)}" data-label="${escapeHtml(k.label || 'this passkey')}" onclick="removePasskey(this)">Remove</button>
+          </div>`).join('')
+          : `<p class="import-help">${passkeysSupported ? 'No passkeys yet.' : 'This browser can’t use passkeys.'}</p>`;
+      } catch (e) {
+        list.innerHTML = '<p class="import-error">Couldn’t load your passkeys.</p>';
+      }
+    }
+    async function addPasskeyFromManager(btn) {
+      const err = document.getElementById('passkeysError');
+      err.classList.add('hidden');
+      btn.disabled = true;
+      try { await registerPasskey(); await loadPasskeys(); }
+      catch (e) {
+        const msg = passkeyFailure(e, 'add a passkey');
+        if (msg) { err.textContent = msg; err.classList.remove('hidden'); }
+      } finally { btn.disabled = false; }
+    }
+    async function removePasskey(btn) {
+      if (!confirm(`Remove ${btn.dataset.label}? You won't be able to sign in with it any more.`)) return;
+      try {
+        const res = await fetch('/api/passkeys/' + encodeURIComponent(btn.dataset.id), { method: 'DELETE' });
+        if (!res.ok) throw new Error();
+        await loadPasskeys();
+      } catch (e) { showToast('Couldn’t remove that passkey.', { tone: 'error' }); }
+    }
+
+    // Every successful sign-in ends here. After a code (email or phone) it
+    // first offers a passkey, as iOS does — not after Apple or Google, which
+    // are already one tap, and not after a passkey.
+    async function finishLogin(enrolled = false, opts = {}) {
+      if (opts.viaCode && await shouldOfferPasskey()) {
+        pendingLoginEnrolled = enrolled;
+        loginShowStep('passkeyOffer');
+        return;
+      }
+      await completeLogin(enrolled);
+    }
+    let pendingLoginEnrolled = false;
+
+    async function completeLogin(enrolled = false) {
       closeLoginModal();
       await checkAuth();
       // Mid-way through connecting an AI app: go back to its consent screen

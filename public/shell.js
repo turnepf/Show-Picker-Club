@@ -164,6 +164,12 @@
     if (menuEl) { closeMenu(); return; }
     var menu = document.createElement('div');
     menu.className = 'shell-menu';
+    var pkItem = document.createElement('button');
+    pkItem.type = 'button';
+    pkItem.textContent = 'Passkeys…';
+    pkItem.style.color = 'var(--ink)';
+    pkItem.addEventListener('click', function () { closeMenu(); location.href = '/?passkeys=1'; });
+    menu.appendChild(pkItem);
     var pasteItem = document.createElement('button');
     pasteItem.type = 'button';
     pasteItem.textContent = 'Paste a list…';
