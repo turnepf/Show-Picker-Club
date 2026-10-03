@@ -400,6 +400,14 @@ set, so the menu never offers a filter that matches nothing and never fills
 with the niche tags a title also carries. It appears only when there's more
 than one genre to choose between; a one-option dropdown is furniture.
 
+**One menu, on every surface that has it.** Sort, the TV / Movies filter and
+the genre filter all sit behind a single sort-and-filter button
+(`line.3.horizontal.decrease.circle`) at the right of the list title, as
+pick-one sections with a checkmark. The web had them as three pills side by
+side until 2026-10, which ran off the edge of a phone on Next Up — the one
+list that shows all three. The web's icon fills in while a filter is
+narrowing the list, so a short list never reads as the whole list.
+
 Two rules keep it from lying: while drag-to-reorder is active the filter is
 ignored, since repositioning rows against titles you can't see would write an
 arrangement you didn't intend; and when a filter empties the screen the list
@@ -989,7 +997,8 @@ A few intentional omissions:
   sort/filter menu at the top (per Patrick — same menu as sort and the Next
   Up genre filter), with counts on each option. Only offered on a list that
   holds both kinds; remembered per list; ignored while reordering. Trending,
-  search, tvOS, watch and web don't have it — nobody has asked there.
+  search, tvOS and watch don't have it — nobody has asked there. The web
+  has had it since 2026-10, in the same single menu.
 
 - **Share / recommend a show within a group** (JC, via Jennifer —
   8/23/2026; JC's pop-up proposal 8/25/2026), shipped 2026-08 as
