@@ -210,6 +210,39 @@
       const used = Object.entries(counts || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
       return used.length ? used.map(([k, n]) => `${escapeHtml(methodLabel(k))} ${fmt(n)}`).join(' · ') : 'No sign-ins';
     }
+    // Who has connected an AI app (Claude, ChatGPT…) through the MCP server,
+    // and how much they've used it. One row per connection.
+    function shortDate(s) {
+      if (!s) return '—';
+      const d = new Date(/Z|[+-]\d\d:?\d\d$/.test(s) ? s : String(s).replace(' ', 'T') + 'Z');
+      return isNaN(d) ? '—' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+    function mcpSection(rows) {
+      if (!Array.isArray(rows)) return '';
+      if (!rows.length) {
+        return `<div class="section"><h2>AI apps (MCP)</h2><div class="empty">Nobody has connected an AI app yet.</div></div>`;
+      }
+      const body = rows.map(r => {
+        const access = /write/.test(r.scope || '') ? 'Read & change' : 'Read only';
+        const status = r.revoked_at ? `Disconnected ${shortDate(r.revoked_at)}` : `Last used ${shortDate(r.last_used_at)}`;
+        return `<tr>
+          <td>${escapeHtml(r.name)}</td>
+          <td>${escapeHtml(r.app)}<div style="font-size:12px;color:var(--ink-quiet)">${access} · connected ${shortDate(r.connected_at)}</div></td>
+          <td${r.revoked_at ? ' style="color:var(--ink-quiet)"' : ''}>${status}</td>
+          <td class="num">${fmt(r.calls_7d)}</td>
+          <td class="num">${fmt(r.writes_7d)}</td>
+        </tr>`;
+      }).join('');
+      return `<div class="section">
+        <h2>AI apps (MCP) <span style="color:var(--ink-quiet);font-weight:400;">(${rows.length})</span></h2>
+        <table>
+          <thead><tr><th>Member</th><th>App</th><th>Status</th><th class="num">Calls</th><th class="num">Changes</th></tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+        <div class="footer">Every connection made through /connect, newest first. Calls and changes are the last 7 days (the usage ledger keeps a week) and count all of that member's AI apps together.</div>
+      </div>`;
+    }
+
     function signinSection(sm) {
       if (!sm) return '';
       return `<div class="section">
@@ -339,6 +372,7 @@
 
         ${platformSection(d.active_by_platform)}
 
+        ${mcpSection(d.mcp_connections)}
         ${signinSection(d.signin_methods)}
         ${calendarSection(d.calendar_usage)}
         ${enrolledSection(d.enrolled_via)}

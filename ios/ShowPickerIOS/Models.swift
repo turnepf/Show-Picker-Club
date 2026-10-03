@@ -301,6 +301,9 @@ struct Reporting: Codable {
     // Calendar feed usage — nothing recorded it before migration 061, so this
     // is nil against an older server.
     let calendarUsage: CalendarUsage?
+    // Who has connected an AI app through the MCP server — one row per
+    // connection, newest first. Nil against an older server.
+    let mcpConnections: [MCPConnection]?
     let totals: ReportTotals
     let membersLogin: LoginStats?
     let neverLoggedIn: [NeverLoggedInMember]?
@@ -322,6 +325,7 @@ struct Reporting: Codable {
         case signinMethods = "signin_methods"
         case enrolledVia = "enrolled_via"
         case calendarUsage = "calendar_usage"
+        case mcpConnections = "mcp_connections"
         case membersLogin = "members_login"
         case neverLoggedIn = "never_logged_in"
         case topNetworks = "top_networks"
@@ -370,6 +374,35 @@ struct SigninMethodWindows: Codable {
 }
 
 // Members whose feed a calendar client actually fetched, plus total fetches.
+// One AI-app connection (an OAuth grant) on the Reporting screen. Every field
+// but the person is optional so one odd row can't fail the whole report.
+// calls7d / writes7d are the member's last 7 days across all their AI apps —
+// the usage ledger is kept a week and keyed by member, not by app.
+struct MCPConnection: Codable, Identifiable {
+    let memberSlug: String
+    let name: String?
+    let app: String?
+    let scope: String?
+    let connectedAt: String?
+    let lastUsedAt: String?
+    let revokedAt: String?
+    let calls7d: Int?
+    let writes7d: Int?
+
+    var id: String { "\(memberSlug)|\(app ?? "")|\(connectedAt ?? "")" }
+    var canWrite: Bool { (scope ?? "").contains("write") }
+
+    enum CodingKeys: String, CodingKey {
+        case name, app, scope
+        case memberSlug = "member_slug"
+        case connectedAt = "connected_at"
+        case lastUsedAt = "last_used_at"
+        case revokedAt = "revoked_at"
+        case calls7d = "calls_7d"
+        case writes7d = "writes_7d"
+    }
+}
+
 struct CalendarUsage: Codable {
     let week: Int
     let month: Int
