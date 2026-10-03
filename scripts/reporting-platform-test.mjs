@@ -416,13 +416,20 @@ console.log('\n== AI apps (MCP): who connected what, admin-only, no secrets');
   const text = await res.clone().text();
   const r = await res.json();
   const rows = r.mcp_connections || [];
-  check('one row per grant, newest first', rows.length === 2 && rows[0].app === 'ChatGPT' && rows[1].app === 'Claude',
-        JSON.stringify(rows.map(x => x.app)));
-  const claude = rows.find(x => x.app === 'Claude') || {};
-  check('names the person and the scope', claude.name === 'Stacy' && claude.scope === 'read write', JSON.stringify(claude));
-  check('carries last use and a disconnect date', !!claude.last_used_at && !!(rows.find(x => x.app === 'ChatGPT') || {}).revoked_at);
-  check('30-day calls and changes count only the last 30 days', claude.calls_30d === 10 && claude.writes_30d === 2, JSON.stringify(claude));
-  check('all-time calls and changes count the whole ledger', claude.calls_all === 15 && claude.writes_all === 6, JSON.stringify(claude));
+  // Stacy holds two grants (Claude live, ChatGPT revoked); she is one person.
+  check('one row per person, not per connection', rows.length === 1, JSON.stringify(rows.map(x => x.name)));
+  const st = rows[0] || {};
+  check('lists every app they connected', JSON.stringify(st.apps) === '["ChatGPT","Claude"]' && st.app === 'ChatGPT, Claude', JSON.stringify(st.apps));
+  check('names the person, and read & change while a live grant can write', st.name === 'Stacy' && st.scope === 'read write', JSON.stringify(st));
+  check('takes the latest use and counts the connections', st.last_used_at === '2026-10-02 09:00:00' && st.connections === 2, JSON.stringify(st));
+  check('not "disconnected" while any connection is live', st.revoked_at === null, JSON.stringify(st));
+  check('30-day calls and changes count only the last 30 days', st.calls_30d === 10 && st.writes_30d === 2, JSON.stringify(st));
+  check('all-time calls and changes count the whole ledger', st.calls_all === 15 && st.writes_all === 6, JSON.stringify(st));
+
+  // Once every connection is revoked, the row says disconnected (latest date).
+  db.prepare(`UPDATE oauth_grants SET revoked_at = '2026-10-02 12:00:00' WHERE revoked_at IS NULL`).run();
+  const after = ((await body(env, adminCookie)).mcp_connections || [])[0] || {};
+  check('disconnected only when every connection is', after.revoked_at === '2026-10-02 12:00:00' && after.scope === 'read', JSON.stringify(after));
   check('never carries a client secret, client id or redirect',
         !text.includes('HASHED-SECRET') && !text.includes('c-claude') && !text.includes('claude.ai/cb'));
 }

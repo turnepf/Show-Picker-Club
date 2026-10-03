@@ -386,6 +386,9 @@ struct MCPConnection: Codable, Identifiable {
     let connectedAt: String?
     let lastUsedAt: String?
     let revokedAt: String?
+    // How many grants the row combines — a reconnect or a second app each
+    // mints one, and the server folds them into one row per member.
+    let connections: Int?
     let calls30d: Int?
     let writes30d: Int?
     let callsAll: Int?
@@ -400,6 +403,7 @@ struct MCPConnection: Codable, Identifiable {
         case connectedAt = "connected_at"
         case lastUsedAt = "last_used_at"
         case revokedAt = "revoked_at"
+        case connections
         case calls30d = "calls_30d"
         case writes30d = "writes_30d"
         case callsAll = "calls_all"

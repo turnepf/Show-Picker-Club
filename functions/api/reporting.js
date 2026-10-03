@@ -136,9 +136,8 @@ export async function onRequestGet(context) {
 
   // Who has connected an AI app, and how much they use it (migration 071) —
   // the named companion to the anonymous `mcp` platform count above. One row
-  // per grant, newest first, so a member with Claude and ChatGPT both
-  // connected appears twice. Admin-only like the rest of this endpoint, and
-  // never carries a token, client secret or redirect: the person, the app's
+  // per member, most recently active first. Admin-only like the rest of this
+  // endpoint, and never carries a token, client secret or redirect: the person, the app's
   // self-chosen name, the scope, and dates. Usage is the last 30 days and all
   // time — mcp_usage is kept a year (_shared/oauth.js), so "all time" means up
   // to a year — per member rather than per app, because that's how the ledger
@@ -146,7 +145,7 @@ export async function onRequestGet(context) {
   let mcpConnections = [];
   try {
     const { results } = await env.DB.prepare(
-      `SELECT g.id, g.member_slug, m.first_name, m.last_name, m.name,
+      `SELECT g.member_slug, m.first_name, m.last_name, m.name,
               c.client_name, g.scope, g.created_at, g.last_used_at, g.revoked_at,
               (SELECT COALESCE(SUM(calls), 0) FROM mcp_usage u
                 WHERE u.member_slug = g.member_slug AND u.day >= date('now', '-30 days')) AS calls_30d,
@@ -158,21 +157,56 @@ export async function onRequestGet(context) {
          LEFT JOIN members m ON m.slug = g.member_slug
          LEFT JOIN oauth_clients c ON c.client_id = g.client_id
         ORDER BY g.created_at DESC
-        LIMIT 200`
+        LIMIT 1000`
     ).all();
-    mcpConnections = (results || []).map((r) => ({
-      member_slug: r.member_slug,
-      name: [r.first_name || (r.name || '').split(' ')[0], r.last_name].filter(Boolean).join(' ') || r.member_slug,
-      app: r.client_name || 'Unknown app',
-      scope: r.scope,
-      connected_at: r.created_at,
-      last_used_at: r.last_used_at,
-      revoked_at: r.revoked_at,
-      calls_30d: r.calls_30d || 0,
-      writes_30d: r.writes_30d || 0,
-      calls_all: r.calls_all || 0,
-      writes_all: r.writes_all || 0,
-    }));
+    // One row per PERSON, not per grant: every reconnect (or a second device,
+    // or a second app) mints a new grant, and listing each one made the same
+    // member appear over and over. Their row takes the latest of everything —
+    // the apps they have, read & change if any live grant can write, first
+    // connected, last used across all of them, and "disconnected" only once
+    // every grant is revoked. Usage is already per member.
+    const ts = (v) => (v ? String(v) : '');
+    const byMember = new Map();
+    for (const r of results || []) {
+      let p = byMember.get(r.member_slug);
+      if (!p) {
+        p = {
+          member_slug: r.member_slug,
+          name: [r.first_name || (r.name || '').split(' ')[0], r.last_name].filter(Boolean).join(' ') || r.member_slug,
+          apps: [], live: false, can_write: false,
+          connected_at: null, last_used_at: null, revoked_at: null, connections: 0,
+          calls_30d: r.calls_30d || 0, writes_30d: r.writes_30d || 0,
+          calls_all: r.calls_all || 0, writes_all: r.writes_all || 0,
+        };
+        byMember.set(r.member_slug, p);
+      }
+      p.connections++;
+      const app = r.client_name || 'Unknown app';
+      if (!p.apps.includes(app)) p.apps.push(app);
+      if (!r.revoked_at) {
+        p.live = true;
+        if (/write/.test(r.scope || '')) p.can_write = true;
+      }
+      if (!p.connected_at || ts(r.created_at) < ts(p.connected_at)) p.connected_at = r.created_at;
+      if (ts(r.last_used_at) > ts(p.last_used_at)) p.last_used_at = r.last_used_at;
+      if (ts(r.revoked_at) > ts(p.revoked_at)) p.revoked_at = r.revoked_at;
+    }
+    mcpConnections = [...byMember.values()].map((p) => ({
+      member_slug: p.member_slug,
+      name: p.name,
+      app: p.apps.join(', '),
+      apps: p.apps,
+      scope: p.can_write ? 'read write' : 'read',
+      connected_at: p.connected_at,
+      last_used_at: p.last_used_at,
+      // Only when nothing is still connected — one revoked grant among live
+      // ones is a reconnect, not a disconnect.
+      revoked_at: p.live ? null : p.revoked_at,
+      connections: p.connections,
+      calls_30d: p.calls_30d, writes_30d: p.writes_30d,
+      calls_all: p.calls_all, writes_all: p.writes_all,
+    })).sort((a, b) =>
+      (ts(b.last_used_at || b.connected_at) > ts(a.last_used_at || a.connected_at) ? 1 : -1));
   } catch (_) { /* pre-071 database */ }
 
   // How members actually sign in (migration 059): distinct *people* who
