@@ -357,7 +357,7 @@ PWA was retired in 2026-08 and stays retired).
    the Archived toggle, multi-line Notes. **Done.** (Find a Show on someone
    else's page still opens the short "add to my list" form.)
 5. Calendar screen; household invite and join. **Done.**
-6. Import a list.
+6. Import a list. **Done.**
 7. Passkeys.
 8. Admin — member detail, the missing Reporting sections, vibe re-score.
 
@@ -460,7 +460,7 @@ The other side of Export: a member arriving with a list they already keep somewh
 
   The permanent entries were added because the nudges were originally the *only* way in: past five shows the feature became unreachable, even though the per-day ceiling below implies repeat use.
 - **Apple TV / Apple Watch:** not offered (view-only / read-only surfaces).
-- **Web:** not offered — the member app is retired.
+- **Web:** the same three steps (paste → reading → review → add) since 2026-10, from **Paste a list…** in the account menu on every page, a card on Home while your library is empty, and a link in the empty state of your own lists. A plain list lands on the list you were looking at.
 
 How it goes:
 

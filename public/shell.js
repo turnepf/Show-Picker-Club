@@ -164,9 +164,17 @@
     if (menuEl) { closeMenu(); return; }
     var menu = document.createElement('div');
     menu.className = 'shell-menu';
+    var pasteItem = document.createElement('button');
+    pasteItem.type = 'button';
+    pasteItem.textContent = 'Paste a list…';
+    pasteItem.style.color = 'var(--ink)';
+    // The import sheet lives in index.html; ?import opens it there.
+    pasteItem.addEventListener('click', function () { closeMenu(); location.href = '/?import=1'; });
+    menu.appendChild(pasteItem);
     var appsItem = document.createElement('button');
     appsItem.type = 'button';
     appsItem.textContent = 'Connected apps';
+    appsItem.style.color = 'var(--ink)';
     appsItem.addEventListener('click', function () { closeMenu(); location.href = '/connected-apps'; });
     menu.appendChild(appsItem);
     var exportItem = document.createElement('button');

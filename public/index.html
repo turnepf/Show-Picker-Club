@@ -666,6 +666,25 @@
     .modal label:first-of-type { margin-top: 0; }
 
     .modal textarea { resize: vertical; min-height: 44px; line-height: 1.4; }
+    .import-modal { max-height: 90vh; overflow-y: auto; }
+    .import-help { font-size: 13px; color: var(--ink-muted); line-height: 1.5; margin: 0 0 10px; }
+    .import-example { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; font-size: 13px; color: var(--ink-muted); line-height: 1.45; margin-bottom: 10px; }
+    .import-example strong { display: block; font-size: 12px; margin-bottom: 4px; }
+    .import-example small { display: block; margin-top: 6px; font-size: 12px; }
+    .import-error { color: var(--danger-deep); font-size: 13px; margin: 6px 0; }
+    .import-rows { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+    .import-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border-soft); }
+    .import-row.out { opacity: 0.5; }
+    .import-row input[type=checkbox] { width: 18px; height: 18px; margin-top: 4px; flex: 0 0 auto; }
+    .import-row img, .import-row .poster-empty { width: 36px; height: 54px; border-radius: 4px; object-fit: cover; flex: 0 0 auto; background: var(--surface-2); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .import-row .t { font-weight: 600; font-size: 14px; }
+    .import-row .m { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+    .import-row .warn { color: #c47a00; }
+    .modal .import-row select { width: auto; padding: 4px 8px; font-size: 12px; margin-top: 4px; }
+    .import-card { background: var(--surface); border-radius: 12px; padding: 14px 16px; margin: 0 0 22px; display: flex; flex-direction: column; gap: 6px; }
+    .import-card strong { font-size: 16px; }
+    .import-card span { font-size: 14px; color: var(--ink-muted); line-height: 1.45; }
+    .import-card .btn { align-self: flex-start; margin-top: 4px; }
     .watcher-picker { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; overflow: hidden; }
     .watcher-picker button {
       display: flex; justify-content: space-between; align-items: center; gap: 8px;
@@ -1257,6 +1276,15 @@
           </a>
         </nav>
 
+        <!-- An empty library's one useful offer: bring a list you already keep
+             (iOS HomeView's card). Shown by showLanding() when signed in with
+             no shows; gone as soon as there's anything. -->
+        <div id="importCard" class="import-card hidden">
+          <strong>Start with a list you already have</strong>
+          <span>Notes, a text file, an old spreadsheet — paste it in and we'll sort the titles onto your four lists.</span>
+          <button type="button" class="btn btn-save" onclick="openImport('watching')">Paste a list</button>
+        </div>
+
         <!-- Small screens: Trending inline, iPhone-style. -->
         <div id="popularSection" style="display: none;">
           <h3 class="ios-group-header">Trending</h3>
@@ -1498,6 +1526,37 @@
       <div class="modal-actions">
         <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
         <button class="btn btn-save" id="modalSave" onclick="saveShow()">Add Show</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import a list: paste → reading → review (iOS ImportListView). -->
+  <div class="modal-overlay hidden" id="importOverlay">
+    <div class="modal import-modal" onclick="event.stopPropagation()">
+      <h2 id="importTitle">Import a list</h2>
+      <div id="importPaste">
+        <p class="import-help">Paste your list below. Headings like “Currently watching” or “Favourites” are used to sort titles onto the right list, and any notes you wrote come along with them.</p>
+        <div class="import-example">
+          <strong>For example</strong>
+          <div><b>Watching</b><br>Severance on Apple TV+<br>The Bear on Hulu<br><br><b>Next Up</b><br>The Diplomat on Netflix</div>
+          <small id="importDefaultHint"></small>
+        </div>
+        <textarea id="importText" rows="8" aria-label="Your list" placeholder="Paste your list here"></textarea>
+        <p class="import-error hidden" id="importPasteError"></p>
+        <p class="import-help" style="font-size:12px">Nothing is added until you’ve looked it over.</p>
+      </div>
+      <div id="importReading" class="hidden" style="text-align:center; padding: 24px 0;">
+        <progress id="importProgress" max="1" value="0" style="width:80%"></progress>
+        <p class="import-help" id="importReadingText">Reading your list…</p>
+      </div>
+      <div id="importReview" class="hidden">
+        <div id="importRows" class="import-rows"></div>
+        <p class="import-help" id="importReviewHelp" style="font-size:12px">Untick a title to leave it out, or change the list it lands on. Titles you already have are greyed out and won’t be added again. Posters, cast and watch links fill in shortly after.</p>
+        <p class="import-error hidden" id="importReviewError"></p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-cancel" id="importCancel" onclick="closeImport()">Cancel</button>
+        <button class="btn btn-save" id="importNext" onclick="importNext()">Read list</button>
       </div>
     </div>
   </div>
@@ -1799,7 +1858,9 @@
         const c = EMPTY_COPY.own[currentTab] || { headline: 'Nothing here yet.' };
         const cta = c.cta ? `<button class="btn-empty-cta" onclick="${c.cta.action}">${escapeHtml(c.cta.label)}</button>` : '';
         const help = c.help ? `<p class="empty-help">${escapeHtml(c.help)}</p>` : '';
-        return `<p class="empty-headline">${escapeHtml(c.headline)}</p>${help}${cta}`;
+        // Same offer as iOS's empty state: bring a list you already keep.
+        const paste = `<p class="empty-help"><a href="#" onclick="openImport(currentTab); return false;">Paste a list</a> you already keep.</p>`;
+        return `<p class="empty-headline">${escapeHtml(c.headline)}</p>${help}${cta}${paste}`;
       }
       const guestFn = EMPTY_COPY.guest[currentTab];
       const headline = guestFn ? guestFn(ownerName) : 'Nothing here yet.';
@@ -1993,17 +2054,6 @@
         const res = await fetch('/api/members');
         const data = await res.json();
         setupCalendarLinks(data.members);
-        // If logged in, fetch my shows to populate the rate backlog badge
-        if (authMember) {
-          try {
-            const showsRes = await fetch(`/api/shows?member=${authMember}`);
-            if (showsRes.ok) {
-              const showsData = await showsRes.json();
-              shows = showsData.shows || [];
-              updateRateBacklogBadge();
-            }
-          } catch (e) {}
-        }
 
       } catch (e) {}
 
@@ -2026,13 +2076,186 @@
       } catch (e) {
         detailStatus.textContent = 'Failed to load trending shows.';
       }
-      checkAuth().then(maybeShowJoinCta).then(maybeResumeOAuth);
+      checkAuth().then(loadLandingLibrary).then(maybeShowJoinCta).then(maybeResumeOAuth);
 
       // A shared /show/<id> link continues here (the preview card's "Open in
       // your browser"). Back reveals Home rather than history.back(), since a
       // fresh tab has nothing behind it.
       const sharedShow = parseInt(new URLSearchParams(location.search).get('show'), 10);
       if (Number.isInteger(sharedShow) && sharedShow > 0) openDetail(sharedShow, false);
+
+      // "Paste a list…" from a shell page's account menu lands here.
+      if (new URLSearchParams(location.search).has('import')) {
+        checkAuth().then(() => { if (authMember) openImport('watching'); });
+      }
+    }
+
+    // ── Import a list ────────────────────────────────────────────────────
+    // POST /api/import/parse, paged by cursor (with the section heading
+    // carried across the seam), then a review, then /api/import/commit in
+    // batches. Claude supplies titles, TMDB supplies identity, and commit
+    // re-validates everything (scripts/import-list-test.mjs).
+    const imp = { step: 'paste', items: [], excluded: new Set(), defaultList: 'watching', committing: false };
+    function openImport(defaultList) {
+      imp.step = 'paste'; imp.items = []; imp.excluded = new Set(); imp.committing = false;
+      imp.defaultList = ['watching', 'waiting', 'recommending', 'next'].includes(defaultList) ? defaultList : 'watching';
+      document.getElementById('importText').value = '';
+      document.getElementById('importDefaultHint').textContent =
+        `Headings are optional — a plain list of titles lands on ${LIST_LABELS[imp.defaultList]}.`;
+      closeAccountMenu();
+      renderImportStep();
+      document.getElementById('importOverlay').classList.remove('hidden');
+      document.getElementById('importText').focus();
+    }
+    function closeImport() {
+      if (imp.committing) return;
+      document.getElementById('importOverlay').classList.add('hidden');
+    }
+    function importErrorText(code) {
+      return ({
+        import_unavailable: 'List import isn’t switched on for this server yet.',
+        text_too_long: 'That’s a lot of text — split it into a couple of pastes.',
+        rate_limited: 'You’ve added a lot today. Try the rest tomorrow.',
+        parse_failed: 'Couldn’t read that list. Try again in a moment.',
+      })[code] || 'Couldn’t read your list. Try again.';
+    }
+    function renderImportStep() {
+      const st = imp.step;
+      document.getElementById('importPaste').classList.toggle('hidden', st !== 'paste');
+      document.getElementById('importReading').classList.toggle('hidden', st !== 'reading');
+      document.getElementById('importReview').classList.toggle('hidden', st !== 'review');
+      const next = document.getElementById('importNext');
+      const included = imp.items.filter((_, i) => !imp.excluded.has(i)).length;
+      document.getElementById('importTitle').textContent = st === 'review'
+        ? `Review ${imp.items.length} title${imp.items.length === 1 ? '' : 's'}` : 'Import a list';
+      next.classList.toggle('hidden', st === 'reading');
+      next.textContent = st === 'review' ? (imp.committing ? 'Adding…' : `Add ${included}`) : 'Read list';
+      next.disabled = imp.committing || (st === 'review' && !included);
+      document.getElementById('importCancel').disabled = imp.committing;
+      if (st === 'review') renderImportRows();
+    }
+    function renderImportRows() {
+      const rows = document.getElementById('importRows');
+      if (!imp.items.length) {
+        rows.innerHTML = '<p class="import-help">Couldn’t find any show or film titles in that. Go back and check it’s a list of titles.</p>';
+        return;
+      }
+      rows.innerHTML = imp.items.map((it, i) => {
+        const dupe = !!it.existing_list || !!it.existing_archived;
+        const out = imp.excluded.has(i);
+        const meta = [];
+        if (it.year) meta.push(String(it.year));
+        if (it.raw_title && it.raw_title.toLowerCase() !== String(it.title).toLowerCase()) meta.push(`You wrote “${escapeHtml(it.raw_title)}”`);
+        if (it.matched === false) meta.push('<span class="warn">No match found — will be added as typed</span>');
+        if (it.existing_list) meta.push(`Already on ${escapeHtml(LIST_LABELS[it.existing_list] || it.existing_list)}`);
+        else if (it.existing_archived) meta.push('You archived this before');
+        if (it.notes) meta.push(escapeHtml(it.notes));
+        const poster = it.poster_url ? `<img src="${safeUrl(it.poster_url)}" alt="" loading="lazy">` : '<div class="poster-empty">🎬</div>';
+        const opts = ['watching', 'waiting', 'recommending', 'next'].map(l =>
+          `<option value="${l}"${it.list === l ? ' selected' : ''}>${LIST_LABELS[l]}</option>`).join('');
+        return `<div class="import-row${out ? ' out' : ''}">
+          <input type="checkbox" ${out ? '' : 'checked'} ${dupe ? 'disabled' : ''} onchange="importToggle(${i})"
+            aria-label="${dupe ? 'Already on your lists' : (out ? 'Include ' : 'Leave out ')}${escapeHtml(it.title)}">
+          ${poster}
+          <div style="min-width:0"><div class="t">${escapeHtml(it.title)}</div>
+            ${meta.map(m => `<div class="m">${m}</div>`).join('')}
+            <select onchange="imp.items[${i}].list = this.value" ${out ? 'disabled' : ''} aria-label="List for ${escapeHtml(it.title)}">${opts}</select>
+          </div></div>`;
+      }).join('');
+    }
+    function importToggle(i) {
+      const it = imp.items[i];
+      if (it.existing_list || it.existing_archived) return;
+      if (imp.excluded.has(i)) imp.excluded.delete(i); else imp.excluded.add(i);
+      renderImportStep();
+    }
+    async function importNext() {
+      if (imp.step === 'paste') return importRead();
+      if (imp.step === 'review') return importCommit();
+    }
+    async function importRead() {
+      const text = document.getElementById('importText').value;
+      const err = document.getElementById('importPasteError');
+      err.classList.add('hidden');
+      if (!text.trim()) return;
+      imp.items = []; imp.excluded = new Set();
+      imp.step = 'reading'; renderImportStep();
+      let cursor = 0, section = '';
+      const total = Math.max(text.length, 1);
+      // The server always advances the cursor; the cap is belt and braces.
+      for (let slices = 0; slices < 200; slices++) {
+        try {
+          const res = await fetch('/api/import/parse', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, cursor, section, default_list: imp.defaultList }),
+          });
+          const page = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(page.error || 'parse_failed');
+          imp.items.push(...(page.items || []));
+          section = page.section || '';
+          document.getElementById('importReadingText').textContent =
+            imp.items.length ? `Reading your list… ${imp.items.length} so far` : 'Reading your list…';
+          if (page.next_cursor == null || page.next_cursor <= cursor) break;
+          cursor = page.next_cursor;
+          document.getElementById('importProgress').value = Math.min(cursor / total, 0.99);
+        } catch (e) {
+          err.textContent = importErrorText(e.message);
+          err.classList.remove('hidden');
+          imp.step = 'paste'; renderImportStep();
+          return;
+        }
+      }
+      // Anything already on your lists starts — and stays — out.
+      imp.items.forEach((it, i) => { if (it.existing_list || it.existing_archived) imp.excluded.add(i); });
+      imp.step = 'review'; renderImportStep();
+    }
+    async function importCommit() {
+      const err = document.getElementById('importReviewError');
+      err.classList.add('hidden');
+      imp.committing = true; renderImportStep();
+      const rows = imp.items.filter((_, i) => !imp.excluded.has(i));
+      let added = 0;
+      try {
+        // The server caps a call at 200 rows; batches of 100.
+        for (let i = 0; i < rows.length; i += 100) {
+          const res = await fetch('/api/import/commit', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: rows.slice(i, i + 100) }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error === 'rate_limited' ? 'You’ve added a lot today. Try the rest tomorrow.' : 'Couldn’t add these shows. Try again.');
+          added += data.added || 0;
+        }
+      } catch (e) {
+        // Say what did land — silently losing a partial import is worse.
+        err.textContent = added ? `Added ${added} before this failed: ${e.message}` : e.message;
+        err.classList.remove('hidden');
+        imp.committing = false; renderImportStep();
+        return;
+      }
+      imp.committing = false;
+      document.getElementById('importOverlay').classList.add('hidden');
+      showToast(`Added ${added} show${added === 1 ? '' : 's'}`);
+      // Imported rows have a poster and an id but no cast or overview yet.
+      fetch('/api/enrich', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ member: authMember }) }).catch(() => {});
+      if (memberSlug && memberSlug === authMember) loadShows();
+      else document.getElementById('importCard').classList.add('hidden');
+    }
+
+    // My own library on Home: the Rate my shows badge and, for an empty
+    // library, the import card. After checkAuth — this used to run before
+    // authMember was known, so on Home it never ran at all.
+    async function loadLandingLibrary() {
+      if (!authMember) return;
+      try {
+        const showsRes = await fetch(`/api/shows?member=${encodeURIComponent(authMember)}`);
+        if (showsRes.ok) {
+          const showsData = await showsRes.json();
+          shows = showsData.shows || [];
+          document.getElementById('importCard').classList.toggle('hidden', shows.length > 0);
+          updateRateBacklogBadge();
+        }
+      } catch (e) {}
     }
 
     // Trending: 10 rows, plus "More" (up to 50) — only when the shelf is
@@ -2209,8 +2432,15 @@
       menu.className = 'account-menu';
       // The AI apps (Claude, ChatGPT…) connected to this account — same
       // screen as iOS's Connected Apps, which already lives at /connected-apps.
+      const paste = document.createElement('button');
+      paste.type = 'button';
+      paste.style.color = 'var(--ink)';
+      paste.textContent = 'Paste a list…';
+      paste.addEventListener('click', () => openImport(memberSlug === authMember ? currentTab : 'watching'));
+      menu.appendChild(paste);
       const apps = document.createElement('button');
       apps.type = 'button';
+      apps.style.color = 'var(--ink)';
       apps.textContent = 'Connected apps';
       apps.addEventListener('click', () => { closeAccountMenu(); location.href = '/connected-apps'; });
       menu.appendChild(apps);
