@@ -53,7 +53,7 @@ function formatSeasonRange(show) {
  */
 function renderShowCard(show, options = {}) {
   options = options || {};
-  const { onClickId, showRating = true, showChevron = true, showDragHandle = false, caption, currentTab, prefixHtml = '', extraHtml = '' } = options;
+  const { onClickId, showRating = true, showChevron = true, showDragHandle = false, caption, currentTab, prefixHtml = '', extraHtml = '', rowMenu = false } = options;
 
   const rating = (showRating && show.rating)
     ? `<span class="show-rating"><span class="star">&#9733;</span>${escapeHtml(show.rating)}</span>`
@@ -81,9 +81,15 @@ function renderShowCard(show, options = {}) {
     ? `<img class="row-poster" src="${safeUrl(show.poster_url)}" alt="" loading="lazy">`
     : `<div class="row-poster row-poster-empty">🎬</div>`;
 
+  // ⋯ opens the row's quick actions (moves, Edit, Archive) — the web's
+  // stand-in for iOS's swipe actions. Only on the member's own rows; the page
+  // supplies openRowMenu(). stopPropagation keeps the row from opening.
+  const menuButton = rowMenu
+    ? `<button type="button" class="row-menu-btn" aria-label="Actions for ${escapeHtml(show.title)}" onclick="event.stopPropagation(); openRowMenu(${Number(show.id)}, this)">&#8943;</button>`
+    : '';
   const rightElement = showDragHandle
     ? `<span class="drag-handle" title="Drag to reorder">&#x2630;</span>`
-    : (showChevron ? `<span class="ios-row-chevron">&#8250;</span>` : '');
+    : (menuButton || (showChevron ? `<span class="ios-row-chevron">&#8250;</span>` : ''));
 
   const clickHandler = onClickId ? `onclick="__showRendererClick(${show.id})"` : '';
 
@@ -122,7 +128,7 @@ function renderShowList(shows, options = {}) {
   }
 
   options = options || {};
-  const { onClickId, showRating = true, showChevron = true, showDragHandle = false, currentTab, showFooter = false, canDrag = false, owners = '' } = options;
+  const { onClickId, showRating = true, showChevron = true, showDragHandle = false, currentTab, showFooter = false, canDrag = false, owners = '', rowMenu = false } = options;
 
   let html = '';
 
@@ -144,7 +150,8 @@ function renderShowList(shows, options = {}) {
     showRating,
     showChevron: showChevron && !showDragHandle,
     showDragHandle,
-    currentTab
+    currentTab,
+    rowMenu: rowMenu && !showDragHandle,
   })).join('');
 
   // Footer: legend + network counts

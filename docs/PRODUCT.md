@@ -348,7 +348,8 @@ PWA was retired in 2026-08 and stays retired).
    "More"; Connected apps in the account menu; shared show links open in a
    browser. **Done.**
 2. List controls — Next Up genre filter, TV / Movies filter, quick moves and
-   Archive with Undo from the list.
+   Archive with Undo from the list (a ⋯ menu on your own rows stands in for
+   iOS's swipes), and "couldn't load" kept apart from "empty". **Done.**
 3. Groups — Watch Next board and pop-up, Recommend to group, icons, change
    notice, rename by any member, invite limits, invite links that survive
    signing in.
@@ -398,8 +399,8 @@ arrangement you didn't intend; and when a filter empties the screen the list
 says *"Nothing on this list is Comedy"* rather than showing the empty-list
 copy for a list that isn't empty.
 
-**Platforms:** iPhone and iPad, Mac via Catalyst. Not Apple TV, the watch or
-the web.
+**Platforms:** iPhone and iPad, Mac via Catalyst, and the web (a select beside
+Sort). Not Apple TV or the watch.
 
 Idea from Liza.
 
