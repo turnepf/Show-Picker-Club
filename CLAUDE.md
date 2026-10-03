@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Show Picker Club — a multi-tenant TV-show/movie tracker, live at [showpicker.club](https://showpicker.club) and publicly listed on the App Store. Each member has a slug (`/patrick`, `/amy`, …) and keeps four ranked lists (Watching, Awaiting, Loved, Next Up). The native SwiftUI apps for iPhone/iPad/Mac, Apple TV and Apple Watch are the product members actually use; the browser app is back as a secondary surface (see `docs/PRODUCT.md#web-app-status`) and the Cloudflare backend in this repo serves both.
+Show Picker Club — a multi-tenant TV-show/movie tracker, live at [showpicker.club](https://showpicker.club) and publicly listed on the App Store. Each member has a slug (`/patrick`, `/amy`, …) and keeps four ranked lists (Watching, Awaiting, Loved, Next Up). The native SwiftUI apps for iPhone/iPad/Mac, Apple TV and Apple Watch are the product members actually use; the browser app is back and keeps parity with iPhone/iPad (see `docs/PRODUCT.md#web-app-status`) and the Cloudflare backend in this repo serves both.
 
 **Despite the name, this is not a small private club any more — don't design as if it were.** Signup is open and self-service (email code / Apple / Google), the universal app is on the public App Store, and the membership is dozens of people rather than a couple of friends. Privacy moved *inside* the product: **private groups** and **households** are joined by invite link only, and group membership — not club membership — is what lets two members see or touch each other's libraries. So "another member" is not a synonym for "a friend": private memos (notes, watching-with text, recommended-by) stay owner-only, the social features (Also watching, vibe, cross-library reads) are group-scoped, and the one cross-member *write* that exists, Watching With, is allowed precisely because a group is a relationship both people opted into. The word *club* in the name and the UI is branding, not an access model.
 
@@ -648,8 +648,8 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 
 ## Working preferences
 
-- **The web member app is back (restored 2026-08), but the Apple apps still
-  lead.** `showpicker.club/` is the app again — member slugs like `/patrick`
+- **The web member app is back (restored 2026-08), and it is a full
+  platform again (2026-10).** `showpicker.club/` is the app again — member slugs like `/patrick`
   render in a browser — and the App Store pitch lives at `/download`. Web
   sign-in (email/phone code, Apple, Google) works again. **The catch-all in
   `public/_redirects` can only be `/*  /index.html  200`**; pointing it at any
@@ -659,14 +659,16 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
   emulator reproduces this exactly, and the post-deploy smoke test is a much
   more expensive way to find out.
 
-  **The web is frozen at its restored state: keep it functional, don't build
-  for it.** Bug fixes, security fixes and anything that keeps it working, yes.
-  New member-facing features, no — those go to iOS/iPad, and the web simply
-  falls further behind on purpose. Don't offer to close the gap, and don't port
-  a feature there as a bonus. It already predates Watching With and Also
-  watching; name the gap rather than treating it as work. If Patrick wants
-  something on the web he'll ask for it on the web. See
-  `docs/PRODUCT.md#web-app-status`.
+  **The web keeps parity with iPhone/iPad (the freeze ended 2026-10-03).**
+  Patrick's words: "No more leaving it behind." A member-facing feature that
+  ships on iPhone/iPad ships on the web in the same PR, or in a follow-up PR
+  named in the first one — not "later". The exceptions are things a browser
+  can't do or that were retired on purpose (widgets, the share extension,
+  shake-to-pick, the watch hand-off, offline/PWA — retired 2026-08). The
+  freeze-era backlog is being closed in a series of PRs; until it's done,
+  `docs/PRODUCT.md#web-app-status` lists what's still missing. The show card
+  is one renderer (`public/show-renderer.js`) shared by `index.html` and
+  `groups.html` — change it there, not per page.
 
 - **Feature requests still name their platforms.** The product ships on
   iPhone/iPad, Mac (Catalyst — it runs the iPad split view and gets what iPad

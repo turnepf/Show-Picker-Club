@@ -102,7 +102,7 @@ The show card names the other members of your groups who have that same title on
 
 Only people you already share a group with can appear, and only their first names — the line never reveals a stranger's library, and it shows nothing to a logged-out visitor. You and the member whose copy you're looking at are both left out (you know your own lists, and their list is already on screen).
 
-Platforms: iPhone/iPad show it above Network on the show card; Apple TV shows the same line above the watch button (which is where the TV names the network). The watch app doesn't — private groups were dropped there. **The web doesn't** — it predates the line.
+Platforms: iPhone/iPad and the web show it above Network on the show card; Apple TV shows the same line above the watch button (which is where the TV names the network). The watch app doesn't — private groups were dropped there.
 
 ### Watch Next (group recommendations)
 
@@ -333,21 +333,34 @@ What this means in practice:
   phone-first and widens into a split view on iPad and desktop. No separate
   small-screen build exists or is needed.
 
-**The web is stuck in time, and that is the point.** It is restored to be
-functional, not current: it gets bug fixes, security fixes and whatever keeps it
-working, and it does not get new features — not on request, not "while we're in
-there". The reason the teardown happened hasn't gone away, and this is the cheap
-version of it: two frontends drift, and a full day in 2026-08 went into
-reconciling web surfaces with each other and then porting the same fixes to
-Swift. Freezing the feature set is what stops that bill from coming back.
+**The web keeps up now (2026-10-03).** From its restoration until October the
+web was frozen on purpose — fixes only, no features — so it fell behind iOS by
+design. Patrick ended that: "No more leaving it behind." A member-facing
+feature ships on the web alongside iPhone/iPad. The only exceptions are things a
+browser can't do or that were retired deliberately: home-screen widgets, the
+share extension, shake to pick, the watch hand-off, and offline support (the
+PWA was retired in 2026-08 and stays retired).
 
-So the web already trails, deliberately. It predates Watching With's member
-picker and the Also-watching line, and it will keep falling further behind as
-iOS ships. Say that plainly rather than treating each gap as a task.
+**Closing the freeze-era gap**, in order, one PR each:
 
-The exception is a feature Patrick asks for on the web by name. **Favorite
-Actors** (2026-09) is the first: it was requested for the web specifically, so
-it's there. That doesn't reopen the freeze for anything else.
+1. Show card — Also watching, Also on / Now on, tagline, language, episode
+   count, the finale date, each co-creator linked, Added by, Share; Trending
+   "More"; Connected apps in the account menu; shared show links open in a
+   browser. **Done.**
+2. List controls — Next Up genre filter, TV / Movies filter, quick moves and
+   Archive with Undo from the list.
+3. Groups — Watch Next board and pop-up, Recommend to group, icons, change
+   notice, rename by any member, invite limits, invite links that survive
+   signing in.
+4. Add / edit — the Watching With member picker, the server's network list,
+   the Archived toggle.
+5. Calendar screen; household invite and join.
+6. Import a list.
+7. Passkeys.
+8. Admin — member detail, the missing Reporting sections, vibe re-score.
+
+Strike items off here as they merge, and drop the per-feature "the web
+doesn't" lines elsewhere in this file as each one lands.
 
 ## Native apps
 

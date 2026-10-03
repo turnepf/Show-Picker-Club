@@ -24,9 +24,17 @@ function seasonsText(show) {
   return show.full_series ? `${seasonsPart}, Complete` : seasonsPart;
 }
 
+// "2026-10-03" → a local date. `new Date('2026-10-03')` reads the string as
+// UTC midnight, which is the previous evening anywhere west of Greenwich —
+// every US member saw each premiere a day early.
+function parseYmd(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ''));
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(s);
+}
+
 function formatSeasonRange(show) {
   if (!show || !show.next_season_date) return '';
-  const date = new Date(show.next_season_date);
+  const date = parseYmd(show.next_season_date);
   const opts = { month: 'short', day: 'numeric' };
   return date.toLocaleDateString('en-US', opts);
 }
@@ -227,6 +235,54 @@ function detailStatusText(raw) {
   }
 }
 
+/*
+ * The "Also on" / "Now on" row, or null. Port of Show.streamingNote: the
+ * member's network is their record and is never corrected, so this says
+ * what TMDB reports today beside it. An empty or missing streaming_on says
+ * nothing — "asked, none" and "never asked" must read alike.
+ */
+function detailStreamingRow(show) {
+  const services = String(show.streaming_on || '').split(',').map(x => x.trim()).filter(Boolean);
+  if (!services.length) return null;
+  const mine = String(show.network || '').trim().toLowerCase();
+  if (mine && services.some(x => x.toLowerCase() === mine)) {
+    const others = services.filter(x => x.toLowerCase() !== mine);
+    return others.length ? { label: 'Also on', services: others.join(', ') } : null;
+  }
+  return { label: 'Now on', services: services.join(', ') };
+}
+
+/* Production language spelled out, only when it isn't English. */
+function detailLanguageText(code) {
+  const c = String(code || '').trim().toLowerCase();
+  if (!c || c === 'en') return '';
+  try {
+    const name = new Intl.DisplayNames(['en'], { type: 'language' }).of(c);
+    if (!name || name.toLowerCase() === c) return '';
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  } catch { return ''; }
+}
+
+/*
+ * Share a show: the /show/<id> link whose preview card names the show
+ * (functions/show/[id].js), same URL the iOS share sheet sends. Uses the
+ * browser's share sheet where there is one, else copies the link.
+ */
+async function shareShow(id, title) {
+  const url = `https://showpicker.club/show/${encodeURIComponent(id)}?title=${encodeURIComponent(title || '')}`;
+  const text = `Check out ${title} — from Show Picker Club`;
+  if (navigator.share) {
+    try { await navigator.share({ title: `${title} on Show Picker Club`, text, url }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    alert('Link copied');
+  } catch {
+    prompt('Copy this link:', url);
+  }
+}
+
 const DETAIL_ALL_LISTS = ['watching', 'waiting', 'recommending', 'next'];
 const DETAIL_LIST_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved', next: 'Next Up' };
 const DETAIL_CHIP_COLORS = {
@@ -238,6 +294,8 @@ const DETAIL_CHIP_COLORS = {
  * Render the whole detail body for a show.
  * Options:
  *   actors:      [{ name, imdb_id, character }] cast, in billing order
+ *   groupWatchers: [{ slug, name }] group-mates with it on Watching
+ *   creators:    [{ name, imdb_id }] the creator/director credit as people
  *   loggedIn:    boolean — gates the My Lists card
  *   myCopy:      my own row for this title (active or archived), or null
  *   ratings:     { average, count, seasons, mine, mineSeasons, owner,
@@ -249,21 +307,39 @@ function renderShowDetailBody(show, options = {}) {
   const {
     actors = [], loggedIn = false, myCopy = null, ratings = null,
     listLabels = DETAIL_LIST_LABELS, allLists = DETAIL_ALL_LISTS, showActions = false,
+    groupWatchers = [], creators = [],
   } = options || {};
   if (!show) return '';
 
   // Title lives in the nav bar above the image — no redundant "Title" row.
-  // The top card leads with where to watch + the trailer, then Cast, then
-  // the rest of the metadata below.
+  // The top card leads with who else is watching, where to watch + the
+  // trailer, then Cast, then the rest of the metadata below — the same
+  // order as the iOS card.
   const topRows = [];
+  // Group-mates with this title on Watching, first names only (that's all
+  // GET /api/shows/:id sends). Social context before the "go watch it" rows.
+  if (groupWatchers.length) {
+    topRows.push(detailRow('Also watching', escapeHtml(groupWatchers.map(w => w.name).join(', '))));
+  }
   if (show.network) {
-    // Spell the affordance out — a bare network name reads as a label, not
-    // a link, so nobody realized it opened the show on the service.
+    // The service name itself is the link, as on iOS, so this row and the
+    // "Also on" / "Now on" row under it read in parallel.
     topRows.push(detailRow('Network', detailRealUrl(show.network_url)
-      ? `<a href="${safeUrl(show.network_url)}" target="_blank" rel="noopener">Watch on ${escapeHtml(show.network)}</a>`
+      ? `<a href="${safeUrl(show.network_url)}" target="_blank" rel="noopener">${escapeHtml(show.network)}</a>`
       : (show.watch_link
           ? `${escapeHtml(show.network)} · <a href="${safeUrl(show.watch_link)}" target="_blank" rel="noopener">Where to watch</a>`
           : escapeHtml(show.network))));
+  } else if (show.watch_link) {
+    // No service to name, but TMDB's watch page still answers the question.
+    topRows.push(detailRow('Network', `<a href="${safeUrl(show.watch_link)}" target="_blank" rel="noopener">Where to watch</a>`));
+  }
+  // Where TMDB says it streams now, beside the member's own network rather
+  // than replacing it (docs/INVARIANTS.md §20). Same rule as
+  // Show.streamingNote: "Also on" when their service is among them, "Now on"
+  // when it isn't, nothing when TMDB named none or was never asked.
+  {
+    const note = detailStreamingRow(show);
+    if (note) topRows.push(detailRow(note.label, escapeHtml(note.services)));
   }
   // Free / free-with-ads services (migration 073), minus the member's own
   // network, which the row above already names. No row until enrichment has
@@ -290,11 +366,17 @@ function renderShowDetailBody(show, options = {}) {
   if (show.movie) rows.push(detailRow('Type', 'Movie'));
   if (show.release_year) rows.push(detailRow('Year', escapeHtml(String(show.release_year))));
   {
-    // "4 Seasons, Complete", or just "2 Seasons" while it's still running
-    // (or just "Complete" when the count is unknown).
+    // "4 Seasons · 19 Episodes, Complete", or just "2 Seasons" while it's
+    // still running (or just "Complete" when the count is unknown). Same as
+    // Show.seriesText.
     const n = show.seasons_released;
+    const e = show.episodes_released;
     const seriesParts = [];
-    if (typeof n === 'number' && n > 0) seriesParts.push(`${n} Season${n === 1 ? '' : 's'}`);
+    if (typeof n === 'number' && n > 0) {
+      let count = `${n} Season${n === 1 ? '' : 's'}`;
+      if (typeof e === 'number' && e > 0) count += ` · ${e} Episode${e === 1 ? '' : 's'}`;
+      seriesParts.push(count);
+    }
     if (show.full_series) seriesParts.push('Complete');
     if (seriesParts.length) rows.push(detailRow('Series', escapeHtml(seriesParts.join(', '))));
   }
@@ -304,18 +386,41 @@ function renderShowDetailBody(show, options = {}) {
   }
   if (show.genres) rows.push(detailRow('Genres', escapeHtml(show.genres)));
   if (show.runtime) rows.push(detailRow('Runtime', escapeHtml(runtimeText(show.runtime))));
-  if (show.next_season_date) rows.push(detailRow('Next episode', escapeHtml(formatSeasonRange(show))));
+  if (show.next_season_date) {
+    rows.push(detailRow('Next episode', escapeHtml(formatSeasonRange(show))));
+  } else if (show.season_end_date) {
+    // Mid-season: no premiere ahead, but the finale date is known.
+    const end = parseYmd(show.season_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    rows.push(detailRow('Next episode', escapeHtml(`through ${end}`)));
+  }
   if (show.content_rating) rows.push(detailRow('Rated', escapeHtml(show.content_rating)));
+  {
+    // Only for non-English titles — a "Language: English" row on nearly
+    // every card would tell nobody anything. Same as originalLanguageText.
+    const lang = detailLanguageText(show.original_language);
+    if (lang) rows.push(detailRow('Language', escapeHtml(lang)));
+  }
 
   // Creator/Director is a standard label/value row grouped in the Cast card.
   // Link a single-person credit to their IMDB page (mirrors the cast links);
   // a multi-creator credit (comma in the name) stays plain so the whole list
   // doesn't point at just the first person.
+  //
+  // When GET /api/shows/:id resolved the credit into people (`creators`),
+  // each co-creator links on their own — the one stored id belongs to the
+  // first name, so linking the joined string pointed everyone at one person.
   let creatorRow = '';
   if (show.director) {
-    const dirVal = (show.director_imdb_id && !show.director.includes(','))
-      ? `<a href="https://www.imdb.com/name/${encodeURIComponent(show.director_imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(show.director)}</a>`
-      : escapeHtml(show.director);
+    let dirVal;
+    if (creators.length) {
+      dirVal = creators.map(c => c.imdb_id
+        ? `<a href="https://www.imdb.com/name/${encodeURIComponent(c.imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(c.name)}</a>`
+        : escapeHtml(c.name)).join(', ');
+    } else {
+      dirVal = (show.director_imdb_id && !show.director.includes(','))
+        ? `<a href="https://www.imdb.com/name/${encodeURIComponent(show.director_imdb_id)}/" target="_blank" rel="noopener">${escapeHtml(show.director)}</a>`
+        : escapeHtml(show.director);
+    }
     creatorRow = detailRow(show.movie ? 'Director' : 'Creator', dirVal);
   }
 
@@ -327,8 +432,14 @@ function renderShowDetailBody(show, options = {}) {
   } else if (show.poster_url) {
     html += `<div class="detail-poster"><img src="${safeUrl(show.poster_url)}" alt="" loading="lazy"></div>`;
   }
-  // Overview (plot synopsis) sits right under the title/image.
-  if (show.overview) html += `<div class="detail-card"><div class="detail-prose">${escapeHtml(show.overview)}</div></div>`;
+  // Tagline then overview, right under the image. The tagline is a pull
+  // quote, italic and fainter, so it's never read as the plot's first line.
+  if (show.tagline || show.overview) {
+    let blurb = '';
+    if (show.tagline) blurb += `<div class="detail-prose detail-tagline">${escapeHtml(show.tagline)}</div>`;
+    if (show.overview) blurb += `<div class="detail-prose">${escapeHtml(show.overview)}</div>`;
+    html += `<div class="detail-card">${blurb}</div>`;
+  }
   if (topRows.length) html += `<div class="detail-card">${topRows.join('')}</div>`;
   // Cast — with the creator/director grouped underneath — directly under
   // the trailer, both as standard label/value rows (names right-aligned).
@@ -357,6 +468,11 @@ function renderShowDetailBody(show, options = {}) {
     if (myCopy && myCopy.archived) memberInner += detailRow('Status', 'Archived');
     if (myCopy && myCopy.recommended_by) memberInner += detailRow('Recommended by', escapeHtml(myCopy.recommended_by));
     if (myCopy && myCopy.watching_with) memberInner += detailRow('Watching with', escapeHtml(myCopy.watching_with));
+    // Why a title you never added is on your list: the group-mate whose
+    // Watching With tag put it there. Owner-only, absent on your own adds.
+    if (myCopy && myCopy.added_by_member && myCopy.added_by_member.name) {
+      memberInner += detailRow('Added by', escapeHtml(myCopy.added_by_member.name));
+    }
     if (myCopy && myCopy.notes) memberInner += `<div class="detail-prose"><strong>Notes:</strong> ${escapeHtml(myCopy.notes)}</div>`;
     // Edit / Archive live here in the member section (only for a copy I
     // actively have) — no separate actions card at the bottom.
@@ -366,6 +482,7 @@ function renderShowDetailBody(show, options = {}) {
     }
     html += `<div class="detail-card"><div class="detail-card-title">My Lists</div>${memberInner}</div>`;
   }
+
 
   // Ratings — directly below My Lists. Club Rating shows on every card,
   // logged in or not; a specific member's own rating shows when viewing
@@ -406,6 +523,11 @@ function renderShowDetailBody(show, options = {}) {
 
   // The remaining catalog data (type, genres, dates, …), grouped below.
   if (rows.length) html += `<div class="detail-card">${rows.join('')}</div>`;
+  // Share — the same /show/<id> link the iOS share sheet sends.
+  if (show.id) {
+    const args = escapeHtml(`${JSON.stringify(show.id)}, ${JSON.stringify(show.title || '')}`);
+    html += `<div class="detail-card"><button class="detail-action" onclick="shareShow(${args})">Share</button></div>`;
+  }
 
   return html;
 }

@@ -381,6 +381,8 @@
     // { average, count, seasons, mine, mineSeasons, owner, ownerSeasons,
     //   ownerName } — rides along on GET /api/shows/:id.
     let detailRatings = null;
+    let detailGroupWatchers = [];
+    let detailCreators = [];
 
     const ALL_LISTS = ['watching', 'waiting', 'recommending', 'next'];
     const LIST_LABELS = {
@@ -617,6 +619,8 @@
       detailMyCopy = null;
       detailActors = [];
       detailRatings = null;
+      detailGroupWatchers = [];
+      detailCreators = [];
 
       try {
         const res = await fetch('/api/shows/' + showId);
@@ -624,6 +628,8 @@
           const data = await res.json();
           detailShow = data.show;
           detailRatings = data.ratings || null;
+          detailGroupWatchers = data.group_watchers || [];
+          detailCreators = data.creators || [];
         }
         if (!detailShow) return;
 
@@ -646,7 +652,7 @@
       detailMyCopy = null;
       if (!authMember || !show) return;
       try {
-        const res = await fetch(`/api/shows?member=${encodeURIComponent(authMember.slug)}&include_archived=1`);
+        const res = await fetch(`/api/shows?member=${encodeURIComponent(authMember)}&include_archived=1`);
         if (!res.ok) return;
         const d = await res.json();
         const t = (show.title || '').toLowerCase();
@@ -669,6 +675,8 @@
         ratings: detailRatings,
         listLabels: LIST_LABELS,
         allLists: ALL_LISTS,
+        groupWatchers: detailGroupWatchers,
+        creators: detailCreators,
       });
     }
 

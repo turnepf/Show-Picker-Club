@@ -1989,7 +1989,7 @@
       try {
         const popRes = await fetch('/api/popular');
         const popData = await popRes.json();
-        const rows = (popData.shows || []).map(trendingRowHtml).join('');
+        const rows = renderTrendingRows(popData.shows || [], false);
         if (rows) {
           document.getElementById('popularList').innerHTML = rows;
           document.getElementById('popularDetailList').innerHTML = rows;
@@ -2003,6 +2003,39 @@
         detailStatus.textContent = 'Failed to load trending shows.';
       }
       checkAuth().then(maybeShowJoinCta).then(maybeResumeOAuth);
+
+      // A shared /show/<id> link continues here (the preview card's "Open in
+      // your browser"). Back reveals Home rather than history.back(), since a
+      // fresh tab has nothing behind it.
+      const sharedShow = parseInt(new URLSearchParams(location.search).get('show'), 10);
+      if (Number.isInteger(sharedShow) && sharedShow > 0) openDetail(sharedShow, false);
+    }
+
+    // Trending: 10 rows, plus "More" (up to 50) — only when the shelf is
+    // full, since a "More" that returns the same nine reads as a bug. Same
+    // sizes as iOS's trendingPageSize / trendingMaxSize.
+    const TRENDING_PAGE = 10;
+    const TRENDING_MAX = 50;
+    function renderTrendingRows(list, expanded) {
+      let html = list.map(trendingRowHtml).join('');
+      if (html && !expanded && list.length >= TRENDING_PAGE) {
+        html += '<button type="button" class="list-more-row" onclick="expandTrending(this)">More</button>';
+      }
+      return html;
+    }
+    async function expandTrending(btn) {
+      document.querySelectorAll('.list-more-row').forEach(b => { b.disabled = true; b.textContent = 'Loading…'; });
+      try {
+        const res = await fetch('/api/popular?limit=' + TRENDING_MAX);
+        const data = await res.json();
+        const rows = renderTrendingRows(data.shows || [], true);
+        if (rows) {
+          document.getElementById('popularList').innerHTML = rows;
+          document.getElementById('popularDetailList').innerHTML = rows;
+          return;
+        }
+      } catch (e) {}
+      document.querySelectorAll('.list-more-row').forEach(b => { b.disabled = false; b.textContent = 'More'; });
     }
 
     async function showMember(slug) {
@@ -2150,6 +2183,13 @@
       if (accountMenuEl) { closeAccountMenu(); return; }
       const menu = document.createElement('div');
       menu.className = 'account-menu';
+      // The AI apps (Claude, ChatGPT…) connected to this account — same
+      // screen as iOS's Connected Apps, which already lives at /connected-apps.
+      const apps = document.createElement('button');
+      apps.type = 'button';
+      apps.textContent = 'Connected apps';
+      apps.addEventListener('click', () => { closeAccountMenu(); location.href = '/connected-apps'; });
+      menu.appendChild(apps);
       const exp = document.createElement('button');
       exp.type = 'button';
       exp.innerHTML = 'Export my lists <svg class="ic"><use href="#i-export"/></svg>';
@@ -3761,6 +3801,9 @@
     // there's no "list underneath" the overlay actually came from. Set
     // fresh on every openDetail() call; see detailBack().
     let detailFromDeepLink = false;
+    // From GET /api/shows/:id, kept for reRenderDetail() like detailRatings.
+    let detailGroupWatchers = [];
+    let detailCreators = [];
     const ALL_LISTS = ['watching', 'waiting', 'recommending', 'next'];
 
     // Repoint the old inline-expand entry point at the detail screen so every
@@ -3790,9 +3833,17 @@
 
       let show = (typeof shows !== 'undefined' && shows.find) ? shows.find(s => s.id === id) : null;
       let ratings = null;
+      detailGroupWatchers = [];
+      detailCreators = [];
       try {
         const res = await fetch('/api/shows/' + id);
-        if (res.ok) { const d = await res.json(); if (d.show) show = d.show; ratings = d.ratings || null; }
+        if (res.ok) {
+          const d = await res.json();
+          if (d.show) show = d.show;
+          ratings = d.ratings || null;
+          detailGroupWatchers = d.group_watchers || [];
+          detailCreators = d.creators || [];
+        }
       } catch {}
       if (!show) { body.innerHTML = '<div class="loading">Couldn’t load this show.</div>'; return; }
 
@@ -3840,6 +3891,8 @@
         listLabels: LIST_LABELS,
         allLists: ALL_LISTS,
         showActions: true,
+        groupWatchers: detailGroupWatchers,
+        creators: detailCreators,
       });
     }
 

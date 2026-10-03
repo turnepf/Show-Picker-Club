@@ -173,9 +173,9 @@ The app is the site root; the marketing page is a real page at `/download`.
   fails silently without them: the button renders, the flow never completes.
 - Comments in `_headers` stay at column 0 — Pages parses an indented line inside
   a rule block as a header and silently corrupts the block.
-- The web is frozen at its restored state: fixes keep it functional, new
-  member-facing features go to iOS/iPad only. Falling behind is the intent, not
-  a defect to close.
+- The web keeps parity with iPhone/iPad (the 2026-08 freeze ended 2026-10-03):
+  a member-facing feature ships on both, except what a browser can't do or was
+  retired on purpose (widgets, share extension, shake, watch hand-off, offline).
 
 - Enforced by `scripts/check-static.sh` (the file set, index.html being the app,
   no `app.html`, the catch-all's exact destination, the absent redirects, the
