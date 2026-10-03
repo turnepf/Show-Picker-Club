@@ -604,7 +604,7 @@ before the teardown. The marketing page moved to `public/download.html`.
 |---|---|
 | `/`, `/patrick`, any unmatched path | `index.html` — the member SPA, **URL intact** |
 | `/download` | `download.html` — the App Store pitch, Trending shelf, and a link into the app |
-| `/groups`, `/vibe`, `/rate-backlog`, `/favorite-actors`, `/subscriptions`, `/welcome` | their own pages |
+| `/groups`, `/vibe`, `/rate-backlog`, `/favorite-actors`, `/subscriptions`, `/calendar`, `/welcome` | their own pages (`/calendar` since 2026-10: the Calendar screen, carrying the webcal Subscribe) |
 | `/members`, `/reporting`, `/url-cleanup`, `/vibe-admin` | the four admin tools |
 | `/privacy`, `/terms`, `/sms` | legal pages, linked from the App Store listing |
 | `/connect`, `/connected-apps` | connecting an AI app to the MCP server, and disconnecting one |

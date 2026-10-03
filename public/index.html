@@ -1230,7 +1230,7 @@
             <span class="ios-item-label">Vibe</span>
             <svg class="ic ios-item-chev"><use href="#i-chevron-right"/></svg>
           </a>
-          <a class="ios-item hidden calendar-feed-row" href="#" title="Subscribe in Calendar to keep upcoming season dates on your phone">
+          <a class="ios-item hidden calendar-feed-row" href="#" title="Upcoming premieres and finales from your lists">
             <span class="ios-item-icon"><svg class="ic"><use href="#i-calendar-plus"/></svg></span>
             <span class="ios-item-label">Calendar</span>
           </a>
@@ -1342,7 +1342,7 @@
           <span class="ios-item-icon"><svg class="ic"><use href="#i-sparkles"/></svg></span>
           <span class="ios-item-label">Vibe</span>
         </a>
-        <a class="ios-item hidden calendar-feed-row" href="#" title="Subscribe in Calendar to keep upcoming season dates on your phone">
+        <a class="ios-item hidden calendar-feed-row" href="#" title="Upcoming premieres and finales from your lists">
           <span class="ios-item-icon"><svg class="ic"><use href="#i-calendar-plus"/></svg></span>
           <span class="ios-item-label">Calendar</span>
         </a>
@@ -1972,12 +1972,14 @@
     // Feeds authenticate with a per-member token and the API only returns
     // your own, so whichever row has one is yours; logged out, none do and
     // the rows stay hidden.
+    // The Calendar rows open the Calendar page (as iOS opens its screen),
+    // which carries the webcal Subscribe button. Shown to whoever has a feed
+    // token — /api/members only returns your own, so that means signed in.
     function setupCalendarLinks(members) {
       const mine = (members || []).find(m => m.calendar_token);
       if (!mine) return;
-      const href = `webcal://showpicker.club/calendar/${encodeURIComponent(mine.slug)}.ics?key=${encodeURIComponent(mine.calendar_token)}`;
       document.querySelectorAll('.calendar-feed-row').forEach(a => {
-        a.href = href;
+        a.href = '/calendar';
         a.classList.remove('hidden');
       });
     }
@@ -2397,10 +2399,12 @@
     // open redirect.
     const OAUTH_RETURN_KEY = 'oauth_return_to';
     function safeOAuthReturn(v) {
-      // /groups?token=… is a group invite opened while signed out: sign in,
-      // then come back and redeem it (groups.html sends it here).
+      // /groups?token=… and /subscriptions?household=… are invites opened
+      // while signed out: sign in, then come back and accept (groups.html
+      // and subscriptions.html send them here).
       return typeof v === 'string' && (v.startsWith('/oauth/authorize?') || v === '/connected-apps'
-        || /^\/groups\?token=[A-Za-z0-9_-]{1,64}$/.test(v)) ? v : null;
+        || /^\/groups\?token=[A-Za-z0-9_-]{1,64}$/.test(v)
+        || /^\/subscriptions\?household=[A-Za-z0-9_-]{1,64}$/.test(v)) ? v : null;
     }
     try {
       const r = safeOAuthReturn(new URLSearchParams(location.search).get('return_to'));

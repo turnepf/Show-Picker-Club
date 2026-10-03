@@ -275,7 +275,8 @@
         // only returns your own, so whichever row has one is yours.
         var mine = members.find(function (m) { return m.calendar_token; });
         if (mine) {
-          discover += iconRow('webcal://showpicker.club/calendar/' + encodeURIComponent(mine.slug) + '.ics?key=' + encodeURIComponent(mine.calendar_token), 'Calendar', 'calendar-plus');
+          // Opens the Calendar page, which carries the webcal Subscribe.
+          discover += iconRow('/calendar', 'Calendar', 'calendar-plus', { selected: path === '/calendar' });
         }
       }
       if (auth.is_admin) {

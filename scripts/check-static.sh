@@ -41,7 +41,7 @@ note "Deployed output carries the web app and the marketing page"
 for f in index.html download.html privacy.html terms.html sms.html styles.css \
          favicon.svg og-default.png sw.js _headers _redirects \
          .well-known/apple-app-site-association \
-         welcome.html groups.html vibe.html rate-backlog.html favorite-actors.html \
+         welcome.html groups.html vibe.html rate-backlog.html favorite-actors.html calendar.html \
          subscriptions.html members.html reporting.html url-cleanup.html \
          vibe-admin.html shell.js nav.js show-renderer.js app-banner.js; do
   [ -e "public/$f" ] || err "public/$f is missing"

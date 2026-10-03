@@ -356,7 +356,7 @@ PWA was retired in 2026-08 and stays retired).
 4. Add / edit — the Watching With member picker, the server's network list,
    the Archived toggle, multi-line Notes. **Done.** (Find a Show on someone
    else's page still opens the short "add to my list" form.)
-5. Calendar screen; household invite and join.
+5. Calendar screen; household invite and join. **Done.**
 6. Import a list.
 7. Passkeys.
 8. Admin — member detail, the missing Reporting sections, vibe re-score.
@@ -446,6 +446,8 @@ Calendar apps re-fetch the feed on their own schedule (Apple Calendar typically 
 
 A "📅 Calendar feed" link in each member-page footer opens the `webcal://` URL, which Apple Calendar recognizes as a one-tap subscribe.
 
+The **Calendar** nav row opens a Calendar screen on every surface that has one — iOS's `CalendarView` and, since 2026-10, the web's `/calendar` — listing the same dates grouped by month (one row per show, whichever of its premiere or finale comes first), with **Subscribe in Calendar** at the top. It used to be a bare `webcal://` link on the web.
+
 ## Import a list
 
 The other side of Export: a member arriving with a list they already keep somewhere else — Notes, a text file, an old spreadsheet, a message thread — can paste it in and have it sorted onto the four lists instead of typing it out one show at a time.
@@ -504,7 +506,7 @@ You stay in control: every service has a **Subscribed / Paused / Cancelled** tog
 
 Prices are editable defaults — approximate US standard-plan rates that each member can correct to what they actually pay. Implementation in [`ARCHITECTURE.md`](ARCHITECTURE.md#subscription-audit).
 
-Platforms: iPhone and iPad only, the whole audit and the household viewer names with it. **Apple TV doesn't** — it's view-only, and cancelling a subscription isn't something you do from the couch with a remote. **The watch doesn't** — it's read-only, and a spend audit needs the toggles and price fields it has no room for. **The web has it** — `subscriptions.html` came back with the 2026-08 restore (see [Web app status](#web-app-status)), reading the same API the iOS audit does.
+Platforms: iPhone and iPad only, the whole audit and the household viewer names with it. **Apple TV doesn't** — it's view-only, and cancelling a subscription isn't something you do from the couch with a remote. **The watch doesn't** — it's read-only, and a spend audit needs the toggles and price fields it has no room for. **The web has it** — `subscriptions.html` came back with the 2026-08 restore (see [Web app status](#web-app-status)), reading the same API the iOS audit does, and since 2026-10 the same household screen: invite by link (Share / Copy), Remove per person, and a household link opened in a browser accepts there (signing in first if needed).
 
 ## Vibe
 

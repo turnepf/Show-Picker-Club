@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendar — Show Picker Club</title>
+  <meta name="apple-itunes-app" content="app-id=6780282764">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
+  <link rel="stylesheet" href="/styles.css?v=6">
+  <style>
+    :root { --tint: #6D63EB; }
+    @media (prefers-color-scheme: dark) { :root { --tint: #8D87F5; } }
+    body { padding: 24px 16px 60px; }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; position: relative; }
+    .topbar a.back { color: var(--tint); text-decoration: none; font-size: 16px; position: relative; z-index: 1; padding: 4px 8px 4px 0; }
+    .topbar h1 {
+      font-family: var(--font-sans); font-size: 17px; font-weight: 600; color: var(--ink);
+      position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap;
+    }
+    .subscribe { display: block; background: var(--surface); border-radius: 10px; padding: 14px 16px; text-decoration: none; color: var(--ink); font-size: 16px; }
+    .subscribe span { color: var(--tint); margin-right: 8px; }
+    .subscribe.disabled { color: var(--ink-quiet); pointer-events: none; }
+    .footnote { font-size: 12px; color: var(--ink-muted); line-height: 1.5; margin: 8px 4px 22px; }
+    .month { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-quiet); margin: 18px 4px 7px; }
+    .empty-card { background: var(--surface); border-radius: 10px; padding: 24px; text-align: center; color: var(--ink-muted); font-size: 14px; line-height: 1.6; }
+    .show { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <a class="back" href="/" title="Home">&#8249; Home</a>
+      <h1>Calendar</h1>
+    </div>
+    <div id="content"><div class="empty-card">Loading&hellip;</div></div>
+  </div>
+
+  <script src="/show-renderer.js?v=2"></script>
+  <script src="/shell.js?v=5" defer></script>
+  <script>
+    // The member's calendar, as on iOS (CalendarView + ShowCalendar.upcoming):
+    // every dated thing on Watching and Awaiting from today on, one row per
+    // show — whichever of its premiere and finale comes first, the premiere
+    // winning a tie — grouped by month, with the webcal feed's Subscribe on top.
+
+    let mySlug = null;
+    window.__showRendererClickHandler = (id) => {
+      if (mySlug) location.href = `/${encodeURIComponent(mySlug)}?show=${id}`;
+    };
+
+    // "yyyy-MM-dd" as a local calendar day — never `new Date(s)`, which reads
+    // it as UTC midnight and lands a day early west of Greenwich.
+    function day(s) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ''));
+      return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+    }
+
+    function upcoming(shows) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const out = [];
+      for (const s of shows) {
+        if (s.archived || (s.list !== 'watching' && s.list !== 'waiting')) continue;
+        const c = [];
+        const p = day(s.next_season_date), f = day(s.season_end_date);
+        if (p && p >= today) c.push({ show: s, date: p, kind: 'premiere' });
+        if (f && f >= today) c.push({ show: s, date: f, kind: 'finale' });
+        c.sort((a, b) => a.date - b.date || (a.kind === 'premiere' ? -1 : 1));
+        if (c.length) out.push(c[0]);
+      }
+      return out.sort((a, b) => a.date - b.date || (a.show.title || '').localeCompare(b.show.title || ''));
+    }
+
+    function caption(item) {
+      const when = item.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const label = item.kind === 'premiere' ? 'Premieres' : 'Finale';
+      return escapeHtml(item.show.network ? `${label} ${when} · ${item.show.network}` : `${label} ${when}`);
+    }
+
+    function render(items, feedUrl, failed) {
+      let html = feedUrl
+        ? `<a class="subscribe" href="${escapeHtml(feedUrl)}"><span>&#128197;</span>Subscribe in Calendar</a>
+           <p class="footnote">Adds these dates to your calendar app, kept up to date as your lists change. Paused subscriptions with a resubscribe date land there too.</p>`
+        : `<span class="subscribe disabled"><span>&#128197;</span>Subscribe in Calendar</span>
+           <p class="footnote">Log in to subscribe to your feed.</p>`;
+      if (!items.length) {
+        html += `<div class="empty-card">${failed
+          ? 'Couldn’t load your shows — reload to try again.'
+          : 'Nothing dated coming up. Premiere dates appear here as soon as a show you’re watching or awaiting announces one.'}</div>`;
+      } else {
+        let month = null;
+        for (const item of items) {
+          const m = item.date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          if (m !== month) {
+            if (month) html += '</div>';
+            html += `<div class="month">${escapeHtml(m)}</div><div class="show-list">`;
+            month = m;
+          }
+          html += renderShowCard(item.show, { onClickId: true, showRating: false, caption: caption(item) });
+        }
+        html += '</div>';
+      }
+      document.getElementById('content').innerHTML = html;
+    }
+
+    async function load() {
+      try {
+        const check = await fetch('/auth/check', {
+          headers: { 'X-Client-Platform': window.innerWidth < 768 ? 'web-small' : 'web-large' },
+        });
+        const auth = await check.json();
+        if (!auth.authenticated || !auth.member) {
+          document.getElementById('content').innerHTML =
+            '<div class="empty-card">Your calendar is built from your own lists. <a href="/?login=1">Log in</a> to see it.</div>';
+          return;
+        }
+        mySlug = auth.member;
+        const [membersRes, showsRes] = await Promise.all([
+          fetch('/api/members'),
+          fetch(`/api/shows?member=${encodeURIComponent(mySlug)}`),
+        ]);
+        let feedUrl = null;
+        try {
+          const me = ((await membersRes.json()).members || []).find(m => m.slug === mySlug && m.calendar_token);
+          if (me) feedUrl = `webcal://showpicker.club/calendar/${encodeURIComponent(me.slug)}.ics?key=${encodeURIComponent(me.calendar_token)}`;
+        } catch (e) {}
+        if (!showsRes.ok) { render([], feedUrl, true); return; }
+        render(upcoming((await showsRes.json()).shows || []), feedUrl, false);
+      } catch (e) {
+        render([], null, true);
+      }
+    }
+    load();
+  </script>
+</body>
+</html>
