@@ -163,7 +163,7 @@ Four rules keep it an offer rather than a nag:
 
 The Passkeys screen lists what's registered (label, last used) and removes any of them. Removing all of them is allowed and can't lock anyone out: the account's original sign-in method — Apple, Google, or an email code — never goes away.
 
-**Platforms:** iPhone and iPad (including Mac Catalyst) get both sign-in and management. **tvOS doesn't** — passkey sign-in on a TV means a cross-device QR handshake with a phone, which is a worse experience than the code the Apple TV already asks for; it keeps Sign in with Apple and one-time codes. **watchOS doesn't** — it has no login of its own, taking its session from the iPhone over WatchConnectivity. **The web doesn't** — the browser app signs members in with codes, Apple and Google, but does not enroll or manage passkeys. The server-side relying party is the domain rather than the app, so adding it to the web later needs no re-enrollment from anyone.
+**Platforms:** iPhone and iPad (including Mac Catalyst) get both sign-in and management. **tvOS doesn't** — passkey sign-in on a TV means a cross-device QR handshake with a phone, which is a worse experience than the code the Apple TV already asks for; it keeps Sign in with Apple and one-time codes. **watchOS doesn't** — it has no login of its own, taking its session from the iPhone over WatchConnectivity. **The web does** (2026-10): "Sign in with a passkey" in the login sheet, the "Skip the code next time" offer after a code sign-in (same 30-day "Not now"), and **Passkeys…** in the account menu to add or remove them. The relying party is the domain rather than the app, so it is the same credential everywhere — nobody re-enrolls, and a passkey synced to the browser (or offered from a phone) signs in there too.
 
 Failed logins are rate-limited: 5 attempts per IP in any 15-minute window returns a 429 with `Retry-After`. Failed-login rows are pruned daily.
 
@@ -358,7 +358,7 @@ PWA was retired in 2026-08 and stays retired).
    else's page still opens the short "add to my list" form.)
 5. Calendar screen; household invite and join. **Done.**
 6. Import a list. **Done.**
-7. Passkeys.
+7. Passkeys. **Done.**
 8. Admin — member detail, the missing Reporting sections, vibe re-score.
 
 Strike items off here as they merge, and drop the per-feature "the web

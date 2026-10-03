@@ -533,6 +533,8 @@ Scheduled-job endpoints accept an `X-Cron-Secret` header compared in constant ti
 
 ### Passkeys (migration 062)
 
+The web is a client too (2026-10): `index.html` drives `navigator.credentials.create/get` against the same four `/auth/passkey-*` routes, sending the same base64url fields `PasskeyAuthenticator.swift` does, and manages them through `/api/passkeys`. No server change was needed — `allowedOrigins` already defaulted to `https://showpicker.club`, which is what a browser reports.
+
 WebAuthn sign-in, added 2026-08. A passkey is the only login path with no third party in it: no SMS, no email delivery, no identity provider — the device signs a challenge and the server checks it against a stored public key.
 
 **A passkey never creates an account.** Registration requires a session, so a credential can only ever be added by someone who has already proved the account is theirs; an unrecognized credential at sign-in is refused, not enrolled. Enrollment stays with Apple/Google/email (see Self-enrollment below). That also means removing every passkey can't lock anybody out — the account's original method still works — which is why `DELETE /api/passkeys/:id` has no "last credential" guard.
