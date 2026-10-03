@@ -164,6 +164,11 @@
     if (menuEl) { closeMenu(); return; }
     var menu = document.createElement('div');
     menu.className = 'shell-menu';
+    var appsItem = document.createElement('button');
+    appsItem.type = 'button';
+    appsItem.textContent = 'Connected apps';
+    appsItem.addEventListener('click', function () { closeMenu(); location.href = '/connected-apps'; });
+    menu.appendChild(appsItem);
     var exportItem = document.createElement('button');
     exportItem.type = 'button';
     exportItem.innerHTML = 'Export my lists <svg class="ic"><use href="#s-export"/></svg>';

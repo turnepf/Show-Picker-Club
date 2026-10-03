@@ -321,6 +321,8 @@ body.admin-page {
 .detail-row .v { color: var(--ink); text-align: right; min-width: 0; }
 .detail-row .v a { color: var(--info); text-decoration: none; }
 .detail-prose { padding: 12px 16px; font-size: 14px; color: var(--ink-muted); line-height: 1.5; }
+.detail-prose.detail-tagline { font-style: italic; color: var(--ink-quiet); padding-bottom: 0; }
+.detail-prose.detail-tagline + .detail-prose { padding-top: 6px; }
 .detail-prose a { color: var(--info); text-decoration: none; }
 .detail-prose a:hover { text-decoration: underline; }
 .detail-action {
@@ -412,3 +414,12 @@ body.admin-page {
 body.no-select { user-select: none; -webkit-user-select: none; }
 .list-announce { text-align: center; font-size: 12px; color: var(--tint); padding: 2px 0 10px; }
 .network-counts { text-align: center; font-size: 12px; color: var(--ink-quiet); padding: 12px 0 4px; }
+
+/* "More" at the foot of a list (Trending), styled as a list row. */
+.list-more-row {
+  display: block; width: 100%; padding: 12px 16px; text-align: left;
+  background: var(--surface); color: var(--info);
+  border: 0; border-top: 1px solid var(--border-soft);
+  font: inherit; cursor: pointer;
+}
+.list-more-row:disabled { color: var(--ink-muted); cursor: default; }

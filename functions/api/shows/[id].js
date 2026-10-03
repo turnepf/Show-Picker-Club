@@ -30,6 +30,10 @@ const PUBLIC_SHOW_FIELDS = [
   'streaming_on',
   // Migration 073: the title's IMDb id, TMDB's status, free services.
   'imdb_id', 'tmdb_status', 'free_on',
+  // Migration 063's catalog fields. They were left off this list, so a card
+  // opened on anyone else's copy (Trending, a group-mate's list) lost its
+  // tagline, language row and episode count on every client.
+  'tagline', 'original_language', 'episodes_released',
 ];
 
 // Other members of the viewer's groups who have this same title on their

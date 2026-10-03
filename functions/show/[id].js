@@ -68,5 +68,9 @@ export async function onRequestGet(context) {
     description: show.overview ? truncate(show.overview) : factsLine(show),
     image: art,
     url: canonical,
+    // The web opens the same card (showLanding() honours ?show=), so a
+    // recipient without the app isn't left with only an App Store button.
+    webUrl: `/?show=${id}`,
+    webLabel: 'Open in your browser',
   });
 }
