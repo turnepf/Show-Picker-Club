@@ -207,6 +207,22 @@ const HOT_LIST = `(archived = 0 AND list IN ('watching', 'next'))`;
 // TMDB can't match, which is stamped and skipped like any other.
 const HOT_UNFILLED = `(${HOT_LIST} AND tmdb_status IS NULL AND ${NOT_TRIED_RECENTLY})`;
 
+// The copies the passes choose from, with the show's own facts taken from the
+// shared row (titles, migration 076) rather than the copy (normalizing, step
+// 3c). It is aliased `shows` and carries the column names the predicates
+// above and below were written against, so a gap means the same thing it
+// always did: the show is missing that fact, wherever it's stored. A copy no
+// entry backs (never matched) has every fact missing, which is right: it
+// needs a lookup. Member-side columns (list, archive, network, the badge,
+// enriched_at) still come from the copy.
+const COPIES = `(SELECT s.id, s.title, s.movie, s.list, s.archived, s.network, s.network_url, s.network_logo_url,
+         s.member_slug, s.enriched_at, s.tmdb_id, s.tmdb_type,
+         t.poster_url, t.episodes_released, t.genres, t.streaming_on, t.tmdb_status,
+         EXISTS (SELECT 1 FROM title_cast c WHERE c.tmdb_type = t.tmdb_type AND c.tmdb_id = t.tmdb_id) AS has_cast
+    FROM shows s
+    LEFT JOIN titles t ON t.tmdb_id = s.tmdb_id
+     AND t.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)) shows`;
+
 export async function onRequestPost(context) {
   const { env, request } = context;
   // Normally driven by a logged-in member loading their page. Also allow a
@@ -332,20 +348,19 @@ export async function onRequestPost(context) {
     // no-match path burned — both come from the same detail fetch, so one
     // predicate catches both halves of the damage. One row per title, since
     // the fetch propagates to every copy.
-    const TV_GAP = `(NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id)
-                     OR episodes_released IS NULL)`;
+    const TV_GAP = `(has_cast = 0 OR episodes_released IS NULL)`;
     // Grouped by (title, tmdb_id), not title alone: two members can hold two
     // different TMDB entries under one title (a remake next to its original),
     // and each pin deserves its own fetch — one row per title would let
     // whichever copy the GROUP BY happened to keep answer for both.
     const tvSelect = skipOmdb
-      ? `SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type FROM shows
+      ? `SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type FROM ${COPIES}
           WHERE ${tvWhere} AND poster_url IS NULL
           GROUP BY LOWER(title), tmdb_id
           ORDER BY MIN(CASE WHEN ${HOT_LIST} THEN 0 ELSE 1 END),
                    MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
       : gapsOnly
-      ? `SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type FROM shows
+      ? `SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type FROM ${COPIES}
           WHERE ${tvWhere} AND ${TV_GAP}
           GROUP BY LOWER(title), tmdb_id
           ORDER BY MIN(CASE WHEN ${HOT_LIST} THEN 0 ELSE 1 END),
@@ -356,7 +371,7 @@ export async function onRequestPost(context) {
                 CASE WHEN (${TV_GAP} OR poster_url IS NULL) AND ${NOT_TRIED_RECENTLY} THEN 0
                      WHEN ${HOT_UNFILLED} THEN 1
                      ELSE 2 END AS tier
-          FROM shows
+          FROM ${COPIES}
           WHERE ${tvWhere} AND (archived = 0 OR ${TV_GAP})
           ORDER BY tier,
                    CASE WHEN tier < 2 AND ${HOT_LIST} THEN 0 ELSE 1 END,
@@ -609,7 +624,7 @@ export async function onRequestPost(context) {
                         -- enter through this gate, and every other clause in
                         -- it is already satisfied across the library.
                         OR streaming_on IS NULL
-                        OR NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id))`;
+                        OR has_cast = 0)`;
     // Posters mode keeps the narrow artwork gate — it exists to catch artwork
     // up in a small batch (max_tmdb 6), not to fill detail.
     // Movies mode rotates through every film, not just the incomplete ones —
@@ -631,7 +646,7 @@ export async function onRequestPost(context) {
       ? env.DB.prepare(`SELECT id, title, network, network_url, tmdb_id, tmdb_type FROM shows
           WHERE movie = 1 AND id = ?`).bind(showId)
       : env.DB.prepare(
-      `SELECT id, title, network, network_url, tmdb_id, tmdb_type FROM shows WHERE ${mvWhere}
+      `SELECT id, title, network, network_url, tmdb_id, tmdb_type FROM ${COPIES} WHERE ${mvWhere}
         GROUP BY LOWER(title), tmdb_id
         -- Gap-first, the same rule as the TV rotation (see NOT_TRIED_RECENTLY).
         -- Movies mode is the one that mixes complete and incomplete films;
@@ -821,9 +836,14 @@ export async function onRequestPost(context) {
     const maxActorImdb = parseInt(body.max_actor_imdb ?? String(actorDefault), 10);
     // Grouped by (title, tmdb_id) like the passes above, so a pinned remake
     // and its same-titled original each refresh from their own entry.
+    // An unlinked name in the show's shared cast (step 3c: the cast members
+    // read), rather than in a copy's own rows.
     const backfillBase = `SELECT s.title, MAX(s.movie) AS movie, s.tmdb_id, MAX(s.tmdb_type) AS tmdb_type
        FROM shows s
-       WHERE EXISTS (SELECT 1 FROM actors a WHERE a.show_id = s.id AND a.imdb_id IS NULL)`;
+       WHERE EXISTS (SELECT 1 FROM title_cast c
+                      WHERE c.tmdb_id = s.tmdb_id
+                        AND c.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)
+                        AND c.imdb_id IS NULL)`;
     const backfillStmt = member
       ? env.DB.prepare(`${backfillBase} AND s.member_slug = ? GROUP BY LOWER(s.title), s.tmdb_id ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(member, maxActorImdb)
       : env.DB.prepare(`${backfillBase} GROUP BY LOWER(s.title), s.tmdb_id ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(maxActorImdb);
@@ -879,15 +899,14 @@ export async function onRequestPost(context) {
   if (gapsOnly) {
     const row = await env.DB.prepare(
       `SELECT
-         (SELECT COUNT(DISTINCT LOWER(title)) FROM shows
+         (SELECT COUNT(DISTINCT LOWER(title)) FROM ${COPIES}
            WHERE movie = 0
-             AND (NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id)
-                  OR episodes_released IS NULL)) AS tv,
-         (SELECT COUNT(DISTINCT LOWER(title)) FROM shows
+             AND (has_cast = 0 OR episodes_released IS NULL)) AS tv,
+         (SELECT COUNT(DISTINCT LOWER(title)) FROM ${COPIES}
            WHERE movie = 1
              AND (poster_url IS NULL OR network IS NULL
                   OR genres IS NULL OR genres = ''
-                  OR NOT EXISTS (SELECT 1 FROM actors a WHERE a.show_id = shows.id))) AS movies`
+                  OR has_cast = 0)) AS movies`
     ).first().catch(() => null);
     remaining = row ? { tv: row.tv, movies: row.movies, total: row.tv + row.movies } : null;
   } else if (logosOnly) {

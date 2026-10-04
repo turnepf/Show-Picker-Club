@@ -211,16 +211,16 @@ export async function onRequestPost(context) {
   const { results: pending } = await env.DB.prepare(`
     SELECT LOWER(s.title) AS title_lower,
            MIN(s.title) AS title,
-           (SELECT genres FROM shows g
+           (SELECT genres FROM shows_v g
               WHERE LOWER(g.title) = LOWER(s.title) AND g.genres IS NOT NULL AND g.genres != ''
               ORDER BY g.id LIMIT 1) AS genres,
-           (SELECT network FROM shows g
+           (SELECT network FROM shows_v g
               WHERE LOWER(g.title) = LOWER(s.title) AND g.network IS NOT NULL AND g.network != ''
               ORDER BY g.id LIMIT 1) AS network,
-           (SELECT rating FROM shows g
+           (SELECT rating FROM shows_v g
               WHERE LOWER(g.title) = LOWER(s.title) AND g.rating IS NOT NULL AND g.rating != ''
               ORDER BY g.id LIMIT 1) AS rating
-    FROM shows s
+    FROM shows_v s
     WHERE s.archived = 0
       ${candidateFilter}
     GROUP BY LOWER(s.title)
@@ -230,7 +230,7 @@ export async function onRequestPost(context) {
 
   const remaining = await env.DB.prepare(`
     SELECT COUNT(*) AS cnt FROM (
-      SELECT LOWER(title) AS t FROM shows
+      SELECT LOWER(title) AS t FROM shows_v
       WHERE archived = 0
         ${remainingFilter}
       GROUP BY LOWER(title)

@@ -25,20 +25,20 @@ const COLD_START_THRESHOLD = 15;
 async function memberBased(env, member) {
   const { results } = await env.DB.prepare(`
     WITH member_active AS (
-      SELECT DISTINCT LOWER(title) AS t FROM shows WHERE member_slug = ? AND archived = 0
+      SELECT DISTINCT LOWER(title) AS t FROM shows_v WHERE member_slug = ? AND archived = 0
     ),
     member_archived AS (
-      SELECT DISTINCT LOWER(title) AS t FROM shows WHERE member_slug = ? AND archived = 1
+      SELECT DISTINCT LOWER(title) AS t FROM shows_v WHERE member_slug = ? AND archived = 1
     ),
     member_actor_names AS (
       SELECT DISTINCT a.name FROM actors a
-      JOIN shows s ON s.id = a.show_id
+      JOIN shows_v s ON s.id = a.show_id
       WHERE s.member_slug = ? AND s.archived = 0
     ),
     ${SEED_ONLY_CTE},
     neighbors AS (
       SELECT s.member_slug, COUNT(DISTINCT LOWER(s.title)) AS shared
-      FROM shows s
+      FROM shows_v s
       WHERE s.archived = 0
         AND s.member_slug != ?
         AND s.member_slug NOT IN (SELECT slug FROM seed_only_members)
@@ -54,7 +54,7 @@ async function memberBased(env, member) {
       ROUND(AVG(CAST(s.rating AS REAL)), 1) AS avg_rating,
       GROUP_CONCAT(DISTINCT s.member_slug) AS who_slugs,
       GROUP_CONCAT(DISTINCT s.list) AS list_states,
-      (SELECT s2.network FROM shows s2
+      (SELECT s2.network FROM shows_v s2
         WHERE LOWER(s2.title) = LOWER(s.title) AND s2.archived = 0
           AND s2.network IS NOT NULL AND s2.network != ''
           AND s2.network_url IS NOT NULL AND s2.network_url != ''
@@ -63,7 +63,7 @@ async function memberBased(env, member) {
           CASE WHEN INSTR(LOWER(s2.network_url), LOWER(REPLACE(REPLACE(s2.network, ' ', ''), '+', ''))) > 0 THEN 0 ELSE 1 END,
           s2.id
         LIMIT 1) AS network,
-      (SELECT s2.network_url FROM shows s2
+      (SELECT s2.network_url FROM shows_v s2
         WHERE LOWER(s2.title) = LOWER(s.title) AND s2.archived = 0
           AND s2.network IS NOT NULL AND s2.network != ''
           AND s2.network_url IS NOT NULL AND s2.network_url != ''
@@ -72,15 +72,15 @@ async function memberBased(env, member) {
           CASE WHEN INSTR(LOWER(s2.network_url), LOWER(REPLACE(REPLACE(s2.network, ' ', ''), '+', ''))) > 0 THEN 0 ELSE 1 END,
           s2.id
         LIMIT 1) AS network_url,
-      (SELECT s2.poster_url FROM shows s2
+      (SELECT s2.poster_url FROM shows_v s2
         WHERE LOWER(s2.title) = LOWER(s.title) AND s2.poster_url IS NOT NULL
         LIMIT 1) AS poster_url,
       (SELECT COUNT(DISTINCT a.name) FROM actors a
-       JOIN shows s2 ON s2.id = a.show_id
+       JOIN shows_v s2 ON s2.id = a.show_id
        WHERE LOWER(s2.title) = LOWER(s.title) AND s2.archived = 0
          AND a.name IN (SELECT name FROM member_actor_names)
       ) AS shared_actors
-    FROM shows s
+    FROM shows_v s
     WHERE s.archived = 0
       AND s.member_slug IN (SELECT member_slug FROM neighbors)
       AND LOWER(s.title) NOT IN (SELECT t FROM member_active)
@@ -112,14 +112,14 @@ async function memberBased(env, member) {
 async function contentBased(env, member) {
   const { results } = await env.DB.prepare(`
     WITH member_active AS (
-      SELECT DISTINCT LOWER(title) AS t FROM shows WHERE member_slug = ? AND archived = 0
+      SELECT DISTINCT LOWER(title) AS t FROM shows_v WHERE member_slug = ? AND archived = 0
     ),
     member_archived AS (
-      SELECT DISTINCT LOWER(title) AS t FROM shows WHERE member_slug = ? AND archived = 1
+      SELECT DISTINCT LOWER(title) AS t FROM shows_v WHERE member_slug = ? AND archived = 1
     ),
     member_actor_names AS (
       SELECT DISTINCT a.name FROM actors a
-      JOIN shows s ON s.id = a.show_id
+      JOIN shows_v s ON s.id = a.show_id
       WHERE s.member_slug = ? AND s.archived = 0
     ),
     ${SEED_ONLY_CTE}
@@ -129,7 +129,7 @@ async function contentBased(env, member) {
       ROUND(AVG(CAST(s.rating AS REAL)), 1) AS avg_rating,
       GROUP_CONCAT(DISTINCT s.member_slug) AS who_slugs,
       GROUP_CONCAT(DISTINCT s.list) AS list_states,
-      (SELECT s2.network FROM shows s2
+      (SELECT s2.network FROM shows_v s2
         WHERE LOWER(s2.title) = LOWER(s.title) AND s2.archived = 0
           AND s2.network IS NOT NULL AND s2.network != ''
           AND s2.network_url IS NOT NULL AND s2.network_url != ''
@@ -138,7 +138,7 @@ async function contentBased(env, member) {
           CASE WHEN INSTR(LOWER(s2.network_url), LOWER(REPLACE(REPLACE(s2.network, ' ', ''), '+', ''))) > 0 THEN 0 ELSE 1 END,
           s2.id
         LIMIT 1) AS network,
-      (SELECT s2.network_url FROM shows s2
+      (SELECT s2.network_url FROM shows_v s2
         WHERE LOWER(s2.title) = LOWER(s.title) AND s2.archived = 0
           AND s2.network IS NOT NULL AND s2.network != ''
           AND s2.network_url IS NOT NULL AND s2.network_url != ''
@@ -147,15 +147,15 @@ async function contentBased(env, member) {
           CASE WHEN INSTR(LOWER(s2.network_url), LOWER(REPLACE(REPLACE(s2.network, ' ', ''), '+', ''))) > 0 THEN 0 ELSE 1 END,
           s2.id
         LIMIT 1) AS network_url,
-      (SELECT s2.poster_url FROM shows s2
+      (SELECT s2.poster_url FROM shows_v s2
         WHERE LOWER(s2.title) = LOWER(s.title) AND s2.poster_url IS NOT NULL
         LIMIT 1) AS poster_url,
       (SELECT COUNT(DISTINCT a.name) FROM actors a
-       JOIN shows s2 ON s2.id = a.show_id
+       JOIN shows_v s2 ON s2.id = a.show_id
        WHERE LOWER(s2.title) = LOWER(s.title) AND s2.archived = 0
          AND a.name IN (SELECT name FROM member_actor_names)
       ) AS shared_actors
-    FROM shows s
+    FROM shows_v s
     WHERE s.archived = 0
       AND s.member_slug != ?
       AND s.member_slug NOT IN (SELECT slug FROM seed_only_members)
