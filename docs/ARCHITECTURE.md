@@ -469,6 +469,7 @@ drained once, so it deliberately has no button in the app.
 | `GET /api/passkeys`                    | `functions/api/passkeys.js`                | GET     | session — the caller's own registered passkeys |
 | `DELETE /api/passkeys/:id`             | `functions/api/passkeys/[id].js`           | DELETE  | session — removes one of the caller's own passkeys |
 | `GET/POST /api/admin-member-emails`    | `functions/api/admin-member-emails.js`     | GET, POST | admin session — GET is the roster with contacts, platforms, last login, current per-list totals and 30-day activity; `?member=<slug>` narrows it to one row (the admin member screen). `list_counts` and `show_count` share the active-non-seed filter, so the four sum to the one. POST edits one member's name/emails/phones |
+| `POST /api/admin-query`                | `functions/api/admin-query.js`             | POST    | admin session, or an admin's MCP connection with `members:admin` (`getConnectorAdminSession`, the only such gate). Read-only, club-wide questions about shows. The body is a spec over the fields in `_shared/show-query.js`, never SQL. `mode: "aggregate"` (default) returns `measures` (`rows`, `titles` = one TMDB entry or one unmatched title, `members`, `avg:`/`sum:`/`min:`/`max:` a numeric field) grouped by up to two fields, plus `totals`. `mode: "rows"` returns paged matching shows. Filters are ANDed; values are always bound. Memos are presence-only, and `added_by` and private groups aren't fields. The demo account and disabled members are excluded unless `include_demo`. Up to 500 groups or rows. See [Invariant 27](INVARIANTS.md#27-a-connected-ai-app-gets-the-members-permissions-no-more) |
 | `GET /api/admin-member-groups`         | `functions/api/admin-member-groups.js`     | GET     | admin session — `?member=<slug>` (required; 400 without it) returns the private groups that member is in, each with its roster (`slug`, `name`, `is_creator`, `disabled`). The one read of a group from outside it; membership only, never the group's content — see [Invariant 13](INVARIANTS.md#13-a-groups-membership-is-legible-to-admins-its-content-never-is) |
 | `POST /api/admin-member-disable`       | `functions/api/admin-member-disable.js`    | POST    | admin session |
 | `POST /api/admin-member-role`          | `functions/api/admin-member-role.js`       | POST    | admin session — promote/demote `members.is_admin`; refuses to demote the last admin |
@@ -847,7 +848,10 @@ Admin (`members:admin` only): `admin_list_members`, `admin_list_member_shows`
 (memos stripped), `admin_add_show` (optionally straight to the archive, with a
 rating), `admin_rate_show` and `admin_archive_show`. Each one runs the member
 tool with the target member's session and records the change in
-`admin_actions` (migration 074). See `docs/INVARIANTS.md` §27.
+`admin_actions` (migration 074). `admin_query` is the read-only exception. It
+runs `/api/admin-query` as the admin for club-wide counts, unique titles,
+averages and breakdowns, or the matching rows, in one call. See
+`docs/INVARIANTS.md` §27.
 
 Deliberately absent: invite redemption, group rename/delete, household,
 account, passkeys, import/export, and every operator endpoint.

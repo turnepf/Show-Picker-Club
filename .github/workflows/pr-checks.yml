@@ -119,6 +119,8 @@ jobs:
         run: node scripts/show-edit-network-test.mjs
       - name: MCP server and OAuth give an AI app the member's permissions, no more
         run: node scripts/mcp-test.mjs
+      - name: Club-wide queries are admin-only, a spec rather than SQL, and keep memos unreadable
+        run: node scripts/admin-query-test.mjs
 
   roku:
     runs-on: ubuntu-latest

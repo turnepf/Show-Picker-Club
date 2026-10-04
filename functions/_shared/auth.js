@@ -8,10 +8,20 @@ import { platformOf, recordPlatformUsage } from './platform.js';
 // handler's own owner/group checks run unchanged — rather than a second copy
 // of those rules. See docs/INVARIANTS.md §27.
 const delegated = new WeakMap();
+// Requests from a connection holding the members:admin scope, built by the
+// one tool that may reach an admin endpoint (admin_query). Only
+// getConnectorAdminSession() in _shared/admin.js reads this; every other
+// admin gate refuses a delegated request outright.
+const adminScoped = new WeakSet();
 
-export function actingAs(request, session) {
+export function actingAs(request, session, { adminScope = false } = {}) {
   delegated.set(request, { ...session, via: 'mcp' });
+  if (adminScope) adminScoped.add(request);
   return request;
+}
+
+export function hasDelegatedAdminScope(request) {
+  return adminScoped.has(request);
 }
 
 // True for a request built by actingAs(). Admin gates refuse these: an
