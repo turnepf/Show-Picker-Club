@@ -305,6 +305,30 @@ draining the storefront rows that predate #337; its admin button was removed
 when it moved.
 
 ```bash
+node scripts/tmdb-audit.mjs
+```
+
+How far the library is from "every show is a TMDB entry, named the way TMDB
+names it". It's a read-only operator report: SELECTs through `npx wrangler d1
+execute shows-db --remote` (or `--db <file>` for a local SQLite copy), plus
+TMDB GETs when `TMDB_TOKEN` is set. It lists:
+- **Rows with no `tmdb_id`,** each sorted into one of three groups:
+  - copyable: exactly one entry is pinned under the same title elsewhere in
+    the club;
+  - ambiguous: a remake and its original are both pinned under that title;
+  - none: nothing in the club matches, so with a token it shows TMDB's top
+    search hit, as a suggestion only.
+- **Entries whose copies carry different titles.**
+- **Movie flags** that disagree with the pinned entry's type.
+- **With a token:** every title that differs from TMDB's official name, and
+  pins TMDB no longer serves.
+- **What normalizing to one row per entry would collapse.**
+
+It never selects memos or emails. `--json <file>` writes everything, and
+`--all` lifts the 40-row cap per section. `scripts/tmdb-audit-test.mjs` pins
+the classification against a fixture database and a fake TMDB.
+
+```bash
 node scripts/asc.mjs status
 ```
 
