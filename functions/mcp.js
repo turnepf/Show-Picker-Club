@@ -51,7 +51,7 @@ const rpcError = (id, code, message) => ({ jsonrpc: '2.0', id: id ?? null, error
 // hammers past the cap stays past it. `calls` is still tallied but nothing is
 // refused on it: reads don't count toward any limit.
 async function spend(env, slug, tool) {
-  const w = tool.scope === 'shows:write' ? 1 : 0;
+  const w = (tool.scope === 'shows:write' || tool.write) ? 1 : 0;
   const s = tool.search ? 1 : 0;
   const row = await env.DB.prepare(
     `INSERT INTO mcp_usage (member_slug, day, calls, writes, searches) VALUES (?, date('now'), 1, ?, ?)

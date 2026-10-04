@@ -63,6 +63,7 @@
         list.innerHTML = apps.map(function (a) {
           return '<div class="app"><div class="meta"><div class="name">' + esc(a.name) + '</div>' +
             '<div class="sub">' + esc(a.host ? 'via ' + a.host : '') + ' · ' + (a.can_write ? 'Can read and make changes' : 'Read-only') +
+            (a.can_admin ? ' · Admin: can change any member’s lists' : '') +
             '<br>Connected ' + esc(when(a.connected_at)) + ' · Last used ' + esc(when(a.last_used_at)) + '</div></div>' +
             '<button type="button" data-id="' + esc(a.id) + '">Disconnect</button></div>';
         }).join('');

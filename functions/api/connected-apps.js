@@ -49,6 +49,9 @@ export async function onRequestGet({ request, env }) {
         // told apart (and a lookalike spotted).
         host: uris.length ? redirectLabel(uris[0]) : null,
         can_write: scopes.includes('shows:write'),
+        // Shown so an admin can find and cut the one connection that can
+        // touch everybody's lists.
+        can_admin: scopes.includes('members:admin'),
         connected_at: r.created_at,
         last_used_at: r.last_used_at,
       };

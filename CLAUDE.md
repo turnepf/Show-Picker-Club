@@ -525,7 +525,10 @@ redirect host beside the client's self-chosen name; PKCE S256 is mandatory and
 a replayed code or rotated refresh token revokes the grant; a read-only grant
 isn't shown write tools and can't call one; owner-only memos, group scoping,
 another member's row and Watching With behave exactly as in the app; even an
-admin's token never passes an admin gate; revoke, ban and the daily caps take
+admin's token never passes an admin gate. The one exception is the opt-in
+`members:admin` scope, which lets an admin add, rate and archive shows on any
+member's lists. It is offered only to admins and dropped on demotion, the
+target's own rules still apply, and every change goes in `admin_actions`; revoke, ban and the daily caps take
 effect on the next call. Connected apps (`/api/connected-apps`) is
 cookie-session only, so an AI can't list or cut connections.
 
@@ -639,7 +642,7 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 - **Feature flags via secrets:** `DEMO_LOGIN_EMAIL`/`DEMO_LOGIN_CODE` (App Review demo account with auto-reset), inert when unset. Signup is always open — there is no kill switch and no approval step.
 - **Retired 2026-07:** the open cross-member writes (suggest-a-show, share-to-member) — those endpoints still return 410, and the reason they're gone is that anyone could push a row onto anyone. **Watching With (2026-08) is the one cross-member write that exists now**, and it's the shape a new one would have to take: only a group-mate can be named, an existing copy is linked where it already sits rather than moved or duplicated, and unlinking touches only your own row (`_shared/watchers.js`, `scripts/watching-with-test.mjs`). "Picks for You" (`/api/recommendations`) is no longer called by any client but kept for compatibility.
 - **The home page does not list members.** `/api/members` is still the roster source for the member-page sidebar, cross-library search, household, and the calendar-feed link — just not the landing page.
-- **MCP server (2026-09):** `/mcp` lets a member's AI app act on their lists; OAuth under `/oauth/*` with the club as its own authorization server; `/connect` and `/connected-apps` are the web pages (OAuth is a browser flow — the one deliberate exception to the frozen web). New tools must call an existing handler through `_shared/mcp-tools.js`, never query around it, and account-shaped actions (invite redemption, household, account, passkeys, admin) stay out. See `docs/ARCHITECTURE.md#mcp-server`.
+- **MCP server (2026-09):** `/mcp` lets a member's AI app act on their lists; OAuth under `/oauth/*` with the club as its own authorization server; `/connect` and `/connected-apps` are the web pages (OAuth is a browser flow — the one deliberate exception to the frozen web). New tools must call an existing handler through `_shared/mcp-tools.js`, never query around it, and account-shaped actions (invite redemption, household, account, passkeys, operator endpoints) stay out. The `members:admin` tools are the one admin power. They act on another member's shows by running the member tools as that member (INVARIANTS §27). See `docs/ARCHITECTURE.md#mcp-server`.
 - **Native apps** call the same `/api/*` endpoints; shared models live in the repo-root `ShowPickerCore` package. tvOS is view-only. watchOS gets its session from the iPhone via WatchConnectivity. iOS has offline caching + a queued-write sync layer (`ios/ShowPickerIOS/Offline/`).
 
 ## Non-obvious conventions (violating these breaks features)

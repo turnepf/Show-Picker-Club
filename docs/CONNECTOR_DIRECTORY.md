@@ -126,7 +126,9 @@ before submitting, not in the portal.
   tokens last 90 days and rotate on every use. Revocation (RFC 7009) is at
   `/oauth/revoke`.
 - **Scopes:** `shows:read` and `shows:write`. The member can untick write on
-  the consent screen.
+  the consent screen. There is also a third scope, `members:admin`. It is
+  offered only to the club's own admins, unticked, and an ordinary member
+  never sees it.
 - **Redirect URIs:** any `https://` redirect registered via DCR, so no
   per-client allowlist is needed for Claude's callback.
 
