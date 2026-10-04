@@ -4830,8 +4830,11 @@
       try {
         const res = await fetch('/api/shows', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
+          // The exact TMDB entry when the copy has one, so a same-titled show
+          // (three 2026 films are "The Odyssey") can't be added instead.
           body: JSON.stringify({ title: s.title, network: s.network || null, network_url: s.network_url || null,
-                                 list, movie: s.movie || 0, full_series: s.full_series || 0 }),
+                                 list, movie: s.movie || 0, full_series: s.full_series || 0,
+                                 ...(s.tmdb_id ? { tmdb_id: s.tmdb_id, tmdb_type: s.tmdb_type || (s.movie ? 'movie' : 'tv') } : {}) }),
         });
         if (res.status === 409) {
           await reRenderDetail();

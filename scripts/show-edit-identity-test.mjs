@@ -234,5 +234,24 @@ console.log('\n== a pinned lookup that fails');
   check('and the catalog fields are left as they were', r.release_year === 1990 && r.overview === 'kept' && r.poster_url === '/kept.jpg');
 }
 
+console.log('\n== someone else\'s copy carries its entry');
+{
+  // "Add to my list" from a group-mate's show sends this id, so the add is
+  // that exact show rather than a title search's guess. The id is a catalog
+  // fact; the owner's memos stay owner-only.
+  const env = makeEnv();
+  env._db.prepare(`INSERT INTO members (slug, name, first_name, last_name, enrolled_via) VALUES ('bea', 'Bea''s Shows', 'Bea', 'C', 'email')`).run();
+  env._db.prepare(`INSERT INTO sessions (id, email, member_slug, expires_at, created_at) VALUES ('s-bea', 'bea@example.com', 'bea', ?, ?)`)
+    .run(new Date(Date.now() + 86400000).toISOString(), new Date().toISOString());
+  const id = addShow(env, { tmdb: REMAKE, year: 2026, notes: 'my private note' });
+  const res = await showApi.onRequestGet({
+    env, params: { id: String(id) },
+    request: new Request(`${ORIGIN}/api/shows/${id}`, { headers: { Cookie: 'session=s-bea' } }),
+  });
+  const { show } = await res.json();
+  check('a group-mate sees which TMDB entry it is', show.tmdb_id === REMAKE && show.tmdb_type === 'tv', JSON.stringify({ id: show.tmdb_id, type: show.tmdb_type }));
+  check('and still not the owner\'s note', !('notes' in show) && !JSON.stringify(show).includes('my private note'));
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

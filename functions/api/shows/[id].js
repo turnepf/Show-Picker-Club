@@ -31,6 +31,10 @@ const PUBLIC_SHOW_FIELDS = [
   'streaming_on',
   // Migration 073: the title's IMDb id, TMDB's status, free services.
   'imdb_id', 'tmdb_status', 'free_on',
+  // Which TMDB entry this is: a catalog fact like the IMDb id, and what lets
+  // "add this to my list" from a group-mate's copy add the same show rather
+  // than whatever a title search finds (three 2026 films are "The Odyssey").
+  'tmdb_id', 'tmdb_type',
   // Migration 063's catalog fields. They were left off this list, so a card
   // opened on anyone else's copy (Trending, a group-mate's list) lost its
   // tagline, language row and episode count on every client.
