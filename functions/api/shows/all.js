@@ -63,6 +63,10 @@ export async function onRequestGet(context) {
   const stmt = env.DB.prepare(
     `SELECT s.id, s.title, s.network, s.network_url, s.rating, s.movie,
             s.full_series, s.list, s.member_slug, s.genres,
+            -- The entry, so clients can tell same-titled shows apart (three
+            -- 2026 films are called "The Odyssey"). Additive: older clients
+            -- ignore it.
+            s.tmdb_id, s.tmdb_type,
             -- Artwork is per-row and backfills row-by-row; borrow from any
             -- active copy of the same title so no member's result lacks a
             -- poster another member's copy already has.

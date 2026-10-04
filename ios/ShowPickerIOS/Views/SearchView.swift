@@ -47,17 +47,23 @@ struct SearchView: View {
         }
     }
 
-    // TMDB hits not already listed above: a title you have is one row (your
+    // TMDB hits not already listed above: a show you have is one row (your
     // copy), not two. Movie-ness is part of the match so owning Fargo the
     // series doesn't hide Fargo the film.
     private var newHits: [TitleHit] {
         hits.filter { hit in
-            !myMatches.contains { sameTitle($0.title, $0.isMovie, hit) }
+            !myMatches.contains { sameShow($0.title, $0.isMovie, $0.tmdbId, hit) }
         }
     }
 
-    private func sameTitle(_ title: String, _ isMovie: Bool, _ hit: TitleHit) -> Bool {
-        isMovie == hit.isMovie && title.lowercased() == hit.title.lowercased()
+    // The same TMDB entry when both sides know theirs: three 2026 films are
+    // called "The Odyssey", and a group-mate's copy of one must not label the
+    // other two. The title (and movie-ness) only decides when a copy has no
+    // id, or the server is too old to send it.
+    private func sameShow(_ title: String, _ isMovie: Bool, _ tmdbId: Int?, _ hit: TitleHit) -> Bool {
+        guard isMovie == hit.isMovie else { return false }
+        if let tmdbId { return tmdbId == hit.tmdbId }
+        return title.lowercased() == hit.title.lowercased()
     }
 
     var body: some View {
@@ -185,13 +191,13 @@ struct SearchView: View {
         .accessibilityHint("Adds this show to your lists")
     }
 
-    // "Quinn · Watching, Amy · Loved" — group-mates with this title, and
-    // where they keep it. Matched on title and movie-ness (the group feed
-    // carries no TMDB id); three names, then a count.
+    // "Quinn · Watching, Amy · Loved" — group-mates with this show, and
+    // where they keep it. Matched on the TMDB entry, falling back to title and
+    // movie-ness for a copy with no id; three names, then a count.
     private func groupLine(for hit: TitleHit) -> String? {
         var seen = Set<String>()
         let people = groupShows
-            .filter { $0.memberSlug != auth.memberSlug && sameTitle($0.title, $0.isMovie, hit) }
+            .filter { $0.memberSlug != auth.memberSlug && sameShow($0.title, $0.isMovie, $0.tmdbId, hit) }
             .filter { seen.insert($0.memberSlug).inserted }
             .map { "\($0.ownerLabel) · \($0.listLabel)" }
         guard !people.isEmpty else { return nil }

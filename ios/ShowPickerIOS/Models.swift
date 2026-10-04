@@ -104,6 +104,9 @@ struct AllShow: Codable, Identifiable, Hashable {
     let memberFirstName: String?
     let actors: String?
     let posterUrl: String?
+    // The TMDB entry, so "who else has this?" can tell same-titled shows
+    // apart. Optional: an older server doesn't send it.
+    let tmdbId: Int?
 
     enum CodingKeys: String, CodingKey {
         case id, title, network, rating, movie, list, genres, actors
@@ -113,6 +116,7 @@ struct AllShow: Codable, Identifiable, Hashable {
         case memberName = "member_name"
         case memberFirstName = "member_first_name"
         case posterUrl = "poster_url"
+        case tmdbId = "tmdb_id"
     }
 
     var isMovie: Bool { (movie ?? 0) == 1 }

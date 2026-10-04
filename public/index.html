@@ -4344,11 +4344,14 @@
       renderFindResults();
     }
 
-    // Title plus movie-ness, so owning Fargo the series doesn't hide (or
-    // borrow group-mates for) Fargo the film.
+    // The same TMDB entry when the copy knows its id: three 2026 films are
+    // called "The Odyssey", and a group-mate's copy of one must not label the
+    // other two. Title plus movie-ness only for a copy with no id, so owning
+    // Fargo the series still doesn't hide (or borrow group-mates for) the film.
     function sameTitle(show, hit) {
-      return !!show.movie === (hit.media_type === 'movie')
-        && (show.title || '').toLowerCase() === (hit.title || '').toLowerCase();
+      if (!!show.movie !== (hit.media_type === 'movie')) return false;
+      if (show.tmdb_id) return Number(show.tmdb_id) === Number(hit.tmdb_id);
+      return (show.title || '').toLowerCase() === (hit.title || '').toLowerCase();
     }
 
     // "Quinn · Watching, Amy · Loved" — three names, then a count.
