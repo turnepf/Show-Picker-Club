@@ -18,6 +18,9 @@ struct ShowDetailView: View {
     // actions and the List row reflect MY row — not the copy that search may
     // have opened by id.
     @State private var myCopy: Show?
+    // Set once refreshMyCopy() has answered, so "not on your lists" is a fact
+    // rather than a guess made before the lookup returns.
+    @State private var myCopyChecked = false
     @State private var cast: [Actor] = []
     @State private var showingEdit = false
     @State private var addingToMine = false
@@ -212,7 +215,7 @@ struct ShowDetailView: View {
             // have it). The member-edited fields and Edit/Archive live here too.
             // Logged-in members only.
             if auth.memberSlug != nil {
-                Section("My Lists") {
+                Section {
                     listChipsRow()
                     if mineArchived != nil {
                         Text("Archived — tap a list to add it back")
@@ -262,6 +265,18 @@ struct ShowDetailView: View {
                             Label("Archive", systemImage: "archivebox")
                         }
                         .disabled(addingToMine)
+                    }
+                } header: {
+                    // On a show that isn't yours (a group-mate's, Trending, a
+                    // recommendation), say what the chips do: they add it.
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("My Lists")
+                        Spacer()
+                        if myCopyChecked && myCopy == nil {
+                            Text("Pick a list to add it to yours")
+                                .textCase(nil)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -643,7 +658,15 @@ struct ShowDetailView: View {
         guard let mine = auth.memberSlug else { myCopy = nil; return }
         let t = (show?.title ?? initialTitle).lowercased()
         let list = (try? await API.shows(member: mine, includeArchived: true)) ?? []
-        myCopy = list.first { $0.title.lowercased() == t }
+        // The same TMDB entry when both sides know theirs: owning one of the
+        // three 2026 "The Odyssey" films isn't owning the others. Title only
+        // for a copy with no id.
+        let id = show?.tmdbId
+        myCopy = list.first { mineShow in
+            if let id, let theirs = mineShow.tmdbId { return theirs == id && mineShow.isMovie == (show?.isMovie ?? mineShow.isMovie) }
+            return mineShow.title.lowercased() == t
+        }
+        myCopyChecked = true
     }
 
     private func move(to list: ShowList, id: Int) async {

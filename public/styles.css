@@ -317,6 +317,14 @@ body.admin-page {
 }
 .detail-card .detail-row:first-of-type,
 .detail-card-title + .detail-row { border-top: none; }
+/* A title with a quiet hint on the right ("Pick a list to add it to yours"). */
+.detail-card-title-row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+}
+.detail-card-hint {
+  text-transform: none; letter-spacing: 0; font-weight: 500;
+  color: var(--ink-muted); text-align: right;
+}
 .detail-row .k { color: var(--ink-muted); flex: 0 0 auto; }
 .detail-row .v { color: var(--ink); text-align: right; min-width: 0; }
 .detail-row .v a { color: var(--info); text-decoration: none; }

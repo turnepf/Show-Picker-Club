@@ -18,6 +18,9 @@ struct ShowDetailView: View {
     // list chip and the actions target MY row — not the stranger's copy that
     // search may have opened by id.
     @State private var myCopy: Show?
+    // Set once refreshMyCopy() has answered, so the "add it" hint never
+    // flashes on a show that turns out to be mine.
+    @State private var myCopyChecked = false
     @State private var cast: [Actor] = []
     @State private var openFailed = false
     @State private var working = false
@@ -144,9 +147,17 @@ struct ShowDetailView: View {
         if auth.memberSlug != nil, (show != nil || id == nil) {
             let cur = mineActive.flatMap { ShowList(rawValue: $0.list) }
             VStack(alignment: .leading, spacing: 14) {
-                Text("My Lists")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundColor(Theme.text)
+                HStack(alignment: .firstTextBaseline, spacing: 20) {
+                    Text("My Lists")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundColor(Theme.text)
+                    // On a show that isn't mine, say what the chips do.
+                    if myCopyChecked && myCopy == nil {
+                        Text("Pick a list to add it to yours")
+                            .font(.system(size: 22))
+                            .foregroundColor(Theme.muted)
+                    }
+                }
                 // Four list chips on one row, each sized to its own label so the
                 // name never wraps. The colored dot carries the list identity;
                 // the label and checkmark take ChipButtonStyle's foreground so
@@ -343,7 +354,14 @@ struct ShowDetailView: View {
         guard let slug = auth.memberSlug else { myCopy = nil; return }
         let t = (show?.title ?? initialTitle).lowercased()
         let mine = (try? await API.myShows(slug: slug, includeArchived: true)) ?? []
-        myCopy = mine.first { $0.title.lowercased() == t }
+        // The same TMDB entry when both sides know theirs (three 2026 films
+        // are "The Odyssey"); title only for a copy with no id.
+        let id = show?.tmdbId
+        myCopy = mine.first { m in
+            if let id, let theirs = m.tmdbId { return theirs == id && m.isMovie == (show?.isMovie ?? m.isMovie) }
+            return m.title.lowercased() == t
+        }
+        myCopyChecked = true
     }
 
     // Cast + creator, sitting under the description on the left so it fills the

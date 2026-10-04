@@ -4700,7 +4700,13 @@
         if (!res.ok) return;
         const d = await res.json();
         const t = (detailShow.title || '').toLowerCase();
-        detailMyCopy = (d.shows || []).find(s => (s.title || '').toLowerCase() === t) || null;
+        // The same TMDB entry when both sides know theirs: owning one of the
+        // three 2026 "The Odyssey" films isn't owning the others. Title only
+        // for a copy with no id.
+        const id = detailShow.tmdb_id ? Number(detailShow.tmdb_id) : null;
+        detailMyCopy = (d.shows || []).find(s => (id && s.tmdb_id)
+          ? Number(s.tmdb_id) === id && !!s.movie === !!detailShow.movie
+          : (s.title || '').toLowerCase() === t) || null;
       } catch {}
     }
 
