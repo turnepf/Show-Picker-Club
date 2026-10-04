@@ -213,6 +213,21 @@ moving their copy must not relink anybody else's. See `docs/INVARIANTS.md`
 §20.
 
 ```bash
+node scripts/show-edit-identity-test.mjs
+```
+
+Invariant §17 on the edit path, same harness and fake TMDB as the identity
+suite. `PUT /api/shows/:id` re-enriches on every save. Given no `tmdb_id`, it
+used to search by title and store the result, so restoring the 1974 Little
+House on the Prairie from the archive, or editing its notes from a client
+that sends no id, turned it into the 2026 remake. Pins that an edit with no
+pick fetches a pinned row by its own pin, with no title search. A type-ahead
+pick still re-points the row. A new title or a TV/movie flip still searches,
+since the pin no longer describes the row. An unpinned row still resolves by
+title. A pinned lookup that fails saves the edit and leaves identity alone
+rather than guessing.
+
+```bash
 node scripts/url-cleanup-authz-test.mjs
 ```
 
