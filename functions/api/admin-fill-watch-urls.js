@@ -2,6 +2,9 @@ import { canonicalNetwork } from '../_shared/networks.js';
 import { isAdmin } from '../_shared/admin.js';
 import { cronAuthorized } from '../_shared/secrets.js';
 import { normalizeAmazonUrl } from '../_shared/amazon-urls.js';
+import { sameShowWhere, showKeySql } from '../_shared/same-show.js';
+
+const SHOW_KEY = showKeySql('shows');
 
 // Backfills network_url for rows missing a real deep link, using Watchmode's
 // /title/{id}/sources endpoint. For each candidate row:
@@ -53,10 +56,16 @@ function watchmodeRegion(env) {
   return env.WATCHMODE_REGION || 'US';
 }
 
-async function watchmodeSearch(env, title, isMovie) {
+// A pinned row is looked up by its TMDB entry, which Watchmode indexes; only
+// a row TMDB never matched falls back to a name search, whose first hit is a
+// guess among every show of that name.
+async function watchmodeSearch(env, row) {
   if (!env.WATCHMODE_API_KEY) return null;
-  const types = isMovie ? 'movie' : 'tv_series,tv_miniseries';
-  const url = `https://api.watchmode.com/v1/search/?search_field=name&search_value=${encodeURIComponent(title)}&types=${types}`;
+  const isMovie = !!row.movie;
+  const type = row.tmdb_type || (isMovie ? 'movie' : 'tv');
+  const url = row.tmdb_id
+    ? `https://api.watchmode.com/v1/search/?search_field=${type === 'movie' ? 'tmdb_movie_id' : 'tmdb_tv_id'}&search_value=${encodeURIComponent(row.tmdb_id)}`
+    : `https://api.watchmode.com/v1/search/?search_field=name&search_value=${encodeURIComponent(row.title)}&types=${isMovie ? 'movie' : 'tv_series,tv_miniseries'}`;
   try {
     const res = await fetch(url, { headers: watchmodeHeaders(env) });
     if (!res.ok) return { error: `search ${res.status}` };
@@ -111,13 +120,13 @@ export async function onRequestPost(context) {
   const amazonShape = body.mode === 'amazon-shape';
 
   const amazonSql = `
-    SELECT id, title, network, network_url, movie
+    SELECT id, title, network, network_url, movie, tmdb_id, tmdb_type
     FROM shows
     WHERE archived = 0
       AND network = 'Amazon Prime Video'
       AND network_url IS NOT NULL
       AND network_url NOT LIKE '%watch.amazon.com%'
-    GROUP BY LOWER(title)
+    GROUP BY ${SHOW_KEY}
     LIMIT ${limit}
   `;
 
@@ -126,7 +135,7 @@ export async function onRequestPost(context) {
   // users at the home screen, and themoviedb.org watch pages left over
   // from the earlier TMDB-based version of this endpoint.
   const sql = `
-    SELECT id, title, network, network_url, movie
+    SELECT id, title, network, network_url, movie, tmdb_id, tmdb_type
     FROM shows
     WHERE archived = 0
       ${network ? 'AND network = ?' : ''}
@@ -151,9 +160,9 @@ export async function onRequestPost(context) {
       AND (network_url IS NULL OR (
             network_url NOT LIKE 'https://play.hbomax.com/search?%'
         AND network_url NOT LIKE 'https://play.hbomax.com/search/result?%'))
-    -- Dedup by title — one lookup per show, push the result to every
-    -- member's same-titled row via the UPDATE below.
-    GROUP BY LOWER(title)
+    -- One lookup per show (TMDB entry, or title for an unpinned row), pushed
+    -- to every member's copy of that show via the UPDATE below.
+    GROUP BY ${SHOW_KEY}
     LIMIT ${limit}
   `;
   const { results } = amazonShape
@@ -173,9 +182,7 @@ export async function onRequestPost(context) {
   };
 
   for (const row of results) {
-    const isMovie = !!row.movie;
-
-    const searchResult = await watchmodeSearch(env, row.title, isMovie);
+    const searchResult = await watchmodeSearch(env, row);
     if (searchResult && typeof searchResult === 'object' && searchResult.error) {
       summary.errors.push({ title: row.title, error: searchResult.error });
       continue;
@@ -222,9 +229,12 @@ export async function onRequestPost(context) {
     // row.network), so blasting it across every same-titled row would
     // misroute members whose row carries a different network for the
     // same title (e.g. All Her Fault on Peacock vs Amazon).
+    // And only to copies of this same show: a copy pinned to a different
+    // TMDB entry with the same title is a different film.
+    const same = sameShowWhere('shows', row, { forWrite: true });
     const upd = await env.DB.prepare(
-      "UPDATE shows SET network_url = ?, enriched_at = datetime('now') WHERE LOWER(title) = LOWER(?) AND network = ? AND archived = 0"
-    ).bind(url, row.title, row.network).run();
+      `UPDATE shows SET network_url = ?, enriched_at = datetime('now') WHERE ${same.sql} AND network = ? AND archived = 0`
+    ).bind(url, ...same.binds, row.network).run();
 
     summary.filled += upd.meta.changes;
     summary.updated.push({

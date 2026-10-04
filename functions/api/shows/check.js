@@ -1,4 +1,5 @@
 import { getSession } from '../../_shared/auth.js';
+import { sameShowWhere } from '../../_shared/same-show.js';
 
 export async function onRequestGet(context) {
   const { env, request } = context;
@@ -20,9 +21,19 @@ export async function onRequestGet(context) {
     });
   }
 
+  // A client that knows which TMDB entry it means sends tmdb_id (and
+  // tmdb_type or movie), so a different show sharing the title isn't
+  // reported as this one. Without them this answers by title, as before.
+  const movieParam = url.searchParams.get('movie');
+  const match = sameShowWhere('s', {
+    title,
+    tmdb_id: url.searchParams.get('tmdb_id'),
+    tmdb_type: url.searchParams.get('tmdb_type'),
+    movie: movieParam === null ? null : movieParam === '1' || movieParam === 'true',
+  });
   const show = await env.DB.prepare(
-    'SELECT id, list, archived FROM shows_v WHERE LOWER(title) = LOWER(?) AND member_slug = ?'
-  ).bind(title, member).first();
+    `SELECT id, list, archived FROM shows_v s WHERE ${match.sql} AND member_slug = ?`
+  ).bind(...match.binds, member).first();
 
   if (!show) {
     return new Response(JSON.stringify({ exists: false }), {

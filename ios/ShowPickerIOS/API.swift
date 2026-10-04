@@ -1033,10 +1033,17 @@ enum API {
         let archived: Bool?
     }
 
-    static func checkShow(title: String, member: String) async throws -> ShowCheck {
+    // tmdbId/tmdbType name the picked entry, so a different show that shares
+    // the title isn't reported as this one.
+    static func checkShow(title: String, member: String,
+                          tmdbId: Int? = nil, tmdbType: String? = nil) async throws -> ShowCheck {
         var comps = URLComponents()
         comps.queryItems = [URLQueryItem(name: "title", value: title),
                             URLQueryItem(name: "member", value: member)]
+        if let tmdbId {
+            comps.queryItems?.append(URLQueryItem(name: "tmdb_id", value: String(tmdbId)))
+            if let tmdbType { comps.queryItems?.append(URLQueryItem(name: "tmdb_type", value: tmdbType)) }
+        }
         let query = comps.percentEncodedQuery ?? ""
         return try await get("/api/shows/check?\(query)")
     }

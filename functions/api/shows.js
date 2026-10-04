@@ -6,6 +6,7 @@ import { lookupWatchmodeUrl } from '../_shared/watch-providers.js';
 import { safeNetworkUrl } from '../_shared/url-utils.js';
 import { chargeSpend } from '../_shared/spend-meter.js';
 import { syncWatchers, watchersForShows, attachAddedByMembers } from '../_shared/watchers.js';
+import { sameShowWhere } from '../_shared/same-show.js';
 
 
 function corsHeaders() {
@@ -160,9 +161,12 @@ export async function onRequestPost(context) {
   // upstream. The canonical title is only known after enrichment, so this
   // matches what the caller sent; the check after enrichment below stays the
   // authoritative one for a title TMDB spells differently.
+  // A pick names its TMDB entry, so another show that merely shares the
+  // title (three 2026 films are called "The Odyssey") isn't a duplicate.
+  const pre = sameShowWhere('s', { title, tmdb_id: body.tmdb_id, tmdb_type: body.tmdb_type, movie });
   const preExisting = await env.DB.prepare(
-    'SELECT id, list, archived FROM shows_v WHERE LOWER(title) = LOWER(?) AND member_slug = ?'
-  ).bind(title, session.member_slug).first();
+    `SELECT id, list, archived FROM shows_v s WHERE ${pre.sql} AND member_slug = ?`
+  ).bind(...pre.binds, session.member_slug).first();
   if (preExisting) {
     if (preExisting.archived) {
       return new Response(JSON.stringify({ error: 'exists_archived', id: preExisting.id, title }), { status: 409, headers: corsHeaders() });
@@ -189,9 +193,16 @@ export async function onRequestPost(context) {
   if (!enriched) enriched = await fetchEnrichment(title, env, !!movie);
   const finalTitle = enriched.canonicalTitle || title;
 
+  const post = sameShowWhere('s', {
+    // The pick still names the entry when TMDB couldn't be reached.
+    title: finalTitle,
+    tmdb_id: enriched.tmdbId || (Number.isInteger(tmdbId) ? tmdbId : null),
+    tmdb_type: enriched.tmdbId ? enriched.tmdbType : tmdbType,
+    movie,
+  });
   const existing = await env.DB.prepare(
-    'SELECT id, list, archived FROM shows_v WHERE LOWER(title) = LOWER(?) AND member_slug = ?'
-  ).bind(finalTitle, session.member_slug).first();
+    `SELECT id, list, archived FROM shows_v s WHERE ${post.sql} AND member_slug = ?`
+  ).bind(...post.binds, session.member_slug).first();
   if (existing) {
     if (existing.archived) {
       return new Response(JSON.stringify({ error: 'exists_archived', id: existing.id, title: finalTitle }), { status: 409, headers: corsHeaders() });

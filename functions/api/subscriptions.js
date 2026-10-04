@@ -1,5 +1,6 @@
 import { getSession } from '../_shared/auth.js';
 import { canonicalNetwork, defaultPriceCents, isStorefront } from '../_shared/networks.js';
+import { showKey } from '../_shared/same-show.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -52,7 +53,7 @@ export async function onRequestGet(context) {
 
   const [{ results: shows }, { results: saved }, { results: memberRows }] = await Promise.all([
     env.DB.prepare(
-      `SELECT member_slug, title, network, list, next_season_date, full_series
+      `SELECT member_slug, title, network, list, next_season_date, full_series, tmdb_id, tmdb_type, movie
        FROM shows_v
        WHERE member_slug IN (${slugPlaceholders}) AND archived = 0 AND network IS NOT NULL AND network != ''`
     ).bind(...auditSlugs).all(),
@@ -102,7 +103,9 @@ export async function onRequestGet(context) {
       byNetwork.set(net, { network: net, titles: new Map(), soonest_upcoming: null });
     }
     const g = byNetwork.get(net);
-    const key = (sh.title || '').toLowerCase();
+    // One row per show, not per title: two films called "The Odyssey" on
+    // the same service are two rows.
+    const key = showKey(sh);
     let entry = g.titles.get(key);
     if (!entry) {
       entry = { title: sh.title, list: null, next_season_date: null, full_series: 0, viewers: new Map() };

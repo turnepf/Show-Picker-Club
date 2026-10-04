@@ -4146,7 +4146,12 @@
             body: JSON.stringify(body),
           });
         } else {
-          const checkRes = await fetch(`/api/shows/check?title=${encodeURIComponent(title)}&member=${memberSlug}`);
+          // Name the picked TMDB entry so a different show with the same
+          // title isn't mistaken for this one (and restored in its place).
+          const checkId = titlePick && titlePick.tmdb_id
+            ? `&tmdb_id=${encodeURIComponent(titlePick.tmdb_id)}&tmdb_type=${encodeURIComponent(titlePick.tmdb_type || '')}`
+            : '';
+          const checkRes = await fetch(`/api/shows/check?title=${encodeURIComponent(title)}&member=${memberSlug}${checkId}`);
           const check = await checkRes.json();
           if (check.exists) {
             if (check.archived) {

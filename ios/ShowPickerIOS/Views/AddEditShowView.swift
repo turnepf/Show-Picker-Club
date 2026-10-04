@@ -338,7 +338,8 @@ struct AddEditShowView: View {
                 // Mirror the web's pre-save dedupe: an active copy blocks with
                 // a pointer to its list, an archived copy offers a restore.
                 // Offline (check unreachable) falls through to the queued add.
-                if let dup = try? await API.checkShow(title: t, member: memberSlug), dup.exists {
+                if let dup = try? await API.checkShow(title: t, member: memberSlug,
+                                                         tmdbId: pin?.tmdbId, tmdbType: pin?.mediaType), dup.exists {
                     if dup.archived == true, let id = dup.id {
                         restoreId = id
                         showingRestorePrompt = true

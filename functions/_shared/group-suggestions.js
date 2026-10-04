@@ -28,6 +28,7 @@
 //      duplicate title folds into the existing card instead of stacking.
 
 import { ensureCopy, copyForMember, displayNames } from './watchers.js';
+import { sameShowWhere } from './same-show.js';
 
 // Ceiling on recommendations per member per group per day. A recommendation
 // fans a pop-up out to the whole group, so the cap is deliberately lower than
@@ -120,14 +121,14 @@ export async function suggestionForViewer(env, groupId, suggestionId, viewerSlug
 // or a second member recommending the same show folds in rather than
 // stacking pop-ups), 429 at the daily ceiling.
 export async function createSuggestion(env, { groupId, memberSlug, show, note }) {
-  // Same title already on this group's board → that card is the answer.
-  const existing = show.tmdb_id
-    ? await env.DB.prepare(
-        'SELECT id FROM group_suggestions WHERE group_id = ? AND (tmdb_id = ? OR LOWER(title) = LOWER(?)) LIMIT 1'
-      ).bind(groupId, show.tmdb_id, show.title).first()
-    : await env.DB.prepare(
-        'SELECT id FROM group_suggestions WHERE group_id = ? AND LOWER(title) = LOWER(?) LIMIT 1'
-      ).bind(groupId, show.title).first();
+  // The same show already on this group's board → that card is the answer.
+  // Same show means the same TMDB entry when both carry one, so a different
+  // film that shares the title gets its own card.
+  const match = sameShowWhere('g', show, { hasType: false });
+  const existing = await env.DB.prepare(
+    `SELECT id FROM group_suggestions g WHERE group_id = ? AND ${match.sql}
+     ORDER BY (g.tmdb_id IS NULL) LIMIT 1`
+  ).bind(groupId, ...match.binds).first();
   if (existing) {
     return { status: 200, suggestion: await suggestionForViewer(env, groupId, existing.id, memberSlug) };
   }

@@ -47,16 +47,20 @@ struct SearchView: View {
         }
     }
 
-    // A title you already have is shown once, as your copy. Movie-ness is part
-    // of the match so owning Fargo the series doesn't hide Fargo the film.
+    // A show you already have is shown once, as your copy. Movie-ness is part
+    // of the match so owning Fargo the series doesn't hide Fargo the film, and
+    // a copy pinned to a TMDB entry matches only that entry, so owning one
+    // "The Odyssey" doesn't hide the other two.
     private var newHits: [TitleHit] {
         hits.filter { hit in
-            !myMatches.contains { sameTitle($0.title, $0.isMovie, hit) }
+            !myMatches.contains { sameShow($0.title, $0.isMovie, $0.tmdbId, hit) }
         }
     }
 
-    private func sameTitle(_ title: String, _ isMovie: Bool, _ hit: TitleHit) -> Bool {
-        isMovie == hit.isMovie && title.lowercased() == hit.title.lowercased()
+    private func sameShow(_ title: String, _ isMovie: Bool, _ tmdbId: Int?, _ hit: TitleHit) -> Bool {
+        guard isMovie == hit.isMovie else { return false }
+        if let tmdbId { return tmdbId == hit.tmdbId }
+        return title.lowercased() == hit.title.lowercased()
     }
 
     var body: some View {
@@ -160,7 +164,7 @@ struct SearchView: View {
     private func groupLine(for hit: TitleHit) -> String? {
         var seen = Set<String>()
         let people = groupCopies
-            .filter { $0.memberSlug != auth.memberSlug && sameTitle($0.title, $0.isMovie, hit) }
+            .filter { $0.memberSlug != auth.memberSlug && sameShow($0.title, $0.isMovie, $0.tmdbId, hit) }
             .filter { seen.insert($0.memberSlug).inserted }
             .map { "\($0.memberName ?? $0.memberSlug) · \($0.listLabel)" }
         guard !people.isEmpty else { return nil }

@@ -21,6 +21,7 @@ import { getSession } from '../../_shared/auth.js';
 import { LIST_KEYS } from '../../_shared/list-parse.js';
 import { canonicalNetwork, networkSearchUrl } from '../../_shared/networks.js';
 import { writeTitle } from '../../_shared/titles.js';
+import { showKey } from '../../_shared/same-show.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -78,10 +79,18 @@ export async function onRequestPost(context) {
   // One dupe query for the whole batch. Archived rows count as existing —
   // silently resurrecting something the member archived on purpose would be
   // worse than skipping it and telling them.
+  // Keyed by show (TMDB entry, else title), so a different film that shares
+  // a title the member already has still imports.
   const { results: existingRows } = await env.DB.prepare(
-    'SELECT LOWER(title) AS ltitle FROM shows WHERE member_slug = ?'
+    'SELECT title, tmdb_id, tmdb_type, movie FROM shows WHERE member_slug = ?'
   ).bind(slug).all();
-  const taken = new Set((existingRows || []).map(r => r.ltitle));
+  const taken = new Set((existingRows || []).map(r => showKey(r)));
+  // A title decides only when one side is unpinned: an unpinned copy claims
+  // its title for every entry of that name, and an unpinned import line is
+  // taken by any copy carrying its title.
+  const lower = (t) => (t || '').toLowerCase();
+  const unpinnedTitles = new Set((existingRows || []).filter(r => !r.tmdb_id).map(r => lower(r.title)));
+  const allTitles = new Set((existingRows || []).map(r => lower(r.title)));
 
   const inserts = [];
   const added = [];
@@ -90,11 +99,14 @@ export async function onRequestPost(context) {
   for (const item of raw) {
     const title = str(item.title, 200);
     if (!title) continue;
-    const key = title.toLowerCase();
-    // `taken` grows as we go, so a payload that lists the same title twice
+    const key = showKey({ title, tmdb_id: item.tmdb_id, tmdb_type: item.tmdb_type, movie: item.movie });
+    // `taken` grows as we go, so a payload that lists the same show twice
     // inserts it once.
-    if (taken.has(key)) { skipped.push(title); continue; }
+    const pinned = !key.startsWith('title:');
+    if (taken.has(key) || (pinned ? unpinnedTitles : allTitles).has(lower(title))) { skipped.push(title); continue; }
     taken.add(key);
+    allTitles.add(lower(title));
+    if (!pinned) unpinnedTitles.add(lower(title));
 
     const list = LIST_KEYS.includes(item.list) ? item.list : null;
     if (!list) { skipped.push(title); continue; }
