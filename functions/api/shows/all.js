@@ -9,6 +9,7 @@
 // 2017 box it is the thing most likely to fall over as the club grows.
 // Filtering here means the device receives matches instead of everything.
 import { getSession } from '../../_shared/auth.js';
+import { sameShowJoin } from '../../_shared/same-show.js';
 
 // Ceiling on a filtered response. A one-letter query matches most of the
 // library, and the point of the parameter is to bound what a small device
@@ -68,13 +69,13 @@ export async function onRequestGet(context) {
             -- ignore it.
             s.tmdb_id, s.tmdb_type,
             -- Artwork is per-row and backfills row-by-row; borrow from any
-            -- active copy of the same title so no member's result lacks a
+            -- active copy of the same show (same TMDB entry when both are pinned) so no member's result lacks a
             -- poster another member's copy already has.
             COALESCE(s.poster_url, (SELECT x.poster_url FROM shows_v x
-              WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0
+              WHERE ${sameShowJoin('x', 's')} AND x.archived = 0
                 AND x.poster_url IS NOT NULL LIMIT 1)) AS poster_url,
             COALESCE(s.network_logo_url, (SELECT x.network_logo_url FROM shows_v x
-              WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0
+              WHERE ${sameShowJoin('x', 's')} AND x.archived = 0
                 AND x.network_logo_url IS NOT NULL LIMIT 1)) AS network_logo_url,
             s.seasons_released, s.next_season_date, s.season_end_date,
             m.name AS member_raw_name, m.first_name AS member_raw_first,

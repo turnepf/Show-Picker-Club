@@ -54,6 +54,8 @@ Show pages now link to IMDb, say whether a series is returning, ended or was can
 When you search for a show, the friends who already have it are shown only on the exact show they picked, not on every show that happens to share its name. And adding a show from a friend's list adds that same show, even when other shows share its name.
 
 Looking at a show from a friend's list that isn't on yours? A hint beside My Lists now says to pick a list to add it.
+
+Shows that share a name are kept apart everywhere: you can add a film even when you already have a different one with the same title, and Trending, "Also watching" and group recommendations no longer mix them up.
 ```
 
 ---

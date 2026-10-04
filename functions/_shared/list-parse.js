@@ -18,6 +18,7 @@
 
 import { searchTmdbTitle } from './enrichment.js';
 import { canonicalNetwork } from './networks.js';
+import { sameShow } from './same-show.js';
 
 // The four lists, exactly as `shows.list` stores them.
 export const LIST_KEYS = ['watching', 'waiting', 'recommending', 'next'];
@@ -232,7 +233,7 @@ export async function resolveItems(env, rawItems, existingByTitle, defaultList =
 
       const finalTitle = hit.canonicalTitle || title;
       const network = blank(raw.network);
-      const existing = existingByTitle.get(finalTitle.toLowerCase()) || null;
+      const existing = existingByTitle.get({ title: finalTitle, tmdb_id: hit.tmdbId, tmdb_type: hit.tmdbType, movie }) || null;
       const writtenYear = parseInt(blank(raw.year), 10);
 
       return {
@@ -267,15 +268,18 @@ export async function resolveItems(env, rawItems, existingByTitle, defaultList =
   return out;
 }
 
-// Every active + archived title the member already has, keyed lowercase, so a
-// whole import dupe-checks in one query instead of one per title.
+// Every active + archived show the member already has, so a whole import
+// dupe-checks in one query instead of one per title. Matched with sameShow:
+// by TMDB entry when both sides are pinned, else by title — owning one of
+// three films called "The Odyssey" doesn't flag the other two.
 export async function existingTitles(env, memberSlug) {
   const { results } = await env.DB.prepare(
-    'SELECT title, list, archived FROM shows_v WHERE member_slug = ?'
+    'SELECT title, list, archived, tmdb_id, tmdb_type, movie FROM shows_v WHERE member_slug = ?'
   ).bind(memberSlug).all();
-  const map = new Map();
-  for (const row of (results || [])) {
-    map.set((row.title || '').toLowerCase(), row);
-  }
-  return map;
+  const rows = results || [];
+  return {
+    get(show) {
+      return rows.find((r) => r.tmdb_id && sameShow(r, show)) || rows.find((r) => sameShow(r, show)) || null;
+    },
+  };
 }

@@ -604,11 +604,30 @@ the original it remade), so a title is a display string, never an identifier.
   matcher: `fetchEnrichment`, `searchTmdbTitle`/`searchTmdbId` (list import,
   TMDB backfill) and `enrich.js`'s lighter search.
 
+- **"Same show" is one rule, `_shared/same-show.js` (2026-10).** Two rows are
+  the same show when both are pinned to the same entry; a title decides only
+  when one side was never pinned. Three 2026 films are called "The Odyssey",
+  and title matching had a member who owned one unable to add the others,
+  "Also watching" naming group-mates who watch a different one, a second
+  film's recommendation folded into the first's card, and all three merged
+  into one Trending card. The duplicate check on add (and `/api/shows/check`,
+  given the pick's `tmdb_id`), "your copy" (`copyForMember`), the group board,
+  Also watching, both Trendings, the cross-library poster fallback, the import
+  dedupe and the subscription audit all use it, and so do the Apple TV and
+  Roku search screens. A write that fans out from an *unpinned* row — a guess
+  made from its title — uses `forWrite`, which stops at pinned copies: the
+  nightly Watchmode fill (which now looks a pinned row up by its TMDB id),
+  URL propagation, network inheritance, and the URL-cleanup page's re-enrich
+  and title fix, whose `COALESCE(new, tmdb_id)` used to re-point every copy of
+  every same-named film at one search result.
+
 Enforcer: `scripts/enrich-identity-test.mjs` (every PR) — drives the add and
 `/api/enrich` against a fake TMDB serving two same-titled entries, popular
 original first, and asserts each pin keeps its own data.
 `scripts/show-edit-identity-test.mjs` (every PR) does the same for the edit
-path.
+path. `scripts/same-show-test.mjs` (every PR) pins the shared rule and the
+add, check, your-copy, board, Also watching and Trending paths against three
+same-titled films.
 
 ## 18. A public endpoint costs O(1) reads per request
 

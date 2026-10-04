@@ -129,6 +129,8 @@ jobs:
         run: node scripts/tmdb-audit-test.mjs
       - name: The shared one-row-per-show table summarizes the copies faithfully
         run: node scripts/titles-test.mjs
+      - name: Same show means the same TMDB entry, not the same title
+        run: node scripts/same-show-test.mjs
 
   roku:
     runs-on: ubuntu-latest

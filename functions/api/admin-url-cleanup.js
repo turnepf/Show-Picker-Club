@@ -2,9 +2,10 @@ import { canonicalNetwork, networkFromUrl, storefrontFromUrl } from '../_shared/
 import { extractUrl, safeNetworkUrl } from '../_shared/url-utils.js';
 import { isAdmin } from '../_shared/admin.js';
 import { cronAuthorized } from '../_shared/secrets.js';
-import { fetchEnrichment, fetchAvailability, fallbackNetwork } from '../_shared/enrichment.js';
+import { fetchEnrichment, fetchEnrichmentById, fetchAvailability, fallbackNetwork } from '../_shared/enrichment.js';
 import { renameShowCopies } from '../_shared/title-fix.js';
 import { syncTitlesNamed, writeTitle, titleFieldsFromEnrichment } from '../_shared/titles.js';
+import { sameShowJoin, sameShowWhere, showKeySql } from '../_shared/same-show.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -81,8 +82,8 @@ const QUEUE_FILTER = `
 `;
 
 // Rows with no network at all can't be rescued by URL propagation — it's
-// scoped to (title, network). But when every other active copy of the title
-// agrees on a service, the answer is unambiguous: adopt it. Titles whose
+// scoped to (show, network). But when every other active copy of the show
+// (same TMDB entry when both are pinned, else same title) agrees on a service, the answer is unambiguous: adopt it. Titles whose
 // copies disagree are left alone; picking a winner there is the conflict
 // queue's job — the one part of this that needs a human, and the reason the
 // Show Cleanup page still exists.
@@ -97,13 +98,13 @@ async function inheritNetworks(env) {
   const result = await env.DB.prepare(`
     UPDATE shows
        SET network = (SELECT s.network FROM shows s
-                       WHERE LOWER(s.title) = LOWER(shows.title) AND s.archived = 0
+                       WHERE ${sameShowJoin('s', 'shows')} AND s.archived = 0
                          AND s.network IS NOT NULL AND s.network != ''),
            enriched_at = datetime('now')
      WHERE archived = 0
        AND (network IS NULL OR network = '')
        AND (SELECT COUNT(DISTINCT s.network) FROM shows s
-             WHERE LOWER(s.title) = LOWER(shows.title) AND s.archived = 0
+             WHERE ${sameShowJoin('s', 'shows')} AND s.archived = 0
                AND s.network IS NOT NULL AND s.network != '') = 1
   `).run();
   return result.meta.changes;
@@ -208,11 +209,11 @@ async function reclassifyStorefronts(env, body) {
 
 async function propagateGoodUrls(env) {
   // Before listing, push every known good URL out to any sibling row that's
-  // still on a placeholder. Scoped to (title, network) because the same
-  // title can live on multiple services — copying URLs across networks
+  // still on a placeholder. Scoped to (show, network) because the same
+  // show can live on multiple services — copying URLs across networks
   // would land members on the wrong streaming app at watch time.
   const { results: sources } = await env.DB.prepare(
-    `SELECT LOWER(title) as ltitle, network, network_url FROM shows
+    `SELECT LOWER(title) as ltitle, title, tmdb_id, tmdb_type, movie, network, network_url FROM shows
      WHERE archived = 0
        AND network IS NOT NULL
        AND network_url IS NOT NULL
@@ -226,15 +227,18 @@ async function propagateGoodUrls(env) {
        AND network_url NOT LIKE 'https://www.themoviedb.org/%'
        AND network_url != 'https://www.amazon.com/s'
        AND network_url != 'https://www.amazon.com/s/'
-     GROUP BY LOWER(title), network`
+     GROUP BY ${showKeySql('shows')}, network`
   ).all();
   let filled = 0;
   for (const src of sources) {
+    // Copies of this same show only: a different film sharing the title
+    // has a different link, even on the same service.
+    const same = sameShowWhere('shows', src, { forWrite: true });
     const result = await env.DB.prepare(
       `UPDATE shows
          SET network_url = ?,
              enriched_at = datetime('now')
-       WHERE LOWER(title) = ? AND network = ? AND archived = 0
+       WHERE ${same.sql} AND network = ? AND archived = 0
          AND (network_url IS NULL
               OR network_url LIKE '%/search%'
               OR network_url LIKE '%/s?%'
@@ -246,7 +250,7 @@ async function propagateGoodUrls(env) {
               OR network_url LIKE 'https://www.themoviedb.org/%'
               OR network_url = 'https://www.amazon.com/s'
               OR network_url = 'https://www.amazon.com/s/')`
-    ).bind(src.network_url, src.ltitle, src.network).run();
+    ).bind(src.network_url, ...same.binds, src.network).run();
     filled += result.meta.changes;
   }
   return filled;
@@ -312,13 +316,16 @@ async function commitTitleFix(env, oldTitle, rawNew, enriched) {
   // The copies keep only what is theirs: the badge, a network if they had
   // none, and the pin. The show's facts and cast are written to its shared
   // row by the caller (writeTitle), where members read them.
+  // Only copies of the entry just found, or unpinned copies of the title:
+  // a copy pinned to a different film of the same name keeps its pin.
+  const same = sameShowWhere('shows', { title: finalTitle, tmdb_id: enriched.tmdbId, tmdb_type: enriched.tmdbType }, { forWrite: true });
   await env.DB.prepare(
     `UPDATE shows
         SET network_logo_url = COALESCE(?, network_logo_url),
             network = COALESCE(network, ?),
             tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type)
-      WHERE LOWER(title) = LOWER(?) AND archived = 0`
-  ).bind(enriched.networkLogoUrl, fallbackNetwork(enriched), enriched.tmdbId, enriched.tmdbType, finalTitle).run();
+      WHERE ${same.sql} AND archived = 0`
+  ).bind(enriched.networkLogoUrl, fallbackNetwork(enriched), enriched.tmdbId, enriched.tmdbType, ...same.binds).run();
 
   return { finalTitle, updated: renamed };
 }
@@ -714,20 +721,35 @@ export async function onRequestPost(context) {
     // up, stamps enriched_at so the title rotates to the back of the queue.
     const id = parseInt(body.id, 10);
     if (!Number.isInteger(id)) return json({ error: 'id required' }, 400);
-    const row = await env.DB.prepare('SELECT title, movie FROM shows WHERE id = ?').bind(id).first();
+    const row = await env.DB.prepare('SELECT title, movie, tmdb_id, tmdb_type FROM shows WHERE id = ?').bind(id).first();
     if (!row) return json({ error: 'Show not found' }, 404);
+    // This show's copies — never a different film that shares the title.
+    const rowCopies = sameShowWhere('shows', row, { forWrite: true });
 
     // Optional media-type correction from the card's Show/Movie toggle, so the
     // fresh lookup searches the right TMDB index.
     const movieOverride = (body.movie === 0 || body.movie === 1) ? body.movie : null;
     if (movieOverride !== null) {
       await env.DB.prepare(
-        `UPDATE shows SET movie = ? WHERE LOWER(title) = LOWER(?) AND archived = 0`
-      ).bind(movieOverride, row.title).run();
+        `UPDATE shows SET movie = ? WHERE ${rowCopies.sql} AND archived = 0`
+      ).bind(movieOverride, ...rowCopies.binds).run();
     }
     const isMovie = movieOverride !== null ? !!movieOverride : !!row.movie;
 
-    const enriched = await fetchEnrichment(row.title, env, isMovie);
+    // A pinned row is fetched by its own entry (invariant §17); a title
+    // search would hand back whichever same-named entry TMDB ranks first.
+    // A type flip invalidates the pin, so that one searches.
+    let enriched = null;
+    if (row.tmdb_id && row.tmdb_type && movieOverride === null) {
+      const byId = await fetchEnrichmentById(row.tmdb_id, row.tmdb_type, env);
+      if (byId.canonicalTitle) enriched = byId;
+    }
+    if (!enriched) enriched = await fetchEnrichment(row.title, env, isMovie);
+    // The copies to stamp: this entry's, plus — after a type flip, which is
+    // the operator re-pointing the show — the copies of the old pin too.
+    const foundOnly = sameShowWhere('shows', { title: row.title, tmdb_id: enriched.tmdbId, tmdb_type: enriched.tmdbType }, { forWrite: true });
+    const found = movieOverride === null ? foundOnly
+      : { sql: `(${foundOnly.sql} OR ${rowCopies.sql})`, binds: [...foundOnly.binds, ...rowCopies.binds] };
     if (enriched.tmdbId || enriched.networkLogoUrl) {
       // The copies: badge, network, pin and stamp. The show's facts and cast
       // go to its shared row just below.
@@ -737,14 +759,14 @@ export async function onRequestPost(context) {
                 network = COALESCE(network, ?),
                 tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type),
                 enriched_at = datetime('now')
-          WHERE LOWER(title) = LOWER(?) AND archived = 0`
-      ).bind(enriched.networkLogoUrl, fallbackNetwork(enriched), enriched.tmdbId, enriched.tmdbType, row.title).run();
+          WHERE ${found.sql} AND archived = 0`
+      ).bind(enriched.networkLogoUrl, fallbackNetwork(enriched), enriched.tmdbId, enriched.tmdbType, ...found.binds).run();
     } else {
       // Nothing found — stamp so the title rotates to the back of the
       // oldest-first background pass instead of blocking it every round.
       await env.DB.prepare(
-        `UPDATE shows SET enriched_at = datetime('now') WHERE LOWER(title) = LOWER(?) AND archived = 0`
-      ).bind(row.title).run();
+        `UPDATE shows SET enriched_at = datetime('now') WHERE ${rowCopies.sql} AND archived = 0`
+      ).bind(...rowCopies.binds).run();
     }
 
     if (enriched.tmdbId) {

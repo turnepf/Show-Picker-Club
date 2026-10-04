@@ -155,6 +155,7 @@ function slimOwn(s as object) as object
         poster_url:       SafeStr(s.poster_url)
         network_logo_url: SafeStr(s.network_logo_url)
         network:          SafeStr(s.network)
+        tmdb_id:          SafeStr(s.tmdb_id)
         castLc:           castNames
     }
 end function
@@ -222,6 +223,7 @@ sub onGroup(ev as object)
                 list:        SafeStr(s.list)
                 member_slug: SafeStr(s.member_slug)
                 member_name: SafeStr(s.member_name)
+                tmdb_id:     SafeStr(s.tmdb_id)
             })
         end if
     end for
@@ -330,25 +332,29 @@ function matchMine(q as string) as object
 end function
 
 ' Movie-ness is part of the match so owning Fargo the series doesn't hide
-' Fargo the film.
+' Fargo the film, and a copy pinned to a TMDB entry matches only that entry,
+' so owning one "The Odyssey" doesn't hide the other two.
 function ownsHit(myMatches as object, h as object) as boolean
-    t = LCase(SafeStr(h.title))
-    hm = (SafeStr(h.media_type) = "movie")
     for each s in myMatches
-        if s.movie = hm and LCase(s.title) = t then return true
+        if sameShow(LCase(s.title), s.movie, s.tmdb_id, h) then return true
     end for
     return false
+end function
+
+' title is lowercased by the caller; tmdbId is "" for a copy never pinned.
+function sameShow(title as string, isMovie as boolean, tmdbId as string, h as object) as boolean
+    if isMovie <> (SafeStr(h.media_type) = "movie") then return false
+    if tmdbId <> "" then return tmdbId = SafeStr(h.tmdb_id)
+    return title = LCase(SafeStr(h.title))
 end function
 
 ' "Quinn · Watching, Amy · Loved" — group-mates with this title and where they
 ' keep it; two names, then a count.
 function groupLine(h as object) as string
-    t = LCase(SafeStr(h.title))
-    hm = (SafeStr(h.media_type) = "movie")
     seen = {}
     people = []
     for each c in m.group
-        if c.movie = hm and c.title = t and seen[c.member_slug] = invalid
+        if sameShow(c.title, c.movie, c.tmdb_id, h) and seen[c.member_slug] = invalid
             seen[c.member_slug] = true
             name = c.member_name
             if name = "" then name = c.member_slug

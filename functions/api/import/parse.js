@@ -22,6 +22,7 @@
 
 import { getSession } from '../../_shared/auth.js';
 import { extractItems, resolveItems, existingTitles, sliceChunk, normalizeList } from '../../_shared/list-parse.js';
+import { showKey } from '../../_shared/same-show.js';
 import { chargeSpend } from '../../_shared/spend-meter.js';
 
 function json(data, status = 200) {
@@ -79,12 +80,12 @@ export async function onRequestPost(context) {
   const items = await resolveItems(env, extracted.items, existing, defaultList);
 
   // Two lines of a paste can name the same show ("Severence" under Watching,
-  // "Severance" further down). They resolve to one canonical title, so keep
+  // "Severance" further down). They resolve to one TMDB entry, so keep
   // the first and drop the rest rather than offering the member a duplicate
   // row that would fail on insert anyway.
   const seen = new Set();
   const deduped = items.filter(item => {
-    const key = item.title.toLowerCase();
+    const key = showKey(item);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

@@ -8,6 +8,7 @@ import { safeNetworkUrl } from '../../_shared/url-utils.js';
 import { getRatingsSummary } from '../../_shared/ratings.js';
 import { creatorsForShow } from '../../_shared/people.js';
 import { syncWatchers, watchersForShow, unlinkShow, attachAddedByMembers } from '../../_shared/watchers.js';
+import { sameShowWhere } from '../../_shared/same-show.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -49,10 +50,11 @@ const PUBLIC_SHOW_FIELDS = [
 // already on screen).
 //
 // Titles are matched the way the rest of the app matches copies across
-// members: by tmdb_id when the row has one, else case-insensitively by
-// title. Returns [] for a logged-out visitor or a member in no groups.
+// members (_shared/same-show.js): by TMDB entry when both rows have one, else
+// case-insensitively by title. Returns [] for a logged-out visitor or a member in no groups.
 async function groupWatchers(env, show, viewerSlug) {
   if (!viewerSlug) return [];
+  const match = sameShowWhere('s', show);
   const { results } = await env.DB.prepare(
     `SELECT DISTINCT m.slug, m.first_name, m.name
        FROM shows_v s
@@ -65,16 +67,9 @@ async function groupWatchers(env, show, viewerSlug) {
           SELECT gm.member_slug FROM group_members gm
            WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE member_slug = ?)
         )
-        AND (LOWER(s.title) = LOWER(?) OR (? IS NOT NULL AND s.tmdb_id = ?))
+        AND ${match.sql}
       ORDER BY m.first_name, m.name`
-  ).bind(
-    viewerSlug,
-    show.member_slug,
-    viewerSlug,
-    show.title,
-    show.tmdb_id ?? null,
-    show.tmdb_id ?? null
-  ).all();
+  ).bind(viewerSlug, show.member_slug, viewerSlug, ...match.binds).all();
   return (results || []).map((m) => ({
     slug: m.slug,
     name: m.first_name || (m.name || '').split(' ')[0] || m.slug,

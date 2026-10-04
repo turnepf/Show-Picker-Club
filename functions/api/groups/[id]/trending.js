@@ -1,5 +1,12 @@
 import { getSession } from '../../../_shared/auth.js';
 import { TRENDING_LISTS_SQL } from '../../../_shared/trending-lists.js';
+import { sameShowJoin, showKeySql } from '../../../_shared/same-show.js';
+
+// One card per show: copies pinned to different TMDB entries that share a
+// title (three 2026 films are called "The Odyssey") stay separate cards, and
+// each card's poster, link and rating come from a copy of that same entry.
+const SAME_AS_S = sameShowJoin('x', 's');
+const SHOW_KEY = showKeySql('s');
 
 // Mirrors /api/popular: clients draw the first 10 and expand behind a
 // "Show more", and the cap bounds a hand-written ?limit=.
@@ -58,16 +65,16 @@ export async function onRequestGet(context) {
 
   // Top shows by how many group members added them in the last 30 days
   const { results } = await env.DB.prepare(
-    `SELECT LOWER(s.title) as ltitle, s.title, s.movie,
+    `SELECT LOWER(s.title) as ltitle, s.title, s.movie, s.tmdb_id, s.tmdb_type,
        MIN(s.id) as id,
        COUNT(DISTINCT s.member_slug) as member_count,
        GROUP_CONCAT(DISTINCT s.member_slug) as member_slugs,
-       (SELECT x.poster_url FROM shows_v x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.poster_url IS NOT NULL LIMIT 1) as poster_url,
-       (SELECT x.network_logo_url FROM shows_v x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.network_logo_url IS NOT NULL LIMIT 1) as network_logo_url,
-       (SELECT x.rating FROM shows_v x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.rating IS NOT NULL LIMIT 1) as rating,
-       (SELECT x.genres FROM shows_v x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.genres IS NOT NULL LIMIT 1) as genres,
-       (SELECT x.network FROM shows_v x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.network IS NOT NULL LIMIT 1) as network,
-       (SELECT x.network_url FROM shows_v x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0
+       (SELECT x.poster_url FROM shows_v x WHERE ${SAME_AS_S} AND x.archived = 0 AND x.poster_url IS NOT NULL LIMIT 1) as poster_url,
+       (SELECT x.network_logo_url FROM shows_v x WHERE ${SAME_AS_S} AND x.archived = 0 AND x.network_logo_url IS NOT NULL LIMIT 1) as network_logo_url,
+       (SELECT x.rating FROM shows_v x WHERE ${SAME_AS_S} AND x.archived = 0 AND x.rating IS NOT NULL LIMIT 1) as rating,
+       (SELECT x.genres FROM shows_v x WHERE ${SAME_AS_S} AND x.archived = 0 AND x.genres IS NOT NULL LIMIT 1) as genres,
+       (SELECT x.network FROM shows_v x WHERE ${SAME_AS_S} AND x.archived = 0 AND x.network IS NOT NULL LIMIT 1) as network,
+       (SELECT x.network_url FROM shows_v x WHERE ${SAME_AS_S} AND x.archived = 0
           AND x.network_url IS NOT NULL AND x.network_url NOT LIKE '%/search%' AND x.network_url NOT LIKE '%/s?%'
           AND x.network_url NOT LIKE '%?q=%' AND x.network_url NOT LIKE '%?query=%' LIMIT 1) as network_url
      FROM shows_v s
@@ -77,7 +84,7 @@ export async function onRequestGet(context) {
        AND s.created_at >= datetime('now', '-30 days')
        -- Same rule as club Trending: intent lists only, never Next Up.
        AND s.list IN (${TRENDING_LISTS_SQL})
-     GROUP BY LOWER(s.title)
+     GROUP BY ${SHOW_KEY}
      ORDER BY member_count DESC, CAST(rating AS REAL) DESC
      LIMIT ?${memberSlugs.length + 1}`
   ).bind(...memberSlugs, limit).all();

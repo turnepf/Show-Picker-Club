@@ -114,9 +114,13 @@ struct GroupCopy: Codable, Hashable {
     let list: String
     let memberSlug: String
     let memberName: String?
+    // The TMDB entry, so same-titled shows (three 2026 films are called
+    // "The Odyssey") aren't mistaken for one another.
+    let tmdbId: Int?
 
     enum CodingKeys: String, CodingKey {
         case title, movie, list
+        case tmdbId = "tmdb_id"
         case memberSlug = "member_slug"
         case memberName = "member_name"
     }

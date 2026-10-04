@@ -29,6 +29,7 @@
 
 import { fetchEnrichment } from './enrichment.js';
 import { syncTitle, writeTitle, titleFieldsFromEnrichment } from './titles.js';
+import { sameShowWhere } from './same-show.js';
 
 // Ceiling on how many people one show can name. Far above a sofa's capacity;
 // it's here so a scripted client can't fan one add out across a large group.
@@ -171,20 +172,18 @@ export async function attachAddedByMembers(env, rows, ownerSlug) {
   }
 }
 
-// The member's own copy of a title, if they have one. Matched the way copies
-// are matched everywhere else in the app: by tmdb_id when both rows carry
-// one, else case-insensitively by title. Archived rows count — finding one is
-// what stops a tag from creating a second copy of something they shelved.
-export async function copyForMember(env, memberSlug, { title, tmdb_id }) {
-  if (tmdb_id) {
-    const byId = await env.DB.prepare(
-      'SELECT * FROM shows WHERE member_slug = ? AND tmdb_id = ? LIMIT 1'
-    ).bind(memberSlug, tmdb_id).first();
-    if (byId) return byId;
-  }
+// The member's own copy of a show, if they have one. Matched the way copies
+// are matched everywhere else in the app (_shared/same-show.js): by TMDB entry
+// when both rows carry one, else case-insensitively by title — so a copy
+// pinned to a different film of the same name is not theirs. Archived rows
+// count — finding one is what stops a tag from creating a second copy of
+// something they shelved.
+export async function copyForMember(env, memberSlug, show) {
+  const match = sameShowWhere('s', show);
   return await env.DB.prepare(
-    'SELECT * FROM shows WHERE member_slug = ? AND LOWER(title) = LOWER(?) LIMIT 1'
-  ).bind(memberSlug, title).first();
+    `SELECT * FROM shows s WHERE member_slug = ? AND ${match.sql}
+     ORDER BY (s.tmdb_id IS NULL) LIMIT 1`
+  ).bind(memberSlug, ...match.binds).first();
 }
 
 // ---- writes -------------------------------------------------------------
