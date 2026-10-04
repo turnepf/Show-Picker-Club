@@ -120,6 +120,12 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
     public let tmdbStatus: String?
     public let freeOn: String?
 
+    // The TMDB entry this copy is. Two different shows can share a title
+    // (three 2026 films are called "The Odyssey"), so anything that asks "is
+    // this the same show?" compares this first and falls back to the title
+    // only when one side has no id.
+    public let tmdbId: Int?
+
     // Explicit public init so other modules (the apps, their offline queues)
     // can construct a Show — the synthesized memberwise init is internal.
     // Parameter order matches the fields as they were declared in the apps'
@@ -168,7 +174,8 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         streamingOn: String? = nil,
         imdbId: String? = nil,
         tmdbStatus: String? = nil,
-        freeOn: String? = nil
+        freeOn: String? = nil,
+        tmdbId: Int? = nil
     ) {
         self.id = id
         self.title = title
@@ -213,6 +220,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         self.imdbId = imdbId
         self.tmdbStatus = tmdbStatus
         self.freeOn = freeOn
+        self.tmdbId = tmdbId
     }
 
     enum CodingKeys: String, CodingKey {
@@ -250,6 +258,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         case imdbId = "imdb_id"
         case tmdbStatus = "tmdb_status"
         case freeOn = "free_on"
+        case tmdbId = "tmdb_id"
     }
 
     // Tolerant decoding. The API varies what it sends by context — `list` and
@@ -309,6 +318,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         imdbId = try? c.decode(String.self, forKey: .imdbId)
         tmdbStatus = try? c.decode(String.self, forKey: .tmdbStatus)
         freeOn = try? c.decode(String.self, forKey: .freeOn)
+        tmdbId = try? c.decode(Int.self, forKey: .tmdbId)
     }
 
     public var isMovie: Bool { (movie ?? 0) == 1 }

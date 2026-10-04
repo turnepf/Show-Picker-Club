@@ -14,6 +14,18 @@ final class TitleFactsTests: XCTestCase {
              imdbId: imdbId, tmdbStatus: tmdbStatus, freeOn: freeOn)
     }
 
+    // MARK: TMDB entry
+
+    /// Two shows can share a title (three 2026 films are "The Odyssey"), so
+    /// "is this the same show?" needs the entry. Optional: an older server,
+    /// or an offline-cached row, may not carry it.
+    func testDecodesTheTmdbEntryWhenSentAndToleratesItsAbsence() throws {
+        let with = try JSONDecoder().decode(Show.self, from: Data(#"{"id":1,"title":"The Odyssey","list":"loved","movie":1,"tmdb_id":1368337}"#.utf8))
+        XCTAssertEqual(with.tmdbId, 1368337)
+        let without = try JSONDecoder().decode(Show.self, from: Data(#"{"id":2,"title":"The Odyssey","list":"loved","movie":1}"#.utf8))
+        XCTAssertNil(without.tmdbId)
+    }
+
     // MARK: IMDb
 
     func testImdbLinkPointsAtTheTitlePage() {
