@@ -361,15 +361,20 @@ keep the table in step. See `docs/ARCHITECTURE.md#titles--title_cast-migration-0
 node scripts/asc.mjs status
 ```
 
-The App Store Connect operator tool — `status`, `set-notes <version> <file>`,
-`attach <version> <build>`, `upload <ipa|pkg>`. Reads and writes the app's
+The App Store Connect operator tool — `status`, `create-version <version>`,
+`set-notes <version> <file>`, `attach <version> <build>`, `upload <ipa|pkg>`,
+`submit <version>`. Reads and writes the app's
 version records directly so a release doesn't depend on three identical
 pastes into the web UI; `set-notes` re-reads Apple and compares SHA-256
 against the local file, which is what actually enforces "byte-identical on
 all three platforms". Credentials stay out of the repo (key in
 `~/.appstoreconnect/private_keys/`, issuer in `~/.appstoreconnect/issuer_id`).
-There is no `submit` subcommand on purpose — sending a version to review
-stays a human decision. Used by the run sheet in
+`create-version <v>` makes the record on every platform, `set-notes
+--platform` writes one platform's text, and `submit <v>` checks every platform
+(build attached, What's New set) and sends to review only with `--confirm`.
+Sending to review stays a human decision: Patrick runs `submit --confirm`
+himself (Claude's App Store Connect writes are blocked), and a rerun after a
+partial failure finishes the job instead of colliding with it. Used by the run sheet in
 `docs/APP_STORE_SUBMISSION.md#6a-run-sheet-releasing-from-a-second-mac`.
 
 ```bash

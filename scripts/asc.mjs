@@ -97,7 +97,16 @@ const get = e => call('GET', e);
 // Every version record, following Apple's pagination: at three records a
 // release, a single page of 50 stops containing the newest version after
 // about sixteen releases.
+// One crawl per run: several commands ask twice (set-notes then its verify,
+// create-version then appPlatforms), and the history doesn't change under a
+// read.
+let versionCache = null;
 async function versions(versionString) {
+  if (!versionCache) versionCache = await fetchVersions();
+  return versionString ? versionCache.filter(v => v.attributes.versionString === versionString) : versionCache;
+}
+
+async function fetchVersions() {
   const all = [];
   let next = `/v1/apps/${APP_ID}/appStoreVersions?limit=200` +
     `&fields[appStoreVersions]=versionString,platform,appStoreState`;
@@ -106,7 +115,7 @@ async function versions(versionString) {
     all.push(...(r.data || []));
     next = r.links?.next ? r.links.next.replace(API, '') : null;
   }
-  return versionString ? all.filter(v => v.attributes.versionString === versionString) : all;
+  return all;
 }
 
 async function cmdStatus() {
@@ -311,6 +320,9 @@ async function cmdSubmit(versionString, flag) {
   for (const v of toSend) {
     const plat = v.attributes.platform;
     let subId = await openSubmission(plat);
+    // A submission created just now is empty, so only a reused one needs
+    // checking for the version before adding it.
+    const reused = !!subId;
     if (!subId) {
       const sub = await call('POST', '/v1/reviewSubmissions', {
         data: {
@@ -321,7 +333,7 @@ async function cmdSubmit(versionString, flag) {
       });
       subId = sub.data.id;
     }
-    if (!(await submissionHasVersion(subId, v.id))) {
+    if (!reused || !(await submissionHasVersion(subId, v.id))) {
       await call('POST', '/v1/reviewSubmissionItems', {
         data: {
           type: 'reviewSubmissionItems',
