@@ -14,9 +14,9 @@ export async function onRequestGet(context) {
   const { results } = await env.DB.prepare(
     // `character` is the role (migration 073), null until enrichment has
     // stored it for this title.
-    'SELECT name, imdb_id, character_name AS character FROM actors WHERE show_id = ? ORDER BY COALESCE(ord, 9999), id'
+    'SELECT name, imdb_id, character_name AS character FROM actors_v WHERE show_id = ? ORDER BY COALESCE(ord, 9999), id'
   ).bind(params.id).all().catch(() => env.DB.prepare(
-    'SELECT name, imdb_id FROM actors WHERE show_id = ?'
+    'SELECT name, imdb_id FROM actors_v WHERE show_id = ?'
   ).bind(params.id).all());
   return new Response(JSON.stringify({ actors: results }), { headers: corsHeaders() });
 }

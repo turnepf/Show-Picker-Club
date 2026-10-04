@@ -1120,7 +1120,8 @@ show's details, kept in step by propagation code, so two members could see
 
 - **Reads that reach a member select `FROM shows_v`, and writes go to
   `shows`.** The view has exactly the columns of `shows`, so switching a
-  read never changes its shape.
+  read never changes its shape. Cast is read the same way, `FROM actors_v`
+  (migration 078), with writes to `actors`.
 - **The member's own fields stay the member's:** list, order, rating, notes,
   watching-with, recommended-by, archived, network and Watch link. So do
   `next_season_date`, `season_end_date` and `network_logo_url`, which differ

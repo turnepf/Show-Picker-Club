@@ -141,11 +141,17 @@ The plan has three steps. The first two have shipped:
    typing a new title in an edit re-matches the show by that title. The
    writers that change details by title rather than by row (URL cleanup's
    rename and re-match) call `syncTitlesNamed()`, and an import syncs any
-   entry the club didn't have. Cast is still read per copy from `actors`
-   until step 3.
-3. **Duplicates removed.** The catalog columns and per-copy `actors` rows go,
-   and enrichment writes once per entry instead of once per copy.
-
+   entry the club didn't have.
+3. **Cast and the duplicates.** Split in three:
+   - **3a (migration 078, shipped):** the view `actors_v` has the columns of
+     `actors`, with each copy's cast taken from `title_cast` when its entry
+     has one, and the copy's own rows otherwise. Member-facing cast reads use
+     it (show cards, the cast endpoint, Favorite Actors, Trending, group
+     Trending, vibe, `admin_query`). The people bank's name linking and the
+     actor backfill pass keep `title_cast` linked too.
+   - **3b:** writers write show details and cast to `titles`/`title_cast`
+     directly.
+   - **3c:** the duplicate columns and the per-copy `actors` rows go.
 At step 1 that's 1,409 copies in 570 entries, catalog text 791 KB → 319 KB
 and cast rows 11,137 → 4,253 (`scripts/tmdb-audit.mjs`, 2026-10-04).
 Enforcer: `scripts/titles-test.mjs`.

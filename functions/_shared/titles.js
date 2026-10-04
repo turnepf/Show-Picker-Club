@@ -185,3 +185,25 @@ export async function syncTitlesNamed(env, title, name = null) {
     for (const r of results || []) await syncTitle(env, r.tmdb_type, r.tmdb_id, name);
   } catch (e) { /* bookkeeping only */ }
 }
+
+// ---- step 3a: cast reads go through `actors_v` ----
+//
+// The columns of `actors`, one row per (member copy, credit): the shared cast
+// from `title_cast` for a copy whose entry has one, and the copy's own rows
+// otherwise. `id` carries the billing order for shared rows, which is all a
+// reader uses it for (ordering within one show).
+export const ACTORS_COLUMNS = ['id', 'show_id', 'name', 'imdb_id', 'ord', 'tmdb_person_id', 'character_name'];
+
+const COPY_ENTRY = `tc.tmdb_id = s.tmdb_id
+       AND tc.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)`;
+
+export function actorsViewSql() {
+  return `CREATE VIEW actors_v AS
+  SELECT tc.ord AS id, s.id AS show_id, tc.name AS name, tc.imdb_id AS imdb_id, tc.ord AS ord,
+         tc.tmdb_person_id AS tmdb_person_id, tc.character_name AS character_name
+    FROM shows s JOIN title_cast tc ON ${COPY_ENTRY}
+  UNION ALL
+  SELECT a.id, a.show_id, a.name, a.imdb_id, a.ord, a.tmdb_person_id, a.character_name
+    FROM actors a
+   WHERE NOT EXISTS (SELECT 1 FROM shows s JOIN title_cast tc ON ${COPY_ENTRY} WHERE s.id = a.show_id)`;
+}

@@ -55,7 +55,7 @@ export async function onRequestGet(context) {
     ? `AND (LOWER(s.title) LIKE ?2 ESCAPE '\\'
             OR LOWER(COALESCE(s.network, '')) LIKE ?2 ESCAPE '\\'
             OR LOWER(COALESCE(s.genres, '')) LIKE ?2 ESCAPE '\\'
-            OR EXISTS (SELECT 1 FROM actors a WHERE a.show_id = s.id
+            OR EXISTS (SELECT 1 FROM actors_v a WHERE a.show_id = s.id
                         AND LOWER(a.name) LIKE ?2 ESCAPE '\\'))`
     : '';
   const limitSql = filtered ? `LIMIT ${limit}` : '';
@@ -76,7 +76,7 @@ export async function onRequestGet(context) {
             m.name AS member_raw_name, m.first_name AS member_raw_first,
             m.last_initial AS member_last_initial,
             (SELECT json_group_array(json_object('name', a.name, 'imdb_id', a.imdb_id))
-             FROM actors a WHERE a.show_id = s.id) AS actors
+             FROM actors_v a WHERE a.show_id = s.id) AS actors
      FROM shows_v s
      JOIN members m ON m.slug = s.member_slug
      WHERE s.archived = 0

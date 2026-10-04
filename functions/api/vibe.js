@@ -166,7 +166,7 @@ async function enrichPick(env, p) {
   p.genres = genreRow ? genreRow.genres : null;
 
   const { results: actors } = await env.DB.prepare(
-    `SELECT a.name FROM actors a
+    `SELECT a.name FROM actors_v a
      JOIN shows_v s ON s.id = a.show_id
      WHERE LOWER(s.title) = ? AND s.archived = 0
      GROUP BY a.name
