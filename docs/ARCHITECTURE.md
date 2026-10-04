@@ -103,6 +103,38 @@ Join table for per-show cast.
 | `name`     | TEXT NOT NULL | |
 | `imdb_id`  | TEXT | NULL for seeded rows and legacy enrichments that predate TMDB actor ids. |
 
+### `titles` / `title_cast` (migration 076): normalizing, step 1
+
+One row per TMDB entry, `(tmdb_type, tmdb_id)`: the show itself, as opposed
+to a member's copy of it. `titles.name` is TMDB's own name. The rest of the
+row is the catalog columns that `shows` repeats on every copy (overview,
+artwork, genres, seasons, ratings, streaming services…), and `title_cast` is
+the cast. No member field lives here: list, order, notes, watching-with,
+recommended-by, archived, the member's network and Watch link stay on
+`shows`.
+
+The plan has three steps, and only the first has shipped:
+
+1. **Shadow table (now).** Nothing reads it. `_shared/titles.js#syncTitle()`
+   runs after the writes that change one show's catalog data: add, edit,
+   and both enrichment passes, the passes passing TMDB's name from the
+   detail payload. `rebuildTitles()` rebuilds everything from the copies.
+   It runs as `POST /api/enrich {mode: "titles"}` (cron secret only) at the
+   end of the nightly `enrich-backfill.yml`, which catches the rarer writers
+   (URL cleanup, imports, group recommendations, Watching With copies) and
+   drops entries no copy points at. Each field comes from the freshest copy
+   that has a value, and a name TMDB gave is kept until TMDB gives another.
+   The migration's backfill is generated from `rebuildSql()`.
+2. **Reads switch over.** Endpoints join `shows` to `titles`, keeping the
+   response shape, so no client changes. Titles then come from TMDB for
+   everyone, and member renames end.
+3. **Duplicates removed.** The catalog columns and per-copy `actors` rows go,
+   and enrichment writes once per entry instead of once per copy.
+
+At step 1 that's 1,409 copies in 570 entries, catalog text 791 KB → 319 KB
+and cast rows 11,137 → 4,253 (`scripts/tmdb-audit.mjs`, 2026-10-04).
+Enforcer: `scripts/titles-test.mjs`.
+
 ### `show_ratings`
 Member ratings (docs/PRODUCT.md backlog: "Member ratings"). Migration 053. Keyed off `(tmdb_id, tmdb_type)` rather than any one member's `shows` row, so every member's independent copy of the same title shares one rating pool.
 
@@ -455,7 +487,7 @@ drained once, so it deliberately has no button in the app.
 | `POST /api/groups/[id]/suggestions/[sid]` | `functions/api/groups/[id]/suggestions/[sid].js` | POST | session + membership — answer the pop-up (`dismiss` \| `add`); `add` copies onto the caller's own Next Up |
 | `DELETE /api/groups/[id]/suggestions/[sid]` | `functions/api/groups/[id]/suggestions/[sid].js` | DELETE | session + (recommender or group creator) |
 | `GET /api/groups/join?token=`          | `functions/api/groups/join.js`             | GET     | session joins; without one, returns a name-only preview |
-| `POST /api/enrich`                     | `functions/api/enrich.js`                  | POST    | session or `CRON_SECRET` header — `{show_id}` refreshes that one row regardless of list, archive state or gaps, and skips the library-wide actor backfill (the `admin_refresh_show` tool) |
+| `POST /api/enrich`                     | `functions/api/enrich.js`                  | POST    | session or `CRON_SECRET` header — `{show_id}` refreshes that one row regardless of list, archive state or gaps, and skips the library-wide actor backfill (the `admin_refresh_show` tool). `{mode: "titles"}` rebuilds the shared `titles` table, and accepts the cron secret only |
 | `POST /api/sync-urls`                  | `functions/api/sync-urls.js`               | POST    | admin session or `X-Cron-Secret` (a member session is a no-op `{synced: 0}`); demo member's rows excluded as URL sources |
 | `GET /api/reporting`                   | `functions/api/reporting.js`               | GET     | admin session |
 | `POST /api/account-delete`             | `functions/api/account-delete.js`          | POST    | session; hard-deletes the caller's account after an emailed code confirms |

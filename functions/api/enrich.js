@@ -3,6 +3,7 @@ import { cronAuthorized } from '../_shared/secrets.js';
 import { fetchEnrichment, fetchEnrichmentById, extractTmdbDetailFields, fallbackNetwork, dedupeCast, castCharacter, CAST_DEPTH, pickBestMatch, titleSearchTerms } from '../_shared/enrichment.js';
 import { fillActorIdsFromKnownPeople, knownByPersonIds, rememberPeople } from '../_shared/people.js';
 import { canonicalNetwork } from '../_shared/networks.js';
+import { syncTitle, rebuildTitles } from '../_shared/titles.js';
 
 // TMDB GET that works with either credential the worker has configured:
 // the v4 Bearer token (TMDB_TOKEN, what the shared enrichment path uses) is
@@ -220,6 +221,20 @@ export async function onRequestPost(context) {
 
   let body = {};
   try { body = await request.json(); } catch (e) {}
+
+  // `mode: 'titles'` rebuilds the shared one-row-per-show table from every
+  // copy (functions/_shared/titles.js). The nightly job runs it once, after
+  // the passes, to catch the rarer writers that don't sync as they go
+  // (URL cleanup, imports, group recommendations, Watching With copies) and
+  // to drop entries nothing points at any more. Whole-library work, so it's
+  // the scheduled job's alone rather than every member page load's.
+  if (body.mode === 'titles') {
+    if (!cronOk) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+    }
+    const counts = await rebuildTitles(env);
+    return new Response(JSON.stringify({ rebuilt: true, ...counts }), { headers: { 'Content-Type': 'application/json' } });
+  }
   const member = body.member || null;
   // Cloudflare's subrequest ceiling still bounds a single invocation, so the
   // heavy TMDB detail passes and the cheap poster catch-up stay separable.
@@ -543,6 +558,7 @@ export async function onRequestPost(context) {
         // whatever shallow cast it was first given. Only people we've never
         // resolved cost a request, and only while the budget holds.
         await refreshCastFromDetail(env, show, detail, tmdbId);
+        await syncTitle(env, 'tv', tmdbId, detail.name);
         tmdbUpdated++;
       } catch (e) {
         tvErrors++;
@@ -747,6 +763,7 @@ export async function onRequestPost(context) {
         // (an archived one imported bare, say) re-qualified every round and
         // stayed out of Favorite Actors for good. Same helper as the TV pass.
         await refreshCastFromDetail(env, show, detail, tmdbId);
+        await syncTitle(env, 'movie', tmdbId, detail.title);
         if (posterUrl) tmdbUpdated++;
       } catch (e) {
         movieErrors++;

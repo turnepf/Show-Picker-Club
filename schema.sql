@@ -415,6 +415,39 @@ CREATE TABLE IF NOT EXISTS group_suggestion_responses (
   PRIMARY KEY (suggestion_id, member_slug)
 );
 
+-- One row per TMDB entry: the show itself, as opposed to a member's copy of
+-- it. Step 1 of normalizing the library (docs/ARCHITECTURE.md#titles).
+-- Nothing reads these tables yet; functions/_shared/titles.js keeps them in
+-- sync with `shows` so the next step can switch reads over. The backfill
+-- for an existing database is in migrations/076_titles.sql.
+CREATE TABLE IF NOT EXISTS titles (
+  tmdb_type TEXT NOT NULL CHECK (tmdb_type IN ('tv', 'movie')),
+  tmdb_id INTEGER NOT NULL,
+  -- TMDB's own name for the entry.
+  name TEXT NOT NULL,
+  overview TEXT, poster_url TEXT, backdrop_url TEXT, network_logo_url TEXT, tagline TEXT, genres TEXT,
+  director TEXT, director_imdb_id TEXT, content_rating TEXT, trailer_key TEXT, runtime INTEGER, release_year INTEGER,
+  rating TEXT, tmdb_rating TEXT, vote_count INTEGER, seasons_released INTEGER, episodes_released INTEGER, full_series INTEGER,
+  next_season_date TEXT, season_end_date TEXT, streaming_on TEXT, free_on TEXT, studio TEXT, original_language TEXT,
+  imdb_id TEXT, tmdb_status TEXT, watch_link TEXT,
+  synced_at TEXT,
+  PRIMARY KEY (tmdb_type, tmdb_id)
+);
+CREATE TABLE IF NOT EXISTS title_cast (
+  tmdb_type TEXT NOT NULL,
+  tmdb_id INTEGER NOT NULL,
+  ord INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  imdb_id TEXT,
+  tmdb_person_id INTEGER,
+  character_name TEXT,
+  PRIMARY KEY (tmdb_type, tmdb_id, ord)
+);
+CREATE INDEX IF NOT EXISTS idx_title_cast_person ON title_cast(tmdb_person_id);
+-- Every lookup from a show copy to its entry goes through this.
+CREATE INDEX IF NOT EXISTS idx_shows_tmdb ON shows(tmdb_id, tmdb_type);
+
+
 -- Daily Trending snapshot (migration 067). /api/popular computes its ranking
 -- once per UTC day and serves everyone else from this one-row cache — the
 -- ranking query is the most expensive read in the product and the endpoint is

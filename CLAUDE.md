@@ -329,6 +329,27 @@ It never selects memos or emails. `--json <file>` writes everything, and
 the classification against a fixture database and a fake TMDB.
 
 ```bash
+node scripts/titles-test.mjs
+```
+
+The shared one-row-per-show tables, `titles` and `title_cast` (migration 076).
+This is step 1 of normalizing the library: one row per TMDB entry instead of
+the show's details repeated on every member's copy. Nothing reads them yet,
+so what's pinned is that they summarize the copies faithfully, built the
+same way by the migration, the nightly rebuild and the sync after each
+write:
+- one row per entry, each field taken from the freshest copy that has it;
+- TMDB's own name, kept until TMDB gives another;
+- the fullest cast any copy holds;
+- no member field;
+- an entry nothing points at is dropped;
+- the migration's backfill is the same SQL as `rebuildTitles()`;
+- a sync never throws, because it runs beside a member's save.
+
+`admin-fix-tools-test.mjs` checks that the real add, edit and refresh paths
+keep the table in step. See `docs/ARCHITECTURE.md#titles--title_cast-migration-076-normalizing-step-1`.
+
+```bash
 node scripts/asc.mjs status
 ```
 

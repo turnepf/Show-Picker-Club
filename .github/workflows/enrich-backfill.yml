@@ -25,6 +25,7 @@ name: Enrich backfill (posters, logos, seasons)
 #      rows-written budget, so the nightly slice is deliberately smaller than
 #      a manual drain. Raise `rounds` / `max_tmdb` on a manual run instead.
 #   4. The Trending titles.
+#   5. A rebuild of the shared one-row-per-show `titles` table.
 #
 # Empty data is filled before stale data is refreshed. The endpoint orders
 # both rotations gap-first (a row missing poster, cast, episode count or
@@ -253,6 +254,22 @@ jobs:
             total=$((total + tup))
             echo "trending pass (HTTP $thttp) — tmdbUpdated: $tup"
             sleep 3
+          fi
+
+          # The shared one-row-per-show table (functions/_shared/titles.js).
+          # Last, so it rebuilds from everything the passes above just wrote.
+          # Nothing reads it yet; a failure here is a warning, not a failed run.
+          tiresp=$(curl -sS --max-time 240 -X POST "$URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Cron-Secret: ${CRON_SECRET}" \
+            -d '{"mode":"titles"}' \
+            -w $'\n%{http_code}' || true)
+          tihttp=$(printf '%s' "$tiresp" | tail -n1)
+          tibody=$(printf '%s' "$tiresp" | sed '$d')
+          if [ "$tihttp" = "200" ]; then
+            echo "titles rebuild — $tibody"
+          else
+            echo "::warning::titles rebuild returned HTTP ${tihttp:-none}: $tibody"
           fi
 
           if [ -n "$stopped_early" ]; then
