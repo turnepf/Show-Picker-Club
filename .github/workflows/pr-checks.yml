@@ -125,6 +125,8 @@ jobs:
         run: node scripts/admin-query-test.mjs
       - name: Admin fix tools keep the row's identity, the member's memos and updated_at
         run: node scripts/admin-fix-tools-test.mjs
+      - name: The TMDB audit classifies unmatched rows correctly and stays read-only
+        run: node scripts/tmdb-audit-test.mjs
 
   roku:
     runs-on: ubuntu-latest
