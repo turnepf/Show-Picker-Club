@@ -23,6 +23,7 @@
 // to a temp directory, schema.sql in node:sqlite behind a D1 shim, and a fake
 // TMDB serving two same-titled entries in popularity order.
 
+import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -132,6 +133,8 @@ function addShow(env, o = {}) {
   ).run(o.title ?? TITLE, o.list ?? 'recommending', o.movie ? 1 : 0, o.archived ? 1 : 0,
     o.tmdb ?? null, o.tmdb ? (o.tmdbType ?? (o.movie ? 'movie' : 'tv')) : null,
     o.year ?? null, o.overview ?? null, o.poster ?? null, o.notes ?? null);
+  // Facts seeded on the copy reach the shared row members read from.
+  liftCopiesIntoTitles(env._db);
   return Number(r.lastInsertRowid);
 }
 
@@ -146,8 +149,8 @@ async function put(env, id, body) {
   return res.status;
 }
 
-const row = (env, id) => env._db.prepare('SELECT * FROM shows WHERE id = ?').get(id);
-const cast = (env, id) => env._db.prepare('SELECT name FROM actors WHERE show_id = ? ORDER BY ord').all(id).map((a) => a.name).join(',');
+const row = (env, id) => env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(id);
+const cast = (env, id) => env._db.prepare('SELECT name FROM actors_v WHERE show_id = ? ORDER BY ord').all(id).map((a) => a.name).join(',');
 const searched = () => fetches.some((p) => p.startsWith('/3/search/'));
 
 // ---- scenarios ----

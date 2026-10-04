@@ -309,36 +309,16 @@ async function commitTitleFix(env, oldTitle, rawNew, enriched) {
   }
   const renamed = await renameShowCopies(env, oldTitle, finalTitle);
 
-  // Prefer the new title's artwork — the old title either had none (search
-  // missed) or the wrong show's (search mismatched). Only keep the old value
-  // when the new lookup returned nothing.
+  // The copies keep only what is theirs: the badge, a network if they had
+  // none, and the pin. The show's facts and cast are written to its shared
+  // row by the caller (writeTitle), where members read them.
   await env.DB.prepare(
     `UPDATE shows
-        SET rating = COALESCE(?, rating),
-            poster_url = COALESCE(?, poster_url),
-            network_logo_url = COALESCE(?, network_logo_url),
-            overview = COALESCE(?, overview), backdrop_url = COALESCE(?, backdrop_url),
-            tmdb_rating = COALESCE(?, tmdb_rating), content_rating = COALESCE(?, content_rating),
-            trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director),
-            runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
-            network = COALESCE(network, ?), watch_link = COALESCE(?, watch_link),
+        SET network_logo_url = COALESCE(?, network_logo_url),
+            network = COALESCE(network, ?),
             tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type)
       WHERE LOWER(title) = LOWER(?) AND archived = 0`
-  ).bind(enriched.rating, enriched.posterUrl, enriched.networkLogoUrl,
-    enriched.overview, enriched.backdropUrl, enriched.tmdbRating, enriched.contentRating,
-    enriched.trailerKey, enriched.director, enriched.runtime, enriched.releaseYear,
-    fallbackNetwork(enriched), enriched.watchLink, enriched.tmdbId, enriched.tmdbType, finalTitle).run();
-
-  if (enriched.actors.length > 0) {
-    const { results: copies } = await env.DB.prepare(
-      'SELECT id FROM shows WHERE LOWER(title) = LOWER(?) AND archived = 0'
-    ).bind(finalTitle).all();
-    const ins = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?)');
-    for (const c of copies) {
-      await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(c.id).run();
-      await env.DB.batch(enriched.actors.map((a, i) => ins.bind(c.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null, a.character ?? null)));
-    }
-  }
+  ).bind(enriched.networkLogoUrl, fallbackNetwork(enriched), enriched.tmdbId, enriched.tmdbType, finalTitle).run();
 
   return { finalTitle, updated: renamed };
 }
@@ -748,43 +728,23 @@ export async function onRequestPost(context) {
     const isMovie = movieOverride !== null ? !!movieOverride : !!row.movie;
 
     const enriched = await fetchEnrichment(row.title, env, isMovie);
-    if (enriched.posterUrl || enriched.networkLogoUrl || enriched.rating || enriched.overview) {
+    if (enriched.tmdbId || enriched.networkLogoUrl) {
+      // The copies: badge, network, pin and stamp. The show's facts and cast
+      // go to its shared row just below.
       await env.DB.prepare(
         `UPDATE shows
-            SET poster_url = COALESCE(?, poster_url),
-                network_logo_url = COALESCE(?, network_logo_url),
-                rating = COALESCE(?, rating),
-                overview = COALESCE(?, overview), backdrop_url = COALESCE(?, backdrop_url),
-                tmdb_rating = COALESCE(?, tmdb_rating), content_rating = COALESCE(?, content_rating),
-                trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director),
-                runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
-                network = COALESCE(network, ?), watch_link = COALESCE(?, watch_link),
+            SET network_logo_url = COALESCE(?, network_logo_url),
+                network = COALESCE(network, ?),
                 tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type),
                 enriched_at = datetime('now')
           WHERE LOWER(title) = LOWER(?) AND archived = 0`
-      ).bind(enriched.posterUrl, enriched.networkLogoUrl, enriched.rating,
-        enriched.overview, enriched.backdropUrl, enriched.tmdbRating, enriched.contentRating,
-        enriched.trailerKey, enriched.director, enriched.runtime, enriched.releaseYear,
-        fallbackNetwork(enriched), enriched.watchLink, enriched.tmdbId, enriched.tmdbType, row.title).run();
+      ).bind(enriched.networkLogoUrl, fallbackNetwork(enriched), enriched.tmdbId, enriched.tmdbType, row.title).run();
     } else {
       // Nothing found — stamp so the title rotates to the back of the
       // oldest-first background pass instead of blocking it every round.
       await env.DB.prepare(
         `UPDATE shows SET enriched_at = datetime('now') WHERE LOWER(title) = LOWER(?) AND archived = 0`
       ).bind(row.title).run();
-    }
-
-    // Fill cast on any copy that has none (TMDB actors only — the fallback
-    // can't supply IMDB ids, so there's nothing to gain from OMDB-only rows).
-    if ((enriched.actors || []).some(a => a.imdb_id)) {
-      const { results: copies } = await env.DB.prepare(
-        'SELECT id FROM shows WHERE LOWER(title) = LOWER(?) AND archived = 0'
-      ).bind(row.title).all();
-      const ins = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?)');
-      for (const c of copies) {
-        const have = await env.DB.prepare('SELECT COUNT(*) AS c FROM actors WHERE show_id = ?').bind(c.id).first();
-        if (have.c === 0) await env.DB.batch(enriched.actors.map((a, i) => ins.bind(c.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null, a.character ?? null)));
-      }
     }
 
     if (enriched.tmdbId) {

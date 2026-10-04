@@ -233,7 +233,6 @@ export async function onRequestPut(context) {
     enriched = byPin.canonicalTitle ? byPin : emptyEnrichment();
   }
   if (!enriched) enriched = await fetchEnrichment(title, env, !!movie);
-  const rating = enriched.rating || existing.rating;
 
   const finalNetwork = network || fallbackNetwork(enriched);
   // The service badge was derived from the network this row USED to name, so a
@@ -253,39 +252,17 @@ export async function onRequestPut(context) {
   const urlService = network_url ? networkFromUrl(network_url) : null;
   const urlNowWrong = networkChanged && !pastedUrl && urlService && urlService !== finalNetwork;
   const finalUrl = urlNowWrong ? null : network_url;
+  // The member's row: what is theirs, plus the pin and the per-service badge.
+  // The show's facts and cast go to its shared row just below.
   await env.DB.prepare(
-    `UPDATE shows SET title = ?, network = ?, network_url = ?, recommended_by = ?, list = ?, notes = ?, movie = ?, full_series = ?, watching_with = ?, rating = ?, archived = ?,
-        poster_url = COALESCE(?, poster_url),
+    `UPDATE shows SET title = ?, network = ?, network_url = ?, recommended_by = ?, list = ?, notes = ?, movie = ?, full_series = ?, watching_with = ?, archived = ?,
         network_logo_url = CASE WHEN ? = 1 THEN NULL ELSE COALESCE(?, network_logo_url) END,
-        overview = COALESCE(?, overview), backdrop_url = COALESCE(?, backdrop_url),
-        tmdb_rating = COALESCE(?, tmdb_rating), content_rating = COALESCE(?, content_rating),
-        trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director),
-        director_imdb_id = COALESCE(?, director_imdb_id),
-        runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
-        watch_link = COALESCE(?, watch_link),
         tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type),
-        imdb_id = COALESCE(?, imdb_id), tmdb_status = COALESCE(?, tmdb_status),
-        free_on = COALESCE(?, free_on),
-        genres = COALESCE(?, genres),
-        -- A movie has no seasons. Fill-only would keep the count from the TV
-        -- entry a row was matched to before it became a movie ("Sinners, 6
-        -- seasons"), since a film's lookup has no number to overwrite it with.
-        seasons_released = CASE WHEN ? = 1 THEN NULL ELSE COALESCE(?, seasons_released) END,
         updated_at = datetime('now') WHERE id = ?`
-  ).bind(title, finalNetwork, finalUrl, recommended_by, list, notes, movie, full_series, watching_with, rating, archived,
-    enriched.posterUrl || null, networkChanged ? 1 : 0, enriched.networkLogoUrl || null,
-    enriched.overview || null, enriched.backdropUrl || null, enriched.tmdbRating || null, enriched.contentRating || null,
-    enriched.trailerKey || null, enriched.director || null, enriched.directorImdbId || null, enriched.runtime || null, enriched.releaseYear || null,
-    enriched.watchLink || null, enriched.tmdbId || null, enriched.tmdbType || null,
-    enriched.imdbId || null, enriched.tmdbStatus ?? null,
-    Array.isArray(enriched.freeNetworks) ? enriched.freeNetworks.join(', ') : null,
-    enriched.genres || null, movie ? 1 : 0, enriched.seasonsReleased ?? null, params.id).run();
+  ).bind(title, finalNetwork, finalUrl, recommended_by, list, notes, movie, full_series, watching_with, archived,
+    networkChanged ? 1 : 0, enriched.networkLogoUrl || null,
+    enriched.tmdbId || null, enriched.tmdbType || null, params.id).run();
 
-  if (enriched.actors.length > 0) {
-    await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(params.id).run();
-    const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?)');
-    await env.DB.batch(enriched.actors.map((a, i) => stmt.bind(params.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null, a.character ?? null)));
-  }
   // The shared row for whichever entry the copy points at now: TMDB's
   // payload when this edit fetched it, otherwise a fill from the copies. An
   // entry a re-point left behind is dropped by the nightly rebuild.

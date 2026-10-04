@@ -28,6 +28,7 @@
 // installed before this shipped keep rendering the one field they read.
 
 import { fetchEnrichment } from './enrichment.js';
+import { syncTitle, writeTitle, titleFieldsFromEnrichment } from './titles.js';
 
 // Ceiling on how many people one show can name. Far above a sofa's capacity;
 // it's here so a scripted client can't fan one add out across a large group.
@@ -222,61 +223,46 @@ export async function ensureCopy(env, memberSlug, source, list, taggerEmail) {
       await env.DB.prepare(
         "UPDATE shows SET archived = 0, list = ?, updated_at = datetime('now') WHERE id = ?"
       ).bind(list, existing.id).run();
-      return await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(existing.id).first();
+      return await env.DB.prepare('SELECT * FROM shows_v WHERE id = ?').bind(existing.id).first();
     }
     return existing;
   }
 
+  // The member's row only: title, service, list and pin. The show's facts and
+  // cast are the entry's shared row, which the source already has
+  // (docs/INVARIANTS.md §29), so nothing is copied but the pin.
   const result = await env.DB.prepare(
-    `INSERT INTO shows (title, network, network_url, list, movie, full_series, rating,
-        poster_url, network_logo_url, member_slug, added_by,
-        overview, backdrop_url, tmdb_rating, content_rating, trailer_key, director,
-        director_imdb_id, runtime, release_year, watch_link, tmdb_id, tmdb_type,
-        episodes_released, vote_count, tagline, original_language, studio,
-        imdb_id, tmdb_status, free_on)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO shows (title, network, network_url, list, movie, full_series,
+        network_logo_url, member_slug, added_by, tmdb_id, tmdb_type)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     source.title, source.network || null, source.network_url || null, list,
-    source.movie || 0, source.full_series || 0, source.rating || null,
-    source.poster_url || null, source.network_logo_url || null,
-    memberSlug, taggerEmail || null,
-    source.overview || null, source.backdrop_url || null, source.tmdb_rating || null,
-    source.content_rating || null, source.trailer_key || null, source.director || null,
-    source.director_imdb_id || null, source.runtime || null, source.release_year || null,
-    source.watch_link || null, source.tmdb_id || null, source.tmdb_type || null,
-    source.episodes_released ?? null, source.vote_count ?? null, source.tagline || null,
-    source.original_language || null, source.studio || null,
-    source.imdb_id || null, source.tmdb_status ?? null, source.free_on ?? null
+    source.movie || 0, source.full_series || 0, source.network_logo_url || null,
+    memberSlug, taggerEmail || null, source.tmdb_id || null, source.tmdb_type || null
   ).run();
 
   const newId = result.meta.last_row_id;
-  // Cast comes along too — a row with no actors renders a visibly emptier
-  // detail screen than the copy it was cloned from.
-  const { results: cast } = await env.DB.prepare(
-    'SELECT name, imdb_id, ord, tmdb_person_id, character_name FROM actors WHERE show_id = ?'
-  ).bind(source.id).all();
-  if (cast && cast.length) {
-    const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?)');
-    await env.DB.batch(cast.map((a, i) => stmt.bind(newId, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null, a.character_name ?? null)));
-  }
-  // A row cloned from a source that never got enriched (added offline, or
-  // added before its enrichment landed) would otherwise stay bare forever —
-  // nothing re-enriches a row that already exists. Fill it once, in the
-  // background, from the title.
-  if (!source.tmdb_id && !source.poster_url) {
+  // A source that was never matched to an entry: look it up once, pin both the
+  // new row and its shared row. Nothing re-enriches a row that already exists,
+  // and the nightly passes would otherwise get to it only in turn.
+  if (!source.tmdb_id) {
     try {
       const enriched = await fetchEnrichment(source.title, env, !!source.movie);
-      if (enriched && (enriched.posterUrl || enriched.tmdbId)) {
+      if (enriched && enriched.tmdbId) {
         await env.DB.prepare(
-          `UPDATE shows SET poster_url = COALESCE(?, poster_url), overview = COALESCE(?, overview),
-              tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type),
+          `UPDATE shows SET tmdb_id = COALESCE(tmdb_id, ?), tmdb_type = COALESCE(tmdb_type, ?),
               enriched_at = datetime('now') WHERE id = ?`
-        ).bind(enriched.posterUrl || null, enriched.overview || null,
-          enriched.tmdbId || null, enriched.tmdbType || null, newId).run();
+        ).bind(enriched.tmdbId, enriched.tmdbType || null, newId).run();
+        await writeTitle(env, enriched.tmdbType, enriched.tmdbId, {
+          name: enriched.canonicalTitle, fields: titleFieldsFromEnrichment(enriched), cast: enriched.actors,
+        });
       }
     } catch (e) { /* the row is usable without it */ }
+  } else {
+    await syncTitle(env, source.tmdb_type || (source.movie ? 'movie' : 'tv'), source.tmdb_id);
   }
-  return await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(newId).first();
+  // Read back through the view: the shared row carries the show's facts.
+  return await env.DB.prepare('SELECT * FROM shows_v WHERE id = ?').bind(newId).first();
 }
 
 // Rewrite one row's `watching_with` from its current link set. `rawText` is

@@ -332,6 +332,9 @@ the classification against a fixture database and a fake TMDB.
 node scripts/titles-test.mjs
 ```
 
+(Test fixtures that describe a show the pre-normalizing way, with facts on
+the copy, lift them into the shared row with `scripts/lib/seed-titles.mjs`.)
+
 The shared one-row-per-show tables, `titles` and `title_cast` (migration
 076), and the views member-facing reads go through: `shows_v` (migration 077)
 for the show and `actors_v` (migration 078) for its cast, which is the shared

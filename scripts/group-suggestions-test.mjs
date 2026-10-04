@@ -31,6 +31,7 @@
 // schema.sql is loaded into node:sqlite behind a thin D1 shim. No TMDB_TOKEN
 // is set, so enrichment returns its empty shape without touching the network.
 
+import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -131,11 +132,13 @@ function addShow(env, { slug, title, list = 'watching', archived = 0, tmdbId = n
     `INSERT INTO shows (title, list, member_slug, archived, tmdb_id, poster_url, network, notes, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(title, list, slug, archived, tmdbId, poster, network, notes, '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z');
-  return Number(env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id);
+  // Facts seeded on the copy reach the shared row members read from.
+  liftCopiesIntoTitles(env._db, { pinUnmatched: true });
+  return Number(env._db.prepare('SELECT MAX(id) AS id FROM shows_v').get().id);
 }
 
 const rowsFor = (env, slug) =>
-  env._db.prepare('SELECT * FROM shows WHERE member_slug = ? ORDER BY id').all(slug).map((r) => ({ ...r }));
+  env._db.prepare('SELECT * FROM shows_v WHERE member_slug = ? ORDER BY id').all(slug).map((r) => ({ ...r }));
 const rowFor = (env, slug, title) =>
   rowsFor(env, slug).find((r) => r.title.toLowerCase() === title.toLowerCase());
 

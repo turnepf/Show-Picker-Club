@@ -40,6 +40,7 @@
 // Same harness as scripts/enrich-identity-test.mjs: functions copied to a temp
 // dir as ES modules, schema.sql in node:sqlite behind a D1 shim, TMDB faked.
 
+import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -192,7 +193,7 @@ function addMovie(env, { title, tmdbId, poster = '/have.jpg', network = 'Max', g
         complete ? 'already here' : null,
         complete ? FILMS[tmdbId].runtime : null,
         '2026-09-01T00:00:00Z', '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z');
-  const id = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id);
+  const id = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows_v').get().id);
   if (withCast) {
     // With an imdb_id already set, so the separate actor-imdb backfill pass —
     // which selects on `imdb_id IS NULL` and fetches by title — stays out of
@@ -204,13 +205,14 @@ function addMovie(env, { title, tmdbId, poster = '/have.jpg', network = 'Max', g
 }
 
 const rowFor = (env, title) =>
-  ({ ...env._db.prepare('SELECT * FROM shows WHERE LOWER(title) = LOWER(?)').get(title) });
+  ({ ...env._db.prepare('SELECT * FROM shows_v WHERE LOWER(title) = LOWER(?)').get(title) });
 
-// Production backfilled the shared titles table from the copies (migration
-// 076) and rebuilds the gaps nightly. These fixtures seed copies directly, so
-// each run starts from the same backfill before the passes choose what's
-// missing (normalizing step 3c: gaps are read from the shared row).
+// These fixtures describe shows the pre-normalizing way, facts on the copy.
+// Each run lifts them into the shared row first, as migration 076 did for
+// production, since the passes read gaps from there and members read facts
+// from there.
 const runEnrich = async (env, body = {}) => {
+  liftCopiesIntoTitles(env._db);
   await rebuildTitles(env);
   return enrichApi.onRequestPost({
   env,
@@ -458,7 +460,7 @@ console.log('\nWhere a title streams now sits beside the network, never over it'
      VALUES ('Sing Sing', 'next', 'quinn', 1, 507, 'movie', '/have.jpg', 'Max', 'Drama', '2026-09-01T00:00:00Z', '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z')`
   ).run();
   await runEnrich(env);
-  const copies = env._db.prepare("SELECT member_slug, streaming_on FROM shows WHERE LOWER(title)='sing sing'").all();
+  const copies = env._db.prepare("SELECT member_slug, streaming_on FROM shows_v WHERE LOWER(title)='sing sing'").all();
   check('every copy of the title carries the same list',
     copies.length === 2 && copies.every((c) => c.streaming_on === 'Amazon Prime Video, HBO Max'),
     JSON.stringify(copies));
@@ -511,7 +513,7 @@ console.log('\nArchived titles are enriched too, since Favorite Actors counts th
   check('an archived film with gaps is selected', res.movieCandidates === 1,
     `movieCandidates=${res.movieCandidates}`);
   check('it gets its detail block', rowFor(env, 'Sinners').genres === 'Horror');
-  const cast = env._db.prepare('SELECT name FROM actors WHERE show_id = ?').all(id).map((r) => r.name);
+  const cast = env._db.prepare('SELECT name FROM actors_v WHERE show_id = ?').all(id).map((r) => r.name);
   check('and its cast, which the movie pass never used to write', cast.includes('Sinners Lead'),
     JSON.stringify(cast));
   const again = await (await runEnrich(env)).json();
@@ -528,12 +530,12 @@ console.log('\nArchived titles are enriched too, since Favorite Actors counts th
     `INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, archived, enriched_at)
      VALUES ('Sinners', 'recommending', 'amy', 1, 501, 'movie', 1, '2026-09-20T00:00:00Z')`
   ).run();
-  const archivedId = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id);
+  const archivedId = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows_v').get().id);
   await runEnrich(env);
-  const r = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(archivedId) };
+  const r = { ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(archivedId) };
   check('an archived sibling receives the propagated detail', r.genres === 'Horror' && r.poster_url,
     `genres=${r.genres} poster=${r.poster_url}`);
-  const cast = env._db.prepare('SELECT COUNT(*) AS n FROM actors WHERE show_id = ?').get(archivedId).n;
+  const cast = env._db.prepare('SELECT COUNT(*) AS n FROM actors_v WHERE show_id = ?').get(archivedId).n;
   check('and the cast', Number(cast) > 0, `cast=${cast}`);
 }
 {
@@ -543,7 +545,7 @@ console.log('\nArchived titles are enriched too, since Favorite Actors counts th
       `INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, archived, episodes_released, enriched_at)
        VALUES ('The Rehearsal', 'watching', 'patrick', 0, 700, 'tv', 1, ?, '2026-09-01T00:00:00Z')`
     ).run(episodes);
-    const id = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id);
+    const id = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows_v').get().id);
     if (withActor) env._db.prepare('INSERT INTO actors (show_id, name, imdb_id, ord) VALUES (?, ?, ?, 0)').run(id, 'Nathan Fielder', 'nm1');
     return id;
   };
@@ -562,7 +564,7 @@ console.log('\nArchived titles are enriched too, since Favorite Actors counts th
   res = await (await runEnrich(env)).json();
   check('an archived series with a gap is selected', res.tvCandidates === 1,
     `tvCandidates=${res.tvCandidates}`);
-  const ep = env._db.prepare('SELECT episodes_released FROM shows WHERE id = ?').get(gapId).episodes_released;
+  const ep = env._db.prepare('SELECT episodes_released FROM shows_v WHERE id = ?').get(gapId).episodes_released;
   check('and filled', ep === 12, `episodes_released=${ep}`);
 }
 
@@ -598,8 +600,11 @@ console.log('\nMovies mode refreshes complete films, oldest first');
   check('its streaming services are brought up to date', c.streaming_on === 'HBO Max',
     `streaming_on=${c.streaming_on}`);
   check('and its vote count converges', c.vote_count === 900, `vote_count=${c.vote_count}`);
-  check('the member\'s own fields are untouched', c.overview === 'already here' && c.network === 'Max',
-    `overview=${c.overview} network=${c.network}`);
+  // The member's service is theirs and stays. The overview is the film's,
+  // on its shared row, so a refresh brings TMDB's current text rather than
+  // keeping whatever an earlier pass left (docs/INVARIANTS.md §29).
+  check('the member\'s own fields are untouched', c.network === 'Max', `network=${c.network}`);
+  check('the film\'s facts are TMDB\'s current ones', c.overview === 'Conclave — the overview.', `overview=${c.overview}`);
   check('the TV pass does not run', !fetchLog.some((u) => u.includes('/3/tv/')), fetchLog.join(' '));
 
   // Conclave now carries today's stamp, so the next round moves on.
@@ -626,7 +631,7 @@ console.log('\nEmpty data is filled before stale data is refreshed');
   env._db.prepare(`INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, poster_url,
                      episodes_released, enriched_at) VALUES ('Old Complete', 'watching', 'patrick', 0, 699, 'tv',
                      '/p.jpg', 12, '2026-08-01T00:00:00Z')`).run();
-  const complete = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id);
+  const complete = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows_v').get().id);
   env._db.prepare(`INSERT INTO actors (show_id, name, imdb_id, ord) VALUES (?, 'Lead', 'nm0000001', 0)`).run(complete);
   // Added two days ago with no poster, cast or episode count: the newest
   // stamp, so it used to wait behind every other row in the rotation. The
@@ -634,7 +639,7 @@ console.log('\nEmpty data is filled before stale data is refreshed');
   // exactly the placeholder-entry case that must not hog the queue.
   env._db.prepare(`INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, enriched_at)
                    VALUES ('The Rehearsal', 'watching', 'patrick', 0, 700, 'tv', datetime('now', '-2 days'))`).run();
-  const stamp = (title) => env._db.prepare('SELECT enriched_at FROM shows WHERE title = ?').get(title).enriched_at;
+  const stamp = (title) => env._db.prepare('SELECT enriched_at FROM shows_v WHERE title = ?').get(title).enriched_at;
   const before = stamp('Old Complete');
 
   await runEnrich(env, { max_tmdb: 1 });

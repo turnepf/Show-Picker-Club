@@ -28,6 +28,7 @@
 // files as the ES modules they are, and schema.sql is loaded into node:sqlite
 // behind a thin D1 shim, so the SQL under test is executed.
 
+import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -95,7 +96,9 @@ function addShow(env, fields) {
   env._db.prepare(
     `INSERT INTO shows (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`
   ).run(...cols.map((c) => row[c]));
-  return env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id;
+  // Facts seeded on the copy reach the shared row members read from.
+  liftCopiesIntoTitles(env._db, { pinUnmatched: true });
+  return env._db.prepare('SELECT MAX(id) AS id FROM shows_v').get().id;
 }
 
 // Pull one meta tag's content back out of the rendered page.

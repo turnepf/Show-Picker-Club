@@ -170,8 +170,18 @@ The plan has three steps. The first two have shipped:
      the shared row keeps `''` as an answer for `streaming_on`, `free_on` and
      `tmdb_status` ("asked, none"). Migration 079 repaired the rows built
      before that rule.
-   - **3c-2:** writers stop writing the duplicate columns and per-copy
-     `actors`; the columns and rows go.
+   - **3c-2a (shipped, migration 080):** nothing writes the show's facts
+     or cast to a member's copy any more. Add, edit, enrichment, URL
+     cleanup, Watching With and group-recommendation copies, and the
+     import write member fields and the pin to `shows` and everything else
+     through `writeTitle()`. The views read show facts from `titles` and cast
+     from `title_cast` only. `full_series` reads the member's row again (it's
+     the "Series complete" toggle). `syncTitle()` and `rebuildTitles()` only
+     make sure an entry has a row. Demo reset skips snapshot columns the
+     table no longer has.
+   - **3c-2b (operator-run):** drop the leftover columns from `shows` and
+     clear `actors`. Nothing reads them since 3c-2a. Run by hand, after a
+     backup, rather than as a deploy-applied migration.
 At step 1 that's 1,409 copies in 570 entries, catalog text 791 KB → 319 KB
 and cast rows 11,137 → 4,253 (`scripts/tmdb-audit.mjs`, 2026-10-04).
 Enforcer: `scripts/titles-test.mjs`.
