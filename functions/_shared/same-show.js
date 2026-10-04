@@ -79,3 +79,19 @@ export function showKey(show) {
   if (id) return `${showType(show) || 'tv'}:${id}`;
   return 'title:' + String(show?.title || '').trim().toLowerCase();
 }
+
+// WHERE fragment matching the copies (alias `a`) that a key from showKey()
+// or showKeySql() names: the entry's copies, or the unpinned copies of a title.
+export function keyWhere(a, key) {
+  const m = /^(tv|movie):(\d+)$/.exec(String(key || ''));
+  if (m) {
+    return {
+      sql: `(${a}.tmdb_id = ? AND ${typeSql(a)} = ?)`,
+      binds: [Number(m[2]), m[1]],
+    };
+  }
+  return {
+    sql: `(${a}.tmdb_id IS NULL AND LOWER(TRIM(${a}.title)) = ?)`,
+    binds: [String(key || '').replace(/^title:/, '')],
+  };
+}

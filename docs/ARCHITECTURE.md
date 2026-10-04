@@ -335,12 +335,14 @@ Used by login throttling. Auto-pruned (>7 days) by the daily backup workflow.
 | `member_slug`  | TEXT | |
 | `created_at`   | TEXT NOT NULL | |
 
-### `show_traits`
-Pre-computed taste fingerprint per title, used by the vibe system. Keyed by `LOWER(title)`.
+### `title_traits` (migration 081)
+Pre-computed taste fingerprint per **show**, used by the vibe system. Keyed by `show_key`: `tv:<tmdb_id>` / `movie:<tmdb_id>`, or `title:<lowercased title>` for a show TMDB never matched — the key `showKeySql()` in `_shared/same-show.js` computes from a `shows`/`shows_v` row. Three 2026 films are called "The Odyssey"; they are three fingerprints.
 
-27 trait columns (REAL, 0.0–1.0): `warmth`, `empathy`, `emotional_repair`, `moral_ambiguity`, `darkness`, `cynicism`, `manipulation`, `power_orientation`, `chaos_intensity`, `humor_warmth`, `cruel_humor`, `intellectual_curiosity`, `growth_orientation`, `violence_intensity`, `comfort_coziness`, `community_belonging`, `satire`, `prestige_energy`, `emotional_volatility`, `healing_redemption`, `revenge_energy`, `status_obsession`, `optimism`, `nihilism`, `teamwork`, `absurdism`.
+It replaced `show_traits`, which was keyed by `LOWER(title)` and so gave every show sharing a name one fingerprint. The migration carried each scored title to its show's key when all its copies pointed at one show (518 of 518 live titles on 2026-10-04) and left a title spanning several shows unscored for the fill queue. `show_traits` stays in the schema, unread, until a cleanup drops it.
 
-Plus `title_lower` (PK), `title`, `unknown_show` (1 if Claude couldn't identify the show), `generated_at`.
+26 trait columns (REAL, 0.0–1.0): `warmth`, `empathy`, `emotional_repair`, `moral_ambiguity`, `darkness`, `cynicism`, `manipulation`, `power_orientation`, `chaos_intensity`, `humor_warmth`, `cruel_humor`, `intellectual_curiosity`, `growth_orientation`, `violence_intensity`, `comfort_coziness`, `community_belonging`, `satire`, `prestige_energy`, `emotional_volatility`, `healing_redemption`, `revenge_energy`, `status_obsession`, `optimism`, `nihilism`, `teamwork`, `absurdism`.
+
+Plus `show_key` (PK), `title`, `unknown_show` (1 if Claude couldn't identify the show), `generated_at`, `scored_at`.
 
 ### `member_subscriptions`
 Per-member subscription decisions for the Subscription Audit (`/subscriptions`). Added by `migrations/014_member_subscriptions.sql`. The audit itself is **derived** from the `shows` table on every request — this table only stores what can't be computed.
@@ -1213,7 +1215,7 @@ Three pieces:
 - `functions/api/vibe.js`: composes a member fingerprint and matches it against clusters.
 
 ### Fingerprint
-For each of the member's non-seed shows, look up `show_traits` by `LOWER(title)`. Weight by list:
+For each of the member's non-seed shows, look up `title_traits` by the show's key (its TMDB entry, else its title). Weight by list:
 
 - `recommending` → 1.0
 - `watching` → 0.8
@@ -1263,8 +1265,8 @@ Score the member against **the club's own distribution**, not against the trait 
 Both carve-outs came out of the 2026-08 report that the one member on the list was the one member who couldn't use Vibe. The first pass fixed her own read; the exclusion was still deciding visibility, which left her invisible to the group-mates whose vibes she could see — a one-way mirror inside a group whose members can already open each other's libraries. Pinned by `scripts/vibe-scope-test.mjs`.
 
 ### Trait backfill (`/api/admin-vibe-fill`)
-- Picks titles with no `show_traits` row (skipping titles where every copy is archived). **Club-wide, including titles only a taste-excluded member holds** — `show_traits` is a catalog of what a title is like, not a tally of whose taste counts, and skipping those rows left the excluded member's own fingerprint computed from just the sliver of her library someone else happens to share. Cost: her unique titles join the fill queue, which is batched and cron-drained.
-- Sends each title to Claude with the calibration prompt.
+- Picks shows (one per TMDB entry, or per title for an unmatched show) with no `title_traits` row (skipping shows where every copy is archived). **Club-wide, including titles only a taste-excluded member holds** — `title_traits` is a catalog of what a title is like, not a tally of whose taste counts, and skipping those rows left the excluded member's own fingerprint computed from just the sliver of her library someone else happens to share. Cost: her unique titles join the fill queue, which is batched and cron-drained.
+- Sends each show to Claude with the calibration prompt, plus its year and synopsis so same-named shows are told apart.
 - Parses the returned JSON; writes the row or marks `unknown_show=1` if Claude can't identify it.
 - 429-aware: respects `Retry-After`, capped at 60s.
 - Batched: caller passes `count`, capped at 8 per request.

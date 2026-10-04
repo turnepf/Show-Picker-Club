@@ -21,6 +21,7 @@ const SHOW_COLS = [
   'id', 'title', 'list', 'member_slug', 'archived', 'added_by', 'created_at',
   'updated_at', 'network', 'network_url', 'rating', 'poster_url', 'movie',
   'seasons_released', 'full_series', 'next_season_date', 'genres',
+  'tmdb_id', 'tmdb_type',
 ].join(', ');
 
 function queries() {
@@ -34,7 +35,9 @@ function queries() {
     // active rows, the engagement check counts an archive as member intent,
     // and taking everything means one snapshot replays for any slug.
     shows: `SELECT ${SHOW_COLS} FROM shows`,
-    show_traits: 'SELECT * FROM show_traits',
+    // Fingerprints by show (migration 081). A snapshot saved before it carries
+    // show_traits instead and replays against the old table.
+    title_traits: 'SELECT * FROM title_traits',
     actors: `SELECT a.id, a.show_id, a.name FROM actors a
                JOIN shows s ON s.id = a.show_id WHERE s.archived = 0`,
   };

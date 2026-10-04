@@ -1,9 +1,16 @@
 import { TRAIT_NAMES, SYSTEM_PROMPT } from '../_shared/vibe-traits.js';
 import { isAdmin } from '../_shared/admin.js';
 import { cronAuthorized } from '../_shared/secrets.js';
+import { showKeySql } from '../_shared/same-show.js';
+
+// The queue is one entry per show — a TMDB entry, or a title TMDB never
+// matched — keyed the way title_traits is (migration 081). Three 2026 films
+// called "The Odyssey" are three fingerprints, each scored with its own year
+// and synopsis so Claude can tell which one it's describing.
+const KEY = showKeySql('s');
 
 // The fill queue is every active title in the club, including titles only a
-// taste-excluded member holds (_shared/excluded-members.js). `show_traits` is
+// taste-excluded member holds (_shared/excluded-members.js). `title_traits` is
 // a catalog: a row says what a title is like, not whose taste it counts
 // towards. Skipping those titles left the excluded member's own vibe computed
 // from the sliver of her library somebody else happens to share — the club
@@ -44,8 +51,10 @@ async function callClaude(env, userMsg) {
   });
 }
 
-async function scoreShow(env, title, genres, network, rating) {
+async function scoreShow(env, { title, year, overview, genres, network, rating }) {
   const lines = [`Score this show.`, `Title: ${title}`];
+  if (year) lines.push(`Year: ${year}`);
+  if (overview) lines.push(`Synopsis: ${String(overview).slice(0, 500)}`);
   if (genres) lines.push(`Genres: ${genres}`);
   if (network) lines.push(`Network: ${network}`);
   if (rating) lines.push(`Audience rating: ${rating}/10`);
@@ -120,25 +129,19 @@ export async function onRequestGet(context) {
   if (!(await authorized(request, env))) return json({ error: 'Forbidden' }, 403);
   const cursor = await getRescoreCursor(env);
   const fillRemaining = (await env.DB.prepare(`
-    SELECT COUNT(*) AS cnt FROM (
-      SELECT LOWER(title) AS t FROM shows
-      WHERE archived = 0
-        AND LOWER(title) NOT IN (SELECT title_lower FROM show_traits)
-      GROUP BY LOWER(title)
-    )
+    SELECT COUNT(DISTINCT ${KEY}) AS cnt FROM shows_v s
+    WHERE s.archived = 0
+      AND ${KEY} NOT IN (SELECT show_key FROM title_traits)
   `).first())?.cnt ?? 0;
   let rescoreRemaining = 0;
   if (cursor) {
     rescoreRemaining = (await env.DB.prepare(`
-      SELECT COUNT(*) AS cnt FROM (
-        SELECT LOWER(title) AS t FROM shows
-        WHERE archived = 0
-          AND LOWER(title) NOT IN (
-            SELECT title_lower FROM show_traits
-             WHERE scored_at IS NOT NULL AND scored_at >= ?
-          )
-        GROUP BY LOWER(title)
-      )
+      SELECT COUNT(DISTINCT ${KEY}) AS cnt FROM shows_v s
+      WHERE s.archived = 0
+        AND ${KEY} NOT IN (
+          SELECT show_key FROM title_traits
+           WHERE scored_at IS NOT NULL AND scored_at >= ?
+        )
     `).bind(cursor).first())?.cnt ?? 0;
   }
   return json({
@@ -192,70 +195,57 @@ export async function onRequestPost(context) {
   }
 
   let candidateFilter;
-  let remainingFilter;
   const filterParams = [];
-  const remainingParams = [];
   if (rescore && before) {
-    candidateFilter = `AND (LOWER(s.title) NOT IN (SELECT title_lower FROM show_traits WHERE scored_at IS NOT NULL AND scored_at >= ?))`;
-    remainingFilter = `AND (LOWER(title) NOT IN (SELECT title_lower FROM show_traits WHERE scored_at IS NOT NULL AND scored_at >= ?))`;
+    candidateFilter = `AND ${KEY} NOT IN (SELECT show_key FROM title_traits WHERE scored_at IS NOT NULL AND scored_at >= ?)`;
     filterParams.push(before);
-    remainingParams.push(before);
   } else if (rescore) {
     candidateFilter = '';
-    remainingFilter = '';
   } else {
-    candidateFilter = 'AND LOWER(s.title) NOT IN (SELECT title_lower FROM show_traits)';
-    remainingFilter = 'AND LOWER(title) NOT IN (SELECT title_lower FROM show_traits)';
+    candidateFilter = `AND ${KEY} NOT IN (SELECT show_key FROM title_traits)`;
   }
 
   const { results: pending } = await env.DB.prepare(`
-    SELECT LOWER(s.title) AS title_lower,
+    SELECT ${KEY} AS show_key,
            MIN(s.title) AS title,
-           (SELECT genres FROM shows_v g
-              WHERE LOWER(g.title) = LOWER(s.title) AND g.genres IS NOT NULL AND g.genres != ''
-              ORDER BY g.id LIMIT 1) AS genres,
-           (SELECT network FROM shows_v g
-              WHERE LOWER(g.title) = LOWER(s.title) AND g.network IS NOT NULL AND g.network != ''
-              ORDER BY g.id LIMIT 1) AS network,
-           (SELECT rating FROM shows_v g
-              WHERE LOWER(g.title) = LOWER(s.title) AND g.rating IS NOT NULL AND g.rating != ''
-              ORDER BY g.id LIMIT 1) AS rating
+           MAX(s.release_year) AS year,
+           MAX(NULLIF(s.overview, '')) AS overview,
+           MIN(NULLIF(s.genres, '')) AS genres,
+           MIN(NULLIF(s.network, '')) AS network,
+           MAX(NULLIF(s.rating, '')) AS rating
     FROM shows_v s
     WHERE s.archived = 0
       ${candidateFilter}
-    GROUP BY LOWER(s.title)
-    ORDER BY LOWER(s.title)
+    GROUP BY ${KEY}
+    ORDER BY LOWER(MIN(s.title)), ${KEY}
     LIMIT ?
   `).bind(...filterParams, count).all();
 
   const remaining = await env.DB.prepare(`
-    SELECT COUNT(*) AS cnt FROM (
-      SELECT LOWER(title) AS t FROM shows_v
-      WHERE archived = 0
-        ${remainingFilter}
-      GROUP BY LOWER(title)
-    )
-  `).bind(...remainingParams).first();
+    SELECT COUNT(DISTINCT ${KEY}) AS cnt FROM shows_v s
+    WHERE s.archived = 0
+      ${candidateFilter}
+  `).bind(...filterParams).first();
 
   const results = [];
   for (let i = 0; i < pending.length; i++) {
     const row = pending[i];
     if (i > 0) await new Promise(r => setTimeout(r, 1500));
     try {
-      const traits = await scoreShow(env, row.title, row.genres || '', row.network || '', row.rating || '');
+      const traits = await scoreShow(env, row);
 
       if (traits.unknown_show) {
         await env.DB.prepare(
-          'INSERT OR REPLACE INTO show_traits (title_lower, title, unknown_show, scored_at) VALUES (?, ?, 1, datetime(\'now\'))'
-        ).bind(row.title_lower, row.title).run();
+          'INSERT OR REPLACE INTO title_traits (show_key, title, unknown_show, scored_at) VALUES (?, ?, 1, datetime(\'now\'))'
+        ).bind(row.show_key, row.title).run();
         results.push({ title: row.title, status: 'unknown' });
         continue;
       }
 
-      const cols = ['title_lower', 'title', ...TRAIT_NAMES, 'scored_at'];
+      const cols = ['show_key', 'title', ...TRAIT_NAMES, 'scored_at'];
       const placeholders = cols.map(c => c === 'scored_at' ? "datetime('now')" : '?').join(', ');
       const values = [
-        row.title_lower,
+        row.show_key,
         row.title,
         ...TRAIT_NAMES.map(t => {
           const v = traits[t];
@@ -263,7 +253,7 @@ export async function onRequestPost(context) {
         }),
       ];
       await env.DB.prepare(
-        `INSERT OR REPLACE INTO show_traits (${cols.join(', ')}) VALUES (${placeholders})`
+        `INSERT OR REPLACE INTO title_traits (${cols.join(', ')}) VALUES (${placeholders})`
       ).bind(...values).run();
       results.push({ title: row.title, status: 'ok' });
     } catch (e) {

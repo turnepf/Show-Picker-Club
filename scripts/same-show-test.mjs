@@ -39,6 +39,9 @@ const checkApi = await load('api/shows/check.js');
 const groupTrendingApi = await load('api/groups/[id]/trending.js');
 const { copyForMember } = await load('_shared/watchers.js');
 const { createSuggestion, suggestionForViewer } = await load('_shared/group-suggestions.js');
+const vibeApi = await load('api/vibe.js');
+const vibeFillApi = await load('api/admin-vibe-fill.js');
+const { TRAIT_NAMES } = await load('_shared/vibe-traits.js');
 
 const ORIGIN = 'https://showpicker.club';
 
@@ -214,6 +217,42 @@ console.log('copyForMember, recommendations, also watching, group trending');
   check('trending keeps A and B as two cards', cards.length === 2, JSON.stringify(cards.map((c) => c.member_count)));
   const cardB = cards.find((c) => Number(c.tmdb_id) === B);
   check('B\'s card doesn\'t borrow A\'s poster', cardB && !cardB.poster_url, cardB ? cardB.poster_url : 'no B card');
+}
+
+
+// ---- vibe: a fingerprint per show ----
+
+console.log('vibe fingerprints by show (title_traits)');
+{
+  const env = makeEnv();
+  env.CRON_SECRET = 'cron';
+  const pat = addMember(env, 'pat');
+  addMember(env, 'amy');
+  const gid = addGroup(env, ['pat', 'amy']);
+  addShow(env, { slug: 'pat', tmdbId: A });
+  addShow(env, { slug: 'amy', tmdbId: B });
+  addShow(env, { slug: 'amy', tmdbId: C });
+  liftCopiesIntoTitles(env._db);
+  const traits = (key, v) => {
+    const cols = ['show_key', 'title', ...TRAIT_NAMES, 'scored_at'];
+    env._db.prepare(`INSERT INTO title_traits (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`)
+      .run(key, 'The Odyssey', ...TRAIT_NAMES.map(() => v), '2026-10-04 00:00:00');
+  };
+  traits(`movie:${A}`, 0.9);
+  traits(`movie:${B}`, 0.1);
+
+  const fill = await (await vibeFillApi.onRequestGet(ctx(env, new Request(ORIGIN + '/api/admin-vibe-fill', { headers: { 'X-Cron-Secret': 'cron' } })))).json();
+  check('the fill queue holds C, unscored though A and B share its title', fill.fill_remaining === 1, JSON.stringify(fill));
+
+  const v = await (await vibeApi.onRequestGet(ctx(env, req('/api/vibe?member=pat', { cookie: pat })))).json();
+  const m = v.member || {};
+  check('pat\'s fingerprint reads A\'s scores only', m.scored_count === 1 && m.display_traits && m.display_traits.Empathy === 90,
+    JSON.stringify(m.display_traits));
+  const picks = m.aligned_picks || [];
+  check('an aligned pick names its TMDB entry, so adding it adds that film',
+    picks.length === 1 && picks[0].tmdb_id === B && picks[0].tmdb_type === 'movie', JSON.stringify(picks));
+  check('owning A doesn\'t hide B from pat\'s picks', picks.some((p) => p.show_key === `movie:${B}`));
+  void gid;
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
