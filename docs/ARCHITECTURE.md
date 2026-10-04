@@ -149,8 +149,15 @@ The plan has three steps. The first two have shipped:
      it (show cards, the cast endpoint, Favorite Actors, Trending, group
      Trending, vibe, `admin_query`). The people bank's name linking and the
      actor backfill pass keep `title_cast` linked too.
-   - **3b:** writers write show details and cast to `titles`/`title_cast`
-     directly.
+   - **3b (shipped):** writers holding a TMDB payload write it to
+     `titles`/`title_cast` directly with `writeTitle()`: add, edit, both
+     enrichment passes, the actor backfill pass, and URL cleanup's rename and
+     re-match. A field the payload carries replaces the stored one, null
+     leaves it, `''` is a value ("asked, none"), and a non-empty cast list
+     replaces the cast. `syncTitle()` and the nightly `rebuildTitles()` now
+     only fill: they create missing rows and fill missing fields and cast
+     from the copies, but never overwrite what TMDB wrote. Member copies are
+     still written too, until 3c.
    - **3c:** the duplicate columns and the per-copy `actors` rows go.
 At step 1 that's 1,409 copies in 570 entries, catalog text 791 KB → 319 KB
 and cast rows 11,137 → 4,253 (`scripts/tmdb-audit.mjs`, 2026-10-04).

@@ -1,5 +1,5 @@
 import { fetchEnrichment, fetchEnrichmentById, fallbackNetwork, emptyEnrichment } from '../../_shared/enrichment.js';
-import { syncTitle } from '../../_shared/titles.js';
+import { syncTitle, writeTitle, titleFieldsFromEnrichment } from '../../_shared/titles.js';
 import { chargeSpend } from '../../_shared/spend-meter.js';
 import { getSession } from '../../_shared/auth.js';
 import { canonicalNetwork, networkFromUrl } from '../../_shared/networks.js';
@@ -286,13 +286,20 @@ export async function onRequestPut(context) {
     const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?)');
     await env.DB.batch(enriched.actors.map((a, i) => stmt.bind(params.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null, a.character ?? null)));
   }
-  // The shared row for whichever entry the copy points at now. An entry a
-  // re-point left behind is dropped by the nightly rebuild.
+  // The shared row for whichever entry the copy points at now: TMDB's
+  // payload when this edit fetched it, otherwise a fill from the copies. An
+  // entry a re-point left behind is dropped by the nightly rebuild.
   {
-    const pin = await env.DB.prepare('SELECT tmdb_id, tmdb_type, movie FROM shows_v WHERE id = ?').bind(params.id).first();
+    const pin = await env.DB.prepare('SELECT tmdb_id, tmdb_type, movie FROM shows WHERE id = ?').bind(params.id).first();
     if (pin && pin.tmdb_id) {
       const type = pin.tmdb_type || (pin.movie ? 'movie' : 'tv');
-      await syncTitle(env, type, pin.tmdb_id, enriched.tmdbId === pin.tmdb_id ? enriched.canonicalTitle : null);
+      if (enriched.canonicalTitle && enriched.tmdbId === pin.tmdb_id) {
+        await writeTitle(env, type, pin.tmdb_id, {
+          name: enriched.canonicalTitle, fields: titleFieldsFromEnrichment(enriched), cast: enriched.actors,
+        });
+      } else {
+        await syncTitle(env, type, pin.tmdb_id);
+      }
     }
   }
 

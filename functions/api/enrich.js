@@ -3,7 +3,7 @@ import { cronAuthorized } from '../_shared/secrets.js';
 import { fetchEnrichment, fetchEnrichmentById, extractTmdbDetailFields, fallbackNetwork, dedupeCast, castCharacter, CAST_DEPTH, pickBestMatch, titleSearchTerms } from '../_shared/enrichment.js';
 import { fillActorIdsFromKnownPeople, knownByPersonIds, rememberPeople } from '../_shared/people.js';
 import { canonicalNetwork } from '../_shared/networks.js';
-import { syncTitle, rebuildTitles } from '../_shared/titles.js';
+import { writeTitle, titleFieldsFromEnrichment, rebuildTitles } from '../_shared/titles.js';
 
 // TMDB GET that works with either credential the worker has configured:
 // the v4 Bearer token (TMDB_TOKEN, what the shared enrichment path uses) is
@@ -85,7 +85,7 @@ async function tmdbSearchFirst(title, type, env) {
 // original) — their cast is not this cast, so they keep their own rows.
 async function refreshCastFromDetail(env, show, detail, tmdbId) {
   const cast = dedupeCast(detail.credits?.cast).slice(0, CAST_DEPTH);
-  if (!cast.length) return;
+  if (!cast.length) return [];
   const known = await knownByPersonIds(env, cast.map(p => p.id));
   const people = [];
   const rows = [];
@@ -114,6 +114,8 @@ async function refreshCastFromDetail(env, show, detail, tmdbId) {
     await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(copy.id).run();
     await env.DB.batch(rows.map(r => insert.bind(copy.id, r.name, r.imdb_id, r.ord, r.tmdb_person_id, r.character)));
   }
+  // The caller writes the same list to the shared cast (writeTitle).
+  return rows;
 }
 
 // Fill missing artwork from sibling copies of the same title — a poster
@@ -557,8 +559,13 @@ export async function onRequestPost(context) {
         // to ignore it entirely, which is why a title enriched here kept
         // whatever shallow cast it was first given. Only people we've never
         // resolved cost a request, and only while the budget holds.
-        await refreshCastFromDetail(env, show, detail, tmdbId);
-        await syncTitle(env, 'tv', tmdbId, detail.name);
+        const castRows = await refreshCastFromDetail(env, show, detail, tmdbId);
+        // The shared row, straight from this payload (docs/INVARIANTS.md §29).
+        await writeTitle(env, 'tv', tmdbId, {
+          name: detail.name,
+          fields: titleFieldsFromEnrichment({ ...df, genres, seasonsReleased, posterUrl, directorImdbId, rating: df.tmdbRating }),
+          cast: castRows,
+        });
         tmdbUpdated++;
       } catch (e) {
         tvErrors++;
@@ -762,8 +769,12 @@ export async function onRequestPost(context) {
         // for missing cast — but this pass never wrote any, so a castless film
         // (an archived one imported bare, say) re-qualified every round and
         // stayed out of Favorite Actors for good. Same helper as the TV pass.
-        await refreshCastFromDetail(env, show, detail, tmdbId);
-        await syncTitle(env, 'movie', tmdbId, detail.title);
+        const castRows = await refreshCastFromDetail(env, show, detail, tmdbId);
+        await writeTitle(env, 'movie', tmdbId, {
+          name: detail.title,
+          fields: titleFieldsFromEnrichment({ ...df, genres, posterUrl, directorImdbId, rating: df.tmdbRating }),
+          cast: castRows,
+        });
         if (posterUrl) tmdbUpdated++;
       } catch (e) {
         movieErrors++;
@@ -851,7 +862,11 @@ export async function onRequestPost(context) {
           actorImdbFilled++;
         }
         // The shared cast members read (actors_v) gets the newly linked names.
-        if (castFromId) await syncTitle(env, result.tmdbType || show.tmdb_type || (show.movie ? 'movie' : 'tv'), castFromId);
+        if (castFromId) {
+          await writeTitle(env, result.tmdbType || show.tmdb_type || (show.movie ? 'movie' : 'tv'), castFromId, {
+            name: result.canonicalTitle, fields: titleFieldsFromEnrichment(result), cast: actors,
+          });
+        }
       } catch (e) {}
     }
   }

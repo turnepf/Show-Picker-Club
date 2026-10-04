@@ -48,7 +48,13 @@ function pick(field) {
 // TMDB's own name when the caller passes one, else the name already stored,
 // else the freshest copy's title (all of which matched TMDB's names after the
 // 2026-10-04 cleanup).
-function upsertSql(keysSql) {
+// `fillOnly` (the default since step 3b): a field already on the shared row
+// is kept, and the copies only fill what's missing. The shared row is written
+// directly from TMDB by writeTitle(), so a member's copy, which only ever had
+// the data some earlier pass gave it, must not overwrite fresher facts.
+// Migration 076's backfill ran into an empty table, where the two modes are
+// the same; rebuildSql() still returns that original form.
+function upsertSql(keysSql, { fillOnly = true } = {}) {
   const cols = ['tmdb_type', 'tmdb_id', 'name', ...TITLE_FIELDS];
   // A name TMDB gave us is kept until TMDB gives another: a rebuild, or a
   // sync from a writer without the detail payload, falls back to the copies'
@@ -59,14 +65,18 @@ function upsertSql(keysSql) {
     INSERT INTO titles (${cols.join(', ')}, synced_at)
     SELECT ${values.join(',\n      ')}, datetime('now') FROM k WHERE true
     ON CONFLICT (tmdb_type, tmdb_id) DO UPDATE SET
-      ${['name', ...TITLE_FIELDS].map((c) => `${c} = excluded.${c}`).join(',\n      ')},
+      ${['name', ...TITLE_FIELDS].map((c) => (fillOnly ? `${c} = COALESCE(titles.${c}, excluded.${c})` : `${c} = excluded.${c}`)).join(',\n      ')},
       synced_at = excluded.synced_at`;
 }
 
 // The cast of the copy that has the most of it (freshest on a tie), since a
 // title-scoped refresh can leave one copy with a shallower list than another.
-function castSql(keysSql) {
-  return `WITH k AS (${keysSql}),
+function castSql(keysSql, { fillOnly = true } = {}) {
+  const keys = fillOnly
+    ? `SELECT * FROM (${keysSql}) kk WHERE NOT EXISTS (
+         SELECT 1 FROM title_cast c WHERE c.tmdb_type = kk.tmdb_type AND c.tmdb_id = kk.tmdb_id)`
+    : keysSql;
+  return `WITH k AS (${keys}),
     best AS (
       SELECT k.tmdb_type, k.tmdb_id,
         (SELECT s2.id FROM shows s2
@@ -88,10 +98,12 @@ const ALL_KEYS = `SELECT DISTINCT ${TYPE_OF} AS tmdb_type, s.tmdb_id AS tmdb_id,
 const ONE_KEY = `SELECT ? AS tmdb_type, ? AS tmdb_id, ? AS name
   WHERE EXISTS (SELECT 1 FROM shows s WHERE s.tmdb_id = ? AND ${TYPE_OF} = ?)`;
 
-// Bring one entry's row up to date from its copies. Never throws: this is
-// bookkeeping beside a write that has already succeeded, and nothing reads
-// the table yet, so a failure must not fail the member's save. The nightly
-// rebuild repairs anything missed.
+// Create one entry's row from its copies, or fill the fields (and cast) it
+// is missing. For writers that have no TMDB payload in hand (imports, URL
+// cleanup's no-match path); a writer that has one calls writeTitle(). Never
+// throws: this is bookkeeping beside a write that has already succeeded, so a
+// failure must not fail the member's save. The nightly rebuild repairs
+// anything missed.
 export async function syncTitle(env, tmdbType, tmdbId, name = null) {
   const type = tmdbType === 'movie' ? 'movie' : tmdbType === 'tv' ? 'tv' : null;
   const id = Number(tmdbId);
@@ -100,7 +112,6 @@ export async function syncTitle(env, tmdbType, tmdbId, name = null) {
   const binds = [type, id, cleanName, id, type];
   try {
     await env.DB.prepare(upsertSql(ONE_KEY)).bind(...binds).run();
-    await env.DB.prepare('DELETE FROM title_cast WHERE tmdb_type = ? AND tmdb_id = ?').bind(type, id).run();
     await env.DB.prepare(castSql(ONE_KEY)).bind(...binds).run();
     return true;
   } catch (e) {
@@ -108,14 +119,16 @@ export async function syncTitle(env, tmdbType, tmdbId, name = null) {
   }
 }
 
-// Rebuild every entry, and drop entries no copy points at any more (a show
-// re-pointed elsewhere, or deleted by its last member). Used by the migration
-// backfill and the nightly pass.
+// Create a row for every entry that lacks one, fill fields and cast that
+// are missing, and drop entries no copy points at any more (a show
+// re-pointed elsewhere, or deleted by its last member). The nightly pass.
+// Never overwrites: fresh facts arrive through writeTitle().
 export async function rebuildTitles(env) {
   await env.DB.prepare(upsertSql(ALL_KEYS)).run();
   await env.DB.prepare(`DELETE FROM titles WHERE NOT EXISTS (
       SELECT 1 FROM shows s WHERE s.tmdb_id = titles.tmdb_id AND ${TYPE_OF} = titles.tmdb_type)`).run();
-  await env.DB.prepare('DELETE FROM title_cast').run();
+  await env.DB.prepare(`DELETE FROM title_cast WHERE NOT EXISTS (
+      SELECT 1 FROM titles t WHERE t.tmdb_type = title_cast.tmdb_type AND t.tmdb_id = title_cast.tmdb_id)`).run();
   await env.DB.prepare(castSql(ALL_KEYS)).run();
   const row = await env.DB.prepare(
     'SELECT (SELECT COUNT(*) FROM titles) AS titles, (SELECT COUNT(*) FROM title_cast) AS cast_rows'
@@ -127,7 +140,81 @@ export async function rebuildTitles(env) {
 // rebuildTitles(), exported so scripts/titles-test.mjs can prove the migration
 // file and the function agree.
 export function rebuildSql() {
-  return [upsertSql(ALL_KEYS), castSql(ALL_KEYS)];
+  return [upsertSql(ALL_KEYS, { fillOnly: false }), castSql(ALL_KEYS, { fillOnly: false })];
+}
+
+// ---- step 3b: writers write the shared row directly ----
+//
+// A writer holding a fresh TMDB payload (add, edit, the enrichment passes,
+// URL cleanup's re-match) writes it here, so the shared row is TMDB's answer
+// rather than whatever a member's copy happens to hold. A field the payload
+// carries replaces the stored one; a field it lacks (null) leaves it. An
+// empty string is a value: `streaming_on = ''` means TMDB was asked and
+// named no service. A cast list replaces the stored cast when non-empty.
+// Never throws, like syncTitle().
+export async function writeTitle(env, tmdbType, tmdbId, { name = null, fields = {}, cast = null } = {}) {
+  const type = tmdbType === 'movie' ? 'movie' : tmdbType === 'tv' ? 'tv' : null;
+  const id = Number(tmdbId);
+  if (!type || !Number.isInteger(id) || id <= 0) return false;
+  const cols = TITLE_FIELDS.filter((f) => fields[f] !== undefined);
+  const cleanName = typeof name === 'string' && name.trim() ? name.trim() : null;
+  try {
+    // A new row needs a name. Without TMDB's, start the row from the copies
+    // (which gives it the freshest copy's title), then write the payload.
+    if (!cleanName) {
+      const have = await env.DB.prepare('SELECT 1 FROM titles WHERE tmdb_type = ? AND tmdb_id = ?').bind(type, id).first();
+      if (!have) {
+        await syncTitle(env, type, id);
+        const made = await env.DB.prepare('SELECT 1 FROM titles WHERE tmdb_type = ? AND tmdb_id = ?').bind(type, id).first();
+        if (!made) return false;
+      }
+    }
+    // '' stands in for "no name given" on the insert side and never wins the
+    // update: an existing row always has one.
+    await env.DB.prepare(
+      `INSERT INTO titles (tmdb_type, tmdb_id, name${cols.map((c) => `, ${c}`).join('')}, synced_at)
+       VALUES (?, ?, ?${cols.map(() => ', ?').join('')}, datetime('now'))
+       ON CONFLICT (tmdb_type, tmdb_id) DO UPDATE SET
+         name = COALESCE(NULLIF(excluded.name, ''), titles.name)${cols.map((c) => `, ${c} = COALESCE(excluded.${c}, titles.${c})`).join('')},
+         synced_at = excluded.synced_at`
+    ).bind(type, id, cleanName || '', ...cols.map((c) => fields[c] ?? null)).run();
+    if (Array.isArray(cast) && cast.length) {
+      await env.DB.prepare('DELETE FROM title_cast WHERE tmdb_type = ? AND tmdb_id = ?').bind(type, id).run();
+      const ins = env.DB.prepare(
+        'INSERT OR IGNORE INTO title_cast (tmdb_type, tmdb_id, ord, name, imdb_id, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      );
+      for (const [i, a] of cast.entries()) {
+        if (!a || !a.name) continue;
+        await ins.bind(type, id, a.ord ?? i, a.name, a.imdb_id ?? null, a.tmdb_person_id ?? null,
+          a.character ?? a.character_name ?? null).run();
+      }
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// The shared-row fields in an enrichment payload (_shared/enrichment.js
+// fetchEnrichment / fetchEnrichmentById shape). Fields the payload doesn't
+// carry are left out, so writeTitle() keeps what's stored.
+export function titleFieldsFromEnrichment(e) {
+  if (!e) return {};
+  const status = typeof e.tmdbStatus === 'string' ? e.tmdbStatus : null;
+  const f = {
+    overview: e.overview, poster_url: e.posterUrl, backdrop_url: e.backdropUrl, tagline: e.tagline,
+    genres: e.genres, director: e.director, director_imdb_id: e.directorImdbId,
+    content_rating: e.contentRating, trailer_key: e.trailerKey, runtime: e.runtime,
+    release_year: e.releaseYear, rating: e.rating ?? e.tmdbRating, tmdb_rating: e.tmdbRating,
+    vote_count: e.voteCount, seasons_released: e.seasonsReleased, episodes_released: e.episodesReleased,
+    full_series: status ? (status === 'Ended' || status === 'Canceled' ? 1 : 0) : undefined,
+    streaming_on: Array.isArray(e.flatrateNetworks) ? e.flatrateNetworks.join(', ') : undefined,
+    free_on: Array.isArray(e.freeNetworks) ? e.freeNetworks.join(', ') : undefined,
+    studio: e.studio, original_language: e.originalLanguage, imdb_id: e.imdbId,
+    tmdb_status: status ?? undefined, watch_link: e.watchLink,
+  };
+  for (const k of Object.keys(f)) if (f[k] === undefined) delete f[k];
+  return f;
 }
 
 // ---- step 2: reads go through `shows_v` ----

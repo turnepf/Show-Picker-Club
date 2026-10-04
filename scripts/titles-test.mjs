@@ -29,7 +29,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = mkdtempSync(join(tmpdir(), 'titles-'));
 cpSync(join(repoRoot, 'functions'), join(sandbox, 'functions'), { recursive: true });
 writeFileSync(join(sandbox, 'package.json'), '{"type":"module"}');
-const { syncTitle, rebuildTitles, rebuildSql, TITLE_FIELDS, SHOWS_COLUMNS, SHARED_FIELDS, PER_COPY_FIELDS, viewSql, ACTORS_COLUMNS, actorsViewSql } = await import(join(sandbox, 'functions', '_shared/titles.js'));
+const { syncTitle, writeTitle, titleFieldsFromEnrichment, rebuildTitles, rebuildSql, TITLE_FIELDS, SHOWS_COLUMNS, SHARED_FIELDS, PER_COPY_FIELDS, viewSql, ACTORS_COLUMNS, actorsViewSql } = await import(join(sandbox, 'functions', '_shared/titles.js'));
 
 let passed = 0, failed = 0;
 function check(name, cond, detail = '') {
@@ -107,16 +107,61 @@ console.log('\n== the per-write sync');
   check('with TMDB\'s own name when the writer has it', title(env, 'tv', 283304).name === 'Little House on the Prairie');
   env._db.prepare("UPDATE shows SET overview = 'New text', enriched_at = '2026-10-04 00:00:00' WHERE tmdb_id = 283304").run();
   await syncTitle(env, 'tv', 283304);
-  check('a later sync picks up new data', title(env, 'tv', 283304).overview === 'New text');
+  check('a sync from the copies fills gaps but never overwrites (step 3b)', title(env, 'tv', 283304).overview === 'Old text', title(env, 'tv', 283304).overview);
+  env._db.prepare("UPDATE titles SET genres = NULL WHERE tmdb_id = 283304").run();
+  env._db.prepare("UPDATE shows SET genres = 'Drama' WHERE tmdb_id = 283304").run();
+  await syncTitle(env, 'tv', 283304);
+  check('and does fill a missing field', title(env, 'tv', 283304).genres === 'Drama');
   check('a sync without a name keeps TMDB\'s name rather than a member\'s title', title(env, 'tv', 283304).name === 'Little House on the Prairie', title(env, 'tv', 283304).name);
   await rebuildTitles(env);
   check('so does the rebuild', title(env, 'tv', 283304).name === 'Little House on the Prairie');
-  await syncTitle(env, 'tv', 283304, 'Little House on the Prairie: A New Beginning');
+  await writeTitle(env, 'tv', 283304, { name: 'Little House on the Prairie: A New Beginning' });
   check('a new name from TMDB replaces it', title(env, 'tv', 283304).name === 'Little House on the Prairie: A New Beginning');
   check('an entry no copy points at isn\'t created', (await syncTitle(env, 'tv', 1, 'Ghost')) === true && !title(env, 'tv', 1));
   check('bad input is refused quietly', (await syncTitle(env, 'film', 5)) === false && (await syncTitle(env, 'tv', 'x')) === false);
   const broken = { DB: { prepare: () => { throw new Error('D1 down'); } } };
   check('a database error never throws', (await syncTitle(broken, 'tv', 283304)) === false);
+}
+
+console.log('\n== step 3b: writers write TMDB\'s payload directly');
+{
+  const env = makeEnv();
+  // A member copy holding stale data, and a shared row built from it.
+  show(env, { title: 'MobLand', tmdb: 247718, overview: 'stale', genres: 'Crime', seasons: 1, cast: ['Old Name'] });
+  await rebuildTitles(env);
+  const payload = {
+    overview: 'Two mob families clash.', genres: 'Crime, Drama', seasonsReleased: 2, posterUrl: 'https://image.tmdb.org/m.jpg',
+    tmdbRating: '8.5', tmdbStatus: 'Returning Series', flatrateNetworks: [], freeNetworks: null, tagline: null,
+    actors: [{ name: 'Tom Hardy', imdb_id: 'nm0362766', ord: 0, tmdb_person_id: 2524, character: 'Harry' }, { name: 'Helen Mirren', ord: 1 }],
+  };
+  check('writes', await writeTitle(env, 'tv', 247718, { name: 'MobLand', fields: titleFieldsFromEnrichment(payload), cast: payload.actors }) === true);
+  const t = title(env, 'tv', 247718);
+  check('TMDB\'s values replace the stale ones', t.overview === 'Two mob families clash.' && t.genres === 'Crime, Drama' && t.seasons_released === 2 && t.poster_url === 'https://image.tmdb.org/m.jpg', JSON.stringify(t));
+  check('rating and status follow', t.rating === '8.5' && t.tmdb_rating === '8.5' && t.tmdb_status === 'Returning Series' && t.full_series === 0);
+  check('"streams nowhere" is a value, not a gap', t.streaming_on === '');
+  check('a field the payload lacks keeps what\'s stored', t.free_on === null && t.name === 'MobLand');
+  check('the cast is replaced by TMDB\'s', cast(env, 'tv', 247718) === 'Tom Hardy,Helen Mirren', cast(env, 'tv', 247718));
+  check('with characters and links', env._db.prepare("SELECT character_name AS c, imdb_id AS i FROM title_cast WHERE name = 'Tom Hardy'").get().c === 'Harry');
+
+  await rebuildTitles(env);
+  check('the nightly rebuild doesn\'t undo it', title(env, 'tv', 247718).overview === 'Two mob families clash.' && cast(env, 'tv', 247718) === 'Tom Hardy,Helen Mirren');
+
+  await writeTitle(env, 'tv', 247718, { fields: { overview: null, vote_count: 900 } });
+  check('a write without a name keeps the name', title(env, 'tv', 247718).name === 'MobLand' && title(env, 'tv', 247718).vote_count === 900);
+  check('and null never blanks a field', title(env, 'tv', 247718).overview === 'Two mob families clash.');
+  await writeTitle(env, 'tv', 247718, { cast: [] });
+  check('an empty cast list keeps the cast', cast(env, 'tv', 247718) === 'Tom Hardy,Helen Mirren');
+
+  const ended = titleFieldsFromEnrichment({ tmdbStatus: 'Ended' });
+  check('an ended series is full_series', ended.full_series === 1 && !('overview' in ended));
+
+  show(env, { title: 'Severance', tmdb: 95396, overview: 'Lumon.' });
+  check('a new entry without TMDB\'s name starts from the copies', await writeTitle(env, 'tv', 95396, { fields: { vote_count: 5 } }) === true
+    && title(env, 'tv', 95396).name === 'Severance' && title(env, 'tv', 95396).overview === 'Lumon.' && title(env, 'tv', 95396).vote_count === 5);
+  check('an entry no copy points at and no name is refused', await writeTitle(env, 'tv', 4242, { fields: { vote_count: 1 } }) === false && !title(env, 'tv', 4242));
+  check('bad input is refused', await writeTitle(env, 'film', 1, {}) === false);
+  const broken = { DB: { prepare: () => { throw new Error('D1 down'); } } };
+  check('a database error never throws', (await writeTitle(broken, 'tv', 1, { name: 'x' })) === false);
 }
 
 console.log('\n== the migration');
