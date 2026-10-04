@@ -77,10 +77,12 @@ async function snapshotBaseline(env, slug) {
 
 // Rebuild INSERT statements from a snapshot row's own keys, so the restore
 // tolerates columns added by later migrations (older snapshots simply omit
-// them and the column default applies).
-function insertFromRow(env, table, row, { dropId = false } = {}) {
+// them and the column default applies) and columns dropped since (a
+// snapshot taken before normalizing carries the show's facts on the row;
+// `columns`, when given, keeps only the ones the table still has).
+function insertFromRow(env, table, row, { dropId = false, columns = null } = {}) {
   const entries = Object.entries(row).filter(([k, v]) =>
-    v !== null && !(dropId && k === 'id'));
+    v !== null && !(dropId && k === 'id') && (!columns || columns.has(k)));
   const cols = entries.map(([k]) => k);
   const vals = entries.map(([, v]) => v);
   const sql = `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`;
@@ -106,6 +108,8 @@ export async function resetDemoIfDue(env, { force = false } = {}) {
     return { reset: false, reason: 'no_baseline' };
   }
   const baseline = JSON.parse(baselineRaw);
+  const { results: showCols } = await env.DB.prepare("SELECT name FROM pragma_table_info('shows')").all();
+  const showColumns = new Set((showCols || []).map((c) => c.name));
 
   const statements = [
     env.DB.prepare(
@@ -113,10 +117,10 @@ export async function resetDemoIfDue(env, { force = false } = {}) {
     ).bind(slug),
     env.DB.prepare('DELETE FROM shows WHERE member_slug = ?').bind(slug),
     env.DB.prepare('DELETE FROM member_subscriptions WHERE member_slug = ?').bind(slug),
-    // shows keep their original ids so the snapshot's actor rows still point
-    // at the right show.
-    ...(baseline.shows || []).map((s) => insertFromRow(env, 'shows', s)),
-    ...(baseline.actors || []).map((a) => insertFromRow(env, 'actors', a)),
+    // Shows keep their original ids. Their facts and cast are their entries'
+    // shared rows, which the restore doesn't touch; a snapshot's own actor
+    // rows are no longer restored (copies don't carry cast since step 3c).
+    ...(baseline.shows || []).map((s) => insertFromRow(env, 'shows', s, { columns: showColumns })),
     ...(baseline.subscriptions || []).map((s) =>
       insertFromRow(env, 'member_subscriptions', s, { dropId: true })),
   ];

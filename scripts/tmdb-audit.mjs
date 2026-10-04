@@ -27,9 +27,8 @@
 //   3. Rows whose movie flag disagrees with the type of entry they're pinned to.
 //   4. With TMDB_TOKEN set: every pinned entry's official TMDB name, the copies
 //      whose title differs from it, and pins TMDB no longer serves (404).
-//   5. What normalizing would collapse: copies per entry, and how many bytes of
-//      catalog text (overview, poster and backdrop URLs, tagline…) are stored
-//      more than once.
+//   5. The shared rows (normalizing): shows, cast rows, copies whose show has
+//      no shared row yet, and whether the leftover per-copy columns are gone.
 //
 // Member memos (notes, watching-with, recommended-by) and login emails are
 // never selected.
@@ -176,19 +175,18 @@ const typeMismatch = query(`SELECT s.id, s.member_slug AS member, s.title, s.mov
   ORDER BY LOWER(s.title)`);
 report.type_mismatch = typeMismatch;
 
-// Normalization: everything here is a fact about the entry, not the member.
-const CATALOG = ['overview', 'poster_url', 'backdrop_url', 'network_logo_url', 'tagline', 'genres', 'director',
-  'content_rating', 'trailer_key', 'watch_link', 'streaming_on', 'free_on', 'studio', 'imdb_id', 'tmdb_status'];
-const bytesExpr = CATALOG.map((c) => `COALESCE(LENGTH(s.${c}), 0)`).join(' + ');
-const [norm] = query(`WITH per AS (
-    SELECT s.tmdb_type, s.tmdb_id, COUNT(*) AS copies, SUM(${bytesExpr}) AS bytes, MAX(${bytesExpr}) AS one_copy
-    FROM shows s ${ACTIVE_MEMBER} WHERE s.tmdb_id IS NOT NULL GROUP BY s.tmdb_type, s.tmdb_id)
-  SELECT COUNT(*) AS entries, SUM(copies) AS rows, SUM(copies > 1) AS shared_entries, MAX(copies) AS max_copies,
-    SUM(bytes) AS catalog_bytes, SUM(one_copy) AS catalog_bytes_normalized,
-    (SELECT COUNT(*) FROM actors a JOIN shows s ON s.id = a.show_id WHERE s.tmdb_id IS NOT NULL) AS actor_rows,
-    (SELECT COUNT(*) FROM (SELECT DISTINCT s.tmdb_type, s.tmdb_id, a.name FROM actors a JOIN shows s ON s.id = a.show_id
-      WHERE s.tmdb_id IS NOT NULL)) AS actor_rows_normalized
-  FROM per`);
+// Normalizing (docs/ARCHITECTURE.md#titles): the show's facts live once per
+// entry in `titles`, its cast in `title_cast`. Until the leftover columns are
+// dropped from `shows`, report that they're still there.
+const [norm] = query(`SELECT
+    (SELECT COUNT(*) FROM titles) AS entries,
+    (SELECT COUNT(*) FROM title_cast) AS cast_rows,
+    (SELECT COUNT(*) FROM shows s ${ACTIVE_MEMBER} WHERE s.tmdb_id IS NOT NULL) AS rows,
+    (SELECT COUNT(*) FROM shows s ${ACTIVE_MEMBER} WHERE s.tmdb_id IS NOT NULL AND NOT EXISTS (
+       SELECT 1 FROM titles t WHERE t.tmdb_id = s.tmdb_id
+         AND t.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END))) AS rows_without_entry,
+    (SELECT COUNT(*) FROM actors) AS leftover_actor_rows,
+    (SELECT COUNT(*) FROM pragma_table_info('shows') WHERE name IN ('overview', 'poster_url', 'genres')) AS leftover_columns`);
 report.normalization = norm;
 
 // Official names (optional).
@@ -265,12 +263,12 @@ if (TMDB_TOKEN) {
 }
 
 const n = report.normalization;
-const kb = (b) => `${Math.round((b || 0) / 1024)} KB`;
-line('\n== Normalizing to one row per TMDB entry');
-line(`  ${n.rows} pinned rows → ${n.entries} entries; ${n.shared_entries} entries are on more than one list (most: ${n.max_copies} copies).`);
-line(`  Catalog text stored: ${kb(n.catalog_bytes)} → ${kb(n.catalog_bytes_normalized)} if stored once per entry.`);
-line(`  Cast rows: ${n.actor_rows} → ${n.actor_rows_normalized}.`);
-line('  (Posters and thumbnails are URLs into TMDB\'s image CDN; no image is stored in the database.)');
+line('\n== Shared show rows');
+line(`  ${n.rows} pinned copies → ${n.entries} shows; ${n.cast_rows} shared cast rows.`);
+if (n.rows_without_entry) line(`  ${n.rows_without_entry} copies point at a show with no shared row (the nightly rebuild adds them).`);
+line(n.leftover_columns
+  ? `  Leftover per-copy columns are still on \`shows\`, and ${n.leftover_actor_rows} old per-copy cast rows: nothing reads them; the cleanup drops them.`
+  : '  No leftover per-copy columns.');
 
 if (JSON_OUT) {
   writeFileSync(JSON_OUT, JSON.stringify(report, null, 2));

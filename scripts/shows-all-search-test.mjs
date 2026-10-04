@@ -31,6 +31,7 @@
 // files as the ES modules they are, and schema.sql is loaded into node:sqlite
 // behind a thin D1 shim, so the SQL under test is really executed.
 
+import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -124,10 +125,12 @@ function addShow(env, { slug, title, list = 'watching', network = null, genres =
     `INSERT INTO shows (title, list, member_slug, network, genres, archived, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(title, list, slug, network, genres, archived, '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z');
-  const id = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id);
+  const id = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows_v').get().id);
   cast.forEach((name, i) => {
     env._db.prepare('INSERT INTO actors (show_id, name, ord) VALUES (?, ?, ?)').run(id, name, i);
   });
+  // Facts seeded on the copy reach the shared row members read from.
+  liftCopiesIntoTitles(env._db, { pinUnmatched: true });
   return id;
 }
 

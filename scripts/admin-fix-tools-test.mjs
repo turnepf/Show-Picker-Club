@@ -29,6 +29,7 @@
 // to a temp directory, schema.sql in node:sqlite behind a D1 shim, and a fake
 // TMDB on globalThis.fetch.
 
+import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -136,10 +137,12 @@ function addShow(env, slug, o = {}) {
   ).run(o.title ?? TITLE, o.list ?? 'waiting', slug, o.movie ? 1 : 0, o.archived ? 1 : 0,
     o.tmdb ?? null, o.tmdb ? (o.movie ? 'movie' : 'tv') : null, o.year ?? null, o.genres ?? null,
     o.seasons ?? null, o.network ?? null, o.url ?? null, o.notes ?? null, o.rec ?? null, o.ww ?? null);
+  // Facts seeded on the copy reach the shared row members read from.
+  liftCopiesIntoTitles(env._db);
   return Number(r.lastInsertRowid);
 }
 
-const row = (env, id) => env._db.prepare('SELECT * FROM shows WHERE id = ?').get(id);
+const row = (env, id) => env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(id);
 // The shared one-row-per-show table (migration 076), kept in sync by every write.
 const titleRow = (env, type, id) => env._db.prepare('SELECT * FROM titles WHERE tmdb_type = ? AND tmdb_id = ?').get(type, id);
 const actions = (env) => env._db.prepare('SELECT * FROM admin_actions ORDER BY id').all().map((a) => ({ ...a, detail: JSON.parse(a.detail || '{}') }));
@@ -188,7 +191,7 @@ console.log('\n== re-pointing a show at the right TMDB entry');
   check('its year comes from the new entry', r.release_year === 2026, String(r.release_year));
   check('genres are replaced, not left from the original', r.genres === 'Drama, Western, Family', r.genres);
   check('so is the season count', r.seasons_released === 2, String(r.seasons_released));
-  check('cast is the remake\'s', env._db.prepare('SELECT name FROM actors WHERE show_id = ? ORDER BY ord').all(id).map((a) => a.name).join(',') === 'Alice Halsey,Luke Bracey');
+  check('cast is the remake\'s', env._db.prepare('SELECT name FROM actors_v WHERE show_id = ? ORDER BY ord').all(id).map((a) => a.name).join(',') === 'Alice Halsey,Luke Bracey');
   check('memos are untouched, even when the call carries one', r.notes === 'grandma loved it' && r.recommended_by === 'Mom' && r.watching_with === 'Sam', JSON.stringify([r.notes, r.recommended_by, r.watching_with]));
   check('no warning on a re-point that landed', out && !out.warning, out && out.warning);
   const shared = titleRow(env, 'tv', REMAKE);
@@ -222,7 +225,11 @@ console.log('\n== edits that aren\'t about identity keep the pin');
 
   const named = await run(env, 'admin_update_show', { member_slug: 'christine', show_id: id, title: 'Little House on the Prairie (2026)' });
   r = row(env, id);
-  check('a rename changes this copy\'s title', !named.err && r.title === 'Little House on the Prairie (2026)', named.err?.message || r.title);
+  // The copy keeps the title it was given, but members see TMDB's name: a
+  // show is its entry (docs/INVARIANTS.md §29).
+  const raw = env._db.prepare('SELECT title FROM shows WHERE id = ?').get(id);
+  check('a rename is stored on this copy', !named.err && raw.title === 'Little House on the Prairie (2026)', named.err?.message || raw.title);
+  check('but members still see TMDB\'s name', r.title === TITLE, r.title);
   check('and keeps the pin', r.tmdb_id === REMAKE);
 
   check('a bad Watch link is refused', !!(await run(env, 'admin_update_show', { member_slug: 'christine', show_id: id, watch_url: 'javascript:alert(1)' })).err);

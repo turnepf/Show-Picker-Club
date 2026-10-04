@@ -25,6 +25,7 @@
 // schema.sql is loaded into node:sqlite behind a thin D1 shim, so the SQL
 // under test is executed.
 
+import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -117,6 +118,8 @@ function addShow(env, slug, title, o = {}) {
   for (const [i, name] of (o.cast || []).entries()) {
     env._db.prepare('INSERT INTO actors (show_id, name, ord) VALUES (?, ?, ?)').run(id, name, i);
   }
+  // Facts seeded on the copy reach the shared row members read from.
+  liftCopiesIntoTitles(env._db);
   return id;
 }
 
@@ -304,8 +307,11 @@ console.log('\n== counts');
     filters: [{ field: 'type', value: 'tv' }, { field: 'genres', op: 'empty' }],
     group_by: ['member'], sort: 'key',
   });
+  // Eric's Little House carries no genres of its own, but it is the same
+  // entry as Christine's, and a show's facts are the show's (INVARIANTS §29):
+  // only the two copies no entry backs are missing genres.
   check('TV missing genres, per member', JSON.stringify(noGenre.data.groups.map((g) => [g.member, g.rows]))
-    === JSON.stringify([['christine', 1], ['eric', 1], ['patrick', 1]]), JSON.stringify(noGenre.data.groups));
+    === JSON.stringify([['christine', 1], ['patrick', 1]]), JSON.stringify(noGenre.data.groups));
 
   const awaiting = await q(env, c, { measures: ['rows'], filters: [{ field: 'list', value: 'awaiting' }] });
   check('list speaks the member vocabulary (awaiting = waiting)', awaiting.data.totals.rows === 2);
@@ -325,12 +331,13 @@ console.log('\n== breakdowns over several values per show');
   const c = addSession(env, 'patrick');
   const byGenre = await q(env, c, { measures: ['rows', 'titles'], group_by: ['genre'], sort: 'key', limit: 50 });
   const g = Object.fromEntries(byGenre.data.groups.map((x) => [x.genre, x.rows]));
-  check('a show counts once in each of its genres', g.Drama === 3 && g.Family === 2 && g.Western === 1 && g.Comedy === 1, JSON.stringify(g));
-  check('a show with no genres groups under null', g.null === 3, JSON.stringify(g));
+  // Both copies of the 2026 entry read its genres (Eric's included).
+  check('a show counts once in each of its genres', g.Drama === 4 && g.Family === 3 && g.Western === 2 && g.Comedy === 1, JSON.stringify(g));
+  check('a show with no genres groups under null', g.null === 2, JSON.stringify(g));
   check('but totals count every show once', byGenre.data.totals.rows === 7, JSON.stringify(byGenre.data.totals));
 
   const drama = await q(env, c, { measures: ['rows'], filters: [{ field: 'genre', value: 'drama' }] });
-  check('genre eq matches a whole entry, any case', drama.data.totals.rows === 3);
+  check('genre eq matches a whole entry, any case', drama.data.totals.rows === 4);
   const partial = await q(env, c, { measures: ['rows'], filters: [{ field: 'genre', value: 'dram' }] });
   check('and not part of one', partial.data.totals.rows === 0);
 
@@ -369,7 +376,9 @@ console.log('\n== measures, dates, paging');
   const capped = await q(env, c, { mode: 'rows', limit: 99999 });
   check('limit is capped at 500', capped.data.query.limit === 500);
   const grouped = await q(env, c, { group_by: ['title'], limit: 2 });
-  check('a truncated breakdown says so', grouped.data.truncated === true && grouped.data.total_groups === 7, JSON.stringify(grouped.data));
+  // Six titles, not seven: Christine's "(2026)" copy reads TMDB's name, the
+  // same as Eric's.
+  check('a truncated breakdown says so', grouped.data.truncated === true && grouped.data.total_groups === 6, JSON.stringify(grouped.data));
   check('the spec is echoed back as read', grouped.data.query.group_by[0] === 'title' && grouped.data.query.measures.length === 2);
 }
 

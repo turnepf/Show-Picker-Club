@@ -79,41 +79,19 @@ export async function rememberPeople(env, people) {
 // Fill actor rows that have no imdb_id from people we already know, by name.
 // Pure SQL — no TMDB requests — so it's cheap enough to run on every
 // enrichment call. Returns how many rows it linked.
-export async function fillActorIdsFromKnownPeople(env, limit = 500) {
+export async function fillActorIdsFromKnownPeople(env) {
+  // The shared cast (title_cast) is the only cast since normalizing step 3c;
+  // per-copy `actors` rows are retired.
   try {
     const res = await env.DB.prepare(
-      `UPDATE actors SET imdb_id = (
-         SELECT p.imdb_id FROM people p
-          WHERE p.name_lower = LOWER(actors.name) AND p.imdb_id IS NOT NULL
-          LIMIT 1)
-        WHERE imdb_id IS NULL
-          AND id IN (
-            SELECT a.id FROM actors a
-             WHERE a.imdb_id IS NULL
-               AND (EXISTS (SELECT 1 FROM people p WHERE p.name_lower = LOWER(a.name) AND p.imdb_id IS NOT NULL)
-                 OR EXISTS (SELECT 1 FROM people_by_name n WHERE n.name_lower = LOWER(a.name)))
-             LIMIT ?)`
-    ).bind(limit).run();
-    const viaPeople = res.meta?.changes || 0;
-    // Second pass for names only people_by_name knows.
-    const res2 = await env.DB.prepare(
-      `UPDATE actors SET imdb_id = (
-         SELECT n.imdb_id FROM people_by_name n WHERE n.name_lower = LOWER(actors.name) LIMIT 1)
-        WHERE imdb_id IS NULL
-          AND EXISTS (SELECT 1 FROM people_by_name n WHERE n.name_lower = LOWER(actors.name))`
-    ).run();
-    // The shared cast (migration 076) gets the same links, so a name the
-    // per-copy rows just linked isn't shown unlinked through actors_v.
-    // Best-effort: a database without the table is pre-076.
-    await env.DB.prepare(
       `UPDATE title_cast SET imdb_id = COALESCE(
          (SELECT p.imdb_id FROM people p WHERE p.name_lower = LOWER(title_cast.name) AND p.imdb_id IS NOT NULL LIMIT 1),
          (SELECT n.imdb_id FROM people_by_name n WHERE n.name_lower = LOWER(title_cast.name) LIMIT 1))
         WHERE imdb_id IS NULL
           AND (EXISTS (SELECT 1 FROM people p WHERE p.name_lower = LOWER(title_cast.name) AND p.imdb_id IS NOT NULL)
             OR EXISTS (SELECT 1 FROM people_by_name n WHERE n.name_lower = LOWER(title_cast.name)))`
-    ).run().catch(() => {});
-    return viaPeople + (res2.meta?.changes || 0);
+    ).run();
+    return res.meta?.changes || 0;
   } catch (_) {
     return 0;
   }

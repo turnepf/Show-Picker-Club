@@ -31,6 +31,7 @@
 // TMDB is a fake fetch that serves two same-titled entries the way the real
 // index does — popular original first.
 
+import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -246,13 +247,13 @@ function addShow(env, { slug, title, list = 'watching', tmdbId = null, tmdbType 
     `INSERT INTO shows (title, list, member_slug, tmdb_id, tmdb_type, network, network_url, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(title, list, slug, tmdbId, tmdbType, network, networkUrl, '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z');
-  return Number(env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id);
+  return Number(env._db.prepare('SELECT MAX(id) AS id FROM shows_v').get().id);
 }
 
 const rowFor = (env, slug, title) =>
-  env._db.prepare('SELECT * FROM shows WHERE member_slug = ? AND LOWER(title) = LOWER(?)').all(slug, title).map((r) => ({ ...r }))[0];
+  env._db.prepare('SELECT * FROM shows_v WHERE member_slug = ? AND LOWER(title) = LOWER(?)').all(slug, title).map((r) => ({ ...r }))[0];
 const castFor = (env, showId) =>
-  env._db.prepare('SELECT name FROM actors WHERE show_id = ? ORDER BY ord').all(showId).map((r) => r.name);
+  env._db.prepare('SELECT name FROM actors_v WHERE show_id = ? ORDER BY ord').all(showId).map((r) => r.name);
 
 function req(path, { cookie, method = 'GET', body } = {}) {
   const headers = { 'Content-Type': 'application/json' };
@@ -268,11 +269,12 @@ const ctx = (env, request, params) => ({ env, request, params, waitUntil: () => 
 
 const postShow = (env, cookie, body) =>
   showsApi.onRequestPost(ctx(env, req('/api/shows', { cookie, method: 'POST', body })));
-// Production backfilled the shared titles table from the copies (migration
-// 076) and rebuilds the gaps nightly. These fixtures seed copies directly, so
-// each run starts from the same backfill before the passes choose what's
-// missing (normalizing step 3c: gaps are read from the shared row).
+// These fixtures describe shows the pre-normalizing way, facts on the copy.
+// Each run lifts them into the shared row first, as migration 076 did for
+// production, since the passes read gaps from there and members read facts
+// from there.
 const runEnrich = async (env, cookie, body = {}) => {
+  liftCopiesIntoTitles(env._db);
   await rebuildTitles(env);
   return enrichApi.onRequestPost(ctx(env, req('/api/enrich', { cookie, method: 'POST', body })));
 };
@@ -395,9 +397,9 @@ console.log('\n== a bare title means the newest version, and a "(YYYY)" suffix p
   const oldId = addShow(env, { slug: 'patrick', title: `${TITLE} (1974)` });
 
   await runEnrich(env, addSession(env, 'quinn'));
-  const bare = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(bareId) };
-  const suffNew = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(newId) };
-  const suffOld = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(oldId) };
+  const bare = { ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(bareId) };
+  const suffNew = { ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(newId) };
+  const suffOld = { ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(oldId) };
   check('a bare title resolves to the newest version, not the popular original',
     bare.tmdb_id === REMAKE_ID, `got ${bare.tmdb_id}`);
   check('a dateless junk entry never wins, however popular', bare.tmdb_id !== 999999);
@@ -426,8 +428,8 @@ console.log('\n== the movie pass honors pins the same way');
     JSON.stringify(body));
   check('no movie title search was needed', !fetchLog.some((u) => u.includes('/search/movie')),
     fetchLog.filter((u) => u.includes('/search')).join(' '));
-  const pat = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(patId) };
-  const jen = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(jenId) };
+  const pat = { ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(patId) };
+  const jen = { ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(jenId) };
   check('the original film keeps its identity', (pat.poster_url || '').includes('/heat-1995.jpg') && pat.release_year === 1995,
     `${pat.poster_url} / ${pat.release_year}`);
   check('the remake film keeps its identity', (jen.poster_url || '').includes('/heat-2026.jpg') && jen.release_year === 2026,
@@ -442,7 +444,7 @@ console.log('\n== the movie pass honors pins the same way');
   env._db.prepare('UPDATE shows SET movie = 1 WHERE id = ?').run(unpinnedId);
   fetchLog = [];
   await runEnrich(env, addSession(env, 'quinn'));
-  const unpinned = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(unpinnedId) };
+  const unpinned = { ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(unpinnedId) };
   check('an unpinned movie resolves by search', fetchLog.some((u) => u.includes('/search/movie')));
   check('and a bare movie title means the newest version', unpinned.tmdb_id === MOVIE_REMAKE_ID, `got ${unpinned.tmdb_id}`);
 }
@@ -460,8 +462,8 @@ console.log('\n== artwork never crosses the identity boundary');
   // posters mode runs the artwork sync first; the fake TMDB then answers by
   // stored id, so the pinned copy comes back with its own art, not borrowed.
   await runEnrich(env, cookie, { mode: 'posters' });
-  const unpinned = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(unpinnedId) };
-  const pinned = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(pinnedId) };
+  const unpinned = { ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(unpinnedId) };
+  const pinned = { ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(pinnedId) };
   // Since normalizing step 3c an unpinned copy isn't papered over with a
   // sibling's poster: it has no shared row, so it's looked up and pinned to
   // its own entry, which is what the borrowed poster never fixed.

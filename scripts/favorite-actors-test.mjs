@@ -44,6 +44,7 @@
 //
 // Same harness as scripts/vibe-scope-test.mjs.
 
+import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -95,14 +96,18 @@ function addSession(env, slug) {
 }
 // created_at recent so the row also counts for Trending's 30-day window.
 function addShow(env, { slug, title, list = 'watching', archived = 0, addedBy = 'member',
-                        network = null, rating = null, posterUrl = null, tmdbId = null }) {
+                        network = null, rating = null, posterUrl = null, tmdbId = null, unmatched = false }) {
   env._db.prepare(
     `INSERT INTO shows (title, list, member_slug, added_by, archived, created_at, network, rating, poster_url,
                         tmdb_id, tmdb_type)
      VALUES (?,?,?,?,?,?,?,?,?,?,?)`
   ).run(title, list, slug, addedBy, archived, new Date().toISOString(), network, rating, posterUrl,
         tmdbId, tmdbId == null ? null : 'tv');
-  return env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id;
+  const id = env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id;
+  // Facts seeded on the copy reach the shared row members read from. A row
+  // the test leaves unmatched on purpose stays unmatched.
+  liftCopiesIntoTitles(env._db, { pinRow: unmatched ? null : id });
+  return id;
 }
 // The member's own overall (season 0) rating, keyed by title identity the way
 // show_ratings is.
@@ -111,9 +116,17 @@ function addRating(env, { slug, tmdbId, rating, season = 0 }) {
     'INSERT INTO show_ratings (tmdb_id, tmdb_type, season_number, member_slug, rating) VALUES (?,?,?,?,?)'
   ).run(tmdbId, 'tv', season, slug, rating);
 }
+// A credit on the show's shared cast, which is the cast members read
+// (title_cast, docs/INVARIANTS.md §29). Billing order is the key there, so a
+// second credit at an order already taken goes after the last one.
 function addActor(env, showId, { name, imdbId = null, personId = null, ord = 0 }) {
-  env._db.prepare('INSERT INTO actors (show_id, name, imdb_id, tmdb_person_id, ord) VALUES (?,?,?,?,?)')
-    .run(showId, name, imdbId, personId, ord);
+  const pin = env._db.prepare('SELECT tmdb_id, tmdb_type FROM shows WHERE id = ?').get(showId);
+  const taken = env._db.prepare('SELECT 1 FROM title_cast WHERE tmdb_type = ? AND tmdb_id = ? AND ord = ?').get(pin.tmdb_type, pin.tmdb_id, ord);
+  const at = taken
+    ? env._db.prepare('SELECT COALESCE(MAX(ord), -1) + 1 AS n FROM title_cast WHERE tmdb_type = ? AND tmdb_id = ?').get(pin.tmdb_type, pin.tmdb_id).n
+    : ord;
+  env._db.prepare('INSERT INTO title_cast (tmdb_type, tmdb_id, ord, name, imdb_id, tmdb_person_id) VALUES (?,?,?,?,?,?)')
+    .run(pin.tmdb_type, pin.tmdb_id, at, name, imdbId, personId);
 }
 // The club-wide bank of people enrichment has resolved (migration 060).
 function addPerson(env, { personId, name, imdbId = null }) {
@@ -416,7 +429,7 @@ console.log('\n== Rate my backlog includes archived shows');
   addShow(env, { slug: 'patrick', title: 'Bookmarked Gone', list: 'next', archived: 1, tmdbId: 6 });
   addShow(env, { slug: 'patrick', title: 'Rated Archived', archived: 1, tmdbId: 7 });
   addRating(env, { slug: 'patrick', tmdbId: 7, rating: 9 });
-  addShow(env, { slug: 'patrick', title: 'Unknown To TMDB', archived: 1 });
+  addShow(env, { slug: 'patrick', title: 'Unknown To TMDB', archived: 1, unmatched: true });
   addShow(env, { slug: 'quinn', title: 'Not Mine', archived: 1, tmdbId: 8 });
 
   const page = await body(await rateBacklog.onRequestGet({ env, request: req('/api/rate-backlog', s) }));

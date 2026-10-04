@@ -75,14 +75,12 @@ async function tmdbSearchFirst(title, type, env) {
   return pickBestMatch(results, type, title);
 }
 
-// Store the cast TMDB just handed us, CAST_DEPTH deep and in billing order,
-// across every copy of the title. IMDB ids come from the canonical people
-// table when we've seen the person before (no request), and are looked up
-// only while the subrequest budget allows — anyone left unresolved is picked
-// up by a later round or by the free cache pass, so a tight budget costs
-// links, never the cast itself. Copies pinned to a DIFFERENT tmdb_id are a
-// different show that happens to share the title (a remake next to the
-// original) — their cast is not this cast, so they keep their own rows.
+// The cast TMDB just handed us, CAST_DEPTH deep and in billing order, with
+// IMDB ids from the canonical people table when we've seen the person before
+// (no request), looked up only while the subrequest budget allows. Anyone
+// left unresolved is picked up by a later round or by the free cache pass,
+// so a tight budget costs links, never the cast itself. Returned for the
+// caller to write to the show's shared cast.
 async function refreshCastFromDetail(env, show, detail, tmdbId) {
   const cast = dedupeCast(detail.credits?.cast).slice(0, CAST_DEPTH);
   if (!cast.length) return [];
@@ -99,22 +97,8 @@ async function refreshCastFromDetail(env, show, detail, tmdbId) {
     rows.push({ name: person.name, imdb_id: imdbId, ord: i, tmdb_person_id: person.id, character: castCharacter(person) });
   }
   await rememberPeople(env, people).catch(() => {});
-
-  const { results: copies } = await env.DB.prepare(
-    `SELECT id FROM shows
-      WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)
-        AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)`
-  ).bind(show.id, tmdbId ?? null, tmdbId ?? null).all();
-  const insert = env.DB.prepare(
-    'INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?)'
-  );
-  for (const copy of copies || []) {
-    // Replace rather than merge: the incoming list is authoritative and
-    // ordered, and a partial overlay would leave the old shallow tail behind.
-    await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(copy.id).run();
-    await env.DB.batch(rows.map(r => insert.bind(copy.id, r.name, r.imdb_id, r.ord, r.tmdb_person_id, r.character)));
-  }
-  // The caller writes the same list to the shared cast (writeTitle).
+  // The caller writes it to the show's shared cast (writeTitle). Copies no
+  // longer carry their own cast (docs/INVARIANTS.md §29).
   return rows;
 }
 
@@ -125,18 +109,8 @@ async function refreshCastFromDetail(env, show, detail, tmdbId) {
 // catches the backlog from before that existed.) A sibling pinned to a
 // different tmdb_id is a different show sharing the title — never a donor.
 async function syncArtworkAcrossCopies(env) {
-  await env.DB.prepare(
-    `UPDATE shows SET poster_url = (
-        SELECT s2.poster_url FROM shows s2
-         WHERE LOWER(s2.title) = LOWER(shows.title)
-           AND (s2.tmdb_id IS NULL OR shows.tmdb_id IS NULL OR s2.tmdb_id = shows.tmdb_id)
-           AND s2.poster_url IS NOT NULL LIMIT 1)
-      WHERE poster_url IS NULL
-        AND EXISTS (SELECT 1 FROM shows s2
-                     WHERE LOWER(s2.title) = LOWER(shows.title)
-                       AND (s2.tmdb_id IS NULL OR shows.tmdb_id IS NULL OR s2.tmdb_id = shows.tmdb_id)
-                       AND s2.poster_url IS NOT NULL)`
-  ).run();
+  // Posters are the show's, on its shared row, so only the per-service badge
+  // still moves between copies.
   await env.DB.prepare(
     `UPDATE shows SET network_logo_url = (
         SELECT s2.network_logo_url FROM shows s2
@@ -477,98 +451,27 @@ export async function onRequestPost(context) {
           }
         }
 
+        // The member's copy: its dates (computed for Watching/Awaiting only),
+        // the TMDB-status default for "Series complete", the badge, a network
+        // if it had none, and the pin. The show's facts and cast go to its
+        // shared row below (docs/INVARIANTS.md §29).
         await env.DB.prepare(
           `UPDATE shows SET next_season_date = ?, season_end_date = ?, full_series = ?,
-              genres = COALESCE(?, genres), seasons_released = COALESCE(?, seasons_released),
-              poster_url = COALESCE(?, poster_url), network_logo_url = COALESCE(?, network_logo_url),
-              overview = COALESCE(?, overview), backdrop_url = COALESCE(?, backdrop_url),
-              tmdb_rating = COALESCE(?, tmdb_rating), rating = COALESCE(?, rating), content_rating = COALESCE(?, content_rating),
-              trailer_key = COALESCE(?, trailer_key), director = COALESCE(?, director), director_imdb_id = COALESCE(?, director_imdb_id),
-              runtime = COALESCE(?, runtime), release_year = COALESCE(?, release_year),
-              network = COALESCE(network, ?), watch_link = COALESCE(?, watch_link),
-              -- TMDB's current answer, refreshed authoritatively rather than
-              -- filled once: unlike the network column beside it, this holds no
-              -- member intent to protect, and its whole job is to be current.
-              -- network stays fill-only, so the UI can show where a title
-              -- streams now without discarding where the member says they
-              -- watch it.
-              streaming_on = ?,
-              -- New-value-wins, same shape as seasons_released: a running
-              -- series gains episodes and collects votes, so these have to
-              -- converge rather than freeze at whatever the first pass saw.
-              episodes_released = COALESCE(?, episodes_released),
-              vote_count = COALESCE(?, vote_count),
-              tagline = COALESCE(?, tagline),
-              original_language = COALESCE(?, original_language),
-              studio = COALESCE(?, studio),
-              -- Migration 073. The IMDb id belongs to the entry just fetched,
-              -- so the fresh one wins; status and free services are today's
-              -- answer, refreshed every pass. All three keep the stored value
-              -- when this payload had nothing.
-              imdb_id = COALESCE(?, imdb_id), tmdb_status = COALESCE(?, tmdb_status),
-              free_on = COALESCE(?, free_on),
-              -- We just resolved this id to fetch the detail above, so persist
-              -- it. Only shows.js (on insert) and the separate
-              -- /api/admin-tmdb-backfill pass used to write tmdb_id, which left
-              -- seeded rows NULL until someone remembered to run that endpoint;
-              -- this pass had the answer in hand every time and dropped it.
-              -- Fill-only: an id already stored (possibly a hand-corrected one)
-              -- outranks whatever a title search turns up today.
+              network_logo_url = COALESCE(?, network_logo_url), network = COALESCE(network, ?),
               tmdb_id = COALESCE(tmdb_id, ?), tmdb_type = COALESCE(tmdb_type, 'tv'),
               enriched_at = datetime('now') WHERE id = ?`
-        ).bind(newDate, endDate, isComplete, genres, seasonsReleased, posterUrl, networkLogoUrl,
-          df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey, df.director, directorImdbId,
-          df.runtime, df.releaseYear, fallbackNetwork(df), df.watchLink, streamingOn(df),
-          df.episodesReleased, df.voteCount, df.tagline, df.originalLanguage, df.studio,
-          df.imdbId, df.tmdbStatus, freeOn(df),
-          tmdbId, show.id).run();
-        // Catalog fields (artwork + the new detail fields) are the same for
-        // every member's copy of a title, so push them to all copies in one
-        // go rather than making each copy wait its own turn in the rotation.
-        // Fill-only (COALESCE keeps anything already set). A DB write, not a
-        // fetch, so it doesn't count against the subrequest budget.
+        ).bind(newDate, endDate, isComplete, networkLogoUrl, fallbackNetwork(df), tmdbId, show.id).run();
+        // Same-titled copies nothing pinned yet learn the id: that's identity,
+        // the one thing a copy still carries. A copy pinned to a different id
+        // is a different show sharing the title, and is left alone. The TV
+        // badge is the same for every copy (TMDB's first network), so it fills
+        // too.
         await env.DB.prepare(
-          `UPDATE shows SET poster_url = COALESCE(poster_url, ?), network_logo_url = COALESCE(network_logo_url, ?),
-              overview = COALESCE(overview, ?), backdrop_url = COALESCE(backdrop_url, ?),
-              tmdb_rating = COALESCE(tmdb_rating, ?), rating = COALESCE(?, rating), content_rating = COALESCE(content_rating, ?),
-              trailer_key = COALESCE(trailer_key, ?), director = COALESCE(director, ?), director_imdb_id = COALESCE(director_imdb_id, ?),
-              runtime = COALESCE(runtime, ?), release_year = COALESCE(release_year, ?),
-              genres = COALESCE(genres, ?), watch_link = COALESCE(watch_link, ?),
-              -- Migration 063's fields are catalog-level like everything else
-              -- here, so they propagate too. Without this a sibling copy would
-              -- sit NULL until its own turn in the rotation came up, which for
-              -- a title only one member is actively watching may be never.
-              episodes_released = COALESCE(episodes_released, ?),
-              vote_count = COALESCE(vote_count, ?),
-              tagline = COALESCE(tagline, ?),
-              original_language = COALESCE(original_language, ?),
-              studio = COALESCE(studio, ?),
-              -- Not fill-only, unlike everything above it: where a title
-              -- streams is a fact about today, and a sibling copy holding last
-              -- season's answer is exactly the staleness this column exists to
-              -- fix. Same value for every copy, so it propagates like the rest.
-              streaming_on = ?,
-              -- Migration 073: catalog facts like the rest. Status and free
-              -- services refresh like streaming_on; the IMDb id fills.
-              imdb_id = COALESCE(imdb_id, ?), tmdb_status = COALESCE(?, tmdb_status),
-              free_on = COALESCE(?, free_on),
-              -- The id is the most catalog-level thing here: every member's
-              -- copy of a title is the same TMDB entry. This is the half that
-              -- reaches seeded rows — they're rarely the copy the rotation
-              -- picks, so without it a seeded row keeps waiting for its own
-              -- turn. (tmdb_id, tmdb_type) is the join key the cross-member
-              -- rating pool uses, so a NULL here costs a member their share of
-              -- the club's ratings on that title.
+          `UPDATE shows SET network_logo_url = COALESCE(network_logo_url, ?),
               tmdb_id = COALESCE(tmdb_id, ?), tmdb_type = COALESCE(tmdb_type, 'tv')
             WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)
-              -- Same title, different pinned id = a different show (remake
-              -- vs original) — its copies keep their own catalog data.
               AND (tmdb_id IS NULL OR tmdb_id = ?)`
-        ).bind(posterUrl, networkLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating,
-          df.trailerKey, df.director, directorImdbId, df.runtime, df.releaseYear, genres, df.watchLink,
-          df.episodesReleased, df.voteCount, df.tagline, df.originalLanguage, df.studio, streamingOn(df),
-          df.imdbId, df.tmdbStatus, freeOn(df),
-          tmdbId, show.id, tmdbId).run();
+        ).bind(networkLogoUrl, tmdbId, show.id, tmdbId).run();
 
         // Cast comes free with the detail call we just made — this pass used
         // to ignore it entirely, which is why a title enriched here kept
@@ -729,57 +632,29 @@ export async function onRequestPost(context) {
         const posterPath = detail.poster_path || searchPoster;
         const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
         const genres = (detail.genres || []).map(g => g.name).join(', ') || null;
-        // Title-scoped: fills every member's copy in one go (fill-only COALESCE,
-        // except rating which converges to the fresh TMDB score), and stamps
-        // enriched_at on all of them so the title rotates evenly.
+        // Title-scoped, like before, but only for what a copy still carries:
+        // the badge, a network for a copy that has none, the pin and the
+        // stamp. The film's facts and cast go to its shared row below.
         await env.DB.prepare(
-          `UPDATE shows SET poster_url = COALESCE(?, poster_url),
+          `UPDATE shows SET
               -- The service badge. TV takes it from detail.networks[0]; a movie
               -- has no networks[], so it comes off the flatrate provider that
               -- matches this row's network. Scoped to copies that actually
-              -- show that network: this statement spans every copy of the
-              -- title, and two members can hold one film under two different
-              -- services. Fill-only, like the rest.
+              -- show that network: two members can hold one film under two
+              -- different services. Fill-only.
               network_logo_url = CASE
                 WHEN network IS NULL OR network = ? THEN COALESCE(network_logo_url, ?)
                 ELSE network_logo_url END,
-              overview = COALESCE(overview, ?), backdrop_url = COALESCE(backdrop_url, ?),
-              tmdb_rating = COALESCE(tmdb_rating, ?), rating = COALESCE(?, rating), content_rating = COALESCE(content_rating, ?),
-              trailer_key = COALESCE(trailer_key, ?), director = COALESCE(director, ?), director_imdb_id = COALESCE(director_imdb_id, ?),
-              runtime = COALESCE(runtime, ?), release_year = COALESCE(release_year, ?),
-              genres = COALESCE(genres, ?), network = COALESCE(network, ?),
-              watch_link = COALESCE(watch_link, ?),
-              -- TMDB's current answer, refreshed authoritatively rather than
-              -- filled once: unlike the network column beside it, this holds no
-              -- member intent to protect, and its whole job is to be current.
-              -- network stays fill-only, so the UI can show where a title
-              -- streams now without discarding where the member says they
-              -- watch it.
-              streaming_on = ?,
-              -- vote_count converges like rating does (a film keeps collecting
-              -- votes); the rest are fill-only, matching this statement's
-              -- prevailing shape. A movie has no episode count.
-              vote_count = COALESCE(?, vote_count),
-              tagline = COALESCE(tagline, ?),
-              original_language = COALESCE(original_language, ?),
-              studio = COALESCE(studio, ?),
-              -- Migration 073, same rules as the TV pass.
-              imdb_id = COALESCE(imdb_id, ?), tmdb_status = COALESCE(?, tmdb_status),
-              free_on = COALESCE(?, free_on),
-              -- Same as the TV pass: the id we just searched for is worth
-              -- keeping, and this statement is already title-scoped so every
-              -- copy gets it. Fill-only, so a corrected id is never clobbered.
+              network = COALESCE(network, ?),
+              -- The id we just resolved, kept fill-only so a corrected one is
+              -- never clobbered.
               tmdb_id = COALESCE(tmdb_id, ?), tmdb_type = COALESCE(tmdb_type, 'movie'),
               enriched_at = datetime('now')
             WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)
               -- Copies pinned to a different id are a different film that
-              -- shares the title — they get their own turn, not this data.
+              -- shares the title.
               AND (tmdb_id IS NULL OR tmdb_id = ?)`
-        ).bind(posterUrl, badgeNetwork, badgeLogoUrl, df.overview, df.backdropUrl, df.tmdbRating, df.tmdbRating, df.contentRating, df.trailerKey,
-          df.director, directorImdbId, df.runtime, df.releaseYear, genres, fallbackNetwork(df), df.watchLink, streamingOn(df),
-          df.voteCount, df.tagline, df.originalLanguage, df.studio,
-          df.imdbId, df.tmdbStatus, freeOn(df),
-          tmdbId, show.id, tmdbId).run();
+        ).bind(badgeNetwork, badgeLogoUrl, fallbackNetwork(df), tmdbId, show.id, tmdbId).run();
         // The detail call already carried credits, and MOVIE_GAP selects a film
         // for missing cast — but this pass never wrote any, so a castless film
         // (an archived one imported bare, say) re-qualified every round and
@@ -867,21 +742,10 @@ export async function onRequestPost(context) {
         // (all ids null), leave the existing cast untouched.
         if (!actors.some(a => a.imdb_id)) continue;
 
-        // Guard on the entry this cast actually came from — for a NULL-id
-        // group that's whatever the title search resolved to, and a sibling
-        // pinned to a different entry keeps its own cast either way.
+        // The entry this cast actually came from. Only the shared cast is
+        // written; copies no longer carry their own.
         const castFromId = result.tmdbId ?? show.tmdb_id ?? null;
-        const { results: copies } = await env.DB.prepare(
-          `SELECT id FROM shows WHERE LOWER(title) = LOWER(?)
-             AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)`
-        ).bind(show.title, castFromId, castFromId).all();
-        const insert = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?)');
-        for (const copy of copies) {
-          await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(copy.id).run();
-          await env.DB.batch(actors.map((a, i) => insert.bind(copy.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null, a.character ?? null)));
-          actorImdbFilled++;
-        }
-        // The shared cast members read (actors_v) gets the newly linked names.
+        actorImdbFilled += actors.filter((a) => a.imdb_id).length;
         if (castFromId) {
           await writeTitle(env, result.tmdbType || show.tmdb_type || (show.movie ? 'movie' : 'tv'), castFromId, {
             name: result.canonicalTitle, fields: titleFieldsFromEnrichment(result), cast: actors,

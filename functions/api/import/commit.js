@@ -20,7 +20,7 @@
 import { getSession } from '../../_shared/auth.js';
 import { LIST_KEYS } from '../../_shared/list-parse.js';
 import { canonicalNetwork, networkSearchUrl } from '../../_shared/networks.js';
-import { syncTitle } from '../../_shared/titles.js';
+import { writeTitle } from '../../_shared/titles.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -127,23 +127,32 @@ export async function onRequestPost(context) {
   if (inserts.length) {
     const stmt = env.DB.prepare(
       `INSERT INTO shows (title, network, network_url, recommended_by, list, notes, movie,
-         watching_with, poster_url, member_slug, added_by, tmdb_id, tmdb_type, release_year)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         watching_with, member_slug, added_by, tmdb_id, tmdb_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     // D1 batches are one round trip but not unbounded; chunk so a 200-row
     // import doesn't hand the driver a single oversized statement list.
     for (let i = 0; i < inserts.length; i += 50) {
-      await env.DB.batch(inserts.slice(i, i + 50).map(args => stmt.bind(...args)));
+      // The poster and year belong to the show's shared row (below), not the
+      // member's copy.
+      await env.DB.batch(inserts.slice(i, i + 50).map(args => stmt.bind(...args.slice(0, 8), ...args.slice(9, 13))));
     }
   }
 
   // A new entry gets its shared row now rather than at tonight's rebuild;
   // an entry already in the club keeps the row it has.
+  // The parse step resolved each title against TMDB, so its name, poster and
+  // year are TMDB's. They seed the shared row; the nightly passes fill the
+  // rest, since a row missing cast and episode data is a gap they select.
   const keys = new Map();
-  for (const args of inserts) if (args[11] && args[12]) keys.set(`${args[12]}:${args[11]}`, [args[12], args[11]]);
-  for (const [type, id] of keys.values()) {
-    const have = await env.DB.prepare('SELECT 1 FROM titles WHERE tmdb_type = ? AND tmdb_id = ?').bind(type, id).first().catch(() => null);
-    if (!have) await syncTitle(env, type, id);
+  for (const args of inserts) {
+    if (args[11] && args[12]) keys.set(`${args[12]}:${args[11]}`, { type: args[12], id: args[11], name: args[0], poster: args[8], year: args[13] });
+  }
+  for (const k of keys.values()) {
+    const have = await env.DB.prepare('SELECT 1 FROM titles WHERE tmdb_type = ? AND tmdb_id = ?').bind(k.type, k.id).first().catch(() => null);
+    if (!have) {
+      await writeTitle(env, k.type, k.id, { name: k.name, fields: { poster_url: k.poster || null, release_year: k.year || null } });
+    }
   }
 
   // Imported rows land with the id, poster and year the parse step resolved,

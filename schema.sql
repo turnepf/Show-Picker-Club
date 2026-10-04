@@ -446,25 +446,25 @@ CREATE TABLE IF NOT EXISTS title_cast (
 CREATE INDEX IF NOT EXISTS idx_title_cast_person ON title_cast(tmdb_person_id);
 -- Every lookup from a show copy to its entry goes through this.
 CREATE INDEX IF NOT EXISTS idx_shows_tmdb ON shows(tmdb_id, tmdb_type);
--- Step 2: member-facing reads go through shows_v, which takes the title and
--- the show's details from titles (migration 077, generated from viewSql() in
--- functions/_shared/titles.js).
+-- Member-facing reads go through shows_v, which takes the title and the
+-- show's details from titles (migrations 077, 080; generated from viewSql()
+-- in functions/_shared/titles.js).
 CREATE VIEW shows_v AS
   SELECT s.id AS id,
     COALESCE(t.name, s.title) AS title,
     s.network AS network,
     s.network_url AS network_url,
     s.recommended_by AS recommended_by,
-    COALESCE(t.rating, s.rating) AS rating,
+    t.rating AS rating,
     s.list AS list,
     s.notes AS notes,
     s.movie AS movie,
-    COALESCE(t.full_series, s.full_series) AS full_series,
+    s.full_series AS full_series,
     s.watching_with AS watching_with,
     s.next_season_date AS next_season_date,
     s.season_end_date AS season_end_date,
-    COALESCE(t.seasons_released, s.seasons_released) AS seasons_released,
-    COALESCE(t.poster_url, s.poster_url) AS poster_url,
+    t.seasons_released AS seasons_released,
+    t.poster_url AS poster_url,
     s.network_logo_url AS network_logo_url,
     s.title_ok AS title_ok,
     s.sort_order AS sort_order,
@@ -474,44 +474,41 @@ CREATE VIEW shows_v AS
     s.updated_at AS updated_at,
     s.added_by AS added_by,
     s.enriched_at AS enriched_at,
-    COALESCE(t.genres, s.genres) AS genres,
-    COALESCE(t.overview, s.overview) AS overview,
-    COALESCE(t.backdrop_url, s.backdrop_url) AS backdrop_url,
-    COALESCE(t.tmdb_rating, s.tmdb_rating) AS tmdb_rating,
-    COALESCE(t.content_rating, s.content_rating) AS content_rating,
-    COALESCE(t.trailer_key, s.trailer_key) AS trailer_key,
-    COALESCE(t.director, s.director) AS director,
-    COALESCE(t.director_imdb_id, s.director_imdb_id) AS director_imdb_id,
-    COALESCE(t.runtime, s.runtime) AS runtime,
-    COALESCE(t.release_year, s.release_year) AS release_year,
-    COALESCE(t.watch_link, s.watch_link) AS watch_link,
+    t.genres AS genres,
+    t.overview AS overview,
+    t.backdrop_url AS backdrop_url,
+    t.tmdb_rating AS tmdb_rating,
+    t.content_rating AS content_rating,
+    t.trailer_key AS trailer_key,
+    t.director AS director,
+    t.director_imdb_id AS director_imdb_id,
+    t.runtime AS runtime,
+    t.release_year AS release_year,
+    t.watch_link AS watch_link,
     s.tmdb_id AS tmdb_id,
     s.tmdb_type AS tmdb_type,
-    COALESCE(t.episodes_released, s.episodes_released) AS episodes_released,
-    COALESCE(t.vote_count, s.vote_count) AS vote_count,
-    COALESCE(t.tagline, s.tagline) AS tagline,
-    COALESCE(t.original_language, s.original_language) AS original_language,
-    COALESCE(t.studio, s.studio) AS studio,
-    COALESCE(t.streaming_on, s.streaming_on) AS streaming_on,
-    COALESCE(t.imdb_id, s.imdb_id) AS imdb_id,
-    COALESCE(t.tmdb_status, s.tmdb_status) AS tmdb_status,
-    COALESCE(t.free_on, s.free_on) AS free_on
+    t.episodes_released AS episodes_released,
+    t.vote_count AS vote_count,
+    t.tagline AS tagline,
+    t.original_language AS original_language,
+    t.studio AS studio,
+    t.streaming_on AS streaming_on,
+    t.imdb_id AS imdb_id,
+    t.tmdb_status AS tmdb_status,
+    t.free_on AS free_on
     FROM shows s
     LEFT JOIN titles t
       ON t.tmdb_id = s.tmdb_id
      AND t.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END);
--- Step 3a: member-facing cast reads go through actors_v (migration 078,
--- generated from actorsViewSql() in functions/_shared/titles.js).
+-- Member-facing cast reads go through actors_v: the shared cast (migrations
+-- 078, 080; generated from actorsViewSql() in functions/_shared/titles.js).
 CREATE VIEW actors_v AS
   SELECT tc.ord AS id, s.id AS show_id, tc.name AS name, tc.imdb_id AS imdb_id, tc.ord AS ord,
          tc.tmdb_person_id AS tmdb_person_id, tc.character_name AS character_name
-    FROM shows s JOIN title_cast tc ON tc.tmdb_id = s.tmdb_id
-       AND tc.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)
-  UNION ALL
-  SELECT a.id, a.show_id, a.name, a.imdb_id, a.ord, a.tmdb_person_id, a.character_name
-    FROM actors a
-   WHERE NOT EXISTS (SELECT 1 FROM shows s JOIN title_cast tc ON tc.tmdb_id = s.tmdb_id
-       AND tc.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END) WHERE s.id = a.show_id);
+    FROM shows s
+    JOIN title_cast tc
+      ON tc.tmdb_id = s.tmdb_id
+     AND tc.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END);
 
 
 -- Daily Trending snapshot (migration 067). /api/popular computes its ranking

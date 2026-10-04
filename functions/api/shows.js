@@ -220,31 +220,18 @@ export async function onRequestPost(context) {
     goodCopyUrl ||
     networkSearchUrl(finalNetwork, finalTitle);
 
+  // The member's row holds what is theirs; the show's facts and cast go to its
+  // shared row just below (docs/INVARIANTS.md §29). The badge stays per copy
+  // because it follows the member's service.
   const result = await env.DB.prepare(
-    `INSERT INTO shows (title, network, network_url, recommended_by, rating, list, notes, movie, full_series, watching_with, poster_url, network_logo_url, member_slug, added_by,
-       overview, backdrop_url, tmdb_rating, content_rating, trailer_key, director, director_imdb_id, runtime, release_year, watch_link, tmdb_id, tmdb_type,
-       episodes_released, vote_count, tagline, original_language, studio, streaming_on,
-       imdb_id, tmdb_status, free_on, genres, seasons_released)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(finalTitle, finalNetwork, finalUrl, recommended_by || null, enriched.rating, list, notes || null, movie || 0, full_series || 0, watching_with || null, enriched.posterUrl || null, enriched.networkLogoUrl || null, session.member_slug, session.email,
-    enriched.overview || null, enriched.backdropUrl || null, enriched.tmdbRating || null, enriched.contentRating || null, enriched.trailerKey || null, enriched.director || null, enriched.directorImdbId || null, enriched.runtime || null, enriched.releaseYear || null, enriched.watchLink || null,
-    enriched.tmdbId || null, enriched.tmdbType || null,
-    enriched.episodesReleased ?? null, enriched.voteCount ?? null, enriched.tagline || null,
-    enriched.originalLanguage || null, enriched.studio || null,
-    // Stored from the very first fetch, so a title never spends its first days
-    // looking as though TMDB was never asked where it streams.
-    Array.isArray(enriched.flatrateNetworks) ? enriched.flatrateNetworks.join(', ') : '',
-    // Migration 073. NULL when enrichment failed, so the rotation's hot tier
-    // still picks the row up.
-    enriched.imdbId || null, enriched.tmdbStatus ?? null,
-    Array.isArray(enriched.freeNetworks) ? enriched.freeNetworks.join(', ') : null,
-    enriched.genres || null, enriched.seasonsReleased ?? null).run();
+    `INSERT INTO shows (title, network, network_url, recommended_by, list, notes, movie, full_series, watching_with,
+       network_logo_url, member_slug, added_by, tmdb_id, tmdb_type)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(finalTitle, finalNetwork, finalUrl, recommended_by || null, list, notes || null, movie || 0, full_series || 0,
+    watching_with || null, enriched.networkLogoUrl || null, session.member_slug, session.email,
+    enriched.tmdbId || null, enriched.tmdbType || null).run();
 
   const showId = result.meta.last_row_id;
-  if (enriched.actors.length > 0) {
-    const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?)');
-    await env.DB.batch(enriched.actors.map((a, i) => stmt.bind(showId, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null, a.character ?? null)));
-  }
   // The show's shared row, straight from the TMDB payload (docs/INVARIANTS.md §29).
   await writeTitle(env, enriched.tmdbType, enriched.tmdbId, {
     name: enriched.canonicalTitle, fields: titleFieldsFromEnrichment(enriched), cast: enriched.actors,

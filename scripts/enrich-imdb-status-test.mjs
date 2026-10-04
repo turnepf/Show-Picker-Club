@@ -29,6 +29,7 @@
 //
 // Same harness as scripts/enrich-movie-detail-test.mjs.
 
+import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -183,18 +184,19 @@ function addRow(env, { title, tmdbId, list, movie = 0, member = 'patrick', enric
      VALUES (?, ?, ?, ?, ?, ?, '/have.jpg', 'Max', 'Drama', 'here', 50, ?, '', ?, ?, '2026-01-01', '2026-01-01')`
   ).run(title, list, member, movie, tmdbId, movie ? 'movie' : 'tv',
         movie ? null : (gap ? null : 10), filled ? 'Ended' : null, enrichedAt);
-  const id = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id);
+  const id = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows_v').get().id);
   env._db.prepare('INSERT INTO actors (show_id, name, imdb_id, ord) VALUES (?, ?, ?, 0)').run(id, `${title} Lead`, 'nm0000001');
   return id;
 }
 
-const row = (env, id) => ({ ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(id) });
+const row = (env, id) => ({ ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(id) });
 
-// Production backfilled the shared titles table from the copies (migration
-// 076) and rebuilds the gaps nightly. These fixtures seed copies directly, so
-// each run starts from the same backfill before the passes choose what's
-// missing (normalizing step 3c: gaps are read from the shared row).
+// These fixtures describe shows the pre-normalizing way, facts on the copy.
+// Each run lifts them into the shared row first, as migration 076 did for
+// production, since the passes read gaps from there and members read facts
+// from there.
 const runEnrich = async (env, body = {}) => {
+  liftCopiesIntoTitles(env._db);
   await rebuildTitles(env);
   return enrichApi.onRequestPost({
   env,
@@ -234,10 +236,10 @@ console.log('\nThe TV pass stores the four new facts and propagates them');
   check('sibling copy receives status and free_on',
     b.tmdb_status === 'Returning Series' && b.free_on === 'Pluto TV, Tubi', `${b.tmdb_status} / ${b.free_on}`);
 
-  const cast = env._db.prepare('SELECT name, character_name FROM actors WHERE show_id = ? ORDER BY ord').all(mine);
+  const cast = env._db.prepare('SELECT name, character_name FROM actors_v WHERE show_id = ? ORDER BY ord').all(mine);
   check('character stored, trimmed', cast[0]?.character_name === 'Mark S.', JSON.stringify(cast));
   check('an uncredited role is NULL, not empty', cast[1] && cast[1].character_name === null, JSON.stringify(cast[1]));
-  const sibCast = env._db.prepare('SELECT character_name FROM actors WHERE show_id = ? ORDER BY ord').all(hers);
+  const sibCast = env._db.prepare('SELECT character_name FROM actors_v WHERE show_id = ? ORDER BY ord').all(hers);
   check('sibling cast carries characters too', sibCast[0]?.character_name === 'Mark S.', JSON.stringify(sibCast));
 
   // 5. the actors endpoint hands it to the apps

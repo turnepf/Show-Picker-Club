@@ -121,8 +121,8 @@ console.log('\n== database-only audit');
     r.title_splits.length === 1 && r.title_splits[0].tmdb_id === 283304 && r.title_splits[0].titles === 2, JSON.stringify(r.title_splits));
   check('a movie flag that disagrees with the pin is reported',
     r.type_mismatch.length === 1 && r.type_mismatch[0].id === ids.fh, JSON.stringify(r.type_mismatch));
-  check('normalization counts entries, not rows', r.normalization.entries === 5 && r.normalization.rows === 6, JSON.stringify(r.normalization));
-  check('shared catalog text would shrink', r.normalization.catalog_bytes_normalized < r.normalization.catalog_bytes);
+  check('reports copies whose show has no shared row yet', r.normalization.rows === 6 && r.normalization.rows_without_entry === 6, JSON.stringify(r.normalization));
+  check('and that the leftover per-copy columns are still there', r.normalization.leftover_columns === 3);
   check('no memo text anywhere in the output', !out.includes('SECRET MEMO') && !readFileSync(jsonFile, 'utf8').includes('SECRET MEMO'));
   check('without a token it says what TMDB would add', /Set TMDB_TOKEN/.test(out));
 }

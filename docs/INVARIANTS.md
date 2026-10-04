@@ -1124,8 +1124,11 @@ show's details, kept in step by propagation code, so two members could see
   (migration 078), with writes to `actors`.
 - **The member's own fields stay the member's:** list, order, rating, notes,
   watching-with, recommended-by, archived, network and Watch link. So do
-  `next_season_date`, `season_end_date` and `network_logo_url`, which differ
-  by member.
+  `next_season_date`, `season_end_date`, `network_logo_url` and
+  `full_series` (the "Series complete" toggle), which differ by member.
+- **A copy never carries the show's facts or cast.** Every writer puts them on
+  the shared row (`writeTitle()`), and a copy holds member fields and the pin
+  only. A leftover value on a copy is never shown.
 - **A writer holding TMDB's payload writes it to `titles` directly**
   (`writeTitle()`): add, edit, enrichment, URL cleanup. TMDB's facts
   replace stored ones. A member's copy can only *fill* the shared row

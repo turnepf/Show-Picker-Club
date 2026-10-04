@@ -191,7 +191,7 @@ export async function respondToSuggestion(env, { groupId, suggestionId, memberSl
       await env.DB.prepare(
         "UPDATE shows SET recommended_by = ?, updated_at = datetime('now') WHERE id = ?"
       ).bind(names.get(suggestion.suggested_by), show.id).run();
-      show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(show.id).first();
+      show = await env.DB.prepare('SELECT * FROM shows_v WHERE id = ?').bind(show.id).first();
     }
   }
 
