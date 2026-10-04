@@ -158,7 +158,20 @@ The plan has three steps. The first two have shipped:
      only fill: they create missing rows and fill missing fields and cast
      from the copies, but never overwrite what TMDB wrote. Member copies are
      still written too, until 3c.
-   - **3c:** the duplicate columns and the per-copy `actors` rows go.
+   - **3c-1 (shipped): gaps are the show's.** The enrichment passes choose
+     what to fetch from a derived table aliased `shows` (`COPIES` in
+     `enrich.js`), whose show facts (poster, episode count, genres,
+     streaming services, status, whether a cast exists) come from the
+     shared row, while list, archive, network, badge and `enriched_at` come
+     from the copy. A copy no entry backs has every fact missing and gets
+     looked up and pinned, instead of borrowing a sibling's poster. The actor
+     backfill selects on unlinked names in `title_cast`, and URL cleanup's
+     Missing-posters list and the vibe fill read through `shows_v`. Building
+     the shared row keeps `''` as an answer for `streaming_on`, `free_on` and
+     `tmdb_status` ("asked, none"). Migration 079 repaired the rows built
+     before that rule.
+   - **3c-2:** writers stop writing the duplicate columns and per-copy
+     `actors`; the columns and rows go.
 At step 1 that's 1,409 copies in 570 entries, catalog text 791 KB → 319 KB
 and cast rows 11,137 → 4,253 (`scripts/tmdb-audit.mjs`, 2026-10-04).
 Enforcer: `scripts/titles-test.mjs`.

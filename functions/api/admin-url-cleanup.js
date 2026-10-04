@@ -364,7 +364,7 @@ async function fetchNeedsPoster(env) {
                ELSE m.first_name END,
           s.member_slug),
         ', ') AS members
-    FROM shows s
+    FROM shows_v s
     LEFT JOIN members m ON m.slug = s.member_slug
     WHERE s.archived = 0
     GROUP BY LOWER(s.title)

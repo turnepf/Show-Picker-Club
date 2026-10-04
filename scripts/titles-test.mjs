@@ -168,9 +168,10 @@ console.log('\n== the migration');
 {
   const mig = readFileSync(join(repoRoot, 'migrations/076_titles.sql'), 'utf8');
   const norm = (s) => s.replace(/\s+/g, ' ').trim();
-  const [upsert, castStmt] = rebuildSql();
-  check('the backfill is rebuildTitles()\'s upsert', norm(mig).includes(norm(upsert)));
-  check('and its cast fill', norm(mig).includes(norm(castStmt)));
+  // 076 ran once, into an empty table, and is history. Its text no longer
+  // matches the rebuild (which since learned that '' is an answer for
+  // streaming_on), so what's pinned is what it does, below.
+  check('the migration backfills titles and cast', /INSERT INTO titles/.test(mig) && /INSERT INTO title_cast/.test(mig));
 
   // Run it the way deploy does: on an existing database that has shows but
   // not yet the new tables.
@@ -247,6 +248,24 @@ console.log('\n== step 3a: the cast view');
   await fillActorIdsFromKnownPeople(env);
   const linked = env._db.prepare("SELECT imdb_id FROM actors_v WHERE show_id = ? AND name = 'Steven Yeun'").get(a);
   check('the people bank links the shared cast as well', linked && linked.imdb_id === 'nm1890784', JSON.stringify(linked));
+}
+
+console.log('\n== \'\' is an answer, not a gap');
+{
+  const env = makeEnv();
+  show(env, { title: 'A Film', movie: true, tmdb: 5001 });
+  env._db.prepare("UPDATE shows SET streaming_on = '', free_on = '', tmdb_status = '' WHERE tmdb_id = 5001").run();
+  await rebuildTitles(env);
+  const t = title(env, 'movie', 5001);
+  check('the rebuild keeps "asked, none" for streaming, free services and status', t.streaming_on === '' && t.free_on === '' && t.tmdb_status === '', JSON.stringify(t));
+  // Migration 079 repairs rows built before that rule.
+  env._db.prepare('UPDATE titles SET streaming_on = NULL, free_on = NULL, tmdb_status = NULL').run();
+  env._db.exec(readFileSync(join(repoRoot, 'migrations/079_titles_empty_answers.sql'), 'utf8'));
+  const r = title(env, 'movie', 5001);
+  check('migration 079 fills them from the copies', r.streaming_on === '' && r.free_on === '' && r.tmdb_status === '', JSON.stringify(r));
+  env._db.prepare("UPDATE titles SET streaming_on = 'Netflix'").run();
+  env._db.exec(readFileSync(join(repoRoot, 'migrations/079_titles_empty_answers.sql'), 'utf8'));
+  check('and never overwrites a value', title(env, 'movie', 5001).streaming_on === 'Netflix');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

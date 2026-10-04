@@ -1133,6 +1133,11 @@ show's details, kept in step by propagation code, so two members could see
   overwrite it, because a copy holds whatever some earlier pass gave it.
 - **TMDB names the show.** A name TMDB gave is kept until TMDB gives another,
   and a member's own title isn't shown.
+- **A gap is the show's, not the copy's.** The enrichment passes decide what
+  to fetch from the shared row. A copy that a fresher one has already filled
+  isn't refetched, and an unmatched copy gets looked up and pinned rather
+  than borrowing a sibling's data. `''` in `streaming_on`, `free_on` or
+  `tmdb_status` is an answer ("asked, none"), never a gap.
 
 Enforcer: `scripts/titles-test.mjs` (every PR) — view/table column parity,
 migration/code parity, shared vs per-member fields; `admin-fix-tools-test.mjs`

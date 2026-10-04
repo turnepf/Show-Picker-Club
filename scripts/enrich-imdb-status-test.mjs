@@ -41,6 +41,7 @@ cpSync(join(repoRoot, 'functions'), join(sandbox, 'functions'), { recursive: tru
 writeFileSync(join(sandbox, 'package.json'), '{"type":"module"}');
 
 const enrichApi = await import(join(sandbox, 'functions', 'api/enrich.js'));
+const { rebuildTitles } = await import(join(sandbox, 'functions', '_shared/titles.js'));
 const actorsApi = await import(join(sandbox, 'functions', 'api/shows/[id]/actors.js'));
 
 const ORIGIN = 'https://showpicker.club';
@@ -189,7 +190,13 @@ function addRow(env, { title, tmdbId, list, movie = 0, member = 'patrick', enric
 
 const row = (env, id) => ({ ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(id) });
 
-const runEnrich = (env, body = {}) => enrichApi.onRequestPost({
+// Production backfilled the shared titles table from the copies (migration
+// 076) and rebuilds the gaps nightly. These fixtures seed copies directly, so
+// each run starts from the same backfill before the passes choose what's
+// missing (normalizing step 3c: gaps are read from the shared row).
+const runEnrich = async (env, body = {}) => {
+  await rebuildTitles(env);
+  return enrichApi.onRequestPost({
   env,
   request: new Request(ORIGIN + '/api/enrich', {
     method: 'POST',
@@ -197,7 +204,8 @@ const runEnrich = (env, body = {}) => enrichApi.onRequestPost({
     body: JSON.stringify(body),
   }),
   waitUntil: () => {},
-});
+  });
+};
 
 const fetchedTv = () => fetchLog.map((u) => new URL(u).pathname.match(/^\/3\/tv\/(\d+)$/)).filter(Boolean).map((m) => Number(m[1]));
 const fetchedMovies = () => fetchLog.map((u) => new URL(u).pathname.match(/^\/3\/movie\/(\d+)$/)).filter(Boolean).map((m) => Number(m[1]));

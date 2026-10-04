@@ -45,6 +45,7 @@ writeFileSync(join(sandbox, 'package.json'), '{"type":"module"}');
 const load = (p) => import(join(sandbox, 'functions', p));
 const showsApi = await load('api/shows.js');
 const enrichApi = await load('api/enrich.js');
+const { rebuildTitles } = await load('_shared/titles.js');
 
 const ORIGIN = 'https://showpicker.club';
 
@@ -267,8 +268,14 @@ const ctx = (env, request, params) => ({ env, request, params, waitUntil: () => 
 
 const postShow = (env, cookie, body) =>
   showsApi.onRequestPost(ctx(env, req('/api/shows', { cookie, method: 'POST', body })));
-const runEnrich = (env, cookie, body = {}) =>
-  enrichApi.onRequestPost(ctx(env, req('/api/enrich', { cookie, method: 'POST', body })));
+// Production backfilled the shared titles table from the copies (migration
+// 076) and rebuilds the gaps nightly. These fixtures seed copies directly, so
+// each run starts from the same backfill before the passes choose what's
+// missing (normalizing step 3c: gaps are read from the shared row).
+const runEnrich = async (env, cookie, body = {}) => {
+  await rebuildTitles(env);
+  return enrichApi.onRequestPost(ctx(env, req('/api/enrich', { cookie, method: 'POST', body })));
+};
 
 // Patrick has the 1974 original pinned, with a real deep link. Jennifer is
 // about to pick the remake.
@@ -341,6 +348,10 @@ console.log('\n== gaps mode fetches each pinned entry, not one row per title');
   // count, but a fresh enriched_at stamp saying "done".
   env._db.prepare('DELETE FROM actors').run();
   env._db.prepare("UPDATE shows SET episodes_released = NULL, enriched_at = datetime('now')").run();
+  // Gaps are read from the shared row since normalizing step 3c, so the
+  // damage has to reach it too.
+  env._db.prepare('DELETE FROM title_cast').run();
+  env._db.prepare('UPDATE titles SET episodes_released = NULL').run();
 
   const body = await (await runEnrich(env, cookie, { mode: 'gaps' })).json();
   check('both pins are their own gap-queue entries', body.tvCandidates === 2 && body.tvErrors === 0,
@@ -451,7 +462,10 @@ console.log('\n== artwork never crosses the identity boundary');
   await runEnrich(env, cookie, { mode: 'posters' });
   const unpinned = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(unpinnedId) };
   const pinned = { ...env._db.prepare('SELECT * FROM shows WHERE id = ?').get(pinnedId) };
-  check('an unpinned copy may borrow', (unpinned.poster_url || '').includes('/old-poster.jpg'), unpinned.poster_url);
+  // Since normalizing step 3c an unpinned copy isn't papered over with a
+  // sibling's poster: it has no shared row, so it's looked up and pinned to
+  // its own entry, which is what the borrowed poster never fixed.
+  check('an unpinned copy is looked up and pinned rather than borrowing', !!unpinned.tmdb_id, String(unpinned.tmdb_id));
   check("a pinned copy never wears the other entry's poster",
     !(pinned.poster_url || '').includes('/old-poster.jpg'), pinned.poster_url);
 }

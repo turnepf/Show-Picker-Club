@@ -36,11 +36,20 @@ const TYPE_OF = `COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE '
 // Most recently enriched first, then most recently edited, then newest row.
 const FRESHEST = `COALESCE(s2.enriched_at, '') DESC, COALESCE(s2.updated_at, '') DESC, s2.id DESC`;
 
+// Fields where '' is an answer rather than a gap: TMDB was asked and named
+// no service, no free service, or no status. Treating it as missing left the
+// shared row NULL, which reads as "never asked" and made the nightly passes
+// re-fetch every such film forever.
+const EMPTY_IS_AN_ANSWER = ['streaming_on', 'free_on', 'tmdb_status'];
+
 function pick(field) {
+  const present = EMPTY_IS_AN_ANSWER.includes(field)
+    ? `s2.${field} IS NOT NULL`
+    : `s2.${field} IS NOT NULL AND TRIM(CAST(s2.${field} AS TEXT)) <> ''`;
   return `(SELECT s2.${field} FROM shows s2
             WHERE s2.tmdb_id = k.tmdb_id
               AND COALESCE(s2.tmdb_type, CASE WHEN s2.movie = 1 THEN 'movie' ELSE 'tv' END) = k.tmdb_type
-              AND s2.${field} IS NOT NULL AND TRIM(CAST(s2.${field} AS TEXT)) <> ''
+              AND ${present}
             ORDER BY ${FRESHEST} LIMIT 1)`;
 }
 

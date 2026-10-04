@@ -52,6 +52,7 @@ cpSync(join(repoRoot, 'functions'), join(sandbox, 'functions'), { recursive: tru
 writeFileSync(join(sandbox, 'package.json'), '{"type":"module"}');
 
 const enrichApi = await import(join(sandbox, 'functions', 'api/enrich.js'));
+const { rebuildTitles } = await import(join(sandbox, 'functions', '_shared/titles.js'));
 
 const ORIGIN = 'https://showpicker.club';
 
@@ -205,7 +206,13 @@ function addMovie(env, { title, tmdbId, poster = '/have.jpg', network = 'Max', g
 const rowFor = (env, title) =>
   ({ ...env._db.prepare('SELECT * FROM shows WHERE LOWER(title) = LOWER(?)').get(title) });
 
-const runEnrich = (env, body = {}) => enrichApi.onRequestPost({
+// Production backfilled the shared titles table from the copies (migration
+// 076) and rebuilds the gaps nightly. These fixtures seed copies directly, so
+// each run starts from the same backfill before the passes choose what's
+// missing (normalizing step 3c: gaps are read from the shared row).
+const runEnrich = async (env, body = {}) => {
+  await rebuildTitles(env);
+  return enrichApi.onRequestPost({
   env,
   request: new Request(ORIGIN + '/api/enrich', {
     method: 'POST',
@@ -213,7 +220,8 @@ const runEnrich = (env, body = {}) => enrichApi.onRequestPost({
     body: JSON.stringify(body),
   }),
   waitUntil: () => {},
-});
+  });
+};
 
 // ---------------------------------------------------------------- 1 + 2
 
@@ -545,8 +553,11 @@ console.log('\nArchived titles are enriched too, since Favorite Actors counts th
   let res = await (await runEnrich(env)).json();
   check('a whole archived series stays out of the normal rotation', res.tvCandidates === 0,
     `tvCandidates=${res.tvCandidates}`);
-  // Archived with a gap: in, until it is filled.
+  // Archived with a gap: in, until it is filled. A fresh library, shared
+  // rows included (gaps are read from those since normalizing step 3c).
   env._db.prepare('DELETE FROM shows').run();
+  env._db.prepare('DELETE FROM titles').run();
+  env._db.prepare('DELETE FROM title_cast').run();
   const gapId = addTv(null, true);
   res = await (await runEnrich(env)).json();
   check('an archived series with a gap is selected', res.tvCandidates === 1,
@@ -610,8 +621,10 @@ console.log('\nEmpty data is filled before stale data is refreshed');
   const env = makeEnv();
   // Complete and the oldest stamp in the library — plain oldest-first order
   // would take it first.
+  // Its own entry (699): a gap belongs to the show, not the copy, so two
+  // copies of one entry can't be one complete and one not.
   env._db.prepare(`INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, poster_url,
-                     episodes_released, enriched_at) VALUES ('Old Complete', 'watching', 'patrick', 0, 700, 'tv',
+                     episodes_released, enriched_at) VALUES ('Old Complete', 'watching', 'patrick', 0, 699, 'tv',
                      '/p.jpg', 12, '2026-08-01T00:00:00Z')`).run();
   const complete = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id);
   env._db.prepare(`INSERT INTO actors (show_id, name, imdb_id, ord) VALUES (?, 'Lead', 'nm0000001', 0)`).run(complete);
