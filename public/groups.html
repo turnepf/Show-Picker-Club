@@ -929,7 +929,10 @@
         if (!res.ok) return;
         const d = await res.json();
         const t = (show.title || '').toLowerCase();
-        detailMyCopy = (d.shows || []).find(s => (s.title || '').toLowerCase() === t) || null;
+        const id = show.tmdb_id ? Number(show.tmdb_id) : null;
+        detailMyCopy = (d.shows || []).find(s => (id && s.tmdb_id)
+          ? Number(s.tmdb_id) === id && !!s.movie === !!show.movie
+          : (s.title || '').toLowerCase() === t) || null;
       } catch {}
     }
 

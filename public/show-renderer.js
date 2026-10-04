@@ -545,7 +545,10 @@ function renderShowDetailBody(show, options = {}) {
       memberInner += `<button class="detail-action" onclick="detailEdit(${myCopy.id})">Edit</button>`;
       memberInner += `<button class="detail-action danger" onclick="detailArchive(${myCopy.id})">Archive</button>`;
     }
-    html += `<div class="detail-card"><div class="detail-card-title">My Lists</div>${memberInner}</div>`;
+    // On a show that isn't mine (a group-mate's, Trending), say what the
+    // chips do: they add it.
+    const addHint = myCopy ? '' : '<span class="detail-card-hint">Pick a list to add it to yours</span>';
+    html += `<div class="detail-card"><div class="detail-card-title detail-card-title-row">My Lists${addHint}</div>${memberInner}</div>`;
   }
 
 
