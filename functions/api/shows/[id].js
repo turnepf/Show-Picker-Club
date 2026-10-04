@@ -265,7 +265,11 @@ export async function onRequestPut(context) {
         tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type),
         imdb_id = COALESCE(?, imdb_id), tmdb_status = COALESCE(?, tmdb_status),
         free_on = COALESCE(?, free_on),
-        genres = COALESCE(?, genres), seasons_released = COALESCE(?, seasons_released),
+        genres = COALESCE(?, genres),
+        -- A movie has no seasons. Fill-only would keep the count from the TV
+        -- entry a row was matched to before it became a movie ("Sinners, 6
+        -- seasons"), since a film's lookup has no number to overwrite it with.
+        seasons_released = CASE WHEN ? = 1 THEN NULL ELSE COALESCE(?, seasons_released) END,
         updated_at = datetime('now') WHERE id = ?`
   ).bind(title, finalNetwork, finalUrl, recommended_by, list, notes, movie, full_series, watching_with, rating, archived,
     enriched.posterUrl || null, networkChanged ? 1 : 0, enriched.networkLogoUrl || null,
@@ -274,7 +278,7 @@ export async function onRequestPut(context) {
     enriched.watchLink || null, enriched.tmdbId || null, enriched.tmdbType || null,
     enriched.imdbId || null, enriched.tmdbStatus ?? null,
     Array.isArray(enriched.freeNetworks) ? enriched.freeNetworks.join(', ') : null,
-    enriched.genres || null, enriched.seasonsReleased ?? null, params.id).run();
+    enriched.genres || null, movie ? 1 : 0, enriched.seasonsReleased ?? null, params.id).run();
 
   if (enriched.actors.length > 0) {
     await env.DB.prepare('DELETE FROM actors WHERE show_id = ?').bind(params.id).run();

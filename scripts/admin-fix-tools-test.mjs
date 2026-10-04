@@ -227,12 +227,14 @@ console.log('\n== edits that aren\'t about identity keep the pin');
 console.log('\n== flipping TV ↔ movie');
 {
   const env = seed();
-  const id = addShow(env, 'christine', { title: 'Frances Ha', list: 'next' });
+  // Saved as TV, so it carries a season count a film can't have.
+  const id = addShow(env, 'christine', { title: 'Frances Ha', list: 'next', seasons: 3 });
   const { out, err } = await run(env, 'admin_update_show', { member_slug: 'christine', show_id: id, media_type: 'movie' });
   const r = row(env, id);
   check('a film saved as TV becomes a movie', !err && r.movie === 1, err?.message || String(r.movie));
   check('and is matched in the movie index', r.tmdb_id === FILM && r.tmdb_type === 'movie', `${r.tmdb_id}/${r.tmdb_type}`);
   check('with its genres', r.genres === 'Comedy, Drama', r.genres);
+  check('and without the season count it had as TV', r.seasons_released === null, String(r.seasons_released));
   check('no warning', out && !out.warning, out && out.warning);
   check('media_type equal to the current type changes nothing, so it\'s refused',
     !!(await run(env, 'admin_update_show', { member_slug: 'christine', show_id: id, media_type: 'movie' })).err);
