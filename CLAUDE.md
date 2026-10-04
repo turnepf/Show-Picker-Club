@@ -757,9 +757,10 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 - **Member-facing reads use `shows_v` and `actors_v`; writes use `shows` and `actors`.** The view
   (migration 077) shows TMDB's name and the shared details from `titles`. A
   new read that shows a member anything selects `FROM shows_v`. A writer
-  that changes a show's details by title rather than by row calls
-  `syncTitlesNamed()` (or `syncTitle()` for one entry), or members see the
-  old values until the nightly rebuild. A column added to `shows` must be
+  holding a TMDB payload passes it to `writeTitle()` (with
+  `titleFieldsFromEnrichment()`), or members keep seeing the old details:
+  copies can only fill the shared row (`syncTitle()`, the nightly rebuild),
+  never overwrite it. A column added to `shows` must be
   added to `SHOWS_COLUMNS` in `_shared/titles.js`, and the view regenerated
   in a migration; `titles-test.mjs` fails until both are done.
 - **`updated_at` is sacred.** Only member-initiated writes bump it; enrichment writes `enriched_at` instead. `updated_at != created_at` is how the app distinguishes member intent from background jobs.

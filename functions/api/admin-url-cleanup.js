@@ -4,7 +4,7 @@ import { isAdmin } from '../_shared/admin.js';
 import { cronAuthorized } from '../_shared/secrets.js';
 import { fetchEnrichment, fetchAvailability, fallbackNetwork } from '../_shared/enrichment.js';
 import { renameShowCopies } from '../_shared/title-fix.js';
-import { syncTitlesNamed } from '../_shared/titles.js';
+import { syncTitlesNamed, writeTitle, titleFieldsFromEnrichment } from '../_shared/titles.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -716,7 +716,12 @@ export async function onRequestPost(context) {
 
     // The shared rows members read (migration 077) for whatever entries the
     // renamed copies now point at.
-    await syncTitlesNamed(env, finalTitle, enriched.canonicalTitle || null);
+    if (enriched.tmdbId) {
+      await writeTitle(env, enriched.tmdbType, enriched.tmdbId, {
+        name: enriched.canonicalTitle, fields: titleFieldsFromEnrichment(enriched), cast: enriched.actors,
+      });
+    }
+    await syncTitlesNamed(env, finalTitle);
     return json({ ok: true, old_title: oldTitle, new_title: finalTitle, network, network_url: rawUrl || null, updated });
   }
 
@@ -782,7 +787,12 @@ export async function onRequestPost(context) {
       }
     }
 
-    await syncTitlesNamed(env, row.title, enriched.canonicalTitle || null);
+    if (enriched.tmdbId) {
+      await writeTitle(env, enriched.tmdbType, enriched.tmdbId, {
+        name: enriched.canonicalTitle, fields: titleFieldsFromEnrichment(enriched), cast: enriched.actors,
+      });
+    }
+    await syncTitlesNamed(env, row.title);
     return json({ ok: true, poster: !!enriched.posterUrl, title: enriched.canonicalTitle || row.title });
   }
 

@@ -1126,10 +1126,11 @@ show's details, kept in step by propagation code, so two members could see
   watching-with, recommended-by, archived, network and Watch link. So do
   `next_season_date`, `season_end_date` and `network_logo_url`, which differ
   by member.
-- **A writer that changes a show's details keeps `titles` current:**
-  `syncTitle()` after a one-row write (add, edit, enrichment), and
-  `syncTitlesNamed()` after a write by title (URL cleanup). The nightly
-  rebuild is the backstop, not the mechanism.
+- **A writer holding TMDB's payload writes it to `titles` directly**
+  (`writeTitle()`): add, edit, enrichment, URL cleanup. TMDB's facts
+  replace stored ones. A member's copy can only *fill* the shared row
+  (`syncTitle()`, `syncTitlesNamed()`, the nightly rebuild), never
+  overwrite it, because a copy holds whatever some earlier pass gave it.
 - **TMDB names the show.** A name TMDB gave is kept until TMDB gives another,
   and a member's own title isn't shown.
 

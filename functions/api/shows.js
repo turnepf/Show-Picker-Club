@@ -1,5 +1,5 @@
 import { fetchEnrichment, fetchEnrichmentById, fallbackNetwork } from '../_shared/enrichment.js';
-import { syncTitle } from '../_shared/titles.js';
+import { writeTitle, titleFieldsFromEnrichment } from '../_shared/titles.js';
 import { getSession } from '../_shared/auth.js';
 import { canonicalNetwork, networkFromUrl, networkSearchUrl } from '../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../_shared/watch-providers.js';
@@ -245,8 +245,10 @@ export async function onRequestPost(context) {
     const stmt = env.DB.prepare('INSERT INTO actors (show_id, name, imdb_id, ord, tmdb_person_id, character_name) VALUES (?, ?, ?, ?, ?, ?)');
     await env.DB.batch(enriched.actors.map((a, i) => stmt.bind(showId, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null, a.character ?? null)));
   }
-  // The show's shared row (step 1 of normalizing; nothing reads it yet).
-  await syncTitle(env, enriched.tmdbType, enriched.tmdbId, enriched.canonicalTitle);
+  // The show's shared row, straight from the TMDB payload (docs/INVARIANTS.md §29).
+  await writeTitle(env, enriched.tmdbType, enriched.tmdbId, {
+    name: enriched.canonicalTitle, fields: titleFieldsFromEnrichment(enriched), cast: enriched.actors,
+  });
 
   // If we ended up on a search-URL placeholder (no user paste, no sibling
   // good URL), kick off a Watchmode lookup in the background. The response

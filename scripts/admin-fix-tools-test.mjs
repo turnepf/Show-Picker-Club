@@ -298,6 +298,11 @@ console.log('\n== refresh is background work, not an edit');
   const sharedR = titleRow(env, 'tv', REMAKE);
   check('the background refresh syncs the shared row, named by TMDB', sharedR && sharedR.name === TITLE && sharedR.seasons_released === 2, JSON.stringify(sharedR));
   check('with the fullest cast', env._db.prepare("SELECT COUNT(*) AS n FROM title_cast WHERE tmdb_type = 'tv' AND tmdb_id = ?").get(REMAKE).n === 2);
+  // A copy of the same entry saved under another title never received the
+  // title-scoped propagation. Through the view it reads the shared row.
+  const renamed = addShow(env, 'stacy', { title: 'Little House on the Prairie (2026)', tmdb: REMAKE, year: 2026 });
+  const seen = env._db.prepare('SELECT title, genres, seasons_released FROM shows_v WHERE id = ?').get(renamed);
+  check('a differently-titled copy reads the refreshed shared row', seen.title === TITLE && seen.genres === 'Drama, Western, Family' && seen.seasons_released === 2, JSON.stringify(seen));
 
   const film = addShow(env, 'christine', { title: 'Frances Ha', movie: true, tmdb: FILM, list: 'next' });
   const fr = await run(env, 'admin_refresh_show', { member_slug: 'christine', show_id: film });
