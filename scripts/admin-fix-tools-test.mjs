@@ -140,6 +140,8 @@ function addShow(env, slug, o = {}) {
 }
 
 const row = (env, id) => env._db.prepare('SELECT * FROM shows WHERE id = ?').get(id);
+// The shared one-row-per-show table (migration 076), kept in sync by every write.
+const titleRow = (env, type, id) => env._db.prepare('SELECT * FROM titles WHERE tmdb_type = ? AND tmdb_id = ?').get(type, id);
 const actions = (env) => env._db.prepare('SELECT * FROM admin_actions ORDER BY id').all().map((a) => ({ ...a, detail: JSON.parse(a.detail || '{}') }));
 
 const ctxFor = (env, slug = 'patrick', scopes = ['shows:read', 'shows:write', 'members:admin']) => ({
@@ -189,6 +191,9 @@ console.log('\n== re-pointing a show at the right TMDB entry');
   check('cast is the remake\'s', env._db.prepare('SELECT name FROM actors WHERE show_id = ? ORDER BY ord').all(id).map((a) => a.name).join(',') === 'Alice Halsey,Luke Bracey');
   check('memos are untouched, even when the call carries one', r.notes === 'grandma loved it' && r.recommended_by === 'Mom' && r.watching_with === 'Sam', JSON.stringify([r.notes, r.recommended_by, r.watching_with]));
   check('no warning on a re-point that landed', out && !out.warning, out && out.warning);
+  const shared = titleRow(env, 'tv', REMAKE);
+  check('the edit syncs the shared row for the new entry', shared && shared.release_year === 2026 && shared.genres === 'Drama, Western, Family', JSON.stringify(shared));
+  check('with no member memo in it', !JSON.stringify(shared).includes('grandma'));
   const a = actions(env).at(-1);
   check('admin_actions records before and after', a && a.action === 'update_show' && a.admin_slug === 'patrick' && a.member_slug === 'eric'
     && a.detail.before.tmdb_id === ORIGINAL && a.detail.after.tmdb_id === REMAKE, JSON.stringify(a));
@@ -290,6 +295,9 @@ console.log('\n== refresh is background work, not an edit');
   check("another member's copy of the same entry gets the catalog fields too", row(env, twin).genres === 'Drama, Western, Family', row(env, twin).genres);
   check('the original\'s copies are left alone', row(env, original).genres === 'Drama, Family' && row(env, original).seasons_released === 9);
   check('logged', actions(env).at(-1).action === 'refresh_show');
+  const sharedR = titleRow(env, 'tv', REMAKE);
+  check('the background refresh syncs the shared row, named by TMDB', sharedR && sharedR.name === TITLE && sharedR.seasons_released === 2, JSON.stringify(sharedR));
+  check('with the fullest cast', env._db.prepare("SELECT COUNT(*) AS n FROM title_cast WHERE tmdb_type = 'tv' AND tmdb_id = ?").get(REMAKE).n === 2);
 
   const film = addShow(env, 'christine', { title: 'Frances Ha', movie: true, tmdb: FILM, list: 'next' });
   const fr = await run(env, 'admin_refresh_show', { member_slug: 'christine', show_id: film });
@@ -301,6 +309,8 @@ console.log('\n== adds store genres and seasons');
   const env = seed();
   const { out, err } = await run(env, 'add_show', { title: TITLE, list: 'awaiting', tmdb_id: REMAKE, media_type: 'tv' }, ctxFor(env, 'stacy', ['shows:read', 'shows:write']));
   const r = err ? null : row(env, out.added.id);
+  const sharedA = titleRow(env, 'tv', REMAKE);
+  check('an add creates the shared row', sharedA && sharedA.name === TITLE && sharedA.genres === 'Drama, Western, Family', JSON.stringify(sharedA));
   check('a new TV row carries genres and seasons from the first fetch', r && r.genres === 'Drama, Western, Family' && r.seasons_released === 2, err?.message || JSON.stringify(r && [r.genres, r.seasons_released]));
 }
 

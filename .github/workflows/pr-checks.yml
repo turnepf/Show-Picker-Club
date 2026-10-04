@@ -127,6 +127,8 @@ jobs:
         run: node scripts/admin-fix-tools-test.mjs
       - name: The TMDB audit classifies unmatched rows correctly and stays read-only
         run: node scripts/tmdb-audit-test.mjs
+      - name: The shared one-row-per-show table summarizes the copies faithfully
+        run: node scripts/titles-test.mjs
 
   roku:
     runs-on: ubuntu-latest
