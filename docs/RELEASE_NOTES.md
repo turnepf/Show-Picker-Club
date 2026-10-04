@@ -43,10 +43,13 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## Unreleased — the update after 1.5.1
+## Unreleased — the update after 1.6
 
-iPhone, iPad and Mac (detail screen; filled in show by show as the
-nightly refresh reaches them, Watching and Next Up first):
+---
+
+## 1.6 (build 30) — iPhone, iPad, Mac and Apple TV, submitted for review 2026-10-04
+
+iPhone, iPad and Mac:
 
 ```
 Show pages now link to IMDb, say whether a series is returning, ended or was canceled, list the free services it's on (Tubi, Pluto TV and more), and name the character each actor plays.
@@ -54,6 +57,15 @@ Show pages now link to IMDb, say whether a series is returning, ended or was can
 Looking at a show from a friend's list that isn't on yours? A hint beside My Lists now says to pick a list to add it.
 
 Shows that share a name are kept apart everywhere. Search shows which friends have the exact show you're looking at, adding from a friend's list adds that same show, and Trending, "Also watching", group recommendations and your vibe no longer mix them up.
+```
+
+Apple TV, which has none of the new show-page details and no Vibe screen
+(`set-notes --platform TV_OS`):
+
+```
+Looking at a show from a friend's list that isn't on yours? A hint beside My Lists now says to pick a list to add it.
+
+Shows that share a name are kept apart. Search no longer hides a film because you have a different one with the same title, and it shows which friends have the exact show you're looking at.
 ```
 
 ---
