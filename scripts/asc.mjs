@@ -94,10 +94,18 @@ async function call(method, endpoint, body) {
 
 const get = e => call('GET', e);
 
+// Every version record, following Apple's pagination: at three records a
+// release, a single page of 50 stops containing the newest version after
+// about sixteen releases.
 async function versions(versionString) {
-  const r = await get(`/v1/apps/${APP_ID}/appStoreVersions?limit=50` +
-    `&fields[appStoreVersions]=versionString,platform,appStoreState`);
-  const all = r.data || [];
+  const all = [];
+  let next = `/v1/apps/${APP_ID}/appStoreVersions?limit=200` +
+    `&fields[appStoreVersions]=versionString,platform,appStoreState`;
+  while (next) {
+    const r = await get(next);
+    all.push(...(r.data || []));
+    next = r.links?.next ? r.links.next.replace(API, '') : null;
+  }
   return versionString ? all.filter(v => v.attributes.versionString === versionString) : all;
 }
 
@@ -258,46 +266,74 @@ async function cmdCreateVersion(versionString) {
 // Send every platform's record for a version to App Review. Checks first and
 // changes nothing unless every platform passes: a build attached and What's
 // New filled in. Without --confirm it only reports what it would submit.
+//
+// Safe to run again after a partial failure. A platform already waiting for
+// or in review is skipped, not refused, and an open review submission left
+// behind (by an earlier run that died between steps, or by "Add for Review"
+// in the web UI) is reused rather than colliding with a new one.
+const IN_REVIEW = new Set(['WAITING_FOR_REVIEW', 'IN_REVIEW']);
+
+async function openSubmission(platform) {
+  const r = await get(`/v1/reviewSubmissions?filter[app]=${APP_ID}&filter[platform]=${platform}` +
+    `&filter[state]=READY_FOR_REVIEW&limit=1`);
+  return r.data?.[0]?.id || null;
+}
+
+async function submissionHasVersion(subId, versionId) {
+  const r = await get(`/v1/reviewSubmissions/${subId}/items?include=appStoreVersion&limit=50`);
+  return (r.data || []).some(i => i.relationships?.appStoreVersion?.data?.id === versionId);
+}
+
 async function cmdSubmit(versionString, flag) {
   if (!versionString) die('usage: submit <version> --confirm');
   const rows = await versions(versionString);
   if (!rows.length) die(`No version records for ${versionString}`);
   let ready = true;
+  const toSend = [];
   for (const v of rows) {
     const plat = v.attributes.platform;
+    const state = v.attributes.appStoreState;
+    if (IN_REVIEW.has(state)) { console.log(`  ${plat.padEnd(7)} already ${state}, skipped`); continue; }
     const build = await get(`/v1/appStoreVersions/${v.id}/build?fields[builds]=version`);
     const locs = await get(`/v1/appStoreVersions/${v.id}/appStoreVersionLocalizations?fields[appStoreVersionLocalizations]=locale,whatsNew`);
     const missingNotes = (locs.data || []).filter(l => !(l.attributes.whatsNew || '').trim()).map(l => l.attributes.locale);
     const problems = [];
-    if (v.attributes.appStoreState !== 'PREPARE_FOR_SUBMISSION') problems.push(`state is ${v.attributes.appStoreState}`);
+    if (state !== 'PREPARE_FOR_SUBMISSION') problems.push(`state is ${state}`);
     if (!build.data) problems.push('no build attached');
     if (missingNotes.length) problems.push(`no What's New for ${missingNotes.join(', ')}`);
-    if (problems.length) ready = false;
+    if (problems.length) ready = false; else toSend.push(v);
     console.log(`  ${plat.padEnd(7)} ${build.data ? `build ${build.data.attributes.version}` : '-'}  ${problems.length ? '*** ' + problems.join('; ') : 'ready'}`);
   }
   if (!ready) die('Not submitted. Fix the platforms above and run it again.');
+  if (!toSend.length) return console.log(`\nNothing to send: every platform of ${versionString} is already in review.`);
   if (flag !== '--confirm') return console.log(`\nAll ready. Run again with --confirm to send ${versionString} to App Review.`);
 
-  for (const v of rows) {
+  for (const v of toSend) {
     const plat = v.attributes.platform;
-    const sub = await call('POST', '/v1/reviewSubmissions', {
-      data: {
-        type: 'reviewSubmissions',
-        attributes: { platform: plat },
-        relationships: { app: { data: { type: 'apps', id: APP_ID } } },
-      },
-    });
-    await call('POST', '/v1/reviewSubmissionItems', {
-      data: {
-        type: 'reviewSubmissionItems',
-        relationships: {
-          reviewSubmission: { data: { type: 'reviewSubmissions', id: sub.data.id } },
-          appStoreVersion: { data: { type: 'appStoreVersions', id: v.id } },
+    let subId = await openSubmission(plat);
+    if (!subId) {
+      const sub = await call('POST', '/v1/reviewSubmissions', {
+        data: {
+          type: 'reviewSubmissions',
+          attributes: { platform: plat },
+          relationships: { app: { data: { type: 'apps', id: APP_ID } } },
         },
-      },
-    });
-    await call('PATCH', `/v1/reviewSubmissions/${sub.data.id}`, {
-      data: { type: 'reviewSubmissions', id: sub.data.id, attributes: { submitted: true } },
+      });
+      subId = sub.data.id;
+    }
+    if (!(await submissionHasVersion(subId, v.id))) {
+      await call('POST', '/v1/reviewSubmissionItems', {
+        data: {
+          type: 'reviewSubmissionItems',
+          relationships: {
+            reviewSubmission: { data: { type: 'reviewSubmissions', id: subId } },
+            appStoreVersion: { data: { type: 'appStoreVersions', id: v.id } },
+          },
+        },
+      });
+    }
+    await call('PATCH', `/v1/reviewSubmissions/${subId}`, {
+      data: { type: 'reviewSubmissions', id: subId, attributes: { submitted: true } },
     });
     console.log(`  ${plat}: submitted for review`);
   }
@@ -307,8 +343,14 @@ const [cmd, ...rest] = process.argv.slice(2);
 switch (cmd) {
   case 'status': await cmdStatus(); break;
   case 'set-notes': {
+    // A bare or misspelled --platform must not fall through to "every
+    // platform": that would put Apple TV's text on iPhone and Mac.
     const i = rest.indexOf('--platform');
-    await cmdSetNotes(rest[0], rest[1], i === -1 ? null : rest[i + 1]);
+    const platform = i === -1 ? null : rest[i + 1];
+    if (i !== -1 && !['IOS', 'MAC_OS', 'TV_OS'].includes(platform)) {
+      die(`--platform needs IOS, MAC_OS or TV_OS (got ${platform === undefined ? 'nothing' : platform})`);
+    }
+    await cmdSetNotes(rest[0], rest[1], platform);
     break;
   }
   case 'attach': await cmdAttach(rest[0], rest[1]); break;
