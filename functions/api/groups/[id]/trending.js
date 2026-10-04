@@ -87,7 +87,7 @@ export async function onRequestGet(context) {
   const byShow = new Map();
   if (showIds.length) {
     const { results: acts } = await env.DB.prepare(
-      `SELECT show_id, name, imdb_id FROM actors
+      `SELECT show_id, name, imdb_id FROM actors_v
         WHERE show_id IN (${showIds.map(() => '?').join(',')})
         ORDER BY show_id, ord`
     ).bind(...showIds).all();

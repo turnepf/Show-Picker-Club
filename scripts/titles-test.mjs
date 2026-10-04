@@ -29,7 +29,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = mkdtempSync(join(tmpdir(), 'titles-'));
 cpSync(join(repoRoot, 'functions'), join(sandbox, 'functions'), { recursive: true });
 writeFileSync(join(sandbox, 'package.json'), '{"type":"module"}');
-const { syncTitle, rebuildTitles, rebuildSql, TITLE_FIELDS, SHOWS_COLUMNS, SHARED_FIELDS, PER_COPY_FIELDS, viewSql } = await import(join(sandbox, 'functions', '_shared/titles.js'));
+const { syncTitle, rebuildTitles, rebuildSql, TITLE_FIELDS, SHOWS_COLUMNS, SHARED_FIELDS, PER_COPY_FIELDS, viewSql, ACTORS_COLUMNS, actorsViewSql } = await import(join(sandbox, 'functions', '_shared/titles.js'));
 
 let passed = 0, failed = 0;
 function check(name, cond, detail = '') {
@@ -174,6 +174,34 @@ console.log('\n== step 2: the view members read through');
   check('so do the per-member fields', v(a).next_season_date === '2026-12-01' && v(b).next_season_date === null && v(a).network_logo_url === 'https://image.tmdb.org/hbo.png' && v(b).network_logo_url === null);
   check('a row with no shared entry reads as itself', v(lone).title === 'Unmatched Thing' && v(lone).overview === 'own text');
   check('the raw table is untouched', env._db.prepare('SELECT title FROM shows WHERE id = ?').get(a).title === 'Sopranos');
+}
+
+console.log('\n== step 3a: the cast view');
+{
+  const env = makeEnv();
+  const actorCols = env._db.prepare("SELECT name FROM pragma_table_info('actors')").all().map((r) => r.name);
+  const viewCols = env._db.prepare("SELECT name FROM pragma_table_info('actors_v')").all().map((r) => r.name);
+  check('actors_v has exactly the columns of actors', JSON.stringify(viewCols) === JSON.stringify(actorCols) && JSON.stringify(ACTORS_COLUMNS) === JSON.stringify(actorCols), viewCols.join(','));
+  const mig = readFileSync(join(repoRoot, 'migrations/078_actors_view.sql'), 'utf8');
+  const norm = (x) => x.replace(/\s+/g, ' ').trim();
+  check('migration 078 is actorsViewSql()', norm(mig).includes(norm(actorsViewSql())));
+
+  // Two copies of one entry: one has a short cast, the other the full one.
+  const a = show(env, { title: 'BEEF', member: 'a', tmdb: 154385, cast: ['Ali Wong'] });
+  const b = show(env, { title: 'BEEF', member: 'b', tmdb: 154385, cast: ['Ali Wong', 'Steven Yeun', 'Joseph Lee'] });
+  const lone = show(env, { title: 'Unmatched', member: 'c', cast: ['Someone Local'] });
+  await syncTitle(env, 'tv', 154385, 'BEEF');
+  const castOf = (id) => env._db.prepare('SELECT name FROM actors_v WHERE show_id = ? ORDER BY ord').all(id).map((r) => r.name).join(',');
+  check('every copy reads the shared, fullest cast', castOf(a) === 'Ali Wong,Steven Yeun,Joseph Lee' && castOf(b) === castOf(a), castOf(a));
+  check('a copy whose entry has no shared cast reads its own', castOf(lone) === 'Someone Local');
+  check('a copy is never shown both lists', env._db.prepare('SELECT COUNT(*) AS n FROM actors_v WHERE show_id = ?').get(a).n === 3);
+
+  // A name the people bank can link is linked on the shared cast too.
+  env._db.prepare("INSERT INTO people (tmdb_person_id, name, name_lower, imdb_id) VALUES (77, 'Steven Yeun', 'steven yeun', 'nm1890784')").run();
+  const { fillActorIdsFromKnownPeople } = await import(join(sandbox, 'functions', '_shared/people.js'));
+  await fillActorIdsFromKnownPeople(env);
+  const linked = env._db.prepare("SELECT imdb_id FROM actors_v WHERE show_id = ? AND name = 'Steven Yeun'").get(a);
+  check('the people bank links the shared cast as well', linked && linked.imdb_id === 'nm1890784', JSON.stringify(linked));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

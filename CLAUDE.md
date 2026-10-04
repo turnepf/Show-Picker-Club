@@ -333,8 +333,9 @@ node scripts/titles-test.mjs
 ```
 
 The shared one-row-per-show tables, `titles` and `title_cast` (migration
-076), and the view `shows_v` (migration 077) that member-facing reads go
-through. This is normalizing the library: one row per TMDB entry instead of
+076), and the views member-facing reads go through: `shows_v` (migration 077)
+for the show and `actors_v` (migration 078) for its cast, which is the shared
+cast for every copy whose entry has one. This is normalizing the library: one row per TMDB entry instead of
 the show's details repeated on every member's copy. What's pinned is that
 the view has exactly the columns of `shows` (so switching a read changes
 nothing about its shape), takes the title and shared details from `titles`
@@ -753,7 +754,7 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 
 ## Non-obvious conventions (violating these breaks features)
 
-- **Member-facing reads use `shows_v`, writes use `shows`.** The view
+- **Member-facing reads use `shows_v` and `actors_v`; writes use `shows` and `actors`.** The view
   (migration 077) shows TMDB's name and the shared details from `titles`. A
   new read that shows a member anything selects `FROM shows_v`. A writer
   that changes a show's details by title rather than by row calls

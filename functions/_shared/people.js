@@ -102,6 +102,17 @@ export async function fillActorIdsFromKnownPeople(env, limit = 500) {
         WHERE imdb_id IS NULL
           AND EXISTS (SELECT 1 FROM people_by_name n WHERE n.name_lower = LOWER(actors.name))`
     ).run();
+    // The shared cast (migration 076) gets the same links, so a name the
+    // per-copy rows just linked isn't shown unlinked through actors_v.
+    // Best-effort: a database without the table is pre-076.
+    await env.DB.prepare(
+      `UPDATE title_cast SET imdb_id = COALESCE(
+         (SELECT p.imdb_id FROM people p WHERE p.name_lower = LOWER(title_cast.name) AND p.imdb_id IS NOT NULL LIMIT 1),
+         (SELECT n.imdb_id FROM people_by_name n WHERE n.name_lower = LOWER(title_cast.name) LIMIT 1))
+        WHERE imdb_id IS NULL
+          AND (EXISTS (SELECT 1 FROM people p WHERE p.name_lower = LOWER(title_cast.name) AND p.imdb_id IS NOT NULL)
+            OR EXISTS (SELECT 1 FROM people_by_name n WHERE n.name_lower = LOWER(title_cast.name)))`
+    ).run().catch(() => {});
     return viaPeople + (res2.meta?.changes || 0);
   } catch (_) {
     return 0;

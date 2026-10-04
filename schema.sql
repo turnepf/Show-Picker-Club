@@ -500,6 +500,18 @@ CREATE VIEW shows_v AS
     LEFT JOIN titles t
       ON t.tmdb_id = s.tmdb_id
      AND t.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END);
+-- Step 3a: member-facing cast reads go through actors_v (migration 078,
+-- generated from actorsViewSql() in functions/_shared/titles.js).
+CREATE VIEW actors_v AS
+  SELECT tc.ord AS id, s.id AS show_id, tc.name AS name, tc.imdb_id AS imdb_id, tc.ord AS ord,
+         tc.tmdb_person_id AS tmdb_person_id, tc.character_name AS character_name
+    FROM shows s JOIN title_cast tc ON tc.tmdb_id = s.tmdb_id
+       AND tc.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)
+  UNION ALL
+  SELECT a.id, a.show_id, a.name, a.imdb_id, a.ord, a.tmdb_person_id, a.character_name
+    FROM actors a
+   WHERE NOT EXISTS (SELECT 1 FROM shows s JOIN title_cast tc ON tc.tmdb_id = s.tmdb_id
+       AND tc.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END) WHERE s.id = a.show_id);
 
 
 -- Daily Trending snapshot (migration 067). /api/popular computes its ranking

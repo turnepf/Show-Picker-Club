@@ -850,6 +850,8 @@ export async function onRequestPost(context) {
           await env.DB.batch(actors.map((a, i) => insert.bind(copy.id, a.name, a.imdb_id || null, a.ord ?? i, a.tmdb_person_id ?? null, a.character ?? null)));
           actorImdbFilled++;
         }
+        // The shared cast members read (actors_v) gets the newly linked names.
+        if (castFromId) await syncTitle(env, result.tmdbType || show.tmdb_type || (show.movie ? 'movie' : 'tv'), castFromId);
       } catch (e) {}
     }
   }

@@ -108,7 +108,7 @@ const FIELDS = {
 const MULTI_JOIN = {
   genre: { join: `LEFT JOIN ${splitList('s.genres')} mv`, key: `NULLIF(TRIM(mv.value), '')` },
   streaming_service: { join: `LEFT JOIN ${splitList('s.streaming_on')} mv`, key: `NULLIF(TRIM(mv.value), '')` },
-  actor: { join: 'LEFT JOIN actors mv ON mv.show_id = s.id', key: 'mv.name' },
+  actor: { join: 'LEFT JOIN actors_v mv ON mv.show_id = s.id', key: 'mv.name' },
 };
 
 const OPS = {
@@ -174,7 +174,7 @@ function multiCondition(f, op, value, binds) {
   const empty = {
     genre: `TRIM(COALESCE(s.genres, '')) = ''`,
     streaming_service: `TRIM(COALESCE(s.streaming_on, '')) = ''`,
-    actor: 'NOT EXISTS (SELECT 1 FROM actors fa WHERE fa.show_id = s.id)',
+    actor: 'NOT EXISTS (SELECT 1 FROM actors_v fa WHERE fa.show_id = s.id)',
   }[f.multi];
   if (op === 'empty') return empty;
   if (op === 'not_empty') return `NOT (${empty})`;
@@ -189,7 +189,7 @@ function multiCondition(f, op, value, binds) {
       }
       case 'actor':
         binds.push(s);
-        return `EXISTS (SELECT 1 FROM actors fa WHERE fa.show_id = s.id AND ${exact ? 'LOWER(fa.name) = LOWER(?)' : 'instr(LOWER(fa.name), LOWER(?)) > 0'})`;
+        return `EXISTS (SELECT 1 FROM actors_v fa WHERE fa.show_id = s.id AND ${exact ? 'LOWER(fa.name) = LOWER(?)' : 'instr(LOWER(fa.name), LOWER(?)) > 0'})`;
     }
     throw new QueryError('unreachable');
   };
