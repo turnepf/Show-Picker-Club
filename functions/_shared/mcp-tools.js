@@ -40,6 +40,7 @@ import * as suggestionsApi from '../api/groups/[id]/suggestions.js';
 import * as suggestionApi from '../api/groups/[id]/suggestions/[sid].js';
 import * as membersApi from '../api/members.js';
 import * as adminQueryApi from '../api/admin-query.js';
+import * as enrichApi from '../api/enrich.js';
 import { fieldGuide, QUERY_FIELDS, GROUP_FIELDS, COLUMN_FIELDS, QUERY_OPS, MAX_GROUPS, MAX_ROWS } from './show-query.js';
 import { actingAs } from './auth.js';
 import { groupMates } from './watchers.js';
@@ -819,6 +820,181 @@ export const TOOLS = [
     },
   },
   {
+    name: 'admin_restore_show',
+    title: "Restore a member's archived show (admin)",
+    description: "Brings one of a member's archived shows back, onto the list it was on or the one you name. Admin connections only.",
+    scope: 'members:admin',
+    write: true,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    inputSchema: {
+      type: 'object',
+      properties: { member_slug: { type: 'string' }, show_id: { type: 'integer' }, list: listSchema },
+      required: ['member_slug', 'show_id'],
+    },
+    async run(ctx, args) {
+      const m = await targetMember(ctx, args);
+      const row = await memberRow(ctx, m, intArg(args, 'show_id'));
+      const body = { archived: 0, ...pinnedIdentity(row) };
+      if (args.list) body.list = apiList(args.list);
+      const d = await ok(asMember(ctx, m), showApi.onRequestPut, { method: 'PUT', path: `/api/shows/${row.id}`, body, params: { id: String(row.id) } }, 'That show');
+      await logAdmin(ctx, m, 'restore_show', { show_id: row.id, title: row.title, list: d.show.list });
+      return { member: m.slug, restored: compactShow(d.show) };
+    },
+  },
+  {
+    name: 'admin_delete_show',
+    title: "Delete a member's show (admin)",
+    description: "Permanently deletes one of a member's shows, with its notes and links. Cannot be undone. Use it to clear out a wrong copy, e.g. the original of a remake once the right version is on their list. admin_archive_show is the reversible alternative. Admin connections only.",
+    scope: 'members:admin',
+    write: true,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    inputSchema: {
+      type: 'object',
+      properties: { member_slug: { type: 'string' }, show_id: { type: 'integer' } },
+      required: ['member_slug', 'show_id'],
+    },
+    async run(ctx, args) {
+      const m = await targetMember(ctx, args);
+      const row = await memberRow(ctx, m, intArg(args, 'show_id'));
+      // Logged before the row goes, so the record names what was deleted even
+      // if the delete itself then fails.
+      await logAdmin(ctx, m, 'delete_show', {
+        show_id: row.id, title: row.title, list: row.list, archived: !!row.archived,
+        tmdb_id: row.tmdb_id ?? null, release_year: row.release_year ?? null,
+      });
+      const out = await toolNamed('delete_show').run(asMember(ctx, m), { show_id: row.id });
+      return { member: m.slug, ...out, title: row.title };
+    },
+  },
+  {
+    name: 'admin_move_show',
+    title: "Move a member's show (admin)",
+    description: "Moves one of a member's shows to another list. Admin connections only.",
+    scope: 'members:admin',
+    write: true,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    inputSchema: {
+      type: 'object',
+      properties: { member_slug: { type: 'string' }, show_id: { type: 'integer' }, list: listSchema },
+      required: ['member_slug', 'show_id', 'list'],
+    },
+    async run(ctx, args) {
+      const m = await targetMember(ctx, args);
+      const row = await memberRow(ctx, m, intArg(args, 'show_id'));
+      const out = await toolNamed('move_show').run(asMember(ctx, m), { show_id: row.id, list: args.list });
+      await logAdmin(ctx, m, 'move_show', { show_id: row.id, title: row.title, from: API_TO_LIST[row.list] || row.list, to: args.list });
+      return { member: m.slug, ...out };
+    },
+  },
+  {
+    name: 'admin_update_show',
+    title: "Fix a member's show (admin)",
+    description: [
+      "Fixes one of a member's shows: which TMDB entry it is, its title, its service, or its Watch link. Only the fields you pass change; notes and other private memos are never touched. Admin connections only.",
+      'tmdb_id re-points the row at a different catalog entry (search_titles finds the id), for a wrong match such as the 1974 original saved where the remake was meant. Poster, overview, cast, year, genres and seasons are re-fetched from the new entry. media_type defaults to the row\'s current type and, if it differs, flips the row between TV and movie. The title is kept unless you pass one.',
+      'media_type alone flips a row saved as the wrong kind (a film saved as TV) and re-matches it by title in the right index; passing the right tmdb_id with it is more reliable.',
+      "network sets the member's service (Netflix, Hulu, …); the Watch link for the old service is dropped and a new one is looked up. watch_url sets the link directly, and its site decides the service.",
+    ].join('\n'),
+    scope: 'members:admin',
+    write: true,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        member_slug: { type: 'string' },
+        show_id: { type: 'integer' },
+        tmdb_id: { type: 'integer', minimum: 1 },
+        media_type: { type: 'string', enum: ['tv', 'movie'] },
+        title: { type: 'string' },
+        network: { type: 'string' },
+        watch_url: { type: 'string', description: 'An http(s) link to the title on its service.' },
+      },
+      required: ['member_slug', 'show_id'],
+    },
+    async run(ctx, args) {
+      const m = await targetMember(ctx, args);
+      const row = await memberRow(ctx, m, intArg(args, 'show_id'));
+      const tmdbId = intArg(args, 'tmdb_id', { required: false });
+      const title = strArg(args, 'title', { max: 300 });
+      const network = strArg(args, 'network', { max: 80 });
+      const watchUrl = strArg(args, 'watch_url', { max: 2000 });
+      const mediaType = args.media_type;
+      if (mediaType !== undefined && mediaType !== 'tv' && mediaType !== 'movie') throw new ToolError('media_type is tv or movie.');
+      const rowType = row.tmdb_type === 'movie' || (!row.tmdb_type && row.movie) ? 'movie' : 'tv';
+      const flipOnly = tmdbId === undefined && mediaType !== undefined && mediaType !== rowType;
+      if (tmdbId === undefined && !flipOnly && !title && !network && !watchUrl) {
+        throw new ToolError('Pass at least one of tmdb_id, media_type (to flip TV/movie), title, network or watch_url.');
+      }
+
+      // Every edit re-enriches. Without an id it re-guesses the entry from the
+      // title, which can swap a pinned remake for its original (or back), so
+      // the row's own pin rides along unless this call is changing it. A flip
+      // without an id is the exception: the old pin names an entry of the
+      // wrong type, so the lookup has to search the other index by title.
+      const body = flipOnly ? { movie: mediaType === 'movie' ? 1 : 0 } : { ...pinnedIdentity(row) };
+      if (tmdbId !== undefined) {
+        const type = mediaType || rowType;
+        body.tmdb_id = tmdbId;
+        body.tmdb_type = type;
+        body.movie = type === 'movie' ? 1 : 0;
+      }
+      if (title) body.title = title;
+      if (network) body.network = network;
+      if (watchUrl) body.network_url = watchUrl;
+
+      const d = await ok(asMember(ctx, m), showApi.onRequestPut, { method: 'PUT', path: `/api/shows/${row.id}`, body, params: { id: String(row.id) } }, 'That show');
+      const after = d.show;
+      await logAdmin(ctx, m, 'update_show', {
+        show_id: row.id,
+        before: { title: row.title, tmdb_id: row.tmdb_id ?? null, tmdb_type: row.tmdb_type ?? null, network: row.network ?? null, watch_url: row.network_url ?? null },
+        after: { title: after.title, tmdb_id: after.tmdb_id ?? null, tmdb_type: after.tmdb_type ?? null, network: after.network ?? null, watch_url: after.network_url ?? null },
+      });
+      const out = { member: m.slug, updated: compactShow(after, { detail: true }) };
+      // The edit path falls back to a title search when an id lookup fails,
+      // and still saves. Say so rather than report a re-point that didn't land.
+      if (tmdbId !== undefined && after.tmdb_id !== tmdbId) {
+        out.warning = `TMDB didn't return entry ${tmdbId} (${body.tmdb_type}), so the row was matched by title instead and is now pinned to ${after.tmdb_id ?? 'nothing'}. Check the id with search_titles.`;
+      }
+      if (flipOnly && after.tmdb_type !== mediaType) {
+        out.warning = `TMDB found no ${mediaType} called "${after.title}", so the row is marked ${mediaType} but still pinned to the old ${after.tmdb_type || 'entry'}. Find the right entry with search_titles and pass its tmdb_id.`;
+      }
+      if (watchUrl && network && after.network !== row.network && after.network !== network) {
+        out.note = `The link's site decided the service: ${after.network}.`;
+      }
+      return out;
+    },
+  },
+  {
+    name: 'admin_refresh_show',
+    title: "Refresh a member's show from TMDB (admin)",
+    description: "Re-fetches one show from TMDB right now: genres, seasons, episode count, next episode date, where it streams, poster, overview and cast. Other members' copies with the same title and entry get the catalog fields too; a copy saved under a different title needs its own refresh. Use it instead of waiting for the nightly refresh, which never reaches some archived rows. Identity and the member's own fields don't change; admin_update_show re-points a wrong match. Admin connections only.",
+    scope: 'members:admin',
+    write: true,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: { member_slug: { type: 'string' }, show_id: { type: 'integer' } },
+      required: ['member_slug', 'show_id'],
+    },
+    async run(ctx, args) {
+      const m = await targetMember(ctx, args);
+      const row = await memberRow(ctx, m, intArg(args, 'show_id'));
+      // /api/enrich is the background refresh; show_id points it at this one
+      // row. It writes enriched_at, never updated_at, so the refresh doesn't
+      // read as the member editing the show.
+      const r = await ok(ctx, enrichApi.onRequestPost, { method: 'POST', path: '/api/enrich', body: { show_id: row.id } }, 'That show');
+      const after = await ctx.env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(row.id).first();
+      await logAdmin(ctx, m, 'refresh_show', { show_id: row.id, title: row.title, updated: r.tmdbUpdated || 0 });
+      const out = { member: m.slug, refreshed: (r.tmdbUpdated || 0) > 0, show: compactShow(after, { detail: true }) };
+      if (!out.refreshed) {
+        out.warning = r.lastError
+          ? `TMDB refresh failed: ${r.lastError}. Try again shortly.`
+          : "TMDB had no match for this row's entry or title, so nothing changed. admin_update_show with the right tmdb_id fixes the match.";
+      }
+      return out;
+    },
+  },
+  {
     // Club-wide questions in one call instead of one call per member. Runs
     // /api/admin-query as the admin; the field list is the engine's own, so
     // the description can't drift from what the endpoint accepts.
@@ -897,6 +1073,24 @@ async function logAdmin(ctx, m, action, detail) {
     'INSERT INTO admin_actions (admin_slug, member_slug, action, detail) VALUES (?, ?, ?, ?)'
   ).bind(ctx.session.member_slug, m.slug, action, JSON.stringify(detail)).run();
 }
+// One of the target member's rows, archived or not. The member tools check
+// ownership too; reading the row first gives the admin tools what they log
+// and lets a wrong show_id fail with the member named.
+async function memberRow(ctx, m, id) {
+  const row = await ctx.env.DB.prepare('SELECT * FROM shows WHERE id = ? AND member_slug = ?').bind(id, m.slug).first();
+  if (!row) throw new ToolError(`Show ${id} isn't on ${m.slug}'s lists. admin_list_member_shows (with include_archived) lists them.`);
+  return row;
+}
+
+// The row's own TMDB pin, for an edit that isn't changing it. The edit
+// handler re-enriches on every save and, given no id, re-guesses the entry
+// from the title, which is how a remake and its original trade places.
+function pinnedIdentity(row) {
+  return row.tmdb_id && (row.tmdb_type === 'tv' || row.tmdb_type === 'movie')
+    ? { tmdb_id: row.tmdb_id, tmdb_type: row.tmdb_type }
+    : {};
+}
+
 const TOOLS_BY_NAME = Object.fromEntries(TOOLS.map((t) => [t.name, t]));
 
 export function toolNamed(name) {

@@ -121,6 +121,8 @@ jobs:
         run: node scripts/mcp-test.mjs
       - name: Club-wide queries are admin-only, a spec rather than SQL, and keep memos unreadable
         run: node scripts/admin-query-test.mjs
+      - name: Admin fix tools keep the row's identity, the member's memos and updated_at
+        run: node scripts/admin-fix-tools-test.mjs
 
   roku:
     runs-on: ubuntu-latest
