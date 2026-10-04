@@ -66,10 +66,10 @@ export async function onRequestGet(context) {
             -- Artwork is per-row and backfills row-by-row; borrow from any
             -- active copy of the same title so no member's result lacks a
             -- poster another member's copy already has.
-            COALESCE(s.poster_url, (SELECT x.poster_url FROM shows x
+            COALESCE(s.poster_url, (SELECT x.poster_url FROM shows_v x
               WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0
                 AND x.poster_url IS NOT NULL LIMIT 1)) AS poster_url,
-            COALESCE(s.network_logo_url, (SELECT x.network_logo_url FROM shows x
+            COALESCE(s.network_logo_url, (SELECT x.network_logo_url FROM shows_v x
               WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0
                 AND x.network_logo_url IS NOT NULL LIMIT 1)) AS network_logo_url,
             s.seasons_released, s.next_season_date, s.season_end_date,
@@ -77,7 +77,7 @@ export async function onRequestGet(context) {
             m.last_initial AS member_last_initial,
             (SELECT json_group_array(json_object('name', a.name, 'imdb_id', a.imdb_id))
              FROM actors a WHERE a.show_id = s.id) AS actors
-     FROM shows s
+     FROM shows_v s
      JOIN members m ON m.slug = s.member_slug
      WHERE s.archived = 0
        -- Your libraries: yours, plus the members you share a group with.

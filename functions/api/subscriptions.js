@@ -53,7 +53,7 @@ export async function onRequestGet(context) {
   const [{ results: shows }, { results: saved }, { results: memberRows }] = await Promise.all([
     env.DB.prepare(
       `SELECT member_slug, title, network, list, next_season_date, full_series
-       FROM shows
+       FROM shows_v
        WHERE member_slug IN (${slugPlaceholders}) AND archived = 0 AND network IS NOT NULL AND network != ''`
     ).bind(...auditSlugs).all(),
     env.DB.prepare(

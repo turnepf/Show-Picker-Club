@@ -62,15 +62,15 @@ export async function onRequestGet(context) {
        MIN(s.id) as id,
        COUNT(DISTINCT s.member_slug) as member_count,
        GROUP_CONCAT(DISTINCT s.member_slug) as member_slugs,
-       (SELECT x.poster_url FROM shows x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.poster_url IS NOT NULL LIMIT 1) as poster_url,
-       (SELECT x.network_logo_url FROM shows x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.network_logo_url IS NOT NULL LIMIT 1) as network_logo_url,
-       (SELECT x.rating FROM shows x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.rating IS NOT NULL LIMIT 1) as rating,
-       (SELECT x.genres FROM shows x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.genres IS NOT NULL LIMIT 1) as genres,
-       (SELECT x.network FROM shows x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.network IS NOT NULL LIMIT 1) as network,
-       (SELECT x.network_url FROM shows x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0
+       (SELECT x.poster_url FROM shows_v x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.poster_url IS NOT NULL LIMIT 1) as poster_url,
+       (SELECT x.network_logo_url FROM shows_v x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.network_logo_url IS NOT NULL LIMIT 1) as network_logo_url,
+       (SELECT x.rating FROM shows_v x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.rating IS NOT NULL LIMIT 1) as rating,
+       (SELECT x.genres FROM shows_v x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.genres IS NOT NULL LIMIT 1) as genres,
+       (SELECT x.network FROM shows_v x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0 AND x.network IS NOT NULL LIMIT 1) as network,
+       (SELECT x.network_url FROM shows_v x WHERE LOWER(x.title) = LOWER(s.title) AND x.archived = 0
           AND x.network_url IS NOT NULL AND x.network_url NOT LIKE '%/search%' AND x.network_url NOT LIKE '%/s?%'
           AND x.network_url NOT LIKE '%?q=%' AND x.network_url NOT LIKE '%?query=%' LIMIT 1) as network_url
-     FROM shows s
+     FROM shows_v s
      WHERE s.archived = 0
        AND s.member_slug IN (${placeholders})
        AND COALESCE(s.added_by, '') != 'seed'

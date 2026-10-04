@@ -20,6 +20,7 @@
 import { getSession } from '../../_shared/auth.js';
 import { LIST_KEYS } from '../../_shared/list-parse.js';
 import { canonicalNetwork, networkSearchUrl } from '../../_shared/networks.js';
+import { syncTitle } from '../../_shared/titles.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -134,6 +135,15 @@ export async function onRequestPost(context) {
     for (let i = 0; i < inserts.length; i += 50) {
       await env.DB.batch(inserts.slice(i, i + 50).map(args => stmt.bind(...args)));
     }
+  }
+
+  // A new entry gets its shared row now rather than at tonight's rebuild;
+  // an entry already in the club keeps the row it has.
+  const keys = new Map();
+  for (const args of inserts) if (args[11] && args[12]) keys.set(`${args[12]}:${args[11]}`, [args[12], args[11]]);
+  for (const [type, id] of keys.values()) {
+    const have = await env.DB.prepare('SELECT 1 FROM titles WHERE tmdb_type = ? AND tmdb_id = ?').bind(type, id).first().catch(() => null);
+    if (!have) await syncTitle(env, type, id);
   }
 
   // Imported rows land with the id, poster and year the parse step resolved,

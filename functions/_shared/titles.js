@@ -129,3 +129,59 @@ export async function rebuildTitles(env) {
 export function rebuildSql() {
   return [upsertSql(ALL_KEYS), castSql(ALL_KEYS)];
 }
+
+// ---- step 2: reads go through `shows_v` ----
+//
+// A view with exactly the columns of `shows`, in the same order, so a read
+// that switches `FROM shows` to `FROM shows_v` returns the same shape. The
+// title and the show's details come from `titles` when the entry has a row
+// there, and fall back to the member's own copy when it doesn't (an
+// unmatched row, or an entry the nightly rebuild hasn't reached yet).
+//
+// Three catalog-looking columns stay per copy, because they differ by member:
+//   - next_season_date and season_end_date: enrichment only computes them for
+//     a copy on Watching or Awaiting, and clears them elsewhere;
+//   - network_logo_url: the badge follows the service the member chose, and
+//     two members can hold one film under two services.
+export const PER_COPY_FIELDS = ['next_season_date', 'season_end_date', 'network_logo_url'];
+export const SHARED_FIELDS = TITLE_FIELDS.filter((f) => !PER_COPY_FIELDS.includes(f));
+
+// The columns of `shows`, in table order. scripts/titles-test.mjs fails if
+// schema.sql and this list disagree, so a column added to `shows` can't be
+// left out of the view.
+export const SHOWS_COLUMNS = [
+  'id', 'title', 'network', 'network_url', 'recommended_by', 'rating', 'list', 'notes', 'movie',
+  'full_series', 'watching_with', 'next_season_date', 'season_end_date', 'seasons_released',
+  'poster_url', 'network_logo_url', 'title_ok', 'sort_order', 'archived', 'member_slug', 'created_at',
+  'updated_at', 'added_by', 'enriched_at', 'genres', 'overview', 'backdrop_url', 'tmdb_rating',
+  'content_rating', 'trailer_key', 'director', 'director_imdb_id', 'runtime', 'release_year',
+  'watch_link', 'tmdb_id', 'tmdb_type', 'episodes_released', 'vote_count', 'tagline',
+  'original_language', 'studio', 'streaming_on', 'imdb_id', 'tmdb_status', 'free_on',
+];
+
+export function viewSql() {
+  const cols = SHOWS_COLUMNS.map((c) => {
+    if (c === 'title') return 'COALESCE(t.name, s.title) AS title';
+    if (SHARED_FIELDS.includes(c)) return `COALESCE(t.${c}, s.${c}) AS ${c}`;
+    return `s.${c} AS ${c}`;
+  });
+  return `CREATE VIEW shows_v AS
+  SELECT ${cols.join(',\n    ')}
+    FROM shows s
+    LEFT JOIN titles t
+      ON t.tmdb_id = s.tmdb_id
+     AND t.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)`;
+}
+
+// Bring every entry carrying a given title up to date, for a writer that
+// changes copies by title rather than by one row (URL cleanup's rename and
+// re-match). Never throws, like syncTitle().
+export async function syncTitlesNamed(env, title, name = null) {
+  try {
+    const { results } = await env.DB.prepare(
+      `SELECT DISTINCT tmdb_id, COALESCE(tmdb_type, CASE WHEN movie = 1 THEN 'movie' ELSE 'tv' END) AS tmdb_type
+         FROM shows WHERE LOWER(title) = LOWER(?) AND tmdb_id IS NOT NULL`
+    ).bind(title).all();
+    for (const r of results || []) await syncTitle(env, r.tmdb_type, r.tmdb_id, name);
+  } catch (e) { /* bookkeeping only */ }
+}

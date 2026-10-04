@@ -21,7 +21,7 @@ export async function onRequestGet(context) {
   }
 
   const show = await env.DB.prepare(
-    'SELECT id, list, archived FROM shows WHERE LOWER(title) = LOWER(?) AND member_slug = ?'
+    'SELECT id, list, archived FROM shows_v WHERE LOWER(title) = LOWER(?) AND member_slug = ?'
   ).bind(title, member).first();
 
   if (!show) {

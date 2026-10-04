@@ -49,7 +49,7 @@ export async function onRequestGet(context) {
 
   const { results } = await env.DB.prepare(
     `SELECT title, network, list
-       FROM shows
+       FROM shows_v
       WHERE member_slug = ? AND archived = 0
       ORDER BY title COLLATE NOCASE`
   ).bind(slug).all();

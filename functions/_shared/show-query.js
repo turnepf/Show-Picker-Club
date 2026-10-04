@@ -127,7 +127,7 @@ const MAX_IN = 100;
 export const MAX_GROUPS = 500;
 export const MAX_ROWS = 500;
 
-const BASE_FROM = `FROM shows s
+const BASE_FROM = `FROM shows_v s
   JOIN members m ON m.slug = s.member_slug
   LEFT JOIN show_ratings sr ON sr.tmdb_id = s.tmdb_id AND sr.member_slug = s.member_slug
     AND sr.season_number = 0 AND sr.tmdb_type = ${TMDB_TYPE_SQL}`;

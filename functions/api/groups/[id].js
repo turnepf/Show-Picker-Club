@@ -50,13 +50,13 @@ export async function onRequestGet(context) {
   // Get members with their show counts
   const { results: members } = await env.DB.prepare(
     `SELECT m.slug, m.first_name, m.last_name,
-            (SELECT COUNT(*) FROM shows WHERE member_slug = m.slug AND archived = 0) AS show_count,
-            (SELECT COUNT(*) FROM shows WHERE member_slug = m.slug AND archived = 0 AND list = 'watching') AS watching_count,
-            (SELECT COUNT(*) FROM shows WHERE member_slug = m.slug AND archived = 0 AND list = 'awaiting') AS awaiting_count,
+            (SELECT COUNT(*) FROM shows_v WHERE member_slug = m.slug AND archived = 0) AS show_count,
+            (SELECT COUNT(*) FROM shows_v WHERE member_slug = m.slug AND archived = 0 AND list = 'watching') AS watching_count,
+            (SELECT COUNT(*) FROM shows_v WHERE member_slug = m.slug AND archived = 0 AND list = 'awaiting') AS awaiting_count,
             MAX(s.updated_at) AS last_activity_at
      FROM group_members gm
      INNER JOIN members m ON m.slug = gm.member_slug
-     LEFT JOIN shows s ON s.member_slug = m.slug
+     LEFT JOIN shows_v s ON s.member_slug = m.slug
      WHERE gm.group_id = ?
      GROUP BY m.slug
      ORDER BY m.first_name, m.last_name`

@@ -17,7 +17,7 @@
 export const BACKLOG_ELIGIBLE_WHERE = `
   s.member_slug = ?1 AND s.list != 'next' AND s.tmdb_id IS NOT NULL
   AND NOT EXISTS (
-    SELECT 1 FROM shows o
+    SELECT 1 FROM shows_v o
      WHERE o.member_slug = s.member_slug
        AND o.tmdb_id = s.tmdb_id AND o.tmdb_type IS s.tmdb_type
        AND o.list != 'next'

@@ -113,7 +113,7 @@ the cast. No member field lives here: list, order, notes, watching-with,
 recommended-by, archived, the member's network and Watch link stay on
 `shows`.
 
-The plan has three steps, and only the first has shipped:
+The plan has three steps. The first two have shipped:
 
 1. **Shadow table (now).** Nothing reads it. `_shared/titles.js#syncTitle()`
    runs after the writes that change one show's catalog data: add, edit,
@@ -125,9 +125,24 @@ The plan has three steps, and only the first has shipped:
    drops entries no copy points at. Each field comes from the freshest copy
    that has a value, and a name TMDB gave is kept until TMDB gives another.
    The migration's backfill is generated from `rebuildSql()`.
-2. **Reads switch over.** Endpoints join `shows` to `titles`, keeping the
-   response shape, so no client changes. Titles then come from TMDB for
-   everyone, and member renames end.
+2. **Reads switch over (migration 077).** The view `shows_v` has exactly
+   the columns of `shows`, in order, with the title and shared details
+   taken from `titles` when the entry has a row, and the member's own copy
+   otherwise. Member-facing reads (lists, show detail, search, Trending,
+   groups, vibe, Favorite Actors, Rate my backlog, the calendar feed, link
+   previews, export, the MCP tools and `admin_query`) select `FROM
+   shows_v`. Writes, and the maintenance code that repairs copies
+   (enrichment, URL cleanup, admin tools), still use `shows`. Three
+   columns stay per copy because they differ by member:
+   `next_season_date` and `season_end_date` (computed only for a copy on
+   Watching or Awaiting) and `network_logo_url` (the badge follows the
+   member's chosen service). Titles now come from TMDB for everyone: a
+   member's own title survives on their raw row but isn't shown, and
+   typing a new title in an edit re-matches the show by that title. The
+   writers that change details by title rather than by row (URL cleanup's
+   rename and re-match) call `syncTitlesNamed()`, and an import syncs any
+   entry the club didn't have. Cast is still read per copy from `actors`
+   until step 3.
 3. **Duplicates removed.** The catalog columns and per-copy `actors` rows go,
    and enrichment writes once per entry instead of once per copy.
 

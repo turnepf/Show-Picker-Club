@@ -34,7 +34,7 @@ export async function onRequestPut(context) {
   }
 
   const show = await env.DB.prepare(
-    'SELECT * FROM shows WHERE id = ? AND member_slug = ?'
+    'SELECT * FROM shows_v WHERE id = ? AND member_slug = ?'
   ).bind(params.id, session.member_slug).first();
   return new Response(JSON.stringify({ show }), { headers: corsHeaders() });
 }
