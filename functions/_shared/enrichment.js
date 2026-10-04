@@ -195,6 +195,15 @@ export function extractTmdbDetailFields(detail, mediaType) {
   const rawImdb = detail.imdb_id || detail.external_ids?.imdb_id || null;
   const imdbId = rawImdb && /^tt\d+$/.test(rawImdb) ? rawImdb : null;
 
+  // Genres and, for a series, the season count. Both arrive on this payload
+  // and were only ever stored by the background rotation (api/enrich.js), so
+  // a fresh add sat without them until a nightly pass reached it, and an
+  // archived add never did. Same encoding the rotation writes.
+  const genres = (detail.genres || []).map((g) => g && g.name).filter(Boolean).join(', ') || null;
+  const seasonsReleased = mediaType === 'movie'
+    ? null
+    : (typeof detail.number_of_seasons === 'number' ? detail.number_of_seasons : null);
+
   // TMDB's status, verbatim. '' rather than null when it sent none, so a
   // stored NULL keeps meaning "no pass has written migration 073's fields".
   const tmdbStatus = typeof detail.status === 'string' ? detail.status.trim() : '';
@@ -204,7 +213,7 @@ export function extractTmdbDetailFields(detail, mediaType) {
     director, directorPersonId, runtime, releaseYear, providerNetwork, providerLogoUrl, providerLogos, flatrateNetworks, watchLink,
     storefronts, availability,
     episodesReleased, voteCount, tagline, originalLanguage, studio,
-    imdbId, tmdbStatus, freeNetworks,
+    imdbId, tmdbStatus, freeNetworks, genres, seasonsReleased,
   };
 }
 
@@ -259,6 +268,7 @@ const EMPTY_DETAIL = {
   episodesReleased: null, voteCount: null, tagline: null,
   originalLanguage: null, studio: null,
   imdbId: null, tmdbStatus: null, freeNetworks: null,
+  genres: null, seasonsReleased: null,
 };
 
 // Retries on 429 (rate limit) with backoff — otherwise a burst of many

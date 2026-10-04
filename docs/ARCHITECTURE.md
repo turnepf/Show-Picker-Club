@@ -455,7 +455,7 @@ drained once, so it deliberately has no button in the app.
 | `POST /api/groups/[id]/suggestions/[sid]` | `functions/api/groups/[id]/suggestions/[sid].js` | POST | session + membership — answer the pop-up (`dismiss` \| `add`); `add` copies onto the caller's own Next Up |
 | `DELETE /api/groups/[id]/suggestions/[sid]` | `functions/api/groups/[id]/suggestions/[sid].js` | DELETE | session + (recommender or group creator) |
 | `GET /api/groups/join?token=`          | `functions/api/groups/join.js`             | GET     | session joins; without one, returns a name-only preview |
-| `POST /api/enrich`                     | `functions/api/enrich.js`                  | POST    | session or `CRON_SECRET` header |
+| `POST /api/enrich`                     | `functions/api/enrich.js`                  | POST    | session or `CRON_SECRET` header — `{show_id}` refreshes that one row regardless of list, archive state or gaps, and skips the library-wide actor backfill (the `admin_refresh_show` tool) |
 | `POST /api/sync-urls`                  | `functions/api/sync-urls.js`               | POST    | admin session or `X-Cron-Secret` (a member session is a no-op `{synced: 0}`); demo member's rows excluded as URL sources |
 | `GET /api/reporting`                   | `functions/api/reporting.js`               | GET     | admin session |
 | `POST /api/account-delete`             | `functions/api/account-delete.js`          | POST    | session; hard-deletes the caller's account after an emailed code confirms |
@@ -846,9 +846,14 @@ Write: `add_show`, `update_show`, `move_show`, `reorder_list`, `rate_show`,
 
 Admin (`members:admin` only): `admin_list_members`, `admin_list_member_shows`
 (memos stripped), `admin_add_show` (optionally straight to the archive, with a
-rating), `admin_rate_show` and `admin_archive_show`. Each one runs the member
-tool with the target member's session and records the change in
-`admin_actions` (migration 074). `admin_query` is the read-only exception. It
+rating), `admin_rate_show`, `admin_archive_show`, `admin_restore_show`,
+`admin_move_show`, `admin_delete_show`, `admin_update_show` (re-point at the
+right TMDB entry, rename this copy, service, Watch link, flip TV/movie) and
+`admin_refresh_show` (one show from TMDB now, via `/api/enrich`'s
+`show_id`). Each one runs the member tool or handler with the target
+member's session and records the change in `admin_actions` (migration 074).
+Edits carry the row's own TMDB pin unless they're re-pointing it. Without
+the pin, the edit path re-guesses the entry from the title. `admin_query` is the read-only exception. It
 runs `/api/admin-query` as the admin for club-wide counts, unique titles,
 averages and breakdowns, or the matching rows, in one call. See
 `docs/INVARIANTS.md` §27.

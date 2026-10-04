@@ -1011,7 +1011,16 @@ member could do anyway, and nothing it does may widen what anyone can see.
     refused, Next Up still can't be rated, and a disabled member's lists
     don't change.
   - **Memos stay private.** `admin_list_member_shows` strips notes,
-    recommended-by and watching-with even though it reads as the owner.
+    recommended-by and watching-with even though it reads as the owner, and
+    no admin tool writes them.
+  - **A fix never changes which show it is by accident.** Every edit
+    re-enriches, and given no TMDB id the edit path re-guesses the entry from
+    the title, which swaps a remake for its original. So `admin_update_show`
+    and `admin_restore_show` always send the row's own pin unless the call is
+    re-pointing it. A re-point TMDB can't serve comes back with a warning
+    instead of success. `admin_refresh_show` goes through `/api/enrich`
+    (`show_id`), so it stamps `enriched_at` and never `updated_at`.
+    Enforcer: `scripts/admin-fix-tools-test.mjs`.
   - **Every change is recorded.** Each change goes to `admin_actions`
     (migration 074). `added_by` names the admin, not the member, and Connected
     apps labels the connection as admin.

@@ -228,7 +228,7 @@ export async function onRequestPost(context) {
   // is kept as an alias now that OMDB is gone — it still selects posters-only.)
   const skipOmdb = body.skip_omdb === true || body.mode === 'posters';
   const skipActors = body.skip_actors === true || body.mode === 'posters' || body.mode === 'logos'
-    || body.mode === 'movies';
+    || body.mode === 'movies' || (Number.isInteger(body.show_id) && body.show_id > 0);
   // `mode: 'gaps'` targets rows that are marked enriched but hold no data —
   // the wreckage of the rate-limit bug this file's tmdbGet comment describes.
   // Those rows carry a FRESH enriched_at (the no-match path stamped them), so
@@ -259,6 +259,11 @@ export async function onRequestPost(context) {
   // mode skips the TV pass and the actor backfill so the whole budget goes
   // to films, oldest-enriched first, the same rotation the TV pass uses.
   const moviesOnly = body.mode === 'movies';
+  // `show_id`: refresh exactly one row now, whatever its list, archive state
+  // or gaps — the admin_refresh_show tool's "fill this in without waiting for
+  // tonight". It skips every gate and rotation below, and the library-wide
+  // actor backfill, so the whole call is spent on the one title.
+  const showId = Number.isInteger(body.show_id) && body.show_id > 0 ? body.show_id : null;
   // Optional: restrict the TMDB passes to a specific set of titles (e.g. the
   // Trending shelf), so we can prioritise the most-visible shows first.
   const titles = Array.isArray(body.titles) && body.titles.length
@@ -339,7 +344,10 @@ export async function onRequestPost(context) {
           ORDER BY tier,
                    CASE WHEN tier < 2 AND ${HOT_LIST} THEN 0 ELSE 1 END,
                    COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`;
-    const tmdbStmt = env.DB.prepare(tvSelect).bind(...tvBinds, maxTmdb);
+    const tmdbStmt = showId
+      ? env.DB.prepare(`SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type FROM shows
+          WHERE movie = 0 AND id = ?`).bind(showId)
+      : env.DB.prepare(tvSelect).bind(...tvBinds, maxTmdb);
     const { results: tmdbShows } = await tmdbStmt.all();
     tvCandidates = (tmdbShows || []).length;
 
@@ -596,7 +604,10 @@ export async function onRequestPost(context) {
     // share the identity, and the artwork sync above already filled anything
     // a sibling could cover. Grouping by id too keeps a remake pinned next to
     // its same-titled original from being answered by the wrong entry.
-    const movieStmt = env.DB.prepare(
+    const movieStmt = showId
+      ? env.DB.prepare(`SELECT id, title, network, network_url, tmdb_id, tmdb_type FROM shows
+          WHERE movie = 1 AND id = ?`).bind(showId)
+      : env.DB.prepare(
       `SELECT id, title, network, network_url, tmdb_id, tmdb_type FROM shows WHERE ${mvWhere}
         GROUP BY LOWER(title), tmdb_id
         -- Gap-first, the same rule as the TV rotation (see NOT_TRIED_RECENTLY).
