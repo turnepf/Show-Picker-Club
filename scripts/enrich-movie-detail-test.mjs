@@ -308,6 +308,29 @@ console.log('\nThe loop stops on the subrequest budget');
     `subrequests=${res.subrequests}`);
 }
 
+console.log('\nTwo overlapping passes each get their own budget');
+{
+  // One isolate serves overlapping requests, and member pages fire
+  // /api/enrich in the background. The count used to be a module-level
+  // `let`: each pass reset it on entry and both incremented it, so one could
+  // run past the cap while the other stopped early. Each pass must count
+  // exactly what it alone spends.
+  const fill = (env) => {
+    for (const id of [501, 502, 503, 504, 505]) {
+      for (let n = 0; n < 12; n++) addMovie(env, { title: `${FILMS[id].title} ${n}`, tmdbId: id });
+    }
+  };
+  const solo = makeEnv(); fill(solo);
+  const alone = await (await runEnrich(solo)).json();
+  const a = makeEnv(); fill(a);
+  const b = makeEnv(); fill(b);
+  const [ra, rb] = await Promise.all([runEnrich(a), runEnrich(b)]).then((rs) => Promise.all(rs.map((r) => r.json())));
+  check('each overlapping pass spends what a pass alone spends',
+    ra.subrequests === alone.subrequests && rb.subrequests === alone.subrequests,
+    `alone=${alone.subrequests} a=${ra.subrequests} b=${rb.subrequests}`);
+  check('and neither passes the cap', ra.subrequests <= 50 && rb.subrequests <= 50);
+}
+
 // ---------------------------------------------------------------- 6
 
 console.log('\nMovies get a service badge, from the provider that named the network');

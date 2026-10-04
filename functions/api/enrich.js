@@ -15,9 +15,15 @@ import { writeTitle, titleFieldsFromEnrichment, rebuildTitles } from '../_shared
 // anyone we haven't resolved before. Spend it deliberately — when the budget
 // is gone the batch stops early and the queue rotation picks up where it left
 // off next round, which is strictly better than a title dying mid-write.
+//
+// The count is per request, carried on the request's own env (env.budget,
+// set in onRequestPost). It used to be a module-level `let`, which every
+// request in the isolate shared: overlapping /api/enrich calls (member pages
+// fire it in the background) reset and incremented one counter, so a pass
+// could blow through the cap mid-write — the failure the budget exists to
+// prevent.
 const SUBREQUEST_BUDGET = 45;
-let spent = 0;
-function budgetLeft() { return SUBREQUEST_BUDGET - spent; }
+function budgetLeft(env) { return SUBREQUEST_BUDGET - env.budget.spent; }
 
 // Retries on 429 and throws on any other failure, mirroring
 // _shared/enrichment.js#tmdbFetch. Both halves matter here.
@@ -35,7 +41,7 @@ function budgetLeft() { return SUBREQUEST_BUDGET - spent; }
 //
 // Each attempt is a genuine subrequest, so each one counts against the budget.
 async function tmdbGet(path, env, attempt = 0) {
-  spent++;
+  env.budget.spent++;
   const token = env.TMDB_TOKEN;
   const sep = path.includes('?') ? '&' : '?';
   const res = token
@@ -90,7 +96,7 @@ async function refreshCastFromDetail(env, show, detail, tmdbId) {
   for (let i = 0; i < cast.length; i++) {
     const person = cast[i];
     let imdbId = known.get(person.id) || null;
-    if (!imdbId && budgetLeft() > 6) {
+    if (!imdbId && budgetLeft(env) > 6) {
       imdbId = await personImdbId(person.id, env);
       if (imdbId) people.push({ tmdbPersonId: person.id, name: person.name, imdbId });
     }
@@ -198,7 +204,10 @@ const COPIES = `(SELECT s.id, s.title, s.movie, s.list, s.archived, s.network, s
      AND t.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)) shows`;
 
 export async function onRequestPost(context) {
-  const { env, request } = context;
+  const { request } = context;
+  // This request's env: the bindings, plus its own subrequest count.
+  const env = Object.create(context.env);
+  env.budget = { spent: 0 };
   // Normally driven by a logged-in member loading their page. Also allow a
   // matching X-Cron-Secret so a scheduled/one-off job can backfill the whole
   // library (e.g. after adding poster/logo enrichment).
@@ -288,7 +297,6 @@ export async function onRequestPost(context) {
   // TMDB: check next season dates for Watching and Waiting shows.
   // Cap the same way; oldest/least-recently-enriched first so the budget rotates evenly.
   const hasTmdb = !!(env.TMDB_TOKEN || env.TMDB_API_KEY);
-  spent = 0;
   let tmdbUpdated = 0;
   // A bare `catch (e) {}` around each title meant a pass that failed on every
   // single show reported exactly the same thing as a pass with nothing to do:
@@ -360,7 +368,7 @@ export async function onRequestPost(context) {
     for (const show of tmdbShows) {
       // Two calls minimum per title (search + detail); don't start one we
       // can't finish.
-      if (budgetLeft() < 3) { budgetExhausted = true; break; }
+      if (budgetLeft(env) < 3) { budgetExhausted = true; break; }
       try {
         // A stored tmdb_id is the row's identity — the member's exact
         // type-ahead pick, or a previously resolved lookup — so fetch that
@@ -573,7 +581,7 @@ export async function onRequestPost(context) {
       // was nearly always empty — now that it has real work to do, an
       // unbounded run would spend straight past SUBREQUEST_BUDGET into
       // Cloudflare's own per-request ceiling and fail the whole endpoint.
-      if (budgetLeft() < 3) { budgetExhausted = true; break; }
+      if (budgetLeft(env) < 3) { budgetExhausted = true; break; }
       try {
         // Same identity rule as the TV pass: a stored tmdb_id is fetched
         // directly, and the title search only serves rows with no id (or a
@@ -724,12 +732,12 @@ export async function onRequestPost(context) {
       : env.DB.prepare(`${backfillBase} GROUP BY LOWER(s.title), s.tmdb_id ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(maxActorImdb);
     const { results: backfillShows } = await backfillStmt.all();
 
-    // fetchEnrichment does its own fetching and doesn't touch `spent`, so
+    // fetchEnrichment does its own fetching and doesn't touch env.budget, so
     // charge it here as an upper bound rather than mutating the true
     // subrequest count the response reports.
     let actorSpend = 0;
     for (const show of backfillShows) {
-      if (budgetLeft() - actorSpend < ACTOR_TITLE_COST) { budgetExhausted = true; break; }
+      if (budgetLeft(env) - actorSpend < ACTOR_TITLE_COST) { budgetExhausted = true; break; }
       actorSpend += ACTOR_TITLE_COST;
       try {
         // A stored tmdb_id is enriched directly (the pick is the identity);
@@ -792,7 +800,7 @@ export async function onRequestPost(context) {
   return new Response(JSON.stringify({
     enriched, tmdbUpdated, actorImdbFilled, actorIdsFromCache,
     tvCandidates, movieCandidates, tvErrors, movieErrors, lastError,
-    budgetExhausted, subrequests: spent, remaining,
+    budgetExhausted, subrequests: env.budget.spent, remaining,
   }), {
     headers: { 'Content-Type': 'application/json' },
   });
