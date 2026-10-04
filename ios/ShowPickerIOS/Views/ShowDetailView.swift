@@ -728,7 +728,11 @@ struct ShowDetailView: View {
                 recommendedBy: nil,
                 movie: show?.isMovie ?? false,
                 fullSeries: show?.isFullSeries ?? false,
-                watchingWith: nil
+                watchingWith: nil,
+                // The exact TMDB entry this copy is, so a same-titled show
+                // (three 2026 films are "The Odyssey") can't be added instead.
+                tmdbId: show?.tmdbId,
+                tmdbType: show?.tmdbId == nil ? nil : ((show?.isMovie ?? false) ? "movie" : "tv")
             )
             addAlert = AddAlert(title: "Added",
                                 message: "“\(addTitle)” was added to your \(list.title) list.")

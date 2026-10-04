@@ -275,7 +275,10 @@ struct ShowDetailView: View {
                                   networkUrl: show?.networkUrl ?? initialNetworkUrl,
                                   list: list.rawValue,
                                   movie: show?.isMovie ?? false,
-                                  fullSeries: show?.isFullSeries ?? false)
+                                  fullSeries: show?.isFullSeries ?? false,
+                                  // The exact TMDB entry, not a title guess.
+                                  tmdbId: show?.tmdbId,
+                                  tmdbType: show?.tmdbId == nil ? nil : ((show?.isMovie ?? false) ? "movie" : "tv"))
             actionMessage = "Added “\(addTitle)” to your \(list.title) list."
             await refreshMyCopy()
         } catch API.APIError.badResponse(409) {
