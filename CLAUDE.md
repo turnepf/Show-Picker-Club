@@ -332,12 +332,16 @@ the classification against a fixture database and a fake TMDB.
 node scripts/titles-test.mjs
 ```
 
-The shared one-row-per-show tables, `titles` and `title_cast` (migration 076).
-This is step 1 of normalizing the library: one row per TMDB entry instead of
-the show's details repeated on every member's copy. Nothing reads them yet,
-so what's pinned is that they summarize the copies faithfully, built the
-same way by the migration, the nightly rebuild and the sync after each
-write:
+The shared one-row-per-show tables, `titles` and `title_cast` (migration
+076), and the view `shows_v` (migration 077) that member-facing reads go
+through. This is normalizing the library: one row per TMDB entry instead of
+the show's details repeated on every member's copy. What's pinned is that
+the view has exactly the columns of `shows` (so switching a read changes
+nothing about its shape), takes the title and shared details from `titles`
+while member fields and the three per-member columns stay the member's, and
+falls back to the copy when there's no shared row. Also that the tables
+summarize the copies faithfully, built the same way by the migration, the
+nightly rebuild and the sync after each write:
 - one row per entry, each field taken from the freshest copy that has it;
 - TMDB's own name, kept until TMDB gives another;
 - the fullest cast any copy holds;
@@ -749,6 +753,14 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 
 ## Non-obvious conventions (violating these breaks features)
 
+- **Member-facing reads use `shows_v`, writes use `shows`.** The view
+  (migration 077) shows TMDB's name and the shared details from `titles`. A
+  new read that shows a member anything selects `FROM shows_v`. A writer
+  that changes a show's details by title rather than by row calls
+  `syncTitlesNamed()` (or `syncTitle()` for one entry), or members see the
+  old values until the nightly rebuild. A column added to `shows` must be
+  added to `SHOWS_COLUMNS` in `_shared/titles.js`, and the view regenerated
+  in a migration; `titles-test.mjs` fails until both are done.
 - **`updated_at` is sacred.** Only member-initiated writes bump it; enrichment writes `enriched_at` instead. `updated_at != created_at` is how the app distinguishes member intent from background jobs.
 - **Seeded rows have NULL `created_at`/`updated_at` and `added_by='seed'`.** The "seed-only member" check depends on exactly that signature.
 - **Network URLs containing `/search`, `/s?`, or `/?q=` are placeholders**, not real deep links — the frontend, sync-urls, and calendar feed all treat them as missing.

@@ -29,7 +29,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = mkdtempSync(join(tmpdir(), 'titles-'));
 cpSync(join(repoRoot, 'functions'), join(sandbox, 'functions'), { recursive: true });
 writeFileSync(join(sandbox, 'package.json'), '{"type":"module"}');
-const { syncTitle, rebuildTitles, rebuildSql, TITLE_FIELDS } = await import(join(sandbox, 'functions', '_shared/titles.js'));
+const { syncTitle, rebuildTitles, rebuildSql, TITLE_FIELDS, SHOWS_COLUMNS, SHARED_FIELDS, PER_COPY_FIELDS, viewSql } = await import(join(sandbox, 'functions', '_shared/titles.js'));
 
 let passed = 0, failed = 0;
 function check(name, cond, detail = '') {
@@ -146,6 +146,34 @@ console.log('\n== the migration');
   check('including cast', db.prepare('SELECT COUNT(*) AS n FROM title_cast').get().n === 1);
   db.exec(mig);
   check('and is safe to run twice', db.prepare('SELECT COUNT(*) AS n FROM titles').get().n === 1);
+}
+
+console.log('\n== step 2: the view members read through');
+{
+  const env = makeEnv();
+  const schemaCols = env._db.prepare("SELECT name FROM pragma_table_info('shows')").all().map((r) => r.name);
+  const viewCols = env._db.prepare("SELECT name FROM pragma_table_info('shows_v')").all().map((r) => r.name);
+  check('the view has exactly the columns of shows, in order', JSON.stringify(viewCols) === JSON.stringify(schemaCols), `${viewCols.length} vs ${schemaCols.length}`);
+  check('and the module\'s column list matches schema.sql', JSON.stringify(SHOWS_COLUMNS) === JSON.stringify(schemaCols),
+    schemaCols.filter((c) => !SHOWS_COLUMNS.includes(c)).join(',') || 'order differs');
+  const mig = readFileSync(join(repoRoot, 'migrations/077_shows_view.sql'), 'utf8');
+  const norm = (x) => x.replace(/\s+/g, ' ').trim();
+  check('migration 077 is viewSql()', norm(mig).includes(norm(viewSql())));
+  check('the three per-member fields are kept out of the shared set', PER_COPY_FIELDS.every((f) => !SHARED_FIELDS.includes(f)));
+
+  // Two members' copies of one entry, one with a stale member-typed title.
+  const a = show(env, { title: 'Sopranos', member: 'a', tmdb: 1398, overview: 'old', notes: 'MINE', network: 'HBO Max', enriched: '2026-01-01 00:00:00' });
+  const b = show(env, { title: 'The Sopranos', member: 'b', tmdb: 1398, overview: 'Tony.', network: 'Max', enriched: '2026-10-01 00:00:00' });
+  env._db.prepare("UPDATE shows SET next_season_date = '2026-12-01', network_logo_url = 'https://image.tmdb.org/hbo.png' WHERE id = ?").run(a);
+  const lone = show(env, { title: 'Unmatched Thing', member: 'c', overview: 'own text' });
+  await syncTitle(env, 'tv', 1398, 'The Sopranos');
+  const v = (id) => env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(id);
+  check('every copy shows TMDB\'s name', v(a).title === 'The Sopranos' && v(b).title === 'The Sopranos', v(a).title);
+  check('and the shared details', v(a).overview === 'Tony.');
+  check('member fields stay the member\'s', v(a).notes === 'MINE' && v(a).network === 'HBO Max' && v(b).network === 'Max' && v(a).member_slug === 'a');
+  check('so do the per-member fields', v(a).next_season_date === '2026-12-01' && v(b).next_season_date === null && v(a).network_logo_url === 'https://image.tmdb.org/hbo.png' && v(b).network_logo_url === null);
+  check('a row with no shared entry reads as itself', v(lone).title === 'Unmatched Thing' && v(lone).overview === 'own text');
+  check('the raw table is untouched', env._db.prepare('SELECT title FROM shows WHERE id = ?').get(a).title === 'Sopranos');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

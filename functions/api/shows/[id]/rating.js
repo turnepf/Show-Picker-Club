@@ -17,7 +17,7 @@ export async function onRequestPut(context) {
   }
 
   const show = await env.DB.prepare(
-    'SELECT member_slug, list, tmdb_id, tmdb_type FROM shows WHERE id = ?'
+    'SELECT member_slug, list, tmdb_id, tmdb_type FROM shows_v WHERE id = ?'
   ).bind(params.id).first();
   if (!show) {
     return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: corsHeaders() });

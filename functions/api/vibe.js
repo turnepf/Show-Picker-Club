@@ -40,14 +40,14 @@ function disambiguatedNames(rows) {
 async function listEligibleMembers(env, viewerSlug) {
   const { results } = await env.DB.prepare(
     `SELECT m.slug, m.name, m.first_name, m.last_initial,
-       (SELECT COUNT(*) FROM shows s WHERE s.member_slug = m.slug AND s.archived = 0) AS active_count
+       (SELECT COUNT(*) FROM shows_v s WHERE s.member_slug = m.slug AND s.archived = 0) AS active_count
      FROM members m
      WHERE (m.slug = ?1 OR m.slug IN (
              SELECT gm.member_slug FROM group_members gm
               WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE member_slug = ?1)
            ))
        AND EXISTS (
-         SELECT 1 FROM shows s
+         SELECT 1 FROM shows_v s
          WHERE s.member_slug = m.slug
            AND (COALESCE(s.added_by, '') != 'seed' OR s.archived = 1 OR s.updated_at IS NOT NULL)
        )
@@ -144,7 +144,7 @@ async function enrichPick(env, p) {
   // poster so the card isn't stuck on the placeholder.
   const showRow = await env.DB.prepare(
     `SELECT id, poster_url, movie, seasons_released, full_series, next_season_date
-     FROM shows
+     FROM shows_v
      WHERE LOWER(title) = ? AND archived = 0
      ORDER BY (poster_url IS NULL OR poster_url = ''), id
      LIMIT 1`
@@ -159,7 +159,7 @@ async function enrichPick(env, p) {
   }
 
   const genreRow = await env.DB.prepare(
-    `SELECT genres FROM shows
+    `SELECT genres FROM shows_v
      WHERE LOWER(title) = ? AND archived = 0 AND genres IS NOT NULL AND genres != ''
      ORDER BY id LIMIT 1`
   ).bind(p.title_lower).first();
@@ -167,7 +167,7 @@ async function enrichPick(env, p) {
 
   const { results: actors } = await env.DB.prepare(
     `SELECT a.name FROM actors a
-     JOIN shows s ON s.id = a.show_id
+     JOIN shows_v s ON s.id = a.show_id
      WHERE LOWER(s.title) = ? AND s.archived = 0
      GROUP BY a.name
      ORDER BY MIN(a.id)
@@ -213,7 +213,7 @@ export async function onRequestGet(context) {
 
   const engaged = await env.DB.prepare(
     `SELECT EXISTS(
-       SELECT 1 FROM shows s
+       SELECT 1 FROM shows_v s
        WHERE s.member_slug = ? AND (COALESCE(s.added_by, '') != 'seed' OR s.archived = 1 OR s.updated_at IS NOT NULL)
      ) AS engaged`
   ).bind(memberSlug).first();
@@ -232,7 +232,7 @@ export async function onRequestGet(context) {
 
   const { results: rows } = await env.DB.prepare(
     `SELECT s.list, s.title, s.network, s.network_url, s.rating, t.title_lower, ${traitCols}
-     FROM shows s
+     FROM shows_v s
      LEFT JOIN show_traits t ON LOWER(s.title) = t.title_lower AND (t.unknown_show = 0 OR t.unknown_show IS NULL)
      WHERE s.member_slug = ? AND s.archived = 0`
   ).bind(memberSlug).all();
@@ -249,22 +249,22 @@ export async function onRequestGet(context) {
 
   const { results: allScored } = await env.DB.prepare(
     `SELECT t.title_lower, t.title, ${traitCols},
-       (SELECT s2.network FROM shows s2 WHERE LOWER(s2.title) = t.title_lower AND s2.archived = 0
+       (SELECT s2.network FROM shows_v s2 WHERE LOWER(s2.title) = t.title_lower AND s2.archived = 0
           AND s2.network IS NOT NULL AND s2.network != ''
           AND s2.network_url IS NOT NULL AND s2.network_url != ''
           AND s2.network_url NOT LIKE '%search%' AND s2.network_url NOT LIKE '%/s?%'
         ORDER BY s2.id LIMIT 1) AS network,
-       (SELECT s2.network_url FROM shows s2 WHERE LOWER(s2.title) = t.title_lower AND s2.archived = 0
+       (SELECT s2.network_url FROM shows_v s2 WHERE LOWER(s2.title) = t.title_lower AND s2.archived = 0
           AND s2.network IS NOT NULL AND s2.network != ''
           AND s2.network_url IS NOT NULL AND s2.network_url != ''
           AND s2.network_url NOT LIKE '%search%' AND s2.network_url NOT LIKE '%/s?%'
         ORDER BY s2.id LIMIT 1) AS network_url,
-       (SELECT s2.rating FROM shows s2 WHERE LOWER(s2.title) = t.title_lower AND s2.archived = 0
+       (SELECT s2.rating FROM shows_v s2 WHERE LOWER(s2.title) = t.title_lower AND s2.archived = 0
           AND s2.rating IS NOT NULL ORDER BY s2.id LIMIT 1) AS rating
      FROM show_traits t
      WHERE (t.unknown_show = 0 OR t.unknown_show IS NULL)
        AND EXISTS (
-         SELECT 1 FROM shows ss
+         SELECT 1 FROM shows_v ss
          WHERE LOWER(ss.title) = t.title_lower
            AND ss.archived = 0
            -- The one place the taste exclusion belongs in this file: a
@@ -282,7 +282,7 @@ export async function onRequestGet(context) {
   // gets a persona.
   const { results: clubRows } = await env.DB.prepare(
     `SELECT s.member_slug, s.list, ${traitCols}
-     FROM shows s
+     FROM shows_v s
      JOIN show_traits t ON LOWER(s.title) = t.title_lower AND (t.unknown_show = 0 OR t.unknown_show IS NULL)
      WHERE s.archived = 0`
   ).all();

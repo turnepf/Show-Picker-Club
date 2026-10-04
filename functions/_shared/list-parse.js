@@ -271,7 +271,7 @@ export async function resolveItems(env, rawItems, existingByTitle, defaultList =
 // whole import dupe-checks in one query instead of one per title.
 export async function existingTitles(env, memberSlug) {
   const { results } = await env.DB.prepare(
-    'SELECT title, list, archived FROM shows WHERE member_slug = ?'
+    'SELECT title, list, archived FROM shows_v WHERE member_slug = ?'
   ).bind(memberSlug).all();
   const map = new Map();
   for (const row of (results || [])) {

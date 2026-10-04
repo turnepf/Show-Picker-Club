@@ -13,7 +13,7 @@ const SEED_ONLY_CTE = `
   seed_only_members AS (
     SELECT m.slug FROM members m
     WHERE NOT EXISTS (
-      SELECT 1 FROM shows s
+      SELECT 1 FROM shows_v s
       WHERE s.member_slug = m.slug
         AND (COALESCE(s.added_by, '') != 'seed' OR s.archived = 1 OR s.updated_at IS NOT NULL)
     )
@@ -92,11 +92,11 @@ async function memberBased(env, member) {
 
   const { results: pool } = await env.DB.prepare(`
     WITH member_active AS (
-      SELECT DISTINCT LOWER(title) AS t FROM shows WHERE member_slug = ? AND archived = 0
+      SELECT DISTINCT LOWER(title) AS t FROM shows_v WHERE member_slug = ? AND archived = 0
     ),
     ${SEED_ONLY_CTE}
     SELECT s.member_slug AS slug, COUNT(DISTINCT LOWER(s.title)) AS shared
-    FROM shows s
+    FROM shows_v s
     WHERE s.archived = 0
       AND s.member_slug != ?
       AND s.member_slug NOT IN (SELECT slug FROM seed_only_members)
@@ -228,9 +228,9 @@ export async function onRequestGet(context) {
 
   const stats = await env.DB.prepare(`
     SELECT
-      (SELECT COUNT(DISTINCT LOWER(title)) FROM shows WHERE member_slug = ? AND archived = 0) AS active_count,
+      (SELECT COUNT(DISTINCT LOWER(title)) FROM shows_v WHERE member_slug = ? AND archived = 0) AS active_count,
       (SELECT EXISTS(
-         SELECT 1 FROM shows s
+         SELECT 1 FROM shows_v s
          WHERE s.member_slug = ?
            AND (COALESCE(s.added_by, '') != 'seed' OR s.archived = 1 OR s.updated_at IS NOT NULL)
        )) AS engaged

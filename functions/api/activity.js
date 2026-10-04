@@ -39,7 +39,7 @@ export async function onRequestGet(context) {
   const scoped = memberSlug
     ? env.DB.prepare(
         `SELECT s.title, s.list, s.member_slug, h.name AS member_name, s.created_at
-           FROM shows s
+           FROM shows_v s
            JOIN members h ON h.slug = s.member_slug
           WHERE s.archived = 0
             AND s.member_slug = ?
@@ -50,7 +50,7 @@ export async function onRequestGet(context) {
       ).bind(memberSlug, rowLimit)
     : env.DB.prepare(
         `SELECT s.title, s.list, s.member_slug, h.name AS member_name, s.created_at
-           FROM shows s
+           FROM shows_v s
            JOIN members h ON h.slug = s.member_slug
           WHERE s.archived = 0
           ORDER BY s.created_at DESC, s.id DESC

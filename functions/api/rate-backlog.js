@@ -22,14 +22,14 @@ export async function onRequestGet(context) {
 
   const { results } = await env.DB.prepare(
     `SELECT s.id, s.title, s.poster_url, s.movie, s.list, s.seasons_released, s.archived
-     FROM shows s
+     FROM shows_v s
      WHERE ${BACKLOG_ELIGIBLE_WHERE}
        AND ${BACKLOG_UNRATED_WHERE}
      ORDER BY s.title ASC`
   ).bind(session.member_slug).all();
 
   const { cnt: eligibleTotal } = (await env.DB.prepare(
-    `SELECT COUNT(*) AS cnt FROM shows s WHERE ${BACKLOG_ELIGIBLE_WHERE}`
+    `SELECT COUNT(*) AS cnt FROM shows_v s WHERE ${BACKLOG_ELIGIBLE_WHERE}`
   ).bind(session.member_slug).first()) || { cnt: 0 };
 
   return new Response(JSON.stringify({ shows: results, has_any: eligibleTotal > 0 }), { headers: corsHeaders() });

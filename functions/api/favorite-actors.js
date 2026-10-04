@@ -48,7 +48,7 @@ const PERSON_KEY = `COALESCE(a.tmdb_person_id, own.pid, glob.pid, LOWER(a.name))
 const PERSON_JOINS = `
      LEFT JOIN (SELECT LOWER(a2.name) AS name_lower, MIN(a2.tmdb_person_id) AS pid
                   FROM actors a2
-                  JOIN shows s2 ON s2.id = a2.show_id
+                  JOIN shows_v s2 ON s2.id = a2.show_id
                  WHERE s2.member_slug = ?1 AND a2.tmdb_person_id IS NOT NULL
                  GROUP BY LOWER(a2.name)) own
        ON own.name_lower = LOWER(a.name)
@@ -92,7 +92,7 @@ export async function onRequestGet(context) {
                     MAX(a.imdb_id) as imdb_id,
                     MAX(${WEIGHT}) as w
                FROM actors a
-               JOIN shows s ON s.id = a.show_id
+               JOIN shows_v s ON s.id = a.show_id
                ${RATING_JOIN}
                ${PERSON_JOINS}
               WHERE s.member_slug = ?1
@@ -109,7 +109,7 @@ export async function onRequestGet(context) {
   const rated = await env.DB.prepare(
     `SELECT COUNT(*) as cnt FROM (
        SELECT DISTINCT s.tmdb_id, s.tmdb_type
-         FROM shows s
+         FROM shows_v s
          JOIN show_ratings r
            ON r.tmdb_id = s.tmdb_id AND r.tmdb_type = s.tmdb_type
           AND r.season_number = 0 AND r.member_slug = s.member_slug
@@ -127,7 +127,7 @@ export async function onRequestGet(context) {
               s.id as show_id, s.title, s.network, s.rating, s.poster_url, s.movie,
               s.archived, r.rating as my_rating, ${WEIGHT} as w
          FROM actors a
-         JOIN shows s ON s.id = a.show_id
+         JOIN shows_v s ON s.id = a.show_id
          ${RATING_JOIN}
          ${PERSON_JOINS}
         WHERE s.member_slug = ?1

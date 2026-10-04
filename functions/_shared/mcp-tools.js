@@ -177,7 +177,7 @@ function compactShow(s, { detail = false } = {}) {
 }
 
 async function ownsShow(ctx, id) {
-  return !!(await ctx.env.DB.prepare('SELECT 1 FROM shows WHERE id = ? AND member_slug = ?')
+  return !!(await ctx.env.DB.prepare('SELECT 1 FROM shows_v WHERE id = ? AND member_slug = ?')
     .bind(id, ctx.session.member_slug).first());
 }
 
@@ -983,7 +983,7 @@ export const TOOLS = [
       // row. It writes enriched_at, never updated_at, so the refresh doesn't
       // read as the member editing the show.
       const r = await ok(ctx, enrichApi.onRequestPost, { method: 'POST', path: '/api/enrich', body: { show_id: row.id } }, 'That show');
-      const after = await ctx.env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(row.id).first();
+      const after = await ctx.env.DB.prepare('SELECT * FROM shows_v WHERE id = ?').bind(row.id).first();
       await logAdmin(ctx, m, 'refresh_show', { show_id: row.id, title: row.title, updated: r.tmdbUpdated || 0 });
       const out = { member: m.slug, refreshed: (r.tmdbUpdated || 0) > 0, show: compactShow(after, { detail: true }) };
       if (!out.refreshed) {
@@ -1077,7 +1077,7 @@ async function logAdmin(ctx, m, action, detail) {
 // ownership too; reading the row first gives the admin tools what they log
 // and lets a wrong show_id fail with the member named.
 async function memberRow(ctx, m, id) {
-  const row = await ctx.env.DB.prepare('SELECT * FROM shows WHERE id = ? AND member_slug = ?').bind(id, m.slug).first();
+  const row = await ctx.env.DB.prepare('SELECT * FROM shows_v WHERE id = ? AND member_slug = ?').bind(id, m.slug).first();
   if (!row) throw new ToolError(`Show ${id} isn't on ${m.slug}'s lists. admin_list_member_shows (with include_archived) lists them.`);
   return row;
 }

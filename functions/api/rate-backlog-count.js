@@ -25,7 +25,7 @@ export async function onRequestGet(context) {
 
   const row = await env.DB.prepare(
     `SELECT COUNT(*) AS cnt
-     FROM shows s
+     FROM shows_v s
      WHERE ${BACKLOG_ELIGIBLE_WHERE}
        AND ${BACKLOG_UNRATED_WHERE}`
   ).bind(session.member_slug).first();

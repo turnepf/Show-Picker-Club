@@ -1110,6 +1110,32 @@ written.
 
 Enforcer: `scripts/spend-limits-test.mjs`.
 
+## 29. A show is its TMDB entry, and members read it through `shows_v`
+
+*Normalizing, 2026-10.* Every member's row used to carry its own copy of the
+show's details, kept in step by propagation code, so two members could see
+"Sopranos" and "The Sopranos", or six seasons on a film. `titles` (migration
+076) holds the details once per TMDB entry with TMDB's own name, and the view
+`shows_v` (migration 077) puts them in front of every member.
+
+- **Reads that reach a member select `FROM shows_v`, and writes go to
+  `shows`.** The view has exactly the columns of `shows`, so switching a
+  read never changes its shape.
+- **The member's own fields stay the member's:** list, order, rating, notes,
+  watching-with, recommended-by, archived, network and Watch link. So do
+  `next_season_date`, `season_end_date` and `network_logo_url`, which differ
+  by member.
+- **A writer that changes a show's details keeps `titles` current:**
+  `syncTitle()` after a one-row write (add, edit, enrichment), and
+  `syncTitlesNamed()` after a write by title (URL cleanup). The nightly
+  rebuild is the backstop, not the mechanism.
+- **TMDB names the show.** A name TMDB gave is kept until TMDB gives another,
+  and a member's own title isn't shown.
+
+Enforcer: `scripts/titles-test.mjs` (every PR) — view/table column parity,
+migration/code parity, shared vs per-member fields; `admin-fix-tools-test.mjs`
+for the write paths.
+
 ## Adding an invariant
 
 Add a section here, then decide which enforcer covers it. Prefer a deterministic

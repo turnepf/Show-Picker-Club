@@ -41,7 +41,7 @@ export async function onRequestGet(context) {
 
   const id = Number.parseInt(params.id, 10);
   const show = Number.isSafeInteger(id) && id > 0
-    ? await env.DB.prepare(`SELECT ${CATALOG_COLUMNS} FROM shows WHERE id = ?`).bind(id).first()
+    ? await env.DB.prepare(`SELECT ${CATALOG_COLUMNS} FROM shows_v WHERE id = ?`).bind(id).first()
     : null;
 
   // A link can outlive the row it points at (the show was removed, or the id

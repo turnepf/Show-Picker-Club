@@ -51,7 +51,7 @@ async function groupWatchers(env, show, viewerSlug) {
   if (!viewerSlug) return [];
   const { results } = await env.DB.prepare(
     `SELECT DISTINCT m.slug, m.first_name, m.name
-       FROM shows s
+       FROM shows_v s
        INNER JOIN members m ON m.slug = s.member_slug
       WHERE s.archived = 0
         AND s.list = 'watching'
@@ -79,7 +79,7 @@ async function groupWatchers(env, show, viewerSlug) {
 
 export async function onRequestGet(context) {
   const { env, request, params } = context;
-  const show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(params.id).first();
+  const show = await env.DB.prepare('SELECT * FROM shows_v WHERE id = ?').bind(params.id).first();
   if (!show) {
     return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: corsHeaders() });
   }
@@ -147,7 +147,7 @@ export async function onRequestPut(context) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders() });
   }
 
-  const existing = await env.DB.prepare('SELECT * FROM shows WHERE id = ? AND member_slug = ?').bind(params.id, session.member_slug).first();
+  const existing = await env.DB.prepare('SELECT * FROM shows_v WHERE id = ? AND member_slug = ?').bind(params.id, session.member_slug).first();
   if (!existing) {
     return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: corsHeaders() });
   }
@@ -289,7 +289,7 @@ export async function onRequestPut(context) {
   // The shared row for whichever entry the copy points at now. An entry a
   // re-point left behind is dropped by the nightly rebuild.
   {
-    const pin = await env.DB.prepare('SELECT tmdb_id, tmdb_type, movie FROM shows WHERE id = ?').bind(params.id).first();
+    const pin = await env.DB.prepare('SELECT tmdb_id, tmdb_type, movie FROM shows_v WHERE id = ?').bind(params.id).first();
     if (pin && pin.tmdb_id) {
       const type = pin.tmdb_type || (pin.movie ? 'movie' : 'tv');
       await syncTitle(env, type, pin.tmdb_id, enriched.tmdbId === pin.tmdb_id ? enriched.canonicalTitle : null);
@@ -324,7 +324,7 @@ export async function onRequestPut(context) {
     })());
   }
 
-  let show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(params.id).first();
+  let show = await env.DB.prepare('SELECT * FROM shows_v WHERE id = ?').bind(params.id).first();
   // `watcher_slugs` is the complete set of named group-mates, so an edit that
   // unticks someone unlinks them. Absent entirely (an older build, a partial
   // update) leaves the links as they are — see syncWatchers.
@@ -333,7 +333,7 @@ export async function onRequestPut(context) {
     slugs: body.watcher_slugs !== undefined ? body.watcher_slugs : null,
     rawWatchingWith: watching_with,
   });
-  show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(params.id).first();
+  show = await env.DB.prepare('SELECT * FROM shows_v WHERE id = ?').bind(params.id).first();
   show.watchers = synced.watchers;
   return new Response(JSON.stringify({ show }), { headers: corsHeaders() });
 }
@@ -348,7 +348,7 @@ export async function onRequestDelete(context) {
   // key cascade only reaches the links hanging off this show; the mirrors
   // live on other members' rows and would otherwise keep naming a member
   // whose copy no longer exists.
-  const existing = await env.DB.prepare('SELECT * FROM shows WHERE id = ? AND member_slug = ?')
+  const existing = await env.DB.prepare('SELECT * FROM shows_v WHERE id = ? AND member_slug = ?')
     .bind(params.id, session.member_slug).first();
   if (existing) await unlinkShow(env, existing);
   await env.DB.prepare('DELETE FROM shows WHERE id = ? AND member_slug = ?').bind(params.id, session.member_slug).run();

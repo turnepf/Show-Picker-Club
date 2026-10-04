@@ -48,7 +48,7 @@ export async function onRequestGet(context) {
               ) as library_activity_at,
               MAX(o.opened_at) as opened_at` : ''}
        FROM members h
-       LEFT JOIN shows s ON s.member_slug = h.slug${admin ? `
+       LEFT JOIN shows_v s ON s.member_slug = h.slug${admin ? `
        LEFT JOIN (SELECT member_slug, MAX(last_seen_at) as opened_at
                   FROM sessions WHERE member_slug IS NOT NULL
                   GROUP BY member_slug) o ON o.member_slug = h.slug` : ''}

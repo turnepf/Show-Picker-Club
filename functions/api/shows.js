@@ -33,7 +33,7 @@ export async function onRequestGet(context) {
     `SELECT s.*,
        (SELECT json_group_array(json_object('name', a.name, 'imdb_id', a.imdb_id)) FROM actors a WHERE a.show_id = s.id) as actors,
        sr.rating as user_rating
-     FROM shows s
+     FROM shows_v s
      LEFT JOIN show_ratings sr ON s.tmdb_id = sr.tmdb_id AND s.member_slug = sr.member_slug AND sr.season_number = 0
      WHERE s.member_slug = ? ${archivedFilter} ORDER BY s.title COLLATE NOCASE`
   ).bind(member).all();
@@ -77,7 +77,7 @@ async function borrowArtworkAcrossCopies(env, rows) {
   const { results: art } = await env.DB.prepare(
     `SELECT LOWER(title) AS ltitle, tmdb_id, MAX(poster_url) AS poster_url,
             MAX(network_logo_url) AS network_logo_url
-       FROM shows
+       FROM shows_v
       WHERE archived = 0 AND (poster_url IS NOT NULL OR network_logo_url IS NOT NULL)
       GROUP BY LOWER(title), tmdb_id`
   ).all();
@@ -108,7 +108,7 @@ async function findGoodCopyAcrossMembers(env, title, tmdbId = null) {
   // title (a remake next to its original) — its URL streams the wrong show,
   // so it is never a donor.
   return await env.DB.prepare(
-    `SELECT network, network_url FROM shows
+    `SELECT network, network_url FROM shows_v
      WHERE LOWER(title) = LOWER(?) AND archived = 0
        AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)
        AND network IS NOT NULL
@@ -132,7 +132,7 @@ export async function onRequestPost(context) {
   // few shows a day), but each add fans out to TMDB/Watchmode calls, so
   // a scripted session could otherwise spam rows and drain API quotas.
   const { cnt: addsToday } = (await env.DB.prepare(
-    "SELECT COUNT(*) AS cnt FROM shows WHERE member_slug = ? AND created_at > datetime('now', '-1 day')"
+    "SELECT COUNT(*) AS cnt FROM shows_v WHERE member_slug = ? AND created_at > datetime('now', '-1 day')"
   ).bind(session.member_slug).first()) || { cnt: 0 };
   if (addsToday >= 50) {
     return new Response(JSON.stringify({ error: 'rate_limited' }), { status: 429, headers: corsHeaders() });
@@ -161,7 +161,7 @@ export async function onRequestPost(context) {
   // matches what the caller sent; the check after enrichment below stays the
   // authoritative one for a title TMDB spells differently.
   const preExisting = await env.DB.prepare(
-    'SELECT id, list, archived FROM shows WHERE LOWER(title) = LOWER(?) AND member_slug = ?'
+    'SELECT id, list, archived FROM shows_v WHERE LOWER(title) = LOWER(?) AND member_slug = ?'
   ).bind(title, session.member_slug).first();
   if (preExisting) {
     if (preExisting.archived) {
@@ -190,7 +190,7 @@ export async function onRequestPost(context) {
   const finalTitle = enriched.canonicalTitle || title;
 
   const existing = await env.DB.prepare(
-    'SELECT id, list, archived FROM shows WHERE LOWER(title) = LOWER(?) AND member_slug = ?'
+    'SELECT id, list, archived FROM shows_v WHERE LOWER(title) = LOWER(?) AND member_slug = ?'
   ).bind(finalTitle, session.member_slug).first();
   if (existing) {
     if (existing.archived) {
@@ -274,13 +274,13 @@ export async function onRequestPost(context) {
   // Named group-mates, if any: links the two copies and puts the title on
   // their list too. The fan-out is bounded to members the caller shares a
   // group with — _shared/watchers.js drops anything else.
-  let show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(showId).first();
+  let show = await env.DB.prepare('SELECT * FROM shows_v WHERE id = ?').bind(showId).first();
   if (Array.isArray(body.watcher_slugs) && body.watcher_slugs.length) {
     const synced = await syncWatchers(env, {
       show, ownerSlug: session.member_slug, ownerEmail: session.email,
       slugs: body.watcher_slugs, rawWatchingWith: watching_with || null,
     });
-    show = await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(showId).first();
+    show = await env.DB.prepare('SELECT * FROM shows_v WHERE id = ?').bind(showId).first();
     show.watchers = synced.watchers;
   } else {
     show.watchers = [];

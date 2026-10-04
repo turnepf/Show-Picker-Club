@@ -54,7 +54,7 @@ export async function onRequestPost(context) {
   // The button lives on your own copy — recommending is vouching, and your
   // copy is also the enrichment source every "Add to Next Up" clones.
   const show = await env.DB.prepare(
-    'SELECT * FROM shows WHERE id = ? AND member_slug = ?'
+    'SELECT * FROM shows_v WHERE id = ? AND member_slug = ?'
   ).bind(showId, session.member_slug).first();
   if (!show) {
     return new Response(JSON.stringify({ error: 'Show not found' }), { status: 404, headers: corsHeaders() });

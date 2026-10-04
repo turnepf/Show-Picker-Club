@@ -42,7 +42,7 @@ export async function onRequestGet(context) {
   const { results } = await env.DB.prepare(
     `SELECT id, title, network, network_url, list, recommended_by,
             next_season_date, season_end_date
-     FROM shows
+     FROM shows_v
      WHERE member_slug = ? AND archived = 0
        AND list IN ('watching','waiting')
        AND (next_season_date IS NOT NULL OR season_end_date IS NOT NULL)`
