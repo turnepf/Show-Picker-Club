@@ -49,13 +49,11 @@ iPhone, iPad and Mac (detail screen; filled in show by show as the
 nightly refresh reaches them, Watching and Next Up first):
 
 ```
-Show pages now link to IMDb, say whether a series is returning, ended or was canceled, list the free services it's on (Tubi, Pluto TV and more), and name the character each actor plays. They fill in over the next few days, starting with the shows you're watching and the ones up next.
-
-When you search for a show, the friends who already have it are shown only on the exact show they picked, not on every show that happens to share its name. And adding a show from a friend's list adds that same show, even when other shows share its name.
+Show pages now link to IMDb, say whether a series is returning, ended or was canceled, list the free services it's on (Tubi, Pluto TV and more), and name the character each actor plays.
 
 Looking at a show from a friend's list that isn't on yours? A hint beside My Lists now says to pick a list to add it.
 
-Shows that share a name are kept apart everywhere: you can add a film even when you already have a different one with the same title, and Trending, "Also watching", group recommendations and your vibe no longer mix them up.
+Shows that share a name are kept apart everywhere. Search shows which friends have the exact show you're looking at, adding from a friend's list adds that same show, and Trending, "Also watching", group recommendations and your vibe no longer mix them up.
 ```
 
 ---
