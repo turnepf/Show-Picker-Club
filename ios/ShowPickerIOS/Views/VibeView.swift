@@ -278,8 +278,8 @@ private struct VibePickRow: View {
                 memberSlug: mine, title: pick.title, network: pick.network,
                 networkUrl: pick.networkUrl, list: chosenList.rawValue,
                 notes: note.isEmpty ? nil : note, recommendedBy: nil,
-                movie: (pick.movie ?? 0) == 1, fullSeries: false,
-                watchingWith: nil)
+                movie: pick.tmdbType.map { $0 == "movie" } ?? ((pick.movie ?? 0) == 1), fullSeries: false,
+                watchingWith: nil, tmdbId: pick.tmdbId, tmdbType: pick.tmdbType)
             added = true
         } catch {
             // 409 (already on a list) or other — treat as already handled.

@@ -18,7 +18,7 @@
 //   2. What does the profile actually say — cluster, blend, traits, balance,
 //      aligned picks, outliers?
 //   3. What is it computed from, per list, and what is missing: titles with no
-//      show_traits row (queue backlog, drains itself) versus titles scored
+//      title_traits row (queue backlog, drains itself) versus titles scored
 //      `unknown_show=1` (Claude couldn't identify them — these never drain and
 //      need a rename in Show Cleanup).
 //   4. Is the fix holding both ways — they see themselves, nobody else does?
@@ -33,6 +33,11 @@
 import {
   envFor, functionsSandbox, hydrate, loadSnapshot, saveSnapshot, takeSnapshot,
 } from './lib/prod-snapshot.mjs';
+
+// A fingerprint is keyed by show (migration 081) — showKeySql('s') in
+// functions/_shared/same-show.js, spelled out here for the snapshot db.
+const KEY = `CASE WHEN s.tmdb_id IS NOT NULL THEN COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END) || ':' || s.tmdb_id
+  ELSE 'title:' || LOWER(TRIM(s.title)) END`;
 
 // ---- args ----
 
@@ -130,11 +135,11 @@ line('untouched seed rows', lib.untouched_seed);
 const perList = many(db, `
   SELECT s.list,
          COUNT(*) AS active,
-         SUM(CASE WHEN t.title_lower IS NOT NULL AND COALESCE(t.unknown_show,0) = 0 THEN 1 ELSE 0 END) AS scored,
+         SUM(CASE WHEN t.show_key IS NOT NULL AND COALESCE(t.unknown_show,0) = 0 THEN 1 ELSE 0 END) AS scored,
          SUM(CASE WHEN COALESCE(t.unknown_show,0) = 1 THEN 1 ELSE 0 END) AS unknown,
-         SUM(CASE WHEN t.title_lower IS NULL THEN 1 ELSE 0 END) AS unscored
+         SUM(CASE WHEN t.show_key IS NULL THEN 1 ELSE 0 END) AS unscored
     FROM shows s
-    LEFT JOIN show_traits t ON t.title_lower = LOWER(s.title)
+    LEFT JOIN title_traits t ON t.show_key = ${KEY}
    WHERE s.member_slug = ? AND s.archived = 0
    GROUP BY s.list ORDER BY s.list`, slug);
 const LIST_LABEL = { recommending: 'Loved (weight 1.0)', watching: 'Watching (0.8)',
@@ -192,24 +197,22 @@ h1('What is missing, and whether it drains on its own');
 const unscored = many(db, `
   SELECT MIN(s.title) AS title, COUNT(*) AS copies FROM shows s
    WHERE s.member_slug = ? AND s.archived = 0
-     AND LOWER(s.title) NOT IN (SELECT title_lower FROM show_traits)
-   GROUP BY LOWER(s.title) ORDER BY LOWER(s.title)`, slug);
+     AND ${KEY} NOT IN (SELECT show_key FROM title_traits)
+   GROUP BY ${KEY} ORDER BY LOWER(MIN(s.title))`, slug);
 const unknown = many(db, `
   SELECT MIN(s.title) AS title FROM shows s
-    JOIN show_traits t ON t.title_lower = LOWER(s.title)
+    JOIN title_traits t ON t.show_key = ${KEY}
    WHERE s.member_slug = ? AND s.archived = 0 AND COALESCE(t.unknown_show,0) = 1
-   GROUP BY LOWER(s.title) ORDER BY LOWER(s.title)`, slug);
+   GROUP BY ${KEY} ORDER BY LOWER(MIN(s.title))`, slug);
 const queue = one(db, `
   SELECT
-    (SELECT COUNT(*) FROM (SELECT LOWER(title) FROM shows WHERE archived = 0
-        AND LOWER(title) NOT IN (SELECT title_lower FROM show_traits)
-        GROUP BY LOWER(title))) AS club_queue,
-    (SELECT COUNT(*) FROM (SELECT LOWER(s.title) FROM shows s WHERE s.archived = 0
-        AND LOWER(s.title) NOT IN (SELECT title_lower FROM show_traits)
-        AND NOT EXISTS (SELECT 1 FROM shows o WHERE LOWER(o.title) = LOWER(s.title)
+    (SELECT COUNT(DISTINCT ${KEY}) FROM shows s WHERE s.archived = 0
+        AND ${KEY} NOT IN (SELECT show_key FROM title_traits)) AS club_queue,
+    (SELECT COUNT(DISTINCT ${KEY}) FROM shows s WHERE s.archived = 0
+        AND ${KEY} NOT IN (SELECT show_key FROM title_traits)
+        AND NOT EXISTS (SELECT 1 FROM shows o WHERE ${KEY.replaceAll('s.', 'o.')} = ${KEY}
                           AND o.archived = 0 AND o.member_slug != ?1)
-        AND s.member_slug = ?1
-        GROUP BY LOWER(s.title))) AS hers_alone`, slug);
+        AND s.member_slug = ?1) AS hers_alone`, slug);
 line('unscored titles (theirs)', `${unscored.length} ${dim('— queue backlog, drains itself')}`);
 line('of those, only they hold', `${queue.hers_alone} ${dim('— unreachable by the old fill filter')}`);
 line('club-wide fill queue', `${queue.club_queue} titles` +
@@ -221,13 +224,13 @@ const solo = one(db, `
   SELECT
     SUM(CASE WHEN shared THEN 1 ELSE 0 END) AS shared_titles,
     SUM(CASE WHEN shared THEN 0 ELSE 1 END) AS solo_titles
-    FROM (SELECT LOWER(s.title) AS lt,
-            EXISTS(SELECT 1 FROM shows o WHERE LOWER(o.title) = LOWER(s.title)
+    FROM (SELECT ${KEY} AS k,
+            EXISTS(SELECT 1 FROM shows o WHERE ${KEY.replaceAll('s.', 'o.')} = ${KEY}
                      AND o.archived = 0 AND o.member_slug != ?1) AS shared
-            FROM shows s JOIN show_traits t ON t.title_lower = LOWER(s.title)
+            FROM shows s JOIN title_traits t ON t.show_key = ${KEY}
            WHERE s.member_slug = ?1 AND s.archived = 0 AND COALESCE(t.unknown_show,0) = 0
-           GROUP BY LOWER(s.title))`, slug);
-// Both of these already counted: the fingerprint join asks show_traits for a
+           GROUP BY ${KEY})`, slug);
+// Both of these already counted: the fingerprint join asks title_traits for a
 // row, never who else holds the title. What the old fill filter cost is
 // the `hers_alone` unscored line above — titles it would never queue at all.
 line('scored titles the club shares', solo.shared_titles ?? 0);

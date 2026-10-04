@@ -4,8 +4,14 @@ import { getSession } from '../_shared/auth.js';
 import {
   LIST_WEIGHT, assignDistinct, centerFp, clubBaseline, computeFingerprint, cosineSim, pickCluster,
 } from '../_shared/vibe-match.js';
+import { showKeySql, keyWhere } from '../_shared/same-show.js';
 
-const EXCLUDED_SQL = EXCLUDED_FROM_TASTE.map(s => `'${s}'`).join(',');
+// A fingerprint belongs to a show — a TMDB entry, or a title TMDB never
+// matched — not to a title: three 2026 films are called "The Odyssey"
+// (migration 081, title_traits). KEY is that show's key on a shows_v row.
+const KEY = showKeySql('s');
+const PLACEHOLDER_URL = /search|\/s\?/;
+
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -95,22 +101,35 @@ function balanceMetrics(fp) {
   return { range, warmth_darkness_balance: balance_score, warmth_darkness_label: label };
 }
 
-function alignedPicks(memberFp, candidatesScored, memberTitleSet) {
+function alignedPicks(memberFp, candidatesScored, memberKeys) {
   const ranked = [];
   for (const c of candidatesScored) {
-    if (memberTitleSet.has(c.title_lower)) continue;
+    if (memberKeys.has(c.show_key)) continue;
     const fpC = {};
     for (const t of TRAIT_NAMES) fpC[t] = c[t];
     ranked.push({ row: c, sim: cosineSim(memberFp, fpC) });
   }
   ranked.sort((a, b) => b.sim - a.sim);
   return ranked.slice(0, 3).map(({ row }) => ({
-    title: row.title,
-    title_lower: row.title_lower,
+    ...pickIdentity(row),
     network: row.network,
     network_url: row.network_url,
     rating: row.rating,
   }));
+}
+
+// Which show a pick is: the key the server looks it up by, and the TMDB entry
+// a client adds it as, so adding a pick adds that show rather than whichever
+// one a title search guesses. title_lower stays for older clients.
+function pickIdentity(row) {
+  const m = /^(tv|movie):(\d+)$/.exec(row.show_key || '');
+  return {
+    title: row.title,
+    title_lower: (row.title || '').toLowerCase(),
+    show_key: row.show_key,
+    tmdb_id: m ? Number(m[2]) : null,
+    tmdb_type: m ? m[1] : null,
+  };
 }
 
 function outlierPicks(memberFp, scoredRows) {
@@ -119,7 +138,7 @@ function outlierPicks(memberFp, scoredRows) {
   const memberCentered = centerFp(memberFp);
   const ranked = [];
   for (const r of scoredRows) {
-    if (!r.title_lower) continue;
+    if (!r.show_key) continue;
     const fpR = {};
     for (const t of TRAIT_NAMES) fpR[t] = r[t];
     const sim = cosineSim(memberCentered, centerFp(fpR));
@@ -127,8 +146,7 @@ function outlierPicks(memberFp, scoredRows) {
   }
   ranked.sort((a, b) => a.sim - b.sim);
   return ranked.slice(0, 3).map(({ row }) => ({
-    title: row.title,
-    title_lower: row.title_lower,
+    ...pickIdentity(row),
     list: row.list,
     network: row.network,
     network_url: row.network_url,
@@ -137,18 +155,19 @@ function outlierPicks(memberFp, scoredRows) {
 }
 
 async function enrichPick(env, p) {
-  // A representative live copy of this title. The web page renders picks with
+  // A representative live copy of this show. The web page renders picks with
   // the shared show card (public/show-renderer.js), which needs the artwork
   // and season data — and an id, so tapping a pick can open the same show
   // detail screen as everywhere else. Prefer a copy that actually has a
   // poster so the card isn't stuck on the placeholder.
+  const which = keyWhere('s', p.show_key);
   const showRow = await env.DB.prepare(
     `SELECT id, poster_url, movie, seasons_released, full_series, next_season_date
-     FROM shows_v
-     WHERE LOWER(title) = ? AND archived = 0
+     FROM shows_v s
+     WHERE ${which.sql} AND archived = 0
      ORDER BY (poster_url IS NULL OR poster_url = ''), id
      LIMIT 1`
-  ).bind(p.title_lower).first();
+  ).bind(...which.binds).first();
   if (showRow) {
     p.id = showRow.id;
     p.poster_url = showRow.poster_url;
@@ -159,21 +178,58 @@ async function enrichPick(env, p) {
   }
 
   const genreRow = await env.DB.prepare(
-    `SELECT genres FROM shows_v
-     WHERE LOWER(title) = ? AND archived = 0 AND genres IS NOT NULL AND genres != ''
+    `SELECT genres FROM shows_v s
+     WHERE ${which.sql} AND archived = 0 AND genres IS NOT NULL AND genres != ''
      ORDER BY id LIMIT 1`
-  ).bind(p.title_lower).first();
+  ).bind(...which.binds).first();
   p.genres = genreRow ? genreRow.genres : null;
 
   const { results: actors } = await env.DB.prepare(
     `SELECT a.name FROM actors_v a
      JOIN shows_v s ON s.id = a.show_id
-     WHERE LOWER(s.title) = ? AND s.archived = 0
+     WHERE ${which.sql} AND s.archived = 0
      GROUP BY a.name
      ORDER BY MIN(a.id)
      LIMIT 5`
-  ).bind(p.title_lower).all();
+  ).bind(...which.binds).all();
   p.actors = actors.map(a => a.name);
+}
+
+// The aligned-picks pool: every scored show some unexcluded member holds,
+// with a working watch link and a rating from any live copy. One pass over
+// the live library, joined in memory — a subquery per fingerprint scanned
+// the library once for each of several hundred shows.
+async function candidatePool(env, traitCols) {
+  const [{ results: traits }, { results: copies }] = await Promise.all([
+    env.DB.prepare(
+      `SELECT t.show_key, t.title, ${traitCols} FROM title_traits t
+        WHERE (t.unknown_show = 0 OR t.unknown_show IS NULL)`
+    ).all(),
+    env.DB.prepare(
+      `SELECT ${KEY} AS show_key, s.member_slug, s.network, s.network_url, s.rating
+         FROM shows_v s WHERE s.archived = 0 ORDER BY s.id`
+    ).all(),
+  ]);
+  const byKey = new Map();
+  for (const c of copies) {
+    let k = byKey.get(c.show_key);
+    if (!k) byKey.set(c.show_key, k = { held: false, network: null, network_url: null, rating: null });
+    // The one place the taste exclusion belongs in this file: a
+    // recommendation is a club-level claim ("someone here rates this"), so a
+    // show no unexcluded member holds isn't offered to anyone.
+    if (!EXCLUDED_FROM_TASTE.includes(c.member_slug)) k.held = true;
+    if (!k.network && c.network && c.network_url && !PLACEHOLDER_URL.test(c.network_url)) {
+      k.network = c.network;
+      k.network_url = c.network_url;
+    }
+    if (k.rating == null && c.rating != null) k.rating = c.rating;
+  }
+  const pool = [];
+  for (const t of traits) {
+    const k = byKey.get(t.show_key);
+    if (k && k.held) pool.push({ ...t, network: k.network, network_url: k.network_url, rating: k.rating });
+  }
+  return pool;
 }
 
 export async function onRequestGet(context) {
@@ -231,13 +287,13 @@ export async function onRequestGet(context) {
   const traitCols = TRAIT_NAMES.map(t => `t.${t}`).join(', ');
 
   const { results: rows } = await env.DB.prepare(
-    `SELECT s.list, s.title, s.network, s.network_url, s.rating, t.title_lower, ${traitCols}
+    `SELECT s.list, s.title, s.network, s.network_url, s.rating, t.show_key, ${traitCols}
      FROM shows_v s
-     LEFT JOIN show_traits t ON LOWER(s.title) = t.title_lower AND (t.unknown_show = 0 OR t.unknown_show IS NULL)
+     LEFT JOIN title_traits t ON t.show_key = ${KEY} AND (t.unknown_show = 0 OR t.unknown_show IS NULL)
      WHERE s.member_slug = ? AND s.archived = 0`
   ).bind(memberSlug).all();
 
-  const scoredRows = rows.filter(r => r.title_lower != null);
+  const scoredRows = rows.filter(r => r.show_key != null);
   const fp = computeFingerprint(scoredRows);
 
   if (!fp) {
@@ -247,32 +303,7 @@ export async function onRequestGet(context) {
     }), { headers: corsHeaders() });
   }
 
-  const { results: allScored } = await env.DB.prepare(
-    `SELECT t.title_lower, t.title, ${traitCols},
-       (SELECT s2.network FROM shows_v s2 WHERE LOWER(s2.title) = t.title_lower AND s2.archived = 0
-          AND s2.network IS NOT NULL AND s2.network != ''
-          AND s2.network_url IS NOT NULL AND s2.network_url != ''
-          AND s2.network_url NOT LIKE '%search%' AND s2.network_url NOT LIKE '%/s?%'
-        ORDER BY s2.id LIMIT 1) AS network,
-       (SELECT s2.network_url FROM shows_v s2 WHERE LOWER(s2.title) = t.title_lower AND s2.archived = 0
-          AND s2.network IS NOT NULL AND s2.network != ''
-          AND s2.network_url IS NOT NULL AND s2.network_url != ''
-          AND s2.network_url NOT LIKE '%search%' AND s2.network_url NOT LIKE '%/s?%'
-        ORDER BY s2.id LIMIT 1) AS network_url,
-       (SELECT s2.rating FROM shows_v s2 WHERE LOWER(s2.title) = t.title_lower AND s2.archived = 0
-          AND s2.rating IS NOT NULL ORDER BY s2.id LIMIT 1) AS rating
-     FROM show_traits t
-     WHERE (t.unknown_show = 0 OR t.unknown_show IS NULL)
-       AND EXISTS (
-         SELECT 1 FROM shows_v ss
-         WHERE LOWER(ss.title) = t.title_lower
-           AND ss.archived = 0
-           -- The one place the taste exclusion belongs in this file: a
-           -- recommendation is a club-level claim ("someone here rates this"),
-           -- so a title no unexcluded member holds isn't offered to anyone.
-           AND ss.member_slug NOT IN (${EXCLUDED_SQL})
-       )`
-  ).all();
+  const allScored = await candidatePool(env, traitCols);
 
   // Every member's fingerprint. Two things need them: the club baseline this
   // member is read against (without it the cluster is decided by what all
@@ -283,7 +314,7 @@ export async function onRequestGet(context) {
   const { results: clubRows } = await env.DB.prepare(
     `SELECT s.member_slug, s.list, ${traitCols}
      FROM shows_v s
-     JOIN show_traits t ON LOWER(s.title) = t.title_lower AND (t.unknown_show = 0 OR t.unknown_show IS NULL)
+     JOIN title_traits t ON t.show_key = ${KEY} AND (t.unknown_show = 0 OR t.unknown_show IS NULL)
      WHERE s.archived = 0`
   ).all();
   const byMember = new Map();
@@ -327,8 +358,8 @@ export async function onRequestGet(context) {
     baseline
   );
 
-  const memberTitleSet = new Set(scoredRows.map(r => r.title_lower));
-  const picks = alignedPicks(fp, allScored, memberTitleSet);
+  const memberKeys = new Set(scoredRows.map(r => r.show_key));
+  const picks = alignedPicks(fp, allScored, memberKeys);
   const outliers = outlierPicks(fp, scoredRows);
 
   for (const p of [...picks, ...outliers]) {

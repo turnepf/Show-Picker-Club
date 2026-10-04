@@ -319,7 +319,7 @@ never decide who is allowed to look at something.
   group whose members can already open each other's libraries.
 - A member always reads their own data, whatever any list says.
 - Catalog work is club-wide. `/api/admin-vibe-fill` scores every active title,
-  including titles only an excluded member holds — `show_traits` describes a
+  including titles only an excluded member holds — `title_traits` describes a
   title, it doesn't count anyone's taste. Skipping them is how the exclusion
   reaches its own member by the back door: a profile computed from the handful
   of her titles somebody else happens to share.
@@ -619,7 +619,9 @@ the original it remade), so a title is a display string, never an identifier.
   nightly Watchmode fill (which now looks a pinned row up by its TMDB id),
   URL propagation, network inheritance, and the URL-cleanup page's re-enrich
   and title fix, whose `COALESCE(new, tmdb_id)` used to re-point every copy of
-  every same-named film at one search result.
+  every same-named film at one search result. Vibe fingerprints are keyed by
+  show too (`title_traits`, migration 081), and an aligned pick carries its
+  TMDB entry so adding it adds that show.
 
 Enforcer: `scripts/enrich-identity-test.mjs` (every PR) — drives the add and
 `/api/enrich` against a fake TMDB serving two same-titled entries, popular

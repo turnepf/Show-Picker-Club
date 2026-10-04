@@ -277,6 +277,27 @@ CREATE TABLE IF NOT EXISTS show_traits (
   scored_at TEXT
 );
 
+-- Vibe fingerprints, one per show (migration 081). show_traits above is the
+-- retired title-keyed table, kept until a cleanup drops it.
+CREATE TABLE IF NOT EXISTS title_traits (
+  -- The show this fingerprint describes: 'tv:<tmdb_id>' / 'movie:<tmdb_id>',
+  -- or 'title:<lowercased title>' for a show TMDB never matched. The same
+  -- key as showKeySql() in functions/_shared/same-show.js.
+  show_key TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  warmth REAL, empathy REAL, emotional_repair REAL, moral_ambiguity REAL,
+  darkness REAL, cynicism REAL, manipulation REAL, power_orientation REAL,
+  chaos_intensity REAL, humor_warmth REAL, cruel_humor REAL,
+  intellectual_curiosity REAL, growth_orientation REAL, violence_intensity REAL,
+  comfort_coziness REAL, community_belonging REAL, satire REAL,
+  prestige_energy REAL, emotional_volatility REAL, healing_redemption REAL,
+  revenge_energy REAL, status_obsession REAL, optimism REAL, nihilism REAL,
+  teamwork REAL, absurdism REAL,
+  unknown_show INTEGER DEFAULT 0,
+  generated_at TEXT DEFAULT (datetime('now')),
+  scored_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS member_subscriptions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   member_slug TEXT NOT NULL REFERENCES members(slug),

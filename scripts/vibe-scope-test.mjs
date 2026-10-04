@@ -23,7 +23,7 @@
 //      she holds is never an aligned pick for someone else.
 //
 // Plus the trait-fill queue, which is what makes (2) more than a blank screen:
-// a title only an excluded member holds still gets scored, because show_traits
+// a title only an excluded member holds still gets scored, because title_traits
 // is a catalog of titles rather than a tally of whose taste counts.
 //
 // Same harness as scripts/activity-feed-test.mjs: the functions tree is copied
@@ -122,14 +122,15 @@ function addShow(env, { slug, title, list = 'watching', archived = 0, addedBy = 
 // Every trait defaults to 0.5; `lean` nudges the few that decide a cluster, so
 // two fixtures can be told apart without spelling out 26 columns each.
 function addTraits(env, title, lean = {}) {
-  const cols = ['title_lower', 'title', ...TRAIT_NAMES, 'scored_at'];
+  // Fixture shows are unpinned, so each one's key is its title (migration 081).
+  const cols = ['show_key', 'title', ...TRAIT_NAMES, 'scored_at'];
   const values = [
-    title.toLowerCase(), title,
+    'title:' + title.trim().toLowerCase(), title,
     ...TRAIT_NAMES.map((t) => (typeof lean[t] === 'number' ? lean[t] : 0.5)),
     '2026-08-02T00:00:00Z',
   ];
   env._db.prepare(
-    `INSERT OR REPLACE INTO show_traits (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`
+    `INSERT OR REPLACE INTO title_traits (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`
   ).run(...values);
 }
 

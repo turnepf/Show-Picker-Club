@@ -797,12 +797,18 @@ struct VibePick: Codable, Identifiable {
     let seasonsReleased: Int?
     let fullSeries: Int?
     let nextSeasonDate: String?
+    // The pick's TMDB entry, so adding it adds that show and not another one
+    // that shares its title. Nil from a server that predates it.
+    let tmdbId: Int?
+    let tmdbType: String?
     var id: String { title }
 
     enum CodingKeys: String, CodingKey {
         case title, list, network, rating, genres, actors, movie
         case showId = "id"
         case titleLower = "title_lower"
+        case tmdbId = "tmdb_id"
+        case tmdbType = "tmdb_type"
         case networkUrl = "network_url"
         case posterUrl = "poster_url"
         case seasonsReleased = "seasons_released"

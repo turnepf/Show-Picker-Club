@@ -408,6 +408,9 @@
             network_url: p.network_url || null,
             list,
             notes: notes || null,
+            // The pick's TMDB entry, so a show that shares its title isn't
+            // added in its place.
+            ...(p.tmdb_id ? { tmdb_id: p.tmdb_id, tmdb_type: p.tmdb_type, movie: p.tmdb_type === 'movie' ? 1 : 0 } : {}),
           }),
         });
         if (!res.ok) {
