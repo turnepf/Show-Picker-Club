@@ -39,6 +39,8 @@ import * as groupTrendingApi from '../api/groups/[id]/trending.js';
 import * as suggestionsApi from '../api/groups/[id]/suggestions.js';
 import * as suggestionApi from '../api/groups/[id]/suggestions/[sid].js';
 import * as membersApi from '../api/members.js';
+import * as adminQueryApi from '../api/admin-query.js';
+import { fieldGuide, QUERY_FIELDS, GROUP_FIELDS, COLUMN_FIELDS, QUERY_OPS, MAX_GROUPS, MAX_ROWS } from './show-query.js';
 import { actingAs } from './auth.js';
 import { groupMates } from './watchers.js';
 
@@ -96,12 +98,17 @@ function strArg(args, name, { required = false, max = 2000 } = {}) {
 }
 
 // Calls a handler as the member. Nothing leaves the Worker.
-async function call(ctx, handler, { method = 'GET', path, query = {}, body, params = {} }) {
+// adminScope marks the request for the one admin endpoint a members:admin
+// connection may reach (/api/admin-query); it is honoured only when the token
+// actually holds that scope.
+async function call(ctx, handler, { method = 'GET', path, query = {}, body, params = {}, adminScope = false }) {
   const url = new URL(path, ctx.origin);
   for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
   const init = { method, headers: { 'Content-Type': 'application/json' } };
   if (body !== undefined && method !== 'GET') init.body = JSON.stringify(body);
-  const request = actingAs(new Request(url, init), ctx.session);
+  const request = actingAs(new Request(url, init), ctx.session, {
+    adminScope: adminScope && Array.isArray(ctx.scopes) && ctx.scopes.includes('members:admin'),
+  });
   const res = await handler({ request, env: ctx.env, params, waitUntil: ctx.waitUntil, data: {} });
   let data = {};
   try { data = await res.json(); } catch { /* empty body */ }
@@ -809,6 +816,59 @@ export const TOOLS = [
       const out = await toolNamed('archive_show').run(asMember(ctx, m), { show_id: args.show_id });
       await logAdmin(ctx, m, 'archive_show', { show_id: out.archived });
       return { member: m.slug, ...out };
+    },
+  },
+  {
+    // Club-wide questions in one call instead of one call per member. Runs
+    // /api/admin-query as the admin; the field list is the engine's own, so
+    // the description can't drift from what the endpoint accepts.
+    name: 'admin_query',
+    title: 'Query the whole club (admin)',
+    description: [
+      'Answers club-wide questions about shows in one call: counts, unique titles, averages, and breakdowns, or the matching rows themselves. Admin connections only.',
+      'Every member\'s shows are included, archived ones too, unless a filter narrows them; the demo account and disabled members are left out. Filters are ANDed.',
+      'mode "aggregate" (default): measures (default ["rows","titles"]) are "rows" (one per member copy), "titles" (unique shows: the same TMDB entry, or the same title when unmatched), "members", or avg:/sum:/min:/max:<numeric field>. group_by takes up to 2 fields; totals for the same filters always come back too.',
+      'mode "rows": the matching shows, with columns, sort_by, sort, limit and offset.',
+      'Ops: eq, ne, in, not_in, contains, starts_with, gt, gte, lt, lte, between ([low, high]), empty, not_empty. Text matching ignores case. "empty" means no value.',
+      'Examples. Unique shows: {"measures":["titles"]}. From 2020 on: {"measures":["titles"],"filters":[{"field":"release_year","op":"gte","value":2020}]}. TV missing genres per member: {"filters":[{"field":"type","value":"tv"},{"field":"genres","op":"empty"}],"group_by":["member"]}.',
+      'Private memos (notes, watching_with, recommended_by) can only be filtered with empty / not_empty; their text is never returned.',
+      'Fields:',
+      fieldGuide(),
+    ].join('\n'),
+    scope: 'members:admin',
+    annotations: R,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mode: { type: 'string', enum: ['aggregate', 'rows'] },
+        measures: { type: 'array', items: { type: 'string' }, maxItems: 6, description: 'rows | titles | members | avg:<field> | sum:<field> | min:<field> | max:<field>' },
+        group_by: { type: 'array', items: { type: 'string', enum: GROUP_FIELDS }, maxItems: 2 },
+        filters: {
+          type: 'array',
+          maxItems: 20,
+          items: {
+            type: 'object',
+            properties: {
+              field: { type: 'string', enum: QUERY_FIELDS },
+              op: { type: 'string', enum: QUERY_OPS, description: 'Default eq.' },
+              value: { description: 'A string, number or boolean; an array for in / not_in / between.' },
+            },
+            required: ['field'],
+            additionalProperties: false,
+          },
+        },
+        columns: { type: 'array', items: { type: 'string', enum: COLUMN_FIELDS }, maxItems: 30, description: 'rows mode only.' },
+        sort_by: { type: 'string', enum: COLUMN_FIELDS, description: 'rows mode only. Default title.' },
+        sort: { type: 'string', enum: ['desc', 'asc', 'key'], description: 'aggregate: by the first measure (default desc) or "key"; rows: asc (default) or desc.' },
+        limit: { type: 'integer', minimum: 1, maximum: Math.max(MAX_GROUPS, MAX_ROWS), description: 'Groups (default 50) or rows (default 100) returned.' },
+        offset: { type: 'integer', minimum: 0, description: 'rows mode only.' },
+        include_demo: { type: 'boolean', description: 'Count the demo account too. Default false.' },
+      },
+    },
+    async run(ctx, args) {
+      return ok(ctx, adminQueryApi.onRequestPost, {
+        method: 'POST', path: '/api/admin-query', body: args, adminScope: true,
+      }, 'That query');
     },
   },
 ];

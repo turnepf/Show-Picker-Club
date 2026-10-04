@@ -1,4 +1,4 @@
-import { getSession, isDelegated } from './auth.js';
+import { getSession, isDelegated, hasDelegatedAdminScope } from './auth.js';
 
 // Admin rights live in the database (members.is_admin, migration 029), not
 // in source. Admin tools (member setup, URL cleanup, vibe fill, SMS test,
@@ -22,6 +22,25 @@ export async function getAdminSession(request, env) {
     return row?.is_admin ? session : null;
   } catch (e) {
     // Pre-migration database (no is_admin column yet): fail closed.
+    return null;
+  }
+}
+
+// getAdminSession, plus an AI connection carrying the members:admin scope.
+// For read-only admin endpoints that an admin's connection may reach — today
+// only /api/admin-query (docs/INVARIANTS.md §27). The admin bit is re-read
+// here rather than trusted from the token, so a demotion closes it at once.
+export async function getConnectorAdminSession(request, env) {
+  if (!isDelegated(request)) return getAdminSession(request, env);
+  if (!hasDelegatedAdminScope(request)) return null;
+  const session = await getSession(request, env);
+  if (!session || !session.member_slug) return null;
+  try {
+    const row = await env.DB.prepare(
+      'SELECT is_admin, COALESCE(disabled, 0) AS disabled FROM members WHERE slug = ?'
+    ).bind(session.member_slug).first();
+    return row?.is_admin && !row.disabled ? session : null;
+  } catch (e) {
     return null;
   }
 }

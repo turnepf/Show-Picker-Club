@@ -993,7 +993,8 @@ member could do anyway, and nothing it does may widen what anyone can see.
   Creating a group, minting an invite and leaving are allowed.
 - **Never an operator tool.** `getAdminSession()` refuses a delegated request,
   so even an admin's own token can't reach reporting, member management or any
-  other admin endpoint.
+  other admin endpoint. The one exception is `/api/admin-query` (below), which
+  uses its own gate, `getConnectorAdminSession()`; no other endpoint calls it.
 - **One admin power, opted into per connection (2026-10).** The `members:admin`
   scope lets an admin's connection list every member and add, rate and archive
   shows on anybody's lists. Patrick's rule: an admin can change anyone's
@@ -1014,6 +1015,18 @@ member could do anyway, and nothing it does may widen what anyone can see.
   - **Every change is recorded.** Each change goes to `admin_actions`
     (migration 074). `added_by` names the admin, not the member, and Connected
     apps labels the connection as admin.
+  - **One read-only question across the club (2026-10).** `admin_query`
+    answers counts, unique titles, averages and breakdowns in one call, through
+    `/api/admin-query`. It is the only admin endpoint a connection reaches.
+    The request carries a flag that only the `members:admin` scope sets, and
+    the gate re-reads `is_admin` and `disabled` on every call. The query is a
+    spec over fields named in `_shared/show-query.js`, never SQL, so no field
+    reaches sessions, tokens, login emails or phones. Memos stay presence-only:
+    a query can count shows that have a note, but can't return or match one.
+    `added_by` isn't a field. Neither is a private group, because "shows per
+    group" is a group's content (§13). The demo account and disabled members
+    are left out unless the caller asks for the demo.
+    Enforcer: `scripts/admin-query-test.mjs`.
 - **Only a token opens `/mcp`.** A session cookie is ignored there: the
   endpoint takes writes, and a cookie rides along from any page the member
   visits. Tokens are opaque and only their SHA-256 is stored.

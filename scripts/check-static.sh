@@ -250,7 +250,7 @@ section_ok=1
 while IFS= read -r f; do
   rel="${f#functions/api/}"
   case " $PUBLIC_ENDPOINTS " in *" $rel "*) continue ;; esac
-  if ! grep -qE 'getSession|getAdminSession|isAdmin|CRON_SECRET|410' "$f"; then
+  if ! grep -qE 'getSession|getAdminSession|getConnectorAdminSession|isAdmin|CRON_SECRET|410' "$f"; then
     err "functions/api/$rel has no session/admin/cron gate and is not a 410 stub. Gate it, or add it to PUBLIC_ENDPOINTS in scripts/check-static.sh."
     section_ok=0
   fi

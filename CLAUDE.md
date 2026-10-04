@@ -533,6 +533,26 @@ effect on the next call. Connected apps (`/api/connected-apps`) is
 cookie-session only, so an AI can't list or cut connections.
 
 ```bash
+node scripts/admin-query-test.mjs
+```
+
+`/api/admin-query` and the `admin_query` MCP tool answer club-wide questions
+about shows in one call ("how many unique shows", "how many from 2020 on",
+"TV missing genres, per member") instead of one call per member. The
+properties pinned are the ones that keep a broad read narrow. **Who:** an
+admin session, or an admin's connection holding `members:admin`. The flag
+that lets a connection in opens this endpoint and no other admin gate, and
+a demoted or disabled admin is refused even while the token still lists the
+scope. **What:** a spec over named fields, never SQL, so a quote is data and
+an unknown field, op or measure is a 400. Private memos can be counted but
+not returned, matched or grouped. Login emails (`added_by`) and private
+groups (§13) aren't fields. **The numbers:** `titles` counts one TMDB entry
+(or one title TMDB never matched). A per-genre or per-actor breakdown counts
+a show once per value, while the totals still count it once. The demo
+account and disabled members stay out. A date filter reads both stored
+timestamp shapes, where a string comparison would drop `datetime('now')`'s.
+
+```bash
 node scripts/og-preview-test.mjs
 ```
 
@@ -642,7 +662,7 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 - **Feature flags via secrets:** `DEMO_LOGIN_EMAIL`/`DEMO_LOGIN_CODE` (App Review demo account with auto-reset), inert when unset. Signup is always open — there is no kill switch and no approval step.
 - **Retired 2026-07:** the open cross-member writes (suggest-a-show, share-to-member) — those endpoints still return 410, and the reason they're gone is that anyone could push a row onto anyone. **Watching With (2026-08) is the one cross-member write that exists now**, and it's the shape a new one would have to take: only a group-mate can be named, an existing copy is linked where it already sits rather than moved or duplicated, and unlinking touches only your own row (`_shared/watchers.js`, `scripts/watching-with-test.mjs`). "Picks for You" (`/api/recommendations`) is no longer called by any client but kept for compatibility.
 - **The home page does not list members.** `/api/members` is still the roster source for the member-page sidebar, cross-library search, household, and the calendar-feed link — just not the landing page.
-- **MCP server (2026-09):** `/mcp` lets a member's AI app act on their lists; OAuth under `/oauth/*` with the club as its own authorization server; `/connect` and `/connected-apps` are the web pages (OAuth is a browser flow — the one deliberate exception to the frozen web). New tools must call an existing handler through `_shared/mcp-tools.js`, never query around it, and account-shaped actions (invite redemption, household, account, passkeys, operator endpoints) stay out. The `members:admin` tools are the one admin power. They act on another member's shows by running the member tools as that member (INVARIANTS §27). See `docs/ARCHITECTURE.md#mcp-server`.
+- **MCP server (2026-09):** `/mcp` lets a member's AI app act on their lists; OAuth under `/oauth/*` with the club as its own authorization server; `/connect` and `/connected-apps` are the web pages (OAuth is a browser flow — the one deliberate exception to the frozen web). New tools must call an existing handler through `_shared/mcp-tools.js`, never query around it, and account-shaped actions (invite redemption, household, account, passkeys, operator endpoints) stay out. The `members:admin` tools are the one admin power. They act on another member's shows by running the member tools as that member (INVARIANTS §27). `admin_query` is their read-only companion: it calls `/api/admin-query`, the only admin endpoint a connection can reach, for club-wide stats in one call. See `docs/ARCHITECTURE.md#mcp-server`.
 - **Native apps** call the same `/api/*` endpoints; shared models live in the repo-root `ShowPickerCore` package. tvOS is view-only. watchOS gets its session from the iPhone via WatchConnectivity. iOS has offline caching + a queued-write sync layer (`ios/ShowPickerIOS/Offline/`).
 
 ## Non-obvious conventions (violating these breaks features)
