@@ -10,10 +10,16 @@
 // The rules that keep this narrow are pinned by scripts/mcp-test.mjs and
 // written down in docs/INVARIANTS.md §27.
 
-export const SCOPES = ['shows:read', 'shows:write'];
+// members:admin is the operator's: an admin who ticks it on the consent
+// screen lets the connection list every member and add, rate and archive
+// shows on their lists. It is never ticked by default, never granted to a
+// member who isn't an admin, and dropped from a live token the moment its
+// member stops being one (authenticateBearer). See docs/INVARIANTS.md §27.
+export const SCOPES = ['shows:read', 'shows:write', 'members:admin'];
 export const SCOPE_LABELS = {
   'shows:read': 'See your lists, notes and groups',
   'shows:write': 'Add, edit, move and remove shows, and act in your groups',
+  'members:admin': 'See every member, and add, rate and archive shows on their lists. Admins only',
 };
 
 export const ACCESS_TTL_SECONDS = 60 * 60;
@@ -171,7 +177,7 @@ export async function authenticateBearer(request, env) {
   if (!m) return null;
   const row = await env.DB.prepare(
     `SELECT g.id AS grant_id, g.member_slug, g.client_id, g.scope, g.last_used_at,
-            m.first_name, m.name
+            m.first_name, m.name, COALESCE(m.is_admin, 0) AS is_admin
        FROM oauth_tokens t
        JOIN oauth_grants g ON g.id = t.grant_id
        JOIN members m ON m.slug = g.member_slug
@@ -188,7 +194,9 @@ export async function authenticateBearer(request, env) {
     // Same value issueSession() stores as sessions.email — the display name
     // handlers stamp into added_by.
     email: row.first_name || row.name || row.member_slug,
-    scopes: parseScope(row.scope),
+    // An admin grant outlives nothing: demote the member and the next call
+    // sees no admin tools.
+    scopes: parseScope(row.scope).filter((sc) => sc !== 'members:admin' || row.is_admin),
   };
 }
 

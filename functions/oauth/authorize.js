@@ -120,7 +120,7 @@ export async function onRequestGet({ request, env }) {
     });
   }
 
-  const member = await env.DB.prepare('SELECT first_name, name FROM members WHERE slug = ?')
+  const member = await env.DB.prepare('SELECT first_name, name, COALESCE(is_admin, 0) AS is_admin FROM members WHERE slug = ?')
     .bind(session.member_slug).first();
   const who = member?.first_name || member?.name || session.member_slug;
   const csrf = await csrfToken(sessionIdFrom(request), req);
@@ -129,6 +129,7 @@ export async function onRequestGet({ request, env }) {
     return `<input type="hidden" name="${f}" value="${escapeHtml(val)}">`;
   }).join('');
   const wantsWrite = req.scopes.includes('shows:write');
+  const offersAdmin = req.scopes.includes('members:admin') && !!member?.is_admin;
 
   return renderPage({
     title: 'Connect an app',
@@ -140,6 +141,7 @@ ${hidden}<input type="hidden" name="csrf" value="${escapeHtml(csrf)}">
 <ul class="scopes">
 <li><input type="checkbox" checked disabled aria-label="Read"><div><strong>Read</strong><div class="muted">${escapeHtml(SCOPE_LABELS['shows:read'])}</div></div></li>
 ${wantsWrite ? `<li><input type="checkbox" name="grant_write" value="1" id="gw" checked><label for="gw"><strong>Make changes</strong><div class="muted">${escapeHtml(SCOPE_LABELS['shows:write'])}. Untick to connect read-only.</div></label></li>` : ''}
+${offersAdmin ? `<li><input type="checkbox" name="grant_admin" value="1" id="ga"><label for="ga"><strong>Act on any member’s lists</strong><div class="muted">${escapeHtml(SCOPE_LABELS['members:admin'])}. Leave unticked unless this connection is for admin work.</div></label></li>` : ''}
 </ul>
 <p class="muted">It can’t join groups for you, change your household, or touch your account settings. You can disconnect it any time from <a href="/connected-apps">Connected apps</a>.</p>
 <div class="actions">
@@ -177,7 +179,14 @@ export async function onRequestPost({ request, env }) {
     return redirectWith(req.redirectUri, { error: 'access_denied', error_description: 'The member declined', state: req.state, iss: req.iss });
   }
 
-  const granted = req.scopes.filter((s) => s === 'shows:read' || (s === 'shows:write' && p.get('grant_write') === '1'));
+  // The admin box is re-checked against the database, not the form: a
+  // hand-built POST from a member who isn't an admin grants nothing extra.
+  const isAdminMember = p.get('grant_admin') === '1' && !!(await env.DB.prepare(
+    'SELECT COALESCE(is_admin, 0) AS is_admin FROM members WHERE slug = ?'
+  ).bind(session.member_slug).first())?.is_admin;
+  const granted = req.scopes.filter((s) => s === 'shows:read' ||
+    (s === 'shows:write' && p.get('grant_write') === '1') ||
+    (s === 'members:admin' && isAdminMember));
   const code = randomToken();
   await env.DB.prepare(
     `INSERT INTO oauth_codes (code_hash, client_id, member_slug, redirect_uri, code_challenge, scope, expires_at)

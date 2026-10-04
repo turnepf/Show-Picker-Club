@@ -12,8 +12,15 @@
 //
 // Deliberately absent (docs/INVARIANTS.md §27): joining a group by invite,
 // renaming or deleting a group, household, account deletion, passkeys,
-// import, anything admin. Account-shaped actions stay in the app, where a
-// person is looking at them.
+// import, and every operator tool. Account-shaped actions stay in the app,
+// where a person is looking at them.
+//
+// The one admin power a connection can carry is the members:admin scope at
+// the bottom of this file: an admin who ticked it can list members and add,
+// rate and archive shows on anybody's lists. Those tools run the ordinary
+// member tools as the target member, so every rule the app applies to that
+// member's own edits still applies, and each change is written to
+// admin_actions.
 
 import * as showsApi from '../api/shows.js';
 import * as showApi from '../api/shows/[id].js';
@@ -31,6 +38,7 @@ import * as groupLeaveApi from '../api/groups/[id]/leave.js';
 import * as groupTrendingApi from '../api/groups/[id]/trending.js';
 import * as suggestionsApi from '../api/groups/[id]/suggestions.js';
 import * as suggestionApi from '../api/groups/[id]/suggestions/[sid].js';
+import * as membersApi from '../api/members.js';
 import { actingAs } from './auth.js';
 import { groupMates } from './watchers.js';
 
@@ -674,8 +682,161 @@ export const TOOLS = [
       return { left: gid };
     },
   },
+  // ---- admin: another member's lists (members:admin) ----
+  // Offered only to a token whose member is an admin and who ticked "Act on
+  // any member's lists" when connecting; authenticateBearer drops the scope
+  // the moment the member stops being an admin.
+  {
+    name: 'admin_list_members',
+    title: 'List all members (admin)',
+    description: 'Every club member with their slug, display name and list counts. Admin connections only.',
+    scope: 'members:admin',
+    annotations: R,
+    inputSchema: { type: 'object', properties: {} },
+    async run(ctx) {
+      const { members } = await ok(ctx, membersApi.onRequestGet, { path: '/api/members' });
+      return {
+        members: (members || []).map((m) => ({
+          slug: m.slug,
+          name: m.display_name || m.name,
+          shows: m.show_count ?? undefined,
+        })),
+      };
+    },
+  },
+  {
+    name: 'admin_list_member_shows',
+    title: "List a member's shows (admin)",
+    description: "Any member's shows, archived ones included when asked, with show_id and their rating. Private notes, recommended-by and watching-with are left out. Admin connections only.",
+    scope: 'members:admin',
+    annotations: R,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        member_slug: { type: 'string' },
+        list: listSchema,
+        include_archived: { type: 'boolean', description: 'Also include archived shows. Default false.' },
+        ...pageSchema,
+      },
+      required: ['member_slug'],
+    },
+    async run(ctx, args) {
+      const m = await targetMember(ctx, args);
+      const { member_slug, ...rest } = args;
+      const out = await toolNamed('list_my_shows').run(asMember(ctx, m), rest);
+      for (const sh of out.shows) { delete sh.notes; delete sh.recommended_by; delete sh.watching_with; }
+      return { member: m.slug, ...out };
+    },
+  },
+  {
+    name: 'admin_add_show',
+    title: "Add a show to a member's list (admin)",
+    description: "Adds a show or movie to any member's list, exactly as add_show does for your own. With archived: true it goes straight to their archive (added to loved, then archived), and with rating it is rated in the same call. Admin connections only.",
+    scope: 'members:admin',
+    write: true,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        member_slug: { type: 'string' },
+        title: { type: 'string' },
+        list: listSchema,
+        tmdb_id: { type: 'integer' },
+        media_type: { type: 'string', enum: ['tv', 'movie'] },
+        archived: { type: 'boolean', description: 'Put it straight into their archive. Default false.' },
+        rating: { type: 'integer', minimum: 1, maximum: 10, description: 'Overall rating to set once it is added.' },
+      },
+      required: ['member_slug', 'title'],
+    },
+    async run(ctx, args) {
+      const m = await targetMember(ctx, args);
+      const as = asMember(ctx, m);
+      const list = args.list || (args.archived ? 'loved' : null);
+      if (!list) throw new ToolError('list is required unless archived is true.');
+      const rating = intArg(args, 'rating', { required: false });
+      if (rating !== undefined && (rating < 1 || rating > 10)) throw new ToolError('rating must be 1–10.');
+      const { added } = await toolNamed('add_show').run(as, {
+        title: args.title, list, tmdb_id: args.tmdb_id, media_type: args.media_type,
+      });
+      // Logged as soon as the row exists, so a rating or archive step that
+      // fails after it still leaves the add on the record.
+      await logAdmin(ctx, m, 'add_show', { show_id: added.id, title: added.title, list, archived: !!args.archived, rating });
+      const out = { member: m.slug, added };
+      if (rating !== undefined) out.ratings = (await toolNamed('rate_show').run(as, { show_id: added.id, rating })).ratings;
+      if (args.archived) { await toolNamed('archive_show').run(as, { show_id: added.id }); out.archived = true; }
+      return out;
+    },
+  },
+  {
+    name: 'admin_rate_show',
+    title: "Rate a member's show (admin)",
+    description: "Sets a member's 1–10 rating on one of their shows, overall or for one season, replacing any rating they had. Not available for Next Up shows. Admin connections only.",
+    scope: 'members:admin',
+    write: true,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        member_slug: { type: 'string' },
+        show_id: { type: 'integer' },
+        rating: { type: 'integer', minimum: 1, maximum: 10 },
+        season: { type: 'integer', minimum: 1, description: 'Omit for an overall rating.' },
+      },
+      required: ['member_slug', 'show_id', 'rating'],
+    },
+    async run(ctx, args) {
+      const m = await targetMember(ctx, args);
+      const { member_slug, ...rest } = args;
+      const out = await toolNamed('rate_show').run(asMember(ctx, m), rest);
+      await logAdmin(ctx, m, 'rate_show', { show_id: rest.show_id, rating: rest.rating, season: rest.season });
+      return { member: m.slug, ...out };
+    },
+  },
+  {
+    name: 'admin_archive_show',
+    title: "Archive a member's show (admin)",
+    description: "Takes one of a member's shows off their lists and into their archive. Admin connections only.",
+    scope: 'members:admin',
+    write: true,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    inputSchema: {
+      type: 'object',
+      properties: { member_slug: { type: 'string' }, show_id: { type: 'integer' } },
+      required: ['member_slug', 'show_id'],
+    },
+    async run(ctx, args) {
+      const m = await targetMember(ctx, args);
+      const out = await toolNamed('archive_show').run(asMember(ctx, m), { show_id: args.show_id });
+      await logAdmin(ctx, m, 'archive_show', { show_id: out.archived });
+      return { member: m.slug, ...out };
+    },
+  },
 ];
 
+// The member an admin tool acts on. A disabled member is refused: a ban
+// stops their lists changing too.
+async function targetMember(ctx, args) {
+  const slug = strArg(args, 'member_slug', { required: true, max: 80 });
+  const m = await ctx.env.DB.prepare(
+    'SELECT slug, COALESCE(disabled, 0) AS disabled FROM members WHERE slug = ?'
+  ).bind(slug).first();
+  if (!m || m.disabled) throw new ToolError(`No active member with the slug "${slug}". admin_list_members has them all.`);
+  return m;
+}
+
+// A ctx whose session is the target member's, so the handlers' owner checks
+// pass for their rows and only theirs. `email` stays the admin's display
+// name: it is what handlers stamp into added_by, so a show an admin added
+// says who added it.
+function asMember(ctx, m) {
+  return { ...ctx, session: { member_slug: m.slug, email: ctx.session.email, expires_at: null } };
+}
+
+async function logAdmin(ctx, m, action, detail) {
+  await ctx.env.DB.prepare(
+    'INSERT INTO admin_actions (admin_slug, member_slug, action, detail) VALUES (?, ?, ?, ?)'
+  ).bind(ctx.session.member_slug, m.slug, action, JSON.stringify(detail)).run();
+}
 const TOOLS_BY_NAME = Object.fromEntries(TOOLS.map((t) => [t.name, t]));
 
 export function toolNamed(name) {

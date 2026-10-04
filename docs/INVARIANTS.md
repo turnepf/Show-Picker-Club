@@ -991,8 +991,29 @@ member could do anyway, and nothing it does may widen what anyone can see.
   Account-shaped actions stay in the app: no redeeming invites, no household,
   no group rename/delete, no account deletion, passkeys, import or export.
   Creating a group, minting an invite and leaving are allowed.
-- **Never admin.** `getAdminSession()` refuses a delegated request, so even an
-  admin's own token can't reach an operator tool.
+- **Never an operator tool.** `getAdminSession()` refuses a delegated request,
+  so even an admin's own token can't reach reporting, member management or any
+  other admin endpoint.
+- **One admin power, opted into per connection (2026-10).** The `members:admin`
+  scope lets an admin's connection list every member and add, rate and archive
+  shows on anybody's lists. Patrick's rule: an admin can change anyone's
+  data. It is held narrow:
+  - **Offered only to an admin, and unticked by default.** The consent screen
+    shows the box only when `members.is_admin = 1`. The POST re-checks the
+    database, so a hand-built `grant_admin` from anyone else grants nothing.
+  - **Lost with the admin bit.** `authenticateBearer` drops the scope from a
+    live token when its member is no longer an admin, so the tools vanish on
+    the next call.
+  - **The member's own rules still apply.** Each admin tool runs the ordinary
+    member tool with the *target's* session, so owner checks pass for that
+    member's rows and only theirs: a `show_id` belonging to someone else is
+    refused, Next Up still can't be rated, and a disabled member's lists
+    don't change.
+  - **Memos stay private.** `admin_list_member_shows` strips notes,
+    recommended-by and watching-with even though it reads as the owner.
+  - **Every change is recorded.** Each change goes to `admin_actions`
+    (migration 074). `added_by` names the admin, not the member, and Connected
+    apps labels the connection as admin.
 - **Only a token opens `/mcp`.** A session cookie is ignored there: the
   endpoint takes writes, and a cookie rides along from any page the member
   visits. Tokens are opaque and only their SHA-256 is stored.
@@ -1005,7 +1026,8 @@ member could do anyway, and nothing it does may widen what anyone can see.
 - **A replay costs the connection.** PKCE S256 is mandatory; a code redeemed
   twice, or a rotated refresh token presented again, revokes the grant.
 - **Scopes decide what exists.** A read-only grant isn't shown the write tools
-  and can't call one by name.
+  and can't call one by name. The same holds for the admin tools without
+  `members:admin`.
 - **Stopping is immediate.** Revoking from Connected apps, the app's own
   RFC 7009 revoke, a ban and account deletion all end the grant on the next
   call; a ban revokes rather than merely suspending, so re-enabling a member

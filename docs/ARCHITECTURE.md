@@ -825,8 +825,9 @@ grant per member per client, which is what Connected apps lists.
 | `oauth_tokens` | access/refresh token hashes per grant; `rotated_at` marks a spent refresh token so a replay can be detected |
 | `mcp_usage` | per-member per-UTC-day counters behind `DAILY_CAPS`, kept a year for Reporting's AI-apps section (30-day and all-time usage); pruned from the token endpoint |
 
-Scopes are `shows:read` and `shows:write`; the consent screen lets the member
-untick write. Expired codes and tokens and week-old usage rows are pruned
+Scopes are `shows:read`, `shows:write` and `members:admin`. The consent screen
+lets the member untick write. It shows the admin box, unticked, to admins only.
+The scope is dropped from a live token once its member stops being an admin. Expired codes and tokens and week-old usage rows are pruned
 opportunistically from the token endpoint.
 
 **Tools call the existing handlers.** `_shared/mcp-tools.js` builds a
@@ -840,8 +841,16 @@ compact rows. Read: `get_profile`, `list_my_shows`, `get_show`,
 Write: `add_show`, `update_show`, `move_show`, `reorder_list`, `rate_show`,
 `archive_show`, `restore_show`, `delete_show`, `recommend_to_group`,
 `respond_to_recommendation`, `remove_recommendation`, `create_group`,
-`create_group_invite`, `leave_group`. Deliberately absent: invite redemption,
-group rename/delete, household, account, passkeys, import/export, admin.
+`create_group_invite`, `leave_group`.
+
+Admin (`members:admin` only): `admin_list_members`, `admin_list_member_shows`
+(memos stripped), `admin_add_show` (optionally straight to the archive, with a
+rating), `admin_rate_show` and `admin_archive_show`. Each one runs the member
+tool with the target member's session and records the change in
+`admin_actions` (migration 074). See `docs/INVARIANTS.md` §27.
+
+Deliberately absent: invite redemption, group rename/delete, household,
+account, passkeys, import/export, and every operator endpoint.
 
 **Bookkeeping.** A call stamps `oauth_grants.last_used_at` (throttled to every
 five minutes) and records `mcp` in `member_platforms`; `/api/reporting` counts

@@ -520,6 +520,18 @@ CREATE TABLE IF NOT EXISTS mcp_usage (
   PRIMARY KEY (member_slug, day)
 );
 
+-- Changes an admin made to another member's lists through a connected AI
+-- app (members:admin scope). See migration 074.
+CREATE TABLE IF NOT EXISTS admin_actions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  admin_slug TEXT NOT NULL,
+  member_slug TEXT NOT NULL,
+  action TEXT NOT NULL,
+  detail TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_admin_actions_member ON admin_actions(member_slug, created_at);
+
 -- Per-member daily ledger of upstream spend (Claude, TMDB/Watchmode). See
 -- migration 072 and _shared/spend-meter.js.
 CREATE TABLE IF NOT EXISTS member_spend (

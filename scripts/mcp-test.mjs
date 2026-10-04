@@ -197,19 +197,19 @@ async function tokenRequest(env, params) {
 }
 
 // The whole dance a client does, returning the code and the token response.
-async function connect(env, slug, { write = true, clientId, redirect = CLAUDE_REDIRECT } = {}) {
+async function connect(env, slug, { write = true, adminBox = false, clientId, redirect = CLAUDE_REDIRECT } = {}) {
   if (!clientId) clientId = (await registerClient(env, { client_name: 'Claude', redirect_uris: [redirect] })).data.client_id;
   const cookie = addSession(env, slug);
   const { verifier, challenge } = pkce();
   const page = await getAuthorize(env, {
     response_type: 'code', client_id: clientId, redirect_uri: redirect, code_challenge: challenge,
-    code_challenge_method: 'S256', state: 'st8', scope: 'shows:read shows:write', resource: `${ORIGIN}/mcp`,
+    code_challenge_method: 'S256', state: 'st8', scope: 'shows:read shows:write members:admin', resource: `${ORIGIN}/mcp`,
   }, cookie);
-  const fields = { ...hiddenFields(page.html), decision: 'allow', ...(write ? { grant_write: '1' } : {}) };
+  const fields = { ...hiddenFields(page.html), decision: 'allow', ...(write ? { grant_write: '1' } : {}), ...(adminBox ? { grant_admin: '1' } : {}) };
   const consent = await postConsent(env, fields, cookie);
   const code = new URL(consent.location).searchParams.get('code');
   const tok = await tokenRequest(env, { grant_type: 'authorization_code', code, redirect_uri: redirect, client_id: clientId, code_verifier: verifier });
-  return { clientId, cookie, code, verifier, consent, tok, access: tok.data.access_token, refresh: tok.data.refresh_token };
+  return { clientId, cookie, code, verifier, consent, page, tok, access: tok.data.access_token, refresh: tok.data.refresh_token };
 }
 
 let rpcId = 0;
@@ -546,6 +546,82 @@ console.log('\n== group actions');
   check('leave_group leaves', !left.isError && !row(env, "SELECT 1 AS x FROM group_members WHERE group_id = ? AND member_slug = 'quinn'", groupId));
   const gone = await tool(env, pat.access, 'list_member_shows', { member_slug: 'quinn' });
   check("once you share no group, their lists close", gone.isError);
+}
+
+console.log('\n== an admin who opts in can act on any member');
+{
+  const { env } = club();
+  const stacyShow = addShow(env, { slug: 'stacy', title: 'Hacks', list: 'recommending', notes: 'STACY-NOTE', tmdb: 61 });
+  const stacyNext = addShow(env, { slug: 'stacy', title: 'Slow Horses', list: 'next', tmdb: 62 });
+  const quinnShow = addShow(env, { slug: 'quinn', title: 'The Pitt', list: 'watching', tmdb: 63 });
+
+  const plain = await connect(env, 'patrick');
+  check('an admin sees the admin box, unticked', /name="grant_admin"/.test(plain.page.html) && !/name="grant_admin"[^>]*checked/.test(plain.page.html));
+  check('left unticked, the grant has no admin scope', !plain.tok.data.scope.includes('members:admin'));
+  const plainTools = (await rpc(env, plain.access, 'tools/list', {})).body.result.tools.map((t) => t.name);
+  check('and no admin tools', !plainTools.some((n) => n.startsWith('admin_')));
+  const refused = await tool(env, plain.access, 'admin_rate_show', { member_slug: 'stacy', show_id: stacyShow, rating: 2 });
+  check('calling one by name is an unknown tool', refused.error && refused.error.code === -32602);
+
+  const member = await connect(env, 'quinn', { adminBox: true });
+  check("a member who isn't an admin never sees the box", !/grant_admin/.test(member.page.html));
+  check('and a hand-built grant_admin grants nothing', !member.tok.data.scope.includes('members:admin'));
+
+  const op = await connect(env, 'patrick', { adminBox: true });
+  check('ticked, the grant carries members:admin', op.tok.data.scope.split(' ').includes('members:admin'), op.tok.data.scope);
+  const opTools = (await rpc(env, op.access, 'tools/list', {})).body.result.tools;
+  check('and the admin tools appear', ['admin_list_members', 'admin_list_member_shows', 'admin_add_show', 'admin_rate_show', 'admin_archive_show']
+    .every((n) => opTools.some((t) => t.name === n)));
+  check('admin rate and archive are marked destructive',
+    ['admin_rate_show', 'admin_archive_show'].every((n) => opTools.find((t) => t.name === n).annotations.destructiveHint === true));
+
+  const roster = await tool(env, op.access, 'admin_list_members');
+  check('the roster includes members outside every group', roster.data.members.some((m) => m.slug === 'stacy'));
+
+  const theirs = await tool(env, op.access, 'admin_list_member_shows', { member_slug: 'stacy' });
+  check("a member's shows are listed with ids", theirs.data.shows.some((x) => x.id === stacyShow));
+  check('without their private memos', !theirs.text.includes('STACY-NOTE') && !theirs.text.includes('REC-') && !theirs.text.includes('WITH-'));
+
+  const rated = await tool(env, op.access, 'admin_rate_show', { member_slug: 'stacy', show_id: stacyShow, rating: 8 });
+  check("an admin can rate a stranger's show", !rated.isError, rated.text);
+  check('the rating is theirs, not the admin\'s',
+    row(env, "SELECT rating FROM show_ratings WHERE member_slug = 'stacy' AND tmdb_id = 61").rating === 8 &&
+    !row(env, "SELECT 1 AS x FROM show_ratings WHERE member_slug = 'patrick'"));
+  const rerate = await tool(env, op.access, 'admin_rate_show', { member_slug: 'stacy', show_id: stacyShow, rating: 6 });
+  check('and replace it', !rerate.isError && row(env, "SELECT rating FROM show_ratings WHERE member_slug = 'stacy' AND tmdb_id = 61").rating === 6);
+  const nextUp = await tool(env, op.access, 'admin_rate_show', { member_slug: 'stacy', show_id: stacyNext, rating: 9 });
+  check('Next Up still refuses a rating', nextUp.isError);
+  const wrongOwner = await tool(env, op.access, 'admin_rate_show', { member_slug: 'stacy', show_id: quinnShow, rating: 1 });
+  check("a show_id that isn't that member's is refused", wrongOwner.isError && !row(env, "SELECT 1 AS x FROM show_ratings WHERE tmdb_id = 63"));
+  const wrongArchive = await tool(env, op.access, 'admin_archive_show', { member_slug: 'stacy', show_id: quinnShow });
+  check('for archive too', wrongArchive.isError && row(env, 'SELECT archived FROM shows WHERE id = ?', quinnShow).archived === 0);
+
+  const added = await tool(env, op.access, 'admin_add_show', { member_slug: 'stacy', title: 'Breaking Bad', archived: true });
+  const bb = row(env, "SELECT member_slug, archived, list, added_by FROM shows WHERE title = 'Breaking Bad'");
+  check('an admin can add straight to a member\'s archive', !added.isError && bb.member_slug === 'stacy' && bb.archived === 1 && bb.list === 'recommending', added.text);
+  check('added_by names the admin who did it', bb.added_by === 'Patrick');
+  const arch = await tool(env, op.access, 'admin_archive_show', { member_slug: 'stacy', show_id: stacyShow });
+  check("and archive a member's show", !arch.isError && row(env, 'SELECT archived FROM shows WHERE id = ?', stacyShow).archived === 1);
+
+  const log = env._db.prepare("SELECT action, admin_slug, member_slug FROM admin_actions ORDER BY id").all();
+  check('every admin change is recorded', log.length === 4 && log.every((l) => l.admin_slug === 'patrick' && l.member_slug === 'stacy'),
+    JSON.stringify(log));
+  check('refusals and reads are not', !log.some((l) => l.action === 'list'));
+
+  const ghost = await tool(env, op.access, 'admin_list_member_shows', { member_slug: 'nobody' });
+  check('an unknown slug is explained', ghost.isError && ghost.text.includes('admin_list_members'));
+  env._db.prepare("UPDATE members SET disabled = 1 WHERE slug = 'quinn'").run();
+  const banned = await tool(env, op.access, 'admin_rate_show', { member_slug: 'quinn', show_id: quinnShow, rating: 5 });
+  check("a disabled member's lists don't change", banned.isError);
+
+  const req = auth.actingAs(new Request(`${ORIGIN}/api/reporting`), { member_slug: 'patrick', email: 'Patrick' });
+  check('the admin scope still never opens an operator endpoint', (await reportingApi.onRequestGet(ctx(env, req))).status === 403);
+
+  env._db.prepare("UPDATE members SET is_admin = 0 WHERE slug = 'patrick'").run();
+  const demoted = (await rpc(env, op.access, 'tools/list', {})).body.result.tools.map((t) => t.name);
+  check('demoting the admin removes the admin tools on the next call', !demoted.some((n) => n.startsWith('admin_')));
+  const after = await tool(env, op.access, 'admin_rate_show', { member_slug: 'stacy', show_id: stacyNext, rating: 1 });
+  check('and refuses them by name', after.error && after.error.code === -32602);
 }
 
 console.log('\n== never admin');

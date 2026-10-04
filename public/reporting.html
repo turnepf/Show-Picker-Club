@@ -223,7 +223,7 @@
         return `<div class="section"><h2>AI apps (MCP)</h2><div class="empty">Nobody has connected an AI app yet.</div></div>`;
       }
       const body = rows.map(r => {
-        const access = /write/.test(r.scope || '') ? 'Read & change' : 'Read only';
+        const access = (/write/.test(r.scope || '') ? 'Read & change' : 'Read only') + (/members:admin/.test(r.scope || '') ? ' + admin' : '');
         const status = r.revoked_at ? `Disconnected ${shortDate(r.revoked_at)}` : `Last used ${shortDate(r.last_used_at)}`;
         return `<tr>
           <td>${escapeHtml(r.name)}</td>
