@@ -207,10 +207,29 @@ export async function onRequestPut(context) {
   // entry directly; fall back to the title search when absent or failed.
   const tmdbId = parseInt(body.tmdb_id, 10);
   const tmdbType = body.tmdb_type === 'movie' || body.tmdb_type === 'tv' ? body.tmdb_type : null;
+  const picked = Number.isInteger(tmdbId) && tmdbType;
+  // No pick: a pinned row is enriched by its own pin (docs/INVARIANTS.md §17).
+  // Searching by title here re-guessed the entry on every save, and the UPDATE
+  // stored the guess, so restoring the 1974 Little House on the Prairie, or
+  // editing its notes, turned it into the 2026 remake. The search is for a row
+  // nothing ever pinned, or an edit that changes what the row is: a new title,
+  // or a TV/movie flip, where the pin names an entry in the wrong index.
+  const pinType = existing.tmdb_type === 'movie' || existing.tmdb_type === 'tv' ? existing.tmdb_type : null;
+  const keepPin = !picked && existing.tmdb_id && pinType
+    && String(title || '').trim().toLowerCase() === String(existing.title || '').trim().toLowerCase()
+    && (movie ? 'movie' : 'tv') === pinType;
   let enriched = mayLookUp ? null : emptyEnrichment();
-  if (!enriched && Number.isInteger(tmdbId) && tmdbType) {
+  if (!enriched && picked) {
     const byId = await fetchEnrichmentById(tmdbId, tmdbType, env);
     if (byId.canonicalTitle) enriched = byId;
+  }
+  if (!enriched && keepPin) {
+    // A failed lookup by the pin (an outage, or an entry TMDB has dropped)
+    // saves the edit and leaves identity and catalog fields alone rather than
+    // falling through to a guess. The background rotation retries by id and
+    // handles a dropped entry (§17).
+    const byPin = await fetchEnrichmentById(existing.tmdb_id, pinType, env);
+    enriched = byPin.canonicalTitle ? byPin : emptyEnrichment();
   }
   if (!enriched) enriched = await fetchEnrichment(title, env, !!movie);
   const rating = enriched.rating || existing.rating;

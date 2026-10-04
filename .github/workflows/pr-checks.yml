@@ -117,6 +117,8 @@ jobs:
         run: node scripts/url-cleanup-authz-test.mjs
       - name: A member's service pick outranks the link a machine fetched
         run: node scripts/show-edit-network-test.mjs
+      - name: A member's edit keeps the row's TMDB identity
+        run: node scripts/show-edit-identity-test.mjs
       - name: MCP server and OAuth give an AI app the member's permissions, no more
         run: node scripts/mcp-test.mjs
       - name: Club-wide queries are admin-only, a spec rather than SQL, and keep memos unreadable

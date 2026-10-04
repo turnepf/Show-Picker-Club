@@ -16,6 +16,7 @@ catch different classes of mistake:
 | List import tests (`scripts/import-list-test.mjs`) | every PR | The paste-a-list path: what a model may and may not put in the database, paging, and the commit-side validation |
 | Network tests (`scripts/networks-test.mjs`) | every PR | The canonical table: a name claimed by two services, and the catalog `/api/networks` serves to the apps |
 | Enrichment identity tests (`scripts/enrich-identity-test.mjs`) | every PR | A stored `tmdb_id` is the row's identity: enrichment never re-guesses a pinned row by title, and propagation never crosses two entries sharing one title |
+| Edit identity tests (`scripts/show-edit-identity-test.mjs`) | every PR | A member's edit enriches a pinned row by its pin; the title search runs only for an unpinned row, a new title or a TV/movie flip |
 | Movie enrichment tests (`scripts/enrich-movie-detail-test.mjs`) | every PR | A background pass selects on every field it writes — the movie detail pass is not gated on artwork alone, and its gaps counter matches its selection |
 | IMDb / status / free-services tests (`scripts/enrich-imdb-status-test.mjs`) | every PR | Migration 073's fields are stored from the fetch we already make, `free_on` keeps asked-vs-never-asked apart, a malformed IMDb id never reaches a URL, and Watching / Next Up rows missing them go first without starving the age rotation |
 | Streaming-services tests (`scripts/enrich-movie-detail-test.mjs`) | every PR | Enrichment never overwrites a member's `network`; TMDB's current services land in `streaming_on` beside it, refreshed authoritatively and canonicalized |
@@ -571,6 +572,17 @@ the original it remade), so a title is a display string, never an identifier.
   fetched by that id; the title search serves only rows nothing ever pinned,
   or an id TMDB no longer serves (404). The pick made in type-ahead — or the
   id a previous search resolved — is the row's identity from then on.
+- **A member's edit doesn't re-guess either (2026-10).** `PUT /api/shows/:id`
+  re-enriches on every save. Given no `tmdb_id`, it used to search by title
+  and store the result, so restoring the 1974 show from the archive, or
+  editing its notes from a client that sends no id, re-pointed it at the
+  remake. The MCP member tools, the web edit and restore paths, and an iOS
+  edit of a row nobody picked from type-ahead all send no id. An edit with no
+  pick now enriches a pinned row by its own pin. The title search runs only
+  for a row nothing pinned, or when the edit changes what the row is: a new
+  title (case aside), or a TV/movie flip, where the pin names an entry in the
+  wrong index. If the pinned lookup fails, the edit is saved and identity and
+  catalog fields are left alone, rather than guessed.
 - **Title-scoped propagation stops at an identity boundary.** Catalog fields,
   cast, artwork and URLs copied "to every copy of the title" skip copies
   pinned to a *different* `tmdb_id` — those are a different show. This covers
@@ -595,6 +607,8 @@ the original it remade), so a title is a display string, never an identifier.
 Enforcer: `scripts/enrich-identity-test.mjs` (every PR) — drives the add and
 `/api/enrich` against a fake TMDB serving two same-titled entries, popular
 original first, and asserts each pin keeps its own data.
+`scripts/show-edit-identity-test.mjs` (every PR) does the same for the edit
+path.
 
 ## 18. A public endpoint costs O(1) reads per request
 
