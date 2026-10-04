@@ -14,9 +14,13 @@
 //   node scripts/asc.mjs set-notes 1.4.1 <file>
 //   node scripts/asc.mjs upload <path-to-.ipa-or-.pkg>
 //   node scripts/asc.mjs attach 1.4.1 24
+//   node scripts/asc.mjs create-version 1.6
+//   node scripts/asc.mjs submit 1.6 --confirm
 //
-// There is deliberately no `submit` subcommand: sending a version to review is
-// a person's decision, made in the web UI.
+// Sending a version to review is a person's decision. `submit` exists so that
+// decision doesn't need a browser, but it only runs with --confirm, refuses a
+// platform missing a build or What's New text, and is run by Patrick himself
+// (Claude's App Store Connect writes are blocked; it hands him the line).
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -116,15 +120,17 @@ async function cmdStatus() {
   }
 }
 
-async function cmdSetNotes(versionString, file) {
-  if (!versionString || !file) die('usage: set-notes <version> <file>');
+// --platform IOS|MAC_OS|TV_OS writes one platform only, for a release whose
+// platforms ship different features (Apple TV has no Vibe screen, for one).
+async function cmdSetNotes(versionString, file, platform) {
+  if (!versionString || !file) die('usage: set-notes <version> <file> [--platform IOS|MAC_OS|TV_OS]');
   const text = fs.readFileSync(file, 'utf8').replace(/\n+$/, '');
   if (text.length > 4000) die(`What's New is ${text.length} chars, over Apple's 4000 cap`);
   const hash = crypto.createHash('sha256').update(text).digest('hex');
   console.log(`${text.length} chars, sha256:${hash.slice(0, 16)}`);
 
-  const rows = await versions(versionString);
-  if (!rows.length) die(`No version records for ${versionString}`);
+  const rows = (await versions(versionString)).filter(v => !platform || v.attributes.platform === platform);
+  if (!rows.length) die(`No version records for ${versionString}${platform ? ` on ${platform}` : ''}`);
   for (const v of rows) {
     const locs = await get(`/v1/appStoreVersions/${v.id}/appStoreVersionLocalizations?fields[appStoreVersionLocalizations]=locale`);
     for (const l of locs.data || []) {
@@ -135,12 +141,12 @@ async function cmdSetNotes(versionString, file) {
     }
   }
   console.log('\nVerifying against Apple:');
-  await verifyNotes(versionString, hash);
+  await verifyNotes(versionString, hash, platform);
 }
 
-async function verifyNotes(versionString, expected) {
+async function verifyNotes(versionString, expected, platform) {
   let ok = true;
-  for (const v of await versions(versionString)) {
+  for (const v of (await versions(versionString)).filter(v => !platform || v.attributes.platform === platform)) {
     const locs = await get(`/v1/appStoreVersions/${v.id}/appStoreVersionLocalizations` +
       `?fields[appStoreVersionLocalizations]=locale,whatsNew`);
     for (const l of locs.data || []) {
@@ -223,13 +229,93 @@ function cmdUpload(file) {
   });
 }
 
+// The platforms the app ships on, read from its own version history rather
+// than hardcoded, so a platform added later is picked up.
+async function appPlatforms() {
+  return [...new Set((await versions()).map(v => v.attributes.platform))];
+}
+
+// One record per platform for a new version. Creating one fails with "You
+// cannot create a new version of the App in the current state" while another
+// release is in flight; with nothing in flight it works, and that's the
+// normal case for a release that ships all platforms together.
+async function cmdCreateVersion(versionString) {
+  if (!versionString) die('usage: create-version <version>');
+  const have = new Set((await versions(versionString)).map(v => v.attributes.platform));
+  for (const platform of await appPlatforms()) {
+    if (have.has(platform)) { console.log(`  ${platform}: ${versionString} already exists`); continue; }
+    await call('POST', '/v1/appStoreVersions', {
+      data: {
+        type: 'appStoreVersions',
+        attributes: { platform, versionString },
+        relationships: { app: { data: { type: 'apps', id: APP_ID } } },
+      },
+    });
+    console.log(`  ${platform}: created ${versionString}`);
+  }
+}
+
+// Send every platform's record for a version to App Review. Checks first and
+// changes nothing unless every platform passes: a build attached and What's
+// New filled in. Without --confirm it only reports what it would submit.
+async function cmdSubmit(versionString, flag) {
+  if (!versionString) die('usage: submit <version> --confirm');
+  const rows = await versions(versionString);
+  if (!rows.length) die(`No version records for ${versionString}`);
+  let ready = true;
+  for (const v of rows) {
+    const plat = v.attributes.platform;
+    const build = await get(`/v1/appStoreVersions/${v.id}/build?fields[builds]=version`);
+    const locs = await get(`/v1/appStoreVersions/${v.id}/appStoreVersionLocalizations?fields[appStoreVersionLocalizations]=locale,whatsNew`);
+    const missingNotes = (locs.data || []).filter(l => !(l.attributes.whatsNew || '').trim()).map(l => l.attributes.locale);
+    const problems = [];
+    if (v.attributes.appStoreState !== 'PREPARE_FOR_SUBMISSION') problems.push(`state is ${v.attributes.appStoreState}`);
+    if (!build.data) problems.push('no build attached');
+    if (missingNotes.length) problems.push(`no What's New for ${missingNotes.join(', ')}`);
+    if (problems.length) ready = false;
+    console.log(`  ${plat.padEnd(7)} ${build.data ? `build ${build.data.attributes.version}` : '-'}  ${problems.length ? '*** ' + problems.join('; ') : 'ready'}`);
+  }
+  if (!ready) die('Not submitted. Fix the platforms above and run it again.');
+  if (flag !== '--confirm') return console.log(`\nAll ready. Run again with --confirm to send ${versionString} to App Review.`);
+
+  for (const v of rows) {
+    const plat = v.attributes.platform;
+    const sub = await call('POST', '/v1/reviewSubmissions', {
+      data: {
+        type: 'reviewSubmissions',
+        attributes: { platform: plat },
+        relationships: { app: { data: { type: 'apps', id: APP_ID } } },
+      },
+    });
+    await call('POST', '/v1/reviewSubmissionItems', {
+      data: {
+        type: 'reviewSubmissionItems',
+        relationships: {
+          reviewSubmission: { data: { type: 'reviewSubmissions', id: sub.data.id } },
+          appStoreVersion: { data: { type: 'appStoreVersions', id: v.id } },
+        },
+      },
+    });
+    await call('PATCH', `/v1/reviewSubmissions/${sub.data.id}`, {
+      data: { type: 'reviewSubmissions', id: sub.data.id, attributes: { submitted: true } },
+    });
+    console.log(`  ${plat}: submitted for review`);
+  }
+}
+
 const [cmd, ...rest] = process.argv.slice(2);
 switch (cmd) {
   case 'status': await cmdStatus(); break;
-  case 'set-notes': await cmdSetNotes(rest[0], rest[1]); break;
+  case 'set-notes': {
+    const i = rest.indexOf('--platform');
+    await cmdSetNotes(rest[0], rest[1], i === -1 ? null : rest[i + 1]);
+    break;
+  }
   case 'attach': await cmdAttach(rest[0], rest[1]); break;
   case 'upload': await cmdUpload(rest[0]); break;
+  case 'create-version': await cmdCreateVersion(rest[0]); break;
+  case 'submit': await cmdSubmit(rest[0], rest[1]); break;
   default:
-    console.log('usage: node scripts/asc.mjs <status | set-notes <version> <file> | attach <version> <build> | upload <file>>');
+    console.log('usage: node scripts/asc.mjs <status | create-version <version> | set-notes <version> <file> | attach <version> <build> | upload <file> | submit <version> [--confirm]>');
     process.exit(cmd ? 1 : 0);
 }

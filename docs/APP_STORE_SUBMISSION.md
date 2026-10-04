@@ -304,13 +304,18 @@ length and SHA-256 of its What's New text. **Records for the new version may
 already be there** — all three of 1.4.1's were, sitting in
 `PREPARE_FOR_SUBMISSION`, so nothing needed creating.
 
-If a platform *is* missing one, create it **in the web UI** with
-**＋ Version or Platform**. Do not reach for `POST /v1/appStoreVersions`: it
-refuses with *"You cannot create a new version of the App in the current
-state"* whenever a release is in flight on another platform, and a throwaway
-version string draws the same error — the block is the app's state, not the
-version number. This cost real time in 1.4; the UI creates the record without
-complaint.
+If they're missing and nothing else is in flight, create all three with:
+
+```
+node scripts/asc.mjs create-version 1.6
+```
+
+It skips a platform that already has the version. While a release is in
+flight on another platform, Apple refuses the create with *"You cannot create
+a new version of the App in the current state"* (a throwaway version string
+draws the same error — the block is the app's state, not the version number).
+In that case create the record **in the web UI** with **＋ Version or
+Platform**, which does it without complaint. This cost real time in 1.4.
 
 **6. Set the What's New text with the tool, not by pasting three times.**
 Extract the fenced block from the current version's section of
@@ -319,6 +324,10 @@ Extract the fenced block from the current version's section of
 ```
 node scripts/asc.mjs set-notes 1.4.1 <file>
 ```
+
+Add `--platform TV_OS` (or `IOS`, `MAC_OS`) to write one platform only, when
+the platforms ship different features (1.6's Apple TV text leaves out the show
+page details and Vibe, which tvOS doesn't have).
 
 It refuses anything over Apple's 4,000 cap, writes every platform and locale,
 then re-reads Apple and compares SHA-256 against the local file — which is
@@ -342,9 +351,17 @@ within a minute or two of its upload finishing, so a platform missing from
 **7. Work §6's hygiene list** — iPad and Apple TV launches, demo sign-in on
 Mac, screenshots, export compliance — then submit.
 
-Submitting is deliberately not automatable here: `scripts/asc.mjs` has no
-`submit` subcommand, so the final send to review is always a person in the
-web UI.
+Submitting stays a person's decision, but it no longer needs the browser:
+
+```
+node scripts/asc.mjs submit 1.6
+node scripts/asc.mjs submit 1.6 --confirm
+```
+
+The first only checks: every platform in `PREPARE_FOR_SUBMISSION`, a build
+attached, What's New filled in. The second sends each platform to App Review,
+and refuses unless all of them pass. Patrick runs it himself — Claude's App
+Store Connect writes are blocked, so it hands him the line.
 
 **8. After it ships:** move the version's section in `docs/RELEASE_NOTES.md`
 under its release date and open a fresh *Unreleased*.
