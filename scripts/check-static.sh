@@ -304,6 +304,18 @@ for v in ios/ShowPickerIOS/Views/HomeView.swift ios/ShowPickerIOS/Views/IPadHome
 done
 ok "signing in refetches the roster myMember is resolved from"
 
+# Wrangler is pinned, not @latest: a release landing between two deploys
+# could break a deploy or the nightly backup on a day no code changed. One
+# version everywhere, bumped on purpose (and run on a branch first).
+wr_versions=$(grep -rhoE "wrangler@[^ \"']+" .github/workflows | sort -u)
+if printf '%s\n' "$wr_versions" | grep -q "@latest"; then
+  err "a workflow installs wrangler@latest — pin the exact version"
+elif [ "$(printf '%s\n' "$wr_versions" | grep -c .)" -gt 1 ]; then
+  err "workflows pin different wrangler versions: $(echo $wr_versions)"
+else
+  ok "every workflow pins one wrangler version ($wr_versions)"
+fi
+
 echo
 if [ "$fail" -eq 0 ]; then echo "PASS — static invariants hold"; else echo "FAILED"; fi
 exit $fail

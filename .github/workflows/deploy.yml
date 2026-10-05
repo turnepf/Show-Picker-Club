@@ -25,7 +25,7 @@ jobs:
           node-version: '22'
 
       - name: Install wrangler
-        run: npm install -g wrangler@latest
+        run: npm install -g wrangler@4.147.0
 
       # Apply any pending D1 migrations BEFORE the code that depends on them
       # goes live. Self-tracked in a schema_migrations table; baselines the
