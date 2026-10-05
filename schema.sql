@@ -254,6 +254,14 @@ CREATE TABLE IF NOT EXISTS title_traits (
   scored_at TEXT
 );
 
+-- The vibe page's club-wide fingerprints and baseline, recomputed weekly
+-- (migration 082).
+CREATE TABLE IF NOT EXISTS vibe_cache (
+  key TEXT PRIMARY KEY,
+  payload TEXT NOT NULL,
+  computed_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS member_subscriptions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   member_slug TEXT NOT NULL REFERENCES members(slug),
