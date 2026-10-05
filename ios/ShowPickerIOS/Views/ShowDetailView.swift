@@ -41,23 +41,10 @@ struct ShowDetailView: View {
     @State private var recommending = false
     // Creators resolved to individual people by the server (up to four).
     @State private var creators: [Credit] = []
-    // iPhone Duo partially folded with this screen across the fold. Then the
-    // artwork moves out of the form into its own pane on one side of the fold
-    // — see HeroBesideFold at the bottom of this file. Always false elsewhere.
-    @State private var foldActive = false
 
     private var title: String { show?.title ?? initialTitle }
     private var network: String? { show?.network ?? initialNetwork }
     private var rating: String? { show?.rating ?? initialRating }
-    // The image the form's hero section shows: backdrop preferred, else poster.
-    private var heroURL: String? {
-        if let b = show?.backdropUrl, !b.isEmpty, URL(string: b) != nil { return b }
-        if let p = show?.posterUrl ?? initialPoster, !p.isEmpty { return p }
-        return nil
-    }
-    // True when the hero is drawn in its own pane beside the fold, so the
-    // form leaves its hero section out rather than showing it twice.
-    private var heroInOwnPane: Bool { foldActive && heroURL != nil }
     // My active copy of this title, if it's on one of my lists.
     private var mineActive: Show? {
         guard let m = myCopy, !m.isArchived else { return nil }
@@ -73,7 +60,7 @@ struct ShowDetailView: View {
         Form {
             // One hero image (backdrop preferred, else poster). No tap-to-
             // enlarge — the affordance confused people.
-            if !heroInOwnPane, let b = show?.backdropUrl, !b.isEmpty, URL(string: b) != nil {
+            if let b = show?.backdropUrl, !b.isEmpty, URL(string: b) != nil {
                 Section {
                     CachedImage(url: b, contentMode: .fit) {
                         Color(.secondarySystemBackground)
@@ -86,7 +73,7 @@ struct ShowDetailView: View {
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
                 }
-            } else if !heroInOwnPane, let p = (show?.posterUrl ?? initialPoster), !p.isEmpty {
+            } else if let p = (show?.posterUrl ?? initialPoster), !p.isEmpty {
                 Section {
                     PosterThumb(url: p, width: 130, height: 195)
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -371,7 +358,6 @@ struct ShowDetailView: View {
                 }
             }
         }
-        .modifier(HeroBesideFold(heroURL: heroInOwnPane ? heroURL : nil, foldActive: $foldActive))
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
@@ -795,64 +781,4 @@ private struct AddAlert: Identifiable {
     let id = UUID()
     let title: String
     let message: String
-}
-
-// iPhone Duo, partially folded: give the artwork one side of the fold and the
-// details the other, instead of one scrolling form with the crease running
-// through it. Apple's tabletop guidance is the reason for ArrangementView over
-// a hand-built HStack/VStack: its .split style picks the axis from the fold
-// (artwork above, details below when the phone stands like a laptop; side by
-// side when it's held like a book) and keeps both panes clear of the crease.
-//
-// It only ever engages while a fold is active. ArrangementView's split shows
-// just the primary pane when both don't fit — on a phone-width screen that
-// would hide every detail — and an *active* division region exists only on
-// the inner display, partially folded. Flat, closed, on any other iPhone or
-// iPad, or before iOS 27.1, `content` (the unchanged form) is all there is.
-//
-// Switching layouts mid-view resets the form's scroll position; everything
-// else on the screen is ShowDetailView's state and carries over.
-private struct HeroBesideFold: ViewModifier {
-    // Non-nil only when the hero should have its own pane: a fold is active
-    // and there's an image to put there.
-    let heroURL: String?
-    @Binding var foldActive: Bool
-
-    func body(content: Content) -> some View {
-        arranged(content)
-            // Read the fold without wrapping the form in a GeometryReader, so
-            // the form stays the navigation stack's scroll view and the large
-            // title collapses exactly as it always has.
-            .onGeometryChange(for: Bool.self) { proxy in
-                if #available(iOS 27.1, *) {
-                    return !proxy.reservedRegions(kind: .division).isEmpty
-                } else {
-                    return false
-                }
-            } action: { active in
-                foldActive = active
-            }
-    }
-
-    @ViewBuilder private func arranged(_ content: Content) -> some View {
-        if #available(iOS 27.1, *) {
-            if let heroURL {
-                ArrangementView {
-                    CachedImage(url: heroURL, contentMode: .fit) {
-                        Color(.secondarySystemBackground)
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemGroupedBackground))
-                } secondary: {
-                    content
-                }
-                .arrangementViewStyle(.split)
-            } else {
-                content
-            }
-        } else {
-            content
-        }
-    }
 }
