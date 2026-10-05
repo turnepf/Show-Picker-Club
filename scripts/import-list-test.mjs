@@ -31,6 +31,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { Stmt } from './lib/d1.mjs';
+import { withLegacyShowColumns } from './lib/seed-titles.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = mkdtempSync(join(tmpdir(), 'import-list-'));
@@ -109,6 +110,7 @@ globalThis.fetch = async (url, init = {}) => {
 function makeEnv(extra = {}) {
   const db = new DatabaseSync(':memory:');
   db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
+  withLegacyShowColumns(db);
   claude.calls.length = 0;
   claude.status = 200;
   claude.reply = { items: [], trailing_section: '' };
@@ -306,11 +308,13 @@ console.log('\n== the personal fields survive the round trip');
 console.log('\n== titles the member already has are skipped, not duplicated');
 {
   const env = makeEnv();
+  // Pinned to the entries the parse step resolves these titles to: every copy
+  // is a TMDB entry, and a duplicate is the same entry.
   env._db.prepare(
-    "INSERT INTO shows (title, list, member_slug, archived) VALUES ('Severance', 'watching', 'patrick', 0)"
+    "INSERT INTO shows (title, list, member_slug, archived, tmdb_id, tmdb_type) VALUES ('Severance', 'watching', 'patrick', 0, 95396, 'tv')"
   ).run();
   env._db.prepare(
-    "INSERT INTO shows (title, list, member_slug, archived) VALUES ('The Wire', 'recommending', 'patrick', 1)"
+    "INSERT INTO shows (title, list, member_slug, archived, tmdb_id, tmdb_type) VALUES ('The Wire', 'recommending', 'patrick', 1, 1438, 'tv')"
   ).run();
   knowTitle('Severance', 95396);
   knowTitle('The Wire', 1438);

@@ -340,40 +340,40 @@ console.log('\n== gaps mode fetches each pinned entry, not one row per title');
     `${pat.episodes_released} / ${castFor(env, pat.id).join(',')}`);
 }
 
-console.log('\n== a row nothing ever pinned still resolves by title search');
+// A copy nothing pinned can't exist any more: every show is a TMDB entry, and
+// an add TMDB can't identify is refused. The title search that used to
+// resolve those rows in the background now runs once, on an add by typed
+// title with no pick, and the same picking rule applies there.
+const addTyped = async (env, slug, title) => {
+  const res = await showsApi.onRequestPost(ctx(env, req('/api/shows', {
+    cookie: addSession(env, slug), method: 'POST', body: { title, list: 'watching' },
+  })));
+  const body = await res.json();
+  return body.show ? { ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(body.show.id) } : body;
+};
+
+console.log('\n== an add by typed title resolves by title search, and stores the entry');
 {
   const env = makeEnv();
   addMember(env, 'quinn', 'Quinn Rosa');
-  const cookie = addSession(env, 'quinn');
-  const id = addShow(env, { slug: 'quinn', title: 'Fargo' });
-
   fetchLog = [];
-  await runEnrich(env, cookie);
-  const row = rowFor(env, 'quinn', 'Fargo');
-  check('title search still runs for unpinned rows', fetchLog.some((u) => u.includes('/search/tv')));
+  const row = await addTyped(env, 'quinn', 'Fargo');
+  check('title search runs for a typed title', fetchLog.some((u) => u.includes('/search/tv')));
   check('the resolved id is stored', row.tmdb_id === FARGO_ID, `got ${row.tmdb_id}`);
   check('and the data lands', (row.poster_url || '').includes('/fargo.jpg') && row.release_year === 2014,
     `${row.poster_url} / ${row.release_year}`);
-  check('cast lands too', castFor(env, id).join(',') === 'Allison Tolman', castFor(env, id).join(','));
+  check('cast lands too', castFor(env, row.id).join(',') === 'Allison Tolman', castFor(env, row.id).join(','));
 }
 
 console.log('\n== a bare title means the newest version, and a "(YYYY)" suffix pins its own');
 {
-  // Three unpinned copies of the remade title: a bare one, and one suffixed
-  // for each era — the shape real rows arrived in when TMDB's own entry was
-  // named "Little House on the Prairie (2026)".
   const env = makeEnv();
   addMember(env, 'quinn', 'Quinn Rosa');
   addMember(env, 'patrick', 'Patrick Turner');
   addMember(env, 'jennifer', 'Jennifer Turner');
-  const bareId = addShow(env, { slug: 'quinn', title: TITLE });
-  const newId = addShow(env, { slug: 'jennifer', title: `${TITLE} (2026)` });
-  const oldId = addShow(env, { slug: 'patrick', title: `${TITLE} (1974)` });
-
-  await runEnrich(env, addSession(env, 'quinn'));
-  const bare = { ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(bareId) };
-  const suffNew = { ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(newId) };
-  const suffOld = { ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(oldId) };
+  const bare = await addTyped(env, 'quinn', TITLE);
+  const suffNew = await addTyped(env, 'jennifer', `${TITLE} (2026)`);
+  const suffOld = await addTyped(env, 'patrick', `${TITLE} (1974)`);
   check('a bare title resolves to the newest version, not the popular original',
     bare.tmdb_id === REMAKE_ID, `got ${bare.tmdb_id}`);
   check('a dateless junk entry never wins, however popular', bare.tmdb_id !== 999999);
@@ -411,14 +411,14 @@ console.log('\n== the movie pass honors pins the same way');
   check('overviews do not cross', pat.overview === 'The 1995 classic.' && jen.overview === 'The 2026 sequel-remake.',
     `${pat.overview} / ${jen.overview}`);
 
-  // An unpinned movie still resolves by search — and a bare title means the
-  // newest version there too, not the popularity-ranked original.
+  // A film added by typed title resolves by search — and a bare title means
+  // the newest version there too, not the popularity-ranked original.
   addMember(env, 'quinn', 'Quinn Rosa');
-  const unpinnedId = addShow(env, { slug: 'quinn', title: MOVIE_TITLE });
-  env._db.prepare('UPDATE shows SET movie = 1 WHERE id = ?').run(unpinnedId);
   fetchLog = [];
-  await runEnrich(env, addSession(env, 'quinn'));
-  const unpinned = { ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(unpinnedId) };
+  const added = await (await showsApi.onRequestPost(ctx(env, req('/api/shows', {
+    cookie: addSession(env, 'quinn'), method: 'POST', body: { title: MOVIE_TITLE, list: 'watching', movie: 1 },
+  })))).json();
+  const unpinned = { ...env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(added.show.id) };
   check('an unpinned movie resolves by search', fetchLog.some((u) => u.includes('/search/movie')));
   check('and a bare movie title means the newest version', unpinned.tmdb_id === MOVIE_REMAKE_ID, `got ${unpinned.tmdb_id}`);
 }

@@ -764,6 +764,12 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 
 ## Non-obvious conventions (violating these breaks features)
 
+- **A copy has no title of its own.** Every show is a TMDB entry, named on its
+  shared row: read a show's name through `shows_v` (or `titles.name`), never
+  `shows.title`, and match copies by TMDB entry (`_shared/same-show.js`, with
+  `hasTitle: false` on the raw table). `check-static.sh` fails a PR that reads
+  a title off raw `shows`. An add TMDB can't identify is refused (422
+  `no_match`, or 503 `tmdb_unavailable`); there is no "add as typed".
 - **Member-facing reads use `shows_v` and `actors_v`; writes use `shows` and `actors`.** The view
   (migration 077) shows TMDB's name and the shared details from `titles`. A
   new read that shows a member anything selects `FROM shows_v`. A writer

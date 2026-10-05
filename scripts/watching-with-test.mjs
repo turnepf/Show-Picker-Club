@@ -42,6 +42,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { Stmt } from './lib/d1.mjs';
+import { withLegacyShowColumns } from './lib/seed-titles.mjs';
 import { fakeTmdb } from './lib/fake-tmdb.mjs';
 
 // Every added show must be a TMDB entry, so adds go to a stand-in TMDB that
@@ -77,6 +78,7 @@ function makeEnv() {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
+  withLegacyShowColumns(db);
   return {
     DB: { prepare: (sql) => new Stmt(db, sql), batch: async (stmts) => { for (const s of stmts) await s.run(); } },
     TMDB_TOKEN: 'test-token',
@@ -120,8 +122,10 @@ function addShow(env, { slug, title, list = 'watching', archived = 0, tmdbId = n
   return Number(env._db.prepare('SELECT MAX(id) AS id FROM shows').get().id);
 }
 
+// Through the view, as members read rows: a copy's name is TMDB's, on the
+// shared row.
 const rowsFor = (env, slug) =>
-  env._db.prepare('SELECT * FROM shows WHERE member_slug = ? ORDER BY id').all(slug).map((r) => ({ ...r }));
+  env._db.prepare('SELECT * FROM shows_v WHERE member_slug = ? ORDER BY id').all(slug).map((r) => ({ ...r }));
 const rowFor = (env, slug, title) =>
   rowsFor(env, slug).find((r) => r.title.toLowerCase() === title.toLowerCase());
 const linksFor = (env, showId) =>

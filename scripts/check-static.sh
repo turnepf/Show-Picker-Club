@@ -304,6 +304,34 @@ for v in ios/ShowPickerIOS/Views/HomeView.swift ios/ShowPickerIOS/Views/IPadHome
 done
 ok "signing in refetches the roster myMember is resolved from"
 
+# A copy has no title of its own (every show is a TMDB entry, named on its
+# shared row; docs/INVARIANTS.md §29). No SQL in functions/ may read or match
+# a title on the raw `shows` table: names come through shows_v or titles. The
+# only exceptions are the two transitional inserts that retry with a title
+# while production still requires the column (remove them once it's dropped).
+raw_title=$(node --input-type=module -e '
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+const walk = (d) => readdirSync(d).flatMap((f) => { const p = join(d, f); return statSync(p).isDirectory() ? walk(p) : p.endsWith(".js") ? [p] : []; });
+const lit = /`(?:\\[\s\S]|\$\{[^}]*\}|[^`\\])*`|'"'"'(?:\\.|[^'"'"'\\\n])*'"'"'|"(?:\\.|[^"\\\n])*"/g;
+const allowed = [/INSERT INTO shows \(\$\{k\.join/, /INSERT INTO shows \(title, \$\{cols\}\)/];
+for (const f of walk("functions")) {
+  const src = readFileSync(f, "utf8");
+  for (const m of src.matchAll(lit)) {
+    const sql = m[0];
+    if (!/\b(FROM|JOIN|UPDATE|INTO)\s+shows\b(?!_v)/i.test(sql)) continue;
+    if (!/(^|[^_\w.])(\w+\.)?title\b(?!_)/.test(sql.replace(/\bt\.name AS title\b/g, ""))) continue;
+    if (/\bshows_v\b/.test(sql) && !/\b(FROM|JOIN|UPDATE|INTO)\s+shows\s+\w+[^\n]*\btitle\b/.test(sql)) continue;
+    if (allowed.some((re) => re.test(sql))) continue;
+    console.log(`${f}:${src.slice(0, m.index).split("\n").length}`);
+  }
+}')
+if [ -n "$raw_title" ]; then
+  err "SQL reads a title from the raw shows table (a copy has none; read shows_v or titles): $(echo $raw_title)"
+else
+  ok "no SQL reads a title off the raw shows table"
+fi
+
 # Wrangler is pinned, not @latest: a release landing between two deploys
 # could break a deploy or the nightly backup on a day no code changed. One
 # version everywhere, bumped on purpose (and run on a branch first).

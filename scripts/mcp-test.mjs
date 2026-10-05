@@ -40,6 +40,7 @@ import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { createHash, randomBytes } from 'node:crypto';
 import { Stmt } from './lib/d1.mjs';
+import { withLegacyShowColumns } from './lib/seed-titles.mjs';
 import { fakeTmdb } from './lib/fake-tmdb.mjs';
 
 // Every added show must be a TMDB entry, so adds go to a stand-in TMDB that
@@ -84,6 +85,7 @@ function makeEnv() {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
+  withLegacyShowColumns(db);
   return {
     DB: {
       prepare: (sql) => new Stmt(db, sql),
@@ -506,7 +508,7 @@ console.log('\n== adding a show, and Watching With stays inside groups');
   const add = await tool(env, access, 'add_show', { title: 'The Bear', list: 'next_up', notes: 'from a podcast', watching_with_members: ['quinn', 'stacy'] });
   check('add_show adds to your list', !add.isError && add.data.added.list === 'next_up', add.text);
   check('added_by is your name, like the app', row(env, "SELECT added_by FROM shows WHERE member_slug = 'patrick'").added_by === 'Patrick');
-  check('a named group-mate gets a linked copy', !!row(env, "SELECT id FROM shows WHERE member_slug = 'quinn' AND title = 'The Bear'"));
+  check('a named group-mate gets a linked copy', !!row(env, "SELECT id FROM shows_v WHERE member_slug = 'quinn' AND title = 'The Bear'"));
   check('a named stranger gets nothing', !row(env, "SELECT id FROM shows WHERE member_slug = 'stacy'"));
   const dupe = await tool(env, access, 'add_show', { title: 'The Bear', list: 'watching' });
   check('a duplicate says which list it is already on', dupe.isError && dupe.text.includes('next_up'));
@@ -527,7 +529,7 @@ console.log('\n== group actions');
   const card = board.data.recommendations[0];
   check("a group-mate sees the card", card && card.title === 'Severance');
   const taken = await tool(env, quinn.access, 'respond_to_recommendation', { group_id: groupId, recommendation_id: card.id, response: 'add' });
-  check('and can add it to their own Next Up', !taken.isError && row(env, "SELECT list FROM shows WHERE member_slug = 'quinn' AND title = 'Severance'").list === 'next');
+  check('and can add it to their own Next Up', !taken.isError && row(env, "SELECT list FROM shows_v WHERE member_slug = 'quinn' AND title = 'Severance'").list === 'next');
   const outsider = await connect(env, 'stacy');
   const peek = await tool(env, outsider.access, 'get_group_recommendations', { group_id: groupId });
   check("a stranger can't read the board", peek.isError);
@@ -593,7 +595,7 @@ console.log('\n== an admin who opts in can act on any member');
   check('for archive too', wrongArchive.isError && row(env, 'SELECT archived FROM shows WHERE id = ?', quinnShow).archived === 0);
 
   const added = await tool(env, op.access, 'admin_add_show', { member_slug: 'stacy', title: 'Breaking Bad', archived: true });
-  const bb = row(env, "SELECT member_slug, archived, list, added_by FROM shows WHERE title = 'Breaking Bad'");
+  const bb = row(env, "SELECT member_slug, archived, list, added_by FROM shows_v WHERE title = 'Breaking Bad'");
   check('an admin can add straight to a member\'s archive', !added.isError && bb.member_slug === 'stacy' && bb.archived === 1 && bb.list === 'recommending', added.text);
   check('added_by names the admin who did it', bb.added_by === 'Patrick');
   const arch = await tool(env, op.access, 'admin_archive_show', { member_slug: 'stacy', show_id: stacyShow });
@@ -674,9 +676,9 @@ console.log('\n== revocation, bans and caps');
     ['abc', '0', '-5', ''].every((v) => tools.dailyCaps({ MCP_DAILY_WRITE_LIMIT: v }).writes === 1000));
   env._db.prepare("INSERT INTO mcp_usage (member_slug, day, calls, writes, searches) VALUES ('patrick', date('now'), 0, ?, 0)").run(tools.DAILY_CAPS.writes - 1);
   const last = await tool(env, q.access, 'add_show', { title: 'Andor', list: 'watching' });
-  check('the last write under the cap goes through', !last.isError && row(env, "SELECT id FROM shows WHERE title = 'Andor'"));
+  check('the last write under the cap goes through', !last.isError && row(env, "SELECT id FROM shows_v WHERE title = 'Andor'"));
   const w = await tool(env, q.access, 'add_show', { title: 'Severance', list: 'watching' });
-  check('the daily write cap refuses the next write', w.isError && w.text.includes('limit of 1,000 changes') && w.text.includes('midnight UTC') && !row(env, "SELECT id FROM shows WHERE title = 'Severance'"));
+  check('the daily write cap refuses the next write', w.isError && w.text.includes('limit of 1,000 changes') && w.text.includes('midnight UTC') && !row(env, "SELECT id FROM shows_v WHERE title = 'Severance'"));
   check('while reads still work', !(await tool(env, q.access, 'get_profile')).isError);
   env._db.prepare("UPDATE mcp_usage SET calls = 100000 WHERE member_slug = 'patrick'").run();
   check('reads never count toward a limit, however many', !(await tool(env, q.access, 'get_profile')).isError);
@@ -688,7 +690,7 @@ console.log('\n== revocation, bans and caps');
   check('and resets the next day', !(await tool(env, q.access, 'add_show', { title: 'Severance', list: 'watching' })).isError);
   const e2 = { ...env, MCP_DAILY_WRITE_LIMIT: '3' };
   env._db.prepare("UPDATE mcp_usage SET writes = 3 WHERE member_slug = 'patrick' AND day = date('now')").run();
-  const lowered = await tool(e2, q.access, 'rate_show', { show_id: row(env, "SELECT id FROM shows WHERE title = 'Andor'").id, rating: 8 });
+  const lowered = await tool(e2, q.access, 'rate_show', { show_id: row(env, "SELECT id FROM shows_v WHERE title = 'Andor'").id, rating: 8 });
   check('the env limit is the one enforced', lowered.isError && lowered.text.includes('limit of 3 changes'));
 }
 

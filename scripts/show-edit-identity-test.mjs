@@ -205,14 +205,8 @@ console.log('\n== changing what the row is still searches');
   check('a TV → movie flip searches the movie index', searched() && r.tmdb_id === FILM && r.tmdb_type === 'movie', `${r.tmdb_id}/${r.tmdb_type}`);
 }
 
-console.log('\n== a row nothing ever pinned');
-{
-  const env = makeEnv();
-  const id = addShow(env, {});
-  await put(env, id, { notes: 'y' });
-  const r = row(env, id);
-  check('is resolved by title, newest version first', searched() && r.tmdb_id === REMAKE, `${r.tmdb_id}`);
-}
+// (A row nothing ever pinned can't exist any more: every copy is a TMDB
+// entry, and an add TMDB can't identify is refused. same-show-test pins that.)
 
 console.log('\n== a pinned lookup that fails');
 {

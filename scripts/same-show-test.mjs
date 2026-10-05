@@ -125,12 +125,14 @@ console.log('sameShow / showKey');
 
 console.log('sameShowWhere / sameShowJoin / showKeySql');
 {
-  const env = makeEnv();
-  addMember(env, 'pat');
-  const a = addShow(env, { slug: 'pat', tmdbId: A });
-  const b = addShow(env, { slug: 'pat', tmdbId: B });
-  const u = addShow(env, { slug: 'pat' });
-  const ids = (w) => env._db.prepare(`SELECT id FROM shows s WHERE ${w.sql} ORDER BY id`).all(...w.binds).map((r) => Number(r.id));
+  // On a table that carries a title (shows_v, a recommendation card), an
+  // unpinned row falls back to its title. A bare table shaped like those.
+  const db = new DatabaseSync(':memory:');
+  db.exec('CREATE TABLE c (id INTEGER PRIMARY KEY, title TEXT, tmdb_id INTEGER, tmdb_type TEXT, movie INTEGER)');
+  const put = (tmdbId) => Number(db.prepare("INSERT INTO c (title, tmdb_id, tmdb_type, movie) VALUES ('The Odyssey', ?, ?, 1)")
+    .run(tmdbId, tmdbId ? 'movie' : null).lastInsertRowid);
+  const a = put(A), b = put(B), u = put(null);
+  const ids = (w) => db.prepare(`SELECT id FROM c s WHERE ${w.sql} ORDER BY id`).all(...w.binds).map((r) => Number(r.id));
 
   check('a pinned show matches its own entry and unpinned copies of its title',
     JSON.stringify(ids(sameShowWhere('s', { title: 'The Odyssey', tmdb_id: A, tmdb_type: 'movie' }))) === JSON.stringify([a, u]));
@@ -140,13 +142,21 @@ console.log('sameShowWhere / sameShowJoin / showKeySql');
     JSON.stringify(ids(sameShowWhere('s', { title: 'The Odyssey' }, { forWrite: true }))) === JSON.stringify([u]));
   check('the wrong type never matches an entry',
     !ids(sameShowWhere('s', { title: 'The Odyssey', tmdb_id: A, tmdb_type: 'tv' })).includes(a));
-
-  const pairs = env._db.prepare(
-    `SELECT x.id AS x, y.id AS y FROM shows x JOIN shows y ON y.id > x.id AND ${sameShowJoin('x', 'y')} ORDER BY x.id, y.id`
+  const pairs = db.prepare(
+    `SELECT x.id AS x, y.id AS y FROM c x JOIN c y ON y.id > x.id AND ${sameShowJoin('x', 'y')} ORDER BY x.id, y.id`
   ).all().map((r) => `${r.x}-${r.y}`);
   check('join: A~unpinned and B~unpinned, never A~B', JSON.stringify(pairs) === JSON.stringify([`${a}-${u}`, `${b}-${u}`]));
-  const keys = env._db.prepare(`SELECT COUNT(DISTINCT ${showKeySql('s')}) AS n FROM shows s`).get().n;
-  check('three grouping keys for A, B and the unpinned copy', Number(keys) === 3);
+  check('three grouping keys for A, B and the unpinned copy',
+    Number(db.prepare(`SELECT COUNT(DISTINCT ${showKeySql('s')}) AS n FROM c s`).get().n) === 3);
+
+  // The raw `shows` table has no title of its own (every copy is a TMDB
+  // entry), so there the helpers match by entry alone and never name a title.
+  const raw = (w) => w.sql.includes('title');
+  check('hasTitle: false matches by entry alone',
+    !raw(sameShowWhere('s', { title: 'The Odyssey', tmdb_id: A, tmdb_type: 'movie' }, { hasTitle: false }))
+    && !sameShowJoin('x', 'y', { hasTitle: false }).includes('title')
+    && !showKeySql('s', { hasTitle: false }).includes('title'));
+  check('and a show with no entry matches nothing there', sameShowWhere('s', { title: 'The Odyssey' }, { hasTitle: false }).sql === '0');
 }
 
 // ---- adding a show ----

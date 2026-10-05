@@ -42,10 +42,13 @@ const BAD_URL = `(s.network_url IS NULL
                   -- query-string stripper.
                   OR s.network_url = 'https://www.amazon.com/s'
                   OR s.network_url = 'https://www.amazon.com/s/')`;
+// Titles the operator dismissed. `s` is shows_v here (a copy has no title of
+// its own; the name is TMDB's), kept apart from QUEUE_FILTER, whose
+// subqueries read the raw table.
+const NOT_DISMISSED = `LOWER(s.title) NOT IN (SELECT ltitle FROM url_cleanup_ignores)`;
 const QUEUE_FILTER = `
   s.archived = 0
   AND ${BAD_URL}
-  AND LOWER(s.title) NOT IN (SELECT ltitle FROM url_cleanup_ignores)
   -- Exempt HBO Max search-fallback URLs: they're the best deep link we
   -- can offer for titles Watchmode only knows as auto-play URLs, so
   -- they shouldn't show up in the queue every cleanup pass. Two shapes:
@@ -62,7 +65,7 @@ const QUEUE_FILTER = `
   -- be auto-rescued because propagation is network-scoped now.
   AND (s.network IS NULL OR NOT EXISTS (
     SELECT 1 FROM shows s_good
-    WHERE ${sameShowJoin('s_good', 's')}
+    WHERE ${sameShowJoin('s_good', 's', { hasTitle: false })}
       AND s_good.archived = 0
       AND s_good.network = s.network
       AND s_good.network_url IS NOT NULL
@@ -96,13 +99,13 @@ async function inheritNetworks(env) {
   const result = await env.DB.prepare(`
     UPDATE shows
        SET network = (SELECT s.network FROM shows s
-                       WHERE ${sameShowJoin('s', 'shows')} AND s.archived = 0
+                       WHERE ${sameShowJoin('s', 'shows', { hasTitle: false })} AND s.archived = 0
                          AND s.network IS NOT NULL AND s.network != ''),
            enriched_at = datetime('now')
      WHERE archived = 0
        AND (network IS NULL OR network = '')
        AND (SELECT COUNT(DISTINCT s.network) FROM shows s
-             WHERE ${sameShowJoin('s', 'shows')} AND s.archived = 0
+             WHERE ${sameShowJoin('s', 'shows', { hasTitle: false })} AND s.archived = 0
                AND s.network IS NOT NULL AND s.network != '') = 1
   `).run();
   return result.meta.changes;
@@ -134,7 +137,7 @@ async function reclassifyStorefronts(env, body) {
 
   const { results: rows } = await env.DB.prepare(
     `SELECT tmdb_id, tmdb_type, MIN(title) AS title, COUNT(*) AS copies
-       FROM shows
+       FROM shows_v
       WHERE archived = 0 AND network = ? AND tmdb_id IS NOT NULL
       GROUP BY tmdb_id
       ORDER BY MIN(COALESCE(enriched_at, '1970-01-01')) ASC
@@ -213,7 +216,7 @@ async function propagateGoodUrls(env) {
   // show can live on multiple services — copying URLs across networks
   // would land members on the wrong streaming app at watch time.
   const { results: sources } = await env.DB.prepare(
-    `SELECT LOWER(title) as ltitle, title, tmdb_id, tmdb_type, movie, network, network_url FROM shows
+    `SELECT tmdb_id, tmdb_type, movie, network, network_url FROM shows
      WHERE archived = 0
        AND network IS NOT NULL
        AND network_url IS NOT NULL
@@ -227,13 +230,13 @@ async function propagateGoodUrls(env) {
        AND network_url NOT LIKE 'https://www.themoviedb.org/%'
        AND network_url != 'https://www.amazon.com/s'
        AND network_url != 'https://www.amazon.com/s/'
-     GROUP BY ${showKeySql('shows')}, network`
+     GROUP BY ${showKeySql('shows', { hasTitle: false })}, network`
   ).all();
   let filled = 0;
   for (const src of sources) {
     // Copies of this same show only: a different film sharing the title
     // has a different link, even on the same service.
-    const same = sameShowWhere('shows', src, { forWrite: true });
+    const same = sameShowWhere('shows', src, { forWrite: true, hasTitle: false });
     const result = await env.DB.prepare(
       `UPDATE shows
          SET network_url = ?,
@@ -265,11 +268,11 @@ async function fetchQueue(env) {
       MIN(s.id) AS id,
       MIN(s.title) AS title,
       (SELECT s2.network FROM shows s2
-        WHERE ${sameShowJoin('s2', 's')} AND s2.archived = 0
+        WHERE ${sameShowJoin('s2', 's', { hasTitle: false })} AND s2.archived = 0
           AND s2.network IS NOT NULL AND s2.network != ''
         ORDER BY s2.id LIMIT 1) AS network,
       (SELECT s3.network_url FROM shows s3
-        WHERE ${sameShowJoin('s3', 's')} AND s3.archived = 0
+        WHERE ${sameShowJoin('s3', 's', { hasTitle: false })} AND s3.archived = 0
         ORDER BY s3.id LIMIT 1) AS network_url,
       COUNT(*) AS member_count,
       GROUP_CONCAT(
@@ -279,9 +282,9 @@ async function fetchQueue(env) {
                ELSE m.first_name END,
           s.member_slug),
         ', ') AS members
-    FROM shows s
+    FROM shows_v s
     LEFT JOIN members m ON m.slug = s.member_slug
-    WHERE ${QUEUE_FILTER}
+    WHERE ${QUEUE_FILTER} AND ${NOT_DISMISSED}
     GROUP BY ${showKeySql('s')}
     ORDER BY LOWER(COALESCE(network, 'zzz')), LOWER(MIN(s.title))
   `).all();
@@ -307,7 +310,7 @@ async function fetchMismatches(env) {
   const { results } = await env.DB.prepare(`
     SELECT s.id, s.title, s.network, s.network_url, s.member_slug,
            m.first_name, m.last_initial
-      FROM shows s
+      FROM shows_v s
       LEFT JOIN members m ON m.slug = s.member_slug
      WHERE s.archived = 0
        AND s.network IS NOT NULL AND s.network != ''
@@ -436,11 +439,11 @@ export async function onRequestPost(context) {
       ? derived
       : canonicalNetwork(submittedNetwork);
 
-    const titleRow = await env.DB.prepare('SELECT title, tmdb_id, tmdb_type, movie FROM shows WHERE id = ?').bind(id).first();
+    const titleRow = await env.DB.prepare('SELECT title, tmdb_id, tmdb_type, movie FROM shows_v WHERE id = ?').bind(id).first();
     if (!titleRow) return json({ error: 'Show not found' }, 404);
     // This show's copies: the same TMDB entry (plus unmatched copies of its
     // title), never a different film that shares the name.
-    const same = sameShowWhere('shows', titleRow, { forWrite: true });
+    const same = sameShowWhere('shows', titleRow, { forWrite: true, hasTitle: false });
 
     // Apply to every copy of this show on the same service, plus any
     // rows that have no network yet. Don't overwrite rows that already

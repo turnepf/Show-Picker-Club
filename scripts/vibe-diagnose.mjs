@@ -35,7 +35,8 @@ import {
 } from './lib/prod-snapshot.mjs';
 
 // A fingerprint is keyed by show (migration 081) — showKeySql('s') in
-// functions/_shared/same-show.js, spelled out here for the snapshot db.
+// functions/_shared/same-show.js, spelled out here for the snapshot db. Reads
+// go through shows_v: a copy has no title of its own, the name is TMDB's.
 const KEY = `CASE WHEN s.tmdb_id IS NOT NULL THEN COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END) || ':' || s.tmdb_id
   ELSE 'title:' || LOWER(TRIM(s.title)) END`;
 
@@ -138,7 +139,7 @@ const perList = many(db, `
          SUM(CASE WHEN t.show_key IS NOT NULL AND COALESCE(t.unknown_show,0) = 0 THEN 1 ELSE 0 END) AS scored,
          SUM(CASE WHEN COALESCE(t.unknown_show,0) = 1 THEN 1 ELSE 0 END) AS unknown,
          SUM(CASE WHEN t.show_key IS NULL THEN 1 ELSE 0 END) AS unscored
-    FROM shows s
+    FROM shows_v s
     LEFT JOIN title_traits t ON t.show_key = ${KEY}
    WHERE s.member_slug = ? AND s.archived = 0
    GROUP BY s.list ORDER BY s.list`, slug);
@@ -195,22 +196,22 @@ if (!m) {
 
 h1('What is missing, and whether it drains on its own');
 const unscored = many(db, `
-  SELECT MIN(s.title) AS title, COUNT(*) AS copies FROM shows s
+  SELECT MIN(s.title) AS title, COUNT(*) AS copies FROM shows_v s
    WHERE s.member_slug = ? AND s.archived = 0
      AND ${KEY} NOT IN (SELECT show_key FROM title_traits)
    GROUP BY ${KEY} ORDER BY LOWER(MIN(s.title))`, slug);
 const unknown = many(db, `
-  SELECT MIN(s.title) AS title FROM shows s
+  SELECT MIN(s.title) AS title FROM shows_v s
     JOIN title_traits t ON t.show_key = ${KEY}
    WHERE s.member_slug = ? AND s.archived = 0 AND COALESCE(t.unknown_show,0) = 1
    GROUP BY ${KEY} ORDER BY LOWER(MIN(s.title))`, slug);
 const queue = one(db, `
   SELECT
-    (SELECT COUNT(DISTINCT ${KEY}) FROM shows s WHERE s.archived = 0
+    (SELECT COUNT(DISTINCT ${KEY}) FROM shows_v s WHERE s.archived = 0
         AND ${KEY} NOT IN (SELECT show_key FROM title_traits)) AS club_queue,
-    (SELECT COUNT(DISTINCT ${KEY}) FROM shows s WHERE s.archived = 0
+    (SELECT COUNT(DISTINCT ${KEY}) FROM shows_v s WHERE s.archived = 0
         AND ${KEY} NOT IN (SELECT show_key FROM title_traits)
-        AND NOT EXISTS (SELECT 1 FROM shows o WHERE ${KEY.replaceAll('s.', 'o.')} = ${KEY}
+        AND NOT EXISTS (SELECT 1 FROM shows_v o WHERE ${KEY.replaceAll('s.', 'o.')} = ${KEY}
                           AND o.archived = 0 AND o.member_slug != ?1)
         AND s.member_slug = ?1) AS hers_alone`, slug);
 line('unscored titles (theirs)', `${unscored.length} ${dim('— queue backlog, drains itself')}`);
@@ -225,9 +226,9 @@ const solo = one(db, `
     SUM(CASE WHEN shared THEN 1 ELSE 0 END) AS shared_titles,
     SUM(CASE WHEN shared THEN 0 ELSE 1 END) AS solo_titles
     FROM (SELECT ${KEY} AS k,
-            EXISTS(SELECT 1 FROM shows o WHERE ${KEY.replaceAll('s.', 'o.')} = ${KEY}
+            EXISTS(SELECT 1 FROM shows_v o WHERE ${KEY.replaceAll('s.', 'o.')} = ${KEY}
                      AND o.archived = 0 AND o.member_slug != ?1) AS shared
-            FROM shows s JOIN title_traits t ON t.show_key = ${KEY}
+            FROM shows_v s JOIN title_traits t ON t.show_key = ${KEY}
            WHERE s.member_slug = ?1 AND s.archived = 0 AND COALESCE(t.unknown_show,0) = 0
            GROUP BY ${KEY})`, slug);
 // Both of these already counted: the fingerprint join asks title_traits for a

@@ -142,9 +142,10 @@ CREATE TABLE IF NOT EXISTS shows (
   -- entry in `titles`, and members read both through the shows_v view. The
   -- 23 columns that used to repeat those facts on every copy were dropped
   -- 2026-10-05, normalizing step 3c-2b, run by hand from
-  -- ~/ShowPickerBackups/cleanup-show-picker.sh.
+  -- ~/ShowPickerBackups/cleanup-show-picker.sh. A copy has no title either:
+  -- every show is a TMDB entry and its name is TMDB's, on the shared row
+  -- (the column was dropped 2026-10, same script).
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  title TEXT NOT NULL,
   network TEXT,
   network_url TEXT,
   recommended_by TEXT,
@@ -322,11 +323,6 @@ CREATE TABLE IF NOT EXISTS url_cleanup_ignores (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS tmdb_backfill_ignores (
-  ltitle TEXT PRIMARY KEY,
-  created_at TEXT DEFAULT (datetime('now'))
-);
-
 CREATE TABLE IF NOT EXISTS groups (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -432,11 +428,11 @@ CREATE INDEX IF NOT EXISTS idx_title_cast_person ON title_cast(tmdb_person_id);
 -- Every lookup from a show copy to its entry goes through this.
 CREATE INDEX IF NOT EXISTS idx_shows_tmdb ON shows(tmdb_id, tmdb_type);
 -- Member-facing reads go through shows_v, which takes the title and the
--- show's details from titles (migrations 077, 080; generated from viewSql()
--- in functions/_shared/titles.js).
+-- show's details from titles (migrations 077, 080, 083; generated from
+-- viewSql() in functions/_shared/titles.js).
 CREATE VIEW shows_v AS
   SELECT s.id AS id,
-    COALESCE(t.name, s.title) AS title,
+    t.name AS title,
     s.network AS network,
     s.network_url AS network_url,
     s.recommended_by AS recommended_by,
@@ -525,11 +521,6 @@ CREATE INDEX IF NOT EXISTS idx_failed_logins_ip_time ON failed_logins(ip, create
 CREATE INDEX IF NOT EXISTS idx_shows_list ON shows(list);
 CREATE INDEX IF NOT EXISTS idx_shows_archived ON shows(archived);
 CREATE INDEX IF NOT EXISTS idx_shows_member ON shows(member_slug);
-CREATE INDEX IF NOT EXISTS idx_shows_member_archived_title ON shows(member_slug, archived, title COLLATE NOCASE);
-CREATE INDEX IF NOT EXISTS idx_shows_active_title ON shows(archived, title COLLATE NOCASE);
--- Serves LOWER(title) matches (Trending's daily compute, title-scoped
--- propagation); idx_shows_active_title is COLLATE NOCASE and can't.
-CREATE INDEX IF NOT EXISTS idx_shows_title_lower ON shows(LOWER(title));
 CREATE INDEX IF NOT EXISTS idx_actors_show_id ON actors(show_id);
 CREATE INDEX IF NOT EXISTS idx_show_ratings_title ON show_ratings(tmdb_id, tmdb_type);
 CREATE INDEX IF NOT EXISTS idx_show_watchers_show ON show_watchers(show_id);

@@ -274,11 +274,13 @@ export async function onRequestPut(context) {
   // The member's row: what is theirs, plus the pin and the per-service badge.
   // The show's facts and cast go to its shared row just below.
   await env.DB.prepare(
-    `UPDATE shows SET title = ?, network = ?, network_url = ?, recommended_by = ?, list = ?, notes = ?, movie = ?, full_series = ?, watching_with = ?, archived = ?,
+    // No title: a copy has none of its own; the name is TMDB's, on the
+    // shared row, and a new title here re-matched the show above.
+    `UPDATE shows SET network = ?, network_url = ?, recommended_by = ?, list = ?, notes = ?, movie = ?, full_series = ?, watching_with = ?, archived = ?,
         network_logo_url = CASE WHEN ? = 1 THEN NULL ELSE COALESCE(?, network_logo_url) END,
         tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type),
         updated_at = datetime('now') WHERE id = ?`
-  ).bind(title, finalNetwork, finalUrl, recommended_by, list, notes, movie, full_series, watching_with, archived,
+  ).bind(finalNetwork, finalUrl, recommended_by, list, notes, movie, full_series, watching_with, archived,
     networkChanged ? 1 : 0, enriched.networkLogoUrl || null,
     enriched.tmdbId || null, enriched.tmdbType || null, params.id).run();
 
@@ -301,14 +303,16 @@ export async function onRequestPut(context) {
 
   // If the network changed (or we landed on a placeholder URL), kick off
   // a Watchmode lookup in the background to keep the row on a real
-  // deep link. Propagates to all members' same-titled active rows.
+  // deep link. Propagates to all members' active copies of the show.
   const onPlaceholder = !finalUrl ||
     finalUrl.includes('/search') || finalUrl.includes('/s?') ||
     finalUrl.includes('?q=') || finalUrl.includes('?query=');
   if (mayLookUp && finalNetwork && (networkChanged || onPlaceholder)) {
-    // Propagates only to copies of the same TMDB entry (or unpinned ones) —
-    // a same-titled row pinned to a different entry streams a different show.
-    const rowTmdbId = enriched.tmdbId || existing.tmdb_id || null;
+    // Propagates only to copies of the same TMDB entry: a same-titled row
+    // pinned to a different entry streams a different show.
+    const same = sameShowWhere('shows', enriched.tmdbId
+      ? { tmdb_id: enriched.tmdbId, tmdb_type: enriched.tmdbType }
+      : { tmdb_id: existing.tmdb_id, tmdb_type: existing.tmdb_type, movie: existing.movie }, { hasTitle: false });
     context.waitUntil((async () => {
       const realUrl = await lookupWatchmodeUrl(env, title, finalNetwork, !!movie);
       if (realUrl) {
@@ -320,9 +324,8 @@ export async function onRequestPut(context) {
           // rule #482 put on sync-urls — a link is only evidence for a row
           // on the service it belongs to.
           `UPDATE shows SET network_url = ?, enriched_at = datetime('now')
-            WHERE LOWER(title) = LOWER(?) AND archived = 0 AND network = ?
-              AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)`
-        ).bind(realUrl, title, finalNetwork, rowTmdbId, rowTmdbId).run();
+            WHERE ${same.sql} AND archived = 0 AND network = ?`
+        ).bind(realUrl, ...same.binds, finalNetwork).run();
       }
     })());
   }

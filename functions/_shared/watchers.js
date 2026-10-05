@@ -30,6 +30,7 @@
 import { fetchEnrichment } from './enrichment.js';
 import { syncTitle, writeTitle, titleFieldsFromEnrichment } from './titles.js';
 import { sameShowWhere } from './same-show.js';
+import { insertCopy } from './insert-copy.js';
 
 // Ceiling on how many people one show can name. Far above a sofa's capacity;
 // it's here so a scripted client can't fan one add out across a large group.
@@ -181,7 +182,7 @@ export async function attachAddedByMembers(env, rows, ownerSlug) {
 export async function copyForMember(env, memberSlug, show) {
   const match = sameShowWhere('s', show);
   return await env.DB.prepare(
-    `SELECT * FROM shows s WHERE member_slug = ? AND ${match.sql}
+    `SELECT * FROM shows_v s WHERE member_slug = ? AND ${match.sql}
      ORDER BY (s.tmdb_id IS NULL) LIMIT 1`
   ).bind(memberSlug, ...match.binds).first();
 }
@@ -227,39 +228,32 @@ export async function ensureCopy(env, memberSlug, source, list, taggerEmail) {
     return existing;
   }
 
-  // The member's row only: title, service, list and pin. The show's facts and
+  // A copy is a TMDB entry. A source with none (an old recommendation card)
+  // is looked up first; one TMDB can't match gets no copy, and the caller is
+  // told (null).
+  let tmdbId = source.tmdb_id || null;
+  let tmdbType = source.tmdb_type || null;
+  if (!tmdbId) {
+    let enriched = null;
+    try { enriched = await fetchEnrichment(source.title, env, !!source.movie); } catch (e) { enriched = null; }
+    if (!enriched || !enriched.tmdbId) return null;
+    tmdbId = enriched.tmdbId;
+    tmdbType = enriched.tmdbType || null;
+    await writeTitle(env, enriched.tmdbType, enriched.tmdbId, {
+      name: enriched.canonicalTitle, fields: titleFieldsFromEnrichment(enriched), cast: enriched.actors,
+    });
+  }
+
+  // The member's row only: service, list and pin. The show's name, facts and
   // cast are the entry's shared row, which the source already has
   // (docs/INVARIANTS.md §29), so nothing is copied but the pin.
-  const result = await env.DB.prepare(
-    `INSERT INTO shows (title, network, network_url, list, movie, full_series,
-        network_logo_url, member_slug, added_by, tmdb_id, tmdb_type)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(
-    source.title, source.network || null, source.network_url || null, list,
-    source.movie || 0, source.full_series || 0, source.network_logo_url || null,
-    memberSlug, taggerEmail || null, source.tmdb_id || null, source.tmdb_type || null
-  ).run();
-
+  const result = await insertCopy(env, {
+    network: source.network || null, network_url: source.network_url || null, list,
+    movie: source.movie || 0, full_series: source.full_series || 0, network_logo_url: source.network_logo_url || null,
+    member_slug: memberSlug, added_by: taggerEmail || null, tmdb_id: tmdbId, tmdb_type: tmdbType,
+  }, source.title);
   const newId = result.meta.last_row_id;
-  // A source that was never matched to an entry: look it up once, pin both the
-  // new row and its shared row. Nothing re-enriches a row that already exists,
-  // and the nightly passes would otherwise get to it only in turn.
-  if (!source.tmdb_id) {
-    try {
-      const enriched = await fetchEnrichment(source.title, env, !!source.movie);
-      if (enriched && enriched.tmdbId) {
-        await env.DB.prepare(
-          `UPDATE shows SET tmdb_id = COALESCE(tmdb_id, ?), tmdb_type = COALESCE(tmdb_type, ?),
-              enriched_at = datetime('now') WHERE id = ?`
-        ).bind(enriched.tmdbId, enriched.tmdbType || null, newId).run();
-        await writeTitle(env, enriched.tmdbType, enriched.tmdbId, {
-          name: enriched.canonicalTitle, fields: titleFieldsFromEnrichment(enriched), cast: enriched.actors,
-        });
-      }
-    } catch (e) { /* the row is usable without it */ }
-  } else {
-    await syncTitle(env, source.tmdb_type || (source.movie ? 'movie' : 'tv'), source.tmdb_id);
-  }
+  await syncTitle(env, tmdbType || (source.movie ? 'movie' : 'tv'), tmdbId, source.title);
   // Read back through the view: the shared row carries the show's facts.
   return await env.DB.prepare('SELECT * FROM shows_v WHERE id = ?').bind(newId).first();
 }
@@ -314,6 +308,7 @@ export async function syncWatchers(env, { show, ownerSlug, ownerEmail, slugs, ra
     // the cross-member write, and it is bounded to a member the check above
     // confirmed shares a group with the owner.
     const theirs = await ensureCopy(env, slug, show, show.list, ownerEmail);
+    if (!theirs) continue;
     await env.DB.prepare(
       'INSERT OR IGNORE INTO show_watchers (show_id, member_slug, created_by) VALUES (?, ?, ?)'
     ).bind(theirs.id, ownerSlug, ownerSlug).run();

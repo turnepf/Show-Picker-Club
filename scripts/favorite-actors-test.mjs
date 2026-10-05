@@ -418,12 +418,12 @@ console.log('\n== Rate my backlog includes archived shows');
   // Two archived copies of one title: one row, the older.
   const dupOld = addShow(env, { slug: 'patrick', title: 'Gone Twice', archived: 1, tmdbId: 4 });
   addShow(env, { slug: 'patrick', title: 'Gone Twice', archived: 1, tmdbId: 4 });
-  // Excluded: Next Up (live or archived), already rated, no tmdb id, someone else's.
+  // Excluded: Next Up (live or archived), already rated, someone else's. (A
+  // copy with no tmdb id can't exist: every show is a TMDB entry.)
   addShow(env, { slug: 'patrick', title: 'Bookmarked', list: 'next', tmdbId: 5 });
   addShow(env, { slug: 'patrick', title: 'Bookmarked Gone', list: 'next', archived: 1, tmdbId: 6 });
   addShow(env, { slug: 'patrick', title: 'Rated Archived', archived: 1, tmdbId: 7 });
   addRating(env, { slug: 'patrick', tmdbId: 7, rating: 9 });
-  addShow(env, { slug: 'patrick', title: 'Unknown To TMDB', archived: 1, unmatched: true });
   addShow(env, { slug: 'quinn', title: 'Not Mine', archived: 1, tmdbId: 8 });
 
   const page = await body(await rateBacklog.onRequestGet({ env, request: req('/api/rate-backlog', s) }));

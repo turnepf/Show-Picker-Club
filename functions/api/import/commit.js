@@ -79,18 +79,13 @@ export async function onRequestPost(context) {
   // One dupe query for the whole batch. Archived rows count as existing —
   // silently resurrecting something the member archived on purpose would be
   // worse than skipping it and telling them.
-  // Keyed by show (TMDB entry, else title), so a different film that shares
-  // a title the member already has still imports.
+  // Keyed by show (TMDB entry), so a different film that shares a title the
+  // member already has still imports. Every copy and every item here is a
+  // TMDB entry, so the key is the whole story.
   const { results: existingRows } = await env.DB.prepare(
-    'SELECT title, tmdb_id, tmdb_type, movie FROM shows WHERE member_slug = ?'
+    'SELECT tmdb_id, tmdb_type, movie FROM shows WHERE member_slug = ?'
   ).bind(slug).all();
   const taken = new Set((existingRows || []).map(r => showKey(r)));
-  // A title decides only when one side is unpinned: an unpinned copy claims
-  // its title for every entry of that name, and an unpinned import line is
-  // taken by any copy carrying its title.
-  const lower = (t) => (t || '').toLowerCase();
-  const unpinnedTitles = new Set((existingRows || []).filter(r => !r.tmdb_id).map(r => lower(r.title)));
-  const allTitles = new Set((existingRows || []).map(r => lower(r.title)));
 
   const inserts = [];
   const added = [];
@@ -110,11 +105,8 @@ export async function onRequestPost(context) {
     const key = showKey({ title, tmdb_id: item.tmdb_id, tmdb_type: item.tmdb_type, movie: item.movie });
     // `taken` grows as we go, so a payload that lists the same show twice
     // inserts it once.
-    const pinned = !key.startsWith('title:');
-    if (taken.has(key) || (pinned ? unpinnedTitles : allTitles).has(lower(title))) { skipped.push(title); continue; }
+    if (taken.has(key)) { skipped.push(title); continue; }
     taken.add(key);
-    allTitles.add(lower(title));
-    if (!pinned) unpinnedTitles.add(lower(title));
 
     const list = LIST_KEYS.includes(item.list) ? item.list : null;
     if (!list) { skipped.push(title); continue; }
@@ -145,17 +137,26 @@ export async function onRequestPost(context) {
   }
 
   if (inserts.length) {
-    const stmt = env.DB.prepare(
-      `INSERT INTO shows (title, network, network_url, recommended_by, list, notes, movie,
-         watching_with, member_slug, added_by, tmdb_id, tmdb_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    );
+    // A copy has no title of its own (the name is TMDB's, on the shared row
+    // below). Transitional, like _shared/insert-copy.js: until the operator
+    // script drops shows.title, production refuses a row without it, so a
+    // refused batch (one transaction, nothing half-written) is retried
+    // carrying the name, which nothing reads.
+    const cols = 'network, network_url, recommended_by, list, notes, movie, watching_with, member_slug, added_by, tmdb_id, tmdb_type';
+    const stmt = env.DB.prepare(`INSERT INTO shows (${cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const stmtWithTitle = env.DB.prepare(`INSERT INTO shows (title, ${cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     // D1 batches are one round trip but not unbounded; chunk so a 200-row
     // import doesn't hand the driver a single oversized statement list.
     for (let i = 0; i < inserts.length; i += 50) {
       // The poster and year belong to the show's shared row (below), not the
       // member's copy.
-      await env.DB.batch(inserts.slice(i, i + 50).map(args => stmt.bind(...args.slice(0, 8), ...args.slice(9, 13))));
+      const chunk = inserts.slice(i, i + 50);
+      try {
+        await env.DB.batch(chunk.map(args => stmt.bind(...args.slice(1, 8), ...args.slice(9, 13))));
+      } catch (e) {
+        if (!/NOT NULL constraint failed: shows\.title/.test(String(e?.message || e))) throw e;
+        await env.DB.batch(chunk.map(args => stmtWithTitle.bind(...args.slice(0, 8), ...args.slice(9, 13))));
+      }
     }
   }
 

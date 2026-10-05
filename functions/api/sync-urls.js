@@ -3,6 +3,7 @@ import { demoMemberSlug } from '../_shared/demo.js';
 import { networkFromUrl } from '../_shared/networks.js';
 import { isAdmin } from '../_shared/admin.js';
 import { cronAuthorized } from '../_shared/secrets.js';
+import { sameShowWhere } from '../_shared/same-show.js';
 
 // Copies a real deep link from one member's copy of a title onto every other
 // active copy on the same service that has only a placeholder.
@@ -38,21 +39,22 @@ export async function onRequestPost(context) {
   const demoSlug = await demoMemberSlug(env);
 
   // Find shows with "good" URLs (not generic search pages), grouped by
-  // (title, network) so we never copy a URL from one network's row onto
+  // (show, network) so we never copy a URL from one network's row onto
   // another's. A title can live on multiple services (e.g. All Her Fault
   // on Peacock vs Amazon vs Hulu) — propagating across them used to
   // serve members a streaming-app URL that didn't match their stored
   // network.
   const { results: withUrls } = await env.DB.prepare(
-    `SELECT LOWER(title) as ltitle, network, network_url, tmdb_id FROM shows
+    `SELECT tmdb_id, tmdb_type, movie, network, network_url FROM shows
      WHERE archived = 0
+       AND tmdb_id IS NOT NULL
        AND network IS NOT NULL
        AND network_url IS NOT NULL
        AND network_url != '#'
        AND network_url NOT LIKE '%/search%'
        AND network_url NOT LIKE '%/s?%'
        AND (?1 IS NULL OR member_slug != ?1)
-     GROUP BY LOWER(title), network, tmdb_id`
+     GROUP BY tmdb_id, COALESCE(tmdb_type, CASE WHEN movie = 1 THEN 'movie' ELSE 'tv' END), network`
   ).bind(demoSlug).all();
 
   if (withUrls.length === 0) {
@@ -79,12 +81,13 @@ export async function onRequestPost(context) {
     // this feature quietly narrowing.
     if (networkFromUrl(source.network_url) !== source.network) { skipped++; continue; }
 
+    // Copies of the same TMDB entry only (a copy has no title of its own).
+    const same = sameShowWhere('shows', source, { hasTitle: false });
     updates.push(env.DB.prepare(
       `UPDATE shows SET network_url = ?, enriched_at = datetime('now')
-       WHERE LOWER(title) = ? AND network = ? AND archived = 0
-         AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)
+       WHERE ${same.sql} AND network = ? AND archived = 0
          AND (network_url IS NULL OR network_url LIKE '%/search%' OR network_url LIKE '%/s?%')`
-    ).bind(source.network_url, source.ltitle, source.network, source.tmdb_id, source.tmdb_id));
+    ).bind(source.network_url, ...same.binds, source.network));
   }
 
   // Batched so a growing library costs round trips in fiftieths rather than

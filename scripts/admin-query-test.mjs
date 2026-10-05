@@ -360,9 +360,10 @@ console.log('\n== measures, dates, paging');
   const capped = await q(env, c, { mode: 'rows', limit: 99999 });
   check('limit is capped at 500', capped.data.query.limit === 500);
   const grouped = await q(env, c, { group_by: ['title'], limit: 2 });
-  // Six titles, not seven: Christine's "(2026)" copy reads TMDB's name, the
-  // same as Eric's.
-  check('a truncated breakdown says so', grouped.data.truncated === true && grouped.data.total_groups === 6, JSON.stringify(grouped.data));
+  // Five titles, not seven: Christine's "(2026)" copy reads TMDB's name, the
+  // same as Eric's, and the two "unmatched show" copies are one entry now
+  // (every copy is a TMDB entry; names are the entry's).
+  check('a truncated breakdown says so', grouped.data.truncated === true && grouped.data.total_groups === 5, JSON.stringify(grouped.data));
   check('the spec is echoed back as read', grouped.data.query.group_by[0] === 'title' && grouped.data.query.measures.length === 2);
 }
 

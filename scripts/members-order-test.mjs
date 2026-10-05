@@ -20,6 +20,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { Stmt } from './lib/d1.mjs';
+import { withLegacyShowColumns } from './lib/seed-titles.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = mkdtempSync(join(tmpdir(), 'members-order-'));
@@ -36,6 +37,7 @@ function check(name, cond, detail = '') {
 
 const db = new DatabaseSync(':memory:');
 db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
+withLegacyShowColumns(db);
 const env = { DB: { prepare: (sql) => new Stmt(db, sql) } };
 
 const addMember = (slug) => db.prepare(

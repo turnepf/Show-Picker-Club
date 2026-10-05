@@ -4,15 +4,17 @@
 //   node scripts/tmdb-audit-test.mjs
 //
 // Runs the real script against a SQLite file built from schema.sql (--db) and
-// a fake TMDB on a local port (TMDB_BASE), and checks what it decides:
+// a fake TMDB on a local port (TMDB_BASE). The database is production's shape
+// since 2026-10: a copy has no title of its own, so every name comes from the
+// shared `titles` row. It checks that the audit reports:
 //
-//   - a row with no id is "copyable" only when exactly one entry is pinned
-//     under its name, "ambiguous" when a remake and its original both are,
-//     and a "(YYYY)" suffix picks between them;
-//   - copies of one entry with different titles, a movie flag that disagrees
-//     with the pin, titles that differ from TMDB's official name, and pins
-//     TMDB no longer serves are all reported;
-//   - it never reads memos or emails, and it refuses anything but a SELECT.
+//   - a copy with no TMDB id (there should be none);
+//   - a copy that would show nameless: no shared row, or one with no name;
+//   - a movie flag that disagrees with the pin;
+//   - with TMDB: a shared name that differs from TMDB's official one, and a
+//     pin TMDB no longer serves;
+//   - and that it never reads memos or emails, and refuses anything but a
+//     SELECT.
 
 import { mkdtempSync, readFileSync, unlinkSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -21,8 +23,6 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
-import { liftCopiesIntoTitles, withLegacyShowColumns } from './lib/seed-titles.mjs';
-import { SHARED_FIELDS } from '../functions/_shared/titles.js';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dir = mkdtempSync(join(tmpdir(), 'tmdb-audit-'));
@@ -39,45 +39,40 @@ function check(name, cond, detail = '') {
 
 const db = new DatabaseSync(dbFile);
 db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
-withLegacyShowColumns(db);
 for (const [slug, disabled] of [['amy', 0], ['eric', 0], ['christine', 0], ['banned', 1]]) {
   db.prepare(`INSERT INTO members (slug, name, first_name, last_name, disabled, enrolled_via) VALUES (?, ?, ?, 'X', ?, 'email')`)
     .run(slug, `${slug}'s Shows`, slug, disabled);
 }
+const entry = (type, id, name) =>
+  db.prepare('INSERT INTO titles (tmdb_type, tmdb_id, name) VALUES (?, ?, ?)').run(type, id, name);
 let nextId = 1;
 const ids = {};
-function show(key, member, title, o = {}) {
-  db.prepare(`INSERT INTO shows (id, title, list, member_slug, movie, archived, tmdb_id, tmdb_type, release_year, overview, poster_url, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(nextId, title, o.list || 'watching', member, o.movie ? 1 : 0,
-    o.archived ? 1 : 0, o.tmdb ?? null, o.tmdb ? (o.type || (o.movie ? 'movie' : 'tv')) : null, o.year ?? null,
-    o.overview ?? null, o.poster ?? null, o.notes ?? null);
+function copy(key, member, o = {}) {
+  db.prepare(`INSERT INTO shows (id, list, member_slug, movie, archived, tmdb_id, tmdb_type, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(nextId, o.list || 'watching', member, o.movie ? 1 : 0,
+    o.archived ? 1 : 0, o.tmdb ?? null, o.tmdb ? (o.type || (o.movie ? 'movie' : 'tv')) : null, o.notes ?? null);
   ids[key] = nextId++;
 }
-// Two entries share "Little House on the Prairie".
-show('lh1974', 'amy', 'Little House on the Prairie', { tmdb: 1234, year: 1974, overview: 'Old.', poster: 'https://image.tmdb.org/t/p/w500/a.jpg' });
-show('lh2026', 'eric', 'Little House on the Prairie', { tmdb: 283304, year: 2026, overview: 'New one, longer overview.', poster: 'https://image.tmdb.org/t/p/w500/b.jpg' });
-show('lh2026b', 'christine', 'Little House on the Prairie (2026)', { tmdb: 283304, year: 2026, overview: 'New one, longer overview.', poster: 'https://image.tmdb.org/t/p/w500/b.jpg' });
-show('lhBare', 'christine', 'little house on the prairie ', { archived: true });       // ambiguous
-show('lhYear', 'amy', 'Little House on the Prairie (1974)', {});                         // year picks 1974
-// One entry, so a copy is unambiguous.
-show('sev1', 'amy', 'Severance', { tmdb: 95396, year: 2022 });
-show('sevCopy', 'eric', 'severance', { notes: 'SECRET MEMO' });                           // copyable
-// Nothing to copy.
-show('special', 'christine', 'RuneScape: Back in Action', { list: 'recommending' });     // none
-// Film saved as TV but pinned to a movie entry.
-show('fh', 'christine', 'Frances Ha', { tmdb: 999, type: 'movie', year: 2012 });         // type mismatch
-// Dead pin, and a disabled member who must not count.
-show('dead', 'amy', 'Gone Show', { tmdb: 4040, year: 2001 });
-show('banned', 'banned', 'Banned Show', {});
-// The facts move to the shared row, and the copy ends up production's shape.
-liftCopiesIntoTitles(db);
-for (const f of SHARED_FIELDS) db.exec(`ALTER TABLE shows DROP COLUMN ${f}`);
+entry('tv', 95396, 'Severance');
+entry('tv', 283304, 'Little House on the Prairie (2026)');   // TMDB's name is the bare one
+entry('movie', 999, 'Frances Ha');
+entry('tv', 4040, 'Gone Show');
+entry('tv', 5050, '');                                         // a row with no name
+copy('sev1', 'amy', { tmdb: 95396 });
+copy('sev2', 'eric', { tmdb: 95396, notes: 'SECRET MEMO' });
+copy('lh', 'christine', { tmdb: 283304 });
+copy('fh', 'christine', { tmdb: 999, type: 'movie' });        // saved as TV, pinned to a film
+copy('dead', 'amy', { tmdb: 4040 });                           // TMDB no longer serves it
+copy('noRow', 'eric', { tmdb: 6060 });                         // no shared row at all
+copy('noName', 'amy', { tmdb: 5050 });                         // a shared row with no name
+copy('legacy', 'christine', {});                               // no TMDB id
+copy('banned', 'banned', {});                                  // disabled member: not counted
 db.close();
 
 // ---- fake TMDB ----
 
-const NAMES = { 'tv:1234': 'Little House on the Prairie', 'tv:283304': 'Little House on the Prairie',
-  'tv:95396': 'Severance', 'movie:999': 'Frances Ha' };
+const NAMES = { 'tv:283304': 'Little House on the Prairie', 'tv:95396': 'Severance', 'movie:999': 'Frances Ha',
+  'tv:5050': 'Something' };
 const server = createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   const send = (code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
@@ -116,35 +111,31 @@ console.log('\n== database-only audit');
   const { code, out, err } = await runAudit(['--json', jsonFile]);
   check('runs cleanly', code === 0, err);
   const r = JSON.parse(readFileSync(jsonFile, 'utf8'));
-  const st = (key) => r.unpinned.find((u) => u.id === ids[key]);
-  check('counts only active members', r.summary.rows === 10 && r.summary.unpinned === 4, JSON.stringify(r.summary));
-  check('a title pinned to one entry elsewhere is copyable', st('sevCopy')?.status === 'copyable' && st('sevCopy').candidates[0].tmdb_id === 95396, JSON.stringify(st('sevCopy')));
-  check('a title pinned to two entries is ambiguous', st('lhBare')?.status === 'ambiguous' && st('lhBare').candidates.length === 2, JSON.stringify(st('lhBare')));
-  check('a "(YYYY)" suffix picks its own entry', st('lhYear')?.status === 'copyable' && st('lhYear').candidates[0].tmdb_id === 1234, JSON.stringify(st('lhYear')));
-  check('a title no copy vouches for is "none"', st('special')?.status === 'none');
-  check('the disabled member\'s row is left out', !r.unpinned.some((u) => u.member === 'banned'));
-  check('copies of one entry under different titles are reported',
-    r.title_splits.length === 1 && r.title_splits[0].tmdb_id === 283304 && r.title_splits[0].titles === 2, JSON.stringify(r.title_splits));
-  check('a movie flag that disagrees with the pin is reported',
-    r.type_mismatch.length === 1 && r.type_mismatch[0].id === ids.fh, JSON.stringify(r.type_mismatch));
-  check('every pinned copy has its shared row', r.normalization.rows === 6 && r.normalization.rows_without_entry === 0, JSON.stringify(r.normalization));
-  check('and the copies carry no leftover columns, as since the 2026-10-05 cleanup',
-    r.normalization.leftover_columns === 0 && /No leftover per-copy columns/.test(out));
+  check('counts only active members', r.summary.rows === 8 && r.summary.unpinned === 1, JSON.stringify(r.summary));
+  check('a copy with no TMDB id is listed', r.unpinned.length === 1 && r.unpinned[0].id === ids.legacy, JSON.stringify(r.unpinned));
+  check('the disabled member\'s copy is left out', !r.unpinned.some((u) => u.member === 'banned'));
+  const nameless = Object.fromEntries(r.nameless.map((n) => [n.id, n.problem]));
+  check('a copy whose entry has no shared row would show nameless', nameless[ids.noRow] === 'no shared row', JSON.stringify(r.nameless));
+  check('and so would one whose shared row has no name', nameless[ids.noName] === 'no name');
+  check('named copies are fine', r.nameless.length === 2);
+  check('a movie flag that disagrees with the pin is reported, with the shared name',
+    r.type_mismatch.length === 1 && r.type_mismatch[0].id === ids.fh && r.type_mismatch[0].title === 'Frances Ha', JSON.stringify(r.type_mismatch));
+  check('no leftover columns on production\'s shape, the copy title included',
+    r.normalization.leftover_columns === 0 && r.normalization.copy_title_column === 0 && /No leftover per-copy columns/.test(out),
+    JSON.stringify(r.normalization));
   check('no memo text anywhere in the output', !out.includes('SECRET MEMO') && !readFileSync(jsonFile, 'utf8').includes('SECRET MEMO'));
   check('without a token it says what TMDB would add', /Set TMDB_TOKEN/.test(out));
 }
 
 console.log('\n== with TMDB');
 {
-  const { code, out, err } = await runAudit(['--json', jsonFile], { TMDB_TOKEN: 'test-token', TMDB_BASE: base });
+  const { code, err } = await runAudit(['--json', jsonFile], { TMDB_TOKEN: 'test-token', TMDB_BASE: base });
   check('runs cleanly', code === 0, err);
   const r = JSON.parse(readFileSync(jsonFile, 'utf8'));
-  const mm = r.name_mismatch.map((m) => m.id).sort((a, b) => a - b);
-  check('titles that differ from TMDB\'s name are listed', JSON.stringify(mm) === JSON.stringify([ids.lh2026b]), JSON.stringify(r.name_mismatch));
-  check('with the official name beside them', r.name_mismatch[0]?.tmdb_name === 'Little House on the Prairie');
+  const mm = r.name_mismatch.map((m) => `${m.tmdb_type}:${m.tmdb_id}`).sort();
+  check('a shared name that differs from TMDB\'s is listed', JSON.stringify(mm) === JSON.stringify(['tv:283304', 'tv:5050']), JSON.stringify(r.name_mismatch));
+  check('with the official name beside it', r.name_mismatch.find((m) => m.tmdb_id === 283304)?.tmdb_name === 'Little House on the Prairie');
   check('a pin TMDB no longer serves is reported', r.dead_pins.length === 1 && r.dead_pins[0].tmdb_id === 4040, JSON.stringify(r.dead_pins));
-  const special = r.unpinned.find((u) => u.id === ids.special);
-  check('an unmatched row gets a suggestion, labelled as one', special.suggestion?.tmdb_id === 7777 && /TMDB suggests/.test(out), JSON.stringify(special));
 }
 
 console.log('\n== read-only');

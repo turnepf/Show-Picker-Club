@@ -53,28 +53,25 @@ export const SHOWS_COLUMNS = [
   'original_language', 'studio', 'streaming_on', 'imdb_id', 'tmdb_status', 'free_on',
 ];
 
-// The columns `shows` itself has since migration 080.
-export const SHOWS_TABLE_COLUMNS = SHOWS_COLUMNS.filter((c) => !SHARED_FIELDS.includes(c));
+// The columns `shows` itself has: the member's own, and no show facts (since
+// migration 080) and no title of its own (since 2026-10; the name is TMDB's,
+// on the shared row).
+export const SHOWS_TABLE_COLUMNS = SHOWS_COLUMNS.filter((c) => c !== 'title' && !SHARED_FIELDS.includes(c));
 
 // A copy's entry. tmdb_type can be missing on rows pinned before it was
 // stored; the movie flag decides then.
 const TYPE_OF = `COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)`;
 
-// The freshest copy's title, for an entry TMDB hasn't named yet.
-const COPY_NAME = `(SELECT s2.title FROM shows s2
-    WHERE s2.tmdb_id = k.tmdb_id
-      AND COALESCE(s2.tmdb_type, CASE WHEN s2.movie = 1 THEN 'movie' ELSE 'tv' END) = k.tmdb_type
-    ORDER BY COALESCE(s2.enriched_at, '') DESC, COALESCE(s2.updated_at, '') DESC, s2.id DESC LIMIT 1)`;
-
+// A shared row is created only with TMDB's own name: a copy has no title of
+// its own to start one from (dropped 2026-10, every show is a TMDB entry).
+// Every add path writes the row with TMDB's name first, so a key with no name
+// here is a row that already exists or a lookup that hasn't happened yet.
 function ensureSql(keysSql) {
   return `WITH k AS (${keysSql})
     INSERT INTO titles (tmdb_type, tmdb_id, name, synced_at)
-    SELECT k.tmdb_type, k.tmdb_id, COALESCE(k.name, ${COPY_NAME}), datetime('now') FROM k WHERE true
+    SELECT k.tmdb_type, k.tmdb_id, k.name, datetime('now') FROM k WHERE k.name IS NOT NULL
     ON CONFLICT (tmdb_type, tmdb_id) DO NOTHING`;
 }
-
-const ALL_KEYS = `SELECT DISTINCT ${TYPE_OF} AS tmdb_type, s.tmdb_id AS tmdb_id, NULL AS name
-  FROM shows s WHERE s.tmdb_id IS NOT NULL`;
 
 const ONE_KEY = `SELECT ? AS tmdb_type, ? AS tmdb_id, ? AS name
   WHERE EXISTS (SELECT 1 FROM shows s WHERE s.tmdb_id = ? AND ${TYPE_OF} = ?)`;
@@ -95,11 +92,11 @@ export async function syncTitle(env, tmdbType, tmdbId, name = null) {
   }
 }
 
-// Every entry a copy points at gets a row; entries nothing points at any more
-// (re-pointed elsewhere, or deleted by their last member) go, with their cast.
-// The nightly pass.
+// Entries nothing points at any more (re-pointed elsewhere, or deleted by
+// their last member) go, with their cast. The nightly pass. (It used to also
+// create rows for copies' entries, named from the copy; rows are now created
+// by the writers, with TMDB's name.)
 export async function rebuildTitles(env) {
-  await env.DB.prepare(ensureSql(ALL_KEYS)).run();
   await env.DB.prepare(`DELETE FROM titles WHERE NOT EXISTS (
       SELECT 1 FROM shows s WHERE s.tmdb_id = titles.tmdb_id AND ${TYPE_OF} = titles.tmdb_type)`).run();
   await env.DB.prepare(`DELETE FROM title_cast WHERE NOT EXISTS (
@@ -126,15 +123,11 @@ export async function writeTitle(env, tmdbType, tmdbId, { name = null, fields = 
   const cols = TITLE_FIELDS.filter((f) => fields[f] !== undefined);
   const cleanName = typeof name === 'string' && name.trim() ? name.trim() : null;
   try {
-    // A new row needs a name. Without TMDB's, start the row from the copies'
-    // title, then write the payload.
+    // A new row needs TMDB's name; without one, only an existing row can
+    // take the payload.
     if (!cleanName) {
       const have = await env.DB.prepare('SELECT 1 FROM titles WHERE tmdb_type = ? AND tmdb_id = ?').bind(type, id).first();
-      if (!have) {
-        await syncTitle(env, type, id);
-        const made = await env.DB.prepare('SELECT 1 FROM titles WHERE tmdb_type = ? AND tmdb_id = ?').bind(type, id).first();
-        if (!made) return false;
-      }
+      if (!have) return false;
     }
     // '' stands in for "no name given" on the insert side and never wins the
     // update: an existing row always has one.
@@ -192,7 +185,7 @@ export function titleFieldsFromEnrichment(e) {
 // fields come from `titles`, and everything else from the member's row.
 export function viewSql() {
   const cols = SHOWS_COLUMNS.map((c) => {
-    if (c === 'title') return 'COALESCE(t.name, s.title) AS title';
+    if (c === 'title') return 't.name AS title';
     if (SHARED_FIELDS.includes(c)) return `t.${c} AS ${c}`;
     return `s.${c} AS ${c}`;
   });
