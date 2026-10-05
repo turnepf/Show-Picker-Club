@@ -1,4 +1,5 @@
 import { getSession } from '../_shared/auth.js';
+import { showKeySql } from '../_shared/same-show.js';
 // How many actors the page shows. Nico's framing was "favorite actors and
 // their other shows", and a favourite you have to scroll to isn't one.
 const TOP_N = 10;
@@ -87,7 +88,7 @@ export async function onRequestGet(context) {
             COUNT(*) as show_count,
             SUM(w) as score
        FROM (SELECT ${PERSON_KEY} as person_key,
-                    LOWER(s.title) as title_lower,
+                    ${showKeySql('s')} as show_key,
                     MIN(a.name) as name,
                     MAX(a.imdb_id) as imdb_id,
                     MAX(${WEIGHT}) as w
@@ -97,7 +98,7 @@ export async function onRequestGet(context) {
                ${PERSON_JOINS}
               WHERE s.member_slug = ?1
                 AND s.list != 'next'
-              GROUP BY person_key, title_lower
+              GROUP BY person_key, show_key
              HAVING w > 0)
       GROUP BY person_key
       ORDER BY score DESC, show_count DESC, name COLLATE NOCASE

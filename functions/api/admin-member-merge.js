@@ -27,6 +27,7 @@
 
 import { isAdmin } from '../_shared/admin.js';
 import { demoMemberSlug } from '../_shared/demo.js';
+import { sameShowJoin } from '../_shared/same-show.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -64,14 +65,15 @@ export async function onRequestPost(context) {
 
   // The two classes of source rows that do NOT move. Untouched seeds are the
   // duplicate account's auto-picks; "dupes" are active rows the target
-  // already carries under the same title (any list — the keeper's copy wins).
+  // already carries — the same show by TMDB entry, else by title (any list —
+  // the keeper's copy wins). A different film sharing a title isn't a dupe.
   const untouchedSeed =
     "member_slug = ?1 AND added_by = 'seed' AND updated_at IS NULL";
   const titleDupe = `member_slug = ?1 AND archived = 0
        AND NOT (added_by = 'seed' AND updated_at IS NULL)
        AND EXISTS (SELECT 1 FROM shows t
                     WHERE t.member_slug = ?2 AND t.archived = 0
-                      AND LOWER(t.title) = LOWER(shows.title))`;
+                      AND ${sameShowJoin('t', 'shows')})`;
 
   // Counts up front so the response can say what happened (the batch's
   // meta.changes are per-statement and awkward to attribute after dedupes).

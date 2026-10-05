@@ -1,4 +1,5 @@
 import { isAdmin } from '../_shared/admin.js';
+import { showKeySql } from '../_shared/same-show.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -279,10 +280,12 @@ export async function onRequestGet(context) {
   ).all();
 
   const { results: topShared } = await env.DB.prepare(
-    `SELECT title, COUNT(DISTINCT member_slug) as members
-     FROM shows
-     WHERE archived = 0
-     GROUP BY LOWER(title)
+    `SELECT MIN(s.title) AS title, COUNT(DISTINCT s.member_slug) as members
+     FROM shows_v s
+     WHERE s.archived = 0
+     -- One row per show (TMDB entry), not per title: three films called
+     -- "The Odyssey" are three shows.
+     GROUP BY ${showKeySql('s')}
      HAVING members > 1
      ORDER BY members DESC, title
      LIMIT 10`

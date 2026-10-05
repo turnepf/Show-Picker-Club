@@ -60,66 +60,30 @@ export async function onRequestGet(context) {
     // explain itself.
     await attachAddedByMembers(env, results, member);
   }
-  await borrowArtworkAcrossCopies(env, results);
   return new Response(JSON.stringify({ shows: results }), { headers: corsHeaders() });
 }
 
-// Posters and network logos live on each member's own row and backfill one
-// row at a time, so a title can have artwork on one member's copy while
-// another member's identical copy is still waiting its turn in the
-// enrichment rotation. For display, borrow artwork from any active copy of
-// the same title. (Enrichment also propagates on write now; this covers the
-// backlog and anything the rotation hasn't reached.)
-async function borrowArtworkAcrossCopies(env, rows) {
-  if (!rows.some(r => !r.poster_url || !r.network_logo_url)) return;
-  // Grouped by (title, tmdb_id) so a copy only borrows from siblings of the
-  // same TMDB entry (or unpinned ones) — a same-titled remake and its
-  // original must not lend each other artwork.
-  const { results: art } = await env.DB.prepare(
-    `SELECT LOWER(title) AS ltitle, tmdb_id, MAX(poster_url) AS poster_url,
-            MAX(network_logo_url) AS network_logo_url
-       FROM shows_v
-      WHERE archived = 0 AND (poster_url IS NOT NULL OR network_logo_url IS NOT NULL)
-      GROUP BY LOWER(title), tmdb_id`
-  ).all();
-  const byTitle = new Map();
-  for (const a of art) {
-    const list = byTitle.get(a.ltitle) || [];
-    list.push(a);
-    byTitle.set(a.ltitle, list);
-  }
-  for (const r of rows) {
-    const candidates = byTitle.get((r.title || '').toLowerCase()) || [];
-    const usable = candidates.filter(a =>
-      a.tmdb_id == null || r.tmdb_id == null || a.tmdb_id === r.tmdb_id);
-    // Prefer the donor that shares the row's exact pin over an unpinned one.
-    usable.sort((a, b) => (a.tmdb_id === r.tmdb_id ? -1 : 0) - (b.tmdb_id === r.tmdb_id ? -1 : 0));
-    for (const a of usable) {
-      if (!r.poster_url) r.poster_url = a.poster_url;
-      if (!r.network_logo_url) r.network_logo_url = a.network_logo_url;
-    }
-  }
-}
-
-async function findGoodCopyAcrossMembers(env, title, tmdbId = null) {
-  // Returns the first (any-member) active row for this title that has a real
+async function findGoodCopyAcrossMembers(env, title, tmdbId = null, tmdbType = null) {
+  // Returns the first (any-member) active copy of this show that has a real
   // network + deep-link URL (not a search-page placeholder). Used to inherit
   // network/URL on insert so new shows don't land in the URL-cleanup queue.
-  // A copy pinned to a different tmdb_id is a different show sharing the
+  // A copy pinned to a different TMDB entry is a different show sharing the
   // title (a remake next to its original) — its URL streams the wrong show,
-  // so it is never a donor.
+  // so it is never a donor. Both columns are the copy's own, so this reads
+  // `shows` directly, where the TMDB-id and title indexes apply.
+  const same = sameShowWhere('s', { title, tmdb_id: tmdbId, tmdb_type: tmdbType });
   return await env.DB.prepare(
-    `SELECT network, network_url FROM shows_v
-     WHERE LOWER(title) = LOWER(?) AND archived = 0
-       AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)
+    `SELECT network, network_url FROM shows s
+     WHERE ${same.sql} AND archived = 0
        AND network IS NOT NULL
        AND network_url IS NOT NULL
        AND network_url NOT LIKE '%/search%'
        AND network_url NOT LIKE '%/s?%'
        AND network_url NOT LIKE '%?q=%'
        AND network_url NOT LIKE '%?query=%'
+     ORDER BY (s.tmdb_id IS NULL)
      LIMIT 1`
-  ).bind(title, tmdbId, tmdbId).first();
+  ).bind(...same.binds).first();
 }
 
 export async function onRequestPost(context) {
@@ -213,7 +177,8 @@ export async function onRequestPost(context) {
   // If another member already has a good (non-placeholder) URL for this title,
   // inherit it. Beats the search-page fallback and keeps the title out of the
   // URL-cleanup queue.
-  const goodCopy = network_url && network ? null : await findGoodCopyAcrossMembers(env, finalTitle, enriched.tmdbId || null);
+  const goodCopy = network_url && network ? null : await findGoodCopyAcrossMembers(env, finalTitle,
+    enriched.tmdbId || (Number.isInteger(tmdbId) ? tmdbId : null), enriched.tmdbId ? enriched.tmdbType : tmdbType);
   const userUrl = network_url || null;
   const goodCopyUrl = goodCopy && goodCopy.network_url;
   // URL trumps the dropdown — if the user pasted a Netflix link but selected
