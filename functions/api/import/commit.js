@@ -185,17 +185,14 @@ export async function onRequestPost(context) {
 
   // A current client marks its last call `final` and sends what it left out.
   // An older one (iOS 1.6 and earlier, before the email existed) sends no
-  // `final` at all and still submits unmatched rows, so the server sets them
-  // aside here and the app never says so; email those from each call, so a
-  // member on an old build still learns what to add by hand. One call per 100
-  // rows, so a long import on an old build can send a note per batch, inside
-  // the same daily cap.
-  const legacyClient = !('final' in body);
-  const emailed = body.final === true
-    ? await emailUnmatched(env, session, addedBefore + added.length, [...new Set([...clientUnmatched, ...unmatched])])
-    : legacyClient
-      ? await emailUnmatched(env, session, added.length, unmatched)
-      : false;
+  // `final` and still submits unmatched rows, which the server sets aside and
+  // the app never mentions. Its batches are held and sent as one note.
+  let emailed = false;
+  if (body.final === true) {
+    emailed = await emailUnmatched(env, session, addedBefore + added.length, [...new Set([...clientUnmatched, ...unmatched])]);
+  } else if (!('final' in body)) {
+    emailed = await legacyBatch(context, session, raw.length, added.length, unmatched);
+  }
 
   return json({
     added: added.length,
@@ -206,6 +203,52 @@ export async function onRequestPost(context) {
     unmatched_titles: unmatched,
     emailed,
   });
+}
+
+// An older app posts a long import in batches of exactly LEGACY_BATCH rows,
+// back to back, and never says which is last. The titles it couldn't match
+// collect in import_pending until the import ends, so the member gets one
+// note with the whole list and the whole count. A short batch is the last
+// one, so it sends at once. A full batch might be the last (an import of
+// exactly 100 or 200), so it sends after a quiet period unless a later batch
+// has taken the row over. Each send claims the row with DELETE ... RETURNING,
+// so a batch and a quiet-period send can't both mail the same list.
+const LEGACY_BATCH = 100;
+const LEGACY_QUIET_MS = 20000; // the next batch arrives in seconds; waitUntil allows 30
+const LEGACY_STALE = '-10 minutes'; // a held import older than this was abandoned
+
+async function legacyBatch(context, session, rows, addedNow, unmatchedNow) {
+  const { env } = context;
+  const slug = session.member_slug;
+  try {
+    const held = await env.DB.prepare(
+      `DELETE FROM import_pending WHERE member_slug = ? RETURNING titles, added,
+         updated_at > datetime('now', '${LEGACY_STALE}') AS fresh`
+    ).bind(slug).first();
+    const prior = held && held.fresh ? held : { titles: '[]', added: 0 };
+    let priorTitles = [];
+    try { priorTitles = JSON.parse(prior.titles) || []; } catch (_) {}
+    const titles = [...new Set([...priorTitles, ...unmatchedNow])];
+    const added = (prior.added || 0) + addedNow;
+
+    if (rows < LEGACY_BATCH) return await emailUnmatched(env, session, added, titles);
+
+    const stamp = crypto.randomUUID();
+    await env.DB.prepare(
+      'INSERT OR REPLACE INTO import_pending (member_slug, titles, added, stamp) VALUES (?, ?, ?, ?)'
+    ).bind(slug, JSON.stringify(titles), added, stamp).run();
+    const quiet = Number.isInteger(env.IMPORT_QUIET_MS) ? env.IMPORT_QUIET_MS : LEGACY_QUIET_MS; // tests shorten it
+    context.waitUntil(new Promise((r) => setTimeout(r, quiet)).then(async () => {
+      const mine = await env.DB.prepare(
+        'DELETE FROM import_pending WHERE member_slug = ? AND stamp = ? RETURNING titles, added'
+      ).bind(slug, stamp).first();
+      if (mine) await emailUnmatched(env, session, mine.added, JSON.parse(mine.titles));
+    }).catch(() => {}));
+    return false;
+  } catch (e) {
+    // No table yet (migration 085 pending): fall back to this batch alone.
+    return await emailUnmatched(env, session, addedNow, unmatchedNow);
+  }
 }
 
 // One note to the member's own address listing what wasn't added. Never to
