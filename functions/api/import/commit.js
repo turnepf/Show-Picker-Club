@@ -95,10 +95,18 @@ export async function onRequestPost(context) {
   const inserts = [];
   const added = [];
   const skipped = [];
+  // Titles TMDB couldn't identify. Every show is a TMDB entry now (a copy has
+  // no title of its own), so these aren't added: they come back by name for
+  // the member to add by hand, picking the right entry from search.
+  const unmatched = [];
 
   for (const item of raw) {
     const title = str(item.title, 200);
     if (!title) continue;
+    if (!Number.isInteger(item.tmdb_id) || !(item.tmdb_type === 'movie' || item.tmdb_type === 'tv')) {
+      unmatched.push(title);
+      continue;
+    }
     const key = showKey({ title, tmdb_id: item.tmdb_id, tmdb_type: item.tmdb_type, movie: item.movie });
     // `taken` grows as we go, so a payload that lists the same show twice
     // inserts it once.
@@ -177,5 +185,7 @@ export async function onRequestPost(context) {
     skipped: skipped.length,
     titles: added,
     skipped_titles: skipped,
+    unmatched: unmatched.length,
+    unmatched_titles: unmatched,
   });
 }

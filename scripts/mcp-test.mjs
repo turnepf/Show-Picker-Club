@@ -40,6 +40,13 @@ import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { createHash, randomBytes } from 'node:crypto';
 import { Stmt } from './lib/d1.mjs';
+import { fakeTmdb } from './lib/fake-tmdb.mjs';
+
+// Every added show must be a TMDB entry, so adds go to a stand-in TMDB that
+// knows every title (scripts/lib/fake-tmdb.mjs). Nothing else goes out.
+const tmdb = fakeTmdb();
+globalThis.fetch = async (url) => tmdb.respond(url)
+  ?? new Response('{}', { headers: { 'Content-Type': 'application/json' } });
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = mkdtempSync(join(tmpdir(), 'mcp-test-'));
@@ -82,6 +89,7 @@ function makeEnv() {
       prepare: (sql) => new Stmt(db, sql),
       batch: async (stmts) => { const out = []; for (const s of stmts) out.push(await s.run()); return out; },
     },
+    TMDB_TOKEN: 'test-token',
     _db: db,
   };
 }

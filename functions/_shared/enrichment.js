@@ -511,6 +511,10 @@ export async function searchTmdbTitle(title, env, isMovie) {
   return { ...empty, reason };
 }
 
+// Every show is a TMDB entry, so an add or a re-match that comes back empty
+// has to say why: `unavailable` (no token, an error, TMDB answering with a
+// failure) means "try again later"; `noMatch` means TMDB was asked and has
+// nothing by that name. The two used to read identically.
 export async function fetchEnrichment(title, env, isMovie) {
   const token = env.TMDB_TOKEN;
   // Try the stored media type first, then the other one. Documentaries and
@@ -518,37 +522,38 @@ export async function fetchEnrichment(title, env, isMovie) {
   // member added them as a show (and vice versa) — without the flip, a
   // correctly-spelled title can never match, so it never gets a poster.
   const mediaTypes = isMovie ? ['movie', 'tv'] : ['tv', 'movie'];
+  if (!token) return { ...emptyEnrichment(), unavailable: true };
 
-  // ── TMDB path ──────────────────────────────────────────────────────────────
-  if (token) {
-    // Same stripped-query rule as searchTmdbTitle: the "(YYYY)" suffix hurts
-    // the search and helps the pick.
-    const { query } = titleSearchTerms(title);
-    try {
-      let search = null;
-      let mediaType = mediaTypes[0];
-      for (const t of mediaTypes) {
-        const s = await tmdbFetch(
-          `/search/${t}?query=${encodeURIComponent(query)}&language=en-US&page=1`,
-          token
-        );
-        if (s.results?.length) { search = s; mediaType = t; break; }
+  // Same stripped-query rule as searchTmdbTitle: the "(YYYY)" suffix hurts
+  // the search and helps the pick.
+  const { query } = titleSearchTerms(title);
+  try {
+    let search = null;
+    let mediaType = mediaTypes[0];
+    for (const t of mediaTypes) {
+      const s = await tmdbFetch(
+        `/search/${t}?query=${encodeURIComponent(query)}&language=en-US&page=1`,
+        token
+      );
+      if (s.success === false || !Array.isArray(s.results)) {
+        return { ...emptyEnrichment(), unavailable: true };
       }
-
-      if (search) {
-        const pick = pickBestMatch(search.results, mediaType, title);
-        const result = await enrichFromTmdbId(
-          pick.id, mediaType, env,
-          tmdbPosterUrl(pick.poster_path)
-        );
-        return { ...result, canonicalTitle: result.canonicalTitle || title };
-      }
-    } catch (_) {
-      // TMDB errored — nothing to fall back to; return the empty shape.
+      if (s.results.length) { search = s; mediaType = t; break; }
     }
-  }
 
-  return emptyEnrichment();
+    if (search) {
+      const pick = pickBestMatch(search.results, mediaType, title);
+      const result = await enrichFromTmdbId(
+        pick.id, mediaType, env,
+        tmdbPosterUrl(pick.poster_path)
+      );
+      return { ...result, canonicalTitle: result.canonicalTitle || title };
+    }
+    return { ...emptyEnrichment(), noMatch: true };
+  } catch (_) {
+    // TMDB errored (an outage, a non-JSON answer): nothing learned.
+    return { ...emptyEnrichment(), unavailable: true };
+  }
 }
 
 // What fetchEnrichment answers when it learned nothing. Also used directly by

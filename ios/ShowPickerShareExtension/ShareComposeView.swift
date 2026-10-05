@@ -84,6 +84,8 @@ struct ShareComposeView: View {
             errorText = archived
                 ? "“\(t)” is in your archive — restore it from the app."
                 : "“\(t)” is already on \(listName.map { "your \($0) list" } ?? "one of your lists")."
+        } catch ShareAPI.APIError.refused(let message) {
+            errorText = message
         } catch {
             errorText = "Couldn't save — check your connection."
         }

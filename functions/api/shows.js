@@ -155,6 +155,23 @@ export async function onRequestPost(context) {
     if (byId.canonicalTitle) enriched = byId;
   }
   if (!enriched) enriched = await fetchEnrichment(title, env, !!movie);
+
+  // Every show is a TMDB entry: its name, artwork and details live once on
+  // the shared row, and a copy carries no title of its own. So a show TMDB
+  // can't identify isn't added. TMDB being unreachable is "try again later";
+  // TMDB having nothing by that name is a refusal the member can act on.
+  if (!enriched.tmdbId) {
+    if (enriched.noMatch) {
+      return new Response(JSON.stringify({
+        error: 'no_match', title,
+        message: `No show or movie called "${title}" was found. Check the spelling, or pick it from the search suggestions.`,
+      }), { status: 422, headers: corsHeaders() });
+    }
+    return new Response(JSON.stringify({
+      error: 'tmdb_unavailable', title,
+      message: "We couldn't reach the show catalog just now. Please try again in a few minutes.",
+    }), { status: 503, headers: corsHeaders() });
+  }
   const finalTitle = enriched.canonicalTitle || title;
 
   const post = sameShowWhere('s', {

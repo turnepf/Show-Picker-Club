@@ -1157,6 +1157,16 @@ show's details, kept in step by propagation code, so two members could see
   overwrite it, because a copy holds whatever some earlier pass gave it.
 - **TMDB names the show.** A name TMDB gave is kept until TMDB gives another,
   and a member's own title isn't shown.
+- **Every copy is a TMDB entry (2026-10-05).** Nobody has a title of their
+  own, so nothing is added that TMDB can't identify. An add or a re-matching
+  edit answers 422 `no_match` (with a sentence naming the title) when TMDB
+  has nothing by that name, and 503 `tmdb_unavailable` ("try again later")
+  when TMDB can't be asked; neither writes a row. An edit that keeps the show
+  (notes, list, service) saves either way. A list import sets unmatched titles
+  aside and returns them as `unmatched_titles`, which the web and iOS show at
+  the end to add by hand; iOS's offline queue keeps a queued add through a
+  TMDB outage and says so when one has no match. The Apple TV and Roku "add as
+  typed" buttons are gone. The per-copy `title` column goes next.
 - **A gap is the show's, not the copy's.** The enrichment passes decide what
   to fetch from the shared row. A copy that a fresher one has already filled
   isn't refetched, and an unmatched copy gets looked up and pinned rather
@@ -1165,7 +1175,9 @@ show's details, kept in step by propagation code, so two members could see
 
 Enforcer: `scripts/titles-test.mjs` (every PR) — view/table column parity,
 migration/code parity, shared vs per-member fields; `admin-fix-tools-test.mjs`
-for the write paths.
+for the write paths; `same-show-test.mjs` for the TMDB-entry rule on add and
+edit, and `import-list-test.mjs` for the import's unmatched list. Suites that
+add shows use the stand-in TMDB in `scripts/lib/fake-tmdb.mjs`.
 
 ## Adding an invariant
 

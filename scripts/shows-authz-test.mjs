@@ -42,8 +42,9 @@
 // Same harness as scripts/watching-with-test.mjs: the functions tree is copied
 // to a temp directory with a `type: module` package.json so Node loads the .js
 // files as the ES modules they are, and schema.sql is loaded into node:sqlite
-// behind a thin D1 shim, so the SQL under test is executed. No TMDB_TOKEN is
-// set, so enrichment returns its empty shape without touching the network.
+// behind a thin D1 shim, so the SQL under test is executed. TMDB is a
+// stand-in that knows every title (scripts/lib/fake-tmdb.mjs), since an add
+// TMDB can't identify is refused.
 
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -51,6 +52,13 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { Stmt } from './lib/d1.mjs';
+import { fakeTmdb } from './lib/fake-tmdb.mjs';
+
+// Every added show must be a TMDB entry, so adds go to a stand-in TMDB that
+// knows every title (scripts/lib/fake-tmdb.mjs). Nothing else goes out.
+const tmdb = fakeTmdb();
+globalThis.fetch = async (url) => tmdb.respond(url)
+  ?? new Response('{}', { headers: { 'Content-Type': 'application/json' } });
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = mkdtempSync(join(tmpdir(), 'shows-authz-'));
@@ -81,6 +89,7 @@ function makeEnv() {
   db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
   return {
     DB: { prepare: (sql) => new Stmt(db, sql), batch: async (stmts) => { const out = []; for (const s of stmts) out.push(await s.run()); return out; } },
+    TMDB_TOKEN: 'test-token',
     _db: db,
   };
 }

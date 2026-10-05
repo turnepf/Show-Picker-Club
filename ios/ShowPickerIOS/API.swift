@@ -25,6 +25,7 @@ enum API {
         let id: Int?
         let list: String?
         let title: String?
+        let message: String?
     }
 
     // sendJSON drops Swift-nil body values so the JSON omits them, and the
@@ -59,6 +60,9 @@ enum API {
         let id: Int?         // exists_archived: the archived row to restore
         let list: String?    // exists_active: which list already has it
         let title: String?   // canonical title the server deduped against
+        // A sentence written for the member (no_match, tmdb_unavailable): a
+        // show TMDB can't identify isn't added, and the server says why.
+        let message: String?
     }
 
     // Short, honest failure line for a member-visible error: names an expired
@@ -70,6 +74,9 @@ enum API {
         }
         if isOffline(error) {
             return "You're offline — couldn't \(action)."
+        }
+        if case let .rejected(rej)? = error as? APIError, let message = rej.message, !message.isEmpty {
+            return message
         }
         return "Couldn't \(action). Try again."
     }
@@ -1123,7 +1130,7 @@ enum API {
         guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
             if let b = try? JSONDecoder().decode(ErrBody.self, from: data), let code = b.error {
-                throw APIError.rejected(ServerRejection(status: status, code: code, id: b.id, list: b.list, title: b.title))
+                throw APIError.rejected(ServerRejection(status: status, code: code, id: b.id, list: b.list, title: b.title, message: b.message))
             }
             throw APIError.badResponse(status)
         }
@@ -1143,7 +1150,7 @@ enum API {
         guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
             if let b = try? JSONDecoder().decode(ErrBody.self, from: data), let code = b.error {
-                throw APIError.rejected(ServerRejection(status: status, code: code, id: b.id, list: b.list, title: b.title))
+                throw APIError.rejected(ServerRejection(status: status, code: code, id: b.id, list: b.list, title: b.title, message: b.message))
             }
             throw APIError.badResponse(status)
         }

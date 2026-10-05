@@ -252,7 +252,7 @@ struct ImportListView: View {
                         .foregroundStyle(.secondary)
                 }
                 if item.wrappedValue.matched == false {
-                    Label("No match found — will be added as typed", systemImage: "questionmark.circle")
+                    Label("No match found — can't be added. Add it by hand from search.", systemImage: "questionmark.circle")
                         .font(.caption2)
                         .foregroundStyle(.orange)
                 }
@@ -291,7 +291,9 @@ struct ImportListView: View {
     // skips a title the member already has, archived ones included, so letting
     // them tick it back on would promise an add that silently never happens.
     private func toggle(_ item: ImportItem) {
-        guard !item.isDuplicate else { return }
+        // A title TMDB couldn't match can't be added (every show is a TMDB
+        // entry), so it stays out like a duplicate does.
+        guard !item.isDuplicate, item.matched != false else { return }
         if excluded.contains(item.id) { excluded.remove(item.id) } else { excluded.insert(item.id) }
     }
 
@@ -338,7 +340,7 @@ struct ImportListView: View {
         // Anything already on one of their lists starts — and stays — out.
         // See toggle(): commit skips these, so offering to include them would
         // promise an add that never happens.
-        excluded = Set(items.filter { $0.isDuplicate }.map { $0.id })
+        excluded = Set(items.filter { $0.isDuplicate || $0.matched == false }.map { $0.id })
         step = .review
     }
 
@@ -348,6 +350,9 @@ struct ImportListView: View {
         defer { committing = false }
 
         var added = 0
+        // Titles TMDB couldn't match: the ones left out at review plus any the
+        // server set aside. Listed at the end, to add by hand from search.
+        var unmatched = items.filter { $0.matched == false }.map { $0.title }
         // Snapshot once: `included` recomputes off two @State properties, and
         // the batch maths needs a stable count.
         let rows = included
@@ -356,7 +361,9 @@ struct ImportListView: View {
         for start in stride(from: 0, to: rows.count, by: 100) {
             let batch = Array(rows[start..<min(start + 100, rows.count)])
             do {
-                added += try await API.importCommit(items: batch).added
+                let result = try await API.importCommit(items: batch)
+                added += result.added
+                for t in result.unmatchedTitles ?? [] where !unmatched.contains(t) { unmatched.append(t) }
             } catch {
                 // Report what did land before the failure — silently losing a
                 // partial import is worse than an awkward message.
@@ -372,7 +379,17 @@ struct ImportListView: View {
         // in now rather than on the next scheduled rotation.
         Task { try? await API.enrich() }
         await onFinished()
-        dismiss()
+        if unmatched.isEmpty {
+            dismiss()
+        } else {
+            // Stay open so the list doesn't vanish: nothing left to add, and a
+            // note naming what wasn't found.
+            items = []
+            excluded = []
+            let n = unmatched.count
+            errorText = "Added \(added) show\(added == 1 ? "" : "s"). No match was found for \(n), so \(n == 1 ? "it wasn't" : "they weren't") added. Add \(n == 1 ? "it" : "them") by hand from search: "
+                + unmatched.joined(separator: ", ")
+        }
     }
 
     private func importFailure(_ error: Error) -> String {

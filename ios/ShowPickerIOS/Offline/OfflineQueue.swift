@@ -179,6 +179,17 @@ final class OfflineQueue: ObservableObject {
                     // Lost the connection mid-drain — keep the rest for later.
                     return
                 }
+                if case let .rejected(rej)? = error as? API.APIError {
+                    // The show catalog (TMDB) was unreachable: the add is fine,
+                    // just early. Keep it and the rest for the next drain.
+                    if rej.code == "tmdb_unavailable" { return }
+                    // An add TMDB has no match for is never coming: every show
+                    // is a TMDB entry. Say so rather than letting the queued
+                    // row vanish without a word.
+                    if rej.code == "no_match" {
+                        ErrorCenter.shared.explain(rej.message ?? "A show you added offline wasn't found in the show catalog, so it wasn't added.")
+                    }
+                }
                 // A real server rejection (e.g. the show was deleted on the
                 // web): this mutation can never succeed, so drop it and move on
                 // rather than wedging the whole queue.

@@ -373,9 +373,11 @@ struct AddEditShowView: View {
             case "rate_limited":
                 errorText = "Daily add limit reached. Try again tomorrow."
             default:
+                // no_match / tmdb_unavailable: the server's own sentence says
+                // whether to fix the title or try again later.
                 errorText = rej.status == 401
                     ? "Couldn't save — you're logged out. Sign in again from Home."
-                    : "Couldn't save. Try again."
+                    : (rej.message ?? "Couldn't save. Try again.")
             }
         } catch let e as API.APIError where e.status == 401 {
             errorText = "Couldn't save — you're logged out. Sign in again from Home."
