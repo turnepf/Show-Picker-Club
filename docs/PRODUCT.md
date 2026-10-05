@@ -1042,7 +1042,10 @@ A few intentional omissions:
   (`suggestions.js` was already a retired 410 stub). Kept:
   `fetchEnrichmentById`, the artwork sync/propagation passes, the URL queue
   and its conflict/mismatch tools, and the operator's manual `fix_title`
-  rename (still shared by the URL queue). The `title_ok` column stays on
+  rename (still shared by the URL queue). In 2026-10 the conflict tool,
+  `fix_title`, `re_enrich` and the missing-posters queue went too, with
+  `_shared/title-fix.js`: TMDB names every show now and the nightly passes
+  fill details by TMDB id. The `title_ok` column stays on
   `shows` as an inert, always-zero remnant — harmless to leave, and dropping
   it would need a migration for no benefit.
 

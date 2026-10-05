@@ -1153,7 +1153,7 @@ show's details, kept in step by propagation code, so two members could see
 - **A writer holding TMDB's payload writes it to `titles` directly**
   (`writeTitle()`): add, edit, enrichment, URL cleanup. TMDB's facts
   replace stored ones. A member's copy can only *fill* the shared row
-  (`syncTitle()`, `syncTitlesNamed()`, the nightly rebuild), never
+  (`syncTitle()`, the nightly rebuild), never
   overwrite it, because a copy holds whatever some earlier pass gave it.
 - **TMDB names the show.** A name TMDB gave is kept until TMDB gives another,
   and a member's own title isn't shown.

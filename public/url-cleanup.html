@@ -36,23 +36,10 @@
       color: var(--ink); margin: 18px 0 4px;
     }
     .section-blurb { color: var(--ink-muted); font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
-    .row.conflict { border-color: color-mix(in oklch, var(--accent) 35%, transparent); }
     .row.mismatch { border-color: color-mix(in oklch, var(--danger) 30%, transparent); }
-    .row.conflict .row-form, .row.mismatch .row-form {
-      grid-template-columns: 1fr auto;
-      gap: 8px;
-    }
-    .row.mismatch .row-form { grid-template-columns: 1fr 1fr; }
-    .row.needs-poster { border-color: color-mix(in oklch, var(--accent) 22%, transparent); }
-    /* Flex (not grid) so the variable set of controls wraps cleanly. */
-    .row.needs-poster .row-form { display: flex; flex-wrap: wrap; align-items: center; }
-    .row.needs-poster .title-input, .row.needs-poster .url-input { flex: 1 1 200px; }
-    .row.needs-poster .net-select, .row.needs-poster .type-select { flex: 0 0 auto; }
-    .row.needs-poster .other-input, .row.needs-poster .row-err { flex: 1 1 100%; }
+    .row.mismatch .row-form { grid-template-columns: 1fr 1fr; gap: 8px; }
     @media (max-width: 560px) {
       .row.mismatch .row-form { grid-template-columns: 1fr; }
-      .row.needs-poster .title-input, .row.needs-poster .url-input,
-      .row.needs-poster .net-select, .row.needs-poster .type-select { flex: 1 1 100%; }
     }
 
     .row {
@@ -171,8 +158,6 @@
     </div>
 
     <div id="bannerErr"></div>
-    <div id="needsPoster"></div>
-    <div id="conflicts"></div>
     <div id="mismatches"></div>
     <div id="list"></div>
   </div>
@@ -224,7 +209,7 @@
         ? `<span class="show-meta">${show.member_count} lists &middot; ${escapeHtml(show.members)}</span>`
         : `<span class="show-meta">${escapeHtml(show.members)}</span>`;
       return `
-        <div class="row" data-id="${show.id}">
+        <div class="row" data-id="${show.id}" data-title="${escapeAttr(show.title)}">
           <div class="row-head">
             <a class="show-link" target="_blank" rel="noopener noreferrer"
                href="${googleSearchUrl(show.title, show.network)}">${linkText}</a>
@@ -236,8 +221,6 @@
             <input type="text" class="url-input" placeholder="Paste direct URL" autocomplete="off">
             <button class="btn-update" type="button">Update</button>
             <input type="text" class="other-input${otherClass}" placeholder="New network name" value="${escapeAttr(otherValue)}">
-            <input type="text" class="title-input" placeholder="Fix title" value="${escapeAttr(show.title)}" autocomplete="off">
-            <button class="btn-rename" type="button">Rename</button>
             <button class="btn-dismiss" type="button">No good link — dismiss</button>
             <div class="row-err"></div>
           </div>
@@ -308,51 +291,12 @@
         }
       });
 
-      // Fix a wrong/typo'd title: renames every member's copy and re-enriches.
-      const titleInput = rowEl.querySelector('.title-input');
-      const renameBtn = rowEl.querySelector('.btn-rename');
-      titleInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); renameBtn.click(); }
-      });
-      renameBtn.addEventListener('click', async () => {
-        errBox.textContent = '';
-        const newTitle = titleInput.value.trim();
-        if (!newTitle) { errBox.textContent = 'Enter a title.'; return; }
-        renameBtn.disabled = true;
-        const old = renameBtn.textContent;
-        renameBtn.textContent = '…';
-        try {
-          const res = await fetch('/api/admin-url-cleanup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'fix_title',
-              id: parseInt(rowEl.dataset.id, 10),
-              new_title: newTitle,
-            }),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            errBox.textContent = data.error || `Error (${res.status})`;
-          } else {
-            const finalTitle = data.new_title || newTitle;
-            rowEl.querySelector('.show-link').textContent = finalTitle;
-            titleInput.value = finalTitle;
-            const n = data.updated || 0;
-            errBox.textContent = `Renamed to "${finalTitle}" across ${n} cop${n === 1 ? 'y' : 'ies'}.`;
-          }
-        } catch (e) {
-          errBox.textContent = 'Network error: ' + e.message;
-        }
-        renameBtn.disabled = false;
-        renameBtn.textContent = old;
-      });
-
       // No good link exists for this title (ambiguous, unlisted, etc.) —
       // dismiss it from the queue permanently rather than leaving it stuck.
       const dismissBtn = rowEl.querySelector('.btn-dismiss');
       dismissBtn.addEventListener('click', async () => {
-        if (!confirm(`Stop flagging "${titleInput.value.trim()}" in Show Cleanup? There's no way to undo this from the page.`)) return;
+        const title = rowEl.dataset.title;
+        if (!confirm(`Stop flagging "${title}" in Show Cleanup? There's no way to undo this from the page.`)) return;
         errBox.textContent = '';
         dismissBtn.disabled = true;
         const old = dismissBtn.textContent;
@@ -361,7 +305,7 @@
           const res = await fetch('/api/admin-url-cleanup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'dismiss', title: titleInput.value.trim() }),
+            body: JSON.stringify({ action: 'dismiss', title }),
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) {
@@ -396,186 +340,6 @@
     // never matched — added before TMDB had them, or only under the opposite
     // media type); "Rename" corrects a wrong/typo'd title and re-enriches. Both
     // reuse the same actions the URL queue does.
-    function renderNeedsPoster(items) {
-      const root = document.getElementById('needsPoster');
-      if (!items.length) { root.innerHTML = ''; return; }
-      root.innerHTML = `
-        <div class="section-head">Missing posters</div>
-        <div class="section-blurb">No copy of these titles has a poster — usually the stored title doesn't match TMDB. Re-enrich to try a fresh lookup as-is, or fix the title if it's wrong (typo, or a descriptive name). If TMDB only indexes it under the other media type, flip the Show/Movie toggle so the lookup searches the right index. A poster fetched here covers every member's copy. Optionally paste a direct watch URL (with its service) to set it in the same click.</div>
-        ${items.map(p => `
-          <div class="row needs-poster" data-id="${p.id}">
-            <div class="row-head">
-              <a class="show-link" target="_blank" rel="noopener noreferrer"
-                 href="${googleSearchUrl(p.title, null)}">${escapeHtml(p.title)}</a>
-              <span class="show-meta">${p.member_count > 1 ? p.member_count + ' lists &middot; ' : ''}${escapeHtml(p.members)}${p.movie ? ' &middot; movie' : ''}</span>
-            </div>
-            <div class="row-form">
-              <input type="text" class="title-input" placeholder="Fix title" value="${escapeAttr(p.title)}" autocomplete="off">
-              <select class="type-select" aria-label="Media type" title="Show or movie — flip this if TMDB indexes it under the other type">
-                <option value="0"${p.movie ? '' : ' selected'}>Show</option>
-                <option value="1"${p.movie ? ' selected' : ''}>Movie</option>
-              </select>
-              <button class="btn-rename" type="button">Rename &amp; re-enrich</button>
-              <button class="btn-update btn-reenrich" type="button">Re-enrich</button>
-              <select class="net-select">${networkOptionsHtml('')}</select>
-              <input type="text" class="url-input" placeholder="Paste direct URL (optional)" autocomplete="off">
-              <input type="text" class="other-input" placeholder="New network name">
-              <div class="row-err"></div>
-            </div>
-          </div>
-        `).join('')}
-      `;
-      root.querySelectorAll('.row.needs-poster').forEach(attachPosterHandlers);
-    }
-
-    function attachPosterHandlers(rowEl) {
-      const errBox = rowEl.querySelector('.row-err');
-      const titleInput = rowEl.querySelector('.title-input');
-      const renameBtn = rowEl.querySelector('.btn-rename');
-      const reenrichBtn = rowEl.querySelector('.btn-reenrich');
-      const netSelect = rowEl.querySelector('.net-select');
-      const otherInput = rowEl.querySelector('.other-input');
-      const urlInput = rowEl.querySelector('.url-input');
-      const typeSelect = rowEl.querySelector('.type-select');
-
-      netSelect.addEventListener('change', () => {
-        if (netSelect.value === '__other') { otherInput.classList.add('show'); otherInput.focus(); }
-        else { otherInput.classList.remove('show'); }
-      });
-
-      const removeRow = () => {
-        rowEl.classList.add('removing');
-        setTimeout(() => { rowEl.remove(); refreshPosterCount(); }, 250);
-      };
-
-      reenrichBtn.addEventListener('click', async () => {
-        errBox.textContent = '';
-        reenrichBtn.disabled = true;
-        const old = reenrichBtn.textContent;
-        reenrichBtn.textContent = 'Re-enriching…';
-        try {
-          const res = await fetch('/api/admin-url-cleanup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 're_enrich', id: parseInt(rowEl.dataset.id, 10), movie: parseInt(typeSelect.value, 10) }),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            errBox.textContent = data.error || `Error (${res.status})`;
-          } else if (data.poster) {
-            removeRow();
-            return;
-          } else {
-            errBox.textContent = 'Still no match — try fixing the title.';
-          }
-        } catch (e) {
-          errBox.textContent = 'Network error: ' + e.message;
-        }
-        reenrichBtn.disabled = false;
-        reenrichBtn.textContent = old;
-      });
-
-      titleInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); renameBtn.click(); }
-      });
-      renameBtn.addEventListener('click', async () => {
-        errBox.textContent = '';
-        const newTitle = titleInput.value.trim();
-        if (!newTitle) { errBox.textContent = 'Enter a title.'; return; }
-        const network = (netSelect.value === '__other' ? otherInput.value : netSelect.value).trim();
-        const newUrl = urlInput.value.trim();
-        // A URL needs a service so we know which app it opens; a network on its
-        // own (no URL) is fine — it just sets the service.
-        if (newUrl && !network) { errBox.textContent = 'Pick a service for that URL.'; return; }
-        renameBtn.disabled = true;
-        const old = renameBtn.textContent;
-        renameBtn.textContent = '…';
-        try {
-          const res = await fetch('/api/admin-url-cleanup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'fix_title', id: parseInt(rowEl.dataset.id, 10), new_title: newTitle,
-              network: network || undefined, network_url: newUrl || undefined,
-              movie: parseInt(typeSelect.value, 10),
-            }),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            errBox.textContent = data.error || `Error (${res.status})`;
-            renameBtn.disabled = false;
-            renameBtn.textContent = old;
-          } else {
-            // If the operator added a new service name, remember it for the
-            // other cards' dropdowns.
-            if (network && !networks.includes(network)) {
-              networks.push(network);
-              networks.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-            }
-            // fix_title re-enriches under the new name; the poster miss is
-            // resolved whether or not TMDB had artwork, so clear the card.
-            removeRow();
-          }
-        } catch (e) {
-          errBox.textContent = 'Network error: ' + e.message;
-          renameBtn.disabled = false;
-          renameBtn.textContent = old;
-        }
-      });
-    }
-
-    function refreshPosterCount() {
-      const root = document.getElementById('needsPoster');
-      const n = root.querySelectorAll('.row.needs-poster').length;
-      if (n === 0) {
-        root.innerHTML = '';
-      } else {
-        const head = root.querySelector('.section-head');
-        if (head) head.textContent = 'Missing posters';
-      }
-    }
-
-    function renderConflicts(conflicts) {
-      const root = document.getElementById('conflicts');
-      if (!conflicts.length) { root.innerHTML = ''; return; }
-      root.innerHTML = `
-        <div class="section-head">Cross-member network conflicts</div>
-        <div class="section-blurb">Members disagree on which service carries the show. Pick the canonical answer and we'll unify all rows; URLs that came from a wrong-network propagation are cleared so the next fill picks the right one.</div>
-        ${conflicts.map(c => `
-          <div class="row conflict" data-title="${escapeAttr(c.title)}">
-            <div class="row-head">
-              <span class="show-link">${escapeHtml(c.title)}</span>
-              <span class="show-meta">${c.rows} rows · ${escapeHtml(c.networks.join(', '))}</span>
-            </div>
-            <div class="row-form">
-              <select class="conflict-net">${[''].concat(c.networks, networks.filter(n => !c.networks.includes(n))).map(n => `<option value="${escapeAttr(n)}">${escapeHtml(n) || '— pick canonical —'}</option>`).join('')}</select>
-              <button class="btn-update conflict-save" type="button">Unify</button>
-            </div>
-          </div>
-        `).join('')}
-      `;
-      root.querySelectorAll('.conflict-save').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const row = btn.closest('.row');
-          const title = row.dataset.title;
-          const net = row.querySelector('.conflict-net').value.trim();
-          if (!net) return;
-          btn.disabled = true; btn.textContent = 'Saving…';
-          try {
-            const res = await fetch('/api/admin-url-cleanup', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'resolve_conflict', title, network: net }),
-            });
-            const data = await res.json();
-            if (!res.ok) { alert(data.error || `Error (${res.status})`); btn.disabled = false; btn.textContent = 'Unify'; return; }
-            row.classList.add('removing');
-            setTimeout(() => row.remove(), 250);
-          } catch (e) { alert('Network error: ' + e.message); btn.disabled = false; btn.textContent = 'Unify'; }
-        });
-      });
-    }
-
     function renderMismatches(mismatches) {
       const root = document.getElementById('mismatches');
       if (!mismatches.length) { root.innerHTML = ''; return; }
@@ -641,16 +405,10 @@
         login.style.display = 'none';
         networks = data.networks || [];
         const shows = data.shows || [];
-        const conflicts = data.conflicts || [];
         const mismatches = data.mismatches || [];
-        const needsPoster = data.needsPoster || [];
-        renderNeedsPoster(needsPoster);
-        renderConflicts(conflicts);
         renderMismatches(mismatches);
         const queueSummary = `${shows.length} show${shows.length === 1 ? '' : 's'} remaining`;
         const extras = [];
-        if (needsPoster.length) extras.push(`${needsPoster.length} missing poster${needsPoster.length === 1 ? '' : 's'}`);
-        if (conflicts.length) extras.push(`${conflicts.length} cross-network conflict${conflicts.length === 1 ? '' : 's'}`);
         if (mismatches.length) extras.push(`${mismatches.length} URL/network mismatch${mismatches.length === 1 ? 'es' : 'es'}`);
         remaining.textContent = extras.length ? `${queueSummary} · ${extras.join(' · ')}` : queueSummary;
         if (shows.length === 0) {

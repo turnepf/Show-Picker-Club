@@ -2,9 +2,7 @@ import { canonicalNetwork, networkFromUrl, storefrontFromUrl } from '../_shared/
 import { extractUrl, safeNetworkUrl } from '../_shared/url-utils.js';
 import { isAdmin } from '../_shared/admin.js';
 import { cronAuthorized } from '../_shared/secrets.js';
-import { fetchEnrichment, fetchEnrichmentById, fetchAvailability, fallbackNetwork } from '../_shared/enrichment.js';
-import { renameShowCopies } from '../_shared/title-fix.js';
-import { syncTitlesNamed, writeTitle, titleFieldsFromEnrichment } from '../_shared/titles.js';
+import { fetchAvailability } from '../_shared/enrichment.js';
 import { sameShowJoin, sameShowWhere, showKeySql } from '../_shared/same-show.js';
 
 function json(data, status = 200) {
@@ -64,7 +62,7 @@ const QUEUE_FILTER = `
   -- be auto-rescued because propagation is network-scoped now.
   AND (s.network IS NULL OR NOT EXISTS (
     SELECT 1 FROM shows s_good
-    WHERE LOWER(s_good.title) = LOWER(s.title)
+    WHERE ${sameShowJoin('s_good', 's')}
       AND s_good.archived = 0
       AND s_good.network = s.network
       AND s_good.network_url IS NOT NULL
@@ -207,6 +205,8 @@ async function reclassifyStorefronts(env, body) {
   });
 }
 
+// Copies a good link to sibling copies still on a placeholder. Nightly only
+// (inherit_networks); it used to also run on every page load.
 async function propagateGoodUrls(env) {
   // Before listing, push every known good URL out to any sibling row that's
   // still on a placeholder. Scoped to (show, network) because the same
@@ -257,19 +257,19 @@ async function propagateGoodUrls(env) {
 }
 
 async function fetchQueue(env) {
-  // One row per distinct title (case-insensitive), with all the member labels
-  // for shows sharing that title.
+  // One row per show (a TMDB entry, or a title TMDB never matched), with all
+  // the member labels for its copies. Three films called "The Odyssey" are
+  // three rows, each with its own link to find.
   const { results } = await env.DB.prepare(`
     SELECT
-      LOWER(s.title) AS ltitle,
       MIN(s.id) AS id,
       MIN(s.title) AS title,
       (SELECT s2.network FROM shows s2
-        WHERE LOWER(s2.title) = LOWER(s.title) AND s2.archived = 0
+        WHERE ${sameShowJoin('s2', 's')} AND s2.archived = 0
           AND s2.network IS NOT NULL AND s2.network != ''
         ORDER BY s2.id LIMIT 1) AS network,
       (SELECT s3.network_url FROM shows s3
-        WHERE LOWER(s3.title) = LOWER(s.title) AND s3.archived = 0
+        WHERE ${sameShowJoin('s3', 's')} AND s3.archived = 0
         ORDER BY s3.id LIMIT 1) AS network_url,
       COUNT(*) AS member_count,
       GROUP_CONCAT(
@@ -282,8 +282,8 @@ async function fetchQueue(env) {
     FROM shows s
     LEFT JOIN members m ON m.slug = s.member_slug
     WHERE ${QUEUE_FILTER}
-    GROUP BY LOWER(s.title)
-    ORDER BY LOWER(COALESCE(network, 'zzz')), LOWER(s.title)
+    GROUP BY ${showKeySql('s')}
+    ORDER BY LOWER(COALESCE(network, 'zzz')), LOWER(MIN(s.title))
   `).all();
 
   return results.map(r => ({
@@ -296,101 +296,8 @@ async function fetchQueue(env) {
   }));
 }
 
-// Apply a title correction: enrich the new title, rename every active copy
-// (member-safely — see renameShowCopies), and stamp the new title's artwork,
-// rating, and cast onto the renamed rows. Drives the operator's fix_title
-// action on the URL-cleanup queue.
-async function commitTitleFix(env, oldTitle, rawNew, enriched) {
-  let finalTitle = enriched.canonicalTitle || rawNew;
-  // The operator is deliberately renaming away from oldTitle. When enrichment's
-  // canonical title circles right back to it — TMDB/OMDB matched a same-named
-  // entry (e.g. "Scarpetta" typed against a movie row collides with the 1918
-  // short "Scarpetta e l'americana" in the movie index) — honoring canonical
-  // would silently no-op the rename, which reads to the operator as the old
-  // name stubbornly reappearing. Trust the operator's typed title in that case.
-  if (finalTitle.trim().toLowerCase() === oldTitle.trim().toLowerCase()) {
-    finalTitle = rawNew;
-  }
-  const renamed = await renameShowCopies(env, oldTitle, finalTitle);
 
-  // The copies keep only what is theirs: the badge, a network if they had
-  // none, and the pin. The show's facts and cast are written to its shared
-  // row by the caller (writeTitle), where members read them.
-  // Only copies of the entry just found, or unpinned copies of the title:
-  // a copy pinned to a different film of the same name keeps its pin.
-  const same = sameShowWhere('shows', { title: finalTitle, tmdb_id: enriched.tmdbId, tmdb_type: enriched.tmdbType }, { forWrite: true });
-  await env.DB.prepare(
-    `UPDATE shows
-        SET network_logo_url = COALESCE(?, network_logo_url),
-            network = COALESCE(network, ?),
-            tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type)
-      WHERE ${same.sql} AND archived = 0`
-  ).bind(enriched.networkLogoUrl, fallbackNetwork(enriched), enriched.tmdbId, enriched.tmdbType, ...same.binds).run();
 
-  return { finalTitle, updated: renamed };
-}
-
-// Titles where no active copy has a poster. Grouped by title (one card per
-// title, with every member label) because artwork is per-title — a poster
-// fetched for one copy covers all. These are the rows a stored title TMDB
-// can't match on its own: a typo that stuck ("Marshalls"), a descriptive
-// member-entered name, or a title only indexed under the opposite media type.
-// The operator fixes them from the Missing-posters section: Re-enrich (a fresh
-// TMDB lookup, media-type-flipping) or, when the title itself is wrong, Rename.
-async function fetchNeedsPoster(env) {
-  const { results } = await env.DB.prepare(`
-    SELECT
-      MIN(s.id) AS id,
-      MIN(s.title) AS title,
-      MAX(s.movie) AS movie,
-      COUNT(*) AS member_count,
-      GROUP_CONCAT(
-        COALESCE(
-          CASE WHEN m.first_name IS NOT NULL AND m.last_initial IS NOT NULL
-               THEN m.first_name || ' ' || m.last_initial
-               ELSE m.first_name END,
-          s.member_slug),
-        ', ') AS members
-    FROM shows_v s
-    LEFT JOIN members m ON m.slug = s.member_slug
-    WHERE s.archived = 0
-    GROUP BY LOWER(s.title)
-    HAVING MAX(CASE WHEN s.poster_url IS NOT NULL AND s.poster_url != '' THEN 1 ELSE 0 END) = 0
-    ORDER BY LOWER(s.title)
-  `).all();
-  return (results || []).map(r => ({
-    id: r.id,
-    title: r.title,
-    movie: r.movie,
-    member_count: r.member_count,
-    members: r.members,
-  }));
-}
-
-// Titles where two or more members carry the show on different networks.
-// Often a typo (member picked the wrong service) but sometimes legitimate
-// (a title that lives on multiple services). Surface so the operator can
-// pick a canonical answer for the title.
-async function fetchConflicts(env) {
-  const { results } = await env.DB.prepare(`
-    SELECT LOWER(s.title) AS ltitle,
-           MIN(s.title) AS title,
-           COUNT(DISTINCT s.network) AS distinct_networks,
-           GROUP_CONCAT(DISTINCT s.network) AS networks,
-           COUNT(*) AS rows
-      FROM shows s
-     WHERE s.archived = 0
-       AND s.network IS NOT NULL
-     GROUP BY LOWER(s.title)
-    HAVING COUNT(DISTINCT s.network) > 1
-     ORDER BY distinct_networks DESC, rows DESC, LOWER(s.title)
-  `).all();
-  return (results || []).map(r => ({
-    title: r.title,
-    networks: (r.networks || '').split(',').filter(Boolean),
-    rows: r.rows,
-  }));
-}
 
 // Rows where the URL's domain points at a different service than the
 // stored network. The url-utils helper canonicalises a URL's host to one
@@ -529,10 +436,13 @@ export async function onRequestPost(context) {
       ? derived
       : canonicalNetwork(submittedNetwork);
 
-    const titleRow = await env.DB.prepare('SELECT title FROM shows WHERE id = ?').bind(id).first();
+    const titleRow = await env.DB.prepare('SELECT title, tmdb_id, tmdb_type, movie FROM shows WHERE id = ?').bind(id).first();
     if (!titleRow) return json({ error: 'Show not found' }, 404);
+    // This show's copies: the same TMDB entry (plus unmatched copies of its
+    // title), never a different film that shares the name.
+    const same = sameShowWhere('shows', titleRow, { forWrite: true });
 
-    // Apply to every row sharing this title on the same service, plus any
+    // Apply to every copy of this show on the same service, plus any
     // rows that have no network yet. Don't overwrite rows that already
     // have a different specific network — the same title can legitimately
     // be carried by multiple services (e.g. All Her Fault on Peacock for
@@ -543,9 +453,9 @@ export async function onRequestPost(context) {
     // only NULL here left them unsaveable with no way to tell from the UI.
     const result = await env.DB.prepare(
       `UPDATE shows SET network = ?, network_url = ?, enriched_at = datetime('now')
-       WHERE LOWER(title) = LOWER(?) AND archived = 0
+       WHERE ${same.sql} AND archived = 0
          AND (network = ? OR network IS NULL OR network = '')`
-    ).bind(network, url, titleRow.title, network).run();
+    ).bind(network, url, ...same.binds, network).run();
 
     // Zero changed rows means every copy of this title is on some other
     // service, so the guard above skipped all of them. That used to return
@@ -556,9 +466,9 @@ export async function onRequestPost(context) {
     if (result.meta.changes === 0) {
       const { results: conflicts } = await env.DB.prepare(
         `SELECT DISTINCT network FROM shows
-          WHERE LOWER(title) = LOWER(?) AND archived = 0
+          WHERE ${same.sql} AND archived = 0
             AND network IS NOT NULL AND network != ''`
-      ).bind(titleRow.title).all();
+      ).bind(...same.binds).all();
       const names = (conflicts || []).map(c => c.network).join(', ');
       return json({
         error: `Nothing saved — every copy of "${titleRow.title}" is on ${names || 'another service'}, not ${network}. `
@@ -580,24 +490,6 @@ export async function onRequestPost(context) {
     return await reclassifyStorefronts(env, body);
   }
 
-  if (action === 'resolve_conflict') {
-    // Operator picked the canonical network for a title where members
-    // disagreed. Set every active row to that network and clear any
-    // network_url that came from a wrong-network propagation so the
-    // next fill pass picks the right URL per the chosen network.
-    const title = String(body.title || '').trim();
-    const network = canonicalNetwork(String(body.network || '').trim());
-    if (!title) return json({ error: 'title required' }, 400);
-    if (!network) return json({ error: 'network required' }, 400);
-    const result = await env.DB.prepare(
-      `UPDATE shows
-          SET network = ?,
-              network_url = CASE WHEN network = ? THEN network_url ELSE NULL END,
-              enriched_at = datetime('now')
-        WHERE LOWER(title) = LOWER(?) AND archived = 0`
-    ).bind(network, network, title).run();
-    return json({ ok: true, updated: result.meta.changes });
-  }
 
   if (action === 'fix_mismatch') {
     // Operator chose which side wins for a single mismatched row.
@@ -627,162 +519,10 @@ export async function onRequestPost(context) {
     return json({ ok: true, cleared_url: true });
   }
 
-  if (action === 'fix_title') {
-    // Operator corrects a wrong/typo'd title. Re-run enrichment on the new
-    // title (canonical title + rating + cast), then rename every active copy
-    // of the old title and refresh their cast. Fixes both failure modes:
-    // enrichment matched the wrong show, or matched nothing and the typo stuck.
-    // Optional `network`: the operator can correct the service at the same
-    // time (same semantics as resolve_conflict — every active copy moves to
-    // the chosen network, and URLs that pointed at the old service are
-    // cleared so the next fill pass picks the right one).
-    const id = parseInt(body.id, 10);
-    const rawNew = String(body.new_title || '').trim();
-    const submittedNetwork = String(body.network || '').trim();
-    // Optional direct URL: lets the operator set a watch link straight from the
-    // Missing-posters card (which otherwise has no URL field). Same paste-blob
-    // tolerance as the save action.
-    const rawUrl = extractUrl(body.network_url || '') || (body.network_url || '').trim();
-    if (!Number.isInteger(id)) return json({ error: 'id required' }, 400);
-    if (!rawNew) return json({ error: 'new title required' }, 400);
 
-    // Validate the URL and resolve its network up front — before we rename —
-    // so a bad paste can't leave a half-applied fix (title renamed, URL rejected).
-    let urlNetwork = null;
-    if (rawUrl) {
-      const lower = rawUrl.toLowerCase();
-      const looksLikeSearch =
-        lower.includes('/search') || lower.includes('/s?') ||
-        lower.includes('?q=') || lower.includes('?query=');
-      if (looksLikeSearch) {
-        return json({ error: 'That still looks like a search URL — paste the direct show URL.' }, 400);
-      }
-      // URL trumps the dropdown pick, same as the save action.
-      urlNetwork = networkFromUrl(rawUrl) || (submittedNetwork ? canonicalNetwork(submittedNetwork) : null);
-      if (!urlNetwork) return json({ error: 'Pick a network for that URL.' }, 400);
-    }
 
-    const row = await env.DB.prepare('SELECT title, movie FROM shows WHERE id = ?').bind(id).first();
-    if (!row) return json({ error: 'Show not found' }, 404);
-    const oldTitle = row.title;
-
-    // Optional media-type correction from the card's Show/Movie toggle. Flipping
-    // it makes enrichment search the right TMDB index — the reason a movie row
-    // like "Scarpetta e l'americana" could never resolve to the TV series.
-    const movieOverride = (body.movie === 0 || body.movie === 1) ? body.movie : null;
-    const isMovie = movieOverride !== null ? !!movieOverride : !!row.movie;
-
-    const enriched = await fetchEnrichment(rawNew, env, isMovie);
-    const { finalTitle, updated } = await commitTitleFix(env, oldTitle, rawNew, enriched);
-    if (movieOverride !== null) {
-      await env.DB.prepare(
-        `UPDATE shows SET movie = ?, enriched_at = datetime('now') WHERE LOWER(title) = LOWER(?) AND archived = 0`
-      ).bind(movieOverride, finalTitle).run();
-    }
-
-    let network = null;
-    if (rawUrl) {
-      // Set the operator's direct URL on every copy of the (freshly renamed)
-      // title that shares this network or has none — mirrors the save action's
-      // scoping so a sibling on a different service isn't clobbered.
-      network = urlNetwork;
-      await env.DB.prepare(
-        `UPDATE shows SET network = ?, network_url = ?, enriched_at = datetime('now')
-          WHERE LOWER(title) = LOWER(?) AND archived = 0 AND (network = ? OR network IS NULL)`
-      ).bind(network, rawUrl, finalTitle, network).run();
-    } else if (submittedNetwork) {
-      network = canonicalNetwork(submittedNetwork);
-      await env.DB.prepare(
-        `UPDATE shows
-            SET network_url = CASE WHEN network = ? THEN network_url ELSE NULL END,
-                network = ?,
-                enriched_at = datetime('now')
-          WHERE LOWER(title) = LOWER(?) AND archived = 0`
-      ).bind(network, network, finalTitle).run();
-    }
-
-    // The shared rows members read (migration 077) for whatever entries the
-    // renamed copies now point at.
-    if (enriched.tmdbId) {
-      await writeTitle(env, enriched.tmdbType, enriched.tmdbId, {
-        name: enriched.canonicalTitle, fields: titleFieldsFromEnrichment(enriched), cast: enriched.actors,
-      });
-    }
-    await syncTitlesNamed(env, finalTitle);
-    return json({ ok: true, old_title: oldTitle, new_title: finalTitle, network, network_url: rawUrl || null, updated });
-  }
-
-  if (action === 're_enrich') {
-    // Force a fresh TMDB lookup for a poster-less title without renaming it —
-    // for titles that are spelled right but never matched (added before TMDB
-    // had the entry, or only indexed under the opposite media type, which
-    // fetchEnrichment flips for). Writes any artwork/rating found onto every
-    // active copy; fills cast only where a copy has none. When nothing turns
-    // up, stamps enriched_at so the title rotates to the back of the queue.
-    const id = parseInt(body.id, 10);
-    if (!Number.isInteger(id)) return json({ error: 'id required' }, 400);
-    const row = await env.DB.prepare('SELECT title, movie, tmdb_id, tmdb_type FROM shows WHERE id = ?').bind(id).first();
-    if (!row) return json({ error: 'Show not found' }, 404);
-    // This show's copies — never a different film that shares the title.
-    const rowCopies = sameShowWhere('shows', row, { forWrite: true });
-
-    // Optional media-type correction from the card's Show/Movie toggle, so the
-    // fresh lookup searches the right TMDB index.
-    const movieOverride = (body.movie === 0 || body.movie === 1) ? body.movie : null;
-    if (movieOverride !== null) {
-      await env.DB.prepare(
-        `UPDATE shows SET movie = ? WHERE ${rowCopies.sql} AND archived = 0`
-      ).bind(movieOverride, ...rowCopies.binds).run();
-    }
-    const isMovie = movieOverride !== null ? !!movieOverride : !!row.movie;
-
-    // A pinned row is fetched by its own entry (invariant §17); a title
-    // search would hand back whichever same-named entry TMDB ranks first.
-    // A type flip invalidates the pin, so that one searches.
-    let enriched = null;
-    if (row.tmdb_id && row.tmdb_type && movieOverride === null) {
-      const byId = await fetchEnrichmentById(row.tmdb_id, row.tmdb_type, env);
-      if (byId.canonicalTitle) enriched = byId;
-    }
-    if (!enriched) enriched = await fetchEnrichment(row.title, env, isMovie);
-    // The copies to stamp: this entry's, plus — after a type flip, which is
-    // the operator re-pointing the show — the copies of the old pin too.
-    const foundOnly = sameShowWhere('shows', { title: row.title, tmdb_id: enriched.tmdbId, tmdb_type: enriched.tmdbType }, { forWrite: true });
-    const found = movieOverride === null ? foundOnly
-      : { sql: `(${foundOnly.sql} OR ${rowCopies.sql})`, binds: [...foundOnly.binds, ...rowCopies.binds] };
-    if (enriched.tmdbId || enriched.networkLogoUrl) {
-      // The copies: badge, network, pin and stamp. The show's facts and cast
-      // go to its shared row just below.
-      await env.DB.prepare(
-        `UPDATE shows
-            SET network_logo_url = COALESCE(?, network_logo_url),
-                network = COALESCE(network, ?),
-                tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type),
-                enriched_at = datetime('now')
-          WHERE ${found.sql} AND archived = 0`
-      ).bind(enriched.networkLogoUrl, fallbackNetwork(enriched), enriched.tmdbId, enriched.tmdbType, ...found.binds).run();
-    } else {
-      // Nothing found — stamp so the title rotates to the back of the
-      // oldest-first background pass instead of blocking it every round.
-      await env.DB.prepare(
-        `UPDATE shows SET enriched_at = datetime('now') WHERE ${rowCopies.sql} AND archived = 0`
-      ).bind(...rowCopies.binds).run();
-    }
-
-    if (enriched.tmdbId) {
-      await writeTitle(env, enriched.tmdbType, enriched.tmdbId, {
-        name: enriched.canonicalTitle, fields: titleFieldsFromEnrichment(enriched), cast: enriched.actors,
-      });
-    }
-    await syncTitlesNamed(env, row.title);
-    return json({ ok: true, poster: !!enriched.posterUrl, title: enriched.canonicalTitle || row.title });
-  }
-
-  await propagateGoodUrls(env);
   const shows = await fetchQueue(env);
   const networks = await fetchNetworks(env);
-  const conflicts = await fetchConflicts(env);
   const mismatches = await fetchMismatches(env);
-  const needsPoster = await fetchNeedsPoster(env);
-  return json({ shows, networks, conflicts, mismatches, needsPoster });
+  return json({ shows, networks, mismatches });
 }

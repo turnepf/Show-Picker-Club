@@ -40,6 +40,7 @@ const groupTrendingApi = await load('api/groups/[id]/trending.js');
 const { copyForMember } = await load('_shared/watchers.js');
 const { createSuggestion, suggestionForViewer } = await load('_shared/group-suggestions.js');
 const vibeApi = await load('api/vibe.js');
+const urlCleanupApi = await load('api/admin-url-cleanup.js');
 const vibeFillApi = await load('api/admin-vibe-fill.js');
 const { TRAIT_NAMES } = await load('_shared/vibe-traits.js');
 
@@ -254,6 +255,30 @@ console.log('vibe fingerprints by show (title_traits)');
     picks.length === 1 && picks[0].tmdb_id === B && picks[0].tmdb_type === 'movie', JSON.stringify(picks));
   check('owning A doesn\'t hide B from pat\'s picks', picks.some((p) => p.show_key === `movie:${B}`));
   void gid;
+}
+
+
+// ---- the URL-cleanup queue: one row per show, and a save stays on it ----
+
+console.log('URL cleanup by show');
+{
+  const env = makeEnv();
+  const pat = addMember(env, 'pat');
+  addMember(env, 'amy');
+  env._db.prepare("UPDATE members SET is_admin = 1 WHERE slug = 'pat'").run();
+  const a = addShow(env, { slug: 'pat', tmdbId: A });
+  const b = addShow(env, { slug: 'amy', tmdbId: B });
+  env._db.prepare("UPDATE shows SET network = 'Peacock', network_url = NULL").run();
+  const cleanup = async (body) => (await urlCleanupApi.onRequestPost(ctx(env,
+    req('/api/admin-url-cleanup', { cookie: pat, method: 'POST', body })))).json();
+
+  const list = await cleanup({ action: 'list' });
+  const odysseys = (list.shows || []).filter((r) => r.title === 'The Odyssey');
+  check('two films sharing a title are two rows to fix', odysseys.length === 2, JSON.stringify(list.shows));
+
+  const saved = await cleanup({ action: 'save', id: a, network: 'Peacock', network_url: 'https://www.peacocktv.com/watch/asset/movies/the-odyssey/a' });
+  const urlOf = (id) => env._db.prepare('SELECT network_url FROM shows WHERE id = ?').get(id).network_url;
+  check('saving A\'s link reaches A\'s copies only', saved.updated === 1 && urlOf(a) && !urlOf(b), JSON.stringify(saved));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

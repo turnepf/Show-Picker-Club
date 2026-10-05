@@ -337,22 +337,7 @@ enum API {
                                body: ["action": "save", "id": id, "network": network, "network_url": url])
     }
 
-    // Rename a wrong/typo'd title across all copies and re-enrich it (operator).
-    // Optional network correction rides along: every copy moves to the chosen
-    // service and wrong-service URLs are cleared for the next fill pass.
-    static func fixShowTitle(id: Int, newTitle: String, network: String? = nil) async throws -> AdminActionResult {
-        var body: [String: Any] = ["action": "fix_title", "id": id, "new_title": newTitle]
-        if let n = network, !n.isEmpty { body["network"] = n }
-        return try await postDecoding("/api/admin-url-cleanup", body: body)
-    }
 
-    // Re-run enrichment for one title as-is, optionally flipping its media
-    // type — the fix for a title TMDB indexed as the opposite of what we
-    // stored. Writes poster/logo/rating/cast onto every copy.
-    static func reEnrichShow(id: Int, movie: Bool) async throws -> AdminActionResult {
-        try await postDecoding("/api/admin-url-cleanup",
-                               body: ["action": "re_enrich", "id": id, "movie": movie ? 1 : 0])
-    }
 
     // One background enrichment batch — posters, logos, seasons, dates. The
     // endpoint processes the least-recently-enriched rows, so calling it
@@ -379,11 +364,6 @@ enum API {
         return try JSONDecoder().decode(T.self, from: data)
     }
 
-    // Resolve a conflict: set every active copy of a title to one network.
-    static func resolveUrlConflict(title: String, network: String) async throws -> AdminActionResult {
-        try await postDecoding("/api/admin-url-cleanup",
-                               body: ["action": "resolve_conflict", "title": title, "network": network])
-    }
 
     // Fix a URL/network mismatch: keep "url" (adopt the URL's network) or
     // "network" (drop the URL so the next fill pass repicks one).
