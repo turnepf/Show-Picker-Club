@@ -56,14 +56,12 @@ struct SearchView: View {
         }
     }
 
-    // The same TMDB entry when both sides know theirs: three 2026 films are
-    // called "The Odyssey", and a group-mate's copy of one must not label the
-    // other two. The title (and movie-ness) only decides when a copy has no
-    // id, or the server is too old to send it.
+    // ShowIdentity (ShowPickerCore) is the app's one "same show?" rule: the
+    // same TMDB entry when both sides know theirs, so owning one of three
+    // films called "The Odyssey" doesn't hide or relabel the other two.
     private func sameShow(_ title: String, _ isMovie: Bool, _ tmdbId: Int?, _ hit: TitleHit) -> Bool {
-        guard isMovie == hit.isMovie else { return false }
-        if let tmdbId { return tmdbId == hit.tmdbId }
-        return title.lowercased() == hit.title.lowercased()
+        ShowIdentity.same(title: title, isMovie: isMovie, tmdbId: tmdbId,
+                          title: hit.title, isMovie: hit.isMovie, tmdbId: hit.tmdbId)
     }
 
     var body: some View {
