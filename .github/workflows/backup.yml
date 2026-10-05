@@ -44,7 +44,7 @@ jobs:
           node-version: '22'
 
       - name: Install wrangler
-        run: npm install -g wrangler@latest
+        run: npm install -g wrangler@4.147.0
 
       - name: Export D1 to /tmp
         env:
