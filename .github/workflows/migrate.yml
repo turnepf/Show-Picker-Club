@@ -13,7 +13,6 @@ on:
       file:
         description: "Migration file to apply to shows-db (filename or repo-root path; a bare NNN_*.sql is resolved under migrations/)"
         required: true
-        default: "migrations/015_seasons_released.sql"
 
 jobs:
   migrate:

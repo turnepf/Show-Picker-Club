@@ -48,7 +48,9 @@ functions/
 ├── auth/          login, logout, request-code, apple, google, enroll, check, config
 ├── calendar/      [slug].js — per-member iCalendar feed (?key=<calendar_token>)
 └── _shared/       auth, admin, enrichment, networks, sms, email, vibe-*, demo, enroll…
-migrations/        Numbered D1 upgrades (auto-applied on deploy when pending)
+migrations/        Numbered D1 upgrades (auto-applied on deploy when pending);
+                   001–082 squashed into schema.sql 2026-10-05, new ones
+                   number on from 083 — see migrations/README.md
 schema.sql         Complete schema for fresh databases
 ShowPickerCore/    Shared Swift package (models) used by all Apple targets
 ios/  tvos/        SwiftUI apps; open ShowPickerClub.xcworkspace at the repo root

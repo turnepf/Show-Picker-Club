@@ -26,7 +26,7 @@ database_id = "..."
 
 ## Database
 
-`schema.sql` is the complete schema for a fresh deployment. The numbered files in `migrations/` are the historical upgrade path for existing databases; their one-off data fixes should not be run against a new database.
+`schema.sql` is the complete schema for a fresh deployment. `migrations/` holds upgrades for the existing production database only. Migrations 001–082 were squashed on 2026-10-05, once production had applied them all and `schema.sql` matched it column for column; they live on in git history, and new ones number on from 083 (`migrations/README.md`).
 
 ### `members`
 | Column         | Type | Notes                                                 |

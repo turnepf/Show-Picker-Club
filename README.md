@@ -83,7 +83,7 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    ```
    Copy the returned `database_id` into `wrangler.toml`.
 
-2. **Apply the schema.** `schema.sql` is the complete current schema for a fresh deployment. Historical files in `migrations/` exist only to upgrade older databases; do not run them after applying the fresh schema.
+2. **Apply the schema.** `schema.sql` is the complete current schema for a fresh deployment. `migrations/` holds upgrades for the existing production database only (001–082 were squashed into `schema.sql` on 2026-10-05; see `migrations/README.md`); never run them after applying the fresh schema.
    ```bash
    wrangler d1 execute shows-db --remote --file=schema.sql
    ```
