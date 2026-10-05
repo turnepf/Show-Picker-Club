@@ -162,7 +162,8 @@ function post(path, body, { session = SESSION_ID } = {}) {
 }
 
 const context = (env, request) => ({ env, request, waitUntil: () => {} });
-const shows = (env) => env._db.prepare('SELECT * FROM shows ORDER BY id').all();
+// Rows as members read them: the poster lives on the shared row now.
+const shows = (env) => env._db.prepare('SELECT * FROM shows_v ORDER BY id').all();
 
 function item(over = {}) {
   return {

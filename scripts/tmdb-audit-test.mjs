@@ -21,6 +21,8 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import { liftCopiesIntoTitles, withLegacyShowColumns } from './lib/seed-titles.mjs';
+import { SHARED_FIELDS } from '../functions/_shared/titles.js';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dir = mkdtempSync(join(tmpdir(), 'tmdb-audit-'));
@@ -37,6 +39,7 @@ function check(name, cond, detail = '') {
 
 const db = new DatabaseSync(dbFile);
 db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
+withLegacyShowColumns(db);
 for (const [slug, disabled] of [['amy', 0], ['eric', 0], ['christine', 0], ['banned', 1]]) {
   db.prepare(`INSERT INTO members (slug, name, first_name, last_name, disabled, enrolled_via) VALUES (?, ?, ?, 'X', ?, 'email')`)
     .run(slug, `${slug}'s Shows`, slug, disabled);
@@ -66,6 +69,9 @@ show('fh', 'christine', 'Frances Ha', { tmdb: 999, type: 'movie', year: 2012 });
 // Dead pin, and a disabled member who must not count.
 show('dead', 'amy', 'Gone Show', { tmdb: 4040, year: 2001 });
 show('banned', 'banned', 'Banned Show', {});
+// The facts move to the shared row, and the copy ends up production's shape.
+liftCopiesIntoTitles(db);
+for (const f of SHARED_FIELDS) db.exec(`ALTER TABLE shows DROP COLUMN ${f}`);
 db.close();
 
 // ---- fake TMDB ----
@@ -121,8 +127,9 @@ console.log('\n== database-only audit');
     r.title_splits.length === 1 && r.title_splits[0].tmdb_id === 283304 && r.title_splits[0].titles === 2, JSON.stringify(r.title_splits));
   check('a movie flag that disagrees with the pin is reported',
     r.type_mismatch.length === 1 && r.type_mismatch[0].id === ids.fh, JSON.stringify(r.type_mismatch));
-  check('reports copies whose show has no shared row yet', r.normalization.rows === 6 && r.normalization.rows_without_entry === 6, JSON.stringify(r.normalization));
-  check('and that the leftover per-copy columns are still there', r.normalization.leftover_columns === 3);
+  check('every pinned copy has its shared row', r.normalization.rows === 6 && r.normalization.rows_without_entry === 0, JSON.stringify(r.normalization));
+  check('and the copies carry no leftover columns, as since the 2026-10-05 cleanup',
+    r.normalization.leftover_columns === 0 && /No leftover per-copy columns/.test(out));
   check('no memo text anywhere in the output', !out.includes('SECRET MEMO') && !readFileSync(jsonFile, 'utf8').includes('SECRET MEMO'));
   check('without a token it says what TMDB would add', /Set TMDB_TOKEN/.test(out));
 }

@@ -137,12 +137,17 @@ CREATE TABLE IF NOT EXISTS failed_logins (
 );
 
 CREATE TABLE IF NOT EXISTS shows (
+  -- A member's copy of a show: only what is theirs. The show's own facts
+  -- (artwork, genres, overview, rating, seasons and so on) live once per TMDB
+  -- entry in `titles`, and members read both through the shows_v view. The
+  -- 23 columns that used to repeat those facts on every copy were dropped
+  -- 2026-10-05, normalizing step 3c-2b, run by hand from
+  -- ~/ShowPickerBackups/cleanup-show-picker.sh.
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,
   network TEXT,
   network_url TEXT,
   recommended_by TEXT,
-  rating TEXT,
   list TEXT NOT NULL,
   notes TEXT,
   movie INTEGER DEFAULT 0,
@@ -150,8 +155,6 @@ CREATE TABLE IF NOT EXISTS shows (
   watching_with TEXT,
   next_season_date TEXT,
   season_end_date TEXT,
-  seasons_released INTEGER,
-  poster_url TEXT,
   network_logo_url TEXT,
   title_ok INTEGER DEFAULT 0,
   sort_order INTEGER,
@@ -161,39 +164,8 @@ CREATE TABLE IF NOT EXISTS shows (
   updated_at TEXT DEFAULT (datetime('now')),
   added_by TEXT,
   enriched_at TEXT,
-  genres TEXT,
-  overview TEXT,
-  backdrop_url TEXT,
-  tmdb_rating TEXT,
-  content_rating TEXT,
-  trailer_key TEXT,
-  director TEXT,
-  director_imdb_id TEXT,
-  runtime INTEGER,
-  release_year INTEGER,
-  watch_link TEXT,
   tmdb_id INTEGER,
-  tmdb_type TEXT,
-  -- Migration 063. `studio` is the originating studio/broadcaster and is
-  -- deliberately not called anything network-shaped — `network` above means
-  -- the streaming service.
-  episodes_released INTEGER,
-  vote_count INTEGER,
-  tagline TEXT,
-  original_language TEXT,
-  studio TEXT,
-  -- TMDB's current US flatrate services, comma-separated canonical names.
-  -- Sits BESIDE `network` rather than replacing it: `network` is the member's
-  -- record and is written fill-only, so it goes stale as licensing moves.
-  -- Pure derived data, refreshed authoritatively by enrichment. See
-  -- migrations/069_streaming_on.sql.
-  streaming_on TEXT,
-  -- Migration 073. The title's IMDb id (tt…); TMDB's status string verbatim
-  -- ('' when TMDB sent none, so NULL means "not stored yet"); and free /
-  -- free-with-ads services, encoded like streaming_on.
-  imdb_id TEXT,
-  tmdb_status TEXT,
-  free_on TEXT
+  tmdb_type TEXT
 );
 
 CREATE TABLE IF NOT EXISTS actors (
@@ -261,24 +233,8 @@ CREATE TABLE IF NOT EXISTS show_watchers (
   PRIMARY KEY (show_id, member_slug)
 );
 
-CREATE TABLE IF NOT EXISTS show_traits (
-  title_lower TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  warmth REAL, empathy REAL, emotional_repair REAL, moral_ambiguity REAL,
-  darkness REAL, cynicism REAL, manipulation REAL, power_orientation REAL,
-  chaos_intensity REAL, humor_warmth REAL, cruel_humor REAL,
-  intellectual_curiosity REAL, growth_orientation REAL, violence_intensity REAL,
-  comfort_coziness REAL, community_belonging REAL, satire REAL,
-  prestige_energy REAL, emotional_volatility REAL, healing_redemption REAL,
-  revenge_energy REAL, status_obsession REAL, optimism REAL, nihilism REAL,
-  teamwork REAL, absurdism REAL,
-  unknown_show INTEGER DEFAULT 0,
-  generated_at TEXT DEFAULT (datetime('now')),
-  scored_at TEXT
-);
-
--- Vibe fingerprints, one per show (migration 081). show_traits above is the
--- retired title-keyed table, kept until a cleanup drops it.
+-- Vibe fingerprints, one per show (migration 081). It replaced the title-keyed
+-- show_traits, dropped 2026-10-05.
 CREATE TABLE IF NOT EXISTS title_traits (
   -- The show this fingerprint describes: 'tv:<tmdb_id>' / 'movie:<tmdb_id>',
   -- or 'title:<lowercased title>' for a show TMDB never matched. The same

@@ -121,12 +121,17 @@ const [summary] = query(`SELECT COUNT(*) AS rows,
 report.summary = summary;
 
 const unpinned = query(`SELECT s.id, s.member_slug AS member, s.title, s.movie, COALESCE(s.archived, 0) AS archived,
-    s.list, s.release_year, s.network, s.poster_url IS NOT NULL AS has_poster
+    s.list, NULL AS release_year, s.network, 0 AS has_poster
   FROM shows s ${ACTIVE_MEMBER} WHERE s.tmdb_id IS NULL ORDER BY LOWER(s.title), s.member_slug`);
+// (An unmatched copy has no shared row, so no year or poster: since the
+// 2026-10-05 cleanup the copy can't hold them either.)
 
 const pinnedTitles = query(`SELECT LOWER(TRIM(s.title)) AS ltitle, s.title, s.tmdb_id, s.tmdb_type,
-    MIN(s.release_year) AS release_year, COUNT(*) AS copies
-  FROM shows s ${ACTIVE_MEMBER} WHERE s.tmdb_id IS NOT NULL
+    MIN(t.release_year) AS release_year, COUNT(*) AS copies
+  FROM shows s ${ACTIVE_MEMBER}
+  LEFT JOIN titles t ON t.tmdb_id = s.tmdb_id
+    AND t.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)
+  WHERE s.tmdb_id IS NOT NULL
   GROUP BY LOWER(TRIM(s.title)), s.tmdb_id, s.tmdb_type`);
 
 // name → the distinct entries pinned under that name
@@ -176,8 +181,9 @@ const typeMismatch = query(`SELECT s.id, s.member_slug AS member, s.title, s.mov
 report.type_mismatch = typeMismatch;
 
 // Normalizing (docs/ARCHITECTURE.md#titles): the show's facts live once per
-// entry in `titles`, its cast in `title_cast`. Until the leftover columns are
-// dropped from `shows`, report that they're still there.
+// entry in `titles`, its cast in `title_cast`. The leftover per-copy columns
+// were dropped 2026-10-05; the check stays so a database restored from an
+// older backup says so.
 const [norm] = query(`SELECT
     (SELECT COUNT(*) FROM titles) AS entries,
     (SELECT COUNT(*) FROM title_cast) AS cast_rows,

@@ -23,7 +23,7 @@
 // to a temp directory, schema.sql in node:sqlite behind a D1 shim, and a fake
 // TMDB serving two same-titled entries in popularity order.
 
-import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
+import { liftCopiesIntoTitles, withLegacyShowColumns } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -116,6 +116,7 @@ class Stmt {
 function makeEnv() {
   const db = new DatabaseSync(':memory:');
   db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
+  withLegacyShowColumns(db);
   db.prepare(`INSERT INTO members (slug, name, first_name, last_name, enrolled_via) VALUES ('amy', 'Amy''s Shows', 'Amy', 'B', 'email')`).run();
   db.prepare(`INSERT INTO sessions (id, email, member_slug, expires_at, created_at) VALUES ('s-amy', 'amy@example.com', 'amy', ?, ?)`)
     .run(new Date(Date.now() + 86400000).toISOString(), new Date().toISOString());

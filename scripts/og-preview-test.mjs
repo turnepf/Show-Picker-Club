@@ -28,7 +28,7 @@
 // files as the ES modules they are, and schema.sql is loaded into node:sqlite
 // behind a thin D1 shim, so the SQL under test is executed.
 
-import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
+import { liftCopiesIntoTitles, withLegacyShowColumns } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -76,6 +76,7 @@ class Stmt {
 function makeEnv() {
   const db = new DatabaseSync(':memory:');
   db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
+  withLegacyShowColumns(db);
   return { DB: { prepare: (sql) => new Stmt(db, sql) }, _db: db };
 }
 

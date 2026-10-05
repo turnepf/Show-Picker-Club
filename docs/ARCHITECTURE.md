@@ -52,6 +52,8 @@ Login is by passkey, one-time code, or Sign in with Apple — there are no store
 - `webauthn_challenges` (migration 062) — single-use challenges (`purpose` = `register` | `authenticate`, `member_slug` set for registration only, `ip`, `expires_at`). Rows are deleted as they're consumed and swept when they expire, so the table stays near-empty.
 
 ### `shows`
+A member's copy of a show: only what is theirs. The show's own facts (artwork, overview, genres, rating, seasons, cast) live once per TMDB entry in [`titles`](#titles--title_cast-migration-076-normalizing-step-1), and members read both through the `shows_v` view. The 23 columns that repeated those facts on every copy were dropped 2026-10-05 (normalizing step 3c-2b); their descriptions moved to the `titles` section.
+
 | Column              | Type | Notes |
 |---------------------|------|-------|
 | `id`                | INTEGER PK | |
@@ -59,7 +61,6 @@ Login is by passkey, one-time code, or Sign in with Apple — there are no store
 | `network`           | TEXT | |
 | `network_url`       | TEXT | Deep link to show on network site (or a search-page placeholder until upgraded). |
 | `recommended_by`    | TEXT | Free-text attribution. |
-| `rating`            | TEXT | Audience rating string. TMDB's score since 2026-07 (migration 043); was the IMDB score from OMDB before that. Drives Sort-by-Rating and vibe input. |
 | `list`              | TEXT NOT NULL | `watching` / `waiting` / `recommending` / `next`. |
 | `notes`             | TEXT | |
 | `movie`             | INTEGER DEFAULT 0 | Suppresses TMDB season lookups. |
@@ -73,28 +74,12 @@ Login is by passkey, one-time code, or Sign in with Apple — there are no store
 | `updated_at`        | TEXT | Default `datetime('now')`. Bumped by member edits (not enrichment). |
 | `added_by`          | TEXT | `'seed'` for seeded shows, otherwise editor email or `'Anonymous'` for public suggestions. |
 | `enriched_at`       | TEXT | Bumped by TMDB enrichment so enrichment can prioritize stale rows. |
-| `genres`            | TEXT | Comma-separated, from TMDB. |
 | `sort_order`        | INTEGER | Position for the member's "My Order" manual sort (migration 033). NULL = never manually placed. Written only by `POST /api/shows/reorder`, which deliberately does **not** bump `updated_at`. |
-| `overview`          | TEXT | Plot synopsis from TMDB (migration 042). |
-| `backdrop_url`      | TEXT | Wide 16:9 hero image (TMDB `backdrop_path`, w780). Migration 042. |
-| `tmdb_rating`       | TEXT | TMDB audience score "x.y". Since 2026-07 (migration 043) `rating` carries the same TMDB score; `tmdb_rating` is retained because older app builds still read it. Migration 042. |
-| `content_rating`    | TEXT | US maturity certification (TV-MA, R, …). Migration 042. |
-| `trailer_key`       | TEXT | YouTube video key for the trailer. Migration 042. |
-| `director`          | TEXT | Director (movie) or creator(s) (TV). Migration 042. |
-| `director_imdb_id`  | TEXT | IMDB id (nm…) of the creator/director, from TMDB external_ids. The detail screen links the name to the IMDB person page, but only for a single-person credit. Migration 043. |
-| `runtime`           | INTEGER | Minutes — a film's length, or one episode's for a series. Migration 042. |
-| `release_year`      | INTEGER | First release / first-air year. Migration 042. |
-| `watch_link`        | TEXT | TMDB/JustWatch "where to watch" page. A **fallback only** — the UI prefers the real deep-link `network_url` and shows this aggregator page only when no deep link exists. Migration 042. |
 | `tmdb_id`           | INTEGER | TMDB's id for the matched title. Migration 049. Canonical cross-member join key: a member rating table keys off `(tmdb_id, tmdb_type)` rather than any one member's row, so every member's independent copy of the same show shares one rating pool. Captured on insert/edit whenever enrichment resolves a match (`_shared/enrichment.js`'s `enrichFromTmdbId`/`fetchEnrichment` now return it). Since 2026-08, the `/api/enrich` rotation also persists the id it resolves — TV and movie passes alike, fill-only and title-scoped, so seeded rows and other members' copies pick it up without being the row the rotation happened to select. It self-heals from then on; `/api/admin-tmdb-backfill` remains for a deliberate one-shot sweep, and `tmdb_backfill_ignores` still exempts titles TMDB genuinely doesn't have. |
 | `tmdb_type`         | TEXT | `movie` or `tv`, alongside `tmdb_id` — TMDB ids aren't unique across the two (movie #550 and tv #550 are different titles), so the pair is the real key. Migration 049. |
-| `episodes_released` | INTEGER | Total episodes across all aired seasons; NULL for movies. The companion to `seasons_released`, which alone says nothing about size — four seasons of Severance is 19 episodes, four of Grey's Anatomy is 90. New-value-wins on re-enrichment (a running series gains episodes), same as `seasons_released`. Shown on the detail screen folded into the Series line. Migration 063. |
-| `vote_count`        | INTEGER | Sample size behind `tmdb_rating` — an 8.9 from 42,000 people and a 9.1 from 11 render identically without it. Converges on re-enrichment like the rating does. **Stored, deliberately not displayed**: it exists so ratings can later be qualified or suppressed below a threshold without a re-enrichment pass. Migration 063. |
-| `tagline`           | TEXT | TMDB's marketing one-liner — the only evocative text TMDB gives us; everything else is factual. Rendered above the overview on the detail screen. Migration 063. |
-| `original_language` | TEXT | ISO 639-1 code of the production language (`ja`, `ko`, …). Displayed **only when it isn't English** — a "Language: English" row on nearly every card is noise. Migration 063. |
-| `studio`            | TEXT | First production company (movie) or first TMDB network (series) — the originating studio/broadcaster. Named `studio` and never anything network-shaped on purpose: `network` above means the **streaming service**, while TMDB's "networks" means the originating broadcaster, and conflating the two is the same class of collision as Apple TV vs Apple TV+. **Stored, deliberately not displayed**: TMDB orders `production_companies` by internal id rather than prominence, so the first entry is as often a financing shell as it is A24. Migration 063. |
 
 ### `actors`
-Join table for per-show cast.
+The retired per-copy cast: empty since the 2026-10-05 cleanup, kept so old foreign keys and the demo reset still resolve. Cast lives once per show in `title_cast`, read through `actors_v`.
 
 | Column     | Type | Notes |
 |------------|------|-------|
@@ -179,12 +164,36 @@ The plan has three steps. The first two have shipped:
      the "Series complete" toggle). `syncTitle()` and `rebuildTitles()` only
      make sure an entry has a row. Demo reset skips snapshot columns the
      table no longer has.
-   - **3c-2b (operator-run):** drop the leftover columns from `shows` and
-     clear `actors`. Nothing reads them since 3c-2a. Run by hand, after a
-     backup, rather than as a deploy-applied migration.
+   - **3c-2b (operator-run, done 2026-10-05):** dropped the leftover
+     columns from `shows`, cleared `actors` and dropped the title-keyed
+     `show_traits`. Nothing read them since 3c-2a and #560. Run by hand from
+     `~/ShowPickerBackups/cleanup-show-picker.sh`, after a backup, rather
+     than as a deploy-applied migration.
 At step 1 that's 1,409 copies in 570 entries, catalog text 791 KB → 319 KB
 and cast rows 11,137 → 4,253 (`scripts/tmdb-audit.mjs`, 2026-10-04).
 Enforcer: `scripts/titles-test.mjs`.
+
+The show's facts on `titles` (each was a column on every `shows` copy until 2026-10-05):
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `rating`            | TEXT | Audience rating string. TMDB's score since 2026-07 (migration 043); was the IMDB score from OMDB before that. Drives Sort-by-Rating and vibe input. |
+| `genres`            | TEXT | Comma-separated, from TMDB. |
+| `overview`          | TEXT | Plot synopsis from TMDB (migration 042). |
+| `backdrop_url`      | TEXT | Wide 16:9 hero image (TMDB `backdrop_path`, w780). Migration 042. |
+| `tmdb_rating`       | TEXT | TMDB audience score "x.y". Since 2026-07 (migration 043) `rating` carries the same TMDB score; `tmdb_rating` is retained because older app builds still read it. Migration 042. |
+| `content_rating`    | TEXT | US maturity certification (TV-MA, R, …). Migration 042. |
+| `trailer_key`       | TEXT | YouTube video key for the trailer. Migration 042. |
+| `director`          | TEXT | Director (movie) or creator(s) (TV). Migration 042. |
+| `director_imdb_id`  | TEXT | IMDB id (nm…) of the creator/director, from TMDB external_ids. The detail screen links the name to the IMDB person page, but only for a single-person credit. Migration 043. |
+| `runtime`           | INTEGER | Minutes — a film's length, or one episode's for a series. Migration 042. |
+| `release_year`      | INTEGER | First release / first-air year. Migration 042. |
+| `watch_link`        | TEXT | TMDB/JustWatch "where to watch" page. A **fallback only** — the UI prefers the real deep-link `network_url` and shows this aggregator page only when no deep link exists. Migration 042. |
+| `episodes_released` | INTEGER | Total episodes across all aired seasons; NULL for movies. The companion to `seasons_released`, which alone says nothing about size — four seasons of Severance is 19 episodes, four of Grey's Anatomy is 90. New-value-wins on re-enrichment (a running series gains episodes), same as `seasons_released`. Shown on the detail screen folded into the Series line. Migration 063. |
+| `vote_count`        | INTEGER | Sample size behind `tmdb_rating` — an 8.9 from 42,000 people and a 9.1 from 11 render identically without it. Converges on re-enrichment like the rating does. **Stored, deliberately not displayed**: it exists so ratings can later be qualified or suppressed below a threshold without a re-enrichment pass. Migration 063. |
+| `tagline`           | TEXT | TMDB's marketing one-liner — the only evocative text TMDB gives us; everything else is factual. Rendered above the overview on the detail screen. Migration 063. |
+| `original_language` | TEXT | ISO 639-1 code of the production language (`ja`, `ko`, …). Displayed **only when it isn't English** — a "Language: English" row on nearly every card is noise. Migration 063. |
+| `studio`            | TEXT | First production company (movie) or first TMDB network (series) — the originating studio/broadcaster. Named `studio` and never anything network-shaped on purpose: `network` above means the **streaming service**, while TMDB's "networks" means the originating broadcaster, and conflating the two is the same class of collision as Apple TV vs Apple TV+. **Stored, deliberately not displayed**: TMDB orders `production_companies` by internal id rather than prominence, so the first entry is as often a financing shell as it is A24. Migration 063. |
 
 ### `show_ratings`
 Member ratings (docs/PRODUCT.md backlog: "Member ratings"). Migration 053. Keyed off `(tmdb_id, tmdb_type)` rather than any one member's `shows` row, so every member's independent copy of the same title shares one rating pool.
@@ -338,7 +347,7 @@ Used by login throttling. Auto-pruned (>7 days) by the daily backup workflow.
 ### `title_traits` (migration 081)
 Pre-computed taste fingerprint per **show**, used by the vibe system. Keyed by `show_key`: `tv:<tmdb_id>` / `movie:<tmdb_id>`, or `title:<lowercased title>` for a show TMDB never matched — the key `showKeySql()` in `_shared/same-show.js` computes from a `shows`/`shows_v` row. Three 2026 films are called "The Odyssey"; they are three fingerprints.
 
-It replaced `show_traits`, which was keyed by `LOWER(title)` and so gave every show sharing a name one fingerprint. The migration carried each scored title to its show's key when all its copies pointed at one show (518 of 518 live titles on 2026-10-04) and left a title spanning several shows unscored for the fill queue. `show_traits` stays in the schema, unread, until a cleanup drops it.
+It replaced `show_traits`, which was keyed by `LOWER(title)` and so gave every show sharing a name one fingerprint. The migration carried each scored title to its show's key when all its copies pointed at one show (518 of 518 live titles on 2026-10-04) and left a title spanning several shows unscored for the fill queue. `show_traits` was dropped by the 2026-10-05 cleanup.
 
 26 trait columns (REAL, 0.0–1.0): `warmth`, `empathy`, `emotional_repair`, `moral_ambiguity`, `darkness`, `cynicism`, `manipulation`, `power_orientation`, `chaos_intensity`, `humor_warmth`, `cruel_humor`, `intellectual_curiosity`, `growth_orientation`, `violence_intensity`, `comfort_coziness`, `community_belonging`, `satire`, `prestige_energy`, `emotional_volatility`, `healing_redemption`, `revenge_energy`, `status_obsession`, `optimism`, `nihilism`, `teamwork`, `absurdism`.
 

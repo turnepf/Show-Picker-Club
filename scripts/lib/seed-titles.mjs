@@ -9,7 +9,20 @@
 // tmdb_status), the cast from the copy with the most, fill-only.
 //
 // `db` is the node:sqlite DatabaseSync behind the suite's D1 shim.
+//
+// Production's `shows` no longer has those columns (dropped 2026-10-05), so
+// schema.sql doesn't either. A suite whose fixtures still write them calls
+// withLegacyShowColumns(db) once after loading the schema, and
+// liftCopiesIntoTitles() clears them again after moving their values to the
+// shared row. Code under test therefore only ever finds a fact in `titles`,
+// as in production, and a read of a dropped column on the copy comes back
+// empty instead of quietly passing.
 import { SHARED_FIELDS } from '../../functions/_shared/titles.js';
+
+export function withLegacyShowColumns(db) {
+  const have = new Set(db.prepare("SELECT name FROM pragma_table_info('shows')").all().map((r) => r.name));
+  for (const f of SHARED_FIELDS) if (!have.has(f)) db.exec(`ALTER TABLE shows ADD COLUMN ${f}`);
+}
 
 const TYPE = (a) => `COALESCE(${a}.tmdb_type, CASE WHEN ${a}.movie = 1 THEN 'movie' ELSE 'tv' END)`;
 const EMPTY_IS_AN_ANSWER = ['streaming_on', 'free_on', 'tmdb_status'];
@@ -51,4 +64,6 @@ export function liftCopiesIntoTitles(db, { pinUnmatched = false, pinRow = null }
          ORDER BY (SELECT COUNT(*) FROM actors a2 WHERE a2.show_id = s.id) DESC, s.id DESC LIMIT 1)
      WHERE NOT EXISTS (SELECT 1 FROM title_cast c WHERE c.tmdb_type = t.tmdb_type AND c.tmdb_id = t.tmdb_id)
     ON CONFLICT (tmdb_type, tmdb_id, ord) DO NOTHING`);
+  // The copy keeps nothing that production's copy can't hold.
+  if (fields.length) db.exec(`UPDATE shows SET ${fields.map((f) => `${f} = NULL`).join(', ')}`);
 }

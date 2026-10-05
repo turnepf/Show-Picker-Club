@@ -31,7 +31,7 @@
 // TMDB is a fake fetch that serves two same-titled entries the way the real
 // index does — popular original first.
 
-import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
+import { liftCopiesIntoTitles, withLegacyShowColumns } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -217,6 +217,7 @@ function makeEnv() {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
+  withLegacyShowColumns(db);
   return {
     TMDB_TOKEN: 'test-token',
     DB: { prepare: (sql) => new Stmt(db, sql), batch: async (stmts) => { for (const s of stmts) await s.run(); } },
