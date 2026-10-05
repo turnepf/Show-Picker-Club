@@ -199,12 +199,20 @@ console.log('\n== a hallucinated id cannot reach the database');
   const env = makeEnv();
   // Straight from a tampered-with (or model-poisoned) client payload.
   const res = await commit.onRequestPost(context(env, post('/api/import/commit', {
-    items: [{ title: 'Severance', list: 'watching', tmdb_id: 'not-a-number', poster_url: 'https://evil.example/x.jpg' }],
+    items: [
+      { title: 'Severance', list: 'watching', tmdb_id: 'not-a-number' },
+      { title: 'The Bear', list: 'watching', tmdb_id: 136315, tmdb_type: 'tv', poster_url: 'https://evil.example/x.jpg' },
+    ],
   })));
   check('commit still succeeds', res.status === 200, `got ${res.status}`);
-  const row = shows(env)[0];
-  check('the non-integer id is dropped', row.tmdb_id === null, String(row.tmdb_id));
-  check('the off-domain poster is dropped', row.poster_url === null, String(row.poster_url));
+  const body = await res.json();
+  // Every show is a TMDB entry, so an item without a real id isn't added: it
+  // comes back by name for the member to add by hand.
+  check('the item with no real id is not added', !shows(env).some((r) => r.title === 'Severance'));
+  check('and comes back as unmatched, by name', body.unmatched === 1 && body.unmatched_titles[0] === 'Severance', JSON.stringify(body));
+  const row = shows(env).find((r) => r.tmdb_id === 136315);
+  check('the matched one is added', !!row);
+  check('the off-domain poster is dropped', row && row.poster_url === null, String(row?.poster_url));
 }
 
 console.log('\n== the four lists are the only lists');
@@ -212,9 +220,9 @@ console.log('\n== the four lists are the only lists');
   const env = makeEnv();
   const res = await commit.onRequestPost(context(env, post('/api/import/commit', {
     items: [
-      { title: 'Severance', list: 'watching' },
-      { title: 'The Bear', list: 'favourites' },
-      { title: 'Shrinking', list: 'DROP TABLE shows' },
+      { title: 'Severance', list: 'watching', tmdb_id: 95396, tmdb_type: 'tv' },
+      { title: 'The Bear', list: 'favourites', tmdb_id: 136315, tmdb_type: 'tv' },
+      { title: 'Shrinking', list: 'DROP TABLE shows', tmdb_id: 136311, tmdb_type: 'tv' },
     ],
   })));
   const out = await res.json();
@@ -327,8 +335,8 @@ console.log('\n== one paste naming a title twice inserts it once');
   const env = makeEnv();
   const res = await commit.onRequestPost(context(env, post('/api/import/commit', {
     items: [
-      { title: 'Andor', list: 'watching' },
-      { title: 'andor', list: 'next' },
+      { title: 'Andor', list: 'watching', tmdb_id: 83867, tmdb_type: 'tv' },
+      { title: 'andor', list: 'next', tmdb_id: 83867, tmdb_type: 'tv' },
     ],
   })));
   const out = await res.json();
@@ -346,13 +354,13 @@ console.log('\n== an import has its own ceiling');
   for (let i = 0; i < 120; i++) insert.run(`Filler ${i}`);
 
   const ok = await commit.onRequestPost(context(env, post('/api/import/commit', {
-    items: [{ title: 'Severance', list: 'watching' }],
+    items: [{ title: 'Severance', list: 'watching', tmdb_id: 95396, tmdb_type: 'tv' }],
   })));
   check('an import is not blocked by the hand-add cap', ok.status === 200, `got ${ok.status}`);
 
   for (let i = 0; i < 180; i++) insert.run(`More ${i}`);
   const capped = await commit.onRequestPost(context(env, post('/api/import/commit', {
-    items: [{ title: 'The Bear', list: 'watching' }],
+    items: [{ title: 'The Bear', list: 'watching', tmdb_id: 136315, tmdb_type: 'tv' }],
   })));
   check('but it is bounded', capped.status === 429, `got ${capped.status}`);
 

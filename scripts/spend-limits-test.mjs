@@ -36,6 +36,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { Stmt } from './lib/d1.mjs';
+import { fakeTmdb } from './lib/fake-tmdb.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = mkdtempSync(join(tmpdir(), 'spend-limits-'));
@@ -65,11 +66,18 @@ function check(name, cond, detail = '') {
 
 // ---- D1 shim over node:sqlite ----
 
-// ---- fake outbound world: count everything, answer nothing useful ----
+// ---- fake outbound world: count everything ----
+//
+// TMDB knows every title (an add TMDB can't identify is refused, so a
+// refusal would hide the metering under test); everything else answers
+// nothing useful.
 
 const upstream = { calls: [] };
+const tmdb = fakeTmdb();
 globalThis.fetch = async (url) => {
   upstream.calls.push(String(url));
+  const fromTmdb = tmdb.respond(url);
+  if (fromTmdb) return fromTmdb;
   const target = String(url);
   if (target.startsWith('https://api.anthropic.com/')) {
     return new Response(JSON.stringify({
@@ -221,7 +229,8 @@ console.log('\n== edit: past the ceiling it still saves, it just skips the looku
 {
   const env = makeEnv();
   const s = addMember(env, 'ann');
-  const id = addShow(env, 'ann', 'Severance', { network: 'Apple TV+' });
+  // Pinned, as every copy is: an edit that keeps the show needs no lookup.
+  const id = addShow(env, 'ann', 'Severance', { network: 'Apple TV+', tmdb_id: 95396, tmdb_type: 'tv' });
   spendTo(env, 'ann', 'lookups', DAILY_LIMITS.lookups);
   upstream.calls.length = 0;
   const res = await showApi.onRequestPut(ctx(env, req(`/api/shows/${id}`, { cookie: s, method: 'PUT', body: { notes: 'season 2 is great', network: 'Hulu' } }), { id: String(id) }));

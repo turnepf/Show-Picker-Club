@@ -233,6 +233,26 @@ export async function onRequestPut(context) {
   }
   if (!enriched) enriched = await fetchEnrichment(title, env, !!movie);
 
+  // An edit that changes what the show is (a pick, a new title, a TV/movie
+  // flip) has to land on a TMDB entry: a copy has no title of its own, so an
+  // unmatched one would have nothing to be called. An edit that keeps the
+  // pin (notes, list, service) saves whether or not TMDB answered.
+  if (!keepPin && !enriched.tmdbId) {
+    if (!mayLookUp) {
+      return new Response(JSON.stringify({ error: 'rate_limited' }), { status: 429, headers: corsHeaders() });
+    }
+    if (enriched.noMatch) {
+      return new Response(JSON.stringify({
+        error: 'no_match', title,
+        message: `No show or movie called "${title}" was found. Check the spelling, or pick it from the search suggestions.`,
+      }), { status: 422, headers: corsHeaders() });
+    }
+    return new Response(JSON.stringify({
+      error: 'tmdb_unavailable', title,
+      message: "We couldn't reach the show catalog just now. Please try again in a few minutes.",
+    }), { status: 503, headers: corsHeaders() });
+  }
+
   const finalNetwork = network || fallbackNetwork(enriched);
   // The service badge was derived from the network this row USED to name, so a
   // member switching services must not keep the previous one's logo — that is

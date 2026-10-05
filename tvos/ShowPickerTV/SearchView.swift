@@ -123,15 +123,8 @@ struct SearchView: View {
                             ForEach(newHits) { hitCard($0) }
                         }
                     }
-                    // TMDB doesn't know everything, and it can be unreachable.
-                    Button {
-                        errorText = nil
-                        adding = AddTarget(hit: nil, title: trimmed)
-                    } label: {
-                        Label("Add “\(trimmed)” as typed", systemImage: "square.and.pencil")
-                            .font(.system(size: 24, weight: .semibold))
-                    }
-                    .buttonStyle(ActionButtonStyle())
+                    // No "add as typed": every show is a TMDB entry, so a title
+                    // the catalog doesn't have can't be added.
                 }
                 .padding(.horizontal, 60)
                 .padding(.vertical, 40)
@@ -278,6 +271,10 @@ struct SearchView: View {
             errorText = "“\(target.title)” is already on one of your lists (maybe archived)."
         } catch API.APIError.badResponse(401) {
             errorText = "You're logged out — sign in again from the Account tab."
+        } catch API.APIError.badResponse(422) {
+            errorText = "“\(target.title)” wasn't found in the show catalog, so it can't be added."
+        } catch API.APIError.badResponse(503) {
+            errorText = "Couldn't reach the show catalog. Please try again in a few minutes."
         } catch {
             errorText = "Couldn't add it. Please try again."
         }

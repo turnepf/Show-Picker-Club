@@ -301,6 +301,11 @@ struct ShowDetailView: View {
                 : "“\(addTitle)” is already on one of your lists."
         } catch API.APIError.badResponse(401) {
             actionMessage = "You're logged out — sign in again from the Account tab."
+        } catch API.APIError.badResponse(422) {
+            // Every show is a TMDB entry; one TMDB has no match for isn't added.
+            actionMessage = "“\(addTitle)” wasn't found in the show catalog, so it can't be added."
+        } catch API.APIError.badResponse(503) {
+            actionMessage = "Couldn't reach the show catalog. Please try again in a few minutes."
         } catch {
             actionMessage = "Couldn't add it. Please try again."
         }

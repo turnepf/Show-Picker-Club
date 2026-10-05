@@ -11,6 +11,10 @@ enum ShareAPI {
         // dedupes against the canonical title, so this fires even when the
         // typed title is a near-match).
         case duplicate(list: String?, archived: Bool)
+        // 422 no_match / 503 tmdb_unavailable: every show is a TMDB entry, so
+        // a title TMDB can't identify (or can't be asked about) isn't added.
+        // Carries the server's own sentence for the member.
+        case refused(message: String)
     }
 
     static func addShow(
@@ -43,6 +47,13 @@ enum ShareAPI {
                 struct ErrBody: Decodable { let error: String?; let list: String? }
                 let b = try? JSONDecoder().decode(ErrBody.self, from: data)
                 throw APIError.duplicate(list: b?.list, archived: b?.error == "exists_archived")
+            }
+            if status == 422 || status == 503 {
+                struct MsgBody: Decodable { let message: String? }
+                let msg = (try? JSONDecoder().decode(MsgBody.self, from: data))?.message
+                throw APIError.refused(message: msg ?? (status == 422
+                    ? "That wasn't found in the show catalog, so it can't be added."
+                    : "Couldn't reach the show catalog. Try again in a few minutes."))
             }
             throw APIError.badResponse(status)
         }

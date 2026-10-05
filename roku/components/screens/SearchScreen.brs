@@ -306,13 +306,17 @@ sub render()
             payload:       payload
         }))
     end for
-    ' TMDB doesn't know everything, and it can be unreachable.
-    row.appendChild(MakeCardContent({
-        title:         "Add “" + q + "” as typed"
-        posterUrl:     ""
-        fallbackColor: Theme().surface
-        payload:       { kind: "typed", title: q }
-    }))
+    ' Every show is a TMDB entry, so there is no "add as typed": a title the
+    ' catalog doesn't have can't be added. With nothing new to offer, one
+    ' card that does nothing keeps the row (and its status line) on screen.
+    if newHits.Count() = 0
+        row.appendChild(MakeCardContent({
+            title:         "Not here? Check the spelling"
+            posterUrl:     ""
+            fallbackColor: Theme().surface
+            payload:       { kind: "none", title: q }
+        }))
+    end if
     m.rowMeta.push("hits")
 
     m.message.visible = false
@@ -395,7 +399,7 @@ sub updateCaption()
         who = groupLine(p)
         if who <> "" then text = text + Chr(10) + who
     else
-        text = "Adds “" + p.title + "” exactly as typed, for a title the catalog doesn't have."
+        text = "Only shows in the catalog can be added. Try another spelling, or the title as it was released."
     end if
     m.caption.text = text
     m.caption.visible = true
@@ -433,6 +437,7 @@ sub onItemSelected()
         m.top.navigate = { action: "openDetail", data: { id: p.id, seed: p } }
         return
     end if
+    if p.kind <> "hit" then return
     m.pending = p
     promptForList()
 end sub
@@ -458,7 +463,7 @@ sub onListPicked()
     listKey = lists[idx].key
     m.top.getScene().dialog = invalid
 
-    ' A TMDB pick is pinned to its id; a typed title goes in bare, as a show.
+    ' A TMDB pick is pinned to its id (the only kind of card that adds).
     r = m.pending
     mediaType = SafeStr(r.media_type)
     body = {
@@ -509,6 +514,19 @@ sub onAdded(ev as object)
     else if res.statusCode = 401
         dialog.title = "Signed out"
         dialog.message = "You're logged out — sign in again from the Account screen."
+    else if res.statusCode = 422 or res.statusCode = 503
+        ' Every show is a TMDB entry: 422 is no match for the title, 503 is the
+        ' catalog being unreachable. The server's sentence says which.
+        msg = ""
+        if res.json <> invalid then msg = SafeStr(res.json.message)
+        if res.statusCode = 422
+            dialog.title = "No match found"
+            if msg = "" then msg = "“" + titleText + "” wasn't found in the show catalog, so it can't be added."
+        else
+            dialog.title = "Try again later"
+            if msg = "" then msg = "Couldn't reach the show catalog. Try again in a few minutes."
+        end if
+        dialog.message = msg
     else
         dialog.title = "Couldn't add"
         dialog.message = "Please try again."

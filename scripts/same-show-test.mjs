@@ -17,7 +17,8 @@
 //
 // Same harness as scripts/watching-with-test.mjs: functions/ copied to a temp
 // directory as ES modules, schema.sql in node:sqlite behind a D1 shim. No
-// TMDB_TOKEN, so enrichment returns its empty shape without the network.
+// network: TMDB is a stand-in (scripts/lib/fake-tmdb.mjs) that knows every
+// title except the ones a case marks unknown or takes down.
 
 import { liftCopiesIntoTitles, withLegacyShowColumns } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -26,6 +27,11 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { Stmt } from './lib/d1.mjs';
+import { fakeTmdb } from './lib/fake-tmdb.mjs';
+
+const tmdb = fakeTmdb({ unknown: ['Not A Real Show Anywhere'] });
+globalThis.fetch = async (url) => tmdb.respond(url)
+  ?? new Response('{}', { headers: { 'Content-Type': 'application/json' } });
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = mkdtempSync(join(tmpdir(), 'same-show-'));
@@ -62,6 +68,7 @@ function makeEnv() {
   withLegacyShowColumns(db);
   return {
     DB: { prepare: (sql) => new Stmt(db, sql), batch: async (stmts) => { for (const s of stmts) await s.run(); } },
+    TMDB_TOKEN: 'test-token',
     _db: db,
   };
 }
@@ -157,7 +164,7 @@ console.log('POST /api/shows and /api/shows/check');
   check('check: no id answers by title, as before', (await chk('')).exists === true);
 
   const rb = await post({ title: 'The Odyssey', list: 'next', movie: 1, tmdb_id: B, tmdb_type: 'movie' });
-  check('owning one Odyssey doesn\'t block adding another', rb.status !== 409, `status ${rb.status}`);
+  check('owning one Odyssey doesn\'t block adding another', rb.status === 201 || rb.status === 200, `status ${rb.status}`);
   const ra = await post({ title: 'The Odyssey', list: 'next', movie: 1, tmdb_id: A, tmdb_type: 'movie' });
   check('adding the entry you already own is still a duplicate', ra.status === 409);
   const rbare = await post({ title: 'the odyssey', list: 'next', movie: 1 });
@@ -280,8 +287,51 @@ console.log('link inheritance on add');
   const res = await showsApi.onRequestPost(ctx(env, req('/api/shows', { cookie: pat, method: 'POST',
     body: { title: 'The Odyssey', list: 'next', movie: 1, tmdb_id: B, tmdb_type: 'movie' } })));
   const added = env._db.prepare("SELECT network_url FROM shows WHERE member_slug = 'pat'").get();
-  check('a new copy of B doesn\'t inherit A\'s watch link', res.status !== 409 && !(added?.network_url || '').includes('/movies/a'),
+  check('a new copy of B doesn\'t inherit A\'s watch link', (res.status === 201 || res.status === 200) && !(added?.network_url || '').includes('/movies/a'),
     JSON.stringify(added));
+}
+
+
+// ---- every show is a TMDB entry: nothing is added without one ----
+
+console.log('a show TMDB can\'t identify is never added');
+{
+  const env = makeEnv();
+  const pat = addMember(env, 'pat');
+  const count = () => env._db.prepare("SELECT COUNT(*) AS n FROM shows WHERE member_slug = 'pat'").get().n;
+  const post = async (body) => showsApi.onRequestPost(ctx(env, req('/api/shows', { cookie: pat, method: 'POST', body })));
+
+  const none = await post({ title: 'Not A Real Show Anywhere', list: 'next' });
+  const noneBody = await none.json();
+  check('no match is a 422 that names the title', none.status === 422 && noneBody.error === 'no_match'
+    && noneBody.message.includes('Not A Real Show Anywhere'), JSON.stringify(noneBody));
+  check('and adds nothing', count() === 0);
+
+  tmdb.down = true;
+  const down = await post({ title: 'Severance', list: 'watching' });
+  const downBody = await down.json();
+  tmdb.down = false;
+  check('TMDB unreachable is a 503 that says to try again later', down.status === 503 && downBody.error === 'tmdb_unavailable'
+    && /try again/i.test(downBody.message), JSON.stringify(downBody));
+  check('and adds nothing', count() === 0);
+
+  const ok = await post({ title: 'Severance', list: 'watching' });
+  const row = env._db.prepare("SELECT id, tmdb_id FROM shows WHERE member_slug = 'pat'").get();
+  check('a title TMDB knows is added, pinned to its entry', (ok.status === 201 || ok.status === 200) && row && row.tmdb_id);
+
+  // Editing what the show is (a new title) has to land on an entry too.
+  const put = (body) => showApi.onRequestPut(ctx(env, req(`/api/shows/${row.id}`, { cookie: pat, method: 'PUT', body }), { id: String(row.id) }));
+  const renamed = await put({ title: 'Not A Real Show Anywhere', list: 'watching' });
+  check('renaming to a title TMDB doesn\'t know is refused', renamed.status === 422);
+  const after = env._db.prepare('SELECT tmdb_id FROM shows WHERE id = ?').get(row.id);
+  check('and leaves the show as it was', after.tmdb_id === row.tmdb_id);
+
+  // An edit that keeps the show saves even while TMDB is down.
+  tmdb.down = true;
+  const noted = await put({ title: 'Severance', list: 'watching', notes: 'season 2!' });
+  tmdb.down = false;
+  const notes = env._db.prepare('SELECT notes FROM shows WHERE id = ?').get(row.id).notes;
+  check('a notes edit saves while TMDB is down', noted.status === 200 && notes === 'season 2!', `status ${noted.status}, notes ${notes}`);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

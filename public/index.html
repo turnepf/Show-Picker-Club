@@ -2189,7 +2189,7 @@
         const meta = [];
         if (it.year) meta.push(String(it.year));
         if (it.raw_title && it.raw_title.toLowerCase() !== String(it.title).toLowerCase()) meta.push(`You wrote “${escapeHtml(it.raw_title)}”`);
-        if (it.matched === false) meta.push('<span class="warn">No match found — will be added as typed</span>');
+        if (it.matched === false) meta.push('<span class="warn">No match found — can’t be added. Add it by hand from search.</span>');
         if (it.existing_list) meta.push(`Already on ${escapeHtml(LIST_LABELS[it.existing_list] || it.existing_list)}`);
         else if (it.existing_archived) meta.push('You archived this before');
         if (it.notes) meta.push(escapeHtml(it.notes));
@@ -2248,8 +2248,10 @@
           return;
         }
       }
-      // Anything already on your lists starts — and stays — out.
-      imp.items.forEach((it, i) => { if (it.existing_list || it.existing_archived) imp.excluded.add(i); });
+      // Anything already on your lists starts — and stays — out, and so does
+      // a title TMDB couldn't match: every show is a TMDB entry, so the
+      // server won't add it (it's listed at the end to add by hand).
+      imp.items.forEach((it, i) => { if (it.existing_list || it.existing_archived || it.matched === false) imp.excluded.add(i); });
       imp.step = 'review'; renderImportStep();
     }
     async function importCommit() {
@@ -2258,6 +2260,9 @@
       imp.committing = true; renderImportStep();
       const rows = imp.items.filter((_, i) => !imp.excluded.has(i));
       let added = 0;
+      // Titles TMDB couldn't match: the ones left out at review, plus any the
+      // server set aside. Listed at the end to add by hand.
+      const unmatched = imp.items.filter((it, i) => imp.excluded.has(i) && it.matched === false).map((it) => it.title);
       try {
         // The server caps a call at 200 rows; batches of 100.
         for (let i = 0; i < rows.length; i += 100) {
@@ -2268,6 +2273,7 @@
           const data = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(data.error === 'rate_limited' ? 'You’ve added a lot today. Try the rest tomorrow.' : 'Couldn’t add these shows. Try again.');
           added += data.added || 0;
+          for (const t of data.unmatched_titles || []) if (!unmatched.includes(t)) unmatched.push(t);
         }
       } catch (e) {
         // Say what did land — silently losing a partial import is worse.
@@ -2277,8 +2283,17 @@
         return;
       }
       imp.committing = false;
-      document.getElementById('importOverlay').classList.add('hidden');
-      showToast(`Added ${added} show${added === 1 ? '' : 's'}`);
+      if (unmatched.length) {
+        // Keep the sheet open so the list doesn't vanish in a toast.
+        imp.items = []; imp.excluded = new Set(); renderImportStep();
+        err.textContent = `Added ${added} show${added === 1 ? '' : 's'}. No match was found for ${unmatched.length}, `
+          + `so ${unmatched.length === 1 ? 'it wasn’t' : 'they weren’t'} added. Add ${unmatched.length === 1 ? 'it' : 'them'} by hand from search: `
+          + unmatched.join(', ');
+        err.classList.remove('hidden');
+      } else {
+        document.getElementById('importOverlay').classList.add('hidden');
+        showToast(`Added ${added} show${added === 1 ? '' : 's'}`);
+      }
       // Imported rows have a poster and an id but no cast or overview yet.
       fetch('/api/enrich', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ member: authMember }) }).catch(() => {});
       if (memberSlug && memberSlug === authMember) loadShows();
@@ -4191,9 +4206,10 @@
             return;
           } else {
             // Translate server codes; never show a raw one like "rate_limited".
+            // no_match / tmdb_unavailable carry their own member-facing message.
             failToast(res, err.error === 'rate_limited'
               ? 'Daily add limit reached. Try again tomorrow.'
-              : 'Failed to save. Try again.');
+              : (err.message || 'Failed to save. Try again.'));
             return;
           }
         }
@@ -4539,7 +4555,7 @@
         } else {
           failToast(res, data.error === 'rate_limited'
             ? 'Daily add limit reached. Try again tomorrow.'
-            : 'Failed to add. Try again.');
+            : (data.message || 'Failed to add. Try again.'));
         }
       } catch (e) {
         showToast('Network error. Try again.', { tone: 'error' });
