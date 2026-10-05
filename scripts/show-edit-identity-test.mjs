@@ -29,6 +29,7 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import { Stmt } from './lib/d1.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = mkdtempSync(join(tmpdir(), 'show-edit-identity-'));
@@ -101,17 +102,6 @@ globalThis.fetch = async (url) => {
 };
 
 // ---- D1 shim over node:sqlite ----
-
-class Stmt {
-  constructor(db, sql, args = []) { this.db = db; this.sql = sql; this.args = args; }
-  bind(...args) { return new Stmt(this.db, this.sql, args.map((a) => (a === undefined ? null : a))); }
-  async first() { const r = this.db.prepare(this.sql).all(...this.args); return r.length ? { ...r[0] } : null; }
-  async all() { return { results: this.db.prepare(this.sql).all(...this.args).map((r) => ({ ...r })) }; }
-  async run() {
-    const r = this.db.prepare(this.sql).run(...this.args);
-    return { meta: { changes: Number(r.changes ?? 0), last_row_id: Number(r.lastInsertRowid ?? 0) } };
-  }
-}
 
 function makeEnv() {
   const db = new DatabaseSync(':memory:');
