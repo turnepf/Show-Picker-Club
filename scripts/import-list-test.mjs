@@ -414,6 +414,35 @@ console.log('\n== titles that didn\'t match are emailed to the member, once');
   check('capped at five a day', resend.length === 5, `sent ${resend.length}`);
 }
 
+console.log('\n== an older app that sends no `final` still gets the note');
+{
+  // iOS 1.6 predates the email: it sends unmatched rows to commit (labelled
+  // "will be added as typed") and never says final. The server sets them
+  // aside, so it has to send the note itself.
+  const env = makeEnv({ RESEND_API_KEY: 'test-resend' });
+  env._db.prepare("INSERT INTO member_emails (email, member_slug, is_primary) VALUES ('patrick@example.com', 'patrick', 1)").run();
+  resend.length = 0;
+  const res = await (await commit.onRequestPost(context(env, post('/api/import/commit', {
+    items: [
+      { title: 'Severance', list: 'watching', tmdb_id: 95396, tmdb_type: 'tv' },
+      { title: 'Grandpa\'s Home Movies', list: 'watching' },
+    ],
+  })))).json();
+  check('the unmatched row is set aside, as before', res.added === 1 && res.unmatched_titles[0] === 'Grandpa\'s Home Movies', JSON.stringify(res));
+  check('and the member is emailed about it', res.emailed === true && resend.length === 1 && /Grandpa's Home Movies/.test(resend[0].text));
+  check('counting what this call added', /We added 1 show to/.test(resend[0].text), resend[0].text);
+
+  const clean = await (await commit.onRequestPost(context(env, post('/api/import/commit', {
+    items: [{ title: 'The Bear', list: 'watching', tmdb_id: 136315, tmdb_type: 'tv' }],
+  })))).json();
+  check('an old app\'s import with everything matched sends nothing', clean.emailed === false && resend.length === 1);
+
+  const current = await (await commit.onRequestPost(context(env, post('/api/import/commit', {
+    items: [{ title: 'Mystery Thing', list: 'watching' }], final: false,
+  })))).json();
+  check('a current app\'s non-final call still waits for its last call', current.emailed === false && resend.length === 1);
+}
+
 console.log('\n== a Claude outage surfaces instead of looking like an empty list');
 {
   const env = makeEnv();

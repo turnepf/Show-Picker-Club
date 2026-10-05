@@ -183,9 +183,19 @@ export async function onRequestPost(context) {
   // background /api/enrich pass once the import lands; the scheduled job is
   // the backstop if it doesn't.
 
+  // A current client marks its last call `final` and sends what it left out.
+  // An older one (iOS 1.6 and earlier, before the email existed) sends no
+  // `final` at all and still submits unmatched rows, so the server sets them
+  // aside here and the app never says so; email those from each call, so a
+  // member on an old build still learns what to add by hand. One call per 100
+  // rows, so a long import on an old build can send a note per batch, inside
+  // the same daily cap.
+  const legacyClient = !('final' in body);
   const emailed = body.final === true
     ? await emailUnmatched(env, session, addedBefore + added.length, [...new Set([...clientUnmatched, ...unmatched])])
-    : false;
+    : legacyClient
+      ? await emailUnmatched(env, session, added.length, unmatched)
+      : false;
 
   return json({
     added: added.length,
