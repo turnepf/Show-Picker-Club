@@ -8,8 +8,10 @@ import SwiftUI
 // scrolling window (top five by recent activity visible); tapping one refocuses
 // the lists on them.
 //
-// iPhone keeps the single-stack HomeView untouched — RootView switches by
-// device idiom.
+// Also what the inner display of iPhone Duo gets: RootView switches on size
+// class (regular x regular) as well as idiom, and hands this view the phone
+// layout's navigation path so a fold or unfold lands on the same screen. See
+// `init(position:mySlug:)` and `portablePath`.
 
 // What the sidebar can point at. The show lists apply to the focused member,
 // which is tracked separately so switching members keeps the same list open.
@@ -66,6 +68,79 @@ struct IPadHomeView: View {
     private let memberRowHeight: CGFloat = 38
     private let memberWindowRows = 5
 
+    // Where the member is, in the phone layout's shape. Owned by RootView so
+    // it outlives this view when iPhone Duo folds and HomeView takes over.
+    @Binding private var position: [Route]
+
+    // Restoring happens here rather than in onAppear on purpose. State seeded
+    // in init is simply the starting value; the same assignments made after
+    // the first render would change `detailKey`, and its onChange empties
+    // `detailPath` — wiping the very stack being restored. The same reason
+    // `focusedSlug` is seeded with your own slug: otherwise load() fills it in
+    // later and that, too, changes detailKey.
+    //
+    // State initial values only apply when the view is first created, so this
+    // runs once per swap, not on every RootView redraw. An empty path (every
+    // iPad and Mac launch) leaves everything exactly as it always started.
+    init(position: Binding<[Route]>, mySlug: String?) {
+        _position = position
+        guard let restored = Self.restore(position.wrappedValue) else { return }
+        _selection = State(initialValue: restored.selection)
+        _detailPath = State(initialValue: restored.detailPath)
+        _session = State(initialValue: SessionScope(focusedSlug: restored.focusedSlug ?? mySlug))
+    }
+
+    // Phone path -> sidebar selection + detail stack. The phone pushes
+    // everything onto one stack; here the first screen usually becomes the
+    // sidebar choice and the rest stack in the detail column. Screens with no
+    // sidebar row of their own open under the row they'd be reached from.
+    private static func restore(_ path: [Route])
+        -> (selection: SidebarItem, detailPath: [Route], focusedSlug: String?)? {
+        guard let first = path.first else { return nil }
+        let rest = Array(path.dropFirst())
+        switch first {
+        // MemberView's own segmented list choice isn't in the path, so this
+        // lands on Watching rather than whichever list was open.
+        case .member(let m):      return (.list(.watching), rest, m.slug)
+        case .groups:             return (.groups, rest, nil)
+        case .groupDetail:        return (.groups, path, nil)
+        case .calendar:           return (.calendar, rest, nil)
+        case .favoriteActors:     return (.favoriteActors, rest, nil)
+        case .adminReporting:     return (.adminReporting, rest, nil)
+        case .adminMembers:       return (.adminManageMembers, rest, nil)
+        case .adminMemberDetail:  return (.adminManageMembers, path, nil)
+        case .adminUrlCleanup:    return (.adminUrlCleanup, rest, nil)
+        case .adminVibe:          return (.adminVibe, rest, nil)
+        case .detail, .pick:      return (.trending, path, nil)
+        }
+    }
+
+    // The reverse: this view's state as a phone path, kept in `position` by
+    // the onChange in body. Sidebar sections that are pushed by destination
+    // rather than by Route on the phone (Vibe, Subscription Audit, Rate My
+    // Shows) and Trending (which is Home itself there) contribute nothing, so
+    // folding from one of them lands on Home with any pushed show on top.
+    //
+    // nil means "can't say yet": a focused member before the roster has
+    // loaded. Writing the path without them would drop the member, so the
+    // last good value is left alone instead.
+    private var portablePath: [Route]? {
+        switch selection {
+        case .list?:
+            guard let m = focusedMember else { return nil }
+            return [.member(m)] + detailPath
+        case .groups?:             return [.groups] + detailPath
+        case .calendar?:           return [.calendar] + detailPath
+        case .favoriteActors?:     return [.favoriteActors] + detailPath
+        case .adminReporting?:     return [.adminReporting] + detailPath
+        case .adminManageMembers?: return [.adminMembers] + detailPath
+        case .adminUrlCleanup?:    return [.adminUrlCleanup] + detailPath
+        case .adminVibe?:          return [.adminVibe] + detailPath
+        case .trending?, .vibe?, .subscriptionAudit?, .rateBacklog?, nil:
+            return detailPath
+        }
+    }
+
     private var myMember: Member? {
         guard let slug = auth.memberSlug else { return nil }
         return members.first { $0.slug == slug }
@@ -118,6 +193,9 @@ struct IPadHomeView: View {
         .onChange(of: detailKey) { _, _ in
             detailPath = pendingDetailPush.map { [$0] } ?? []
             pendingDetailPush = nil
+        }
+        .onChange(of: portablePath) { _, path in
+            if let path { position = path }
         }
         .sheet(isPresented: $showingLogin) { LoginView().environmentObject(auth) }
         .sheet(isPresented: $showingDeleteAccount) { DeleteAccountView().environmentObject(auth) }

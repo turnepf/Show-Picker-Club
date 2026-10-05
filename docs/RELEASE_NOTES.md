@@ -45,6 +45,12 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ## Unreleased — the update after 1.6
 
+iPhone, iPad and Mac:
+
+```
+Ready for iPhone Duo. Unfold it and Show Picker Club spreads out into the iPad layout, with your lists in a sidebar; fold it and you're back on the phone layout, on the same screen you left.
+```
+
 ---
 
 ## 1.6 (build 30) — iPhone, iPad, Mac and Apple TV, submitted for review 2026-10-04

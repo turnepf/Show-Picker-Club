@@ -25,7 +25,9 @@ struct HomeView: View {
     @State private var showingExport = false
     @State private var showingSearch = false
     @State private var shakePick: Show?
-    @State private var path: [Route] = []
+    // Owned by RootView so it survives a fold/unfold swap to the split view
+    // and back (IPadHomeView translates it to and from its own selection).
+    @Binding var path: [Route]
     // Universal link that arrived before the roster loaded (cold launch);
     // replayed by load().
     @State private var pendingLink: URL?
