@@ -52,7 +52,7 @@ Login is by passkey, one-time code, or Sign in with Apple — there are no store
 - `webauthn_challenges` (migration 062) — single-use challenges (`purpose` = `register` | `authenticate`, `member_slug` set for registration only, `ip`, `expires_at`). Rows are deleted as they're consumed and swept when they expire, so the table stays near-empty.
 
 ### `shows`
-A member's copy of a show: only what is theirs. The show's own facts (artwork, overview, genres, rating, seasons, cast) live once per TMDB entry in [`titles`](#titles--title_cast-migration-076-normalizing-step-1), and members read both through the `shows_v` view. The 23 columns that repeated those facts on every copy were dropped 2026-10-05 (normalizing step 3c-2b); their descriptions moved to the `titles` section. A copy has no title either: every show is a TMDB entry, `shows_v.title` is `titles.name` (migration 083), and the column is dropped by `~/ShowPickerBackups/cleanup-titles-show-picker.sh`.
+A member's copy of a show: only what is theirs. The show's own facts (artwork, overview, genres, rating, seasons, cast) live once per TMDB entry in [`titles`](#titles--title_cast-migration-076-normalizing-step-1), and members read both through the `shows_v` view. The 23 columns that repeated those facts on every copy were dropped 2026-10-05 (normalizing step 3c-2b); their descriptions moved to the `titles` section. A copy has no title either: every show is a TMDB entry, `shows_v.title` is `titles.name` (migration 083), and the column was dropped 2026-10-05 (`~/ShowPickerBackups/cleanup-titles-show-picker.sh`).
 
 | Column              | Type | Notes |
 |---------------------|------|-------|

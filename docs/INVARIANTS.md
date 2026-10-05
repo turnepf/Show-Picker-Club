@@ -1173,9 +1173,9 @@ show's details, kept in step by propagation code, so two members could see
   (migration 083), a shared row is only ever created with TMDB's name (never
   from a copy), and no code reads or matches a title on the raw `shows`
   table: same-show matching there is by entry alone (`hasTitle: false` in
-  `_shared/same-show.js`). The column itself is dropped by an operator
-  script, `~/ShowPickerBackups/cleanup-titles-show-picker.sh`; until then the
-  two insert paths retry with the name if production still demands it.
+  `_shared/same-show.js`). The column was dropped 2026-10-05 by an operator
+  script, `~/ShowPickerBackups/cleanup-titles-show-picker.sh`, along with the
+  unused `auth_tokens`, `suggestions` and `tmdb_backfill_ignores`.
 - **A gap is the show's, not the copy's.** The enrichment passes decide what
   to fetch from the shared row. A copy that a fresher one has already filled
   isn't refetched, and an unmatched copy gets looked up and pinned rather

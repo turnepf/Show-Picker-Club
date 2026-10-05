@@ -149,26 +149,16 @@ export async function onRequestPost(context) {
   }
 
   if (inserts.length) {
-    // A copy has no title of its own (the name is TMDB's, on the shared row
-    // below). Transitional, like _shared/insert-copy.js: until the operator
-    // script drops shows.title, production refuses a row without it, so a
-    // refused batch (one transaction, nothing half-written) is retried
-    // carrying the name, which nothing reads.
+    // A copy has no title of its own: the name is TMDB's, on the shared row
+    // below.
     const cols = 'network, network_url, recommended_by, list, notes, movie, watching_with, member_slug, added_by, tmdb_id, tmdb_type';
     const stmt = env.DB.prepare(`INSERT INTO shows (${cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    const stmtWithTitle = env.DB.prepare(`INSERT INTO shows (title, ${cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     // D1 batches are one round trip but not unbounded; chunk so a 200-row
     // import doesn't hand the driver a single oversized statement list.
     for (let i = 0; i < inserts.length; i += 50) {
       // The poster and year belong to the show's shared row (below), not the
       // member's copy.
-      const chunk = inserts.slice(i, i + 50);
-      try {
-        await env.DB.batch(chunk.map(args => stmt.bind(...args.slice(1, 8), ...args.slice(9, 13))));
-      } catch (e) {
-        if (!/NOT NULL constraint failed: shows\.title/.test(String(e?.message || e))) throw e;
-        await env.DB.batch(chunk.map(args => stmtWithTitle.bind(...args.slice(0, 8), ...args.slice(9, 13))));
-      }
+      await env.DB.batch(inserts.slice(i, i + 50).map(args => stmt.bind(...args.slice(1, 8), ...args.slice(9, 13))));
     }
   }
 
