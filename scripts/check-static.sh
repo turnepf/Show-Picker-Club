@@ -306,15 +306,14 @@ ok "signing in refetches the roster myMember is resolved from"
 
 # A copy has no title of its own (every show is a TMDB entry, named on its
 # shared row; docs/INVARIANTS.md §29). No SQL in functions/ may read or match
-# a title on the raw `shows` table: names come through shows_v or titles. The
-# only exceptions are the two transitional inserts that retry with a title
-# while production still requires the column (remove them once it's dropped).
+# a title on the raw `shows` table (dropped 2026-10-05): names come through
+# shows_v or titles.
 raw_title=$(node --input-type=module -e '
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 const walk = (d) => readdirSync(d).flatMap((f) => { const p = join(d, f); return statSync(p).isDirectory() ? walk(p) : p.endsWith(".js") ? [p] : []; });
 const lit = /`(?:\\[\s\S]|\$\{[^}]*\}|[^`\\])*`|'"'"'(?:\\.|[^'"'"'\\\n])*'"'"'|"(?:\\.|[^"\\\n])*"/g;
-const allowed = [/INSERT INTO shows \(\$\{k\.join/, /INSERT INTO shows \(title, \$\{cols\}\)/];
+const allowed = [];
 for (const f of walk("functions")) {
   const src = readFileSync(f, "utf8");
   for (const m of src.matchAll(lit)) {

@@ -251,7 +251,7 @@ export async function ensureCopy(env, memberSlug, source, list, taggerEmail) {
     network: source.network || null, network_url: source.network_url || null, list,
     movie: source.movie || 0, full_series: source.full_series || 0, network_logo_url: source.network_logo_url || null,
     member_slug: memberSlug, added_by: taggerEmail || null, tmdb_id: tmdbId, tmdb_type: tmdbType,
-  }, source.title);
+  });
   const newId = result.meta.last_row_id;
   await syncTitle(env, tmdbType || (source.movie ? 'movie' : 'tv'), tmdbId, source.title);
   // Read back through the view: the shared row carries the show's facts.

@@ -222,7 +222,7 @@ export async function onRequestPost(context) {
     notes: notes || null, movie: movie || 0, full_series: full_series || 0, watching_with: watching_with || null,
     network_logo_url: enriched.networkLogoUrl || null, member_slug: session.member_slug, added_by: session.email,
     tmdb_id: enriched.tmdbId, tmdb_type: enriched.tmdbType,
-  }, finalTitle);
+  });
 
   const showId = result.meta.last_row_id;
   // The show's shared row, straight from the TMDB payload (docs/INVARIANTS.md §29).
