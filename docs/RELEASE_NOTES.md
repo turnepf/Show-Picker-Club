@@ -48,7 +48,7 @@ the Prime Video home screen, for titles where we have a direct link to them.
 iPhone, iPad and Mac:
 
 ```
-Ready for iPhone Duo. Unfold it and Show Picker Club spreads out into the iPad layout, with your lists in a sidebar; fold it and you're back on the phone layout, on the same screen you left.
+Ready for iPhone Duo. Unfold it and Show Picker Club spreads out into the iPad layout, with your lists in a sidebar; fold it and you're back on the phone layout, on the same screen you left. Half-fold it and a show's artwork takes one side of the crease, with the details on the other.
 ```
 
 ---
