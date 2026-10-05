@@ -1,6 +1,0 @@
--- One-time load of a single member's watchlist, entered on their behalf.
---
--- Applied to production in 2026-07. The statements named real members and have
--- been removed now that this repository is public. Migrations are tracked by
--- filename (scripts/apply-migrations.sh), so this file is never re-run, and a
--- fresh database is built from schema.sql, not from this set.

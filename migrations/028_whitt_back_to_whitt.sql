@@ -1,7 +1,0 @@
--- One-time reversal of migration 026, which had merged two different members'
--- identities into one record.
---
--- Applied to production in 2026-07. The statements named real members and have
--- been removed now that this repository is public. Migrations are tracked by
--- filename (scripts/apply-migrations.sh), so this file is never re-run, and a
--- fresh database is built from schema.sql, not from this set.
