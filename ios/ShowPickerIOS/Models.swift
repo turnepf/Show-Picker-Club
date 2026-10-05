@@ -1208,9 +1208,11 @@ struct ImportCommitResult: Codable {
     // Titles TMDB couldn't identify, set aside rather than added: every show
     // is a TMDB entry. Absent from a server that predates it.
     let unmatchedTitles: [String]?
+    // On the final call: whether the list of unmatched titles was emailed.
+    let emailed: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case added, skipped, titles
+        case added, skipped, titles, emailed
         case skippedTitles = "skipped_titles"
         case unmatchedTitles = "unmatched_titles"
     }

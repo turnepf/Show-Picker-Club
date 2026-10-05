@@ -67,8 +67,10 @@ struct ImportListView: View {
                     case .reading:
                         EmptyView()
                     case .review:
-                        Button(committing ? "Adding…" : "Add \(included.count)") { Task { await commit() } }
-                            .disabled(committing || included.isEmpty)
+                        // Nothing matched? "Finish" still lists (and emails)
+                        // the titles to add by hand.
+                        Button(committing ? "Adding…" : (included.isEmpty ? "Finish" : "Add \(included.count)")) { Task { await commit() } }
+                            .disabled(committing || (included.isEmpty && !items.contains { $0.matched == false }))
                     }
                 }
             }
@@ -357,13 +359,20 @@ struct ImportListView: View {
         // the batch maths needs a stable count.
         let rows = included
         // The server caps one call at 200 rows; send in batches so a big
-        // import is a few requests rather than a rejection.
-        for start in stride(from: 0, to: rows.count, by: 100) {
-            let batch = Array(rows[start..<min(start + 100, rows.count)])
+        // import is a few requests rather than a rejection. The last call
+        // (made even when there's nothing to add) carries the titles left out
+        // at review, so the member gets one email listing what to add by hand.
+        var emailed = false
+        let starts = rows.isEmpty ? [0] : Array(stride(from: 0, to: rows.count, by: 100))
+        for start in starts {
+            let batch = rows.isEmpty ? [] : Array(rows[start..<min(start + 100, rows.count)])
+            let isFinal = start == starts.last
             do {
-                let result = try await API.importCommit(items: batch)
+                let result = try await API.importCommit(items: batch, final: isFinal,
+                                                        unmatchedTitles: unmatched, addedBefore: added)
                 added += result.added
                 for t in result.unmatchedTitles ?? [] where !unmatched.contains(t) { unmatched.append(t) }
+                if isFinal { emailed = result.emailed ?? false }
             } catch {
                 // Report what did land before the failure — silently losing a
                 // partial import is worse than an awkward message.
@@ -388,7 +397,7 @@ struct ImportListView: View {
             excluded = []
             let n = unmatched.count
             errorText = "Added \(added) show\(added == 1 ? "" : "s"). No match was found for \(n), so \(n == 1 ? "it wasn't" : "they weren't") added. Add \(n == 1 ? "it" : "them") by hand from search: "
-                + unmatched.joined(separator: ", ")
+                + unmatched.joined(separator: ", ") + (emailed ? ". We've emailed you this list too." : "")
         }
     }
 

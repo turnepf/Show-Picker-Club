@@ -1164,7 +1164,9 @@ show's details, kept in step by propagation code, so two members could see
   when TMDB can't be asked; neither writes a row. An edit that keeps the show
   (notes, list, service) saves either way. A list import sets unmatched titles
   aside and returns them as `unmatched_titles`, which the web and iOS show at
-  the end to add by hand; iOS's offline queue keeps a queued add through a
+  the end to add by hand, and emails the member once with the same list (the
+  app's last commit call carries what it left out at review; never to the
+  demo account, five a day via `member_spend.emails`); iOS's offline queue keeps a queued add through a
   TMDB outage and says so when one has no match. The Apple TV and Roku "add as
   typed" buttons are gone.
 - **A copy has no title of its own.** `shows_v.title` is the shared row's name

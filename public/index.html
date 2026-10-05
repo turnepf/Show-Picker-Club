@@ -2172,8 +2172,10 @@
       document.getElementById('importTitle').textContent = st === 'review'
         ? `Review ${imp.items.length} title${imp.items.length === 1 ? '' : 's'}` : 'Import a list';
       next.classList.toggle('hidden', st === 'reading');
-      next.textContent = st === 'review' ? (imp.committing ? 'Adding…' : `Add ${included}`) : 'Read list';
-      next.disabled = imp.committing || (st === 'review' && !included);
+      // Nothing matched? "Finish" still lists (and emails) what to add by hand.
+      const anyUnmatched = imp.items.some((it) => it.matched === false);
+      next.textContent = st === 'review' ? (imp.committing ? 'Adding…' : (included ? `Add ${included}` : 'Finish')) : 'Read list';
+      next.disabled = imp.committing || (st === 'review' && !included && !anyUnmatched);
       document.getElementById('importCancel').disabled = imp.committing;
       if (st === 'review') renderImportRows();
     }
@@ -2263,17 +2265,27 @@
       // Titles TMDB couldn't match: the ones left out at review, plus any the
       // server set aside. Listed at the end to add by hand.
       const unmatched = imp.items.filter((it, i) => imp.excluded.has(i) && it.matched === false).map((it) => it.title);
+      let emailed = false;
       try {
-        // The server caps a call at 200 rows; batches of 100.
-        for (let i = 0; i < rows.length; i += 100) {
+        // The server caps a call at 200 rows; batches of 100. The last call
+        // (made even when there's nothing to add) carries the titles set aside
+        // at review, so the server can email the member one list of what to
+        // add by hand.
+        const last = Math.max(0, Math.ceil(rows.length / 100) - 1);
+        for (let b = 0; b <= last; b++) {
+          const final = b === last;
           const res = await fetch('/api/import/commit', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ items: rows.slice(i, i + 100) }),
+            body: JSON.stringify({
+              items: rows.slice(b * 100, b * 100 + 100),
+              ...(final ? { final: true, unmatched_titles: unmatched, added_before: added } : {}),
+            }),
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(data.error === 'rate_limited' ? 'You’ve added a lot today. Try the rest tomorrow.' : 'Couldn’t add these shows. Try again.');
           added += data.added || 0;
           for (const t of data.unmatched_titles || []) if (!unmatched.includes(t)) unmatched.push(t);
+          if (final) emailed = !!data.emailed;
         }
       } catch (e) {
         // Say what did land — silently losing a partial import is worse.
@@ -2288,7 +2300,7 @@
         imp.items = []; imp.excluded = new Set(); renderImportStep();
         err.textContent = `Added ${added} show${added === 1 ? '' : 's'}. No match was found for ${unmatched.length}, `
           + `so ${unmatched.length === 1 ? 'it wasn’t' : 'they weren’t'} added. Add ${unmatched.length === 1 ? 'it' : 'them'} by hand from search: `
-          + unmatched.join(', ');
+          + unmatched.join(', ') + (emailed ? '. We’ve emailed you this list too.' : '');
         err.classList.remove('hidden');
       } else {
         document.getElementById('importOverlay').classList.add('hidden');

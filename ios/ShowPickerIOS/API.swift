@@ -1112,9 +1112,20 @@ enum API {
 
     // Add the reviewed rows to the caller's own lists. Batched by the caller;
     // the server caps one call at 200 rows.
-    static func importCommit(items: [ImportItem]) async throws -> ImportCommitResult {
-        struct Body: Encodable { let items: [ImportItem] }
-        return try await postEncodable("/api/import/commit", body: Body(items: items))
+    // `final` marks the import's last call: it carries the titles left out at
+    // review (no TMDB match) and the running total, so the server can email
+    // the member one list of what to add by hand.
+    static func importCommit(items: [ImportItem], final: Bool = false,
+                             unmatchedTitles: [String] = [], addedBefore: Int = 0) async throws -> ImportCommitResult {
+        struct Body: Encodable {
+            let items: [ImportItem]
+            let final: Bool?
+            let unmatched_titles: [String]?
+            let added_before: Int?
+        }
+        return try await postEncodable("/api/import/commit", body: Body(
+            items: items, final: final ? true : nil,
+            unmatched_titles: final ? unmatchedTitles : nil, added_before: final ? addedBefore : nil))
     }
 
     // POST for bodies that are Encodable structs rather than a loose
