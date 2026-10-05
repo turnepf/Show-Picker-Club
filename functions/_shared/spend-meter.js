@@ -18,6 +18,7 @@ export const DAILY_LIMITS = {
   claude: 100,   // /api/import/parse slices
   lookups: 300,  // enrichment fan-outs: add, edit, suggest
   searches: 1000, // /api/title-search queries (type-ahead)
+  emails: 5,     // member-triggered notes to themselves (an import's unmatched titles)
 };
 
 // Charges one unit of `kind` to the member's day and says whether the request

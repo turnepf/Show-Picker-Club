@@ -22,6 +22,9 @@ import { LIST_KEYS } from '../../_shared/list-parse.js';
 import { canonicalNetwork, networkSearchUrl } from '../../_shared/networks.js';
 import { writeTitle } from '../../_shared/titles.js';
 import { showKey } from '../../_shared/same-show.js';
+import { sendEmail, importUnmatchedEmail } from '../../_shared/email.js';
+import { chargeSpend } from '../../_shared/spend-meter.js';
+import { isDemoMember } from '../../_shared/demo.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -64,7 +67,16 @@ export async function onRequestPost(context) {
 
   const raw = Array.isArray(body.items) ? body.items : null;
   if (!raw) return json({ error: 'items required' }, 400);
-  if (raw.length === 0) return json({ added: 0, skipped: 0, titles: [], skipped_titles: [] });
+  // The client sends, on its last call (`final`), the titles it set aside at
+  // review because TMDB couldn't match them, and how many it added in all, so
+  // the member gets one note listing what to add by hand.
+  const clientUnmatched = (Array.isArray(body.unmatched_titles) ? body.unmatched_titles : [])
+    .map((t) => str(t, 200)).filter(Boolean).slice(0, MAX_UNMATCHED_IN_EMAIL);
+  const addedBefore = Number.isInteger(body.added_before) && body.added_before >= 0 ? Math.min(body.added_before, 10000) : 0;
+  if (raw.length === 0) {
+    const emailed = body.final === true ? await emailUnmatched(env, session, addedBefore, clientUnmatched) : false;
+    return json({ added: 0, skipped: 0, titles: [], skipped_titles: [], unmatched: 0, unmatched_titles: [], emailed });
+  }
   if (raw.length > MAX_ITEMS_PER_CALL) return json({ error: 'too_many_items' }, 400);
 
   const slug = session.member_slug;
@@ -181,6 +193,10 @@ export async function onRequestPost(context) {
   // background /api/enrich pass once the import lands; the scheduled job is
   // the backstop if it doesn't.
 
+  const emailed = body.final === true
+    ? await emailUnmatched(env, session, addedBefore + added.length, [...new Set([...clientUnmatched, ...unmatched])])
+    : false;
+
   return json({
     added: added.length,
     skipped: skipped.length,
@@ -188,5 +204,26 @@ export async function onRequestPost(context) {
     skipped_titles: skipped,
     unmatched: unmatched.length,
     unmatched_titles: unmatched,
+    emailed,
   });
+}
+
+// One note to the member's own address listing what wasn't added. Never to
+// the demo account, capped per day, and a failure to send never fails the
+// import (the app shows the same list on screen).
+const MAX_UNMATCHED_IN_EMAIL = 100;
+async function emailUnmatched(env, session, added, titles) {
+  if (!titles.length) return false;
+  try {
+    if (await isDemoMember(env, session.member_slug)) return false;
+    const row = await env.DB.prepare(
+      'SELECT email FROM member_emails WHERE member_slug = ? ORDER BY is_primary DESC LIMIT 1'
+    ).bind(session.member_slug).first();
+    if (!row || !row.email) return false;
+    if (!(await chargeSpend(env, session.member_slug, 'emails'))) return false;
+    const sent = await sendEmail(env, { to: row.email, ...importUnmatchedEmail({ added, titles: titles.slice(0, MAX_UNMATCHED_IN_EMAIL) }) });
+    return !!sent.ok;
+  } catch (e) {
+    return false;
+  }
 }

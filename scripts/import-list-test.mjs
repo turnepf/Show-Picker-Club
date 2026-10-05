@@ -102,8 +102,14 @@ globalThis.fetch = async (url, init = {}) => {
     });
   }
 
+  if (target.startsWith('https://api.resend.com/')) {
+    resend.push(JSON.parse(init.body || '{}'));
+    return jsonRes({ id: 'email-1' });
+  }
+
   throw new Error(`unexpected outbound fetch: ${target}`);
 };
+const resend = [];
 
 // ---- fixtures ----
 
@@ -372,6 +378,40 @@ console.log('\n== an import has its own ceiling');
     items: Array.from({ length: 201 }, (_, i) => ({ title: `Bulk ${i}`, list: 'next' })),
   })));
   check('and one call cannot post an unbounded batch', huge.status === 400, `got ${huge.status}`);
+}
+
+console.log('\n== titles that didn\'t match are emailed to the member, once');
+{
+  // Every show is a TMDB entry, so an import's unmatched titles aren't added.
+  // The app's last commit call carries the ones it left out at review; the
+  // member gets one friendly note listing them, at their own address.
+  const env = makeEnv({ RESEND_API_KEY: 'test-resend' });
+  env._db.prepare("INSERT INTO member_emails (email, member_slug, is_primary) VALUES ('patrick@example.com', 'patrick', 1)").run();
+  resend.length = 0;
+  const commitWith = async (body) => (await commit.onRequestPost(context(env, post('/api/import/commit', body)))).json();
+
+  const mid = await commitWith({ items: [{ title: 'Severance', list: 'watching', tmdb_id: 95396, tmdb_type: 'tv' }] });
+  check('a call that isn\'t the last sends nothing', mid.emailed === false && resend.length === 0, JSON.stringify(mid));
+
+  const last = await commitWith({
+    items: [{ title: 'The Bear', list: 'watching', tmdb_id: 136315, tmdb_type: 'tv' }],
+    final: true, unmatched_titles: ['My Cousin\'s Home Video', '<script>x</script>'], added_before: 1,
+  });
+  check('the last call emails the member', last.emailed === true && resend.length === 1, JSON.stringify(last));
+  const mail = resend[0] || {};
+  check('to their own address, with replies to Patrick', JSON.stringify(mail.to) === '["patrick@example.com"]' && mail.reply_to === 'patrick@patrickturner.net');
+  check('naming every unmatched title and the count added', /My Cousin's Home Video/.test(mail.text) && /We added 2 shows/.test(mail.text), mail.text);
+  check('with titles escaped in the HTML', mail.html.includes('&lt;script&gt;') && !mail.html.includes('<script>'));
+  check('and a thank-you', /Thanks for importing/.test(mail.html));
+
+  const empty = await commitWith({ items: [], final: true, unmatched_titles: ['Nothing Matched'] });
+  check('an import where nothing matched still gets its note', empty.emailed === true && resend.length === 2);
+
+  const none = await commitWith({ items: [], final: true, unmatched_titles: [] });
+  check('nothing unmatched, no email', none.emailed === false && resend.length === 2);
+
+  for (let i = 0; i < 5; i++) await commitWith({ items: [], final: true, unmatched_titles: ['Again'] });
+  check('capped at five a day', resend.length === 5, `sent ${resend.length}`);
 }
 
 console.log('\n== a Claude outage surfaces instead of looking like an empty list');
