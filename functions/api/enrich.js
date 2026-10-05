@@ -108,26 +108,22 @@ async function refreshCastFromDetail(env, show, detail, tmdbId) {
   return rows;
 }
 
-// Fill missing artwork from sibling copies of the same title — a poster
-// fetched for one member's copy covers everyone's, so no TMDB budget should
-// ever be spent on a title that already has artwork somewhere. Pure DB work,
-// zero subrequests. (New fetches also propagate at write time; this sweep
-// catches the backlog from before that existed.) A sibling pinned to a
-// different tmdb_id is a different show sharing the title — never a donor.
+// Fill a missing service badge from another copy of the same show on the
+// same service. Posters are the show's, on its shared row; the badge follows
+// the member's service, so only a copy naming that service may lend one.
+// Pure DB work, zero subrequests. Matched by TMDB entry: a copy has no title
+// of its own.
+const SAME_ENTRY = `s2.tmdb_id = shows.tmdb_id
+  AND COALESCE(s2.tmdb_type, CASE WHEN s2.movie = 1 THEN 'movie' ELSE 'tv' END)
+    = COALESCE(shows.tmdb_type, CASE WHEN shows.movie = 1 THEN 'movie' ELSE 'tv' END)
+  AND s2.network = shows.network`;
 async function syncArtworkAcrossCopies(env) {
-  // Posters are the show's, on its shared row, so only the per-service badge
-  // still moves between copies.
   await env.DB.prepare(
     `UPDATE shows SET network_logo_url = (
         SELECT s2.network_logo_url FROM shows s2
-         WHERE LOWER(s2.title) = LOWER(shows.title)
-           AND (s2.tmdb_id IS NULL OR shows.tmdb_id IS NULL OR s2.tmdb_id = shows.tmdb_id)
-           AND s2.network_logo_url IS NOT NULL LIMIT 1)
-      WHERE network_logo_url IS NULL
-        AND EXISTS (SELECT 1 FROM shows s2
-                     WHERE LOWER(s2.title) = LOWER(shows.title)
-                       AND (s2.tmdb_id IS NULL OR shows.tmdb_id IS NULL OR s2.tmdb_id = shows.tmdb_id)
-                       AND s2.network_logo_url IS NOT NULL)`
+         WHERE ${SAME_ENTRY} AND s2.network_logo_url IS NOT NULL LIMIT 1)
+      WHERE network_logo_url IS NULL AND tmdb_id IS NOT NULL AND network IS NOT NULL
+        AND EXISTS (SELECT 1 FROM shows s2 WHERE ${SAME_ENTRY} AND s2.network_logo_url IS NOT NULL)`
   ).run();
 }
 
@@ -195,7 +191,7 @@ const HOT_UNFILLED = `(${HOT_LIST} AND tmdb_status IS NULL AND ${NOT_TRIED_RECEN
 // entry backs (never matched) has every fact missing, which is right: it
 // needs a lookup. Member-side columns (list, archive, network, the badge,
 // enriched_at) still come from the copy.
-const COPIES = `(SELECT s.id, s.title, s.movie, s.list, s.archived, s.network, s.network_url, s.network_logo_url,
+const COPIES = `(SELECT s.id, t.name AS title, s.movie, s.list, s.archived, s.network, s.network_url, s.network_logo_url,
          s.member_slug, s.enriched_at, s.tmdb_id, s.tmdb_type,
          t.poster_url, t.episodes_released, t.genres, t.streaming_on, t.tmdb_status,
          EXISTS (SELECT 1 FROM title_cast c WHERE c.tmdb_type = t.tmdb_type AND c.tmdb_id = t.tmdb_id) AS has_cast
@@ -359,7 +355,7 @@ export async function onRequestPost(context) {
                    CASE WHEN tier < 2 AND ${HOT_LIST} THEN 0 ELSE 1 END,
                    COALESCE(enriched_at, '1970-01-01') ASC LIMIT ?`;
     const tmdbStmt = showId
-      ? env.DB.prepare(`SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type FROM shows
+      ? env.DB.prepare(`SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type FROM shows_v
           WHERE movie = 0 AND id = ?`).bind(showId)
       : env.DB.prepare(tvSelect).bind(...tvBinds, maxTmdb);
     const { results: tmdbShows } = await tmdbStmt.all();
@@ -401,13 +397,13 @@ export async function onRequestPost(context) {
             // Stamp enriched_at so a title TMDB can't match rotates to the back
             // of the oldest-first queue instead of blocking it every round. (A DB
             // write, not a fetch — it doesn't count against the subrequest cap.)
-            // Every copy of the title, not just this row: the posters-mode batch
-            // groups by title and sorts by the group's oldest stamp, so one
-            // unstamped sibling would pin a hopeless title to the front forever.
+            // Every copy of the show, not just this row: the batch groups copies
+            // and sorts by the group's oldest stamp, so one unstamped sibling
+            // would pin a hopeless show to the front forever.
             await env.DB.prepare(
               `UPDATE shows SET enriched_at = datetime('now')
-                WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
-            ).bind(show.id).run();
+                WHERE id = ? OR (tmdb_id IS NOT NULL AND tmdb_id = (SELECT tmdb_id FROM shows WHERE id = ?))`
+            ).bind(show.id, show.id).run();
             continue;
           }
           tmdbId = first.id;
@@ -469,17 +465,16 @@ export async function onRequestPost(context) {
               tmdb_id = COALESCE(tmdb_id, ?), tmdb_type = COALESCE(tmdb_type, 'tv'),
               enriched_at = datetime('now') WHERE id = ?`
         ).bind(newDate, endDate, isComplete, networkLogoUrl, fallbackNetwork(df), tmdbId, show.id).run();
-        // Same-titled copies nothing pinned yet learn the id: that's identity,
-        // the one thing a copy still carries. A copy pinned to a different id
-        // is a different show sharing the title, and is left alone. The TV
-        // badge is the same for every copy (TMDB's first network), so it fills
-        // too.
+        // This row learns the id if a title search found it, and every copy of
+        // the entry gets the TV badge, which is the same for all of them
+        // (TMDB's first network). A copy pinned to a different id is a
+        // different show, and is left alone.
         await env.DB.prepare(
           `UPDATE shows SET network_logo_url = COALESCE(network_logo_url, ?),
               tmdb_id = COALESCE(tmdb_id, ?), tmdb_type = COALESCE(tmdb_type, 'tv')
-            WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)
+            WHERE (id = ? OR (tmdb_id = ? AND COALESCE(tmdb_type, CASE WHEN movie = 1 THEN 'movie' ELSE 'tv' END) = 'tv'))
               AND (tmdb_id IS NULL OR tmdb_id = ?)`
-        ).bind(networkLogoUrl, tmdbId, show.id, tmdbId).run();
+        ).bind(networkLogoUrl, tmdbId, show.id, tmdbId, tmdbId).run();
 
         // Cast comes free with the detail call we just made — this pass used
         // to ignore it entirely, which is why a title enriched here kept
@@ -554,7 +549,7 @@ export async function onRequestPost(context) {
     // a sibling could cover. Grouping by id too keeps a remake pinned next to
     // its same-titled original from being answered by the wrong entry.
     const movieStmt = showId
-      ? env.DB.prepare(`SELECT id, title, network, network_url, tmdb_id, tmdb_type FROM shows
+      ? env.DB.prepare(`SELECT id, title, network, network_url, tmdb_id, tmdb_type FROM shows_v
           WHERE movie = 1 AND id = ?`).bind(showId)
       : env.DB.prepare(
       `SELECT id, title, network, network_url, tmdb_id, tmdb_type FROM ${COPIES} WHERE ${mvWhere}
@@ -606,8 +601,8 @@ export async function onRequestPost(context) {
             // pinning the front of the grouped-by-title queue.
             await env.DB.prepare(
               `UPDATE shows SET enriched_at = datetime('now')
-                WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)`
-            ).bind(show.id).run();
+                WHERE id = ? OR (tmdb_id IS NOT NULL AND tmdb_id = (SELECT tmdb_id FROM shows WHERE id = ?))`
+            ).bind(show.id, show.id).run();
             continue;
           }
           tmdbId = first.id;
@@ -658,11 +653,10 @@ export async function onRequestPost(context) {
               -- never clobbered.
               tmdb_id = COALESCE(tmdb_id, ?), tmdb_type = COALESCE(tmdb_type, 'movie'),
               enriched_at = datetime('now')
-            WHERE LOWER(title) = (SELECT LOWER(title) FROM shows WHERE id = ?)
-              -- Copies pinned to a different id are a different film that
-              -- shares the title.
+            WHERE (id = ? OR (tmdb_id = ? AND COALESCE(tmdb_type, CASE WHEN movie = 1 THEN 'movie' ELSE 'tv' END) = 'movie'))
+              -- Copies pinned to a different id are a different film.
               AND (tmdb_id IS NULL OR tmdb_id = ?)`
-        ).bind(badgeNetwork, badgeLogoUrl, fallbackNetwork(df), tmdbId, show.id, tmdbId).run();
+        ).bind(badgeNetwork, badgeLogoUrl, fallbackNetwork(df), tmdbId, show.id, tmdbId, tmdbId).run();
         // The detail call already carried credits, and MOVIE_GAP selects a film
         // for missing cast — but this pass never wrote any, so a castless film
         // (an archived one imported bare, say) re-qualified every round and
@@ -717,19 +711,19 @@ export async function onRequestPost(context) {
     // shrinks all of it rather than just its first half.
     const actorDefault = Number.isFinite(maxTmdb) ? Math.min(8, Math.max(1, maxTmdb)) : 8;
     const maxActorImdb = parseInt(body.max_actor_imdb ?? String(actorDefault), 10);
-    // Grouped by (title, tmdb_id) like the passes above, so a pinned remake
-    // and its same-titled original each refresh from their own entry.
+    // Grouped by TMDB entry, so a pinned remake and its same-titled original
+    // each refresh from their own entry.
     // An unlinked name in the show's shared cast (step 3c: the cast members
     // read), rather than in a copy's own rows.
-    const backfillBase = `SELECT s.title, MAX(s.movie) AS movie, s.tmdb_id, MAX(s.tmdb_type) AS tmdb_type
-       FROM shows s
+    const backfillBase = `SELECT MAX(s.title) AS title, MAX(s.movie) AS movie, s.tmdb_id, MAX(s.tmdb_type) AS tmdb_type
+       FROM shows_v s
        WHERE EXISTS (SELECT 1 FROM title_cast c
                       WHERE c.tmdb_id = s.tmdb_id
                         AND c.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)
                         AND c.imdb_id IS NULL)`;
     const backfillStmt = member
-      ? env.DB.prepare(`${backfillBase} AND s.member_slug = ? GROUP BY LOWER(s.title), s.tmdb_id ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(member, maxActorImdb)
-      : env.DB.prepare(`${backfillBase} GROUP BY LOWER(s.title), s.tmdb_id ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(maxActorImdb);
+      ? env.DB.prepare(`${backfillBase} AND s.member_slug = ? GROUP BY s.tmdb_id, COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END) ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(member, maxActorImdb)
+      : env.DB.prepare(`${backfillBase} GROUP BY s.tmdb_id, COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END) ORDER BY MAX(COALESCE(s.updated_at, s.created_at)) DESC LIMIT ?`).bind(maxActorImdb);
     const { results: backfillShows } = await backfillStmt.all();
 
     // fetchEnrichment does its own fetching and doesn't touch env.budget, so
@@ -788,7 +782,7 @@ export async function onRequestPost(context) {
     // no provider logo), so a caller must stop on a count that stops falling
     // rather than on one that reaches zero.
     const row = await env.DB.prepare(
-      `SELECT COUNT(DISTINCT LOWER(title) || ':' || COALESCE(tmdb_id, '')) AS movies FROM shows
+      `SELECT COUNT(DISTINCT COALESCE(tmdb_id, 'row:' || id)) AS movies FROM shows
         WHERE movie = 1
           AND (network_logo_url IS NULL OR network_logo_url = '')`
     ).first().catch(() => null);

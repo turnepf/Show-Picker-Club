@@ -19,11 +19,11 @@ import { Stmt } from './d1.mjs';
 export const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DB_NAME = 'shows-db';
 
-// The member's columns only: since the 2026-10-05 cleanup a show's facts
-// (rating, poster, genres, seasons) live in `titles`, taken whole below, and
-// the replayed endpoints read both through shows_v as production does.
+// The member's columns only: a show's facts (rating, poster, genres,
+// seasons) and its name live in `titles`, taken whole below, and the
+// replayed endpoints read both through shows_v as production does.
 const SHOW_COLS = [
-  'id', 'title', 'list', 'member_slug', 'archived', 'added_by', 'created_at',
+  'id', 'list', 'member_slug', 'archived', 'added_by', 'created_at',
   'updated_at', 'network', 'network_url', 'movie', 'full_series',
   'next_season_date', 'tmdb_id', 'tmdb_type',
 ].join(', ');

@@ -52,6 +52,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { Stmt } from './lib/d1.mjs';
+import { withLegacyShowColumns } from './lib/seed-titles.mjs';
 import { fakeTmdb } from './lib/fake-tmdb.mjs';
 
 // Every added show must be a TMDB entry, so adds go to a stand-in TMDB that
@@ -87,6 +88,7 @@ function makeEnv() {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
+  withLegacyShowColumns(db);
   return {
     DB: { prepare: (sql) => new Stmt(db, sql), batch: async (stmts) => { const out = []; for (const s of stmts) out.push(await s.run()); return out; } },
     TMDB_TOKEN: 'test-token',

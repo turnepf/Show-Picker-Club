@@ -4,6 +4,8 @@ import { cronAuthorized } from '../_shared/secrets.js';
 import { normalizeAmazonUrl } from '../_shared/amazon-urls.js';
 import { sameShowWhere, showKeySql } from '../_shared/same-show.js';
 
+// Read through shows_v (aliased `shows` so the filters read as before): the
+// title, for a Watchmode name search or an HBO Max search link, is TMDB's.
 const SHOW_KEY = showKeySql('shows');
 
 // Backfills network_url for rows missing a real deep link, using Watchmode's
@@ -121,7 +123,7 @@ export async function onRequestPost(context) {
 
   const amazonSql = `
     SELECT id, title, network, network_url, movie, tmdb_id, tmdb_type
-    FROM shows
+    FROM shows_v shows
     WHERE archived = 0
       AND network = 'Amazon Prime Video'
       AND network_url IS NOT NULL
@@ -136,7 +138,7 @@ export async function onRequestPost(context) {
   // from the earlier TMDB-based version of this endpoint.
   const sql = `
     SELECT id, title, network, network_url, movie, tmdb_id, tmdb_type
-    FROM shows
+    FROM shows_v shows
     WHERE archived = 0
       ${network ? 'AND network = ?' : ''}
       AND (network_url IS NULL
@@ -231,7 +233,7 @@ export async function onRequestPost(context) {
     // same title (e.g. All Her Fault on Peacock vs Amazon).
     // And only to copies of this same show: a copy pinned to a different
     // TMDB entry with the same title is a different film.
-    const same = sameShowWhere('shows', row, { forWrite: true });
+    const same = sameShowWhere('shows', row, { forWrite: true, hasTitle: false });
     const upd = await env.DB.prepare(
       `UPDATE shows SET network_url = ?, enriched_at = datetime('now') WHERE ${same.sql} AND network = ? AND archived = 0`
     ).bind(url, ...same.binds, row.network).run();

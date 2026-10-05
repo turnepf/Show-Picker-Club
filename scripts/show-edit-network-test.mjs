@@ -30,6 +30,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { Stmt } from './lib/d1.mjs';
+import { withLegacyShowColumns } from './lib/seed-titles.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = mkdtempSync(join(tmpdir(), 'show-edit-'));
@@ -83,6 +84,7 @@ function makeEnv() {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
+  withLegacyShowColumns(db);
   return {
     DB: { prepare: (sql) => new Stmt(db, sql), batch: async (s) => { for (const x of s) await x.run(); } },
     TMDB_TOKEN: 'test-token',

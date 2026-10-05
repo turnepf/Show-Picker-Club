@@ -36,6 +36,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { Stmt } from './lib/d1.mjs';
+import { withLegacyShowColumns } from './lib/seed-titles.mjs';
 import { fakeTmdb } from './lib/fake-tmdb.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -93,6 +94,7 @@ globalThis.fetch = async (url) => {
 function makeEnv({ withLedger = true } = {}) {
   const db = new DatabaseSync(':memory:');
   db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
+  withLegacyShowColumns(db);
   if (!withLedger) db.exec('DROP TABLE member_spend');
   upstream.calls.length = 0;
   return {

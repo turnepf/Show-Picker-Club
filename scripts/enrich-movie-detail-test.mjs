@@ -279,15 +279,24 @@ console.log('\nPosters mode keeps its narrow artwork gate');
 
 // ---------------------------------------------------------------- 5
 
+// Sixty more films for the budget cases, each its own TMDB entry.
+function manyFilms() {
+  const ids = [];
+  for (let n = 0; n < 60; n++) {
+    const id = 7000 + n;
+    FILMS[id] = { title: `Budget Film ${n}`, year: '2020-01-01', genre: 'Drama', runtime: 100 };
+    ids.push(id);
+  }
+  return ids;
+}
+
 console.log('\nThe loop stops on the subrequest budget');
 {
   const env = makeEnv();
   // More films than the budget can pay for, each needing a detail fetch.
-  for (const id of [501, 502, 503, 504, 505]) {
-    for (let n = 0; n < 12; n++) {
-      addMovie(env, { title: `${FILMS[id].title} ${n}`, tmdbId: id });
-    }
-  }
+  // Sixty different films: copies of one film are one show, so twelve copies
+  // under twelve titles would be a single item in the queue.
+  manyFilms().forEach((id) => addMovie(env, { title: FILMS[id].title, tmdbId: id }));
   fetchLog = [];
   const res = await (await runEnrich(env)).json();
   check('it reports the budget as exhausted rather than running on', res.budgetExhausted === true,
@@ -303,11 +312,7 @@ console.log('\nTwo overlapping passes each get their own budget');
   // `let`: each pass reset it on entry and both incremented it, so one could
   // run past the cap while the other stopped early. Each pass must count
   // exactly what it alone spends.
-  const fill = (env) => {
-    for (const id of [501, 502, 503, 504, 505]) {
-      for (let n = 0; n < 12; n++) addMovie(env, { title: `${FILMS[id].title} ${n}`, tmdbId: id });
-    }
-  };
+  const fill = (env) => manyFilms().forEach((id) => addMovie(env, { title: FILMS[id].title, tmdbId: id }));
   const solo = makeEnv(); fill(solo);
   const alone = await (await runEnrich(solo)).json();
   const a = makeEnv(); fill(a);

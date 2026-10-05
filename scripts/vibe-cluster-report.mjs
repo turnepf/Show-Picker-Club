@@ -93,13 +93,14 @@ const db = hydrate(snapshot);
 const env = envFor(db);
 const traitCols = TRAIT_NAMES.map((t) => `t.${t}`).join(', ');
 // A fingerprint is keyed by show (migration 081) — showKeySql('s') in
-// functions/_shared/same-show.js, spelled out here for the snapshot db.
+// functions/_shared/same-show.js, spelled out here for the snapshot db. Reads
+// go through shows_v: a copy has no title of its own, the name is TMDB's.
 const KEY = `CASE WHEN s.tmdb_id IS NOT NULL THEN COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END) || ':' || s.tmdb_id
   ELSE 'title:' || LOWER(TRIM(s.title)) END`;
 
 const rows = db.prepare(
   `SELECT s.member_slug, s.list, ${traitCols}
-     FROM shows s
+     FROM shows_v s
      JOIN title_traits t ON t.show_key = ${KEY}
       AND (t.unknown_show = 0 OR t.unknown_show IS NULL)
     WHERE s.archived = 0`

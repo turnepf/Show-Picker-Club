@@ -172,7 +172,7 @@ export async function respondToSuggestion(env, { groupId, suggestionId, memberSl
     // enrichment, cast and all), else the snapshot on the card — ensureCopy
     // backfills a bare source from TMDB on its own.
     const source = (suggestion.show_id
-      ? await env.DB.prepare('SELECT * FROM shows WHERE id = ?').bind(suggestion.show_id).first()
+      ? await env.DB.prepare('SELECT * FROM shows_v WHERE id = ?').bind(suggestion.show_id).first()
       : null) || {
         id: null, title: suggestion.title, tmdb_id: suggestion.tmdb_id,
         movie: suggestion.movie, poster_url: suggestion.poster_url, network: suggestion.network,
@@ -181,6 +181,8 @@ export async function respondToSuggestion(env, { groupId, suggestionId, memberSl
     // added_by is the member's own email — this is their tap, not the
     // recommender's write.
     show = await ensureCopy(env, memberSlug, source, 'next', memberEmail);
+    // A card TMDB can't match (an old one with no entry) makes no copy.
+    if (!show) return { status: 422, error: 'no_match', message: `"${suggestion.title}" wasn't found in the show catalog, so it can't be added.` };
     if (!hadCopy) {
       // A fresh copy remembers who to thank, in the owner-only field that has
       // always meant exactly this. A copy they already had is theirs — its

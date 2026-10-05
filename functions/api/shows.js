@@ -7,6 +7,7 @@ import { safeNetworkUrl } from '../_shared/url-utils.js';
 import { chargeSpend } from '../_shared/spend-meter.js';
 import { syncWatchers, watchersForShows, attachAddedByMembers } from '../_shared/watchers.js';
 import { sameShowWhere } from '../_shared/same-show.js';
+import { insertCopy } from '../_shared/insert-copy.js';
 
 
 function corsHeaders() {
@@ -70,8 +71,8 @@ async function findGoodCopyAcrossMembers(env, title, tmdbId = null, tmdbType = n
   // A copy pinned to a different TMDB entry is a different show sharing the
   // title (a remake next to its original) — its URL streams the wrong show,
   // so it is never a donor. Both columns are the copy's own, so this reads
-  // `shows` directly, where the TMDB-id and title indexes apply.
-  const same = sameShowWhere('s', { title, tmdb_id: tmdbId, tmdb_type: tmdbType });
+  // `shows` directly, where the TMDB-id index applies.
+  const same = sameShowWhere('s', { title, tmdb_id: tmdbId, tmdb_type: tmdbType }, { hasTitle: false });
   return await env.DB.prepare(
     `SELECT network, network_url FROM shows s
      WHERE ${same.sql} AND archived = 0
@@ -216,13 +217,12 @@ export async function onRequestPost(context) {
   // The member's row holds what is theirs; the show's facts and cast go to its
   // shared row just below (docs/INVARIANTS.md §29). The badge stays per copy
   // because it follows the member's service.
-  const result = await env.DB.prepare(
-    `INSERT INTO shows (title, network, network_url, recommended_by, list, notes, movie, full_series, watching_with,
-       network_logo_url, member_slug, added_by, tmdb_id, tmdb_type)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(finalTitle, finalNetwork, finalUrl, recommended_by || null, list, notes || null, movie || 0, full_series || 0,
-    watching_with || null, enriched.networkLogoUrl || null, session.member_slug, session.email,
-    enriched.tmdbId || null, enriched.tmdbType || null).run();
+  const result = await insertCopy(env, {
+    network: finalNetwork, network_url: finalUrl, recommended_by: recommended_by || null, list,
+    notes: notes || null, movie: movie || 0, full_series: full_series || 0, watching_with: watching_with || null,
+    network_logo_url: enriched.networkLogoUrl || null, member_slug: session.member_slug, added_by: session.email,
+    tmdb_id: enriched.tmdbId, tmdb_type: enriched.tmdbType,
+  }, finalTitle);
 
   const showId = result.meta.last_row_id;
   // The show's shared row, straight from the TMDB payload (docs/INVARIANTS.md §29).
@@ -238,17 +238,16 @@ export async function onRequestPost(context) {
     finalUrl.includes('/search') || finalUrl.includes('/s?') ||
     finalUrl.includes('?q=') || finalUrl.includes('?query=');
   if (onPlaceholder && finalNetwork) {
-    // Propagates only to copies of the same TMDB entry (or unpinned ones) —
-    // a same-titled row pinned to a different entry streams a different show.
-    const newRowTmdbId = enriched.tmdbId || null;
+    // Propagates only to copies of the same TMDB entry: a same-titled row
+    // pinned to a different entry streams a different show.
+    const same = sameShowWhere('shows', { tmdb_id: enriched.tmdbId, tmdb_type: enriched.tmdbType }, { hasTitle: false });
     context.waitUntil((async () => {
       const realUrl = await lookupWatchmodeUrl(env, finalTitle, finalNetwork, !!movie);
       if (realUrl) {
         await env.DB.prepare(
           `UPDATE shows SET network_url = ?, enriched_at = datetime('now')
-            WHERE LOWER(title) = LOWER(?) AND archived = 0
-              AND (tmdb_id IS NULL OR ? IS NULL OR tmdb_id = ?)`
-        ).bind(realUrl, finalTitle, newRowTmdbId, newRowTmdbId).run();
+            WHERE ${same.sql} AND archived = 0`
+        ).bind(realUrl, ...same.binds).run();
       }
     })());
   }

@@ -17,11 +17,35 @@
 // shared row. Code under test therefore only ever finds a fact in `titles`,
 // as in production, and a read of a dropped column on the copy comes back
 // empty instead of quietly passing.
+//
+// The same goes for a copy's own title (dropped 2026-10: every show is a TMDB
+// entry, named on its shared row). withLegacyShowColumns() also brings back a
+// nullable `title`, and a trigger turns a fixture row that names a title into
+// what production would hold: a copy pinned to an entry (its own id, else the
+// one the stand-in TMDB gives that title), and that entry's shared row
+// carrying the name. Code under test reads names through shows_v, so the
+// fixture's leftover title is never what it sees; check-static's raw-title
+// scan keeps code from reading it at all.
 import { SHARED_FIELDS } from '../../functions/_shared/titles.js';
+import { tmdbIdFor } from './fake-tmdb.mjs';
 
 export function withLegacyShowColumns(db) {
+  // A fixture row with no id is pinned where the stand-in TMDB would put it
+  // (scripts/lib/fake-tmdb.mjs), so a copy a test inserts and a copy the code
+  // adds through the fake TMDB land on the same entry, as two members adding
+  // one show do in production.
+  db.function('fixture_tmdb_id', { deterministic: true }, (title, type) => tmdbIdFor(title, type));
   const have = new Set(db.prepare("SELECT name FROM pragma_table_info('shows')").all().map((r) => r.name));
+  if (!have.has('title')) db.exec('ALTER TABLE shows ADD COLUMN title TEXT');
   for (const f of SHARED_FIELDS) if (!have.has(f)) db.exec(`ALTER TABLE shows ADD COLUMN ${f}`);
+  const T = `COALESCE(NEW.tmdb_type, CASE WHEN NEW.movie = 1 THEN 'movie' ELSE 'tv' END)`;
+  const PIN = `COALESCE(NEW.tmdb_id, fixture_tmdb_id(NEW.title, ${T}))`;
+  db.exec(`CREATE TRIGGER IF NOT EXISTS fixture_copy_is_an_entry AFTER INSERT ON shows
+    WHEN NEW.title IS NOT NULL
+    BEGIN
+      INSERT OR IGNORE INTO titles (tmdb_type, tmdb_id, name) VALUES (${T}, ${PIN}, NEW.title);
+      UPDATE shows SET tmdb_id = ${PIN}, tmdb_type = ${T} WHERE id = NEW.id;
+    END`);
 }
 
 const TYPE = (a) => `COALESCE(${a}.tmdb_type, CASE WHEN ${a}.movie = 1 THEN 'movie' ELSE 'tv' END)`;
@@ -35,7 +59,7 @@ const EMPTY_IS_AN_ANSWER = ['streaming_on', 'free_on', 'tmdb_status'];
 // `pinRow` does the same for one row only, for a suite that also needs a
 // deliberately unmatched row to stay unmatched.
 export function liftCopiesIntoTitles(db, { pinUnmatched = false, pinRow = null } = {}) {
-  if (pinUnmatched || pinRow) {
+  if ((pinUnmatched || pinRow) && db.prepare("SELECT 1 FROM pragma_table_info('shows') WHERE name = 'title'").get()) {
     db.prepare(`UPDATE shows SET
         tmdb_id = 9000000 + (SELECT MIN(s2.id) FROM shows s2 WHERE LOWER(s2.title) = LOWER(shows.title)),
         tmdb_type = CASE WHEN movie = 1 THEN 'movie' ELSE 'tv' END
@@ -50,8 +74,8 @@ export function liftCopiesIntoTitles(db, { pinUnmatched = false, pinRow = null }
   db.exec(`WITH k AS (SELECT DISTINCT ${TYPE('s')} AS tmdb_type, s.tmdb_id FROM shows s WHERE s.tmdb_id IS NOT NULL)
     INSERT INTO titles (tmdb_type, tmdb_id, name${fields.map((f) => `, ${f}`).join('')}, synced_at)
     SELECT k.tmdb_type, k.tmdb_id,
-      (SELECT s2.title FROM shows s2 WHERE s2.tmdb_id = k.tmdb_id AND ${TYPE('s2')} = k.tmdb_type
-        ORDER BY COALESCE(s2.enriched_at, '') DESC, s2.id DESC LIMIT 1)
+      COALESCE(${cols.includes('title') ? `(SELECT s2.title FROM shows s2 WHERE s2.tmdb_id = k.tmdb_id AND ${TYPE('s2')} = k.tmdb_type
+        ORDER BY COALESCE(s2.enriched_at, '') DESC, s2.id DESC LIMIT 1)` : 'NULL'}, 'Entry ' || k.tmdb_id)
       ${fields.map((f) => `, ${pick(f)}`).join('')}, datetime('now')
     FROM k WHERE true
     ON CONFLICT (tmdb_type, tmdb_id) DO UPDATE SET

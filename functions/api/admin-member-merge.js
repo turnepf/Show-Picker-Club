@@ -73,7 +73,7 @@ export async function onRequestPost(context) {
        AND NOT (added_by = 'seed' AND updated_at IS NULL)
        AND EXISTS (SELECT 1 FROM shows t
                     WHERE t.member_slug = ?2 AND t.archived = 0
-                      AND ${sameShowJoin('t', 'shows')})`;
+                      AND ${sameShowJoin('t', 'shows', { hasTitle: false })})`;
 
   // Counts up front so the response can say what happened (the batch's
   // meta.changes are per-statement and awkward to attribute after dedupes).

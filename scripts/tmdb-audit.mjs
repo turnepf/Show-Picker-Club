@@ -13,22 +13,19 @@
 // --db reads a local SQLite file instead: a restored backup, or the test
 // fixture.
 //
-// What it reports:
+// Since 2026-10 every copy is a TMDB entry with no title of its own: an add
+// TMDB can't identify is refused, and a show's name is TMDB's, on its shared
+// row. So the audit checks that this holds:
 //
-//   1. Rows with no tmdb_id, and for each one whether another member's copy
-//      of the same title is pinned: "copyable" (exactly one entry, so the id
-//      could simply be copied over), "ambiguous" (two entries share the title,
-//      a remake next to its original, so a person has to pick), or "none".
-//      A trailing "(YYYY)" in the title is used to pick between same-named
-//      entries, and with TMDB_TOKEN set, a "none" row gets TMDB's best search
-//      hit as a suggestion, never an answer.
-//   2. Entries whose copies carry different titles ("Little House on the
-//      Prairie" next to "Little House on the Prairie (2026)").
-//   3. Rows whose movie flag disagrees with the type of entry they're pinned to.
-//   4. With TMDB_TOKEN set: every pinned entry's official TMDB name, the copies
-//      whose title differs from it, and pins TMDB no longer serves (404).
-//   5. The shared rows (normalizing): shows, cast rows, copies whose show has
-//      no shared row yet, and whether the leftover per-copy columns are gone.
+//   1. Copies with no tmdb_id. There should be none; any listed predates the
+//      rule or slipped past it.
+//   2. Copies whose entry has no shared row, or a row with no name: with no
+//      title of its own, such a copy would show nameless.
+//   3. Copies whose movie flag disagrees with the type of their entry.
+//   4. With TMDB_TOKEN set: shared rows whose name differs from TMDB's
+//      official one, and pins TMDB no longer serves (404).
+//   5. Leftovers the cleanups remove: per-copy fact columns, a per-copy
+//      title, old per-copy cast rows.
 //
 // Member memos (notes, watching-with, recommended-by) and login emails are
 // never selected.
@@ -71,15 +68,6 @@ function query(sql) {
   return (block && block.results) || [];
 }
 
-// ---- title matching (mirrors the app's matcher: case and spaces ignored,
-// a trailing "(YYYY)" is a year hint rather than part of the name) ----
-
-function terms(title) {
-  const t = String(title || '').replace(/\s+/g, ' ').trim();
-  const m = t.match(/^(.*\S)\s*\((\d{4})\)$/);
-  return m ? { name: m[1].toLowerCase(), year: Number(m[2]) } : { name: t.toLowerCase(), year: null };
-}
-
 // ---- TMDB (optional) ----
 
 async function tmdb(path, attempt = 0) {
@@ -109,97 +97,43 @@ async function pool(items, size, fn) {
 // ---- the audit ----
 
 const ACTIVE_MEMBER = `JOIN members m ON m.slug = s.member_slug AND COALESCE(m.disabled, 0) = 0`;
+const TYPE_OF = `COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)`;
+const ENTRY = `LEFT JOIN titles t ON t.tmdb_id = s.tmdb_id AND t.tmdb_type = ${TYPE_OF}`;
 const report = { generated_at: new Date().toISOString(), source: DB_FILE ? `file:${DB_FILE}` : 'production D1' };
 
 const [summary] = query(`SELECT COUNT(*) AS rows,
     COUNT(DISTINCT s.member_slug) AS members,
     SUM(s.tmdb_id IS NOT NULL) AS pinned,
     SUM(s.tmdb_id IS NULL) AS unpinned,
-    SUM(s.tmdb_id IS NULL AND COALESCE(s.archived, 0) = 0) AS unpinned_active,
-    COUNT(DISTINCT CASE WHEN s.tmdb_id IS NOT NULL THEN s.tmdb_type || ':' || s.tmdb_id END) AS entries
+    COUNT(DISTINCT CASE WHEN s.tmdb_id IS NOT NULL THEN ${TYPE_OF} || ':' || s.tmdb_id END) AS entries
   FROM shows s ${ACTIVE_MEMBER}`);
 report.summary = summary;
 
-const unpinned = query(`SELECT s.id, s.member_slug AS member, s.title, s.movie, COALESCE(s.archived, 0) AS archived,
-    s.list, NULL AS release_year, s.network, 0 AS has_poster
-  FROM shows s ${ACTIVE_MEMBER} WHERE s.tmdb_id IS NULL ORDER BY LOWER(s.title), s.member_slug`);
-// (An unmatched copy has no shared row, so no year or poster: since the
-// 2026-10-05 cleanup the copy can't hold them either.)
+report.unpinned = query(`SELECT s.id, s.member_slug AS member, s.movie, COALESCE(s.archived, 0) AS archived, s.list
+  FROM shows s ${ACTIVE_MEMBER} WHERE s.tmdb_id IS NULL ORDER BY s.member_slug, s.id`);
 
-const pinnedTitles = query(`SELECT LOWER(TRIM(s.title)) AS ltitle, s.title, s.tmdb_id, s.tmdb_type,
-    MIN(t.release_year) AS release_year, COUNT(*) AS copies
-  FROM shows s ${ACTIVE_MEMBER}
-  LEFT JOIN titles t ON t.tmdb_id = s.tmdb_id
-    AND t.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)
-  WHERE s.tmdb_id IS NOT NULL
-  GROUP BY LOWER(TRIM(s.title)), s.tmdb_id, s.tmdb_type`);
+report.nameless = query(`SELECT s.id, s.member_slug AS member, ${TYPE_OF} AS tmdb_type, s.tmdb_id,
+    CASE WHEN t.tmdb_id IS NULL THEN 'no shared row' ELSE 'no name' END AS problem
+  FROM shows s ${ACTIVE_MEMBER} ${ENTRY}
+  WHERE s.tmdb_id IS NOT NULL AND (t.tmdb_id IS NULL OR COALESCE(TRIM(t.name), '') = '')
+  ORDER BY s.member_slug, s.id`);
 
-// name → the distinct entries pinned under that name
-const byName = new Map();
-for (const p of pinnedTitles) {
-  const { name } = terms(p.title);
-  const key = name;
-  const list = byName.get(key) || [];
-  if (!list.some((e) => e.tmdb_id === p.tmdb_id && e.tmdb_type === p.tmdb_type)) {
-    list.push({ tmdb_id: p.tmdb_id, tmdb_type: p.tmdb_type, release_year: p.release_year, example_title: p.title });
-  }
-  byName.set(key, list);
-}
-
-const classified = unpinned.map((r) => {
-  const { name, year } = terms(r.title);
-  let candidates = byName.get(name) || [];
-  const wantType = r.movie ? 'movie' : 'tv';
-  // A "(YYYY)" suffix picks among same-named entries.
-  if (candidates.length > 1 && year) {
-    const hinted = candidates.filter((c) => c.release_year === year);
-    if (hinted.length) candidates = hinted;
-  }
-  // Prefer entries of the row's own type when both exist.
-  if (candidates.length > 1) {
-    const sameType = candidates.filter((c) => c.tmdb_type === wantType);
-    if (sameType.length) candidates = sameType;
-  }
-  const status = !candidates.length ? 'none' : candidates.length === 1 ? 'copyable' : 'ambiguous';
-  const out = { ...r, archived: !!r.archived, has_poster: !!r.has_poster, status, candidates };
-  if (status === 'copyable' && candidates[0].tmdb_type !== wantType) out.type_differs = true;
-  return out;
-});
-report.unpinned = classified;
-
-const titleSplits = query(`SELECT s.tmdb_type, s.tmdb_id, COUNT(*) AS copies,
-    COUNT(DISTINCT s.title) AS titles, GROUP_CONCAT(DISTINCT s.title) AS title_list
-  FROM shows s ${ACTIVE_MEMBER} WHERE s.tmdb_id IS NOT NULL
-  GROUP BY s.tmdb_type, s.tmdb_id HAVING COUNT(DISTINCT s.title) > 1
-  ORDER BY copies DESC`);
-report.title_splits = titleSplits;
-
-const typeMismatch = query(`SELECT s.id, s.member_slug AS member, s.title, s.movie, s.tmdb_type, s.tmdb_id
-  FROM shows s ${ACTIVE_MEMBER}
+report.type_mismatch = query(`SELECT s.id, s.member_slug AS member, t.name AS title, s.movie, s.tmdb_type, s.tmdb_id
+  FROM shows s ${ACTIVE_MEMBER} ${ENTRY}
   WHERE s.tmdb_id IS NOT NULL AND ((s.tmdb_type = 'movie' AND COALESCE(s.movie, 0) = 0) OR (s.tmdb_type = 'tv' AND s.movie = 1))
-  ORDER BY LOWER(s.title)`);
-report.type_mismatch = typeMismatch;
+  ORDER BY LOWER(t.name)`);
 
-// Normalizing (docs/ARCHITECTURE.md#titles): the show's facts live once per
-// entry in `titles`, its cast in `title_cast`. The leftover per-copy columns
-// were dropped 2026-10-05; the check stays so a database restored from an
-// older backup says so.
 const [norm] = query(`SELECT
     (SELECT COUNT(*) FROM titles) AS entries,
     (SELECT COUNT(*) FROM title_cast) AS cast_rows,
-    (SELECT COUNT(*) FROM shows s ${ACTIVE_MEMBER} WHERE s.tmdb_id IS NOT NULL) AS rows,
-    (SELECT COUNT(*) FROM shows s ${ACTIVE_MEMBER} WHERE s.tmdb_id IS NOT NULL AND NOT EXISTS (
-       SELECT 1 FROM titles t WHERE t.tmdb_id = s.tmdb_id
-         AND t.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END))) AS rows_without_entry,
     (SELECT COUNT(*) FROM actors) AS leftover_actor_rows,
-    (SELECT COUNT(*) FROM pragma_table_info('shows') WHERE name IN ('overview', 'poster_url', 'genres')) AS leftover_columns`);
+    (SELECT COUNT(*) FROM pragma_table_info('shows') WHERE name IN ('overview', 'poster_url', 'genres')) AS leftover_columns,
+    (SELECT COUNT(*) FROM pragma_table_info('shows') WHERE name = 'title') AS copy_title_column`);
 report.normalization = norm;
 
 // Official names (optional).
 if (TMDB_TOKEN) {
-  const pinned = query(`SELECT s.id, s.member_slug AS member, s.title, s.tmdb_type, s.tmdb_id, COALESCE(s.archived, 0) AS archived
-    FROM shows s ${ACTIVE_MEMBER} WHERE s.tmdb_id IS NOT NULL AND s.tmdb_type IN ('tv', 'movie')`);
-  const entries = [...new Map(pinned.map((p) => [`${p.tmdb_type}:${p.tmdb_id}`, p])).values()];
+  const entries = query(`SELECT tmdb_type, tmdb_id, name FROM titles WHERE tmdb_type IN ('tv', 'movie')`);
   process.stderr.write(`Looking up ${entries.length} TMDB entries…\n`);
   const names = new Map();
   let done = 0;
@@ -208,25 +142,10 @@ if (TMDB_TOKEN) {
     names.set(`${e.tmdb_type}:${e.tmdb_id}`, d ? (e.tmdb_type === 'movie' ? d.title : d.name) : null);
     if (++done % 100 === 0) process.stderr.write(`  ${done}/${entries.length}\n`);
   });
-  report.dead_pins = entries.filter((e) => names.get(`${e.tmdb_type}:${e.tmdb_id}`) === null)
-    .map((e) => ({ tmdb_type: e.tmdb_type, tmdb_id: e.tmdb_id, example_title: e.title }));
-  report.name_mismatch = pinned
-    .map((p) => ({ ...p, archived: !!p.archived, tmdb_name: names.get(`${p.tmdb_type}:${p.tmdb_id}`) }))
-    .filter((p) => p.tmdb_name && p.tmdb_name !== p.title);
-
-  // Suggestions for rows nothing in the club can vouch for.
-  const none = classified.filter((r) => r.status === 'none');
-  await pool(none, 5, async (r) => {
-    const type = r.movie ? 'movie' : 'tv';
-    const { name } = terms(r.title);
-    const hit = async (t) => {
-      const d = await tmdb(`/search/${t}?query=${encodeURIComponent(name)}&language=en-US`);
-      const top = d && d.results && d.results[0];
-      return top ? { tmdb_type: t, tmdb_id: top.id, tmdb_name: t === 'movie' ? top.title : top.name,
-        date: (t === 'movie' ? top.release_date : top.first_air_date) || null } : null;
-    };
-    r.suggestion = (await hit(type)) || (await hit(type === 'movie' ? 'tv' : 'movie'));
-  });
+  report.dead_pins = entries.filter((e) => names.get(`${e.tmdb_type}:${e.tmdb_id}`) === null);
+  report.name_mismatch = entries
+    .map((e) => ({ ...e, tmdb_name: names.get(`${e.tmdb_type}:${e.tmdb_id}`) }))
+    .filter((e) => e.tmdb_name && e.tmdb_name !== e.name);
 }
 
 // ---- printing ----
@@ -241,39 +160,35 @@ function section(title, rows, fmt) {
 
 const s = report.summary;
 line(`TMDB audit — ${report.source}`);
-line(`${s.rows} shows across ${s.members} members: ${s.pinned} have a TMDB id, ${s.unpinned} don't (${s.unpinned_active} of those active).`);
+line(`${s.rows} shows across ${s.members} members: ${s.pinned} have a TMDB id, ${s.unpinned} don't.`);
 line(`${s.entries} distinct TMDB entries.`);
 
-const byStatus = (st) => classified.filter((r) => r.status === st);
-section('No TMDB id, another copy has one: copyable', byStatus('copyable'), (r) =>
-  `#${r.id} ${r.member} · "${r.title}" (${flagOf(r)}) → ${r.candidates[0].tmdb_type}:${r.candidates[0].tmdb_id}`
-  + ` "${r.candidates[0].example_title}"${r.type_differs ? ' [entry is the other type]' : ''}`);
-section('No TMDB id, same title pinned to more than one entry: needs a person', byStatus('ambiguous'), (r) =>
-  `#${r.id} ${r.member} · "${r.title}" (${flagOf(r)}) → ${r.candidates.map((c) => `${c.tmdb_type}:${c.tmdb_id} (${c.release_year ?? '?'})`).join(' or ')}`);
-section('No TMDB id, nothing in the club to copy', byStatus('none'), (r) =>
-  `#${r.id} ${r.member} · "${r.title}" (${flagOf(r)})`
-  + (r.suggestion ? ` → TMDB suggests ${r.suggestion.tmdb_type}:${r.suggestion.tmdb_id} "${r.suggestion.tmdb_name}" (${r.suggestion.date || 'no date'})`
-    : TMDB_TOKEN ? ' → TMDB has no match' : ''));
-section('One entry, different titles across copies', titleSplits, (r) =>
-  `${r.tmdb_type}:${r.tmdb_id} · ${r.copies} copies · ${r.title_list.split(',').map((t) => `"${t}"`).join(' / ')}`);
-section('Movie flag disagrees with the pinned entry\'s type', typeMismatch, (r) =>
+section('Copies with no TMDB id (should be none)', report.unpinned, (r) =>
+  `#${r.id} ${r.member} (${flagOf(r)})`);
+section('Copies that would show nameless: no shared row, or one with no name', report.nameless, (r) =>
+  `#${r.id} ${r.member} · ${r.tmdb_type}:${r.tmdb_id} · ${r.problem}`);
+section('Movie flag disagrees with the pinned entry\'s type', report.type_mismatch, (r) =>
   `#${r.id} ${r.member} · "${r.title}" saved as ${r.movie ? 'movie' : 'tv'}, pinned to ${r.tmdb_type}:${r.tmdb_id}`);
 
 if (TMDB_TOKEN) {
-  section('Title differs from TMDB\'s official name', report.name_mismatch, (r) =>
-    `#${r.id} ${r.member} · "${r.title}" → "${r.tmdb_name}" (${r.tmdb_type}:${r.tmdb_id}${r.archived ? ', archived' : ''})`);
+  section('Shared name differs from TMDB\'s official name', report.name_mismatch, (r) =>
+    `${r.tmdb_type}:${r.tmdb_id} "${r.name}" → "${r.tmdb_name}"`);
   section('Pinned to an entry TMDB no longer serves', report.dead_pins, (r) =>
-    `${r.tmdb_type}:${r.tmdb_id} "${r.example_title}"`);
+    `${r.tmdb_type}:${r.tmdb_id} "${r.name}"`);
 } else {
-  line('\n(Set TMDB_TOKEN to also compare every title with TMDB\'s official name, find dead pins, and get suggestions for unmatched rows.)');
+  line('\n(Set TMDB_TOKEN to also compare every name with TMDB\'s official one and find dead pins.)');
 }
 
 const n = report.normalization;
 line('\n== Shared show rows');
-line(`  ${n.rows} pinned copies → ${n.entries} shows; ${n.cast_rows} shared cast rows.`);
-if (n.rows_without_entry) line(`  ${n.rows_without_entry} copies point at a show with no shared row (the nightly rebuild adds them).`);
-line(n.leftover_columns
-  ? `  Leftover per-copy columns are still on \`shows\`, and ${n.leftover_actor_rows} old per-copy cast rows: nothing reads them; the cleanup drops them.`
+line(`  ${s.pinned} pinned copies → ${n.entries} shows; ${n.cast_rows} shared cast rows.`);
+const leftovers = [
+  n.leftover_columns ? 'per-copy fact columns' : null,
+  n.copy_title_column ? 'a per-copy title column' : null,
+  n.leftover_actor_rows ? `${n.leftover_actor_rows} old per-copy cast rows` : null,
+].filter(Boolean);
+line(leftovers.length
+  ? `  Still on \`shows\`: ${leftovers.join(', ')}. Nothing reads them; the cleanup script drops them.`
   : '  No leftover per-copy columns.');
 
 if (JSON_OUT) {

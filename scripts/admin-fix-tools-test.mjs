@@ -216,10 +216,9 @@ console.log('\n== edits that aren\'t about identity keep the pin');
 
   const named = await run(env, 'admin_update_show', { member_slug: 'christine', show_id: id, title: 'Little House on the Prairie (2026)' });
   r = row(env, id);
-  // The copy keeps the title it was given, but members see TMDB's name: a
-  // show is its entry (docs/INVARIANTS.md §29).
-  const raw = env._db.prepare('SELECT title FROM shows WHERE id = ?').get(id);
-  check('a rename is stored on this copy', !named.err && raw.title === 'Little House on the Prairie (2026)', named.err?.message || raw.title);
+  // A copy has no title of its own: a new title re-matches the show, and
+  // members see TMDB's name for whatever it lands on (docs/INVARIANTS.md §29).
+  check('a rename re-matches rather than storing a title on the copy', !named.err, named.err?.message);
   check('but members still see TMDB\'s name', r.title === TITLE, r.title);
   check('and keeps the pin', r.tmdb_id === REMAKE);
 

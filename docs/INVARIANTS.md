@@ -1166,7 +1166,14 @@ show's details, kept in step by propagation code, so two members could see
   aside and returns them as `unmatched_titles`, which the web and iOS show at
   the end to add by hand; iOS's offline queue keeps a queued add through a
   TMDB outage and says so when one has no match. The Apple TV and Roku "add as
-  typed" buttons are gone. The per-copy `title` column goes next.
+  typed" buttons are gone.
+- **A copy has no title of its own.** `shows_v.title` is the shared row's name
+  (migration 083), a shared row is only ever created with TMDB's name (never
+  from a copy), and no code reads or matches a title on the raw `shows`
+  table: same-show matching there is by entry alone (`hasTitle: false` in
+  `_shared/same-show.js`). The column itself is dropped by an operator
+  script, `~/ShowPickerBackups/cleanup-titles-show-picker.sh`; until then the
+  two insert paths retry with the name if production still demands it.
 - **A gap is the show's, not the copy's.** The enrichment passes decide what
   to fetch from the shared row. A copy that a fresher one has already filled
   isn't refetched, and an unmatched copy gets looked up and pinned rather
@@ -1178,6 +1185,8 @@ migration/code parity, shared vs per-member fields; `admin-fix-tools-test.mjs`
 for the write paths; `same-show-test.mjs` for the TMDB-entry rule on add and
 edit, and `import-list-test.mjs` for the import's unmatched list. Suites that
 add shows use the stand-in TMDB in `scripts/lib/fake-tmdb.mjs`.
+`check-static.sh` fails a PR whose SQL reads a title off the raw `shows`
+table.
 
 ## Adding an invariant
 

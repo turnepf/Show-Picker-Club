@@ -52,12 +52,11 @@ Login is by passkey, one-time code, or Sign in with Apple — there are no store
 - `webauthn_challenges` (migration 062) — single-use challenges (`purpose` = `register` | `authenticate`, `member_slug` set for registration only, `ip`, `expires_at`). Rows are deleted as they're consumed and swept when they expire, so the table stays near-empty.
 
 ### `shows`
-A member's copy of a show: only what is theirs. The show's own facts (artwork, overview, genres, rating, seasons, cast) live once per TMDB entry in [`titles`](#titles--title_cast-migration-076-normalizing-step-1), and members read both through the `shows_v` view. The 23 columns that repeated those facts on every copy were dropped 2026-10-05 (normalizing step 3c-2b); their descriptions moved to the `titles` section.
+A member's copy of a show: only what is theirs. The show's own facts (artwork, overview, genres, rating, seasons, cast) live once per TMDB entry in [`titles`](#titles--title_cast-migration-076-normalizing-step-1), and members read both through the `shows_v` view. The 23 columns that repeated those facts on every copy were dropped 2026-10-05 (normalizing step 3c-2b); their descriptions moved to the `titles` section. A copy has no title either: every show is a TMDB entry, `shows_v.title` is `titles.name` (migration 083), and the column is dropped by `~/ShowPickerBackups/cleanup-titles-show-picker.sh`.
 
 | Column              | Type | Notes |
 |---------------------|------|-------|
 | `id`                | INTEGER PK | |
-| `title`             | TEXT NOT NULL | |
 | `network`           | TEXT | |
 | `network_url`       | TEXT | Deep link to show on network site (or a search-page placeholder until upgraded). |
 | `recommended_by`    | TEXT | Free-text attribution. |
@@ -75,7 +74,7 @@ A member's copy of a show: only what is theirs. The show's own facts (artwork, o
 | `added_by`          | TEXT | `'seed'` for seeded shows, otherwise editor email or `'Anonymous'` for public suggestions. |
 | `enriched_at`       | TEXT | Bumped by TMDB enrichment so enrichment can prioritize stale rows. |
 | `sort_order`        | INTEGER | Position for the member's "My Order" manual sort (migration 033). NULL = never manually placed. Written only by `POST /api/shows/reorder`, which deliberately does **not** bump `updated_at`. |
-| `tmdb_id`           | INTEGER | TMDB's id for the matched title. Migration 049. Canonical cross-member join key: a member rating table keys off `(tmdb_id, tmdb_type)` rather than any one member's row, so every member's independent copy of the same show shares one rating pool. Captured on insert/edit whenever enrichment resolves a match (`_shared/enrichment.js`'s `enrichFromTmdbId`/`fetchEnrichment` now return it). Since 2026-08, the `/api/enrich` rotation also persists the id it resolves — TV and movie passes alike, fill-only and title-scoped, so seeded rows and other members' copies pick it up without being the row the rotation happened to select. It self-heals from then on; `/api/admin-tmdb-backfill` remains for a deliberate one-shot sweep, and `tmdb_backfill_ignores` still exempts titles TMDB genuinely doesn't have. |
+| `tmdb_id`           | INTEGER | TMDB's id for the matched title. Migration 049. Canonical cross-member join key: a member rating table keys off `(tmdb_id, tmdb_type)` rather than any one member's row, so every member's independent copy of the same show shares one rating pool. Captured on insert/edit whenever enrichment resolves a match (`_shared/enrichment.js`'s `enrichFromTmdbId`/`fetchEnrichment` now return it). Since 2026-08, the `/api/enrich` rotation also persists the id it resolves — TV and movie passes alike, fill-only and title-scoped, so seeded rows and other members' copies pick it up without being the row the rotation happened to select. It self-heals from then on. Since 2026-10 every copy has one from the start (an add TMDB can't identify is refused), and `/api/admin-tmdb-backfill` and `tmdb_backfill_ignores` are gone. |
 | `tmdb_type`         | TEXT | `movie` or `tv`, alongside `tmdb_id` — TMDB ids aren't unique across the two (movie #550 and tv #550 are different titles), so the pair is the real key. Migration 049. |
 
 ### `actors`
@@ -571,7 +570,6 @@ drained once, so it deliberately has no button in the app.
 | `POST /api/admin-dupe-check`           | `functions/api/admin-dupe-check.js`        | POST    | admin session or `CRON_SECRET` header — monthly possible-duplicate scan, emails Patrick |
 | `POST /api/admin-vibe-fill`            | `functions/api/admin-vibe-fill.js`         | POST    | admin session or `CRON_SECRET` header |
 | `POST /api/admin-url-cleanup`          | `functions/api/admin-url-cleanup.js`       | POST    | admin session |
-| `POST /api/admin-tmdb-backfill`        | `functions/api/admin-tmdb-backfill.js`     | POST    | admin session — one-time `tmdb_id`/`tmdb_type` backfill for rows added before migration 049; call repeatedly until `remaining` is 0, then review `unresolved` manually |
 | `POST /api/admin-sms-test`             | `functions/api/admin-sms-test.js`          | POST    | admin session |
 | `POST /api/admin-fill-watch-urls`      | `functions/api/admin-fill-watch-urls.js`   | POST    | admin session or `CRON_SECRET` header |
 | `POST /api/admin-demo-reset`           | `functions/api/admin-demo-reset.js`        | POST    | admin session or `CRON_SECRET` header |

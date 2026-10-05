@@ -21,7 +21,6 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
-import { withLegacyShowColumns } from './lib/seed-titles.mjs';
 import { Stmt } from './lib/d1.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -47,13 +46,19 @@ function makeEnv() {
 }
 
 // A member's copy: only member fields and the pin.
+// A copy, production's shape: no title of its own. `o.title` names the show
+// the way the writers do, on its shared row (when the copy has an entry).
 function show(env, o) {
+  const type = o.type === undefined ? (o.tmdb ? (o.movie ? 'movie' : 'tv') : null) : o.type;
   const r = env._db.prepare(
-    `INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, notes, network, full_series, enriched_at, updated_at)
-     VALUES (?, 'watching', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(o.title, o.member || 'a', o.movie ? 1 : 0, o.tmdb ?? null,
-    o.type === undefined ? (o.tmdb ? (o.movie ? 'movie' : 'tv') : null) : o.type,
+    `INSERT INTO shows (list, member_slug, movie, tmdb_id, tmdb_type, notes, network, full_series, enriched_at, updated_at)
+     VALUES ('watching', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(o.member || 'a', o.movie ? 1 : 0, o.tmdb ?? null, type,
     o.notes ?? null, o.network ?? null, o.full ?? 0, o.enriched ?? null, o.updated ?? null);
+  if (o.title && o.tmdb && !o.unnamed) {
+    env._db.prepare('INSERT OR IGNORE INTO titles (tmdb_type, tmdb_id, name) VALUES (?, ?, ?)')
+      .run(type || (o.movie ? 'movie' : 'tv'), o.tmdb, o.title);
+  }
   return Number(r.lastInsertRowid);
 }
 const title = (env, type, id) => env._db.prepare('SELECT * FROM titles WHERE tmdb_type = ? AND tmdb_id = ?').get(type, id);
@@ -61,44 +66,50 @@ const cast = (env, type, id) => env._db.prepare('SELECT name FROM title_cast WHE
 const v = (env, id) => env._db.prepare('SELECT * FROM shows_v WHERE id = ?').get(id);
 const norm = (x) => x.replace(/\s+/g, ' ').trim();
 
-console.log('\n== every entry a copy points at has a row');
+console.log('\n== a shared row starts only from TMDB\'s name');
 {
+  // A copy has no title of its own (every show is a TMDB entry), so a shared
+  // row is never created or named from a copy: the writers create it with
+  // TMDB's name, and the rebuild only drops rows nothing points at.
   const env = makeEnv();
-  show(env, { title: 'Severance', member: 'a', tmdb: 95396, enriched: '2026-09-01 00:00:00', notes: 'SECRET' });
-  show(env, { title: 'severance', member: 'b', tmdb: 95396, enriched: '2026-10-01 00:00:00' });
-  show(env, { title: 'Frances Ha', member: 'c', movie: true, tmdb: 121986, type: null });
-  show(env, { title: 'Unmatched', member: 'c' });
+  show(env, { title: 'Severance', member: 'a', tmdb: 95396, notes: 'SECRET' });
+  show(env, { member: 'b', tmdb: 95396 });
+  show(env, { member: 'c', movie: true, tmdb: 121986, type: null, unnamed: true });
   const counts = await rebuildTitles(env);
-  check('one row per entry', counts.titles === 2, JSON.stringify(counts));
-  check('named from the freshest copy until TMDB names it', title(env, 'tv', 95396).name === 'severance');
+  check('the rebuild creates nothing from copies', counts.titles === 1, JSON.stringify(counts));
+  check('a named entry keeps its name', title(env, 'tv', 95396).name === 'Severance');
   check('carrying no facts of its own (those arrive from TMDB)', title(env, 'tv', 95396).overview === null);
-  check('a row with no stored type is keyed by its movie flag', !!title(env, 'movie', 121986) && !title(env, 'tv', 121986));
+  check('an entry with no name gets no row from a sync', (await syncTitle(env, 'movie', 121986)) === true && !title(env, 'movie', 121986));
+  check('nor from a writer with no name', (await writeTitle(env, 'movie', 121986, { fields: { overview: 'x' } })) === false && !title(env, 'movie', 121986));
+  await writeTitle(env, 'movie', 121986, { name: 'Frances Ha' });
+  check('a writer with TMDB\'s name creates it, keyed by the movie flag when the type is missing',
+    title(env, 'movie', 121986)?.name === 'Frances Ha' && !title(env, 'tv', 121986));
   const cols = env._db.prepare("SELECT name FROM pragma_table_info('titles')").all().map((r) => r.name);
   check('no member field is a column', !['notes', 'list', 'network', 'network_url', 'watching_with', 'recommended_by', 'added_by', 'member_slug', 'archived'].some((c) => cols.includes(c)), cols.join(','));
   check('every catalog field is a column', TITLE_FIELDS.every((f) => cols.includes(f)));
   check('memo text never lands in the shared tables', !JSON.stringify(env._db.prepare('SELECT * FROM titles').all()).includes('SECRET'));
 
   env._db.prepare("INSERT INTO title_cast (tmdb_type, tmdb_id, ord, name) VALUES ('movie', 121986, 0, 'Greta Gerwig')").run();
-  env._db.prepare("UPDATE shows SET tmdb_id = 999, tmdb_type = 'movie' WHERE title = 'Frances Ha'").run();
+  env._db.prepare("UPDATE shows SET tmdb_id = 999, tmdb_type = 'movie' WHERE tmdb_id = 121986").run();
   await rebuildTitles(env);
-  check('an entry nothing points at is dropped', !title(env, 'movie', 121986) && !!title(env, 'movie', 999));
+  check('an entry nothing points at is dropped', !title(env, 'movie', 121986));
   check('with its cast', cast(env, 'movie', 121986) === '');
 }
 
 console.log('\n== the sync never overwrites');
 {
   const env = makeEnv();
-  show(env, { title: 'little house on the prairie (2026)', tmdb: 283304 });
-  check('creates a missing row', await syncTitle(env, 'tv', 283304) === true && !!title(env, 'tv', 283304));
+  show(env, { tmdb: 283304 });
+  check('creates a missing row when given a name', await syncTitle(env, 'tv', 283304, 'Little House on the Prairie (2026)') === true && !!title(env, 'tv', 283304));
   await writeTitle(env, 'tv', 283304, { name: 'Little House on the Prairie', fields: { overview: 'TMDB text' } });
-  await syncTitle(env, 'tv', 283304, 'something a copy says');
+  await syncTitle(env, 'tv', 283304, 'something else');
   check('keeps TMDB\'s name and facts', title(env, 'tv', 283304).name === 'Little House on the Prairie' && title(env, 'tv', 283304).overview === 'TMDB text');
   await rebuildTitles(env);
   check('so does the rebuild', title(env, 'tv', 283304).name === 'Little House on the Prairie' && title(env, 'tv', 283304).overview === 'TMDB text');
   check('an entry no copy points at isn\'t created', (await syncTitle(env, 'tv', 1, 'Ghost')) === true && !title(env, 'tv', 1));
   check('bad input is refused quietly', (await syncTitle(env, 'film', 5)) === false && (await syncTitle(env, 'tv', 'x')) === false);
   const broken = { DB: { prepare: () => { throw new Error('D1 down'); } } };
-  check('a database error never throws', (await syncTitle(broken, 'tv', 283304)) === false);
+  check('a database error never throws', (await syncTitle(broken, 'tv', 283304, 'x')) === false);
 }
 
 console.log('\n== writers write TMDB\'s payload directly');
@@ -168,7 +179,9 @@ console.log('\n== the views');
   check('member fields stay the member\'s', v(env, a).notes === 'MINE' && v(env, a).network === 'HBO Max' && v(env, b).network === 'Max' && v(env, a).member_slug === 'a');
   check('so do the per-member fields, the "Series complete" toggle included', v(env, a).next_season_date === '2026-12-01' && v(env, b).next_season_date === null
     && v(env, a).network_logo_url === 'https://image.tmdb.org/hbo.png' && v(env, a).full_series === 1 && v(env, b).full_series === 0);
-  check('a copy no entry backs reads its own title and no facts', v(env, lone).title === 'Unmatched Thing' && v(env, lone).overview === null);
+  // A copy no entry backs can't be created any more; one left over shows no
+  // name of its own (a copy has none) and no facts, never a guess.
+  check('a copy no entry backs reads no title of its own and no facts', v(env, lone).title === null && v(env, lone).overview === null);
   const castOf = (id) => env._db.prepare('SELECT name FROM actors_v WHERE show_id = ? ORDER BY ord').all(id).map((r) => r.name).join(',');
   check('every copy reads the shared cast', castOf(a) === 'James Gandolfini,Edie Falco' && castOf(b) === castOf(a), castOf(a));
   env._db.prepare("INSERT INTO actors (show_id, name, ord) VALUES (?, 'Old Copy Cast', 0)").run(lone);

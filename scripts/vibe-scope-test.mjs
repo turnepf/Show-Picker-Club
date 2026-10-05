@@ -37,6 +37,8 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { Stmt } from './lib/d1.mjs';
+import { withLegacyShowColumns } from './lib/seed-titles.mjs';
+import { tmdbIdFor } from './lib/fake-tmdb.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = mkdtempSync(join(tmpdir(), 'vibe-scope-'));
@@ -67,6 +69,7 @@ function check(name, cond, detail = '') {
 function makeEnv() {
   const db = new DatabaseSync(':memory:');
   db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
+  withLegacyShowColumns(db);
   return {
     DB: { prepare: (sql) => new Stmt(db, sql) },
     _db: db,
@@ -105,10 +108,11 @@ function addShow(env, { slug, title, list = 'watching', archived = 0, addedBy = 
 // Every trait defaults to 0.5; `lean` nudges the few that decide a cluster, so
 // two fixtures can be told apart without spelling out 26 columns each.
 function addTraits(env, title, lean = {}) {
-  // Fixture shows are unpinned, so each one's key is its title (migration 081).
+  // Fixture shows are pinned where the stand-in TMDB puts their title
+  // (scripts/lib/seed-titles.mjs), so that entry is the key (migration 081).
   const cols = ['show_key', 'title', ...TRAIT_NAMES, 'scored_at'];
   const values = [
-    'title:' + title.trim().toLowerCase(), title,
+    'tv:' + tmdbIdFor(title, 'tv'), title,
     ...TRAIT_NAMES.map((t) => (typeof lean[t] === 'number' ? lean[t] : 0.5)),
     '2026-08-02T00:00:00Z',
   ];

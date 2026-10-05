@@ -29,6 +29,12 @@ function showId(show) {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
+// `hasTitle: false` is for the raw `shows` table, which has no title of its
+// own (every copy is a TMDB entry, 2026-10): there, a show is matched by its
+// entry alone, and a show with no entry matches nothing. shows_v (whose title
+// is TMDB's name) and group_suggestions (a card's snapshot) keep the title
+// fallback for a show that arrives without an id.
+
 // WHERE fragment matching rows (alias `a`) that are copies of `show`.
 // A pinned show matches rows pinned to the same entry, plus unpinned rows
 // carrying its title. An unpinned show matches by title alone.
@@ -36,15 +42,17 @@ function showId(show) {
 // forWrite: true is for a write fanning out from an unpinned show — a guess
 // made from its title — which must stop at copies that are pinned, since
 // those already know which show they are.
-export function sameShowWhere(a, show, { hasType = true, forWrite = false } = {}) {
+export function sameShowWhere(a, show, { hasType = true, forWrite = false, hasTitle = true } = {}) {
   const id = showId(show);
   const title = String(show?.title || '');
   if (!id) {
+    if (!hasTitle) return { sql: '0', binds: [] };
     const sql = `LOWER(${a}.title) = LOWER(?)`;
     return { sql: forWrite ? `(${a}.tmdb_id IS NULL AND ${sql})` : sql, binds: [title] };
   }
   const type = showType(show);
   const idSql = type ? `(${a}.tmdb_id = ? AND ${typeSql(a, hasType)} = ?)` : `${a}.tmdb_id = ?`;
+  if (!hasTitle) return { sql: idSql, binds: type ? [id, type] : [id] };
   return {
     sql: `(${idSql} OR (${a}.tmdb_id IS NULL AND LOWER(${a}.title) = LOWER(?)))`,
     binds: type ? [id, type, title] : [id, title],
@@ -52,16 +60,19 @@ export function sameShowWhere(a, show, { hasType = true, forWrite = false } = {}
 }
 
 // Join predicate: rows `a` and `b` are the same show.
-export function sameShowJoin(a, b) {
-  return `((${a}.tmdb_id IS NOT NULL AND ${b}.tmdb_id IS NOT NULL
-      AND ${a}.tmdb_id = ${b}.tmdb_id AND ${typeSql(a)} = ${typeSql(b)})
+export function sameShowJoin(a, b, { hasTitle = true } = {}) {
+  const byId = `(${a}.tmdb_id IS NOT NULL AND ${b}.tmdb_id IS NOT NULL
+      AND ${a}.tmdb_id = ${b}.tmdb_id AND ${typeSql(a)} = ${typeSql(b)})`;
+  if (!hasTitle) return byId;
+  return `(${byId}
     OR ((${a}.tmdb_id IS NULL OR ${b}.tmdb_id IS NULL) AND LOWER(${a}.title) = LOWER(${b}.title)))`;
 }
 
-// Grouping key: one value per show across members.
-export function showKeySql(a) {
+// Grouping key: one value per show across members. On the raw table a copy
+// with no entry (none exist now) keys by its own id rather than a title.
+export function showKeySql(a, { hasTitle = true } = {}) {
   return `CASE WHEN ${a}.tmdb_id IS NOT NULL THEN ${typeSql(a)} || ':' || ${a}.tmdb_id
-    ELSE 'title:' || LOWER(TRIM(${a}.title)) END`;
+    ELSE ${hasTitle ? `'title:' || LOWER(TRIM(${a}.title))` : `'row:' || ${a}.id`} END`;
 }
 
 // The same rule in JS, for rows already in memory.
