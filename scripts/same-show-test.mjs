@@ -281,5 +281,21 @@ console.log('URL cleanup by show');
   check('saving A\'s link reaches A\'s copies only', saved.updated === 1 && urlOf(a) && !urlOf(b), JSON.stringify(saved));
 }
 
+// ---- adding inherits a link only from the same show ----
+
+console.log('link inheritance on add');
+{
+  const env = makeEnv();
+  addMember(env, 'amy');
+  const pat = addMember(env, 'pat');
+  const a = addShow(env, { slug: 'amy', tmdbId: A });
+  env._db.prepare("UPDATE shows SET network = 'Peacock', network_url = 'https://www.peacocktv.com/watch/asset/movies/a' WHERE id = ?").run(a);
+  const res = await showsApi.onRequestPost(ctx(env, req('/api/shows', { cookie: pat, method: 'POST',
+    body: { title: 'The Odyssey', list: 'next', movie: 1, tmdb_id: B, tmdb_type: 'movie' } })));
+  const added = env._db.prepare("SELECT network_url FROM shows WHERE member_slug = 'pat'").get();
+  check('a new copy of B doesn\'t inherit A\'s watch link', res.status !== 409 && !(added?.network_url || '').includes('/movies/a'),
+    JSON.stringify(added));
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

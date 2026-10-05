@@ -766,15 +766,15 @@ export async function onRequestPost(context) {
   // How many titles still hold no data. Counted DISTINCT by title to match
   // what the passes above consume (one fetch per title, propagated to copies),
   // so a caller looping until this hits zero is counting the same units it is
-  // working through. Only computed in gaps mode — it's two extra scans.
+  // working through: one per (title, TMDB entry), as the passes group. Only computed in gaps mode — it's two extra scans.
   let remaining = null;
   if (gapsOnly) {
     const row = await env.DB.prepare(
       `SELECT
-         (SELECT COUNT(DISTINCT LOWER(title)) FROM ${COPIES}
+         (SELECT COUNT(DISTINCT LOWER(title) || ':' || COALESCE(tmdb_id, '')) FROM ${COPIES}
            WHERE movie = 0
              AND (has_cast = 0 OR episodes_released IS NULL)) AS tv,
-         (SELECT COUNT(DISTINCT LOWER(title)) FROM ${COPIES}
+         (SELECT COUNT(DISTINCT LOWER(title) || ':' || COALESCE(tmdb_id, '')) FROM ${COPIES}
            WHERE movie = 1
              AND (poster_url IS NULL OR network IS NULL
                   OR genres IS NULL OR genres = ''
@@ -788,7 +788,7 @@ export async function onRequestPost(context) {
     // no provider logo), so a caller must stop on a count that stops falling
     // rather than on one that reaches zero.
     const row = await env.DB.prepare(
-      `SELECT COUNT(DISTINCT LOWER(title)) AS movies FROM shows
+      `SELECT COUNT(DISTINCT LOWER(title) || ':' || COALESCE(tmdb_id, '')) AS movies FROM shows
         WHERE movie = 1
           AND (network_logo_url IS NULL OR network_logo_url = '')`
     ).first().catch(() => null);
