@@ -157,8 +157,11 @@ console.log('\n== the views');
     tableCols.filter((c) => !SHOWS_TABLE_COLUMNS.includes(c)).concat(SHOWS_TABLE_COLUMNS.filter((c) => !tableCols.includes(c))).join(','));
   const actorCols = env._db.prepare("SELECT name FROM pragma_table_info('actors_v')").all().map((r) => r.name);
   check('actors_v keeps the cast shape', JSON.stringify(actorCols) === JSON.stringify(ACTORS_COLUMNS), actorCols.join(','));
-  const mig = readFileSync(join(repoRoot, 'migrations/080_views_shared_only.sql'), 'utf8');
-  check('migration 080 is viewSql() and actorsViewSql()', norm(mig).includes(norm(viewSql())) && norm(mig).includes(norm(actorsViewSql())));
+  // The migrations that built these views were squashed into schema.sql
+  // (2026-10-05), so schema.sql is what has to stay in step with the code.
+  const schemaSql = readFileSync(join(repoRoot, 'schema.sql'), 'utf8');
+  check('schema.sql creates the views viewSql() and actorsViewSql() describe',
+    norm(schemaSql).includes(norm(viewSql())) && norm(schemaSql).includes(norm(actorsViewSql())));
   check('the per-member fields stay off the shared set', PER_COPY_FIELDS.every((f) => !SHARED_FIELDS.includes(f)) && PER_COPY_FIELDS.includes('full_series'));
 
   const a = show(env, { title: 'Sopranos', member: 'a', tmdb: 1398, notes: 'MINE', network: 'HBO Max', full: 1 });
@@ -182,46 +185,6 @@ console.log('\n== the views');
   await fillActorIdsFromKnownPeople(env);
   const linked = env._db.prepare("SELECT imdb_id FROM actors_v WHERE show_id = ? AND name = 'Edie Falco'").get(a);
   check('the people bank links the shared cast', linked && linked.imdb_id === 'nm0004908', JSON.stringify(linked));
-}
-
-console.log('\n== the migrations that built this');
-{
-  // Each run the way deploy did: on an existing database that has `shows`
-  // (with the facts still on the copies, as production had) but not yet the
-  // new tables.
-  const db = new DatabaseSync(':memory:');
-  const schema = readFileSync(join(repoRoot, 'schema.sql'), 'utf8')
-    .replace(/CREATE TABLE IF NOT EXISTS titles \([\s\S]*?\n\);\n/, '')
-    .replace(/CREATE TABLE IF NOT EXISTS title_cast \([\s\S]*?\n\);\n/, '')
-    .replace(/CREATE INDEX IF NOT EXISTS idx_title_cast_person[^\n]*\n/, '')
-    .replace(/CREATE INDEX IF NOT EXISTS idx_shows_tmdb[^\n]*\n/, '')
-    .replace(/CREATE VIEW shows_v AS[\s\S]*?;\n/, '')
-    .replace(/CREATE VIEW actors_v AS[\s\S]*?;\n/, '');
-  db.exec(schema);
-  withLegacyShowColumns(db);
-  check('the fixture database starts without the tables', !db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'titles'").get());
-  db.prepare(`INSERT INTO members (slug, name, first_name, last_name, enrolled_via) VALUES ('a','A','A','X','email')`).run();
-  db.prepare(`INSERT INTO shows (title, list, member_slug, tmdb_id, tmdb_type, overview, streaming_on, free_on) VALUES ('BEEF','loved','a',154385,'tv','Road rage.','', '')`).run();
-  db.prepare(`INSERT INTO actors (show_id, name, ord) VALUES (1, 'Ali Wong', 0)`).run();
-  const m = (n) => readFileSync(join(repoRoot, `migrations/${n}`), 'utf8');
-  db.exec(m('076_titles.sql'));
-  const row = db.prepare('SELECT * FROM titles').get();
-  check('076 creates and backfills', row && row.name === 'BEEF' && row.overview === 'Road rage.', JSON.stringify(row));
-  check('including cast', db.prepare('SELECT COUNT(*) AS n FROM title_cast').get().n === 1);
-  db.exec(m('076_titles.sql'));
-  check('and is safe to run twice', db.prepare('SELECT COUNT(*) AS n FROM titles').get().n === 1);
-  check('076 read \'\' as missing (the bug 079 repairs)', row.streaming_on === null);
-  db.exec(m('079_titles_empty_answers.sql'));
-  const r = db.prepare('SELECT streaming_on, free_on FROM titles').get();
-  check('079 restores "asked, none" from the copies', r.streaming_on === '' && r.free_on === '', JSON.stringify(r));
-  db.prepare("UPDATE titles SET streaming_on = 'Netflix'").run();
-  db.exec(m('079_titles_empty_answers.sql'));
-  check('and never overwrites a value', db.prepare('SELECT streaming_on FROM titles').get().streaming_on === 'Netflix');
-  db.exec(m('077_shows_view.sql'));
-  db.exec(m('078_actors_view.sql'));
-  db.exec(m('080_views_shared_only.sql'));
-  check('080 leaves the views in their final shape', db.prepare('SELECT title, overview FROM shows_v').get().overview === 'Road rage.'
-    && db.prepare('SELECT COUNT(*) AS n FROM actors_v').get().n === 1);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
