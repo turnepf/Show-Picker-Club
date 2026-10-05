@@ -232,6 +232,52 @@ async function candidatePool(env, traitCols) {
   return pool;
 }
 
+// Everyone's fingerprint and the club baseline, recomputed at most weekly.
+// Reading them meant joining every member's library to title_traits on every
+// vibe view, for numbers that barely move in a week (Patrick's call,
+// 2026-10-04). A missing, stale or unreadable cache recomputes, and a cache
+// that can't be written still answers, as with trending_cache.
+const VIBE_CACHE_DAYS = 7;
+
+async function clubVibe(env, traitCols) {
+  const cached = await env.DB.prepare(
+    `SELECT payload FROM vibe_cache WHERE key = 'club' AND computed_at >= datetime('now', ?)`
+  ).bind(`-${VIBE_CACHE_DAYS} days`).first().catch(() => null);
+  if (cached) {
+    try {
+      const c = JSON.parse(cached.payload);
+      if (Array.isArray(c.fingerprints) && Array.isArray(c.scored)) return c;
+    } catch { /* recompute below */ }
+  }
+
+  const { results: clubRows } = await env.DB.prepare(
+    `SELECT s.member_slug, s.list, ${traitCols}
+     FROM shows_v s
+     JOIN title_traits t ON t.show_key = ${KEY} AND (t.unknown_show = 0 OR t.unknown_show IS NULL)
+     WHERE s.archived = 0`
+  ).all();
+  const byMember = new Map();
+  for (const r of clubRows) {
+    if (!byMember.has(r.member_slug)) byMember.set(r.member_slug, []);
+    byMember.get(r.member_slug).push(r);
+  }
+  const fingerprints = [];
+  const scored = [];
+  for (const [slug, rows] of byMember) {
+    scored.push([slug, rows.length]);
+    const f = computeFingerprint(rows);
+    if (f) fingerprints.push([slug, f]);
+  }
+  const baseline = clubBaseline(
+    fingerprints.filter(([slug]) => !EXCLUDED_FROM_TASTE.includes(slug)).map(([, f]) => f)
+  );
+  const club = { fingerprints, scored, baseline };
+  await env.DB.prepare(
+    `INSERT OR REPLACE INTO vibe_cache (key, payload, computed_at) VALUES ('club', ?, datetime('now'))`
+  ).bind(JSON.stringify(club)).run().catch(() => {});
+  return club;
+}
+
 export async function onRequestGet(context) {
   const { env, request } = context;
   // Vibe profiles surface taste fingerprints that feel personal — keep it
@@ -310,28 +356,20 @@ export async function onRequestGet(context) {
   // television has in common and nearly everybody comes back the same label),
   // and the group variety rule below. Everyone is fetched — the taste
   // exclusion applies to the baseline, which is club arithmetic, not to who
-  // gets a persona.
-  const { results: clubRows } = await env.DB.prepare(
-    `SELECT s.member_slug, s.list, ${traitCols}
-     FROM shows_v s
-     JOIN title_traits t ON t.show_key = ${KEY} AND (t.unknown_show = 0 OR t.unknown_show IS NULL)
-     WHERE s.archived = 0`
-  ).all();
-  const byMember = new Map();
-  for (const r of clubRows) {
-    if (!byMember.has(r.member_slug)) byMember.set(r.member_slug, []);
-    byMember.get(r.member_slug).push(r);
+  // gets a persona. Cached weekly (clubVibe); this member's own is live.
+  const club = await clubVibe(env, traitCols);
+  const fingerprints = new Map(club.fingerprints);
+  const scoredBy = new Map(club.scored);
+  // Personas are handed out from the cached numbers for everybody, the
+  // viewer included: the live fingerprint is summed in a different order and
+  // differs in the last decimal, which is enough to flip a tie and give two
+  // identical libraries the same persona depending on who is looking. Only a
+  // member the cache hasn't met yet is placed by their live numbers.
+  if (!fingerprints.has(memberSlug)) {
+    fingerprints.set(memberSlug, fp);
+    scoredBy.set(memberSlug, scoredRows.length);
   }
-  const fingerprints = new Map();
-  for (const [slug, rows] of byMember) {
-    const f = computeFingerprint(rows);
-    if (f) fingerprints.set(slug, f);
-  }
-  const baseline = clubBaseline(
-    [...fingerprints.entries()]
-      .filter(([slug]) => !EXCLUDED_FROM_TASTE.includes(slug))
-      .map(([, f]) => f)
-  );
+  const baseline = club.baseline;
 
   // Nobody in a group shares a persona while there are personas left — the
   // comparison is the fun, and it dies if half the group reads the same. The
@@ -353,7 +391,7 @@ export async function onRequestGet(context) {
     groupPeers.map(p => ({
       slug: p.member_slug,
       fp: fingerprints.get(p.member_slug) || null,
-      scoredTitles: (byMember.get(p.member_slug) || []).length,
+      scoredTitles: scoredBy.get(p.member_slug) || 0,
     })),
     baseline
   );

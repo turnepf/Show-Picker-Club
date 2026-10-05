@@ -326,5 +326,48 @@ console.log('\n== the trait-fill queue covers her titles');
   check('and the queue stays admin-gated', gated.status === 403, `got ${gated.status}`);
 }
 
+console.log('\n== the club numbers are cached for a week');
+{
+  // Every view used to rebuild every member's fingerprint from the whole
+  // library. They're computed once a week now (migration 082); the viewer's
+  // own fingerprint is still live.
+  const env = makeEnv();
+  addMember(env, 'ada', 'Ada Lovelace');
+  addMember(env, 'bo', 'Bo Diddley');
+  addMember(env, 'cy', 'Cy Twombly');
+  addGroup(env, 'Trio', ['ada', 'bo', 'cy']);
+  ['One', 'Two', 'Three', 'Four', 'Five', 'Six'].forEach((t, i) => {
+    addTraits(env, t, { warmth: 0.3 + i * 0.1, darkness: 0.8 - i * 0.1 });
+    for (const who of ['ada', 'bo', 'cy']) addShow(env, { slug: who, title: t, list: 'watching' });
+  });
+  const cookie = addSession(env, 'ada');
+  const cacheRow = () => env._db.prepare("SELECT payload, computed_at FROM vibe_cache WHERE key = 'club'").get();
+
+  const first = await (await call(env, '/api/vibe?member=ada', { cookie })).json();
+  const row1 = cacheRow();
+  check('the first view writes the club numbers', !!row1 && JSON.parse(row1.payload).fingerprints.length === 3);
+
+  // A tell-tale payload: if it's read back, Bo's scored count says so.
+  const marked = JSON.parse(row1.payload);
+  marked.scored = marked.scored.map(([slug, n]) => [slug, slug === 'bo' ? 999 : n]);
+  env._db.prepare("UPDATE vibe_cache SET payload = ? WHERE key = 'club'").run(JSON.stringify(marked));
+  addTraits(env, 'Seven', { warmth: 0.9 });
+  addShow(env, { slug: 'ada', title: 'Seven', list: 'watching' });
+  const second = await (await call(env, '/api/vibe?member=ada', { cookie })).json();
+  check('a view within the week reads the cache instead of rebuilding it',
+    JSON.parse(cacheRow().payload).scored.some(([slug, n]) => slug === 'bo' && n === 999));
+  check('while the viewer\'s own fingerprint is still live',
+    second.member.scored_count === first.member.scored_count + 1, `${first.member.scored_count} → ${second.member.scored_count}`);
+
+  env._db.prepare("UPDATE vibe_cache SET computed_at = datetime('now', '-8 days') WHERE key = 'club'").run();
+  await call(env, '/api/vibe?member=ada', { cookie });
+  check('a week-old cache is rebuilt',
+    !JSON.parse(cacheRow().payload).scored.some(([, n]) => n === 999) && cacheRow().computed_at > row1.computed_at.slice(0, 10));
+
+  env._db.prepare("UPDATE vibe_cache SET payload = 'not json' WHERE key = 'club'").run();
+  const res = await call(env, '/api/vibe?member=ada', { cookie });
+  check('and a corrupt one is rebuilt rather than erroring', res.status === 200 && JSON.parse(cacheRow().payload).fingerprints.length === 3);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

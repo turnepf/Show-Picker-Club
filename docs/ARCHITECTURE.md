@@ -1223,6 +1223,9 @@ Three pieces:
 - `_shared/vibe-clusters.js`: defines 7 cluster targets, each as a sparse target vector over the 27 traits (unspecified dims default to 0.5).
 - `functions/api/vibe.js`: composes a member fingerprint and matches it against clusters.
 
+### Club numbers, cached weekly (migration 082)
+`/api/vibe` reads each member against the club baseline and hands out group personas from everyone's fingerprints. Both used to be rebuilt on every view by joining every member's library to `title_traits`. `vibe_cache` (one row, `key = 'club'`) now holds every member's fingerprint and scored count plus the baseline, recomputed when it's older than 7 days (Patrick's choice, 2026-10-04); a missing or corrupt row recomputes, like `trending_cache`. The viewer's own fingerprint, display traits and picks stay live. Personas are assigned from the cached numbers for everyone, the viewer included, because a live fingerprint summed in a different order differs in the last decimal and would flip a tie depending on who is looking. Pinned by `scripts/vibe-scope-test.mjs`.
+
 ### Fingerprint
 For each of the member's non-seed shows, look up `title_traits` by the show's key (its TMDB entry, else its title). Weight by list:
 
