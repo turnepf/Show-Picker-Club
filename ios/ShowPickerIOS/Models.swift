@@ -539,46 +539,9 @@ struct UrlQueueItem: Codable, Identifiable {
 struct UrlCleanupResponse: Codable {
     let shows: [UrlQueueItem]
     let networks: [String]
-    // Titles members carry on different networks, and rows whose URL points at
-    // a different service than the stored network. Present on the list action.
-    let conflicts: [UrlConflict]?
+    // Rows whose URL points at a different service than the stored network.
+    // (The conflict and missing-poster queues left in 2026-10.)
     let mismatches: [UrlMismatch]?
-    // Titles where NO active copy has a poster — the observable symptom of a
-    // title TMDB can't match (a typo, a member-entered name, or a title only
-    // indexed under the opposite media type). The URL queue misses these
-    // because the row's link may be perfectly good.
-    let needsPoster: [NeedsPosterItem]?
-
-    enum CodingKeys: String, CodingKey {
-        case shows, networks, conflicts, mismatches, needsPoster
-    }
-}
-
-// One title with no poster on any copy. POST actions: re_enrich { id, movie }
-// to re-look-up as-is (optionally flipping the media type), or fix_title
-// { id, new_title } to rename and re-enrich.
-struct NeedsPosterItem: Codable, Identifiable {
-    let id: Int
-    let title: String
-    let movie: Int?
-    let memberCount: Int?
-    let members: String?
-
-    var isMovie: Bool { (movie ?? 0) == 1 }
-
-    enum CodingKeys: String, CodingKey {
-        case id, title, movie, members
-        case memberCount = "member_count"
-    }
-}
-
-// A title two or more members carry on different networks — operator picks the
-// canonical one. POST action: resolve_conflict { title, network }.
-struct UrlConflict: Codable, Identifiable {
-    let title: String
-    let networks: [String]
-    let rows: Int
-    var id: String { title }
 }
 
 // A row whose URL domain disagrees with its stored network. Operator chooses

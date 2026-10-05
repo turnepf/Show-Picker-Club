@@ -124,9 +124,8 @@ The plan has three steps. The first two have shipped:
    member's chosen service). Titles now come from TMDB for everyone: a
    member's own title survives on their raw row but isn't shown, and
    typing a new title in an edit re-matches the show by that title. The
-   writers that change details by title rather than by row (URL cleanup's
-   rename and re-match) call `syncTitlesNamed()`, and an import syncs any
-   entry the club didn't have.
+   import syncs any entry the club didn't have. (URL cleanup's rename and
+   re-match, the writers that changed details by title, left in 2026-10.)
 3. **Cast and the duplicates.** Split in three:
    - **3a (migration 078, shipped):** the view `actors_v` has the columns of
      `actors`, with each copy's cast taken from `title_cast` when its entry
@@ -1307,7 +1306,7 @@ Body: `{dry_run?: boolean}`. Admin session OR `X-Cron-Secret` — the monthly `d
 Body: `{secret, count}`. Runs the vibe trait-backfill loop described above. The iOS Vibe trait scoring screen calls it in a loop until the operator stops or every show is scored (the `vibe-admin.html` web UI was archived in 2026-08).
 
 ### `POST /api/admin-url-cleanup`
-Body: `{secret}`. Before listing, runs `propagateGoodUrls` to push every known good URL out to any sibling row still on a placeholder (so the queue never surfaces a title that someone has already fixed). Then returns the residual queue: titles where *no* copy has a good URL yet. The companion Show Cleanup screen in the iOS app lets the operator paste a real deep link, then push it to every member's copy of that title in one go (the `url-cleanup.html` web UI was archived in 2026-08).
+Body: `{secret}`. The nightly `inherit_networks` runs `propagateGoodUrls` to push every known good URL out to any sibling row still on a placeholder (so the queue never surfaces a title that someone has already fixed). Then returns the residual queue: titles where *no* copy has a good URL yet. The companion Show Cleanup screen in the iOS app lets the operator paste a real deep link, then push it to every member's copy of that title in one go (the `url-cleanup.html` web UI was archived in 2026-08).
 
 **Apple links vs. stored network (the `save` action).** A pasted URL normally overrules the operator's dropdown, because copy-paste catches the real platform and the dropdown is only judgement (`networkFromUrl`). `tv.apple.com` is the one exception: it is a storefront, not a service, carrying both Apple TV+ originals and rent/buy titles that stream on somebody else's subscription. Letting an Apple link set `network` relabels rentals as Apple TV+, which feeds straight into the Subscription Audit's per-network value. So for Apple domains the operator's pick wins and only the URL is stored. This is what makes it safe to use Apple links as the universal deep-link fallback while `network` keeps naming the service that actually carries the title.
 
@@ -1319,9 +1318,7 @@ The `reclassify_storefronts` action (the "Re-check Apple TV+ rentals" button in 
 
 The `inherit_networks` action rescues rows that have no `network` at all — URL propagation can't reach them because it is scoped to `(title, network)`. Any active row whose title has exactly one distinct network across the rest of the club adopts that network, then a propagation pass fills its URL from the siblings. Titles whose copies disagree on the service are deliberately skipped; those belong to the conflict queue. Returns `{networks_set, urls_filled}`. It runs nightly as the first step of `watch-urls-fill.yml`, ahead of the Watchmode pass it feeds, and accepts `X-Cron-Secret` for that reason — it and `reclassify_storefronts` are the only two actions here that do, because they are the only two that decide nothing. It was a button on the page until 2026-09-22; a permanent control for work that runs on its own is clutter that outlives its reason.
 
-The list response also carries a `needsPoster` section (`fetchNeedsPoster`): titles where *no* active copy has a poster, grouped by title. A missing poster is the observable symptom of a title TMDB can't match — a typo that stuck ("Marshalls" for *Marshals*), a descriptive member-entered name, or a title only indexed under the opposite media type. The row's URL may be perfectly good, which is exactly why the URL queue misses these. The companion "Missing posters" section (iOS Show Cleanup; the `url-cleanup.html` web UI was archived in 2026-08) offers two fixes per title: **Re-enrich** (the `re_enrich` action — a fresh `fetchEnrichment` lookup for the title as-is, which flips media types, writing any poster/logo/rating/cast onto every copy) and **Rename** (the shared `fix_title` action, for when the stored title itself is wrong).
-
-The automatic title-healing that used to back this queue was retired in July 2026 (`b1ecd34`) once TMDB type-ahead pinning made new in-app rows arrive canonical: the old `bad_titles`/`title_ok` queue, `og:title` recovery from deep links (`title-fix.js`), title-variant and cross-media-type retries in `/api/enrich`'s poster passes, and the OMDB title-guessing fallback are all gone. Kept: the manual `fix_title` rename and the artwork sync/propagation passes. Bulk off-platform imports (e.g. migration 032) bypass type-ahead, so hand-typed titles and movie flags can still miss — the `needsPoster` queue and per-title fix migrations are the operator's net for exactly that.
+**Shrunk 2026-10.** With watch links from Watchmode, every show matched to a TMDB entry, and members seeing TMDB's name, the page keeps only what still needs a person: the missing-links queue (one row per show, keyed by TMDB entry; `save` and `dismiss`), URL/network mismatches (`fix_mismatch`), and the two cron actions. Gone: the missing-posters queue and `re_enrich` (the nightly passes fill details by TMDB id, and `admin_refresh_show` covers a one-off), `fix_title` and `_shared/title-fix.js` (a copy's own title isn't shown), the cross-member network conflict queue and `resolve_conflict` (two members carrying a show on two services is allowed, invariant §20), and running `propagateGoodUrls` on every page load (the nightly `inherit_networks` still does). The iOS Show Cleanup screen shrank with it; builds before 1.7 still show the removed buttons, which now answer "unknown action".
 
 ## Seed-only definition
 

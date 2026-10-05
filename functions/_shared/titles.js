@@ -15,7 +15,7 @@
 //
 //   - writeTitle(): a writer holding a TMDB payload (add, edit, enrichment,
 //     URL cleanup) writes it here. The only way show facts arrive.
-//   - syncTitle() / syncTitlesNamed() / rebuildTitles(): make sure every
+//   - syncTitle() / rebuildTitles(): make sure every
 //     entry a copy points at has a row (named from the copies until TMDB
 //     names it), and drop entries nothing points at.
 
@@ -182,19 +182,6 @@ export function titleFieldsFromEnrichment(e) {
   };
   for (const k of Object.keys(f)) if (f[k] === undefined) delete f[k];
   return f;
-}
-
-// Make sure every entry carrying a given title has a row, for a writer that
-// changes copies by title rather than by one row (URL cleanup's rename and
-// re-match). Never throws, like syncTitle().
-export async function syncTitlesNamed(env, title, name = null) {
-  try {
-    const { results } = await env.DB.prepare(
-      `SELECT DISTINCT tmdb_id, COALESCE(tmdb_type, CASE WHEN movie = 1 THEN 'movie' ELSE 'tv' END) AS tmdb_type
-         FROM shows WHERE LOWER(title) = LOWER(?) AND tmdb_id IS NOT NULL`
-    ).bind(title).all();
-    for (const r of results || []) await syncTitle(env, r.tmdb_type, r.tmdb_id, name);
-  } catch (e) { /* bookkeeping only */ }
 }
 
 // ---- the views members read through ----
