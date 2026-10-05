@@ -656,15 +656,14 @@ struct ShowDetailView: View {
     // the List row reflect MY copy, regardless of whose copy opened the screen.
     private func refreshMyCopy() async {
         guard let mine = auth.memberSlug else { myCopy = nil; return }
-        let t = (show?.title ?? initialTitle).lowercased()
         let list = (try? await API.shows(member: mine, includeArchived: true)) ?? []
-        // The same TMDB entry when both sides know theirs: owning one of the
-        // three 2026 "The Odyssey" films isn't owning the others. Title only
-        // for a copy with no id.
-        let id = show?.tmdbId
+        // ShowIdentity: owning one of the three 2026 "The Odyssey" films
+        // isn't owning the others. Before the show loads, only the title is
+        // known, so movie-ness is taken from the candidate.
         myCopy = list.first { mineShow in
-            if let id, let theirs = mineShow.tmdbId { return theirs == id && mineShow.isMovie == (show?.isMovie ?? mineShow.isMovie) }
-            return mineShow.title.lowercased() == t
+            ShowIdentity.same(title: show?.title ?? initialTitle, isMovie: show?.isMovie ?? mineShow.isMovie,
+                              tmdbId: show?.tmdbId,
+                              title: mineShow.title, isMovie: mineShow.isMovie, tmdbId: mineShow.tmdbId)
         }
         myCopyChecked = true
     }
