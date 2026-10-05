@@ -17,11 +17,13 @@ import { DatabaseSync } from 'node:sqlite';
 export const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DB_NAME = 'shows-db';
 
+// The member's columns only: since the 2026-10-05 cleanup a show's facts
+// (rating, poster, genres, seasons) live in `titles`, taken whole below, and
+// the replayed endpoints read both through shows_v as production does.
 const SHOW_COLS = [
   'id', 'title', 'list', 'member_slug', 'archived', 'added_by', 'created_at',
-  'updated_at', 'network', 'network_url', 'rating', 'poster_url', 'movie',
-  'seasons_released', 'full_series', 'next_season_date', 'genres',
-  'tmdb_id', 'tmdb_type',
+  'updated_at', 'network', 'network_url', 'movie', 'full_series',
+  'next_season_date', 'tmdb_id', 'tmdb_type',
 ].join(', ');
 
 function queries() {
@@ -35,11 +37,13 @@ function queries() {
     // active rows, the engagement check counts an archive as member intent,
     // and taking everything means one snapshot replays for any slug.
     shows: `SELECT ${SHOW_COLS} FROM shows`,
-    // Fingerprints by show (migration 081). A snapshot saved before it carries
-    // show_traits instead and replays against the old table.
+    // Fingerprints by show (migration 081). A snapshot saved before the
+    // 2026-10-05 cleanup has the old shape and won't replay; take a new one.
     title_traits: 'SELECT * FROM title_traits',
-    actors: `SELECT a.id, a.show_id, a.name FROM actors a
-               JOIN shows s ON s.id = a.show_id WHERE s.archived = 0`,
+    titles: 'SELECT * FROM titles',
+    // The shared cast (actors_v reads it); the per-copy `actors` table has
+    // been empty since the cleanup.
+    title_cast: 'SELECT * FROM title_cast',
   };
 }
 

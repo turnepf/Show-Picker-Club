@@ -44,7 +44,7 @@
 //
 // Same harness as scripts/vibe-scope-test.mjs.
 
-import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
+import { liftCopiesIntoTitles, withLegacyShowColumns } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -81,6 +81,7 @@ class Stmt {
 function makeEnv() {
   const db = new DatabaseSync(':memory:');
   db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
+  withLegacyShowColumns(db);
   return { DB: { prepare: (sql) => new Stmt(db, sql) }, _db: db };
 }
 

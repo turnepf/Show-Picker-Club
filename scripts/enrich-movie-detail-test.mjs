@@ -40,7 +40,7 @@
 // Same harness as scripts/enrich-identity-test.mjs: functions copied to a temp
 // dir as ES modules, schema.sql in node:sqlite behind a D1 shim, TMDB faked.
 
-import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
+import { liftCopiesIntoTitles, withLegacyShowColumns } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -167,6 +167,7 @@ function makeEnv() {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
+  withLegacyShowColumns(db);
   db.prepare('INSERT INTO members (slug, name, first_name) VALUES (?, ?, ?)').run('patrick', 'Patrick Turner', 'Patrick');
   db.prepare('INSERT INTO member_emails (email, member_slug, is_primary) VALUES (?, ?, 1)').run('patrick@example.com', 'patrick');
   db.prepare('INSERT INTO sessions (id, email, member_slug, expires_at, created_at) VALUES (?, ?, ?, ?, ?)')

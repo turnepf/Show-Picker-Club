@@ -21,13 +21,14 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import { withLegacyShowColumns } from './lib/seed-titles.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = mkdtempSync(join(tmpdir(), 'titles-'));
 cpSync(join(repoRoot, 'functions'), join(sandbox, 'functions'), { recursive: true });
 writeFileSync(join(sandbox, 'package.json'), '{"type":"module"}');
 const T = await import(join(sandbox, 'functions', '_shared/titles.js'));
-const { syncTitle, writeTitle, titleFieldsFromEnrichment, rebuildTitles, TITLE_FIELDS, SHOWS_COLUMNS,
+const { syncTitle, writeTitle, titleFieldsFromEnrichment, rebuildTitles, TITLE_FIELDS, SHOWS_COLUMNS, SHOWS_TABLE_COLUMNS,
   SHARED_FIELDS, PER_COPY_FIELDS, viewSql, ACTORS_COLUMNS, actorsViewSql } = T;
 const { fillActorIdsFromKnownPeople } = await import(join(sandbox, 'functions', '_shared/people.js'));
 
@@ -149,6 +150,11 @@ console.log('\n== the views');
   const env = makeEnv();
   const viewCols = env._db.prepare("SELECT name FROM pragma_table_info('shows_v')").all().map((r) => r.name);
   check('shows_v returns exactly the shape the apps have always had', JSON.stringify(viewCols) === JSON.stringify(SHOWS_COLUMNS), `${viewCols.length}`);
+  // schema.sql's `shows` is production's since the 2026-10-05 cleanup: the
+  // member's own columns and nothing the shared row holds.
+  const tableCols = env._db.prepare("SELECT name FROM pragma_table_info('shows')").all().map((r) => r.name);
+  check('shows holds exactly the member\'s columns', JSON.stringify([...tableCols].sort()) === JSON.stringify([...SHOWS_TABLE_COLUMNS].sort()),
+    tableCols.filter((c) => !SHOWS_TABLE_COLUMNS.includes(c)).concat(SHOWS_TABLE_COLUMNS.filter((c) => !tableCols.includes(c))).join(','));
   const actorCols = env._db.prepare("SELECT name FROM pragma_table_info('actors_v')").all().map((r) => r.name);
   check('actors_v keeps the cast shape', JSON.stringify(actorCols) === JSON.stringify(ACTORS_COLUMNS), actorCols.join(','));
   const mig = readFileSync(join(repoRoot, 'migrations/080_views_shared_only.sql'), 'utf8');
@@ -158,8 +164,6 @@ console.log('\n== the views');
   const a = show(env, { title: 'Sopranos', member: 'a', tmdb: 1398, notes: 'MINE', network: 'HBO Max', full: 1 });
   const b = show(env, { title: 'The Sopranos', member: 'b', tmdb: 1398, network: 'Max' });
   env._db.prepare("UPDATE shows SET next_season_date = '2026-12-01', network_logo_url = 'https://image.tmdb.org/hbo.png' WHERE id = ?").run(a);
-  // A stale fact left on a copy from before normalizing is never shown.
-  env._db.prepare("UPDATE shows SET overview = 'stale copy text' WHERE id = ?").run(a);
   const lone = show(env, { title: 'Unmatched Thing', member: 'c' });
   await writeTitle(env, 'tv', 1398, { name: 'The Sopranos', fields: { overview: 'Tony.' },
     cast: [{ name: 'James Gandolfini', ord: 0 }, { name: 'Edie Falco', ord: 1 }] });
@@ -194,6 +198,7 @@ console.log('\n== the migrations that built this');
     .replace(/CREATE VIEW shows_v AS[\s\S]*?;\n/, '')
     .replace(/CREATE VIEW actors_v AS[\s\S]*?;\n/, '');
   db.exec(schema);
+  withLegacyShowColumns(db);
   check('the fixture database starts without the tables', !db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'titles'").get());
   db.prepare(`INSERT INTO members (slug, name, first_name, last_name, enrolled_via) VALUES ('a','A','A','X','email')`).run();
   db.prepare(`INSERT INTO shows (title, list, member_slug, tmdb_id, tmdb_type, overview, streaming_on, free_on) VALUES ('BEEF','loved','a',154385,'tv','Road rage.','', '')`).run();

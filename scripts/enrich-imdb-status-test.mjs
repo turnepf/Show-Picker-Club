@@ -29,7 +29,7 @@
 //
 // Same harness as scripts/enrich-movie-detail-test.mjs.
 
-import { liftCopiesIntoTitles } from './lib/seed-titles.mjs';
+import { liftCopiesIntoTitles, withLegacyShowColumns } from './lib/seed-titles.mjs';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -160,6 +160,7 @@ function makeEnv() {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(readFileSync(join(repoRoot, 'schema.sql'), 'utf8'));
+  withLegacyShowColumns(db);
   for (const [slug, name] of [['patrick', 'Patrick Turner'], ['amy', 'Amy Turner']]) {
     db.prepare('INSERT INTO members (slug, name, first_name) VALUES (?, ?, ?)').run(slug, name, name.split(' ')[0]);
   }
