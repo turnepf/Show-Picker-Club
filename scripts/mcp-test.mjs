@@ -39,6 +39,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { createHash, randomBytes } from 'node:crypto';
+import { Stmt } from './lib/d1.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = mkdtempSync(join(tmpdir(), 'mcp-test-'));
@@ -71,19 +72,6 @@ function check(name, cond, detail = '') {
 }
 
 // ---- D1 shim over node:sqlite ----
-
-class Stmt {
-  constructor(db, sql, args = []) { this.db = db; this.sql = sql; this.args = args; }
-  bind(...args) { return new Stmt(this.db, this.sql, args.map((a) => (a === undefined ? null : a))); }
-  guard() { if (this.args.length > 100) throw new Error('D1_ERROR: too many bound parameters'); }
-  async first() { this.guard(); const rows = this.db.prepare(this.sql).all(...this.args); return rows.length ? { ...rows[0] } : null; }
-  async all() { this.guard(); return { results: this.db.prepare(this.sql).all(...this.args).map((r) => ({ ...r })) }; }
-  async run() {
-    this.guard();
-    const r = this.db.prepare(this.sql).run(...this.args);
-    return { meta: { changes: Number(r.changes ?? 0), last_row_id: Number(r.lastInsertRowid ?? 0) } };
-  }
-}
 
 function makeEnv() {
   const db = new DatabaseSync(':memory:');

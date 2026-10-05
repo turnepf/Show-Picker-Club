@@ -40,6 +40,7 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import { Stmt } from './lib/d1.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = mkdtempSync(join(tmpdir(), 'watching-with-'));
@@ -61,38 +62,6 @@ function check(name, cond, detail = '') {
 }
 
 // ---- D1 shim over node:sqlite ----
-
-// D1 refuses a query with more than 100 bound parameters. node:sqlite is far
-// more permissive (32k+), which is how an IN (...) built over a whole library
-// could pass every test here and still 500 in production — so the shim
-// enforces the real limit.
-const D1_MAX_BOUND_PARAMS = 100;
-
-class Stmt {
-  constructor(db, sql, args = []) { this.db = db; this.sql = sql; this.args = args; }
-  bind(...args) {
-    return new Stmt(this.db, this.sql, args.map((a) => (a === undefined ? null : a)));
-  }
-  guard() {
-    if (this.args.length > D1_MAX_BOUND_PARAMS) {
-      throw new Error(`D1_ERROR: too many bound parameters (${this.args.length} > ${D1_MAX_BOUND_PARAMS})`);
-    }
-  }
-  async first() {
-    this.guard();
-    const rows = this.db.prepare(this.sql).all(...this.args);
-    return rows.length ? { ...rows[0] } : null;
-  }
-  async all() {
-    this.guard();
-    return { results: this.db.prepare(this.sql).all(...this.args).map((r) => ({ ...r })) };
-  }
-  async run() {
-    this.guard();
-    const r = this.db.prepare(this.sql).run(...this.args);
-    return { meta: { changes: Number(r.changes ?? 0), last_row_id: Number(r.lastInsertRowid ?? 0) } };
-  }
-}
 
 // ---- fixtures ----
 
