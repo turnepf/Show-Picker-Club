@@ -1166,7 +1166,11 @@ show's details, kept in step by propagation code, so two members could see
   aside and returns them as `unmatched_titles`, which the web and iOS show at
   the end to add by hand, and emails the member once with the same list (the
   app's last commit call carries what it left out at review; never to the
-  demo account, five a day via `member_spend.emails`); iOS's offline queue keeps a queued add through a
+  demo account, five a day via `member_spend.emails`). An older app (iOS 1.6)
+  sends no `final` and posts 100-row batches, so the server holds each batch's
+  unmatched titles in `import_pending` (migration 085) and sends one note when
+  a short batch arrives, or after a quiet period following a full one; one
+  import is one email either way. iOS's offline queue keeps a queued add through a
   TMDB outage and says so when one has no match. The Apple TV and Roku "add as
   typed" buttons are gone.
 - **A copy has no title of its own.** `shows_v.title` is the shared row's name

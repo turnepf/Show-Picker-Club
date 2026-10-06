@@ -593,6 +593,16 @@ CREATE TABLE IF NOT EXISTS mcp_usage (
   PRIMARY KEY (member_slug, day)
 );
 
+-- An older app's import in progress, so its unmatched titles reach the member
+-- in one note. See migration 085 and functions/api/import/commit.js.
+CREATE TABLE IF NOT EXISTS import_pending (
+  member_slug TEXT PRIMARY KEY,
+  titles TEXT NOT NULL DEFAULT '[]',
+  added INTEGER NOT NULL DEFAULT 0,
+  stamp TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Changes an admin made to another member's lists through a connected AI
 -- app (members:admin scope). See migration 074.
 CREATE TABLE IF NOT EXISTS admin_actions (

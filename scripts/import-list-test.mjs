@@ -414,6 +414,55 @@ console.log('\n== titles that didn\'t match are emailed to the member, once');
   check('capped at five a day', resend.length === 5, `sent ${resend.length}`);
 }
 
+console.log('\n== an older app that sends no `final` still gets one note');
+{
+  // iOS 1.6 predates the email: it sends unmatched rows to commit (labelled
+  // "will be added as typed") in 100-row batches and never says final. The
+  // server sets them aside, so it sends the note itself: one per import, not
+  // one per batch, with the import's whole count.
+  const env = makeEnv({ RESEND_API_KEY: 'test-resend', IMPORT_QUIET_MS: 30 });
+  env._db.prepare("INSERT INTO member_emails (email, member_slug, is_primary) VALUES ('patrick@example.com', 'patrick', 1)").run();
+  resend.length = 0;
+  const pending = [];
+  const legacy = async (items) => (await commit.onRequestPost({
+    env, request: post('/api/import/commit', { items }), waitUntil: (p) => pending.push(p),
+  })).json();
+  const settle = async () => { while (pending.length) await pending.shift(); };
+  let next = 900000;
+  const matched = (n) => Array.from({ length: n }, () => ({ title: `Show ${next}`, list: 'watching', tmdb_id: next++, tmdb_type: 'tv' }));
+  const batch = (n, title) => [...matched(n - 1), { title, list: 'watching' }];
+
+  const one = await legacy([...matched(1), { title: 'Grandpa\'s Home Movies', list: 'watching' }]);
+  check('a short import sets the unmatched row aside, as before', one.added === 1 && one.unmatched_titles[0] === 'Grandpa\'s Home Movies', JSON.stringify(one));
+  check('and emails the member at once', one.emailed === true && resend.length === 1 && /Grandpa's Home Movies/.test(resend[0].text) && /We added 1 show to/.test(resend[0].text), resend[0]?.text);
+
+  const clean = await legacy(matched(1));
+  check('an import with everything matched sends nothing', clean.emailed === false && resend.length === 1);
+
+  resend.length = 0;
+  const b1 = await legacy(batch(100, 'Lost Tape One'));
+  const b2 = await legacy(batch(100, 'Lost Tape Two'));
+  const b3 = await legacy(batch(30, 'Lost Tape Three'));
+  await settle();
+  check('a three-batch import waits for its short last batch', b1.emailed === false && b2.emailed === false && b3.emailed === true, JSON.stringify([b1.emailed, b2.emailed, b3.emailed]));
+  check('and sends exactly one note', resend.length === 1, `sent ${resend.length}`);
+  check('listing every batch\'s unmatched title', ['One', 'Two', 'Three'].every((w) => resend[0]?.text.includes(`Lost Tape ${w}`)), resend[0]?.text);
+  check('with the import\'s total, not the last batch\'s', /We added 227 shows/.test(resend[0]?.text), resend[0]?.text);
+  check('and leaves nothing held', env._db.prepare('SELECT COUNT(*) AS n FROM import_pending').get().n === 0);
+
+  resend.length = 0;
+  env._db.prepare('DELETE FROM shows').run();
+  const exact = await legacy(batch(100, 'Exactly A Hundred'));
+  check('an import of exactly 100 sends nothing yet', exact.emailed === false && resend.length === 0);
+  await settle();
+  check('and sends its note once the quiet period passes', resend.length === 1 && /Exactly A Hundred/.test(resend[0].text) && /We added 99 shows/.test(resend[0].text), resend[0]?.text);
+
+  const current = await commit.onRequestPost(context(env, post('/api/import/commit', {
+    items: [{ title: 'Mystery Thing', list: 'watching' }], final: false,
+  })));
+  check('a current app\'s non-final call still waits for its last call', (await current.json()).emailed === false && resend.length === 1);
+}
+
 console.log('\n== a Claude outage surfaces instead of looking like an empty list');
 {
   const env = makeEnv();
