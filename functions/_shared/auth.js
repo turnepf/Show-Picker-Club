@@ -24,6 +24,17 @@ export function hasDelegatedAdminScope(request) {
   return adminScoped.has(request);
 }
 
+// The SQL value a show write assigns to updated_at. That column means member
+// intent (docs/INVARIANTS.md §5), and an admin fixing a member's row through
+// the members:admin tools is neither the member nor intent, so the row keeps
+// its timestamp. Only asMember() in mcp-tools.js sets acting_admin, on a
+// session that rides the WeakMap above, so nothing on the network can. Adds
+// and ratings an admin makes for a member still count: those carry what the
+// member told them.
+export function updatedAtFor(session) {
+  return session && session.acting_admin ? 'updated_at' : "datetime('now')";
+}
+
 // True for a request built by actingAs(). Admin gates refuse these: an
 // OAuth token is a member's lists, never the operator's tools.
 export function isDelegated(request) {

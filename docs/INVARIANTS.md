@@ -191,6 +191,15 @@ background job. Seeded rows have NULL `created_at`/`updated_at` and
 `added_by='seed'`, and the "seed-only member" check depends on exactly that
 signature.
 
+An admin fixing a member's row through the `members:admin` MCP tools (edit,
+move, archive, restore) is not member intent either: those writes keep the
+row's `updated_at` (`updatedAtFor()` in `_shared/auth.js`, keyed on the
+`acting_admin` that only `asMember()` sets). Adds and ratings an admin makes
+for a member still stamp `created_at` / `show_ratings.updated_at`, because
+they carry what the member told the admin. A batch of admin fixes on
+2026-10-04/05 moved ~140 rows' `updated_at` before this rule existed and had
+to be restored from backup. Enforced by `scripts/admin-fix-tools-test.mjs`.
+
 ## 6. Enrollment is the only way a member row appears
 
 `createMember()` is called from one place, `functions/_shared/enroll.js`. There

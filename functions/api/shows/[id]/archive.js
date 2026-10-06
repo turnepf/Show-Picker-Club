@@ -1,4 +1,4 @@
-import { getSession } from '../../../_shared/auth.js';
+import { getSession, updatedAtFor } from '../../../_shared/auth.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -12,7 +12,7 @@ export async function onRequestPut(context) {
   }
 
   await env.DB.prepare(
-    "UPDATE shows SET archived = 1, updated_at = datetime('now') WHERE id = ? AND member_slug = ?"
+    `UPDATE shows SET archived = 1, updated_at = ${updatedAtFor(session)} WHERE id = ? AND member_slug = ?`
   ).bind(params.id, session.member_slug).run();
 
   return new Response(JSON.stringify({ success: true }), { headers: corsHeaders() });
