@@ -1,4 +1,4 @@
-import { getSession } from '../../../_shared/auth.js';
+import { getSession, updatedAtFor } from '../../../_shared/auth.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -19,7 +19,7 @@ export async function onRequestPut(context) {
   }
 
   const res = await env.DB.prepare(
-    "UPDATE shows SET list = ?, updated_at = datetime('now') WHERE id = ? AND member_slug = ?"
+    `UPDATE shows SET list = ?, updated_at = ${updatedAtFor(session)} WHERE id = ? AND member_slug = ?`
   ).bind(list, params.id, session.member_slug).run();
 
   // The read-back carries the same owner predicate as the write above, and a

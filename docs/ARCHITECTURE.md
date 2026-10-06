@@ -71,7 +71,7 @@ A member's copy of a show: only what is theirs. The show's own facts (artwork, o
 | `archived`          | INTEGER DEFAULT 0 | |
 | `member_slug`       | TEXT REFERENCES members(slug) | |
 | `created_at`        | TEXT | Default `datetime('now')`. May be NULL for seeded shows. |
-| `updated_at`        | TEXT | Default `datetime('now')`. Bumped by member edits (not enrichment). |
+| `updated_at`        | TEXT | Default `datetime('now')`. Bumped by member edits (not enrichment, and not an admin's `members:admin` edit/move/archive/restore — INVARIANTS §5). |
 | `added_by`          | TEXT | `'seed'` for seeded shows, otherwise editor email or `'Anonymous'` for public suggestions. |
 | `enriched_at`       | TEXT | Bumped by TMDB enrichment so enrichment can prioritize stale rows. |
 | `sort_order`        | INTEGER | Position for the member's "My Order" manual sort (migration 033). NULL = never manually placed. Written only by `POST /api/shows/reorder`, which deliberately does **not** bump `updated_at`. |
@@ -1385,7 +1385,7 @@ Two things in `smoke.sh` look like fussiness and are not. Every request carries 
 
 ## Conventions that aren't obvious
 
-- **`updated_at` is sacred.** Enrichment writes `enriched_at` so member intent (`updated_at != created_at`) stays clean. Don't bump `updated_at` from background jobs.
+- **`updated_at` is sacred.** Enrichment writes `enriched_at` so member intent (`updated_at != created_at`) stays clean. Don't bump `updated_at` from background jobs. Admin fixes made through the `members:admin` MCP tools don't bump it either (`updatedAtFor()` in `_shared/auth.js`).
 - **Seeded rows have NULL `created_at` and `updated_at`.** This is intentional — it makes the seed-only query single-sided and cheap.
 - **Network URLs that look like `/search`, `/s?`, or `/?q=` are placeholders.** The frontend renders these as plain text instead of links; sync-urls and calendar feed treat them as missing.
 - **Member display names disambiguate dynamically.** `/api/members` counts first-name collisions and appends `last_initial` only when it would otherwise be ambiguous.

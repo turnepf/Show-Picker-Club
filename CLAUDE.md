@@ -645,6 +645,10 @@ thing:
 - **Memos untouched,** even when a call carries one.
 - **A refresh is not an edit.** It stamps `enriched_at`, never `updated_at`,
   and it reaches the archived rows the nightly rotation skips.
+- **An admin fix is not the member's activity.** Edit, move, archive and
+  restore keep `updated_at`, which the activity reports read; the member's
+  own writes still bump it. Admin adds and ratings still stamp their times,
+  since they carry what the member said.
 
 Also pins that an add stores genres and the season count from its first
 fetch, where they used to wait for the nightly job.

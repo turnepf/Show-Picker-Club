@@ -1,7 +1,7 @@
 import { fetchEnrichment, fetchEnrichmentById, fallbackNetwork, emptyEnrichment } from '../../_shared/enrichment.js';
 import { syncTitle, writeTitle, titleFieldsFromEnrichment } from '../../_shared/titles.js';
 import { chargeSpend } from '../../_shared/spend-meter.js';
-import { getSession } from '../../_shared/auth.js';
+import { getSession, updatedAtFor } from '../../_shared/auth.js';
 import { canonicalNetwork, networkFromUrl } from '../../_shared/networks.js';
 import { lookupWatchmodeUrl } from '../../_shared/watch-providers.js';
 import { safeNetworkUrl } from '../../_shared/url-utils.js';
@@ -277,7 +277,7 @@ export async function onRequestPut(context) {
     `UPDATE shows SET title = ?, network = ?, network_url = ?, recommended_by = ?, list = ?, notes = ?, movie = ?, full_series = ?, watching_with = ?, archived = ?,
         network_logo_url = CASE WHEN ? = 1 THEN NULL ELSE COALESCE(?, network_logo_url) END,
         tmdb_id = COALESCE(?, tmdb_id), tmdb_type = COALESCE(?, tmdb_type),
-        updated_at = datetime('now') WHERE id = ?`
+        updated_at = ${updatedAtFor(session)} WHERE id = ?`
   ).bind(title, finalNetwork, finalUrl, recommended_by, list, notes, movie, full_series, watching_with, archived,
     networkChanged ? 1 : 0, enriched.networkLogoUrl || null,
     enriched.tmdbId || null, enriched.tmdbType || null, params.id).run();

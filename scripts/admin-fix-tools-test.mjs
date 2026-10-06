@@ -317,5 +317,37 @@ console.log('\n== adds store genres and seasons');
   check('a new TV row carries genres and seasons from the first fetch', r && r.genres === 'Drama, Western, Family' && r.seasons_released === 2, err?.message || JSON.stringify(r && [r.genres, r.seasons_released]));
 }
 
+console.log('\n== an admin fix is not the member\'s activity');
+{
+  // updated_at drives the member-activity reports. A batch of admin fixes on
+  // 2026-10-04/05 moved it on ~140 rows and had to be restored from backup.
+  const env = seed();
+  const STAMP = '2026-09-01 00:00:00';
+  const id = addShow(env, 'eric', { tmdb: REMAKE, year: 2026, network: 'Peacock' });
+  const stamp = () => row(env, id).updated_at;
+
+  const ed = await run(env, 'admin_update_show', { member_slug: 'eric', show_id: id, network: 'netflix' });
+  check('an admin edit lands', !ed.err && row(env, id).network === 'Netflix', ed.err?.message);
+  check('and leaves updated_at alone', stamp() === STAMP, stamp());
+  await run(env, 'admin_move_show', { member_slug: 'eric', show_id: id, list: 'loved' });
+  check('so does an admin move', row(env, id).list === 'recommending' && stamp() === STAMP, `${row(env, id).list} ${stamp()}`);
+  await run(env, 'admin_archive_show', { member_slug: 'eric', show_id: id });
+  check('and an admin archive', row(env, id).archived === 1 && stamp() === STAMP, stamp());
+  await run(env, 'admin_restore_show', { member_slug: 'eric', show_id: id, list: 'watching' });
+  check('and an admin restore', row(env, id).archived === 0 && stamp() === STAMP, stamp());
+
+  const member = ctxFor(env, 'eric', ['shows:read', 'shows:write']);
+  await run(env, 'move_show', { show_id: id, list: 'awaiting' }, member);
+  check('the member\'s own move still bumps it', stamp() !== STAMP, stamp());
+
+  // Adds and ratings an admin makes for a member carry what the member told
+  // them, so they count as the member's.
+  const add = await run(env, 'admin_add_show', { member_slug: 'stacy', title: 'Frances Ha', tmdb_id: FILM, media_type: 'movie', list: 'loved', rating: 9 });
+  const added = add.err ? null : env._db.prepare('SELECT created_at, updated_at FROM shows WHERE id = ?').get(add.out.added.id);
+  check('an admin add stamps created_at', added && added.created_at && added.created_at !== STAMP, add.err?.message || JSON.stringify(added));
+  const rated = env._db.prepare("SELECT updated_at FROM show_ratings WHERE member_slug = 'stacy' AND tmdb_id = ?").get(FILM);
+  check('and its rating stamps the rating\'s updated_at', rated && !!rated.updated_at, JSON.stringify(rated));
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

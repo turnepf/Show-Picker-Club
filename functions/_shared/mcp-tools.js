@@ -1063,9 +1063,10 @@ async function targetMember(ctx, args) {
 // A ctx whose session is the target member's, so the handlers' owner checks
 // pass for their rows and only theirs. `email` stays the admin's display
 // name: it is what handlers stamp into added_by, so a show an admin added
-// says who added it.
+// says who added it. `acting_admin` keeps an admin's edit, move, archive or
+// restore off the member's updated_at (updatedAtFor in _shared/auth.js).
 function asMember(ctx, m) {
-  return { ...ctx, session: { member_slug: m.slug, email: ctx.session.email, expires_at: null } };
+  return { ...ctx, session: { member_slug: m.slug, email: ctx.session.email, expires_at: null, acting_admin: ctx.session.member_slug } };
 }
 
 async function logAdmin(ctx, m, action, detail) {
