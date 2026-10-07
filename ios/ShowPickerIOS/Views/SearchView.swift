@@ -129,7 +129,7 @@ struct SearchView: View {
             .onAppear { fieldFocused = true }
             .sheet(item: $adding) { target in
                 if let slug = auth.memberSlug {
-                    AddEditShowView(memberSlug: slug, existing: nil, initialList: initialList,
+                    AddEditShowView(memberSlug: slug, initialList: initialList,
                                     initialTitle: target.title, initialPick: target.hit) {
                         // Stay open: the show moves up into "On your lists",
                         // which is the confirmation, and the next one can be

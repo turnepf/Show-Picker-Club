@@ -55,7 +55,6 @@ struct MemberView: View {
     @State private var showingLogin = false
     @State private var showingImport = false
     @State private var showingSearch = false
-    @State private var editingShow: Show?
     // Programmatic push for taps while reordering: edit mode swallows
     // NavigationLink taps, so the row's tap gesture lands here instead.
     @State private var reorderDetail: Show?
@@ -164,10 +163,6 @@ struct MemberView: View {
                                 Button(role: .destructive) {
                                     Task { await archiveWithUndo(show) }
                                 } label: { Label("Archive", systemImage: "archivebox") }
-                                Button {
-                                    editingShow = show
-                                } label: { Label("Edit", systemImage: "pencil") }
-                                    .tint(.blue)
                             }
                         }
                         // One-tap promotions to the list each row should move to,
@@ -312,9 +307,6 @@ struct MemberView: View {
             // searching from Awaiting adds to Awaiting. On someone else's,
             // their list says nothing about yours, so it starts on Watching.
             SearchView(initialList: isMine ? currentList : .watching).environmentObject(auth)
-        }
-        .sheet(item: $editingShow) { show in
-            AddEditShowView(memberSlug: member.slug, existing: show) { await load() }
         }
         .sheet(isPresented: $showingImport) {
             if isMine {

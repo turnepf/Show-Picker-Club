@@ -18,7 +18,7 @@ ios/ShowPickerIOS/
     ├── HomeView.swift          Popular shelf + member list
     ├── MemberView.swift        Member's four lists with swipe-to-archive / edit
     ├── ShowDetailView.swift    Read-only detail + Edit + Watch
-    ├── AddEditShowView.swift   Sheet for add / edit
+    ├── AddEditShowView.swift   Sheet for adding a show (no edit — memos are edited on the show card)
     └── LoginView.swift         Sign in with Apple + one-time code entry
 ```
 
