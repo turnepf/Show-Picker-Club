@@ -153,21 +153,6 @@ tracking, so no App Tracking Transparency prompt is presented.
       questions) answered — for this app: no chat/messaging, no public UGC;
       lists and notes are visible only inside the private club.
 
-## 5b. Deferred Apple-side cleanup (carried from the 2026-08 approval removal)
-
-Backend approval was removed in migration 058, but the Apple targets were
-deliberately left on known-good code so the launch archive wouldn't build
-from unverified edits. The item below is safe to leave — nothing is
-broken — but clear it in the next build. (The inert approval queue was
-stripped from the iPhone/iPad app on 2026-10-07.)
-
-- [ ] **tvOS still credits the retired OMDB.** `GroupsListViewTV.swift` and
-      `tvos/ShowPickerTV/HomeView.swift` display "Ratings and metadata from
-      IMDb (via OMDb) and TMDB". TMDB has been the sole source since
-      2026-07. Replace with the string iOS and the web already use:
-      "Ratings and metadata from TMDB. This product uses the TMDB API but is
-      not endorsed or certified by TMDB." (iOS is already correct — only its
-      code comments mention OMDb.)
 ## 6. Standard build hygiene
 
 - [ ] Build/version number bumped and archived from a clean release build.
