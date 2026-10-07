@@ -47,7 +47,7 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## 1.6.1 (build 31) — iPhone, iPad, Mac and Apple TV
+## 1.6.1 (build 31) — iPhone, iPad, Mac and Apple TV, submitted for review 2026-10-07
 
 iPhone and iPad:
 
