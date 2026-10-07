@@ -43,11 +43,11 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## Unreleased — the update after 1.7
+## Unreleased — the update after 1.6.1
 
 ---
 
-## 1.7 (build 31) — iPhone, iPad, Mac and Apple TV
+## 1.6.1 (build 31) — iPhone, iPad, Mac and Apple TV
 
 iPhone, iPad and Mac:
 
