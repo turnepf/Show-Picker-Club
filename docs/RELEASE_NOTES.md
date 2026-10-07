@@ -49,7 +49,7 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ## 1.6.1 (build 31) — iPhone, iPad, Mac and Apple TV
 
-iPhone, iPad and Mac:
+iPhone and iPad:
 
 ```
 Ready for iPhone Duo. Unfold it and Show Picker Club spreads out into the iPad layout, with your lists in a sidebar; fold it and you're back on the phone layout, on the same screen you left.
@@ -65,9 +65,26 @@ Apple TV (`set-notes --platform TV_OS`) — no Duo layout on tvOS:
 Every show now comes from the show catalog, so it always has the right name, artwork and details. If a title can't be found, you'll be told so; if the catalog can't be reached, you'll be asked to try again in a few minutes.
 ```
 
+Mac (`set-notes --platform MAC_OS`). Mac 1.6 was withdrawn from review and its
+record renamed 1.6.1, so Mac users get 1.6's changes in this update too:
+
+```
+Ready for iPhone Duo. Unfold it and Show Picker Club spreads out into the iPad layout, with your lists in a sidebar; fold it and you're back on the phone layout, on the same screen you left.
+
+Every show now comes from the show catalog, so it always has the right name, artwork and details. If a title can't be found, you'll be told so (and list imports end with the titles to add by hand, which we also email you); if the catalog can't be reached, you'll be asked to try again in a few minutes.
+
+No more Edit screen. Write who you're watching with and your notes right on the show page — they save as soon as you move on. Ratings now sit at the bottom of the page, so a show with lots of seasons no longer pushes the show's details out of sight.
+
+Show pages now link to IMDb, say whether a series is returning, ended or was canceled, list the free services it's on (Tubi, Pluto TV and more), and name the character each actor plays.
+
+Looking at a show from a friend's list that isn't on yours? A hint beside My Lists now says to pick a list to add it.
+
+Shows that share a name are kept apart everywhere. Search shows which friends have the exact show you're looking at, adding from a friend's list adds that same show, and Trending, "Also watching", group recommendations and your vibe no longer mix them up.
+```
+
 ---
 
-## 1.6 (build 30) — iPhone, iPad, Mac and Apple TV, submitted for review 2026-10-04
+## 1.6 (build 30) — iPhone, iPad and Apple TV, submitted for review 2026-10-04 (Mac withdrawn and shipped as 1.6.1)
 
 iPhone, iPad and Mac:
 
