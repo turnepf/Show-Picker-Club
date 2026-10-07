@@ -230,6 +230,21 @@ title. A pinned lookup that fails saves the edit and leaves identity alone
 rather than guessing.
 
 ```bash
+node scripts/memo-save-test.mjs
+```
+
+A memo-only save never reaches TMDB. The show card saves Notes and Watching
+With every time the member leaves a field, and `PUT /api/shows/:id`
+re-enriched on every save, so each one cost a TMDB round trip and a lookup
+off the member's daily ceiling for fields no catalog lookup feeds. A body
+whose only changes are memos (`notes`, `watching_with`, `recommended_by`,
+`watcher_slugs`) now writes those alone. Pins both client shapes — the web
+sends just the memo, iOS sends the whole row back unchanged — and that any
+real change beside a memo (list, service, archive, TV/movie flip, a new pick)
+or a body with no memo at all still takes the full path and charges the
+lookup.
+
+```bash
 node scripts/url-cleanup-authz-test.mjs
 ```
 

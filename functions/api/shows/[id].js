@@ -139,6 +139,51 @@ export async function onRequestGet(context) {
   return new Response(JSON.stringify({ show: redacted, ratings, group_watchers, creators }), { headers: corsHeaders() });
 }
 
+// The member's own memos: owner-only text that no catalog lookup feeds or
+// depends on. `watcher_slugs` rides with watching_with (the linked half).
+const MEMO_KEYS = ['notes', 'watching_with', 'recommended_by', 'watcher_slugs'];
+
+// Whether a PUT body changes nothing but memos. It must carry at least one
+// memo, and every other field it carries must equal the row's current value
+// (an absent field is unchanged). Compared the way the full path reads them:
+// the title as the identity check does, the network after canonicalizing,
+// the flags as truthiness — iOS sends 1/0 where the row may hold 1/0 or null.
+function isMemoOnlySave(body, existing) {
+  if (!MEMO_KEYS.some((k) => body[k] !== undefined)) return false;
+  const same = (a, b) => (a ?? null) === (b ?? null);
+  const flag = (v) => !!Number(v);
+  for (const [k, v] of Object.entries(body)) {
+    if (MEMO_KEYS.includes(k)) continue;
+    switch (k) {
+      case 'title':
+        if (String(v || '').trim().toLowerCase() !== String(existing.title || '').trim().toLowerCase()) return false;
+        break;
+      case 'network':
+        if (!same(canonicalNetwork(v) || null, canonicalNetwork(existing.network) || null)) return false;
+        break;
+      case 'network_url':
+        if (!same(v || null, existing.network_url || null)) return false;
+        break;
+      case 'list':
+        if (v !== existing.list) return false;
+        break;
+      case 'movie': case 'full_series': case 'archived':
+        if (flag(v) !== flag(existing[k])) return false;
+        break;
+      case 'tmdb_id':
+        if (v != null && Number(v) !== Number(existing.tmdb_id)) return false;
+        break;
+      case 'tmdb_type':
+        if (v != null && v !== existing.tmdb_type) return false;
+        break;
+      default:
+        // A key this handler doesn't read can't change the row either way.
+        break;
+    }
+  }
+  return true;
+}
+
 export async function onRequestPut(context) {
   const { request, env, params } = context;
   const session = await getSession(request, env);
@@ -196,6 +241,29 @@ export async function onRequestPut(context) {
   const full_series = val('full_series');
   const watching_with = val('watching_with');
   const archived = val('archived');
+
+  // Memo-only save: the card's Notes / Watching With fields save every time
+  // the member leaves one, and nothing in them is TMDB's business. Every
+  // other field the body carries (the iOS card sends the whole row back as
+  // it was) must say what the row already says; then the save writes the
+  // memos alone — no re-enrichment, no lookup charged to the member's daily
+  // ceiling, no Watchmode refresh, no shared-row sync. Anything that does
+  // change what the show is, where it streams, or which list it's on takes
+  // the full path below.
+  if (isMemoOnlySave(body, existing)) {
+    await env.DB.prepare(
+      `UPDATE shows SET notes = ?, recommended_by = ?, watching_with = ?, updated_at = datetime('now') WHERE id = ?`
+    ).bind(notes, recommended_by, watching_with, params.id).run();
+    let saved = await env.DB.prepare('SELECT * FROM shows_v WHERE id = ?').bind(params.id).first();
+    const synced = await syncWatchers(env, {
+      show: saved, ownerSlug: session.member_slug, ownerEmail: session.email,
+      slugs: body.watcher_slugs !== undefined ? body.watcher_slugs : null,
+      rawWatchingWith: watching_with,
+    });
+    saved = await env.DB.prepare('SELECT * FROM shows_v WHERE id = ?').bind(params.id).first();
+    saved.watchers = synced.watchers;
+    return new Response(JSON.stringify({ show: saved }), { headers: corsHeaders() });
+  }
 
   // Every edit re-enriches, so owning the row is not a budget: an edit past
   // the member's daily lookup ceiling still saves what they typed, it just
