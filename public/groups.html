@@ -293,7 +293,7 @@
 
 
   </style>
-  <script src="/show-renderer.js?v=3"></script>
+  <script src="/show-renderer.js?v=4"></script>
   <script>
     // Set nav context before loading nav.js. No backLabel here on purpose:
     // updateNav() owns the label (it names the view the back button returns
@@ -357,7 +357,13 @@
 
     <!-- Show Detail -->
     <div id="showDetail">
-      <h2 id="showDetailTitle" style="margin: 0 0 20px; font-size: 22px; font-weight: 600;"></h2>
+      <!-- Share sits top right beside the title, where iOS keeps it. -->
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px;">
+        <h2 id="showDetailTitle" style="margin: 0; font-size: 22px; font-weight: 600;"></h2>
+        <button id="showDetailShare" aria-label="Share" title="Share"
+          onclick="if (detailShow) shareShow(detailShow.id, detailShow.title)"
+          style="display: none; background: none; border: none; padding: 8px; cursor: pointer; color: var(--tint); flex: 0 0 auto;"></button>
+      </div>
       <div id="showDetailContent" style="margin-bottom: 40px;"></div>
     </div>
 
@@ -947,6 +953,9 @@
       if (!detailShow) return;
       document.getElementById('pageTitle').textContent = detailShow.title;
       document.getElementById('showDetailTitle').textContent = detailShow.title;
+      const shareBtn = document.getElementById('showDetailShare');
+      if (!shareBtn.innerHTML) shareBtn.innerHTML = SHARE_ICON_SVG;
+      shareBtn.style.display = detailShow.id ? '' : 'none';
       // Same body as the main app's detail screen (show-renderer.js). Archive
       // is left off: the browsing stack here is for looking at somebody
       // else's list. Everything else — the list chips, Watching With and

@@ -275,6 +275,9 @@ function detailLanguageText(code) {
  * (functions/show/[id].js), same URL the iOS share sheet sends. Uses the
  * browser's share sheet where there is one, else copies the link.
  */
+// The share glyph for the title bar (iOS's square.and.arrow.up).
+const SHARE_ICON_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
+
 async function shareShow(id, title) {
   const url = `https://showpicker.club/show/${encodeURIComponent(id)}?title=${encodeURIComponent(title || '')}`;
   const text = `Check out ${title} — from Show Picker Club`;
@@ -600,11 +603,8 @@ function renderShowDetailBody(show, options = {}) {
     html += `<div class="detail-card"><div class="detail-card-title">Ratings</div>${ratingsInner}</div>`;
   }
 
-  // Share — the same /show/<id> link the iOS share sheet sends.
-  if (show.id) {
-    const args = escapeHtml(`${JSON.stringify(show.id)}, ${JSON.stringify(show.title || '')}`);
-    html += `<div class="detail-card"><button class="detail-action" onclick="shareShow(${args})">Share</button></div>`;
-  }
+  // Share is not in the body: it's the top-right button in each page's
+  // title bar, where iOS keeps it — at the bottom of the card nobody found it.
 
   return html;
 }

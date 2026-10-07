@@ -302,7 +302,7 @@ The **+** button on any show row opens a share modal. The original member can co
 
 There is no edit screen (retired 2026-10). Title, service and the catalog facts all come from TMDB, so the only things a member writes about a show they already have are **Watching with** and **Notes** — and both are edited right on the show card, in the My Lists section of your own copy. A text field saves when you leave it (tap elsewhere, Return in Watching with, Done on the iPhone keyboard, or back out of the card); a group-mate chip saves on the tap. Nothing is sent when the field didn't change. Ratings are tapped in on the same card. Recommended by is set when you add a show and shown read-only afterwards. An archived copy shows its memos read-only until it's back on a list.
 
-The card's order is: image, tagline/overview, Also watching + where to watch, Cast, My Lists, the catalog facts (type, year, series, status, genres, runtime, next episode, rated, language), and **Ratings last** — a long series grows one rating row per season, and with Ratings in the middle that buried the catalog facts below it. (On the web a Share button follows Ratings.)
+The card's order is: image, tagline/overview, Also watching + where to watch, Cast, My Lists, the catalog facts (type, year, series, status, genres, runtime, next episode, rated, language), and **Ratings last** — a long series grows one rating row per season, and with Ratings in the middle that buried the catalog facts below it. Share is the top-right button in the title bar on every platform, never a section of the card.
 
 Archive sits on the card and in the row's swipe (iPhone/iPad) or ⋯ menu (web). Archive sets `archived=1`; archived shows are still searchable but don't appear in lists, trending, or vibe.
 
