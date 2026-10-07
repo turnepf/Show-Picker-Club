@@ -256,10 +256,14 @@ async function appPlatforms() {
 // cannot create a new version of the App in the current state" while another
 // release is in flight; with nothing in flight it works, and that's the
 // normal case for a release that ships all platforms together.
-async function cmdCreateVersion(versionString) {
-  if (!versionString) die('usage: create-version <version>');
+// --platform IOS,TV_OS limits the create to those platforms: Apple refuses the
+// API create on a platform whose previous version is still in review, and the
+// others needn't wait for it.
+async function cmdCreateVersion(versionString, only) {
+  if (!versionString) die('usage: create-version <version> [--platform IOS,TV_OS]');
   const have = new Set((await versions(versionString)).map(v => v.attributes.platform));
   for (const platform of await appPlatforms()) {
+    if (only && !only.includes(platform)) { console.log(`  ${platform}: skipped`); continue; }
     if (have.has(platform)) { console.log(`  ${platform}: ${versionString} already exists`); continue; }
     await call('POST', '/v1/appStoreVersions', {
       data: {
@@ -367,7 +371,15 @@ switch (cmd) {
   }
   case 'attach': await cmdAttach(rest[0], rest[1]); break;
   case 'upload': await cmdUpload(rest[0]); break;
-  case 'create-version': await cmdCreateVersion(rest[0]); break;
+  case 'create-version': {
+    const i = rest.indexOf('--platform');
+    const only = i === -1 ? null : (rest[i + 1] || '').split(',');
+    if (only && !only.every(p => ['IOS', 'MAC_OS', 'TV_OS'].includes(p))) {
+      die(`--platform needs IOS, MAC_OS or TV_OS, comma-separated (got ${rest[i + 1] || 'nothing'})`);
+    }
+    await cmdCreateVersion(rest[0], only);
+    break;
+  }
   case 'submit': await cmdSubmit(rest[0], rest[1]); break;
   default:
     console.log('usage: node scripts/asc.mjs <status | create-version <version> | set-notes <version> <file> | attach <version> <build> | upload <file> | submit <version> [--confirm]>');

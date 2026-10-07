@@ -314,8 +314,10 @@ It skips a platform that already has the version. While a release is in
 flight on another platform, Apple refuses the create with *"You cannot create
 a new version of the App in the current state"* (a throwaway version string
 draws the same error — the block is the app's state, not the version number).
-In that case create the record **in the web UI** with **＋ Version or
-Platform**, which does it without complaint. This cost real time in 1.4.
+In that case create the others with `--platform`, leaving out the one still
+in review (1.7: Mac 1.6 was in review, so
+`create-version 1.7 --platform IOS,TV_OS`), or create the record **in the web
+UI** with **＋ Version or Platform**.
 
 **6. Set the What's New text with the tool, not by pasting three times.**
 Extract the fenced block from the current version's section of
