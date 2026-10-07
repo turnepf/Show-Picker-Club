@@ -1056,6 +1056,7 @@
       font-weight: 700; font-size: 20px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+    .detail-nav .detail-nav-share { margin-left: auto; margin-right: -6px; }
     .detail-body { max-width: 640px; margin: 16px auto 60px; padding: 0 14px; }
     /* Click the detail poster to view it full screen; click again to close. */
     .poster-lightbox {
@@ -1479,6 +1480,10 @@
       <div class="detail-nav-inner">
         <button onclick="detailBack()" aria-label="Back">&#8249; Back</button>
         <span class="detail-nav-title" id="detailNavTitle"></span>
+        <!-- Share, top right as on iOS — the same /show/<id> link. Hidden
+             until a show with an id has loaded. -->
+        <button class="detail-nav-share" id="detailShareBtn" aria-label="Share" title="Share"
+          style="display:none" onclick="if (detailShow) shareShow(detailShow.id, detailShow.title)"></button>
       </div>
     </div>
     <div class="detail-body" id="detailBody"></div>
@@ -1745,7 +1750,7 @@
   </div>
 
   <script type="text/javascript" src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
-  <script src="/show-renderer.js?v=3"></script>
+  <script src="/show-renderer.js?v=4"></script>
   <script>
     // Set nav context before loading nav.js
     window.navContext = { page: 'home' };
@@ -4627,6 +4632,7 @@
       const page = document.getElementById('detailPage');
       const body = document.getElementById('detailBody');
       document.getElementById('detailNavTitle').textContent = '';
+      document.getElementById('detailShareBtn').style.display = 'none';
       body.innerHTML = '<div class="loading">Loading…</div>';
       page.classList.add('open');
       document.body.style.overflow = 'hidden';
@@ -4699,6 +4705,9 @@
       // section would vanish on every such re-render.
       if (ratings !== undefined) detailRatings = ratings;
       document.getElementById('detailNavTitle').textContent = show.title;
+      const shareBtn = document.getElementById('detailShareBtn');
+      if (!shareBtn.innerHTML) shareBtn.innerHTML = SHARE_ICON_SVG;
+      shareBtn.style.display = show.id ? '' : 'none';
       // The body itself is shared with the groups page (show-renderer.js) so
       // the two detail screens can't drift apart. Archive is ours only.
       document.getElementById('detailBody').innerHTML = renderShowDetailBody(show, {
