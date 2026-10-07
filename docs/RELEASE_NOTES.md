@@ -43,7 +43,11 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## Unreleased — the update after 1.6
+## Unreleased — the update after 1.7
+
+---
+
+## 1.7 (build 31) — iPhone, iPad, Mac and Apple TV
 
 iPhone, iPad and Mac:
 
@@ -53,6 +57,12 @@ Ready for iPhone Duo. Unfold it and Show Picker Club spreads out into the iPad l
 Every show now comes from the show catalog, so it always has the right name, artwork and details. If a title can't be found, you'll be told so (and list imports end with the titles to add by hand, which we also email you); if the catalog can't be reached, you'll be asked to try again in a few minutes.
 
 No more Edit screen. Write who you're watching with and your notes right on the show page — they save as soon as you move on. Ratings now sit at the bottom of the page, so a show with lots of seasons no longer pushes the show's details out of sight.
+```
+
+Apple TV (`set-notes --platform TV_OS`) — no Duo layout on tvOS:
+
+```
+Every show now comes from the show catalog, so it always has the right name, artwork and details. If a title can't be found, you'll be told so; if the catalog can't be reached, you'll be asked to try again in a few minutes.
 ```
 
 ---
