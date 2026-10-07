@@ -157,8 +157,9 @@ tracking, so no App Tracking Transparency prompt is presented.
 
 Backend approval was removed in migration 058, but the Apple targets were
 deliberately left on known-good code so the launch archive wouldn't build
-from unverified edits. Both items below are safe to leave — nothing is
-broken — but clear them in the first build after the apps have shipped.
+from unverified edits. The item below is safe to leave — nothing is
+broken — but clear it in the next build. (The inert approval queue was
+stripped from the iPhone/iPad app on 2026-10-07.)
 
 - [ ] **tvOS still credits the retired OMDB.** `GroupsListViewTV.swift` and
       `tvos/ShowPickerTV/HomeView.swift` display "Ratings and metadata from
@@ -167,15 +168,6 @@ broken — but clear them in the first build after the apps have shipped.
       "Ratings and metadata from TMDB. This product uses the TMDB API but is
       not endorsed or certified by TMDB." (iOS is already correct — only its
       code comments mention OMDb.)
-- [ ] **Strip the inert approval queue from the iPhone/iPad app.** The
-      endpoints it calls are gone, so it renders empty and degrades cleanly
-      (see the note in `docs/ARCHITECTURE.md` under [Frontend pages](ARCHITECTURE.md#frontend-pages)). To
-      remove: the queue sections in `ManageMembersView.swift`,
-      `SignupRequest`/`CreateMemberResult` in `Models.swift`,
-      `signupRequests()`/`actOnSignupRequest()`/`approveMember()` in
-      `API.swift`, `WelcomeIntroPanel.swift`, and the `AdminView` waiting
-      badge.
-
 ## 6. Standard build hygiene
 
 - [ ] Build/version number bumped and archived from a clean release build.

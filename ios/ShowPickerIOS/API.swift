@@ -313,26 +313,6 @@ enum API {
         try await get("/api/reporting")
     }
 
-    // Pending /join signup requests (operator only).
-    static func signupRequests() async throws -> [SignupRequest] {
-        let r: SignupRequestsResponse = try await get("/api/admin-signup-requests")
-        return r.requests
-    }
-
-    // Approve or reject a signup request; decodes the body either way so the
-    // caller can show the server's message (e.g. a phone clash on approve).
-    static func actOnSignupRequest(id: Int, action: String, notes: String? = nil) async throws -> SignupActionResult {
-        guard let url = URL(string: baseString + "/api/admin-signup-requests") else { throw APIError.badURL }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        var body: [String: Any] = ["id": id, "action": action]
-        if let n = notes { body["notes"] = n }
-        req.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, _) = try await URLSession.shared.data(for: req)
-        return try JSONDecoder().decode(SignupActionResult.self, from: data)
-    }
-
     // URL-cleanup queue: titles still on a placeholder network URL (operator).
     static func urlCleanupQueue() async throws -> UrlCleanupResponse {
         try await postDecoding("/api/admin-url-cleanup", body: ["action": "list"])
@@ -510,12 +490,6 @@ enum API {
     static func setMemberDisabled(slug: String, disabled: Bool) async throws -> AdminActionResult {
         try await postDecoding("/api/admin-member-disable",
                                body: ["slug": slug, "action": disabled ? "disable" : "enable"])
-    }
-
-    // Approve a held self-enrolled member onto the roster (members.approved).
-    static func approveMember(slug: String) async throws -> AdminActionResult {
-        try await postDecoding("/api/admin-member-approve",
-                               body: ["slug": slug, "action": "approve"])
     }
 
     // Admin hand-off: promote or demote members.is_admin. The server refuses

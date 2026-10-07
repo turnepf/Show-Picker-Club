@@ -1,14 +1,11 @@
 import SwiftUI
 
 // Operator tool: the single member-administration hub, mirroring the web
-// /members page capability-for-capability. The new-members queue (pending
-// /join requests via /api/admin-signup-requests + held self-enrolled
-// members via /api/admin-member-approve) sits at the top and disappears
-// once everything is processed and hidden; then the full roster — rename,
-// edit login emails/phones, disable/enable, approve held members, and hand
-// off the admin role (GET/POST /api/admin-member-emails,
-// /api/admin-member-disable, /api/admin-member-approve,
+// /members page capability-for-capability. The full roster — rename, edit
+// login emails/phones, disable/enable, and hand off the admin role
+// (GET/POST /api/admin-member-emails, /api/admin-member-disable,
 // /api/admin-member-role). Reached from AdminView → Manage members.
+// Everyone self-enrolls (migration 058), so there is no approval queue.
 //
 // The "Possible duplicates" panel (heuristic detection + merge/ignore UI)
 // was removed here and on the web — Patrick decided not to keep worrying
@@ -18,48 +15,14 @@ import SwiftUI
 // real duplicate turns up, just with no UI trigger anywhere.
 struct ManageMembersView: View {
     @State private var members: [AdminMember] = []
-    @State private var requests: [SignupRequest] = []
     @State private var loading = true
-    @State private var working: Int?
-    @State private var workingSlug: String?
-    @State private var banner: String?
 
     // Tap a platform badge above the roster to show only members who've
     // ever used it; tap the active one again to clear. nil = no filter.
     @State private var platformFilter: String?
 
-    // Reject-with-note (the web's prompt() equivalent).
-    @State private var rejectTarget: SignupRequest?
-    @State private var rejectNote = ""
-
-    private var held: [AdminMember] { members.filter { $0.approved == false } }
-    private var pendingRequests: [SignupRequest] { requests.filter { $0.status == "pending" } }
-    private var reviewed: [SignupRequest] { requests.filter { $0.status != "pending" } }
-
     var body: some View {
         List {
-            if let b = banner {
-                Section { Text(b).font(.callout) }
-            }
-            if !held.isEmpty {
-                Section {
-                    ForEach(held) { heldRow($0) }
-                } header: {
-                    Text("Held members (\(held.count))")
-                } footer: {
-                    Text("Self-enrolled via Apple/Google — they can already use their own lists, but stay off the roster until approved.")
-                }
-            }
-            if !pendingRequests.isEmpty {
-                Section("Pending requests (\(pendingRequests.count))") {
-                    ForEach(pendingRequests) { pendingRow($0) }
-                }
-            }
-            if !reviewed.isEmpty {
-                Section("Processed — hide when done") {
-                    ForEach(reviewed) { reviewedRow($0) }
-                }
-            }
             Section {
                 platformFilterRow
             } header: {
@@ -84,169 +47,6 @@ struct ManageMembersView: View {
         .overlay { if loading && members.isEmpty { ProgressView() } }
         .task { await load() }
         .refreshable { await load() }
-        .alert(
-            "Reject \(rejectTarget?.fullName ?? "request")?",
-            isPresented: Binding(get: { rejectTarget != nil }, set: { if !$0 { rejectTarget = nil } }),
-            presenting: rejectTarget
-        ) { r in
-            TextField("Optional note (kept for your records)", text: $rejectNote)
-            Button("Reject", role: .destructive) {
-                let note = rejectNote
-                rejectNote = ""
-                Task { await act(r, action: "reject", notes: note) }
-            }
-            Button("Cancel", role: .cancel) { rejectNote = "" }
-        } message: { _ in
-            Text("The note is not sent to the requester.")
-        }
-    }
-
-    // ---- New-members queue (moved here from the retired New members screen) ----
-
-    @ViewBuilder private func heldRow(_ m: AdminMember) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(m.personName).font(.body)
-            Text(heldContact(m)).font(.caption).foregroundStyle(.secondary)
-            HStack(spacing: 12) {
-                Button {
-                    Task { await approveHeld(m) }
-                } label: {
-                    Label("Approve", systemImage: "checkmark.circle.fill")
-                }
-                .buttonStyle(.borderless)
-                .tint(.green)
-                Spacer()
-                if workingSlug == m.slug { ProgressView() }
-            }
-            .disabled(workingSlug != nil)
-        }
-        .padding(.vertical, 2)
-    }
-
-    private func heldContact(_ m: AdminMember) -> String {
-        var parts: [String] = ["@\(m.slug)"]
-        if let via = m.enrolledVia, !via.isEmpty { parts.append("via \(via)") }
-        if let email = m.emails.first { parts.append(email) }
-        return parts.joined(separator: " · ")
-    }
-
-    private func approveHeld(_ m: AdminMember) async {
-        workingSlug = m.slug
-        defer { workingSlug = nil }
-        banner = nil
-        do {
-            let res = try await API.approveMember(slug: m.slug)
-            if let e = res.error { banner = "Couldn't approve: \(e)" }
-            else { banner = "Approved \(m.personName)" }
-            await load()
-        } catch {
-            banner = "Network error. Try again."
-        }
-    }
-
-    @ViewBuilder private func pendingRow(_ r: SignupRequest) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(r.fullName).font(.body)
-            contactLinks(email: r.email, phone: r.phone)
-            // The /join form's "how do you know Patrick" answer — often the
-            // deciding signal, so it shows right on the card like the web.
-            if let s = r.source, !s.isEmpty {
-                Text(s)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 6))
-            }
-            HStack(spacing: 12) {
-                Button {
-                    Task { await act(r, action: "approve") }
-                } label: {
-                    Label("Approve", systemImage: "checkmark.circle.fill")
-                }
-                .buttonStyle(.borderless)
-                .tint(.green)
-                Button(role: .destructive) {
-                    rejectTarget = r
-                } label: {
-                    Label("Reject", systemImage: "xmark.circle")
-                }
-                .buttonStyle(.borderless)
-                Spacer()
-                if working == r.id { ProgressView() }
-            }
-            .disabled(working != nil)
-        }
-        .padding(.vertical, 2)
-    }
-
-    // mailto:/tel: links so a tap starts the conversation, like the web card.
-    @ViewBuilder private func contactLinks(email: String?, phone: String?) -> some View {
-        HStack(spacing: 14) {
-            if let e = email, !e.isEmpty, let u = URL(string: "mailto:\(e)") {
-                Link(e, destination: u)
-            }
-            if let p = phone, !p.isEmpty,
-               let u = URL(string: "tel:\(p.replacingOccurrences(of: " ", with: ""))") {
-                Link(p, destination: u)
-            }
-        }
-        .font(.caption)
-    }
-
-    // Processed rows carry a Hide: dismisses the request for good (the
-    // server stops returning it), so the queue empties once handled.
-    // Approved rows keep the welcome intro handy until hidden.
-    @ViewBuilder private func reviewedRow(_ r: SignupRequest) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(r.fullName).font(.body)
-            HStack(spacing: 6) {
-                Text(r.status.capitalized)
-                    .foregroundStyle(r.status == "approved" ? .green : .secondary)
-                if let s = r.createdMemberSlug { Text("· @\(s)") }
-                if let by = r.reviewedBy, !by.isEmpty { Text("· by \(by)") }
-                Spacer()
-                if working == r.id {
-                    ProgressView()
-                } else {
-                    Button("Hide") { Task { await act(r, action: "hide") } }
-                        .buttonStyle(.borderless)
-                        .disabled(working != nil)
-                }
-            }
-            .font(.caption)
-            if let n = r.notes, !n.isEmpty {
-                Text(n).font(.caption).foregroundStyle(.secondary)
-            }
-            if r.status == "approved", let slug = r.createdMemberSlug {
-                WelcomeIntroPanel(
-                    slug: slug,
-                    displayName: r.fullName.split(separator: " ").first.map(String.init) ?? slug,
-                    phone: r.phone)
-            }
-        }
-    }
-
-    private func act(_ r: SignupRequest, action: String, notes: String? = nil) async {
-        working = r.id
-        defer { working = nil }
-        banner = nil
-        do {
-            let trimmed = notes?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let res = try await API.actOnSignupRequest(
-                id: r.id, action: action,
-                notes: (trimmed?.isEmpty ?? true) ? nil : trimmed)
-            if let e = res.error {
-                banner = "Couldn't \(action): \(e)"
-            } else if action == "approve" {
-                banner = "Approved \(r.fullName)" + (res.created?.slug.map { " → @\($0)" } ?? "")
-            } else if action == "reject" {
-                banner = "Rejected \(r.fullName)"
-            }
-            await load()
-        } catch {
-            banner = "Network error. Try again."
-        }
     }
 
     // ---- Roster ----
@@ -257,7 +57,6 @@ struct ManageMembersView: View {
                 Text(m.personName).font(.body)
                 if m.isAdmin == true { statusTag("ADMIN", .blue) }
                 if m.disabled == true { statusTag("DISABLED", .red) }
-                if m.approved == false { statusTag("PENDING", .orange) }
             }
             Text(contactSummary(m)).font(.caption).foregroundStyle(.secondary)
             Text(lastActivityText(m.lastActivityAt)).font(.caption).foregroundStyle(.secondary)
@@ -344,7 +143,6 @@ struct ManageMembersView: View {
         loading = true
         defer { loading = false }
         members = (try? await API.adminMembers()) ?? []
-        requests = (try? await API.signupRequests()) ?? []
     }
 }
 
@@ -444,7 +242,6 @@ struct MemberDetailAdminView: View {
     @State private var emails: String
     @State private var phones: String
     @State private var isDisabled: Bool
-    @State private var isApproved: Bool
     @State private var isAdmin: Bool
     @State private var working = false
     @State private var banner: String?
@@ -459,7 +256,6 @@ struct MemberDetailAdminView: View {
         _emails = State(initialValue: member.emails.joined(separator: ", "))
         _phones = State(initialValue: member.phones.joined(separator: ", "))
         _isDisabled = State(initialValue: member.disabled ?? false)
-        _isApproved = State(initialValue: member.approved ?? true)
         _isAdmin = State(initialValue: member.isAdmin ?? false)
     }
 
@@ -518,15 +314,6 @@ struct MemberDetailAdminView: View {
             }
 
             Section {
-                if !isApproved {
-                    Button {
-                        Task { await approve() }
-                    } label: {
-                        Label("Approve member", systemImage: "checkmark.circle.fill")
-                    }
-                    .tint(.orange)
-                }
-
                 Button {
                     confirmAdmin = true
                 } label: {
@@ -574,7 +361,6 @@ struct MemberDetailAdminView: View {
         var bits: [String] = []
         if isAdmin { bits.append("Admin.") }
         if isDisabled { bits.append("Disabled — can't log in.") }
-        if !isApproved { bits.append("Held — hidden from the roster until approved.") }
         return bits.isEmpty ? "Active member." : bits.joined(separator: " ")
     }
 
@@ -597,10 +383,6 @@ struct MemberDetailAdminView: View {
                 dismiss()
             }
         } catch { banner = "Network error. Try again." }
-    }
-
-    private func approve() async {
-        await run { try await API.approveMember(slug: member.slug) } onOK: { isApproved = true }
     }
 
     private func toggleAdmin() async {
