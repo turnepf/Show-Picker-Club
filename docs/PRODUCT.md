@@ -58,7 +58,7 @@ Only people you already share a group with are offered, and only they can be nam
 
 Who's named stays as private as the field itself: only you see the Watching with on your own rows, whether it's a typed name or a linked member.
 
-Platforms: **iPhone/iPad** get the picker (in the Add/Edit sheet). **Apple TV and the watch** render the resulting text like they always have — both are view-only, so neither can tag. **The web** gets the same picker in its Add/Edit form (2026-10).
+Platforms: **iPhone/iPad** get the picker in the Add sheet and, for a show already on your lists, as chips under Watching with on the show card — a tap saves straight away, so it puts the show on their list at once. **Apple TV and the watch** render the resulting text like they always have — both are view-only, so neither can tag. **The web** gets the same picker in its Add form and on the show card (2026-10).
 
 ### Where it streams now
 
@@ -298,9 +298,15 @@ Any logged-in member can suggest a show to any other member via the **Suggest a 
 
 The **+** button on any show row opens a share modal. The original member can copy the show to their own other list (rare) or to any other member's Next Up. The whole show — including rating, network link, cast, and notes — carries over.
 
-### Edit, archive
+### Memos on the show card, archive
 
-Logged in as yourself, every row gets Edit and Archive buttons inline. Editing re-runs enrichment if the title changes. Archive sets `archived=1`; archived shows are still searchable but don't appear in lists, trending, or vibe.
+There is no edit screen (retired 2026-10). Title, service and the catalog facts all come from TMDB, so the only things a member writes about a show they already have are **Watching with** and **Notes** — and both are edited right on the show card, in the My Lists section of your own copy. A text field saves when you leave it (tap elsewhere, Return in Watching with, Done on the iPhone keyboard, or back out of the card); a group-mate chip saves on the tap. Nothing is sent when the field didn't change. Ratings are tapped in on the same card. Recommended by is set when you add a show and shown read-only afterwards. An archived copy shows its memos read-only until it's back on a list.
+
+The card's order is: image, tagline/overview, Also watching + where to watch, Cast, My Lists, the catalog facts (type, year, series, status, genres, runtime, next episode, rated, language), and **Ratings last** — a long series grows one rating row per season, and with Ratings in the middle that buried the catalog facts below it. (On the web a Share button follows Ratings.)
+
+Archive sits on the card and in the row's swipe (iPhone/iPad) or ⋯ menu (web). Archive sets `archived=1`; archived shows are still searchable but don't appear in lists, trending, or vibe.
+
+Platforms: iPhone/iPad (Mac via Catalyst) and the web, on every page that opens a show card. Apple TV and the watch are view-only and unchanged; Roku has no show editing.
 
 ## Web app status
 
@@ -354,7 +360,8 @@ PWA was retired in 2026-08 and stays retired).
    notice, rename by any member, invite limits, invite links that survive
    signing in, and the NEW flag on Groups. **Done.**
 4. Add / edit — the Watching With member picker, the server's network list,
-   the Archived toggle, multi-line Notes. **Done.** (Find a Show on someone
+   multi-line Notes. **Done.** (Edit itself was retired on every platform in
+   2026-10: memos are edited on the show card instead.) (Find a Show on someone
    else's page still opens the short "add to my list" form.)
 5. Calendar screen; household invite and join. **Done.**
 6. Import a list. **Done.**

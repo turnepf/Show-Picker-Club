@@ -360,8 +360,11 @@ const DETAIL_CHIP_COLORS = {
  *   myCopy:      my own row for this title (active or archived), or null
  *   ratings:     { average, count, seasons, mine, mineSeasons, owner,
  *                  ownerSeasons, ownerName } from GET /api/shows/:id
- *   showActions: boolean — include Edit/Archive in My Lists (main app only;
- *                the groups page has no edit modal to open)
+ *   showActions: boolean — include Archive in My Lists (main app only)
+ *
+ * Watching With and Notes on my own active copy are edited right on the
+ * card — there's no edit screen — on every page that renders one; see
+ * detailMemoSave below.
  */
 function renderShowDetailBody(show, options = {}) {
   const {
@@ -527,22 +530,25 @@ function renderShowDetailBody(show, options = {}) {
     let memberInner = `<div class="list-chips detail-list-chips">${chips}</div>`;
     if (myCopy && myCopy.archived) memberInner += detailRow('Status', 'Archived');
     if (myCopy && myCopy.recommended_by) memberInner += detailRow('Recommended by', escapeHtml(myCopy.recommended_by));
-    if (myCopy && myCopy.watching_with) memberInner += detailRow('Watching with', escapeHtml(myCopy.watching_with));
+    // An archived copy shows its memos read-only; an active one gets the
+    // editable fields below.
+    const editable = !!(myCopy && !myCopy.archived);
+    if (!editable && myCopy && myCopy.watching_with) memberInner += detailRow('Watching with', escapeHtml(myCopy.watching_with));
     // Why a title you never added is on your list: the group-mate whose
     // Watching With tag put it there. Owner-only, absent on your own adds.
     if (myCopy && myCopy.added_by_member && myCopy.added_by_member.name) {
       memberInner += detailRow('Added by', escapeHtml(myCopy.added_by_member.name));
     }
-    if (myCopy && myCopy.notes) memberInner += `<div class="detail-prose"><strong>Notes:</strong> ${escapeHtml(myCopy.notes)}</div>`;
-    // Edit / Archive live here in the member section (only for a copy I
-    // actively have) — no separate actions card at the bottom.
+    if (!editable && myCopy && myCopy.notes) memberInner += `<div class="detail-prose"><strong>Notes:</strong> ${escapeHtml(myCopy.notes)}</div>`;
+    if (editable) memberInner += detailMemoEditorsHtml(myCopy);
+    // Archive lives here in the member section (only for a copy I actively
+    // have) — no separate actions card at the bottom.
     // Put this show on a group's Watch Next board. It recommends MY copy, so
     // it shows only when the title is on one of my lists and I'm in a group.
     if (myCopy && !myCopy.archived && groups.length) {
       memberInner += `<button class="detail-action" onclick="recommendToGroup(${Number(myCopy.id)})">Recommend to group</button>`;
     }
     if (showActions && myCopy && !myCopy.archived) {
-      memberInner += `<button class="detail-action" onclick="detailEdit(${myCopy.id})">Edit</button>`;
       memberInner += `<button class="detail-action danger" onclick="detailArchive(${myCopy.id})">Archive</button>`;
     }
     // On a show that isn't mine (a group-mate's, Trending), say what the
@@ -552,7 +558,12 @@ function renderShowDetailBody(show, options = {}) {
   }
 
 
-  // Ratings — directly below My Lists. Club Rating shows on every card,
+  // The remaining catalog data (type, genres, dates, …), above Ratings: a
+  // long-running show grows a rating row per season, and with Ratings in the
+  // middle that pushed these facts so far down nobody scrolled to them.
+  if (rows.length) html += `<div class="detail-card">${rows.join('')}</div>`;
+
+  // Ratings — the last section of the card. Club Rating shows on every card,
   // logged in or not; a specific member's own rating shows when viewing
   // their copy; entry is gated to lists other than Next Up, matching the
   // backend's own gating in functions/api/shows/[id]/rating.js. Nothing
@@ -589,8 +600,6 @@ function renderShowDetailBody(show, options = {}) {
     html += `<div class="detail-card"><div class="detail-card-title">Ratings</div>${ratingsInner}</div>`;
   }
 
-  // The remaining catalog data (type, genres, dates, …), grouped below.
-  if (rows.length) html += `<div class="detail-card">${rows.join('')}</div>`;
   // Share — the same /show/<id> link the iOS share sheet sends.
   if (show.id) {
     const args = escapeHtml(`${JSON.stringify(show.id)}, ${JSON.stringify(show.title || '')}`);
@@ -599,3 +608,163 @@ function renderShowDetailBody(show, options = {}) {
 
   return html;
 }
+
+// ── Watching With + Notes, edited in place ───────────────────────────────
+// The only member-written fields left on a show — title, service and the
+// catalog facts are TMDB's — so they're edited right on the card instead of
+// in an edit screen. A text field saves when the member leaves it (the
+// `change` event); a group-mate chip saves on the tap. Same rules as iOS
+// ShowDetailView.saveMemos, and the same PUT /api/shows/:id the old edit
+// form used, sending only the memo that changed.
+let detailMemoCopy = null;        // the copy the fields on screen belong to
+let detailMemoMates = null;       // [{slug, name, groups}] once fetched
+let detailMemoSelected = new Set();
+let detailMemoQueue = Promise.resolve();
+let detailMemoInflight = null;    // {id, notes, watching_with} while saving
+
+// The composed watching_with minus the linked names = what the member typed.
+// Mirror of composeWatchingWith() in functions/_shared/watchers.js.
+function detailMemoFreeText(composed, names) {
+  const linked = new Set(names.map(n => String(n).trim().toLowerCase()));
+  return String(composed || '').split(',').map(x => x.trim())
+    .filter(x => x && !linked.has(x.toLowerCase())).join(', ');
+}
+
+function detailMemoWatchersKnown(copy) { return Array.isArray(copy && copy.watchers); }
+
+// What the text field shows: only the typed half when the row says who it
+// links (they're the chips), the whole string when it can't.
+function detailMemoSavedFree(copy) {
+  return detailMemoWatchersKnown(copy)
+    ? detailMemoFreeText(copy.watching_with, copy.watchers.map(w => w.name))
+    : (copy.watching_with || '');
+}
+
+function detailMemoEditorsHtml(copy) {
+  detailMemoCopy = copy;
+  detailMemoSelected = new Set((copy.watchers || []).map(w => w.slug));
+  // A save still landing for this row wins over the copy we were handed —
+  // a list move re-renders from a re-fetch that may predate it.
+  const pending = detailMemoInflight && detailMemoInflight.id === copy.id ? detailMemoInflight : null;
+  const notes = pending ? pending.notes : (copy.notes || '');
+  const free = pending ? pending.watching_with : detailMemoSavedFree(copy);
+  if (pending && pending.slugs) detailMemoSelected = new Set(pending.slugs);
+  // Chips are filled in once the group-mates load; the markup is static.
+  setTimeout(detailMemoRenderChips, 0);
+  if (detailMemoMates === null) detailMemoLoadMates();
+  return `<div class="detail-memo">
+      <label class="detail-memo-label" for="detailMemoWatching">Watching with</label>
+      <div class="detail-memo-chips hidden" id="detailMemoChips"></div>
+      <input type="text" class="detail-memo-input" id="detailMemoWatching" autocomplete="off"
+        value="${escapeHtml(free)}" placeholder="Who are you watching with?"
+        onchange="detailMemoSave()" onkeydown="if (event.key === 'Enter') this.blur()">
+      <div class="detail-memo-hint hidden" id="detailMemoHint"></div>
+    </div>
+    <div class="detail-memo">
+      <label class="detail-memo-label" for="detailMemoNotes">Notes</label>
+      <textarea class="detail-memo-input" id="detailMemoNotes" rows="3" placeholder="Add a note"
+        onchange="detailMemoSave()">${escapeHtml(notes)}</textarea>
+    </div>`;
+}
+
+async function detailMemoLoadMates() {
+  detailMemoMates = [];
+  try {
+    const res = await fetch('/api/group-members');
+    if (res.ok) detailMemoMates = (await res.json()).members || [];
+  } catch (e) {}
+  detailMemoRenderChips();
+}
+
+function detailMemoRenderChips() {
+  const box = document.getElementById('detailMemoChips');
+  const hint = document.getElementById('detailMemoHint');
+  const input = document.getElementById('detailMemoWatching');
+  if (!box || !detailMemoCopy) return;
+  // Someone linked here who has since left my groups stays a chip, so the
+  // next save doesn't silently unlink them.
+  const mates = (detailMemoMates || []).slice();
+  for (const w of detailMemoCopy.watchers || []) {
+    if (!mates.some(m => m.slug === w.slug)) mates.push({ slug: w.slug, name: w.name });
+  }
+  if (!mates.length) { box.classList.add('hidden'); hint.classList.add('hidden'); return; }
+  box.innerHTML = mates.map(m => {
+    const on = detailMemoSelected.has(m.slug);
+    return `<button type="button" class="detail-memo-chip${on ? ' selected' : ''}" data-slug="${escapeHtml(m.slug)}" aria-pressed="${on}">${on ? '✓ ' : ''}${escapeHtml(m.name)}</button>`;
+  }).join('');
+  box.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    const slug = b.dataset.slug;
+    if (detailMemoSelected.has(slug)) detailMemoSelected.delete(slug); else detailMemoSelected.add(slug);
+    detailMemoRenderChips();
+    detailMemoSave();
+  }));
+  box.classList.remove('hidden');
+  if (input) input.placeholder = 'Someone else';
+  // Say plainly what a tap does to the other person's library.
+  const picked = mates.filter(m => detailMemoSelected.has(m.slug)).map(m => m.name);
+  hint.textContent = picked.length
+    ? `Also on ${picked.length > 1 ? picked.slice(0, -1).join(', ') + ' and ' + picked[picked.length - 1] : picked[0]}’s ${picked.length > 1 ? 'lists' : 'list'}. If they already had it, it stays where they put it.`
+    : 'Tap anyone you share a group with — it goes on their list too. Anyone else, just type.';
+  hint.classList.remove('hidden');
+}
+
+// Save whatever differs from the copy. Queued, so a chip tapped while a note
+// is still saving runs after it rather than racing it. A no-op when nothing
+// changed, so leaving an untouched field costs nothing.
+function detailMemoSave() {
+  detailMemoQueue = detailMemoQueue.then(detailMemoSaveOnce, detailMemoSaveOnce);
+  return detailMemoQueue;
+}
+
+async function detailMemoSaveOnce() {
+  const copy = detailMemoCopy;
+  const notesEl = document.getElementById('detailMemoNotes');
+  const wwEl = document.getElementById('detailMemoWatching');
+  if (!copy || !notesEl || !wwEl) return;
+  const notes = notesEl.value.trim();
+  const free = wwEl.value.trim();
+  const known = detailMemoWatchersKnown(copy);
+  const slugs = Array.from(detailMemoSelected);
+  const linked = new Set((copy.watchers || []).map(w => w.slug));
+  const watchersChanged = slugs.length !== linked.size || slugs.some(x => !linked.has(x));
+  const body = {};
+  if (notes !== (copy.notes || '').trim()) body.notes = notes || null;
+  if (free !== detailMemoSavedFree(copy).trim() || watchersChanged) {
+    body.watching_with = free || null;
+    // The complete set, so un-tapping someone unlinks them — unless the row
+    // can't say who it names, where [] would unlink people never shown.
+    if (known || slugs.length) body.watcher_slugs = slugs;
+  }
+  if (!Object.keys(body).length) return;
+  detailMemoInflight = { id: copy.id, notes, watching_with: free, slugs };
+  const toast = (msg, opts) => (typeof showToast === 'function' ? showToast(msg, opts) : (opts ? alert(msg) : null));
+  try {
+    const res = await fetch(`/api/shows/${copy.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      toast(res.status === 401 ? 'You’re logged out — sign in again to save.' : 'Couldn’t save. Try again.', { tone: 'error' });
+      return;
+    }
+    const saved = (await res.json()).show;
+    if (saved) {
+      // In place, so the page's own reference to my copy sees it too.
+      Object.assign(copy, saved);
+      if (typeof window.onDetailMemoSaved === 'function') window.onDetailMemoSaved(saved);
+    }
+    toast('Saved');
+  } catch (e) {
+    toast('Network error. Try again.', { tone: 'error' });
+  } finally {
+    detailMemoInflight = null;
+  }
+}
+
+// Leaving the card with a field still focused: the field never blurs, so
+// `change` never fires. Pages call this on the way out.
+function detailMemoFlush() {
+  const el = document.activeElement;
+  if (el && (el.id === 'detailMemoNotes' || el.id === 'detailMemoWatching')) el.blur();
+  return detailMemoSave();
+}
+

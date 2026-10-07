@@ -22,7 +22,6 @@ struct ShowDetailView: View {
     // rather than a guess made before the lookup returns.
     @State private var myCopyChecked = false
     @State private var cast: [Actor] = []
-    @State private var showingEdit = false
     @State private var addingToMine = false
     @State private var addAlert: AddAlert?
     // Average/count always present once the show has a tmdb_id; `mine`/
@@ -41,6 +40,17 @@ struct ShowDetailView: View {
     @State private var recommending = false
     // Creators resolved to individual people by the server (up to four).
     @State private var creators: [Credit] = []
+    // The two memos a member edits right on the card — there's no edit
+    // screen any more. Each saves when the member leaves the field (or
+    // taps a group-mate), not on every keystroke. Drafts are seeded from
+    // my copy whenever it's (re)loaded and the field isn't being typed in.
+    @State private var notesDraft = ""
+    @State private var watchingWithDraft = ""
+    @State private var selectedWatchers: Set<String> = []
+    @State private var groupMates: [GroupMate] = []
+    @State private var savingMemos = false
+    @State private var memoSavePending = false
+    @FocusState private var memoFocus: MemoField?
 
     private var title: String { show?.title ?? initialTitle }
     private var network: String? { show?.network ?? initialNetwork }
@@ -212,7 +222,8 @@ struct ShowDetailView: View {
 
             // My Lists — the four list chips ARE the move/add control (tap to
             // move an active copy, restore an archived one, or add it if I don't
-            // have it). The member-edited fields and Edit/Archive live here too.
+            // have it). Watching With and Notes are edited right here — there's no
+            // edit screen — and Archive lives here too.
             // Logged-in members only.
             if auth.memberSlug != nil {
                 Section {
@@ -224,7 +235,9 @@ struct ShowDetailView: View {
                     if let by = myCopy?.recommendedBy, !by.isEmpty {
                         LabeledContent("Recommended by", value: by)
                     }
-                    if let w = myCopy?.watchingWith, !w.isEmpty {
+                    // An archived copy shows its memos read-only; the
+                    // editable fields are for a copy on one of my lists.
+                    if mineActive == nil, let w = myCopy?.watchingWith, !w.isEmpty {
                         LabeledContent("Watching with", value: w)
                     }
                     // Why a title you never added is on your list: the
@@ -234,14 +247,16 @@ struct ShowDetailView: View {
                     if let tagger = myCopy?.addedByMember {
                         LabeledContent("Added by", value: tagger.name)
                     }
-                    if let notes = myCopy?.notes, !notes.isEmpty {
+                    if mineActive == nil, let notes = myCopy?.notes, !notes.isEmpty {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Notes").font(.caption).foregroundStyle(.secondary)
                             Text(notes).font(.callout).foregroundStyle(.secondary)
                         }
                     }
+                    if mineActive != nil {
+                        memoEditors()
+                    }
                     if let m = mineActive {
-                        Button("Edit") { showingEdit = true }
                         // JC's button: put this show on a group's Watch Next
                         // board. It recommends MY copy — that's also the
                         // enrichment source every group-mate's "Add to Next
@@ -281,7 +296,40 @@ struct ShowDetailView: View {
                 }
             }
 
-            // Ratings — directly below My Lists. TMDB Rating and Club Rating
+            // Catalog facts about the show itself, above Ratings: a long-running
+            // show grows a rating row per season, and with Ratings in the middle
+            // that pushed these facts so far down nobody scrolled to them.
+            if hasCatalog {
+                Section {
+                    if let s = show {
+                        if s.isMovie { LabeledContent("Type", value: "Movie") }
+                        if let y = s.releaseYear {
+                            LabeledContent("Year", value: String(y))
+                        }
+                        if let series = s.seriesText { LabeledContent("Series", value: series) }
+                        if let status = s.statusText { LabeledContent("Status", value: status) }
+                        if !s.genreList.isEmpty {
+                            LabeledContent("Genres", value: s.genreList.joined(separator: " · "))
+                        }
+                        if let rt = s.runtimeText {
+                            LabeledContent("Runtime", value: rt)
+                        }
+                        if let dates = s.seasonDatesText {
+                            LabeledContent("Next episode", value: dates)
+                        }
+                        if let cr = s.contentRating, !cr.isEmpty {
+                            LabeledContent("Rated", value: cr)
+                        }
+                        // Only ever non-nil for non-English titles — see
+                        // Show.originalLanguageText.
+                        if let lang = s.originalLanguageText {
+                            LabeledContent("Language", value: lang)
+                        }
+                    }
+                }
+            }
+            // Ratings — the last section, so its per-season rows never bury
+            // anything beneath them. TMDB Rating and Club Rating
             // show on every card, logged in or not (ratings key off tmdb_id,
             // not this row's id, so they're the same regardless of whose
             // copy this is). Entry (instant-save tap row) is gated to lists
@@ -327,40 +375,19 @@ struct ShowDetailView: View {
                 }
             }
 
-            // Catalog facts about the show itself, grouped below.
-            if hasCatalog {
-                Section {
-                    if let s = show {
-                        if s.isMovie { LabeledContent("Type", value: "Movie") }
-                        if let y = s.releaseYear {
-                            LabeledContent("Year", value: String(y))
-                        }
-                        if let series = s.seriesText { LabeledContent("Series", value: series) }
-                        if let status = s.statusText { LabeledContent("Status", value: status) }
-                        if !s.genreList.isEmpty {
-                            LabeledContent("Genres", value: s.genreList.joined(separator: " · "))
-                        }
-                        if let rt = s.runtimeText {
-                            LabeledContent("Runtime", value: rt)
-                        }
-                        if let dates = s.seasonDatesText {
-                            LabeledContent("Next episode", value: dates)
-                        }
-                        if let cr = s.contentRating, !cr.isEmpty {
-                            LabeledContent("Rated", value: cr)
-                        }
-                        // Only ever non-nil for non-English titles — see
-                        // Show.originalLanguageText.
-                        if let lang = s.originalLanguageText {
-                            LabeledContent("Language", value: lang)
-                        }
-                    }
-                }
-            }
         }
+        // Scrolling the card away drops the keyboard, which counts as leaving
+        // the field — so it saves.
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
+            // Notes takes Return as a new line, so the keyboard needs its own
+            // way out. Done leaves the field, which saves it.
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { memoFocus = nil }
+            }
             // Standard iOS share sheet — text, mail, AirDrop, anything the
             // user has. Shares a watch link (or the club page) plus a blurb.
             //
@@ -380,11 +407,14 @@ struct ShowDetailView: View {
             }
         }
         .task { await load() }
-        .sheet(isPresented: $showingEdit) {
-            if let m = myCopy {
-                AddEditShowView(memberSlug: m.memberSlug ?? (auth.memberSlug ?? ""), existing: m) { await load() }
-            }
+        // Leaving a field saves it. Tapping from one memo field to the other
+        // counts as leaving the first.
+        .onChange(of: memoFocus) { old, _ in
+            if old != nil { Task { await saveMemos() } }
         }
+        // Backing out with the keyboard still up never moves focus, so the
+        // last field typed in is saved on the way out instead.
+        .onDisappear { Task { await saveMemos() } }
         .alert(addAlert?.title ?? "",
                isPresented: Binding(get: { addAlert != nil }, set: { if !$0 { addAlert = nil } }),
                presenting: addAlert) { _ in
@@ -495,6 +525,163 @@ struct ShowDetailView: View {
             label += " — \(mine)/10"
         }
         return label
+    }
+
+    // Watching With and Notes, edited in place on my active copy. These are
+    // the only member-written fields left — title, service and the catalog
+    // facts are TMDB's — so there's no edit screen, just these two.
+    @ViewBuilder private func memoEditors() -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Watching with").font(.caption).foregroundStyle(.secondary)
+            // Group-mates as chips. A tap saves straight away (there's no
+            // field to leave) and puts the show on their list too — the one
+            // cross-member write, scoped to people I share a group with.
+            if !groupMates.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(groupMates) { mate in
+                            Button { toggleWatcher(mate.slug) } label: {
+                                watcherChip(mate.name, selected: selectedWatchers.contains(mate.slug))
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                }
+            }
+            TextField(groupMates.isEmpty ? "Who are you watching with?" : "Someone else",
+                      text: $watchingWithDraft)
+                .focused($memoFocus, equals: .watchingWith)
+                .submitLabel(.done)
+                .onSubmit { memoFocus = nil }
+            if !groupMates.isEmpty {
+                Text(watchersHint).font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 2)
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Notes").font(.caption).foregroundStyle(.secondary)
+            TextField("Add a note", text: $notesDraft, axis: .vertical)
+                .lineLimit(1...8)
+                .focused($memoFocus, equals: .notes)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func watcherChip(_ name: String, selected: Bool) -> some View {
+        HStack(spacing: 4) {
+            if selected { Image(systemName: "checkmark") }
+            Text(name)
+        }
+        .font(.caption).fontWeight(.semibold)
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(selected ? Color.accentColor : Color.clear)
+        .foregroundStyle(selected ? Color.white : Color.accentColor)
+        .overlay(Capsule().stroke(Color.accentColor, lineWidth: 1.5))
+        .clipShape(Capsule())
+    }
+
+    // Says what a tap does, because it does something to another person's
+    // library and that shouldn't be a surprise after the fact.
+    private var watchersHint: String {
+        let names = groupMates.filter { selectedWatchers.contains($0.slug) }.map(\.name)
+        guard let last = names.last else {
+            return "Tap anyone you share a group with — it goes on their list too. Anyone else, just type."
+        }
+        let who = names.count > 1 ? names.dropLast().joined(separator: ", ") + " and " + last : last
+        return "Also on \(who)’s \(names.count > 1 ? "lists" : "list"). If they already had it, it stays where they put it."
+    }
+
+    private func toggleWatcher(_ slug: String) {
+        if selectedWatchers.contains(slug) { selectedWatchers.remove(slug) }
+        else { selectedWatchers.insert(slug) }
+        Task { await saveMemos() }
+    }
+
+    // Copy my row's memos into the editable drafts. Skipped while a field is
+    // being typed in or a save is in flight, so a reload (after a list move,
+    // say) never overwrites what the member is in the middle of writing.
+    private func seedMemos() {
+        guard memoFocus == nil, !savingMemos, let m = myCopy else { return }
+        notesDraft = m.notes ?? ""
+        let linked = m.watchers ?? []
+        selectedWatchers = Set(linked.map(\.slug))
+        // Linked people are the chips, so the text holds only what was typed.
+        // A row without `watchers` (an old offline cache) can't say who it
+        // names, so the field shows the whole string instead.
+        watchingWithDraft = m.watchers == nil
+            ? (m.watchingWith ?? "")
+            : Self.freeText(from: m.watchingWith, minus: linked.map(\.name))
+        // Someone linked here who has since left my groups stays a chip, so
+        // the next save doesn't silently unlink them.
+        let missing = linked.filter { l in !groupMates.contains(where: { $0.slug == l.slug }) }
+        groupMates.append(contentsOf: missing.map { GroupMate(slug: $0.slug, name: $0.name, groups: nil) })
+    }
+
+    // Save whatever changed in Notes / Watching With. Called when a field
+    // loses focus, a chip is tapped, or the card goes away — and a no-op
+    // when nothing differs from my copy, so leaving an untouched field costs
+    // nothing. Saves are serialized: one that arrives mid-flight runs again
+    // once the first lands, so a quick tap after typing isn't dropped.
+    private func saveMemos() async {
+        if savingMemos { memoSavePending = true; return }
+        savingMemos = true
+        defer { savingMemos = false }
+        repeat {
+            memoSavePending = false
+            await saveMemosOnce()
+        } while memoSavePending
+    }
+
+    private func saveMemosOnce() async {
+        guard let m = mineActive else { return }
+        let notes = notesDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let free = watchingWithDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let linked = m.watchers ?? []
+        let watchersKnown = m.watchers != nil
+        let savedFree = watchersKnown
+            ? Self.freeText(from: m.watchingWith, minus: linked.map(\.name))
+            : (m.watchingWith ?? "")
+        let notesChanged = notes != (m.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let freeChanged = free != savedFree.trimmingCharacters(in: .whitespacesAndNewlines)
+        let watchersChanged = selectedWatchers != Set(linked.map(\.slug))
+        guard notesChanged || freeChanged || watchersChanged else { return }
+        // The complete set, so un-tapping someone unlinks them — unless this
+        // row can't say who it names, where [] would unlink people the member
+        // never saw. Tapping somebody is a real instruction either way.
+        let slugs: [String]? = (watchersKnown || !selectedWatchers.isEmpty) ? Array(selectedWatchers) : nil
+        do {
+            // Everything else is sent back exactly as it is, so the server
+            // keeps the row's pin, service and list; only the memos change.
+            let updated = try await API.updateShow(
+                id: m.id, title: m.title, network: m.network, list: m.list,
+                notes: notes.isEmpty ? nil : notes, recommendedBy: m.recommendedBy,
+                movie: m.isMovie, fullSeries: m.isFullSeries,
+                watchingWith: free.isEmpty ? nil : free, watcherSlugs: slugs,
+                archived: false, memberSlug: auth.memberSlug)
+            if updated.id == m.id { myCopy = updated }
+        } catch let e as API.APIError where e.status == 401 {
+            addAlert = AddAlert(title: "Logged out",
+                                message: "Your session expired — sign in again from Home.")
+        } catch {
+            addAlert = AddAlert(title: "Couldn’t save",
+                                message: "Your change didn’t save. Check your connection and try again.")
+        }
+    }
+
+    // The half of the composed "Watching with" string that isn't a linked
+    // member's name. The mirror of composeWatchingWith() in
+    // functions/_shared/watchers.js: the field is comma-joined, so a name is
+    // one whole part, matched without regard to case or padding. Anything
+    // that isn't a linked name is the member's own text and comes back
+    // untouched, in the order they typed it.
+    static func freeText(from composed: String?, minus names: [String]) -> String {
+        guard let composed, !composed.isEmpty else { return "" }
+        let linked = Set(names.map { $0.trimmingCharacters(in: .whitespaces).lowercased() })
+        return composed
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !linked.contains($0.lowercased()) }
+            .joined(separator: ", ")
     }
 
     // The four list chips, current one filled. Tapping a chip moves/adds/
@@ -617,9 +804,14 @@ struct ShowDetailView: View {
             cast = (try? await API.actors(showId: id)) ?? []
         }
         await refreshMyCopy()
-        // Non-fatally: no groups just means no Recommend button.
+        // Non-fatally: no groups just means no Recommend button, and no
+        // group-mate chips under Watching With (the text field still works).
         if auth.memberSlug != nil {
             myGroups = (try? await API.groups())?.groups ?? []
+            if let mates = try? await API.groupMates() {
+                groupMates = mates
+                seedMemos()
+            }
         }
     }
 
@@ -666,6 +858,7 @@ struct ShowDetailView: View {
                               title: mineShow.title, isMovie: mineShow.isMovie, tmdbId: mineShow.tmdbId)
         }
         myCopyChecked = true
+        seedMemos()
     }
 
     private func move(to list: ShowList, id: Int) async {
@@ -781,4 +974,9 @@ private struct AddAlert: Identifiable {
     let id = UUID()
     let title: String
     let message: String
+}
+
+// Which memo field has the keyboard. Losing it is what saves.
+private enum MemoField: Hashable {
+    case notes, watchingWith
 }

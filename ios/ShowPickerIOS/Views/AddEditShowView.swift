@@ -1,18 +1,18 @@
 import SwiftUI
 
-// Sheet for adding a new show or editing an existing one. Standard Form
-// layout with system controls — Section / TextField / Picker / Toggle.
+// Sheet for adding a new show. Standard Form layout with system controls —
+// Section / TextField / Picker / Toggle. Add only, despite the name: there's
+// no edit screen any more. Title, service and the catalog facts are TMDB's,
+// and the two memos a member still writes (Watching With, Notes) are edited
+// in place on the show card (ShowDetailView); ratings are rated there too.
 struct AddEditShowView: View {
     let memberSlug: String
-    let existing: Show?
     // Which list a brand-new show lands on before the member touches the
     // picker. The caller passes the list currently on screen, so tapping "+"
     // while looking at Awaiting adds to Awaiting — not silently to Watching.
-    // Ignored when editing: an existing row seeds from its own list.
     var initialList: ShowList = .watching
     // Opened from Find a Show: the title typed there, and the TMDB entry the
     // member tapped (pinned, exactly as if picked from the type-ahead here).
-    // Ignored when editing.
     var initialTitle: String? = nil
     var initialPick: TitleHit? = nil
     let onSave: () async -> Void
@@ -24,9 +24,7 @@ struct AddEditShowView: View {
     @State private var title = ""
     @State private var network = ""
     // Free-text network for anything outside the canonical list. Selecting
-    // "Network not listed…" reveals the field; an existing row whose network
-    // isn't canonical (set on the web, or inherited from enrichment) opens
-    // straight into it rather than silently losing its value to the picker.
+    // "Network not listed…" reveals the field.
     @State private var customNetwork = ""
     private static let otherNetworkTag = "__other"
     @State private var list: ShowList = .watching
@@ -43,7 +41,6 @@ struct AddEditShowView: View {
     @State private var selectedWatchers: Set<String> = []
     @State private var movie = false
     @State private var fullSeries = false
-    @State private var archived = false
     @State private var saving = false
     @State private var errorText: String?
     // Type-ahead: matching TMDB titles for what's typed, and the member's
@@ -147,22 +144,19 @@ struct AddEditShowView: View {
                 Section {
                     Toggle("Movie", isOn: $movie)
                     Toggle("Series complete", isOn: $fullSeries)
-                    if existing != nil {
-                        Toggle("Archived", isOn: $archived)
-                    }
                 }
                 if let err = errorText {
                     Section { Text(err).foregroundStyle(.red) }
                 }
             }
-            .navigationTitle(existing == nil ? "Add Show" : "Edit Show")
+            .navigationTitle("Add Show")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(existing == nil ? "Add" : "Save") { Task { await save() } }
+                    Button("Add") { Task { await save() } }
                         .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || saving)
                 }
             }
@@ -189,10 +183,9 @@ struct AddEditShowView: View {
     // actually hits the network.
     private func searchTitles() async {
         let q = title.trimmingCharacters(in: .whitespaces)
-        // Just picked (or unchanged existing title) — nothing to suggest.
+        // Just picked — nothing to suggest.
         if let p = picked, p.title == q { titleHits = []; return }
         picked = nil
-        if let s = existing, s.title == q { titleHits = []; return }
         guard q.count >= 2 else { titleHits = []; return }
         try? await Task.sleep(nanoseconds: 300_000_000)
         if Task.isCancelled { return }
@@ -205,16 +198,6 @@ struct AddEditShowView: View {
         title = hit.title
         movie = hit.isMovie
         titleHits = []
-    }
-
-    // Whether the row we're editing told us who it names. A new show knows by
-    // definition (nobody, until the member picks). An existing one knows only
-    // if it arrived with a `watchers` array — absent means "this payload
-    // predates links", not "no one is linked", and the two must not be
-    // confused on save.
-    private var watchersKnown: Bool {
-        guard let s = existing else { return true }
-        return s.watchers != nil
     }
 
     // Which group someone is in only explains anything when there's more than
@@ -255,48 +238,18 @@ struct AddEditShowView: View {
     private func loadGroupMates() async {
         guard let mates = try? await API.groupMates() else { return }
         groupMates = mates
-        // A show can name someone the owner has since left the group with.
-        // Their link is still real, so keep them selectable rather than
-        // silently dropping them on the next save.
-        let linked = existing?.watchers ?? []
-        let missing = linked.filter { l in !mates.contains(where: { $0.slug == l.slug }) }
-        groupMates.append(contentsOf: missing.map { GroupMate(slug: $0.slug, name: $0.name, groups: nil) })
     }
 
     private func prefill() {
-        guard let s = existing else {
-            list = initialList
-            // Seed once: a title already in the field is the member's.
-            if title.isEmpty {
-                if let hit = initialPick {
-                    pick(hit)
-                } else if let t = initialTitle {
-                    title = t
-                }
+        list = initialList
+        // Seed once: a title already in the field is the member's.
+        if title.isEmpty {
+            if let hit = initialPick {
+                pick(hit)
+            } else if let t = initialTitle {
+                title = t
             }
-            return
         }
-        title = s.title
-        let existingNetwork = s.network ?? ""
-        if !existingNetwork.isEmpty && !catalog.contains(existingNetwork) {
-            customNetwork = existingNetwork
-            network = Self.otherNetworkTag
-        } else {
-            network = existingNetwork
-        }
-        list = ShowList(rawValue: s.list) ?? .watching
-        notes = s.notes ?? ""
-        recommendedBy = s.recommendedBy ?? ""
-        // The stored field is the composed string — free text plus the linked
-        // members' names. Show only the free half here; the names are the
-        // ticked pickers above, and leaving them in the box would save them a
-        // second time as literal text.
-        let linked = s.watchers ?? []
-        selectedWatchers = Set(linked.map(\.slug))
-        watchingWith = Self.freeText(from: s.watchingWith, minus: linked.map(\.name))
-        movie = s.isMovie
-        fullSeries = s.isFullSeries
-        archived = s.isArchived
     }
 
     private func save() async {
@@ -311,50 +264,32 @@ struct AddEditShowView: View {
         let n = notes.trimmingCharacters(in: .whitespaces).isEmpty ? nil : notes
         let rec = recommendedBy.trimmingCharacters(in: .whitespaces).isEmpty ? nil : recommendedBy
         let ww = watchingWith.trimmingCharacters(in: .whitespaces).isEmpty ? nil : watchingWith
-        // The complete set, so unticking someone unlinks them — an empty array
-        // is a real instruction ("nobody"), not an omission.
-        //
-        // Except when we don't actually know the current set: a row decoded
-        // from an offline cache written before links existed has no
-        // `watchers`, so the pickers open with nothing ticked whether or not
-        // anyone is really linked. Sending [] there would silently unlink
-        // people the member never saw, over an edit to some other field. nil
-        // omits the key and the server leaves the links alone. Ticking
-        // somebody is a real instruction either way and always sends.
-        let watchers: [String]? = (watchersKnown || !selectedWatchers.isEmpty)
-            ? Array(selectedWatchers) : nil
+        // A new show names nobody until the member picks, so the set is
+        // always known and always sent.
+        let watchers: [String]? = Array(selectedWatchers)
         // Only send the pick while the field still holds the picked title —
         // hand-edits after picking fall back to title-search enrichment.
         let pin = (picked?.title == t) ? picked : nil
         do {
-            if let s = existing {
-                _ = try await API.updateShow(id: s.id, title: t, network: net, list: list.rawValue,
-                                             notes: n, recommendedBy: rec, movie: movie,
-                                             fullSeries: fullSeries, watchingWith: ww,
-                                             watcherSlugs: watchers, archived: archived,
-                                             memberSlug: memberSlug,
-                                             tmdbId: pin?.tmdbId, tmdbType: pin?.mediaType)
-            } else {
-                // Mirror the web's pre-save dedupe: an active copy blocks with
-                // a pointer to its list, an archived copy offers a restore.
-                // Offline (check unreachable) falls through to the queued add.
-                if let dup = try? await API.checkShow(title: t, member: memberSlug,
-                                                         tmdbId: pin?.tmdbId, tmdbType: pin?.mediaType), dup.exists {
-                    if dup.archived == true, let id = dup.id {
-                        restoreId = id
-                        showingRestorePrompt = true
-                        return
-                    }
-                    let listName = dup.list.flatMap { ShowList(rawValue: $0)?.title } ?? "one of your lists"
-                    errorText = "“\(t)” is already on \(listName == "one of your lists" ? listName : "your \(listName) list")."
+            // Mirror the web's pre-save dedupe: an active copy blocks with
+            // a pointer to its list, an archived copy offers a restore.
+            // Offline (check unreachable) falls through to the queued add.
+            if let dup = try? await API.checkShow(title: t, member: memberSlug,
+                                                     tmdbId: pin?.tmdbId, tmdbType: pin?.mediaType), dup.exists {
+                if dup.archived == true, let id = dup.id {
+                    restoreId = id
+                    showingRestorePrompt = true
                     return
                 }
-                _ = try await API.addShow(memberSlug: memberSlug, title: t, network: net, list: list.rawValue,
-                                          notes: n, recommendedBy: rec, movie: movie,
-                                          fullSeries: fullSeries, watchingWith: ww,
-                                          watcherSlugs: watchers,
-                                          tmdbId: pin?.tmdbId, tmdbType: pin?.mediaType)
+                let listName = dup.list.flatMap { ShowList(rawValue: $0)?.title } ?? "one of your lists"
+                errorText = "“\(t)” is already on \(listName == "one of your lists" ? listName : "your \(listName) list")."
+                return
             }
+            _ = try await API.addShow(memberSlug: memberSlug, title: t, network: net, list: list.rawValue,
+                                      notes: n, recommendedBy: rec, movie: movie,
+                                      fullSeries: fullSeries, watchingWith: ww,
+                                      watcherSlugs: watchers,
+                                      tmdbId: pin?.tmdbId, tmdbType: pin?.mediaType)
             await onSave()
             dismiss()
         } catch let API.APIError.rejected(rej) {
@@ -384,22 +319,6 @@ struct AddEditShowView: View {
         } catch {
             errorText = "Couldn't save. Check your connection and try again."
         }
-    }
-
-    // The half of the composed "Watching with" string that isn't a linked
-    // member's name. The mirror of composeWatchingWith() in
-    // functions/_shared/watchers.js: the field is comma-joined, so a name is
-    // one whole part, matched without regard to case or padding. Anything
-    // that isn't a linked name is the member's own text and comes back
-    // untouched, in the order they typed it.
-    static func freeText(from composed: String?, minus names: [String]) -> String {
-        guard let composed, !composed.isEmpty else { return "" }
-        let linked = Set(names.map { $0.trimmingCharacters(in: .whitespaces).lowercased() })
-        return composed
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty && !linked.contains($0.lowercased()) }
-            .joined(separator: ", ")
     }
 
     private func restoreArchived() async {

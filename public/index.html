@@ -43,7 +43,7 @@
   <link rel="apple-touch-icon" href="/favicon.svg">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
-  <link rel="stylesheet" href="/styles.css?v=6">
+  <link rel="stylesheet" href="/styles.css?v=7">
   <style>
     header {
       background: var(--header-bg);
@@ -1526,7 +1526,6 @@
 
       <label class="checkbox-label"><input type="checkbox" id="inputMovie"> Movie</label>
       <label class="checkbox-label"><input type="checkbox" id="inputFullSeries"> Series Complete</label>
-      <label class="checkbox-label hidden" id="inputArchivedRow"><input type="checkbox" id="inputArchived"> Archived</label>
 
       <label>List</label>
       <div class="list-chips" id="inputListChips">
@@ -1746,7 +1745,7 @@
   </div>
 
   <script type="text/javascript" src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
-  <script src="/show-renderer.js?v=2"></script>
+  <script src="/show-renderer.js?v=3"></script>
   <script>
     // Set nav context before loading nav.js
     window.navContext = { page: 'home' };
@@ -1756,7 +1755,6 @@
     let shows = [];
     let currentTab = 'watching';
     // isEditor removed: per-row actions now always show on own page when logged in.
-    let editingId = null;
     let memberSlug = null;
     let memberName = '';
     let memberLabel = '';
@@ -3793,7 +3791,6 @@
         menu.appendChild(b);
       };
       for (const p of detailPromotions(show.list)) add(p.label, () => moveShow(id, p.target));
-      add('Edit', () => openEditModal(id));
       add('Archive', () => archiveShow(id), true);
       document.body.appendChild(menu);
       const r = btn.getBoundingClientRect();
@@ -4073,8 +4070,10 @@
     }
     let watcherExtra = [];
 
+    // Add only: there's no edit screen any more. Title, service and the
+    // catalog facts are TMDB's; Watching With and Notes are edited in place
+    // on the show card (show-renderer.js, detailMemoSave).
     function openAddModal() {
-      editingId = null;
       titlePickers.inputTitle.clear();
       document.getElementById('modalTitle').textContent = 'Add Show';
       document.getElementById('modalSave').textContent = 'Add Show';
@@ -4087,45 +4086,10 @@
       document.getElementById('inputWatchingWith').value = '';
       document.getElementById('inputMovie').checked = false;
       document.getElementById('inputFullSeries').checked = false;
-      document.getElementById('inputArchived').checked = false;
-      document.getElementById('inputArchivedRow').classList.add('hidden');
       selectedWatchers = new Set();
       watchersKnown = true;
       watcherExtra = [];
       setSelectedList(currentTab);
-      document.getElementById('modalOverlay').classList.remove('hidden');
-      document.getElementById('inputTitle').focus();
-      loadNetworkCatalog();
-      loadGroupMates().then(() => renderWatcherPicker(watcherExtra));
-    }
-
-    function openEditModal(showId) {
-      const show = shows.find(s => s.id === showId);
-      if (!show) return;
-      editingId = showId;
-      titlePickers.inputTitle.clear();
-      document.getElementById('modalTitle').textContent = 'Edit Show';
-      document.getElementById('modalSave').textContent = 'Save Changes';
-      document.getElementById('inputTitle').value = show.title;
-      setNetworkField(show.network);
-      document.getElementById('inputRecommended').value = show.recommended_by || '';
-      document.getElementById('inputNotes').value = show.notes || '';
-      // Linked people are pickers, so the text box holds only what was typed.
-      // A row without `watchers` predates links: we don't know who it names,
-      // so the box shows the whole string and an untouched picker sends
-      // nothing (sending [] would unlink people the member never saw).
-      const linked = Array.isArray(show.watchers) ? show.watchers : [];
-      watchersKnown = Array.isArray(show.watchers);
-      selectedWatchers = new Set(linked.map(w => w.slug));
-      watcherExtra = linked;
-      document.getElementById('inputWatchingWith').value = watchersKnown
-        ? watchingWithFreeText(show.watching_with, linked.map(w => w.name))
-        : (show.watching_with || '');
-      document.getElementById('inputMovie').checked = !!show.movie;
-      document.getElementById('inputFullSeries').checked = !!show.full_series;
-      document.getElementById('inputArchived').checked = !!show.archived;
-      document.getElementById('inputArchivedRow').classList.remove('hidden');
-      setSelectedList(show.list);
       document.getElementById('modalOverlay').classList.remove('hidden');
       document.getElementById('inputTitle').focus();
       loadNetworkCatalog();
@@ -4141,7 +4105,6 @@
     async function saveShow() {
       const title = document.getElementById('inputTitle').value.trim();
       if (!title) { showToast('Title is required', { tone: 'error' }); return; }
-      const wasEditing = !!editingId;
 
       const body = {
         title,
@@ -4156,7 +4119,6 @@
       // The complete set of named group-mates — but only when we know the
       // row's current set, or the member ticked someone (a real instruction).
       if (watchersKnown || selectedWatchers.size) body.watcher_slugs = Array.from(selectedWatchers);
-      if (wasEditing) body.archived = document.getElementById('inputArchived').checked ? 1 : 0;
       // Member picked the show from type-ahead — enrich that exact entry.
       const titlePick = titlePickers.inputTitle.pick;
       if (titlePick) {
@@ -4166,40 +4128,32 @@
 
       try {
         let res;
-        if (editingId) {
-          res = await fetch(`/api/shows/${editingId}`, {
-            method: 'PUT',
+        // Name the picked TMDB entry so a different show with the same
+        // title isn't mistaken for this one (and restored in its place).
+        const checkId = titlePick && titlePick.tmdb_id
+          ? `&tmdb_id=${encodeURIComponent(titlePick.tmdb_id)}&tmdb_type=${encodeURIComponent(titlePick.tmdb_type || '')}`
+          : '';
+        const checkRes = await fetch(`/api/shows/check?title=${encodeURIComponent(title)}&member=${memberSlug}${checkId}`);
+        const check = await checkRes.json();
+        if (check.exists) {
+          if (check.archived) {
+            const restore = confirm(`"${title}" is already in the database but not on any list. Add it to ${body.list}?`);
+            if (!restore) return;
+            res = await fetch(`/api/shows/${check.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...body, archived: 0 }),
+            });
+          } else {
+            showToast(`"${title}" is already on the ${LIST_LABELS[check.list] || check.list} list.`, { tone: 'error' });
+            return;
+          }
+        } else {
+          res = await fetch('/api/shows', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
           });
-        } else {
-          // Name the picked TMDB entry so a different show with the same
-          // title isn't mistaken for this one (and restored in its place).
-          const checkId = titlePick && titlePick.tmdb_id
-            ? `&tmdb_id=${encodeURIComponent(titlePick.tmdb_id)}&tmdb_type=${encodeURIComponent(titlePick.tmdb_type || '')}`
-            : '';
-          const checkRes = await fetch(`/api/shows/check?title=${encodeURIComponent(title)}&member=${memberSlug}${checkId}`);
-          const check = await checkRes.json();
-          if (check.exists) {
-            if (check.archived) {
-              const restore = confirm(`"${title}" is already in the database but not on any list. Add it to ${body.list}?`);
-              if (!restore) return;
-              res = await fetch(`/api/shows/${check.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...body, archived: 0 }),
-              });
-            } else {
-              showToast(`"${title}" is already on the ${LIST_LABELS[check.list] || check.list} list.`, { tone: 'error' });
-              return;
-            }
-          } else {
-            res = await fetch('/api/shows', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(body),
-            });
-          }
         }
         if (!res.ok) {
           const err = await res.json();
@@ -4227,16 +4181,9 @@
         }
         const saved = await res.json();
         closeModal();
-        if (editingId) {
-          const idx = shows.findIndex(s => s.id === editingId);
-          // Archived from the form: off the page's lists, like Archive.
-          if (idx !== -1 && body.archived) shows.splice(idx, 1);
-          else if (idx !== -1) shows[idx] = saved.show;
-        } else {
-          shows.push(saved.show);
-        }
+        shows.push(saved.show);
         renderShows();
-        showToast(wasEditing ? 'Saved changes' : `Added "${saved.show.title}"`);
+        showToast(`Added "${saved.show.title}"`);
       } catch (e) {
         showToast('Network error. Try again.', { tone: 'error' });
       }
@@ -4638,7 +4585,7 @@
        popular, or picks) pushes this view instead of expanding the
        row inline, mirroring the native ShowDetailView. Reuses the
        existing globals (shows, authMember, moveShow, archiveShow,
-       openEditModal, showToast, safeUrl, …).
+       showToast, safeUrl, …).
        =========================================================== -->
   <script>
     let detailShow = null;
@@ -4753,8 +4700,7 @@
       if (ratings !== undefined) detailRatings = ratings;
       document.getElementById('detailNavTitle').textContent = show.title;
       // The body itself is shared with the groups page (show-renderer.js) so
-      // the two detail screens can't drift apart. Edit/Archive are ours only:
-      // they open this page's edit modal.
+      // the two detail screens can't drift apart. Archive is ours only.
       document.getElementById('detailBody').innerHTML = renderShowDetailBody(show, {
         actors: detailActors,
         loggedIn: !!authMember,
@@ -4770,6 +4716,8 @@
     }
 
     function closeDetail() {
+      // A field still focused never fired `change`; save it on the way out.
+      detailMemoFlush();
       document.getElementById('detailPage').classList.remove('open');
       document.body.style.overflow = '';
       detailShow = null;
@@ -4785,7 +4733,13 @@
       closeDetail();
     }
 
-    function detailEdit(id) { closeDetail(); openEditModal(id); }
+    // A memo saved on the card: keep this page's copy of the row in step,
+    // so the list (and a re-render of the card) shows what was just typed.
+    window.onDetailMemoSaved = (saved) => {
+      const idx = shows.findIndex(s => s.id === saved.id);
+      if (idx !== -1) Object.assign(shows[idx], saved);
+      if (detailMyCopy && detailMyCopy.id === saved.id) Object.assign(detailMyCopy, saved);
+    };
 
     // Re-resolve my copy and re-render, so the detail's actions reflect the
     // new state (e.g. after archiving it offers "Add back to").

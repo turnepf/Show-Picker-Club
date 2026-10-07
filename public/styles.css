@@ -343,6 +343,27 @@ body.admin-page {
 }
 .detail-card .detail-action:first-child { border-top: none; }
 
+/* Watching With + Notes, edited in place in the My Lists card. Quiet
+   fields that read as part of the card until focused — they save on blur. */
+.detail-memo { padding: 10px 16px 12px; border-top: 1px solid var(--border-soft); }
+.detail-memo-label { display: block; font-size: 13px; color: var(--ink-muted); margin-bottom: 6px; }
+.detail-memo-input {
+  display: block; width: 100%; box-sizing: border-box;
+  font: inherit; font-size: 15px; color: var(--ink);
+  background: transparent; border: 1px solid var(--border-soft); border-radius: 8px;
+  padding: 8px 10px; resize: vertical;
+}
+.detail-memo-input:focus { outline: none; border-color: var(--accent); }
+.detail-memo-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.detail-memo-chip {
+  font: inherit; font-size: 12px; font-weight: 600;
+  padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  border: 1.5px solid var(--accent); color: var(--accent); background: transparent;
+}
+.detail-memo-chip.selected { background: var(--accent); color: #fff; }
+.detail-memo-hint { font-size: 12px; color: var(--ink-muted); margin-top: 6px; line-height: 1.4; }
+.detail-memo-chips.hidden, .detail-memo-hint.hidden { display: none; }
+
 .rating-count { color: var(--ink-muted); font-size: 12px; font-weight: 400; }
 .rating-entry {
   padding: 8px 16px 12px;
