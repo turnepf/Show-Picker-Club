@@ -248,7 +248,9 @@ console.log('\n== edit: under the ceiling it enriches as before');
   const env = makeEnv();
   const s = addMember(env, 'ann');
   const id = addShow(env, 'ann', 'Severance');
-  await showApi.onRequestPut(ctx(env, req(`/api/shows/${id}`, { cookie: s, method: 'PUT', body: { notes: 'x' } }), { id: String(id) }));
+  // A real edit (a list move beside the note). A notes-only save skips the
+  // lookup altogether — that's scripts/memo-save-test.mjs.
+  await showApi.onRequestPut(ctx(env, req(`/api/shows/${id}`, { cookie: s, method: 'PUT', body: { notes: 'x', list: 'waiting' } }), { id: String(id) }));
   check('TMDB is asked', tmdbCalls() > 0);
   check('and one lookup is charged', spent(env, 'ann', 'lookups') === 1);
 }
