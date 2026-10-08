@@ -24,6 +24,7 @@
 
 import * as showsApi from '../api/shows.js';
 import * as showApi from '../api/shows/[id].js';
+import * as actorsApi from '../api/shows/[id]/actors.js';
 import * as moveApi from '../api/shows/[id]/move.js';
 import * as archiveApi from '../api/shows/[id]/archive.js';
 import * as ratingApi from '../api/shows/[id]/rating.js';
@@ -130,6 +131,23 @@ async function ok(ctx, handler, opts, what) {
   return r.data;
 }
 
+// A show's cast, top-billed first, through the same endpoint the apps call.
+// The show itself no longer carries it: shows_v has no `actors` column (the
+// cast is one shared list per TMDB entry, read through actors_v), so reading
+// it off the show row gave every detail tool an empty cast. Best-effort, like
+// the apps: no cast is an empty list, never an error.
+async function castOf(ctx, showId) {
+  const r = await call(ctx, actorsApi.onRequestGet, {
+    path: `/api/shows/${showId}/actors`, params: { id: String(showId) },
+  });
+  return r.status < 400 && Array.isArray(r.data?.actors) ? r.data.actors : [];
+}
+
+// compactShow's detail shape, with the cast filled in.
+async function detailShow(ctx, s) {
+  return compactShow({ ...s, actors: await castOf(ctx, s.id) }, { detail: true });
+}
+
 function parseJsonArray(v) {
   if (Array.isArray(v)) return v;
   try { const a = JSON.parse(v || '[]'); return Array.isArray(a) ? a : []; } catch { return []; }
@@ -171,7 +189,9 @@ function compactShow(s, { detail = false } = {}) {
       streaming_on: s.streaming_on || undefined,
       watch_url: s.network_url || undefined,
       tmdb_id: s.tmdb_id || undefined,
-      cast: parseJsonArray(s.actors).map((a) => a && a.name).filter(Boolean).slice(0, 10),
+      // "Gary Oldman (Jackson Lamb)" once the role is stored.
+      cast: parseJsonArray(s.actors).filter((a) => a && a.name)
+        .map((a) => (a.character ? `${a.name} (${a.character})` : a.name)).slice(0, 10),
     });
   }
   for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k];
@@ -268,7 +288,7 @@ export const TOOLS = [
       const id = intArg(args, 'show_id');
       const data = await ok(ctx, showApi.onRequestGet, { path: `/api/shows/${id}`, params: { id: String(id) } }, 'That show');
       return {
-        show: compactShow(data.show, { detail: true }),
+        show: await detailShow(ctx, data.show),
         is_yours: data.show.member_slug === ctx.session.member_slug,
         ratings: data.ratings || undefined,
         group_mates_also_watching: (data.group_watchers || []).map((w) => w.name),
@@ -951,7 +971,7 @@ export const TOOLS = [
         before: { title: row.title, tmdb_id: row.tmdb_id ?? null, tmdb_type: row.tmdb_type ?? null, network: row.network ?? null, watch_url: row.network_url ?? null },
         after: { title: after.title, tmdb_id: after.tmdb_id ?? null, tmdb_type: after.tmdb_type ?? null, network: after.network ?? null, watch_url: after.network_url ?? null },
       });
-      const out = { member: m.slug, updated: compactShow(after, { detail: true }) };
+      const out = { member: m.slug, updated: await detailShow(ctx, after) };
       // The edit path falls back to a title search when an id lookup fails,
       // and still saves. Say so rather than report a re-point that didn't land.
       if (tmdbId !== undefined && after.tmdb_id !== tmdbId) {
@@ -987,7 +1007,7 @@ export const TOOLS = [
       const r = await ok(ctx, enrichApi.onRequestPost, { method: 'POST', path: '/api/enrich', body: { show_id: row.id } }, 'That show');
       const after = await ctx.env.DB.prepare('SELECT * FROM shows_v WHERE id = ?').bind(row.id).first();
       await logAdmin(ctx, m, 'refresh_show', { show_id: row.id, title: row.title, updated: r.tmdbUpdated || 0 });
-      const out = { member: m.slug, refreshed: (r.tmdbUpdated || 0) > 0, show: compactShow(after, { detail: true }) };
+      const out = { member: m.slug, refreshed: (r.tmdbUpdated || 0) > 0, show: await detailShow(ctx, after) };
       if (!out.refreshed) {
         out.warning = r.lastError
           ? `TMDB refresh failed: ${r.lastError}. Try again shortly.`
