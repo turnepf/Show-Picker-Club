@@ -636,14 +636,22 @@ struct IPadHomeView: View {
     // detail gives its members. Non-fatal by design: on failure the window
     // shows just me, which is wrong-but-safe, where falling back to the full
     // roster would be exactly the thing we removed.
+    //
+    // The details are fetched side by side. One at a time, each group cost a
+    // full round trip after the last, and load() waits on this before Home
+    // settles: five groups held an iPhone Duo unfold for about a second.
     private func loadGroupMembers() async {
         guard auth.isLoggedIn else { session.groupMemberSlugs = []; return }
         guard let groups = try? await API.groups().groups else { return }
-        var slugs: Set<String> = []
-        for group in groups {
-            if let detail = try? await API.groupDetail(id: group.id) {
-                for member in detail.members { slugs.insert(member.slug) }
+        let slugs = await withTaskGroup(of: [String].self) { tasks in
+            for group in groups {
+                tasks.addTask {
+                    ((try? await API.groupDetail(id: group.id))?.members ?? []).map(\.slug)
+                }
             }
+            var all: Set<String> = []
+            for await members in tasks { all.formUnion(members) }
+            return all
         }
         session.groupMemberSlugs = slugs
     }
@@ -674,8 +682,12 @@ struct IPadHomeView: View {
             return $0.activeCount > $1.activeCount
         }
         popular = pr ?? popular
-        session.backlogCount = auth.isLoggedIn ? ((try? await API.rateBacklogCount()) ?? 0) : 0
-        await loadGroupMembers()
+        // Independent of each other, so neither waits on the other.
+        let loggedIn = auth.isLoggedIn
+        async let backlog = loggedIn ? ((try? await API.rateBacklogCount()) ?? 0) : 0
+        async let groupMembers: Void = loadGroupMembers()
+        session.backlogCount = await backlog
+        await groupMembers
         if let link = pendingLink {
             pendingLink = nil
             route(url: link, allowRefetch: false)
