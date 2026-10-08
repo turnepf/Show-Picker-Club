@@ -49,6 +49,7 @@ iPhone and iPad:
 
 ```
 Fixed Home coming up empty after folding or unfolding iPhone Duo — it no longer needs a pull to refresh.
+Home on iPad, Mac and an unfolded iPhone Duo loads faster when you're in several groups.
 ```
 
 ---
