@@ -126,6 +126,14 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
     // only when one side has no id.
     public let tmdbId: Int?
 
+    // Migration 087. The season airing now (or next to start) and the day it
+    // premiered, one answer per TMDB entry. nil until a refresh has stored
+    // them. currentSeason is also a floor under seasonsReleased: TMDB's count
+    // can trail the season actually airing, which read "4 seasons" to a member
+    // watching season 5. See currentSeasonText / listLine.
+    public let currentSeason: Int?
+    public let seasonPremiereDate: String?
+
     // Explicit public init so other modules (the apps, their offline queues)
     // can construct a Show — the synthesized memberwise init is internal.
     // Parameter order matches the fields as they were declared in the apps'
@@ -175,7 +183,9 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         imdbId: String? = nil,
         tmdbStatus: String? = nil,
         freeOn: String? = nil,
-        tmdbId: Int? = nil
+        tmdbId: Int? = nil,
+        currentSeason: Int? = nil,
+        seasonPremiereDate: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -221,6 +231,8 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         self.tmdbStatus = tmdbStatus
         self.freeOn = freeOn
         self.tmdbId = tmdbId
+        self.currentSeason = currentSeason
+        self.seasonPremiereDate = seasonPremiereDate
     }
 
     enum CodingKeys: String, CodingKey {
@@ -259,6 +271,8 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         case tmdbStatus = "tmdb_status"
         case freeOn = "free_on"
         case tmdbId = "tmdb_id"
+        case currentSeason = "current_season"
+        case seasonPremiereDate = "season_premiere_date"
     }
 
     // Tolerant decoding. The API varies what it sends by context — `list` and
@@ -319,6 +333,8 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         tmdbStatus = try? c.decode(String.self, forKey: .tmdbStatus)
         freeOn = try? c.decode(String.self, forKey: .freeOn)
         tmdbId = try? c.decode(Int.self, forKey: .tmdbId)
+        currentSeason = try? c.decode(Int.self, forKey: .currentSeason)
+        seasonPremiereDate = try? c.decode(String.self, forKey: .seasonPremiereDate)
     }
 
     public var isMovie: Bool { (movie ?? 0) == 1 }
@@ -381,9 +397,17 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         return nil
     }
 
+    // The season count to show: TMDB's count, but never less than the season
+    // airing now. nil for a movie or when neither is known.
+    public var seasonCount: Int? {
+        guard !isMovie else { return nil }
+        let n = max(seasonsReleased ?? 0, currentSeason ?? 0)
+        return n > 0 ? n : nil
+    }
+
     // "3 seasons" / "1 season" — total seasons released, when known.
     public var seasonsText: String? {
-        guard let n = seasonsReleased, n > 0 else { return nil }
+        guard let n = seasonCount else { return nil }
         return "\(n) season\(n == 1 ? "" : "s")"
     }
 
@@ -398,7 +422,7 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
     // no episode count at all.
     public var seriesText: String? {
         var parts: [String] = []
-        if let n = seasonsReleased, n > 0 {
+        if let n = seasonCount {
             var count = "\(n) Season\(n == 1 ? "" : "s")"
             if let e = episodesReleased, e > 0 {
                 count += " · \(e) Episode\(e == 1 ? "" : "s")"
@@ -428,19 +452,86 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         return "\(m)/\(d)"
     }
 
-    // Premiere of the next season ("6/1"); nil without a premiere date.
-    // Used on the Watching/Awaiting list rows. Deliberately just the one
-    // date — the finale date stays off "Next episode" everywhere.
-    public var nextUpRange: String? {
-        monthDay(nextSeasonDate)
+    // Today as YYYY-MM-DD on this device. The stored dates are air dates, so
+    // they compare as strings against the member's own calendar day.
+    public static func todayString(_ date: Date = Date()) -> String {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = .current
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: date)
     }
 
-    // Whatever season dates exist, for the detail view (falls back to a
-    // finale-only "through M/D").
-    public var seasonDatesText: String? {
-        if let r = nextUpRange { return r }
-        if let end = monthDay(seasonEndDate) { return "through \(end)" }
+    // The stored next episode, but only while it's still ahead (today counts).
+    // A date that has passed means the refresh hasn't caught up since the
+    // episode aired, and showing it read "Next episode: 10/7" on 10/8.
+    public func upcomingNextDate(today: String = Show.todayString()) -> String? {
+        guard let d = nextSeasonDate, !d.isEmpty, d >= today else { return nil }
+        return d
+    }
+
+    // Next episode ("6/1"); nil without an upcoming date. Used on the
+    // Watching/Awaiting list rows. Deliberately just the one date — the
+    // finale date stays off "Next episode" everywhere.
+    public var nextUpRange: String? { nextUpRange(today: Show.todayString()) }
+
+    public func nextUpRange(today: String) -> String? {
+        monthDay(upcomingNextDate(today: today))
+    }
+
+    // Whatever season dates are still ahead, for the detail view (falls back
+    // to a finale-only "through M/D").
+    public var seasonDatesText: String? { seasonDatesText(today: Show.todayString()) }
+
+    public func seasonDatesText(today: String) -> String? {
+        if let r = nextUpRange(today: today) { return r }
+        if let end = seasonEndDate, !end.isEmpty, end >= today, let md = monthDay(end) { return "through \(md)" }
         return nil
+    }
+
+    // "Season 6 · premiered 9/16" while a season is on, "Season 6 premieres
+    // 10/14" before it starts. Shown only while the season is current: about to
+    // start, or with a next episode stored on this copy (Watching and Awaiting
+    // carry one, and a passed one still means the season was airing at the
+    // last refresh). A finished season says nothing here; the count covers it.
+    public var currentSeasonText: String? { currentSeasonText(today: Show.todayString()) }
+
+    public func currentSeasonText(today: String) -> String? {
+        guard let row = currentSeasonRow(today: today) else { return nil }
+        return row.upcoming ? "\(row.label) premieres \(row.date)" : "\(row.label) · premiered \(row.date)"
+    }
+
+    // The same, split for the detail screen's two-column rows:
+    //   Season 6      Premiered 9/16
+    public var currentSeasonRow: (label: String, value: String)? {
+        guard let row = currentSeasonRow(today: Show.todayString()) else { return nil }
+        return (row.label, "\(row.upcoming ? "Premieres" : "Premiered") \(row.date)")
+    }
+
+    func currentSeasonRow(today: String) -> (label: String, date: String, upcoming: Bool)? {
+        guard !isMovie, let n = currentSeason, n > 0,
+              let premiere = seasonPremiereDate, !premiere.isEmpty, let md = monthDay(premiere) else { return nil }
+        if premiere > today { return ("Season \(n)", md, true) }
+        guard let next = nextSeasonDate, !next.isEmpty else { return nil }
+        return ("Season \(n)", md, false)
+    }
+
+    // The season line under a list row:
+    //   "Season 6 · premiered 9/16 · next 10/14"   a season on air
+    //   "Season 6 premieres 10/14"                 one about to start
+    //   "Next episode: 10/14 · 6 seasons"          no season data yet
+    //   "6 seasons"                                nothing coming up
+    public var listLine: String? { listLine(today: Show.todayString()) }
+
+    public func listLine(today: String) -> String? {
+        let next = nextUpRange(today: today)
+        if let current = currentSeasonText(today: today) {
+            if let next, !current.contains("premieres") { return "\(current) · next \(next)" }
+            return current
+        }
+        if let next { return [ "Next episode: \(next)", seasonsText ].compactMap { $0 }.joined(separator: " · ") }
+        return seasonsText
     }
 
     public var castMembers: [Actor] {

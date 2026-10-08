@@ -1750,7 +1750,7 @@
   </div>
 
   <script type="text/javascript" src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
-  <script src="/show-renderer.js?v=4"></script>
+  <script src="/show-renderer.js?v=5"></script>
   <script>
     // Set nav context before loading nav.js
     window.navContext = { page: 'home' };
@@ -1919,12 +1919,11 @@
       }
       if (!opts.aggregate) {
         if (show.recommended_by && !opts.skipRecommender) lines.push(`Recommended by ${escapeHtml(show.recommended_by)}`);
-        if (show.next_season_date && !opts.skipNextSeason) {
-          const seasons = seasonsText(show);
-          lines.push(`Next episode: ${formatSeasonRange(show)}${seasons ? ` · ${seasons}` : ''}`);
-        } else if (!opts.skipNextSeason && seasonsText(show)) {
-          // No upcoming date but we know the total — still worth showing.
-          lines.push(seasonsText(show));
+        if (!opts.skipNextSeason) {
+          // The season line from show-renderer.js ("Season 6 · premiered
+          // 9/16 · next 10/14"), the same text the cards show.
+          const seasonLine = seasonLineText(show);
+          if (seasonLine) lines.push(escapeHtml(seasonLine));
         }
         if (show.watching_with) lines.push(`Watching with ${escapeHtml(show.watching_with)}`);
         if (show.notes) lines.push(escapeHtml(show.notes));
@@ -1937,10 +1936,11 @@
       return formatDate(show.next_season_date);
     }
 
-    // "3 seasons" / "1 season" — total seasons released so far, when known.
+    // "3 seasons" / "1 season" — total seasons so far, when known, never
+    // fewer than the season airing (seasonCount() in show-renderer.js).
     function seasonsText(show) {
-      const n = show.seasons_released;
-      return (typeof n === 'number' && n > 0) ? `${n} season${n === 1 ? '' : 's'}` : null;
+      const n = seasonCount(show);
+      return n > 0 ? `${n} season${n === 1 ? '' : 's'}` : null;
     }
 
     document.getElementById('inputNetwork').addEventListener('change', function() {

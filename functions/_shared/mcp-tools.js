@@ -150,6 +150,8 @@ function compactShow(s, { detail = false } = {}) {
     your_rating: s.user_rating ?? undefined,
     seasons_released: s.seasons_released ?? undefined,
     next_episode_date: s.next_season_date || undefined,
+    current_season: s.current_season ?? undefined,
+    season_premiere_date: s.season_premiere_date || undefined,
     archived: s.archived ? true : undefined,
     // Present only on the member's own rows — the handler strips them
     // everywhere else, and this passes along whatever it was given.

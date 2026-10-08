@@ -261,6 +261,10 @@ Two pieces of metadata are **always visible** under the row (not collapsed):
 
 - **Awaiting list:** "Next episode: 5/9" — the next premiere date only (the finale date is never shown here). The label is "Next episode" rather than "Next season" because midseason episode dates can also appear here.
 - **Every list shows the premiere date when one exists** (since 2026-07): Loved and Next Up rows carry the same "📅 Next episode" line — a show you thought was done can drop a surprise season, and the date is the nudge to move it back to Watching.
+- **A season on air says which one, and when it premiered** (since 2026-10, migration 087): "Season 6 · premiered 9/16 · next 10/14" on a Watching or Awaiting row, and "Season 7 premieres 10/14" on any list before a new season starts. A finished season falls back to the count ("4 seasons"). The detail screen carries the same as a "Season 6 — Premiered 9/16" row above Next episode.
+- **A date that has passed is never shown** as the next episode or the finale: it means the refresh hasn't caught up since the episode aired, and "Next episode: 10/7" on 10/8 was wrong. Watching and Awaiting rows with a passed date go to the front of the next refresh.
+- **The season count never trails the season airing**: it's the larger of TMDB's count and the current season, so a member watching season 5 never reads "4 seasons".
+- Platforms: iPhone/iPad/Mac, the web and Apple TV show all of the above; the watch shows the detail rows; Roku's card badge drops passed dates and badges an upcoming premiere.
 - **Next Up list:** "Recommended by Rosa" — surfaces attribution without an expand.
 
 ### The admin member screen (iPhone, iPad and Mac — admin sessions only)

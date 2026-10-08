@@ -83,6 +83,13 @@ const tvDetail = (id) => {
     id: Number(id), name: s.name, first_air_date: '2022-02-18', status: s.status,
     poster_path: `/${id}.jpg`, overview: `${s.name}.`, vote_average: 8.4, vote_count: 900,
     number_of_episodes: 19, number_of_seasons: 2, episode_run_time: [50],
+    // Mid-season: season 3 premiered 2026-10-01 and its fourth episode is
+    // next. number_of_seasons still says 2, the lag migration 087's
+    // current_season covers.
+    next_episode_to_air: { air_date: '2026-10-22', season_number: 3, episode_number: 4 },
+    last_episode_to_air: { air_date: '2026-10-15', season_number: 3, episode_number: 3 },
+    seasons: [{ season_number: 0, air_date: '2021-01-01' }, { season_number: 2, air_date: '2025-01-17' },
+              { season_number: 3, air_date: '2026-10-01' }],
     genres: [{ name: 'Drama' }], networks: [{ name: 'Apple TV+', logo_path: '/atv.png' }],
     created_by: [],
     credits: { cast: [
@@ -171,7 +178,7 @@ function makeEnv() {
 // A row with no gap for the old gates to find: poster, cast (ids resolved, so
 // the actor backfill stays out of it), episode count, genres, streaming_on.
 // `filled` says whether a post-073 pass has already been through it.
-function addRow(env, { title, tmdbId, list, movie = 0, member = 'patrick', enrichedAt, filled = false, gap = false }) {
+function addRow(env, { title, tmdbId, list, movie = 0, member = 'patrick', enrichedAt, filled = false, gap = false, nextDate = null }) {
   env._db.prepare(
     `INSERT INTO shows (title, list, member_slug, movie, tmdb_id, tmdb_type, poster_url, network,
                         genres, overview, runtime, episodes_released, streaming_on, tmdb_status,
@@ -180,6 +187,10 @@ function addRow(env, { title, tmdbId, list, movie = 0, member = 'patrick', enric
   ).run(title, list, member, movie, tmdbId, movie ? 'movie' : 'tv',
         movie ? null : (gap ? null : 10), filled ? 'Ended' : null, enrichedAt);
   const id = Number(env._db.prepare('SELECT MAX(id) AS id FROM shows_v').get().id);
+  // A filled series also has its current season (migration 087), so only a
+  // stale date can pull it forward. The next-episode date is the copy's own.
+  env._db.prepare('UPDATE shows SET current_season = ?, next_season_date = ? WHERE id = ?')
+    .run(filled && !movie ? 2 : null, nextDate, id);
   env._db.prepare('INSERT INTO actors (show_id, name, imdb_id, ord) VALUES (?, ?, ?, 0)').run(id, `${title} Lead`, 'nm0000001');
   return id;
 }
@@ -227,6 +238,8 @@ console.log('\nThe TV pass stores the four new facts and propagates them');
   check('status stored verbatim', a.tmdb_status === 'Returning Series', a.tmdb_status);
   check('free_on keeps free services in priority order, maps Tubi, drops the unknown and every paid service',
     a.free_on === 'Pluto TV, Tubi', JSON.stringify(a.free_on));
+  check('the season airing now is stored, not number_of_seasons', a.current_season === 3, a.current_season);
+  check('…with the day that season premiered', a.season_premiere_date === '2026-10-01', a.season_premiere_date);
   check('sibling copy receives imdb_id', b.imdb_id === 'tt11280740', b.imdb_id);
   check('sibling copy receives status and free_on',
     b.tmdb_status === 'Returning Series' && b.free_on === 'Pluto TV, Tubi', `${b.tmdb_status} / ${b.free_on}`);
@@ -356,6 +369,79 @@ console.log('\nMigration 086 cleans the stored free_on to the same allow-list');
   check('an all-free list is unchanged', after[3] === 'Pluto TV, Tubi', JSON.stringify(after[3]));
   check('a mixed list keeps only the free names', after[7] === 'Pluto TV, Tubi', JSON.stringify(after[7]));
   check("'' and NULL are left as they were", after[5] === '' && after[6] === null, JSON.stringify([after[5], after[6]]));
+}
+
+console.log('\ncurrentSeasonOf: the season a member is on, and its premiere');
+{
+  const { currentSeasonOf } = await import(join(sandbox, 'functions', '_shared/enrichment.js'));
+  const seasons = [{ season_number: 0, air_date: '2020-01-01' }, { season_number: 4, air_date: '2026-08-04' },
+                   { season_number: 5, air_date: null }];
+  let r = currentSeasonOf({ seasons, last_episode_to_air: { season_number: 4, episode_number: 10, air_date: '2026-10-06' } });
+  check('no next episode: the season that last aired', r.currentSeason === 4 && r.seasonPremiereDate === '2026-08-04', JSON.stringify(r));
+  r = currentSeasonOf({ seasons, last_episode_to_air: { season_number: 4, episode_number: 10 },
+    next_episode_to_air: { season_number: 5, episode_number: 1, air_date: '2027-01-09' } });
+  check('a scheduled premiere TMDB has not dated the season for: the episode date', r.currentSeason === 5 && r.seasonPremiereDate === '2027-01-09', JSON.stringify(r));
+  r = currentSeasonOf({ seasons, next_episode_to_air: { season_number: 5, episode_number: 3, air_date: '2027-01-23' } });
+  check('mid-season with no season date: the number, and no guessed premiere', r.currentSeason === 5 && r.seasonPremiereDate === null, JSON.stringify(r));
+  r = currentSeasonOf({ seasons: [], next_episode_to_air: { season_number: 0, episode_number: 2, air_date: '2027-01-23' } });
+  check('a special (season 0) is not a current season', r.currentSeason === null, JSON.stringify(r));
+  r = currentSeasonOf({ seasons: [{ season_number: 2, air_date: 'soon' }], last_episode_to_air: { season_number: 2, episode_number: 1 } });
+  check('a malformed date is not stored', r.currentSeason === 2 && r.seasonPremiereDate === null, JSON.stringify(r));
+  check('nothing aired or scheduled: nothing', currentSeasonOf({}).currentSeason === null);
+}
+
+console.log('\nStale dates on Watching and Awaiting jump the age rotation');
+{
+  const env = makeEnv();
+  addRow(env, { title: 'Succession', tmdbId: 702, list: 'loved', enrichedAt: '2026-08-01', filled: true });
+  // Newer, filled, but its stored next episode has already aired.
+  addRow(env, { title: 'The Bear', tmdbId: 704, list: 'watching', enrichedAt: '2026-09-20', filled: true, nextDate: '2020-01-01' });
+  fetchLog = [];
+  await runEnrich(env, { max_tmdb: 1 });
+  check('a Watching row whose next episode already aired beats an older Loved row',
+    fetchedTv()[0] === 704, JSON.stringify(fetchedTv()));
+}
+{
+  const env = makeEnv();
+  addRow(env, { title: 'Succession', tmdbId: 702, list: 'loved', enrichedAt: '2026-08-01', filled: true });
+  addRow(env, { title: 'The Bear', tmdbId: 704, list: 'waiting', enrichedAt: '2026-09-20', filled: true, nextDate: '2020-01-01' });
+  fetchLog = [];
+  await runEnrich(env, { max_tmdb: 1 });
+  check('so does an Awaiting row', fetchedTv()[0] === 704, JSON.stringify(fetchedTv()));
+}
+{
+  const env = makeEnv();
+  addRow(env, { title: 'Succession', tmdbId: 702, list: 'loved', enrichedAt: '2026-08-01', filled: true });
+  addRow(env, { title: 'The Bear', tmdbId: 704, list: 'watching', enrichedAt: '2026-09-20', filled: true, nextDate: '2999-01-01' });
+  fetchLog = [];
+  await runEnrich(env, { max_tmdb: 1 });
+  check('an upcoming next episode waits its turn', fetchedTv()[0] === 702, JSON.stringify(fetchedTv()));
+}
+{
+  const env = makeEnv();
+  addRow(env, { title: 'Succession', tmdbId: 702, list: 'loved', enrichedAt: '2026-08-01', filled: true });
+  addRow(env, { title: 'The Bear', tmdbId: 704, list: 'loved', enrichedAt: '2026-09-20', filled: true, nextDate: '2020-01-01' });
+  fetchLog = [];
+  await runEnrich(env, { max_tmdb: 1 });
+  check('a stale date off Watching and Awaiting does not', fetchedTv()[0] === 702, JSON.stringify(fetchedTv()));
+}
+{
+  const env = makeEnv();
+  addRow(env, { title: 'Succession', tmdbId: 702, list: 'loved', enrichedAt: '2026-08-01', filled: true });
+  const bear = addRow(env, { title: 'The Bear', tmdbId: 704, list: 'watching', enrichedAt: new Date().toISOString().slice(0, 19).replace('T', ' '), filled: true, nextDate: '2020-01-01' });
+  fetchLog = [];
+  await runEnrich(env, { max_tmdb: 1 });
+  check('a stale row tried in the last 20 hours waits for tomorrow', fetchedTv()[0] === 702, JSON.stringify(fetchedTv()));
+  void bear;
+}
+{
+  const env = makeEnv();
+  addRow(env, { title: 'Succession', tmdbId: 702, list: 'loved', enrichedAt: '2026-08-01', filled: true });
+  const bear = addRow(env, { title: 'The Bear', tmdbId: 704, list: 'watching', enrichedAt: '2026-09-20', filled: true });
+  env._db.prepare('UPDATE shows SET current_season = NULL WHERE id = ?').run(bear);
+  fetchLog = [];
+  await runEnrich(env, { max_tmdb: 1 });
+  check('a Watching row with no current season yet goes first', fetchedTv()[0] === 704, JSON.stringify(fetchedTv()));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

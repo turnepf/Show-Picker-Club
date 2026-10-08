@@ -97,6 +97,7 @@ struct WatchDetailView: View {
                 if let l = ShowList(rawValue: s.list) { row("List", l.title) }
                 // Premiere when there is one, else the finale date ("through
                 // 6/12") — the phone's fallback, which the watch was missing.
+                if let season = s.currentSeasonRow { row(season.label, season.value) }
                 if let dates = s.seasonDatesText { row("Next episode", dates) }
                 if let series = s.seriesText { row("Series", series) }
                 if s.isMovie { row("Type", "Movie") }

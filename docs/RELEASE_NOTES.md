@@ -50,6 +50,8 @@ iPhone and iPad:
 ```
 Fixed Home coming up empty after folding or unfolding iPhone Duo — it no longer needs a pull to refresh.
 Home on iPad, Mac and an unfolded iPhone Duo loads faster when you're in several groups.
+A season on the air now says which one and when it premiered: "Season 6 · premiered 9/16 · next 10/14".
+A next-episode date no longer lingers after the episode airs, and the season count keeps up with a new season.
 ```
 
 ---

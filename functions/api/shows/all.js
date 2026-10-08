@@ -78,6 +78,7 @@ export async function onRequestGet(context) {
               WHERE ${sameShowJoin('x', 's')} AND x.archived = 0
                 AND x.network_logo_url IS NOT NULL LIMIT 1)) AS network_logo_url,
             s.seasons_released, s.next_season_date, s.season_end_date,
+            s.current_season, s.season_premiere_date,
             m.name AS member_raw_name, m.first_name AS member_raw_first,
             m.last_initial AS member_last_initial,
             (SELECT json_group_array(json_object('name', a.name, 'imdb_id', a.imdb_id))

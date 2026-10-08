@@ -26,6 +26,7 @@ protocol ShowRowDisplayable {
     var rowIsFullSeries: Bool { get }
     var rowSeasonsText: String? { get }
     var rowNextUpRange: String? { get }
+    var rowSeasonLine: String? { get }
 }
 
 extension ShowRowDisplayable {
@@ -34,6 +35,17 @@ extension ShowRowDisplayable {
     var rowIsFullSeries: Bool { false }
     var rowSeasonsText: String? { nil }
     var rowNextUpRange: String? { nil }
+
+    // "Next episode: 6/1 · 3 seasons" — the premiere plus the season count
+    // when both are known, either alone otherwise. A premiere date shows on
+    // EVERY list: a Loved show that drops a surprise season is exactly what to
+    // surface. Show replaces this with its season-aware listLine.
+    var rowSeasonLine: String? {
+        if let next = rowNextUpRange {
+            return ["Next episode: \(next)", rowSeasonsText].compactMap { $0 }.joined(separator: " · ")
+        }
+        return rowSeasonsText
+    }
 }
 
 extension Show: ShowRowDisplayable {
@@ -45,6 +57,9 @@ extension Show: ShowRowDisplayable {
     var rowIsFullSeries: Bool { isFullSeries }
     var rowSeasonsText: String? { seasonsText }
     var rowNextUpRange: String? { nextUpRange }
+    // "Season 6 · premiered 9/16 · next 10/14" while a season is on; see
+    // Show.listLine for the rest.
+    var rowSeasonLine: String? { listLine }
 }
 
 extension PopularShow: ShowRowDisplayable {
@@ -131,17 +146,7 @@ struct ShowRow<Leading: View, Extra: View>: View {
         self.extra = extra()
     }
 
-    // "Next episode: 6/1 · 3 seasons" — the premiere plus the season count
-    // when both are known, either alone otherwise. A premiere date shows on
-    // EVERY list: a Loved show that drops a surprise season is exactly what to
-    // surface.
-    private var seasonLine: String? {
-        if show.rowNextUpRange != nil {
-            let parts = [show.rowNextUpRange.map { "Next episode: \($0)" }, show.rowSeasonsText].compactMap { $0 }
-            return parts.isEmpty ? nil : parts.joined(separator: " · ")
-        }
-        return show.rowSeasonsText
-    }
+    private var seasonLine: String? { show.rowSeasonLine }
 
     private var captionText: String? {
         if let caption = caption { return caption.isEmpty ? nil : caption }

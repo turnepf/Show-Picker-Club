@@ -219,12 +219,44 @@ export function extractTmdbDetailFields(detail, mediaType) {
   // stored NULL keeps meaning "no pass has written migration 073's fields".
   const tmdbStatus = typeof detail.status === 'string' ? detail.status.trim() : '';
 
+  const { currentSeason, seasonPremiereDate } = mediaType === 'movie'
+    ? { currentSeason: null, seasonPremiereDate: null }
+    : currentSeasonOf(detail);
+
   return {
     overview, backdropUrl, tmdbRating, contentRating, trailerKey,
     director, directorPersonId, runtime, releaseYear, providerNetwork, providerLogoUrl, providerLogos, flatrateNetworks, watchLink,
     storefronts, availability,
     episodesReleased, voteCount, tagline, originalLanguage, studio,
     imdbId, tmdbStatus, freeNetworks, genres, seasonsReleased,
+    currentSeason, seasonPremiereDate,
+  };
+}
+
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+
+// The season a member is watching or waiting on, and the day it premiered
+// (migration 087). The season of the next episode when one is scheduled,
+// else of the last one that aired. Clients show "Season 6 · premiered 9/16"
+// while a season is on, "Season 6 premieres 10/14" before it starts, and use
+// the number as a floor under the season count: number_of_seasons and the
+// season actually airing don't always agree on the day a new season starts.
+// Both come off the detail call every pass already makes. The premiere is the
+// season's own air date, or the next episode's date when that episode is the
+// premiere and TMDB hasn't dated the season yet.
+export function currentSeasonOf(detail) {
+  const next = detail?.next_episode_to_air || null;
+  const last = detail?.last_episode_to_air || null;
+  const ep = next && Number.isInteger(next.season_number) && next.season_number > 0 ? next
+    : last && Number.isInteger(last.season_number) && last.season_number > 0 ? last
+    : null;
+  if (!ep) return { currentSeason: null, seasonPremiereDate: null };
+  const season = (detail.seasons || []).find((s) => s && s.season_number === ep.season_number);
+  let premiere = season && typeof season.air_date === 'string' ? season.air_date : null;
+  if (!premiere && ep === next && ep.episode_number === 1) premiere = next.air_date;
+  return {
+    currentSeason: ep.season_number,
+    seasonPremiereDate: premiere && YMD.test(premiere) ? premiere : null,
   };
 }
 
@@ -280,6 +312,7 @@ const EMPTY_DETAIL = {
   originalLanguage: null, studio: null,
   imdbId: null, tmdbStatus: null, freeNetworks: null,
   genres: null, seasonsReleased: null,
+  currentSeason: null, seasonPremiereDate: null,
 };
 
 // Retries on 429 (rate limit) with backoff — otherwise a burst of many

@@ -16,10 +16,18 @@ function safeUrl(url) {
   } catch { return ''; }
 }
 
+// TMDB's season count, but never less than the season airing now
+// (current_season, migration 087): the count can trail a new season, which
+// read "4 seasons" to a member watching season 5. Same as Show.seasonCount.
+function seasonCount(show) {
+  if (!show || show.movie) return 0;
+  return Math.max(Number(show.seasons_released) || 0, Number(show.current_season) || 0);
+}
+
 function seasonsText(show) {
   if (!show || show.movie) return '';
-  const n = show.seasons_released;
-  if (typeof n !== 'number' || n <= 0) return '';
+  const n = seasonCount(show);
+  if (n <= 0) return '';
   const seasonsPart = `${n} Season${n === 1 ? '' : 's'}`;
   return show.full_series ? `${seasonsPart}, Complete` : seasonsPart;
 }
@@ -30,6 +38,59 @@ function seasonsText(show) {
 function parseYmd(s) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ''));
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(s);
+}
+
+// Today as YYYY-MM-DD in the viewer's own calendar. Stored dates are air
+// dates, so they compare against it as strings.
+function todayYmd() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// "2026-09-16" → "9/16", the format the apps use.
+function monthDay(ymd) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd || ''));
+  return m ? `${Number(m[2])}/${Number(m[3])}` : '';
+}
+
+// The stored next episode, only while it's still ahead (today counts). A
+// passed one means the refresh hasn't caught up since it aired, and showing it
+// read "Next episode: 10/7" on 10/8. Same as Show.upcomingNextDate.
+function upcomingNextDate(show, today = todayYmd()) {
+  const d = show && show.next_season_date;
+  return d && String(d).slice(0, 10) >= today ? d : null;
+}
+
+// { label: 'Season 6', date: '9/16', upcoming: false } while a season is on
+// (a next episode is stored on this copy) or about to start; null otherwise.
+// Same rule as Show.currentSeasonRow.
+function currentSeasonInfo(show, today = todayYmd()) {
+  if (!show || show.movie) return null;
+  const n = Number(show.current_season);
+  const premiere = show.season_premiere_date;
+  if (!(n > 0) || !premiere) return null;
+  const date = monthDay(premiere);
+  if (!date) return null;
+  if (String(premiere).slice(0, 10) > today) return { label: `Season ${n}`, date, upcoming: true };
+  if (!show.next_season_date) return null;
+  return { label: `Season ${n}`, date, upcoming: false };
+}
+
+// The season line under a list row. Same as Show.listLine:
+//   "Season 6 · premiered 9/16 · next 10/14"   a season on air
+//   "Season 7 premieres 10/14"                 one about to start
+//   "Next episode: 10/14 · 6 Seasons"          no season data yet
+//   "6 Seasons"                                nothing coming up
+function seasonLineText(show, today = todayYmd()) {
+  const next = upcomingNextDate(show, today);
+  const cur = currentSeasonInfo(show, today);
+  if (cur) {
+    if (cur.upcoming) return `${cur.label} premieres ${cur.date}`;
+    return `${cur.label} · premiered ${cur.date}${next ? ` · next ${monthDay(next)}` : ''}`;
+  }
+  const seasons = seasonsText(show);
+  if (next) return `Next episode: ${monthDay(next)}${seasons ? ` · ${seasons}` : ''}`;
+  return seasons;
 }
 
 function formatSeasonRange(show) {
@@ -69,13 +130,8 @@ function renderShowCard(show, options = {}) {
   }
   const captionHtml = captionParts.length ? `<div class="show-sub">${captionParts.join(' · ')}</div>` : '';
 
-  let dateLine = '';
-  const seasons = seasonsText(show);
-  if (show.next_season_date) {
-    dateLine = `<div class="show-sub">Next episode: ${formatSeasonRange(show)}${seasons ? ` · ${seasons}` : ''}</div>`;
-  } else if (seasons) {
-    dateLine = `<div class="show-sub">${seasons}</div>`;
-  }
+  const seasonLine = seasonLineText(show);
+  const dateLine = seasonLine ? `<div class="show-sub">${escapeHtml(seasonLine)}</div>` : '';
 
   const poster = show.poster_url
     ? `<img class="row-poster" src="${safeUrl(show.poster_url)}" alt="" loading="lazy">`
@@ -435,10 +491,10 @@ function renderShowDetailBody(show, options = {}) {
     // "4 Seasons · 19 Episodes, Complete", or just "2 Seasons" while it's
     // still running (or just "Complete" when the count is unknown). Same as
     // Show.seriesText.
-    const n = show.seasons_released;
+    const n = seasonCount(show);
     const e = show.episodes_released;
     const seriesParts = [];
-    if (typeof n === 'number' && n > 0) {
+    if (n > 0) {
       let count = `${n} Season${n === 1 ? '' : 's'}`;
       if (typeof e === 'number' && e > 0) count += ` · ${e} Episode${e === 1 ? '' : 's'}`;
       seriesParts.push(count);
@@ -452,10 +508,15 @@ function renderShowDetailBody(show, options = {}) {
   }
   if (show.genres) rows.push(detailRow('Genres', escapeHtml(show.genres)));
   if (show.runtime) rows.push(detailRow('Runtime', escapeHtml(runtimeText(show.runtime))));
-  if (show.next_season_date) {
+  {
+    // "Season 6   Premiered 9/16" while a season is on.
+    const cur = currentSeasonInfo(show);
+    if (cur) rows.push(detailRow(cur.label, escapeHtml(`${cur.upcoming ? 'Premieres' : 'Premiered'} ${cur.date}`)));
+  }
+  if (upcomingNextDate(show)) {
     rows.push(detailRow('Next episode', escapeHtml(formatSeasonRange(show))));
-  } else if (show.season_end_date) {
-    // Mid-season: no premiere ahead, but the finale date is known.
+  } else if (show.season_end_date && String(show.season_end_date).slice(0, 10) >= todayYmd()) {
+    // Mid-season: no next episode stored, but the finale is still ahead.
     const end = parseYmd(show.season_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     rows.push(detailRow('Next episode', escapeHtml(`through ${end}`)));
   }
