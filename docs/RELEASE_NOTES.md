@@ -43,15 +43,33 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## Unreleased — the update after 1.6.1
+## Unreleased — the update after 1.6.2
+
+Nothing yet.
+
+---
+
+## 1.6.2 (build 32) — iPhone, iPad and Apple TV, submitted for review 2026-10-08
+
+**Mac isn't in this release:** its 1.6.1 was still in review, and Apple won't
+open a new Mac version while one is. The Mac picks these changes up with the
+next release that includes it. First release with iPhone Duo screenshots
+(`APP_IPHONE_DUO`, uploaded with `scripts/asc.mjs screenshots`).
 
 iPhone and iPad:
 
 ```
-Fixed Home coming up empty after folding or unfolding iPhone Duo — it no longer needs a pull to refresh.
-Home on iPad, Mac and an unfolded iPhone Duo loads faster when you're in several groups.
-A season on the air now says which one and when it premiered: "Season 6 · premiered 9/16 · next 10/14".
-A next-episode date no longer lingers after the episode airs, and the season count keeps up with a new season.
+A season on the air now says which one and when it premiered: "Season 6 · premiered 9/16 · next 10/14", or "Season 7 premieres 10/14" before it starts.
+A next-episode date no longer lingers after the episode airs, and the season count keeps up when a new season starts.
+Ready for iPhone Duo: Home no longer comes up empty after folding or unfolding.
+Home on iPad and an unfolded iPhone Duo loads faster when you're in several groups.
+```
+
+Apple TV:
+
+```
+A season on the air now says which one and when it premiered: "Season 6 · premiered 9/16 · next 10/14", or "Season 7 premieres 10/14" before it starts.
+A next-episode date no longer lingers after the episode airs, and the season count keeps up when a new season starts.
 ```
 
 ---
