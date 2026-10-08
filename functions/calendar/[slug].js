@@ -19,7 +19,7 @@ export async function onRequestGet(context) {
   // .catch: pre-migration database (no calendar_token column) → 404, same
   // as a missing member.
   const member = await env.DB.prepare(
-    `SELECT slug, calendar_token FROM members WHERE slug = ?`
+    `SELECT slug, name, first_name, calendar_token FROM members WHERE slug = ?`
   ).bind(slug).first().catch(() => null);
   if (!member) return new Response('Not found', { status: 404 });
 
@@ -74,10 +74,13 @@ export async function onRequestGet(context) {
     'X-PUBLISHED-TTL:PT24H',
   ];
 
-  const memberPageUrl = `https://showpicker.club/${slug}`;
+  const memberName = displayName(member);
   for (const s of results) {
-    const url = isRealShowUrl(s.network_url) ? s.network_url : memberPageUrl;
-    const desc = describeShow(s, slug, memberPageUrl);
+    // /show/:id is the universal link the widgets use: it opens the show's
+    // card in the app, and on the web for anyone without it.
+    const showUrl = `https://showpicker.club/show/${s.id}`;
+    const url = isRealShowUrl(s.network_url) ? s.network_url : showUrl;
+    const desc = describeShow(s, memberName, showUrl);
     const summary = s.network ? `${s.title} on ${s.network}` : s.title;
     if (s.next_season_date) {
       lines.push(...buildEvent({
@@ -151,11 +154,18 @@ function isRealShowUrl(url) {
   return !!url && !url.includes('/search') && !url.includes('/s?') && url !== '#';
 }
 
-function describeShow(s, slug, memberPageUrl) {
-  const bits = [`On ${slug}'s ${s.list} list`];
+// The member's first name as they gave it, falling back to the slug; either
+// way capitalized, since slugs are lowercase.
+function displayName(member) {
+  const n = String(member.first_name || member.name || member.slug).trim() || member.slug;
+  return n.charAt(0).toUpperCase() + n.slice(1);
+}
+
+function describeShow(s, memberName, showUrl) {
+  const bits = [`On ${memberName}'s ${s.list} list`];
   if (s.recommended_by) bits.push(`Recommended by ${s.recommended_by}`);
   if (s.network) bits.push(`Network: ${s.network}`);
-  bits.push(`More: ${memberPageUrl}`);
+  bits.push(`More: ${showUrl}`);
   return bits.join('. ') + '.';
 }
 
