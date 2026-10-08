@@ -45,6 +45,12 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ## Unreleased — the update after 1.6.1
 
+iPhone and iPad:
+
+```
+Fixed Home coming up empty after folding or unfolding iPhone Duo — it no longer needs a pull to refresh.
+```
+
 ---
 
 ## 1.6.1 (build 31) — iPhone, iPad, Mac and Apple TV, submitted for review 2026-10-07

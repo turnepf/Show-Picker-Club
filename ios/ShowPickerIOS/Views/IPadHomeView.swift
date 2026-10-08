@@ -650,11 +650,20 @@ struct IPadHomeView: View {
 
     private func load() async {
         loading = true
-        defer { loading = false }
         async let m = try? await API.members()
         async let p = try? await API.popular()
         let mr = await m
         let pr = await p
+        // A cancelled load must not count as a finished one. Folding or
+        // unfolding iPhone Duo swaps this view for the phone layout, and
+        // SwiftUI cancels the outgoing view's .task. The cancelled requests
+        // came back nil through try?, which looked like a failed load, so
+        // `loading` went false and the `.task { if loading }` guard skipped
+        // the retry when Home appeared again: Home stayed empty until a pull
+        // to refresh. Returning here leaves `loading` set, so the next
+        // appearance loads.
+        if Task.isCancelled { return }
+        defer { loading = false }
         loadFailed = (mr == nil)
         // Most recently active first (the window shows the top five), then most
         // shows as the tiebreaker. On failure keep the previous roster —
