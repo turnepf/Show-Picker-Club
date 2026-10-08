@@ -16,6 +16,7 @@
 //   node scripts/asc.mjs attach 1.4.1 24
 //   node scripts/asc.mjs create-version 1.6
 //   node scripts/asc.mjs submit 1.6 --confirm
+//   node scripts/asc.mjs screenshots 1.6.2 APP_IPHONE_DUO a.png b.png --replace
 //
 // Sending a version to review is a person's decision. `submit` exists so that
 // decision doesn't need a browser, but it only runs with --confirm, refuses a
@@ -246,6 +247,96 @@ function cmdUpload(file) {
   });
 }
 
+// Upload screenshots into one display type's set on a version's en-US page,
+// e.g. APP_IPHONE_DUO (iPhone Duo, 2026-10: 1398x2034 / 2034x1398 folded,
+// 2007x2853 / 2853x2007 open). Apple's published OpenAPI doesn't list the Duo
+// type yet; the live API accepts it. The set is created when the version has
+// none for that type. --replace empties an existing set first, so a rerun
+// doesn't pile duplicates on top; without it, files are appended. Each file
+// goes up in Apple's upload operations, is committed with its MD5, and is
+// polled until Apple reports it COMPLETE or FAILED.
+const SCREENSHOT_SIZES = {
+  APP_IPHONE_DUO: ['1398x2034', '2034x1398', '2007x2853', '2853x2007'],
+};
+
+function pngSize(file) {
+  const b = fs.readFileSync(file);
+  if (b.length < 24 || b.toString('ascii', 1, 4) !== 'PNG') return null;
+  return `${b.readUInt32BE(16)}x${b.readUInt32BE(20)}`;
+}
+
+async function cmdScreenshots(versionString, displayType, files, { platform = 'IOS', replace = false } = {}) {
+  if (!versionString || !displayType || !files.length) {
+    die('usage: screenshots <version> <DISPLAY_TYPE> <file.png>... [--replace] [--platform IOS|MAC_OS|TV_OS]');
+  }
+  if (files.length > 10) die(`Apple takes at most 10 screenshots per set (got ${files.length})`);
+  const sizes = SCREENSHOT_SIZES[displayType];
+  for (const f of files) {
+    if (!fs.existsSync(f)) die(`No such file: ${f}`);
+    const size = pngSize(f);
+    if (!size) die(`${f} is not a PNG`);
+    if (sizes && !sizes.includes(size)) die(`${f} is ${size}; ${displayType} takes ${sizes.join(', ')}`);
+  }
+  const v = (await versions(versionString)).find(r => r.attributes.platform === platform);
+  if (!v) die(`No ${platform} version record for ${versionString}`);
+  const locs = await get(`/v1/appStoreVersions/${v.id}/appStoreVersionLocalizations?fields[appStoreVersionLocalizations]=locale`);
+  const loc = (locs.data || []).find(l => l.attributes.locale === 'en-US');
+  if (!loc) die(`${platform} ${versionString} has no en-US page`);
+
+  const sets = await get(`/v1/appStoreVersionLocalizations/${loc.id}/appScreenshotSets?limit=50`);
+  let set = (sets.data || []).find(x => x.attributes.screenshotDisplayType === displayType);
+  if (!set) {
+    set = (await call('POST', '/v1/appScreenshotSets', {
+      data: {
+        type: 'appScreenshotSets',
+        attributes: { screenshotDisplayType: displayType },
+        relationships: { appStoreVersionLocalization: { data: { type: 'appStoreVersionLocalizations', id: loc.id } } },
+      },
+    })).data;
+    console.log(`  created the ${displayType} set`);
+  } else if (replace) {
+    const old = await get(`/v1/appScreenshotSets/${set.id}/appScreenshots?limit=50`);
+    for (const shot of old.data || []) await call('DELETE', `/v1/appScreenshots/${shot.id}`);
+    console.log(`  emptied the ${displayType} set (${(old.data || []).length} removed)`);
+  }
+
+  for (const f of files) {
+    const bytes = fs.readFileSync(f);
+    const name = path.basename(f);
+    const shot = (await call('POST', '/v1/appScreenshots', {
+      data: {
+        type: 'appScreenshots',
+        attributes: { fileName: name, fileSize: bytes.length },
+        relationships: { appScreenshotSet: { data: { type: 'appScreenshotSets', id: set.id } } },
+      },
+    })).data;
+    for (const op of shot.attributes.uploadOperations || []) {
+      const headers = Object.fromEntries((op.requestHeaders || []).map(h => [h.name, h.value]));
+      const res = await fetch(op.url, {
+        method: op.method, headers, body: bytes.subarray(op.offset, op.offset + op.length),
+      });
+      if (!res.ok) die(`${name}: upload part failed with ${res.status}`);
+    }
+    await call('PATCH', `/v1/appScreenshots/${shot.id}`, {
+      data: {
+        type: 'appScreenshots', id: shot.id,
+        attributes: { uploaded: true, sourceFileChecksum: crypto.createHash('md5').update(bytes).digest('hex') },
+      },
+    });
+    let state = 'UPLOAD_COMPLETE';
+    for (let i = 0; i < 30 && !['COMPLETE', 'FAILED'].includes(state); i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      const now = await get(`/v1/appScreenshots/${shot.id}?fields[appScreenshots]=assetDeliveryState`);
+      state = now.data.attributes.assetDeliveryState?.state || state;
+      if (state === 'FAILED') {
+        const errs = (now.data.attributes.assetDeliveryState.errors || []).map(e => e.description || e.code).join('; ');
+        die(`${name}: Apple rejected it: ${errs || 'no reason given'}`);
+      }
+    }
+    console.log(`  ${name} (${pngSize(f)}): ${state}`);
+  }
+}
+
 // The platforms the app ships on, read from its own version history rather
 // than hardcoded, so a platform added later is picked up.
 async function appPlatforms() {
@@ -381,7 +472,15 @@ switch (cmd) {
     break;
   }
   case 'submit': await cmdSubmit(rest[0], rest[1]); break;
+  case 'screenshots': {
+    const i = rest.indexOf('--platform');
+    const platform = i === -1 ? 'IOS' : rest[i + 1];
+    if (!['IOS', 'MAC_OS', 'TV_OS'].includes(platform)) die(`--platform needs IOS, MAC_OS or TV_OS (got ${platform || 'nothing'})`);
+    const files = rest.slice(2).filter((a, j, all) => a !== '--replace' && a !== '--platform' && all[j - 1] !== '--platform');
+    await cmdScreenshots(rest[0], rest[1], files, { platform, replace: rest.includes('--replace') });
+    break;
+  }
   default:
-    console.log('usage: node scripts/asc.mjs <status | create-version <version> | set-notes <version> <file> | attach <version> <build> | upload <file> | submit <version> [--confirm]>');
+    console.log('usage: node scripts/asc.mjs <status | create-version <version> | set-notes <version> <file> | attach <version> <build> | upload <file> | submit <version> [--confirm] | screenshots <version> <TYPE> <file>... [--replace]>');
     process.exit(cmd ? 1 : 0);
 }
