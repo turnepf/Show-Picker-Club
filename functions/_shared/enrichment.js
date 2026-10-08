@@ -8,24 +8,35 @@
 import { knownNetwork, storefrontFromProvider } from './networks.js';
 import { knownByPersonIds, rememberPeople } from './people.js';
 
-// Free and free-with-ads services that aren't in the network table (Pluto TV
-// is, and resolves through knownNetwork). Only for `free_on`: these are names
-// a member recognises, but they aren't networks a member can pick, so they
-// stay out of networks.js and the picker it feeds. Anything matching neither
-// is dropped rather than shown under TMDB's raw provider name.
+// Free and free-with-ads services that aren't in the network table. Only for
+// `free_on`: these are names a member recognises, but they aren't networks a
+// member can pick, so they stay out of networks.js and the picker it feeds.
+// Anything else is dropped rather than shown under TMDB's raw provider name.
 const FREE_SERVICES = new Map([
   ['tubi', 'Tubi'], ['tubi tv', 'Tubi'],
   ['the roku channel', 'The Roku Channel'], ['roku channel', 'The Roku Channel'],
   ['plex', 'Plex'], ['plex channel', 'Plex'],
   ['kanopy', 'Kanopy'], ['hoopla', 'Hoopla'],
-  ['crackle', 'Crackle'], ['amazon freevee', 'Prime Video'],
+  ['crackle', 'Crackle'],
 ]);
 
-function freeServiceName(providerName) {
-  return knownNetwork(providerName)
-    || FREE_SERVICES.get(String(providerName || '').trim().toLowerCase())
-    || null;
+// The networks from the table that are free to watch. TMDB's `free` and `ads`
+// lists also carry paid services: Apple TV and Prime Video when a series puts
+// an episode or two up free, and the ad tiers of Peacock or Prime Video, which
+// still need a subscription. Accepting every known network put "Free on
+// Apple TV+, Prime Video" on Slow Horses (2026-10). Freevee is gone too, folded
+// into Prime Video, so it no longer maps to anything.
+const FREE_NETWORKS = new Set(['Pluto TV', 'PBS', 'YouTube']);
+
+export function freeServiceName(providerName) {
+  const network = knownNetwork(providerName);
+  if (network) return FREE_NETWORKS.has(network) ? network : null;
+  return FREE_SERVICES.get(String(providerName || '').trim().toLowerCase()) || null;
 }
+
+// Every name free_on can hold, for the migration that cleaned the stored
+// values and the test that keeps the two in step.
+export const FREE_ON_NAMES = [...new Set([...FREE_NETWORKS, ...FREE_SERVICES.values()])];
 
 // How many cast members we store per title. Clients show the top few;
 // storing more means a search by actor can find the character actor nobody

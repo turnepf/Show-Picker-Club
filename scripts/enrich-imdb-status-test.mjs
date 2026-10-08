@@ -96,9 +96,16 @@ const tvDetail = (id) => {
       flatrate: [{ provider_name: 'Apple TV Plus', display_priority: 1 }],
       // Free and with-ads: a known network (Pluto TV), a free service mapped
       // by name (Tubi TV → Tubi), and one we can't name, which is dropped.
+      // Plus the paid services TMDB lists here too, all of which must be
+      // dropped: a free sample episode on Apple TV and Prime Video (Slow
+      // Horses, 2026-10) and the ad tiers of Peacock and Prime Video.
       ads: [{ provider_name: 'Tubi TV', display_priority: 3 },
-            { provider_name: 'Pluto TV', display_priority: 2 }],
-      free: [{ provider_name: 'Some Obscure FAST Channel', display_priority: 1 }],
+            { provider_name: 'Pluto TV', display_priority: 2 },
+            { provider_name: 'Peacock Premium', display_priority: 0 },
+            { provider_name: 'Amazon Prime Video with Ads', display_priority: 0 }],
+      free: [{ provider_name: 'Some Obscure FAST Channel', display_priority: 1 },
+             { provider_name: 'Apple TV', display_priority: 0 },
+             { provider_name: 'Amazon Prime Video', display_priority: 0 }],
     } } },
   };
 };
@@ -218,7 +225,7 @@ console.log('\nThe TV pass stores the four new facts and propagates them');
     fetchLog.some((u) => u.includes('/3/tv/701?') && u.includes('external_ids')), fetchLog.join(' '));
   check('imdb_id stored from external_ids', a.imdb_id === 'tt11280740', a.imdb_id);
   check('status stored verbatim', a.tmdb_status === 'Returning Series', a.tmdb_status);
-  check('free_on keeps known names in priority order, maps Tubi, drops the unknown',
+  check('free_on keeps free services in priority order, maps Tubi, drops the unknown and every paid service',
     a.free_on === 'Pluto TV, Tubi', JSON.stringify(a.free_on));
   check('sibling copy receives imdb_id', b.imdb_id === 'tt11280740', b.imdb_id);
   check('sibling copy receives status and free_on',
@@ -321,6 +328,34 @@ console.log('\nWatching and Next Up get the new fields first, without starving t
   await runEnrich(env, { mode: 'movies', max_tmdb: 1 });
   check('movies mode: a filled Next Up film does not jump the age rotation',
     fetchedMovies()[0] === 803, JSON.stringify(fetchedMovies()));
+}
+
+console.log('\nMigration 086 cleans the stored free_on to the same allow-list');
+{
+  const { FREE_ON_NAMES } = await import(join(sandbox, 'functions', '_shared/enrichment.js'));
+  const sql = readFileSync(join(repoRoot, 'migrations', '086_free_on_only_free_services.sql'), 'utf8');
+  const missing = FREE_ON_NAMES.filter((n) => !sql.includes(`', ${n}, '`));
+  check('the migration keeps every name enrichment can write', missing.length === 0, missing.join(', '));
+  const db = new DatabaseSync(':memory:');
+  db.exec('CREATE TABLE titles (id INTEGER PRIMARY KEY, free_on TEXT)');
+  const before = {
+    1: 'Amazon Prime Video, Apple TV+',
+    2: 'Amazon Prime Video, The Roku Channel',
+    3: 'Pluto TV, Tubi',
+    4: 'Peacock',
+    5: '',
+    6: null,
+    7: 'Tubi, Pluto TV, Food Network',
+  };
+  const ins = db.prepare('INSERT INTO titles (id, free_on) VALUES (?, ?)');
+  for (const [id, v] of Object.entries(before)) ins.run(Number(id), v);
+  db.exec(sql);
+  const after = Object.fromEntries(db.prepare('SELECT id, free_on FROM titles').all().map((r) => [r.id, r.free_on]));
+  check("paid services only becomes '' (asked, none)", after[1] === '' && after[4] === '', JSON.stringify([after[1], after[4]]));
+  check('a free service beside a paid one survives', after[2] === 'The Roku Channel', JSON.stringify(after[2]));
+  check('an all-free list is unchanged', after[3] === 'Pluto TV, Tubi', JSON.stringify(after[3]));
+  check('a mixed list keeps only the free names', after[7] === 'Pluto TV, Tubi', JSON.stringify(after[7]));
+  check("'' and NULL are left as they were", after[5] === '' && after[6] === null, JSON.stringify([after[5], after[6]]));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
