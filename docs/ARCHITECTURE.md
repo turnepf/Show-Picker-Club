@@ -1185,8 +1185,8 @@ The share extension has its own separate mapping: `ios/Shared/ShareTitleParser.s
   - One per `member_subscriptions` row with `status = 'paused'` and a `resubscribe_date` set (uid: `resub-<slug>-<network-slug>@showpicker.club`, summary `Resubscribe to <Network>`). These come from the Subscription Audit.
 - **Event fields:**
   - `SUMMARY`: `<Title> on <Network>` (or just `<Title>` if no network).
-  - `URL`: the show's `network_url` if it's a real deep link (not a `/search` or `/s?` placeholder), else the member's app page.
-  - `DESCRIPTION`: list label, recommender (if any), network, and a link back to the member's app page.
+  - `URL`: the show's `network_url` if it's a real deep link (not a `/search` or `/s?` placeholder), else the show's `/show/<id>` page.
+  - `DESCRIPTION`: the member's capitalized first name and list label, recommender (if any), network, and a `/show/<id>` link — the universal link that opens the show's card in the app (or on the web).
   - All-day events: `DTSTART;VALUE=DATE:YYYYMMDD`, `DTEND` = next day (DTEND is exclusive in iCal).
 - **Headers:** `Content-Type: text/calendar; charset=utf-8`, `Cache-Control: public, max-age=3600`. Plus `REFRESH-INTERVAL;VALUE=DURATION:PT24H` and `X-PUBLISHED-TTL:PT24H` so calendar clients know not to thrash.
 - **Line folding:** RFC 5545 requires lines > 75 octets to fold with a leading space on continuation lines; the handler implements this.
