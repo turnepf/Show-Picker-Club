@@ -487,10 +487,16 @@ struct ShowDetailView: View {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    // "Next episode: 6/29" — the same M/D formatting the iOS rows use, instead
-    // of raw ISO dates.
+    // "Season 6 · premiered 9/16 · next 10/14" while a season is on, "Season 7
+    // premieres 10/14" before one starts, else "Next episode: 6/29". The same
+    // M/D formatting the iOS rows use, instead of raw ISO dates, and never a
+    // date that has already passed.
     private func seasonLine(_ s: Show) -> String? {
         // Season count now lives in the combined series line (seriesText).
+        if let current = s.currentSeasonText {
+            if let r = s.nextUpRange, !current.contains("premieres") { return "\(current) · next \(r)" }
+            return current
+        }
         guard let r = s.nextUpRange else { return nil }
         return "Next episode: \(r)"
     }

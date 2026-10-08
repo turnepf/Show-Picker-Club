@@ -26,6 +26,7 @@ export const TITLE_FIELDS = [
   'rating', 'tmdb_rating', 'vote_count', 'seasons_released', 'episodes_released', 'full_series',
   'next_season_date', 'season_end_date', 'streaming_on', 'free_on', 'studio', 'original_language',
   'imdb_id', 'tmdb_status', 'watch_link',
+  'current_season', 'season_premiere_date',
 ];
 
 // Catalog-looking columns that stay on the member's row, because they differ
@@ -51,6 +52,7 @@ export const SHOWS_COLUMNS = [
   'content_rating', 'trailer_key', 'director', 'director_imdb_id', 'runtime', 'release_year',
   'watch_link', 'tmdb_id', 'tmdb_type', 'episodes_released', 'vote_count', 'tagline',
   'original_language', 'studio', 'streaming_on', 'imdb_id', 'tmdb_status', 'free_on',
+  'current_season', 'season_premiere_date',
 ];
 
 // The columns `shows` itself has: the member's own, and no show facts (since
@@ -172,6 +174,7 @@ export function titleFieldsFromEnrichment(e) {
     free_on: Array.isArray(e.freeNetworks) ? e.freeNetworks.join(', ') : undefined,
     studio: e.studio, original_language: e.originalLanguage, imdb_id: e.imdbId,
     tmdb_status: status ?? undefined, watch_link: e.watchLink,
+    current_season: e.currentSeason, season_premiere_date: e.seasonPremiereDate,
   };
   for (const k of Object.keys(f)) if (f[k] === undefined) delete f[k];
   return f;

@@ -18,10 +18,31 @@ function MakeCardContent(fields as object) as object
     return n
 end function
 
-' A "next up" premiere date -> short "M/D" badge, matching tvOS nextUpRange.
+' Today as yyyy-mm-dd on the device's clock. Stored dates are air dates, so
+' they compare against it as strings.
+function TodayYmd() as string
+    dt = CreateObject("roDateTime")
+    dt.ToLocalTime()
+    mo = dt.GetMonth()
+    dy = dt.GetDayOfMonth()
+    m = Stri(mo).Trim()
+    if mo < 10 then m = "0" + m
+    d = Stri(dy).Trim()
+    if dy < 10 then d = "0" + d
+    return Stri(dt.GetYear()).Trim() + "-" + m + "-" + d
+end function
+
+' A "next up" date -> short "M/D" badge, matching tvOS nextUpRange: the next
+' episode while it's still ahead, else the premiere of a season about to
+' start (current_season, migration 087). A date that has passed is never
+' shown: it means the refresh hasn't caught up since the episode aired.
 function PremiereBadge(show as object) as string
-    d = SafeStr(show.next_season_date)
-    if d = "" then return ""
+    today = TodayYmd()
+    d = Left(SafeStr(show.next_season_date), 10)
+    if d = "" or d < today
+        d = Left(SafeStr(show.season_premiere_date), 10)
+        if d = "" or d <= today then return ""
+    end if
     ' Expect ISO yyyy-mm-dd; render as M/D.
     parts = d.Split("-")
     if parts.Count() < 3 then return ""

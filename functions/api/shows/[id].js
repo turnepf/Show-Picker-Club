@@ -40,6 +40,8 @@ const PUBLIC_SHOW_FIELDS = [
   // opened on anyone else's copy (Trending, a group-mate's list) lost its
   // tagline, language row and episode count on every client.
   'tagline', 'original_language', 'episodes_released',
+  // Migration 087: the season airing now and its premiere, catalog facts.
+  'current_season', 'season_premiere_date',
 ];
 
 // Other members of the viewer's groups who have this same title on their

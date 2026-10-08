@@ -314,6 +314,11 @@ struct ShowDetailView: View {
                         if let rt = s.runtimeText {
                             LabeledContent("Runtime", value: rt)
                         }
+                        // "Season 6   Premiered 9/16" while a season is on,
+                        // "Premieres 10/14" before it starts.
+                        if let season = s.currentSeasonRow {
+                            LabeledContent(season.label, value: season.value)
+                        }
                         if let dates = s.seasonDatesText {
                             LabeledContent("Next episode", value: dates)
                         }
@@ -473,7 +478,7 @@ struct ShowDetailView: View {
         // part of what makes this catalog card worth showing.
         guard let s = show else { return false }
         return s.isMovie || s.seriesText != nil || !s.genreList.isEmpty
-            || s.seasonDatesText != nil || (s.contentRating.map { !$0.isEmpty } ?? false)
+            || s.seasonDatesText != nil || s.currentSeasonRow != nil || (s.contentRating.map { !$0.isEmpty } ?? false)
             || s.releaseYear != nil || s.runtimeText != nil
             || s.originalLanguageText != nil || s.statusText != nil
     }

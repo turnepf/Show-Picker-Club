@@ -411,6 +411,7 @@ CREATE TABLE IF NOT EXISTS titles (
   rating TEXT, tmdb_rating TEXT, vote_count INTEGER, seasons_released INTEGER, episodes_released INTEGER, full_series INTEGER,
   next_season_date TEXT, season_end_date TEXT, streaming_on TEXT, free_on TEXT, studio TEXT, original_language TEXT,
   imdb_id TEXT, tmdb_status TEXT, watch_link TEXT,
+  current_season INTEGER, season_premiere_date TEXT,
   synced_at TEXT,
   PRIMARY KEY (tmdb_type, tmdb_id)
 );
@@ -476,7 +477,9 @@ CREATE VIEW shows_v AS
     t.streaming_on AS streaming_on,
     t.imdb_id AS imdb_id,
     t.tmdb_status AS tmdb_status,
-    t.free_on AS free_on
+    t.free_on AS free_on,
+    t.current_season AS current_season,
+    t.season_premiere_date AS season_premiere_date
     FROM shows s
     LEFT JOIN titles t
       ON t.tmdb_id = s.tmdb_id

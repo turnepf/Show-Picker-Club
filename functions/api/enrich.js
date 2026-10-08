@@ -183,6 +183,17 @@ const HOT_LIST = `(archived = 0 AND list IN ('watching', 'next'))`;
 // TMDB can't match, which is stamped and skipped like any other.
 const HOT_UNFILLED = `(${HOT_LIST} AND tmdb_status IS NULL AND ${NOT_TRIED_RECENTLY})`;
 
+// A Watching or Awaiting copy whose stored next episode has already aired, or
+// that has no current season yet (migration 087). Either way its dates are
+// known to be wrong or missing, and on those two lists a stale date is what a
+// member sees: "Next episode: 10/7" on 10/8, because the age rotation hadn't
+// come back to the show since the day before the episode aired. These go
+// ahead of the age rotation, behind real gaps, like HOT_UNFILLED. The 20-hour
+// window keeps a show TMDB hasn't moved on yet to one retry a night. Only
+// these two lists carry next-episode dates at all.
+const DATES_STALE = `(archived = 0 AND list IN ('watching', 'waiting') AND ${NOT_TRIED_RECENTLY}
+  AND ((next_season_date IS NOT NULL AND next_season_date < date('now')) OR current_season IS NULL))`;
+
 // The copies the passes choose from, with the show's own facts taken from the
 // shared row (titles, migration 076) rather than the copy (normalizing, step
 // 3c). It is aliased `shows` and carries the column names the predicates
@@ -192,8 +203,8 @@ const HOT_UNFILLED = `(${HOT_LIST} AND tmdb_status IS NULL AND ${NOT_TRIED_RECEN
 // needs a lookup. Member-side columns (list, archive, network, the badge,
 // enriched_at) still come from the copy.
 const COPIES = `(SELECT s.id, t.name AS title, s.movie, s.list, s.archived, s.network, s.network_url, s.network_logo_url,
-         s.member_slug, s.enriched_at, s.tmdb_id, s.tmdb_type,
-         t.poster_url, t.episodes_released, t.genres, t.streaming_on, t.tmdb_status,
+         s.member_slug, s.enriched_at, s.tmdb_id, s.tmdb_type, s.next_season_date,
+         t.poster_url, t.episodes_released, t.genres, t.streaming_on, t.tmdb_status, t.current_season,
          EXISTS (SELECT 1 FROM title_cast c WHERE c.tmdb_type = t.tmdb_type AND c.tmdb_id = t.tmdb_id) AS has_cast
     FROM shows s
     LEFT JOIN titles t ON t.tmdb_id = s.tmdb_id
@@ -343,11 +354,12 @@ export async function onRequestPost(context) {
           GROUP BY LOWER(title), tmdb_id
           ORDER BY MIN(CASE WHEN ${HOT_LIST} THEN 0 ELSE 1 END),
                    MIN(COALESCE(enriched_at, '1970-01-01')) ASC LIMIT ?`
-      // Tiers: 0 a real gap, 1 a hot-list row missing migration 073's fields,
-      // 2 the age rotation. Hot lists lead within tiers 0 and 1 only.
+      // Tiers: 0 a real gap, 1 a hot-list row missing migration 073's fields
+      // or a Watching/Awaiting row whose dates are stale, 2 the age rotation.
+      // Hot lists lead within tiers 0 and 1 only.
       : `SELECT id, title, movie, list, archived, network_url, tmdb_id, tmdb_type,
                 CASE WHEN (${TV_GAP} OR poster_url IS NULL) AND ${NOT_TRIED_RECENTLY} THEN 0
-                     WHEN ${HOT_UNFILLED} THEN 1
+                     WHEN ${HOT_UNFILLED} OR ${DATES_STALE} THEN 1
                      ELSE 2 END AS tier
           FROM ${COPIES}
           WHERE ${tvWhere} AND (archived = 0 OR ${TV_GAP})

@@ -514,7 +514,12 @@ never reaches a URL. Nothing backfills them, so the part worth pinning is the
 order: a **Watching or Next Up** row missing them goes ahead of the age
 rotation (behind real gaps), but a hot row that already has them waits its
 turn — otherwise a long Watching list would take every nightly slot and the
-rest of the library would never refresh.
+rest of the library would never refresh. It also pins the rest of
+what that detail call carries: `free_on` holds only services that are free
+to watch (TMDB's free and ads lists also name paid ones, migration 086), the
+current season and its premiere (migration 087), and that a Watching or
+Awaiting row whose next episode has already aired goes ahead of the age
+rotation, so "Next episode: 10/7" doesn't linger on 10/8.
 
 ```bash
 node scripts/auth-code-flow-test.mjs
