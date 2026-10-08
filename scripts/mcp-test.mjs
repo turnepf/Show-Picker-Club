@@ -474,6 +474,17 @@ console.log('\n== the tools carry the app\'s own privacy rules');
   check("another member's show has no memos", detail.data && !detail.text.includes('QUINN-NOTE') && detail.data.is_yours === false);
   const ownDetail = await tool(env, access, 'get_show', { show_id: mine });
   check('your own show does', ownDetail.text.includes('PAT-NOTE') && ownDetail.data.is_yours === true);
+  // The cast lives in the shared per-entry list (actors_v), not on the show
+  // row, and reading it off the row gave every detail tool an empty cast.
+  {
+    const k = row(env, 'SELECT tmdb_id, COALESCE(tmdb_type, CASE WHEN movie = 1 THEN \'movie\' ELSE \'tv\' END) AS t FROM shows WHERE id = ?', mine);
+    env._db.prepare('INSERT INTO title_cast (tmdb_type, tmdb_id, ord, name, character_name) VALUES (?, ?, 0, ?, ?), (?, ?, 1, ?, NULL)')
+      .run(k.t, k.tmdb_id, 'Lead Actor', 'The Hero', k.t, k.tmdb_id, 'Second Actor');
+    const withCast = await tool(env, access, 'get_show', { show_id: mine });
+    check('a show\'s detail carries its cast, top-billed first, with the role when known',
+      JSON.stringify(withCast.data.show.cast) === JSON.stringify(['Lead Actor (The Hero)', 'Second Actor']),
+      JSON.stringify(withCast.data.show.cast));
+  }
 
   const search = await tool(env, access, 'search_libraries', { query: 's' });
   check("library search covers group-mates", search.text.includes('Slow Horses'));
