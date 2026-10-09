@@ -45,7 +45,7 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ## Unreleased — the update after 1.6.2
 
-Nothing yet.
+- **The Calendar only says "Premieres" for a real premiere.** A show already partway through its season now shows its next episode as "New episode" instead of looking like it was just starting.
 
 ---
 
