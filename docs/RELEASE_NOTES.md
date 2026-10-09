@@ -43,11 +43,22 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## Unreleased — the update after 1.6.2
+## Unreleased — the update after 1.6.3
 
-- **Swipe between your lists.** On My Shows, swipe left or right to go from Watching to Awaiting, Loved and Next Up — swipe right from Watching to get back Home. Long-press a show to move it straight to any of your other lists.
-- **The Calendar only says "Premieres" for a real premiere.** A show already partway through its season now shows its next episode as "New episode" instead of looking like it was just starting.
-- **Season finales are on the row.** A season on the air now says when it premiered, when the next episode is out, and when the season ends, once that date is known: "Season 6 · premiered 9/16 · next 10/14 · finale 11/4".
+---
+
+## 1.6.3 (build 33) — iPhone and iPad, submitted for review 2026-10-09
+
+**iPhone and iPad only.** Apple TV has nothing new this time: tvOS draws its
+own season line, has no Calendar screen and no list swipes. The Mac is still
+waiting on 1.6.1's review and picks this up in a later release.
+
+```
+Swipe left and right on My Shows to move between Watching, Awaiting, Loved and Next Up. Swipe right from Watching to go back Home.
+Long-press a show to move it straight to any of your other lists.
+A season on the air now shows when it ends, once that's known: "Season 6 · premiered 9/16 · next 10/14 · finale 11/4".
+The Calendar only says "Premieres" for a real premiere; an episode partway through a season reads "New episode".
+```
 
 ---
 
