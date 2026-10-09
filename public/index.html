@@ -3772,9 +3772,8 @@
     function setGenreFilter(v) { genreFilter = v || null; renderShows(); }
 
     // ── Row quick actions (⋯) ─────────────────────────────────────────────
-    // The web's version of iOS's swipe actions: the list's promotions
-    // (Watched → Loved, Season done → Awaiting, Start watching…), then Edit
-    // and Archive. Moves and archives both carry an Undo toast.
+    // The web's version of iOS's long-press menu: "Move to" each of the other
+    // three lists, then Archive. Moves and archives both carry an Undo toast.
     let rowMenuEl = null;
     function closeRowMenu() {
       if (rowMenuEl) { rowMenuEl.remove(); rowMenuEl = null; }
@@ -3795,7 +3794,7 @@
         b.addEventListener('click', () => { closeRowMenu(); fn(); });
         menu.appendChild(b);
       };
-      for (const p of detailPromotions(show.list)) add(p.label, () => moveShow(id, p.target));
+      for (const l of ALL_LISTS) if (l !== show.list) add('Move to ' + LIST_LABELS[l], () => moveShow(id, l));
       add('Archive', () => archiveShow(id), true);
       document.body.appendChild(menu);
       const r = btn.getBoundingClientRect();
@@ -3805,6 +3804,49 @@
       rowMenuEl = menu;
       setTimeout(() => document.addEventListener('click', rowMenuOutside), 0);
     }
+
+    // ── Swipe between lists (phone width) ─────────────────────────────────
+    // Same as iOS: swipe left for the next list (Watching → Awaiting → Loved
+    // → Next Up), right for the previous one, and right from Watching goes
+    // back Home. Only where the segmented tabs are showing — the split view
+    // has the sidebar instead — and only for a clearly sideways swipe, so
+    // scrolling is untouched. A touch on the ☰ handle belongs to reordering.
+    let listSwipeStart = null;
+    function listSwipeEnabled() {
+      const tabs = document.getElementById('tabs');
+      return tabs && tabs.offsetParent !== null
+        && !document.getElementById('detailPage').classList.contains('open');
+    }
+    function attachListSwipe() {
+      const main = document.querySelector('#showPage main');
+      if (!main) return;
+      main.addEventListener('touchstart', e => {
+        listSwipeStart = null;
+        if (e.touches.length !== 1 || !listSwipeEnabled()) return;
+        if (e.target.closest('.drag-handle, input, textarea, select')) return;
+        const t = e.touches[0];
+        // Leave the left edge to the browser's own back swipe.
+        if (t.clientX < 30) return;
+        listSwipeStart = { x: t.clientX, y: t.clientY };
+      }, { passive: true });
+      main.addEventListener('touchend', e => {
+        const start = listSwipeStart;
+        listSwipeStart = null;
+        if (!start || document.body.classList.contains('no-select')) return;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - start.x, dy = t.clientY - start.y;
+        if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 2) return;
+        const i = ALL_LISTS.indexOf(currentTab);
+        if (dx < 0) {
+          if (i >= 0 && i + 1 < ALL_LISTS.length) switchTab(ALL_LISTS[i + 1]);
+        } else if (i > 0) {
+          switchTab(ALL_LISTS[i - 1]);
+        } else if (i === 0) {
+          location.href = '/?home';
+        }
+      }, { passive: true });
+    }
+    document.addEventListener('DOMContentLoaded', attachListSwipe);
 
     // ── "My Order" drag-to-reorder ────────────────────────────────────────
     // Pointer events (not HTML5 DnD) so the same code works for mouse and
@@ -4619,14 +4661,6 @@
     // field, tap a position and it saves instantly (see detailRate below).
     // `season` is null for the overall rating, or a season number.
     // Minutes → "1h 52m" / "45m".
-    function detailPromotions(list) {
-      if (list === 'watching') return [{ label: 'Watched it → Loved', target: 'recommending' }, { label: 'Season done → Awaiting', target: 'waiting' }];
-      if (list === 'waiting') return [{ label: "It's back → Watching", target: 'watching' }];
-      if (list === 'recommending') return [{ label: 'Watch again → Watching', target: 'watching' }];
-      if (list === 'next') return [{ label: 'Start watching', target: 'watching' }];
-      return [];
-    }
-
     async function openDetail(id, fromDeepLink) {
       detailFromDeepLink = !!fromDeepLink;
       const page = document.getElementById('detailPage');

@@ -45,6 +45,7 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ## Unreleased — the update after 1.6.2
 
+- **Swipe between your lists.** On My Shows, swipe left or right to go from Watching to Awaiting, Loved and Next Up — swipe right from Watching to get back Home. Long-press a show to move it straight to any of your other lists.
 - **The Calendar only says "Premieres" for a real premiere.** A show already partway through its season now shows its next episode as "New episode" instead of looking like it was just starting.
 - **Season finales are on the row.** A season on the air now says when it premiered, when the next episode is out, and when the season ends, once that date is known: "Season 6 · premiered 9/16 · next 10/14 · finale 11/4".
 
