@@ -57,6 +57,9 @@
       return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
     }
 
+    const TIE_RANK = { premiere: 0, finale: 1, episode: 2 };
+    const LABEL = { premiere: 'Premieres', finale: 'Finale', episode: 'New episode' };
+
     function upcoming(shows) {
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const out = [];
@@ -64,9 +67,12 @@
         if (s.archived || (s.list !== 'watching' && s.list !== 'waiting')) continue;
         const c = [];
         const p = day(s.next_season_date), f = day(s.season_end_date);
-        if (p && p >= today) c.push({ show: s, date: p, kind: 'premiere' });
+        // next_season_date is TMDB's next episode; it's a premiere only when it
+        // opens its season. Same rule and same tie order as ShowCalendar.upcoming.
+        const kind = s.next_season_date && s.next_season_date === s.season_premiere_date ? 'premiere' : 'episode';
+        if (p && p >= today) c.push({ show: s, date: p, kind });
         if (f && f >= today) c.push({ show: s, date: f, kind: 'finale' });
-        c.sort((a, b) => a.date - b.date || (a.kind === 'premiere' ? -1 : 1));
+        c.sort((a, b) => a.date - b.date || TIE_RANK[a.kind] - TIE_RANK[b.kind]);
         if (c.length) out.push(c[0]);
       }
       return out.sort((a, b) => a.date - b.date || (a.show.title || '').localeCompare(b.show.title || ''));
@@ -74,7 +80,7 @@
 
     function caption(item) {
       const when = item.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      const label = item.kind === 'premiere' ? 'Premieres' : 'Finale';
+      const label = LABEL[item.kind];
       return escapeHtml(item.show.network ? `${label} ${when} · ${item.show.network}` : `${label} ${when}`);
     }
 

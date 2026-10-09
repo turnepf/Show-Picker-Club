@@ -19,9 +19,11 @@ final class ShowCalendarTests: XCTestCase {
                       list: ShowList = .watching,
                       premiere: String? = nil,
                       finale: String? = nil,
+                      seasonPremiere: String? = nil,
                       archived: Int? = nil) -> Show {
         Show(id: id, title: title, list: list.rawValue,
-             nextSeasonDate: premiere, seasonEndDate: finale, archived: archived)
+             nextSeasonDate: premiere, seasonEndDate: finale, archived: archived,
+             seasonPremiereDate: seasonPremiere)
     }
 
     // MARK: What counts as a calendar date
@@ -51,10 +53,41 @@ final class ShowCalendarTests: XCTestCase {
     }
 
     func testDateTodayStillCounts() {
-        let shows = [show(1, "Andor", premiere: "2026-08-10")]
+        let shows = [show(1, "Andor", premiere: "2026-08-10", seasonPremiere: "2026-08-10")]
         let next = ShowCalendar.next(from: shows, on: today, calendar: cal)
         XCTAssertEqual(next?.show.id, 1)
         XCTAssertEqual(next?.kind, .premiere)
+    }
+
+    // MARK: Premiere or just the next episode
+
+    /// `next_season_date` is TMDB's next episode. Mid-season it is not a
+    /// premiere — Slow Horses premiered 9/16 and its 10/14 episode read
+    /// "Premieres Wed, Oct 14" on the Calendar screen.
+    func testMidSeasonEpisodeIsNotAPremiere() {
+        let shows = [show(1, "Slow Horses", premiere: "2026-08-14", seasonPremiere: "2026-07-17")]
+        let next = ShowCalendar.next(from: shows, on: today, calendar: cal)
+        XCTAssertEqual(next?.kind, .episode)
+        XCTAssertEqual(next?.label, "New episode")
+    }
+
+    /// With no season premiere known, nothing says the date opens a season,
+    /// so it isn't claimed as one.
+    func testUnknownSeasonPremiereIsNotClaimedAsAPremiere() {
+        let shows = [show(1, "MobLand", premiere: "2026-08-14")]
+        XCTAssertEqual(ShowCalendar.next(from: shows, on: today, calendar: cal)?.kind, .episode)
+    }
+
+    func testFirstEpisodeOfASeasonIsAPremiere() {
+        let shows = [show(1, "Severance", list: .waiting, premiere: "2026-09-01", seasonPremiere: "2026-09-01")]
+        XCTAssertEqual(ShowCalendar.next(from: shows, on: today, calendar: cal)?.label, "Premieres")
+    }
+
+    /// The last episode airing next is the finale, not "a new episode".
+    func testFinaleBeatsAnEpisodeOnTheSameDay() {
+        let shows = [show(1, "The Pitt", premiere: "2026-08-20", finale: "2026-08-20",
+                          seasonPremiere: "2026-07-01")]
+        XCTAssertEqual(ShowCalendar.next(from: shows, on: today, calendar: cal)?.kind, .finale)
     }
 
     func testPastDatesAreDropped() {

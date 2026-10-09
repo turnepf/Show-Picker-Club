@@ -1,9 +1,14 @@
 import Foundation
 
 // The member's calendar, in one place: every dated thing on the Watching and
-// Awaiting lists, soonest first. Two dates per show can be known — the start of
-// the next season (`next_season_date`) and the end of the current one
-// (`season_end_date`) — and both are calendar events, so both count here. The
+// Awaiting lists, soonest first. Two dates per show can be known — the next
+// episode to air (`next_season_date`, despite the name: it is TMDB's
+// `next_episode_to_air`) and the end of the current season
+// (`season_end_date`) — and both are calendar events, so both count here.
+// The next episode is only a *premiere* when it opens its season, i.e. it falls
+// on `season_premiere_date`; mid-season it is just the next episode, and
+// calling it "Premieres" put shows that started weeks ago back on the calendar
+// as if they were new. The
 // in-app Calendar screen and the Upcoming widget both read this, which is what
 // keeps them showing the same "next" item.
 extension Show {
@@ -20,12 +25,14 @@ public enum ShowCalendar {
     public enum Kind: String, Codable, Sendable, Hashable {
         case premiere
         case finale
+        case episode    // the next episode of a season already on air
 
         // Row caption in the Calendar screen ("Premieres Tue, Mar 3").
         public var label: String {
             switch self {
             case .premiere: return "Premieres"
             case .finale:   return "Finale"
+            case .episode:  return "New episode"
             }
         }
 
@@ -34,6 +41,18 @@ public enum ShowCalendar {
             switch self {
             case .premiere: return "Premiere"
             case .finale:   return "Finale"
+            case .episode:  return "Episode"
+            }
+        }
+
+        // Which wins when two dates for one show land on the same day: a
+        // premiere is the bigger news than a finale, and a finale is more
+        // specific than "the next episode" (the last episode IS the finale).
+        var tieRank: Int {
+            switch self {
+            case .premiere: return 0
+            case .finale:   return 1
+            case .episode:  return 2
             }
         }
     }
@@ -53,7 +72,7 @@ public enum ShowCalendar {
         }
 
         // A show can contribute either date, so the kind rides along in the id.
-        public var id: String { "\(show.id)-\(kind == .premiere ? "p" : "f")" }
+        public var id: String { "\(show.id)-\(kind.rawValue)" }
         public var label: String { kind.label }
     }
 
@@ -90,18 +109,19 @@ public enum ShowCalendar {
             var candidates: [DatedShow] = []
             if let raw = show.nextSeasonDate, let date = ShowCalendar.day(raw),
                calendar.startOfDay(for: date) >= today {
+                let kind: Kind = raw == show.seasonPremiereDate ? .premiere : .episode
                 candidates.append(DatedShow(show: show, date: calendar.startOfDay(for: date),
-                                            day: raw, kind: .premiere))
+                                            day: raw, kind: kind))
             }
             if let raw = show.seasonEndDate, let date = ShowCalendar.day(raw),
                calendar.startOfDay(for: date) >= today {
                 candidates.append(DatedShow(show: show, date: calendar.startOfDay(for: date),
                                             day: raw, kind: .finale))
             }
-            // A premiere and a finale on the same day is the same event told
-            // two ways — the premiere wins, so `min` breaks the tie on kind.
+            // Two dates on the same day are the same event told two ways —
+            // `min` breaks the tie on kind (premiere, then finale, then episode).
             if let soonest = candidates.min(by: {
-                $0.date == $1.date ? $0.kind == .premiere : $0.date < $1.date
+                $0.date == $1.date ? $0.kind.tieRank < $1.kind.tieRank : $0.date < $1.date
             }) {
                 out.append(soonest)
             }
