@@ -49,6 +49,7 @@ struct MemberView: View {
     // each list as its own entry) and the segmented picker is hidden.
     let fixedList: ShowList?
     @EnvironmentObject private var auth: AuthStore
+    @Environment(\.dismiss) private var dismiss
     @State private var shows: [Show] = []
     @State private var currentList: ShowList
     @State private var loading = true
@@ -68,14 +69,10 @@ struct MemberView: View {
     // "just show me the comedies" is how you actually pick something. The
     // other three are short enough to read.
     @State private var genreFilter: String?
-    // Archive Undo: the just-archived show, shown in a 6-second bottom
-    // banner (mirrors the web's undo toast).
-    @State private var undoShow: Show?
-    @State private var undoDismiss: Task<Void, Never>?
     // A load that threw (vs. a genuinely empty library) — the empty state
     // must not claim "you're not watching anything" when the server failed.
     @State private var loadFailed = false
-    // Failed-write banner, same bottom slot as the undo banner.
+    // Failed-write banner along the bottom edge.
     @State private var errorBanner: String?
     @State private var errorDismiss: Task<Void, Never>?
 
@@ -158,22 +155,18 @@ struct MemberView: View {
                             TapGesture().onEnded { reorderDetail = show },
                             including: isReordering ? .all : .subviews
                         )
-                        .swipeActions(edge: .trailing) {
-                            if isMine {
-                                Button(role: .destructive) {
-                                    Task { await archiveWithUndo(show) }
-                                } label: { Label("Archive", systemImage: "archivebox") }
-                            }
-                        }
-                        // One-tap promotions to the list each row should move to,
-                        // colour-coded to the destination. Full swipe fires the first.
-                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                            if isMine {
-                                ForEach(listPromotions(for: currentList)) { p in
+                        // Long-press for a quick move to any of the other
+                        // three lists. Row swipe actions were retired
+                        // (2026-10) — a horizontal swipe now changes list
+                        // instead (see listSwipe). Archive lives on the card.
+                        .contextMenu {
+                            if isMine && !isReordering {
+                                ForEach(ShowList.allCases.filter { $0.rawValue != show.list }) { target in
                                     Button {
-                                        Task { await move(show, to: p.target) }
-                                    } label: { Label(p.label, systemImage: p.systemImage) }
-                                        .tint(p.tint)
+                                        Task { await move(show, to: target) }
+                                    } label: {
+                                        Label("Move to \(target.title)", systemImage: target.menuSymbol)
+                                    }
                                 }
                             }
                         }
@@ -223,6 +216,10 @@ struct MemberView: View {
             // stock reorder behavior). Driven by the sort choice, so picking
             // any other sort drops straight back to normal browsing.
             .environment(\.editMode, .constant(isReordering ? .active : .inactive))
+            // Swipe sideways to change list, in the segmented picker's order.
+            // Masked off while reordering (the ≡ drag owns the gesture then)
+            // and on the iPad sidebar's single-list pages.
+            .simultaneousGesture(listSwipe, including: canSwipeLists ? .all : .subviews)
             // Destination for taps made while reordering (see the row's tap
             // gesture). Pushes the same card as the NavigationLink route.
             .navigationDestination(item: $reorderDetail) { show in
@@ -256,8 +253,7 @@ struct MemberView: View {
                 }
             }
         }
-        // Bottom banners: failed-write errors and the archive Undo toast
-        // (mirroring the web's 6-second undo toast).
+        // Bottom banner for failed writes.
         .overlay(alignment: .bottom) {
             VStack(spacing: 8) {
                 if let msg = errorBanner {
@@ -269,17 +265,6 @@ struct MemberView: View {
                         .padding(.vertical, 12)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
                         .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                if let s = undoShow {
-                    HStack(spacing: 12) {
-                        Text("Archived “\(s.title)”").lineLimit(1)
-                        Spacer()
-                        Button("Undo") { undoArchive() }.fontWeight(.bold)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .padding(.horizontal)
@@ -317,6 +302,32 @@ struct MemberView: View {
                 ImportListView(defaultList: currentList) { await load() }
             }
         }
+    }
+
+    // ── Swipe between lists ──────────────────────────────────────────────
+    // Left goes to the next list (Watching → Awaiting → Loved → Next Up),
+    // right to the previous one; right from Watching goes back Home. Only a
+    // clearly horizontal drag counts, so vertical scrolling is untouched, and
+    // one starting at the left edge is left to the system back gesture.
+    private var canSwipeLists: Bool { fixedList == nil && !isReordering }
+
+    private var listSwipe: some Gesture {
+        DragGesture(minimumDistance: 30, coordinateSpace: .local)
+            .onEnded { value in
+                let dx = value.translation.width
+                let dy = value.translation.height
+                guard abs(dx) > 60, abs(dx) > abs(dy) * 2, value.startLocation.x > 30 else { return }
+                let all = ShowList.allCases
+                guard let i = all.firstIndex(of: currentList) else { return }
+                if dx < 0 {
+                    guard i + 1 < all.count else { return }
+                    withAnimation { currentList = all[i + 1] }
+                } else if i > 0 {
+                    withAnimation { currentList = all[i - 1] }
+                } else {
+                    dismiss()
+                }
+            }
     }
 
     private var sortMenu: some View {
@@ -548,7 +559,7 @@ struct MemberView: View {
         }
     }
 
-    // One-tap swipe promotion to another list. Offline moves are queued by
+    // Quick move from the long-press menu. Offline moves are queued by
     // the API layer; a real server rejection surfaces in the error banner.
     private func move(_ show: Show, to target: ShowList) async {
         do { try await API.moveShow(id: show.id, to: target.rawValue) }
@@ -556,7 +567,7 @@ struct MemberView: View {
         await load()
     }
 
-    // Failed-write banner in the undo-toast slot, auto-dismissed after 6s.
+    // Failed-write banner, auto-dismissed after 6s.
     private func showError(_ error: Error, action: String) {
         errorDismiss?.cancel()
         withAnimation { errorBanner = API.failureLine(error, action: action) }
@@ -666,36 +677,6 @@ struct MemberView: View {
         case .waiting:      return "When you finish a season but want to come back, move the show here. Premiere dates show on your calendar feed."
         case .recommending: return "Once you've watched something you loved, move it here so the rest of the club sees it."
         case .next:         return "Add shows you want to watch later, plus picks from other members."
-        }
-    }
-
-    // ── Archive with Undo ────────────────────────────────────────────────
-    private func archiveWithUndo(_ show: Show) async {
-        do { try await API.archiveShow(id: show.id) }
-        catch {
-            // No undo banner for an archive that didn't happen.
-            showError(error, action: "archive “\(show.title)”")
-            return
-        }
-        await load()
-        undoDismiss?.cancel()
-        withAnimation { undoShow = show }
-        undoDismiss = Task {
-            try? await Task.sleep(nanoseconds: 6_000_000_000)
-            if !Task.isCancelled {
-                withAnimation { undoShow = nil }
-            }
-        }
-    }
-
-    private func undoArchive() {
-        guard let s = undoShow else { return }
-        undoDismiss?.cancel()
-        withAnimation { undoShow = nil }
-        Task {
-            do { try await API.restoreShow(id: s.id, to: s.list) }
-            catch { showError(error, action: "restore “\(s.title)”") }
-            await load()
         }
     }
 }

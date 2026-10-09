@@ -6,8 +6,9 @@ import SwiftUI
 //   Waiting       → "Watching"
 //   Loved         → "Watching"
 //   Next Up       → "Start watching"
-// Used by MemberView (leading swipe actions) and ShowDetailView (a Move
-// section), so the same moves work with or without the gesture.
+// Used by ShowDetailView's Move section. (MemberView's rows used to carry
+// these as swipe actions; since 2026-10 a long-press there offers every other
+// list instead, and a sideways swipe changes list.)
 struct ListPromotion: Identifiable {
     let id = UUID()
     let label: String        // short label for swipe actions
@@ -35,5 +36,18 @@ func listPromotions(for list: ShowList) -> [ListPromotion] {
     case .next:
         return [ListPromotion(label: "Start", detailLabel: "Start watching",
                               systemImage: "play.circle.fill", target: .watching, tint: .green)]
+    }
+}
+
+// Each list's SF Symbol — the iPad sidebar's list rows and the member page's
+// long-press "Move to…" menu.
+extension ShowList {
+    var menuSymbol: String {
+        switch self {
+        case .watching:     return "play.circle"
+        case .waiting:      return "hourglass"
+        case .recommending: return "hand.thumbsup"
+        case .next:         return "text.badge.plus"
+        }
     }
 }

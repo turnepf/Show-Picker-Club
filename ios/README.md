@@ -16,7 +16,7 @@ ios/ShowPickerIOS/
 ├── AuthStore.swift             @Observable session state
 └── Views/
     ├── HomeView.swift          Popular shelf + member list
-    ├── MemberView.swift        Member's four lists with swipe-to-archive / edit
+    ├── MemberView.swift        Member's four lists; swipe to change list, long-press to move
     ├── ShowDetailView.swift    Read-only detail + Edit + Watch
     ├── AddEditShowView.swift   Sheet for adding a show (no edit — memos are edited on the show card)
     └── LoginView.swift         Sign in with Apple + one-time code entry
@@ -268,8 +268,9 @@ Offline/
 | Sign in with Apple | ✅ (maps the Apple ID email → existing member; see note) |
 | Add show | ✅ (starts from Find a Show — the 🔍 on Home and My Shows; there is no separate "+") |
 | Edit show | ✅ |
-| Archive show (swipe action) | ✅ |
-| Quick-list promotions (leading swipe + detail "Move" section) | ✅ (Watched it / Season done / Watching / Start) |
+| Archive show | ✅ (on the show card; row swipe actions retired 2026-10) |
+| Quick moves (long-press a row → Move to any other list; detail "Move" section) | ✅ |
+| Swipe between lists (left/right; right from Watching goes Home) | ✅ (iPhone layout; iPad/Mac use the sidebar) |
 | Suggest a show to another member | ❌ Retired 2026-07 (all cross-member writes) |
 | Send an existing show to another member's Next Up | ❌ Retired 2026-07 (all cross-member writes) |
 | Find a Show (TMDB title search → add; your own copies incl. archived, and which group-mates have each result) | ✅ (🔍 on Home and every member page, ⌘F) |

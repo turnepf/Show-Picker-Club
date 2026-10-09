@@ -25,7 +25,11 @@ Shows can also be **Archived** (hidden from lists, kept in DB for de-dupe and hi
 
 ### Quick actions
 
-The Watching list has one-tap promotions to keep the lists honest:
+On your own lists, **long-press a row** (iPhone/iPad/Mac) or open its **⋯ menu** (web) to move the show to any of the other three lists — "Move to Awaiting", "Move to Loved", and so on. The web menu also carries Archive.
+
+Rows have **no swipe actions** (retired 2026-10 — members found them confusing). A sideways swipe on the member page **changes list** instead, in tab order: left goes Watching → Awaiting → Loved → Next Up, right goes back, and right from Watching returns Home. iPhone and phone-width web only; the iPad/Mac split view picks lists from the sidebar, and the swipe is off while reordering ("My Order").
+
+The show card keeps one-tap promotions to keep the lists honest:
 
 - **Watched it →** moves to Loved.
 - **Season done →** moves to Awaiting.
@@ -308,7 +312,7 @@ There is no edit screen (retired 2026-10). Title, service and the catalog facts 
 
 The card's order is: image, tagline/overview, Also watching + where to watch, Cast, My Lists, the catalog facts (type, year, series, status, genres, runtime, next episode, rated, language), and **Ratings last** — a long series grows one rating row per season, and with Ratings in the middle that buried the catalog facts below it. Share is the top-right button in the title bar on every platform, never a section of the card.
 
-Archive sits on the card and in the row's swipe (iPhone/iPad) or ⋯ menu (web). Archive sets `archived=1`; archived shows are still searchable but don't appear in lists, trending, or vibe.
+Archive sits on the card (every platform) and in the row's ⋯ menu (web). Archive sets `archived=1`; archived shows are still searchable but don't appear in lists, trending, or vibe.
 
 Platforms: iPhone/iPad (Mac via Catalyst) and the web, on every page that opens a show card. Apple TV and the watch are view-only and unchanged; Roku has no show editing.
 
@@ -359,7 +363,7 @@ PWA was retired in 2026-08 and stays retired).
    browser. **Done.**
 2. List controls — Next Up genre filter, TV / Movies filter, quick moves and
    Archive with Undo from the list (a ⋯ menu on your own rows stands in for
-   iOS's swipes), and "couldn't load" kept apart from "empty". **Done.**
+   iOS's long-press), and "couldn't load" kept apart from "empty". **Done.**
 3. Groups — Watch Next board and pop-up, Recommend to group, icons, change
    notice, rename by any member, invite limits, invite links that survive
    signing in, and the NEW flag on Groups. **Done.**

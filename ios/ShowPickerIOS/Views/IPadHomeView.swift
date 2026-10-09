@@ -377,14 +377,7 @@ struct IPadHomeView: View {
         return auth.isMe(m.slug) ? "My Shows" : "\(m.label)'s Shows"
     }
 
-    private func listIcon(_ l: ShowList) -> String {
-        switch l {
-        case .watching:     return "play.circle"
-        case .waiting:      return "hourglass"
-        case .recommending: return "hand.thumbsup"
-        case .next:         return "text.badge.plus"
-        }
-    }
+    private func listIcon(_ l: ShowList) -> String { l.menuSymbol }
 
     // A fixed-height window over the member roster: the five most recently
     // active members are visible, the rest scroll within the window. When more
