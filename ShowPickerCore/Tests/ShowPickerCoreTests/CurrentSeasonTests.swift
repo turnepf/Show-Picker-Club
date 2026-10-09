@@ -94,6 +94,42 @@ final class CurrentSeasonTests: XCTestCase {
         XCTAssertEqual(show(next: "2026-10-07").listLine(today: today), "6 seasons")
     }
 
+    // MARK: the finale, when a refresh has dated it
+
+    func testASeasonOnAirAlsoSaysWhenItEnds() {
+        let s = show(next: "2026-10-14", end: "2026-11-04", current: 6, premiere: "2026-09-16")
+        XCTAssertEqual(s.listLine(today: today), "Season 6 · premiered 9/16 · next 10/14 · finale 11/4")
+    }
+
+    /// The next episode is the last one: say "finale" once rather than
+    /// "next 10/14 · finale 10/14".
+    func testWhenTheNextEpisodeIsTheFinaleItIsSaidOnce() {
+        let s = show(next: "2026-10-14", end: "2026-10-14", current: 6, premiere: "2026-09-16")
+        XCTAssertEqual(s.listLine(today: today), "Season 6 · premiered 9/16 · finale 10/14")
+    }
+
+    func testASeasonAboutToStartSaysWhenItEnds() {
+        let s = show(next: "2026-10-14", end: "2026-12-02", current: 7, premiere: "2026-10-14")
+        XCTAssertEqual(s.listLine(today: today), "Season 7 premieres 10/14 · finale 12/2")
+    }
+
+    func testAOneEpisodeSeasonIsNotDatedTwice() {
+        let s = show(next: "2026-10-14", end: "2026-10-14", current: 7, premiere: "2026-10-14")
+        XCTAssertEqual(s.listLine(today: today), "Season 7 premieres 10/14")
+    }
+
+    func testAPassedFinaleStaysOffTheRow() {
+        let s = show(next: "2026-10-07", end: "2026-10-07", current: 6, premiere: "2026-09-16")
+        XCTAssertEqual(s.listLine(today: today), "Season 6 · premiered 9/16")
+    }
+
+    func testWithoutSeasonDataTheFinaleStillShows() {
+        XCTAssertEqual(show(next: "2026-10-14", end: "2026-11-04").listLine(today: today),
+                       "Next episode: 10/14 · finale 11/4 · 6 seasons")
+        XCTAssertEqual(show(next: "2026-10-14", end: "2026-10-14").listLine(today: today),
+                       "Finale: 10/14 · 6 seasons")
+    }
+
     func testTheDetailRowSplitsLabelAndDate() {
         let on = show(next: "2026-10-14", current: 6, premiere: "2026-09-16")
         XCTAssertEqual(on.currentSeasonText(today: today), "Season 6 · premiered 9/16")

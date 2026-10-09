@@ -517,20 +517,38 @@ public struct Show: Codable, Identifiable, Hashable, Sendable {
         return ("Season \(n)", md, false)
     }
 
+    // The season's last episode ("11/4") while it's still ahead; nil when
+    // unknown or passed. Computed only for Watching and Awaiting copies.
+    public func upcomingFinale(today: String) -> String? {
+        // A one-episode season ends the day it premieres; "premieres 10/14 ·
+        // finale 10/14" would say the same date twice.
+        guard let end = seasonEndDate, !end.isEmpty, end >= today,
+              end != seasonPremiereDate else { return nil }
+        return monthDay(end)
+    }
+
     // The season line under a list row:
-    //   "Season 6 · premiered 9/16 · next 10/14"   a season on air
-    //   "Season 6 premieres 10/14"                 one about to start
-    //   "Next episode: 10/14 · 6 seasons"          no season data yet
-    //   "6 seasons"                                nothing coming up
+    //   "Season 6 · premiered 9/16 · next 10/14 · finale 11/4"   a season on air
+    //   "Season 6 · premiered 9/16 · finale 10/14"               its last episode is next
+    //   "Season 7 premieres 10/14 · finale 12/2"                 one about to start
+    //   "Next episode: 10/14 · finale 11/4 · 6 seasons"          no season data yet
+    //   "6 seasons"                                              nothing coming up
+    // The finale shows only when a refresh has dated it.
     public var listLine: String? { listLine(today: Show.todayString()) }
 
     public func listLine(today: String) -> String? {
-        let next = nextUpRange(today: today)
+        let finale = upcomingFinale(today: today)
+        // When the next episode IS the finale, say "finale" once, not both.
+        let nextIsFinale = upcomingNextDate(today: today) != nil && nextSeasonDate == seasonEndDate
+        let next = nextIsFinale ? nil : nextUpRange(today: today)
+        let finalePart = finale.map { "finale \($0)" }
         if let current = currentSeasonText(today: today) {
-            if let next, !current.contains("premieres") { return "\(current) · next \(next)" }
-            return current
+            let upcoming = current.contains("premieres")
+            return [current, upcoming ? nil : next.map { "next \($0)" }, finalePart]
+                .compactMap { $0 }.joined(separator: " · ")
         }
-        if let next { return [ "Next episode: \(next)", seasonsText ].compactMap { $0 }.joined(separator: " · ") }
+        if let next { return [ "Next episode: \(next)", finalePart, seasonsText ].compactMap { $0 }.joined(separator: " · ") }
+        if let finale { return [ "Finale: \(finale)", seasonsText ].compactMap { $0 }.joined(separator: " · ") }
         return seasonsText
     }
 

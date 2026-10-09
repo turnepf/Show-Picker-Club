@@ -76,20 +76,36 @@ function currentSeasonInfo(show, today = todayYmd()) {
   return { label: `Season ${n}`, date, upcoming: false };
 }
 
+// The season's last episode ("11/4") while it's still ahead; '' when unknown,
+// passed, or the same day as a one-episode season's premiere. Same as
+// Show.upcomingFinale.
+function upcomingFinale(show, today = todayYmd()) {
+  const end = show && show.season_end_date ? String(show.season_end_date).slice(0, 10) : '';
+  if (!end || end < today || end === String(show.season_premiere_date || '').slice(0, 10)) return '';
+  return monthDay(end);
+}
+
 // The season line under a list row. Same as Show.listLine:
-//   "Season 6 · premiered 9/16 · next 10/14"   a season on air
-//   "Season 7 premieres 10/14"                 one about to start
-//   "Next episode: 10/14 · 6 Seasons"          no season data yet
-//   "6 Seasons"                                nothing coming up
+//   "Season 6 · premiered 9/16 · next 10/14 · finale 11/4"   a season on air
+//   "Season 6 · premiered 9/16 · finale 10/14"               its last episode is next
+//   "Season 7 premieres 10/14 · finale 12/2"                 one about to start
+//   "Next episode: 10/14 · finale 11/4 · 6 Seasons"          no season data yet
+//   "6 Seasons"                                              nothing coming up
 function seasonLineText(show, today = todayYmd()) {
-  const next = upcomingNextDate(show, today);
+  const upcomingNext = upcomingNextDate(show, today);
+  // When the next episode IS the finale, say "finale" once, not both.
+  const nextIsFinale = !!upcomingNext && show.next_season_date === show.season_end_date;
+  const next = nextIsFinale ? null : upcomingNext;
+  const finale = upcomingFinale(show, today);
+  const finalePart = finale ? `finale ${finale}` : '';
   const cur = currentSeasonInfo(show, today);
-  if (cur) {
-    if (cur.upcoming) return `${cur.label} premieres ${cur.date}`;
-    return `${cur.label} · premiered ${cur.date}${next ? ` · next ${monthDay(next)}` : ''}`;
-  }
   const seasons = seasonsText(show);
-  if (next) return `Next episode: ${monthDay(next)}${seasons ? ` · ${seasons}` : ''}`;
+  if (cur) {
+    const head = cur.upcoming ? `${cur.label} premieres ${cur.date}` : `${cur.label} · premiered ${cur.date}`;
+    return [head, !cur.upcoming && next ? `next ${monthDay(next)}` : '', finalePart].filter(Boolean).join(' · ');
+  }
+  if (next) return [`Next episode: ${monthDay(next)}`, finalePart, seasons].filter(Boolean).join(' · ');
+  if (finale) return [`Finale: ${finale}`, seasons].filter(Boolean).join(' · ');
   return seasons;
 }
 
