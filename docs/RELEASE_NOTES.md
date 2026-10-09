@@ -46,6 +46,7 @@ the Prime Video home screen, for titles where we have a direct link to them.
 ## Unreleased — the update after 1.6.2
 
 - **The Calendar only says "Premieres" for a real premiere.** A show already partway through its season now shows its next episode as "New episode" instead of looking like it was just starting.
+- **Season finales are on the row.** A season on the air now says when it premiered, when the next episode is out, and when the season ends, once that date is known: "Season 6 · premiered 9/16 · next 10/14 · finale 11/4".
 
 ---
 
