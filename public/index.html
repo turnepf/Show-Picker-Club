@@ -3795,7 +3795,10 @@
         menu.appendChild(b);
       };
       for (const l of ALL_LISTS) if (l !== show.list) add('Move to ' + LIST_LABELS[l], () => moveShow(id, l));
-      add('Archive', () => archiveShow(id), true);
+      // Asks first, like Archive on the show card; the Undo toast stays too.
+      add('Archive', () => {
+        if (confirm(`Archive "${show.title}"? It comes off your lists — you can add it back later.`)) archiveShow(id);
+      }, true);
       document.body.appendChild(menu);
       const r = btn.getBoundingClientRect();
       const h = menu.offsetHeight;

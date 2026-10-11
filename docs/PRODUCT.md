@@ -312,7 +312,7 @@ There is no edit screen (retired 2026-10). Title, service and the catalog facts 
 
 The card's order is: image, tagline/overview, Also watching + where to watch, Cast, My Lists, the catalog facts (type, year, series, status, genres, runtime, next episode, rated, language), and **Ratings last** — a long series grows one rating row per season, and with Ratings in the middle that buried the catalog facts below it. Share is the top-right button in the title bar on every platform, never a section of the card.
 
-Archive sits on the card (web, iPhone/iPad/Mac, Apple TV, Roku) directly under the four list chips, styled as a small muted control rather than a fifth chip, and **asks for confirmation** before archiving. It is also in the row's ⋯ menu (web), which skips the confirmation because it offers Undo instead. Archive sets `archived=1`; archived shows are still searchable but don't appear in lists, trending, or vibe.
+Archive sits on the card (web, iPhone/iPad/Mac, Apple TV, Roku) directly under the four list chips, styled as a small muted control rather than a fifth chip, and **asks for confirmation** before archiving. It is also in the row's ⋯ menu (web), which asks the same way and still offers Undo afterwards. Archive sets `archived=1`; archived shows are still searchable but don't appear in lists, trending, or vibe.
 
 Platforms: iPhone/iPad (Mac via Catalyst) and the web, on every page that opens a show card. Apple TV and the watch are view-only and unchanged; Roku has no show editing.
 
