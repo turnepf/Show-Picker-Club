@@ -3,6 +3,7 @@ import { isAdmin } from '../_shared/admin.js';
 import { cronAuthorized } from '../_shared/secrets.js';
 import { normalizeAmazonUrl } from '../_shared/amazon-urls.js';
 import { normalizeHboMaxUrl } from '../_shared/hbomax-urls.js';
+import { setWatchLink } from '../_shared/watch-links.js';
 import { sameShowWhere, showKeySql } from '../_shared/same-show.js';
 
 // Read through shows_v (aliased `shows` so the filters read as before): the
@@ -238,6 +239,10 @@ export async function onRequestPost(context) {
     const upd = await env.DB.prepare(
       `UPDATE shows SET network_url = ?, enriched_at = datetime('now') WHERE ${same.sql} AND network = ? AND archived = 0`
     ).bind(url, ...same.binds, row.network).run();
+
+    // And as the show's link on this service, unless one is already set.
+    // A search fallback isn't shareable and stays on the copies only.
+    await setWatchLink(env, row, row.network, url, 'watchmode');
 
     summary.filled += upd.meta.changes;
     summary.updated.push({

@@ -436,6 +436,19 @@ instead of somewhere they can search. Same for a `primevideo.com` opaque id, a
 retail `/dp/` page, a lookalike host, and anything that isn't Amazon.
 
 ```bash
+node scripts/watch-links-test.mjs
+```
+
+One Watch link per show per service (migration 089, `watch_links`). A link
+used to live on every member's copy, so a Show Cleanup fix reached only the
+copies it was pasted onto. Now `shows_v` reads `network_url` from the shared
+row for the copy's (TMDB entry, network), falling back to the copy's own
+column. Pinned is who may write it (INVARIANTS §24): an admin save overwrites,
+Watchmode and the nightly lift from copies only fill, and a member's own
+pasted link stays on their copy. Only a real link whose host is that service
+is ever shared, and the lift takes the link most copies carry.
+
+```bash
 node scripts/trending-cache-test.mjs
 ```
 

@@ -920,8 +920,12 @@ Watch button under a real service's name.
 
 - **A club-wide write needs a provider-grade source.** Today that is the host
   check: a URL only propagates when `networkFromUrl()` maps it to the row's own
-  service. A `network_url_source` column would say it directly and is the
-  better long-term answer.
+  service. Since migration 089 the link is shared outright — one row per
+  (TMDB entry, network) in `watch_links`, read by every copy through
+  `shows_v` — and it carries a `source`: `admin` (Show Cleanup, the admin
+  fix tools) overwrites, `watchmode` and `copy` (the nightly host-checked
+  lift) only fill. A member's request body never writes it; their paste
+  stays on their own copy as a fallback (`_shared/watch-links.js`).
 - **A denylist is not the control.** Excluding the demo account was correct and
   insufficient — open signup means the next untrusted row is one registration
   away.
@@ -931,7 +935,7 @@ Watch button under a real service's name.
 - **And it still stops at a different show.** §17 applies here like everywhere
   else: a copy pinned to another `tmdb_id` is a different title sharing a name.
 
-Enforcer: `scripts/shows-authz-test.mjs`.
+Enforcer: `scripts/shows-authz-test.mjs`, and for the shared link `scripts/watch-links-test.mjs`.
 
 ## 25. A time window compares like with like
 

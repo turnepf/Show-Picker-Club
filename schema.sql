@@ -428,14 +428,27 @@ CREATE TABLE IF NOT EXISTS title_cast (
 CREATE INDEX IF NOT EXISTS idx_title_cast_person ON title_cast(tmdb_person_id);
 -- Every lookup from a show copy to its entry goes through this.
 CREATE INDEX IF NOT EXISTS idx_shows_tmdb ON shows(tmdb_id, tmdb_type);
+-- One Watch link per show per service (migration 089). shows_v reads a
+-- copy's network_url from here, falling back to the copy's own column.
+-- Written by Show Cleanup and the admin tools (overwrite), Watchmode and the
+-- nightly lift from copies (fill only) — see functions/_shared/watch-links.js.
+CREATE TABLE IF NOT EXISTS watch_links (
+  tmdb_type TEXT NOT NULL,
+  tmdb_id INTEGER NOT NULL,
+  network TEXT NOT NULL,
+  url TEXT NOT NULL,
+  source TEXT NOT NULL,
+  updated_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (tmdb_type, tmdb_id, network)
+);
 -- Member-facing reads go through shows_v, which takes the title and the
--- show's details from titles (migrations 077, 080, 083; generated from
+-- show's details from titles (migrations 077, 080, 083, 089; generated from
 -- viewSql() in functions/_shared/titles.js).
 CREATE VIEW shows_v AS
   SELECT s.id AS id,
     t.name AS title,
     s.network AS network,
-    s.network_url AS network_url,
+    COALESCE(w.url, s.network_url) AS network_url,
     s.recommended_by AS recommended_by,
     t.rating AS rating,
     s.list AS list,
@@ -483,7 +496,11 @@ CREATE VIEW shows_v AS
     FROM shows s
     LEFT JOIN titles t
       ON t.tmdb_id = s.tmdb_id
-     AND t.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END);
+     AND t.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)
+    LEFT JOIN watch_links w
+      ON w.tmdb_id = s.tmdb_id
+     AND w.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)
+     AND w.network = s.network;
 -- Member-facing cast reads go through actors_v: the shared cast (migrations
 -- 078, 080; generated from actorsViewSql() in functions/_shared/titles.js).
 CREATE VIEW actors_v AS

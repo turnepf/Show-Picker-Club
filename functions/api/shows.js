@@ -8,6 +8,7 @@ import { chargeSpend } from '../_shared/spend-meter.js';
 import { syncWatchers, watchersForShows, attachAddedByMembers } from '../_shared/watchers.js';
 import { sameShowWhere } from '../_shared/same-show.js';
 import { insertCopy } from '../_shared/insert-copy.js';
+import { setWatchLink } from '../_shared/watch-links.js';
 
 
 function corsHeaders() {
@@ -244,10 +245,14 @@ export async function onRequestPost(context) {
     context.waitUntil((async () => {
       const realUrl = await lookupWatchmodeUrl(env, finalTitle, finalNetwork, !!movie);
       if (realUrl) {
+        // Copies on the same service only: the link was looked up for
+        // finalNetwork, and a copy on another service streams elsewhere
+        // (docs/INVARIANTS.md §20). The edit path has always scoped it so.
         await env.DB.prepare(
           `UPDATE shows SET network_url = ?, enriched_at = datetime('now')
-            WHERE ${same.sql} AND archived = 0`
-        ).bind(realUrl, ...same.binds).run();
+            WHERE ${same.sql} AND archived = 0 AND network = ?`
+        ).bind(realUrl, ...same.binds, finalNetwork).run();
+        await setWatchLink(env, { tmdb_id: enriched.tmdbId, tmdb_type: enriched.tmdbType }, finalNetwork, realUrl, 'watchmode');
       }
     })());
   }
