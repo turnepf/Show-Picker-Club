@@ -314,7 +314,7 @@ The card's order is: image, tagline/overview, Also watching + where to watch, Ca
 
 Archive sits on the card (web, iPhone/iPad/Mac, Apple TV, Roku) directly under the four list chips, styled as a small muted control rather than a fifth chip, and **asks for confirmation** before archiving. It is also in the row's ⋯ menu (web), which asks the same way and still offers Undo afterwards. Archive sets `archived=1`; archived shows are still searchable but don't appear in lists, trending, or vibe.
 
-Platforms: **memo editing** is iPhone/iPad (Mac via Catalyst) and the web, on every page that opens a show card; Apple TV and Roku show memos read-only, and the watch is read-only. **Archive with its confirmation** is on the show card on the web, iPhone/iPad/Mac, Apple TV (a dashed pill under the chips) and Roku (its own quieter row under the chips); the web row ⋯ menu asks too. **The watch has no Archive** — it's read-only.
+Platforms: **memo editing** is iPhone/iPad (Mac via Catalyst) and the web, on every page that opens a show card; Apple TV, Roku and the watch can't edit memos. **Archive with its confirmation** is on the show card on the web, iPhone/iPad/Mac, Apple TV (a dashed pill under the chips) and Roku (its own quieter row under the chips); the web row ⋯ menu asks too. **The watch has no Archive** — it's read-only.
 
 ## Web app status
 
