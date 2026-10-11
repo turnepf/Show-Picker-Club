@@ -4836,6 +4836,8 @@
     }
 
     async function detailArchive(id) {
+      const title = (detailShow && detailShow.title) || 'this show';
+      if (!confirm(`Archive "${title}"? It comes off your lists — you can add it back later.`)) return;
       try {
         const res = await fetch(`/api/shows/${id}/archive`, {
           method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{}',

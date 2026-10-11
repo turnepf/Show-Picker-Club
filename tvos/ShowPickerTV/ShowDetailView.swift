@@ -25,6 +25,9 @@ struct ShowDetailView: View {
     @State private var openFailed = false
     @State private var working = false
     @State private var actionMessage: String?
+    // The copy Archive is asking about — set by the Archive button, cleared
+    // by the confirmation's Archive or Cancel.
+    @State private var confirmingArchive: Show?
     // Average/count always present once the show has a tmdb_id; `owner`
     // populates only when viewing a specific other member's copy. tvOS is
     // view-only for ratings — rate from iPhone/iPad.
@@ -134,6 +137,16 @@ struct ShowDetailView: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .task { await load() }
+        .confirmationDialog("Archive “\(title)”?",
+                            isPresented: Binding(get: { confirmingArchive != nil },
+                                                 set: { if !$0 { confirmingArchive = nil } }),
+                            titleVisibility: .visible,
+                            presenting: confirmingArchive) { m in
+            Button("Archive", role: .destructive) { Task { await archive(m.id) } }
+            Button("Cancel", role: .cancel) { }
+        } message: { _ in
+            Text("It comes off your lists. You can add it back later.")
+        }
     }
 
     // Add-to-my-list (when signed in and it isn't already mine) or move-between-
@@ -142,7 +155,7 @@ struct ShowDetailView: View {
     // The four list chips ARE the move/add control: select one to move an
     // active copy to that list, restore an archived one, or add the show if I
     // don't have it. A checkmark marks the list it's currently on. Archive
-    // stays as a separate action for a copy I actively have.
+    // sits right under the chips for a copy I actively have, and asks first.
     @ViewBuilder private var actionsSection: some View {
         if auth.memberSlug != nil, (show != nil || id == nil) {
             let cur = mineActive.flatMap { ShowList(rawValue: $0.list) }
@@ -182,23 +195,21 @@ struct ShowDetailView: View {
                         .disabled(working)
                     }
                 }
-                // Archive on its own row so the list row isn't crowded and the
-                // focused button has room to scale up. Not role:.destructive —
-                // that painted the pill red with red text, unreadable until
-                // focused. The red box icon keeps its color in both states
-                // (red reads on the dark surface and on the focused plate);
-                // the label follows the style's foreground.
+                // Archive on its own row under the chips, so the list row isn't
+                // crowded and the focused button has room to scale up. It
+                // wears QuietButtonStyle — smaller, muted, dashed rim — so it
+                // never reads as a fifth list, and it confirms before acting.
                 if let m = mineActive {
-                    Button { Task { await archive(m.id) } } label: {
+                    Button { confirmingArchive = m } label: {
                         HStack(spacing: 10) {
-                            Image(systemName: "archivebox").foregroundColor(.red)
-                            Text("Archive")
+                            Image(systemName: "archivebox")
+                            Text("Archive this show")
                         }
-                        .font(.system(size: 24, weight: .semibold))
+                        .font(.system(size: 20, weight: .medium))
                         .lineLimit(1)
                         .fixedSize()
                     }
-                    .buttonStyle(ChipButtonStyle())
+                    .buttonStyle(QuietButtonStyle())
                     .disabled(working)
                 }
                 if mineArchived != nil {

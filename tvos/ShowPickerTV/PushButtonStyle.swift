@@ -44,6 +44,41 @@ struct ChipButtonStyle: ButtonStyle {
     }
 }
 
+// A secondary control that should read as set apart from the list chips —
+// Archive on the detail screen. Unfocused it has no plate, only a dashed
+// muted rim and muted text, so it sits quieter than the chips above it; on
+// focus it takes the same white plate and dark text as ChipButtonStyle, so it
+// is never harder to read than any other focused control. Labels must not set
+// their own foreground color.
+struct QuietButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        FocusAware(configuration: configuration)
+    }
+
+    private struct FocusAware: View {
+        let configuration: ButtonStyle.Configuration
+        @Environment(\.isFocused) private var focused: Bool
+
+        var body: some View {
+            configuration.label
+                .foregroundColor(focused ? Theme.background : Theme.muted)
+                .padding(.horizontal, 22)
+                .padding(.vertical, 10)
+                .background(Capsule().fill(focused ? Theme.text : Color.clear))
+                .overlay(
+                    Capsule().stroke(Theme.muted.opacity(focused ? 0 : 0.6),
+                                     style: StrokeStyle(lineWidth: 2, dash: [6, 5]))
+                )
+                .scaleEffect(configuration.isPressed ? 1.02 : (focused ? 1.05 : 1.0))
+                .shadow(color: .black.opacity(focused ? 0.5 : 0),
+                        radius: focused ? 14 : 0, x: 0, y: focused ? 8 : 0)
+                .animation(.easeOut(duration: 0.18), value: focused)
+                .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+                .zIndex(focused ? 1 : 0)
+        }
+    }
+}
+
 // Focus effect for cards. The system `.card` style swaps in its own plate when
 // focused — which squared off our rounded corners and shifted the bottom-left
 // text — so instead we keep the card's own shape and just grow + lift it on

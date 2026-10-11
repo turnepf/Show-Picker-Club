@@ -38,6 +38,9 @@ struct ShowDetailView: View {
     @State private var recommendGroup: ShowPickerCore.Group?
     @State private var recommendNote = ""
     @State private var recommending = false
+    // The copy Archive is asking about — set by the button under the list
+    // chips, cleared by the confirmation's Archive or Cancel.
+    @State private var confirmingArchive: Show?
     // Creators resolved to individual people by the server (up to four).
     @State private var creators: [Credit] = []
     // The two memos a member edits right on the card — there's no edit
@@ -223,7 +226,7 @@ struct ShowDetailView: View {
             // My Lists — the four list chips ARE the move/add control (tap to
             // move an active copy, restore an archived one, or add it if I don't
             // have it). Watching With and Notes are edited right here — there's no
-            // edit screen — and Archive lives here too.
+            // edit screen — and Archive sits right under the chips.
             // Logged-in members only.
             if auth.memberSlug != nil {
                 Section {
@@ -256,7 +259,7 @@ struct ShowDetailView: View {
                     if mineActive != nil {
                         memoEditors()
                     }
-                    if let m = mineActive {
+                    if mineActive != nil {
                         // JC's button: put this show on a group's Watch Next
                         // board. It recommends MY copy — that's also the
                         // enrichment source every group-mate's "Add to Next
@@ -274,12 +277,6 @@ struct ShowDetailView: View {
                             }
                             .disabled(recommending)
                         }
-                        Button(role: .destructive) {
-                            Task { await archive(m.id) }
-                        } label: {
-                            Label("Archive", systemImage: "archivebox")
-                        }
-                        .disabled(addingToMine)
                     }
                 } header: {
                     // On a show that isn't yours (a group-mate's, Trending, a
@@ -425,6 +422,16 @@ struct ShowDetailView: View {
                presenting: addAlert) { _ in
             Button("OK", role: .cancel) { }
         } message: { Text($0.message) }
+        .confirmationDialog("Archive “\(title)”?",
+                            isPresented: Binding(get: { confirmingArchive != nil },
+                                                 set: { if !$0 { confirmingArchive = nil } }),
+                            titleVisibility: .visible,
+                            presenting: confirmingArchive) { m in
+            Button("Archive", role: .destructive) { Task { await archive(m.id) } }
+            Button("Cancel", role: .cancel) { }
+        } message: { _ in
+            Text("It comes off your lists. You can add it back later.")
+        }
         .confirmationDialog("Recommend to which group?",
                             isPresented: $choosingRecommendGroup,
                             titleVisibility: .visible) {
@@ -693,10 +700,24 @@ struct ShowDetailView: View {
     // restores the show to that list.
     @ViewBuilder private func listChipsRow() -> some View {
         let cur = mineActive.flatMap { ShowList(rawValue: $0.list) }
-        HStack(spacing: 6) {
-            ForEach(ShowList.allCases) { l in
-                Button { Task { await chipTap(l) } } label: {
-                    chipLabel(l, selected: cur == l)
+        VStack(spacing: 8) {
+            HStack(spacing: 6) {
+                ForEach(ShowList.allCases) { l in
+                    Button { Task { await chipTap(l) } } label: {
+                        chipLabel(l, selected: cur == l)
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(addingToMine)
+                }
+            }
+            // Archive is the other place a show can go, so it sits right
+            // under the chips — but as a small, muted link rather than a
+            // fifth chip or a red row, and it asks before it archives.
+            if let m = mineActive {
+                Button { confirmingArchive = m } label: {
+                    Label("Archive this show", systemImage: "archivebox")
+                        .font(.caption).fontWeight(.medium)
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
                 .disabled(addingToMine)

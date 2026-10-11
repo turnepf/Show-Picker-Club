@@ -45,6 +45,10 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ## Unreleased — the update after 1.6.3
 
+```
+Archive now sits right under the list buttons on a show, and asks before it archives — no more archiving a show by accident.
+```
+
 ---
 
 ## 1.6.3 (build 33) — iPhone and iPad, submitted for review 2026-10-09
