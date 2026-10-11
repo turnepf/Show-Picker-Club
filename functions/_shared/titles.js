@@ -190,6 +190,9 @@ export function viewSql() {
   const cols = SHOWS_COLUMNS.map((c) => {
     if (c === 'title') return 't.name AS title';
     if (SHARED_FIELDS.includes(c)) return `t.${c} AS ${c}`;
+    // The show's Watch link on this copy's service (migration 089), else the
+    // copy's own — see _shared/watch-links.js.
+    if (c === 'network_url') return 'COALESCE(w.url, s.network_url) AS network_url';
     return `s.${c} AS ${c}`;
   });
   return `CREATE VIEW shows_v AS
@@ -197,7 +200,11 @@ export function viewSql() {
     FROM shows s
     LEFT JOIN titles t
       ON t.tmdb_id = s.tmdb_id
-     AND t.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)`;
+     AND t.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)
+    LEFT JOIN watch_links w
+      ON w.tmdb_id = s.tmdb_id
+     AND w.tmdb_type = COALESCE(s.tmdb_type, CASE WHEN s.movie = 1 THEN 'movie' ELSE 'tv' END)
+     AND w.network = s.network`;
 }
 
 // actors_v keeps the columns of the retired `actors` table: one row per

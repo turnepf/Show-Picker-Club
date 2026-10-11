@@ -9,6 +9,7 @@ import { getRatingsSummary } from '../../_shared/ratings.js';
 import { creatorsForShow } from '../../_shared/people.js';
 import { syncWatchers, watchersForShow, unlinkShow, attachAddedByMembers } from '../../_shared/watchers.js';
 import { sameShowWhere } from '../../_shared/same-show.js';
+import { setWatchLink } from '../../_shared/watch-links.js';
 
 function corsHeaders() {
   return { 'Access-Control-Allow-Origin': 'https://showpicker.club', 'Content-Type': 'application/json' };
@@ -396,6 +397,10 @@ export async function onRequestPut(context) {
           `UPDATE shows SET network_url = ?, enriched_at = datetime('now')
             WHERE ${same.sql} AND archived = 0 AND network = ?`
         ).bind(realUrl, ...same.binds, finalNetwork).run();
+        const pin = enriched.tmdbId
+          ? { tmdb_id: enriched.tmdbId, tmdb_type: enriched.tmdbType }
+          : { tmdb_id: existing.tmdb_id, tmdb_type: existing.tmdb_type, movie: existing.movie };
+        await setWatchLink(env, pin, finalNetwork, realUrl, 'watchmode');
       }
     })());
   }

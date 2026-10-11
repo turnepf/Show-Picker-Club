@@ -1,6 +1,7 @@
 import { canonicalNetwork, networkFromUrl, storefrontFromUrl } from '../_shared/networks.js';
 import { extractUrl, safeNetworkUrl } from '../_shared/url-utils.js';
 import { normalizeHboMaxUrl } from '../_shared/hbomax-urls.js';
+import { setWatchLink, liftWatchLinks } from '../_shared/watch-links.js';
 import { isAdmin } from '../_shared/admin.js';
 import { cronAuthorized } from '../_shared/secrets.js';
 import { fetchAvailability } from '../_shared/enrichment.js';
@@ -500,13 +501,22 @@ export async function onRequestPost(context) {
       }, 409);
     }
 
+    // The show's shared link on this service — what every copy on it reads,
+    // including copies added later. The copy write above stays as the
+    // fallback for a show with no TMDB pin, or a service whose host the
+    // network table doesn't know.
+    await setWatchLink(env, titleRow, network, url, 'admin');
+
     return json({ ok: true, updated: result.meta.changes, network });
   }
 
   if (action === 'inherit_networks') {
     const networksSet = await inheritNetworks(env);
     const urlsFilled = await propagateGoodUrls(env);
-    return json({ ok: true, networks_set: networksSet, urls_filled: urlsFilled });
+    // Then every show still without a shared link on a service takes the one
+    // its copies carry (fill-only, host-checked — _shared/watch-links.js).
+    const linksLifted = await liftWatchLinks(env);
+    return json({ ok: true, networks_set: networksSet, urls_filled: urlsFilled, links_lifted: linksLifted });
   }
 
   if (action === 'reclassify_storefronts') {

@@ -42,6 +42,7 @@ import * as suggestionApi from '../api/groups/[id]/suggestions/[sid].js';
 import * as membersApi from '../api/members.js';
 import * as adminQueryApi from '../api/admin-query.js';
 import * as enrichApi from '../api/enrich.js';
+import { setWatchLink } from './watch-links.js';
 import { fieldGuide, QUERY_FIELDS, GROUP_FIELDS, COLUMN_FIELDS, QUERY_OPS, MAX_GROUPS, MAX_ROWS } from './show-query.js';
 import { actingAs } from './auth.js';
 import { groupMates } from './watchers.js';
@@ -965,7 +966,14 @@ export const TOOLS = [
       if (watchUrl) body.network_url = watchUrl;
 
       const d = await ok(asMember(ctx, m), showApi.onRequestPut, { method: 'PUT', path: `/api/shows/${row.id}`, body, params: { id: String(row.id) } }, 'That show');
-      const after = d.show;
+      let after = d.show;
+      // The edit ran as the member, and a member's pasted link only reaches
+      // their own copy (INVARIANTS §24). An admin's is the show's link on
+      // that service, the same as a Show Cleanup save.
+      if (watchUrl && after.network) {
+        const shared = await setWatchLink(ctx.env, after, after.network, watchUrl, 'admin');
+        if (shared) after = { ...after, network_url: shared };
+      }
       await logAdmin(ctx, m, 'update_show', {
         show_id: row.id,
         before: { title: row.title, tmdb_id: row.tmdb_id ?? null, tmdb_type: row.tmdb_type ?? null, network: row.network ?? null, watch_url: row.network_url ?? null },
