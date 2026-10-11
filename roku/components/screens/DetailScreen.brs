@@ -13,6 +13,9 @@ sub init()
     m.status = m.top.findNode("status")
     m.busy = m.top.findNode("busy")
     m.actions.observeField("buttonSelected", "onAction")
+    m.archiveAction = m.top.findNode("archiveAction")
+    m.archiveAction.buttons = ["Archive this show"]
+    m.archiveAction.observeField("buttonSelected", "onArchivePressed")
 end sub
 
 ' Draw what the card already told us — title and its artwork — before the
@@ -197,7 +200,7 @@ end function
 ' Build the action buttons and remember what each one does.
 sub buildActions()
     labels = ["< Back"]
-    m.actionKind = ["back"]   ' "back" | "move:<key>" | "add:<key>" | "archive" | "restore"
+    m.actionKind = ["back"]   ' "back" | "move:<key>" | "add:<key>" | "restore"
 
     mine = ownedByMe()
     archived = (m.show.archived <> invalid and m.show.archived = 1)
@@ -213,16 +216,54 @@ sub buildActions()
                 m.actionKind.push("add:" + l.key)
             end if
         end for
-        if mine
-            if archived
-                labels.push("Restore") : m.actionKind.push("restore")
-            else
-                labels.push("Archive") : m.actionKind.push("archive")
-            end if
+        if mine and archived
+            labels.push("Restore") : m.actionKind.push("restore")
         end if
     end if
 
     m.actions.buttons = labels
+    ' Archive is its own quieter row under the list buttons (see the XML).
+    m.archiveAction.visible = (loggedIn() and mine and not archived)
+end sub
+
+' Up/Down between the list buttons and the Archive row beneath them.
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+    if key = "down" and m.actions.hasFocus() and m.archiveAction.visible
+        m.archiveAction.setFocus(true)
+        return true
+    end if
+    if key = "up" and m.archiveAction.hasFocus()
+        m.actions.setFocus(true)
+        return true
+    end if
+    return false
+end function
+
+' Archive asks first: a Dialog with Archive / Cancel.
+sub onArchivePressed()
+    dialog = CreateObject("roSGNode", "Dialog")
+    dialog.title = "Archive “" + SafeStr(m.show.title) + "”?"
+    dialog.message = "It comes off your lists. You can add it back later."
+    dialog.buttons = ["Archive", "Cancel"]
+    ' A Dialog does not dismiss itself — observe both the buttons and Back.
+    dialog.observeField("buttonSelected", "onArchiveConfirm")
+    dialog.observeField("wasClosed", "onArchiveDialogClosed")
+    m.archiveDialog = dialog
+    m.top.getScene().dialog = dialog
+end sub
+
+sub onArchiveConfirm()
+    idx = m.archiveDialog.buttonSelected
+    onArchiveDialogClosed()
+    if idx <> 0 then return
+    id = Stri(m.top.showId).Trim()
+    StartApi(m, { method: "PUT", path: "/api/shows/" + id, body: FormatJson({ archived: 1 }), tag: "archive" }, "onWriteDone")
+end sub
+
+sub onArchiveDialogClosed()
+    m.top.getScene().dialog = invalid
+    m.archiveAction.setFocus(true)
 end sub
 
 sub onAction()
@@ -246,8 +287,6 @@ sub onAction()
     else if Left(kind, 4) = "add:"
         listKey = Mid(kind, 5)
         addToMyList(listKey)
-    else if kind = "archive"
-        StartApi(m, { method: "PUT", path: "/api/shows/" + id, body: FormatJson({ archived: 1 }), tag: "archive" }, "onWriteDone")
     else if kind = "restore"
         target = SafeStr(m.show.list)
         if target = "" then target = "watching"

@@ -608,6 +608,12 @@ function renderShowDetailBody(show, options = {}) {
       `<div class="list-chip${l === curList ? ' selected' : ''}" style="--chip-color: ${DETAIL_CHIP_COLORS[l]};" onclick="detailChip('${l}')">${escapeHtml(listLabels[l] || l)}</div>`
     ).join('');
     let memberInner = `<div class="list-chips detail-list-chips">${chips}</div>`;
+    // Archive sits right under the chips — it's the fifth place a show can
+    // go — but as a quiet link rather than a fifth chip or a red action row,
+    // so it never reads as a list. detailArchive() asks before it archives.
+    if (showActions && myCopy && !myCopy.archived) {
+      memberInner += `<button class="detail-archive" onclick="detailArchive(${Number(myCopy.id)})"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M10 12h4"/></svg>Archive this show</button>`;
+    }
     if (myCopy && myCopy.archived) memberInner += detailRow('Status', 'Archived');
     if (myCopy && myCopy.recommended_by) memberInner += detailRow('Recommended by', escapeHtml(myCopy.recommended_by));
     // An archived copy shows its memos read-only; an active one gets the
@@ -621,15 +627,10 @@ function renderShowDetailBody(show, options = {}) {
     }
     if (!editable && myCopy && myCopy.notes) memberInner += `<div class="detail-prose"><strong>Notes:</strong> ${escapeHtml(myCopy.notes)}</div>`;
     if (editable) memberInner += detailMemoEditorsHtml(myCopy);
-    // Archive lives here in the member section (only for a copy I actively
-    // have) — no separate actions card at the bottom.
     // Put this show on a group's Watch Next board. It recommends MY copy, so
     // it shows only when the title is on one of my lists and I'm in a group.
     if (myCopy && !myCopy.archived && groups.length) {
       memberInner += `<button class="detail-action" onclick="recommendToGroup(${Number(myCopy.id)})">Recommend to group</button>`;
-    }
-    if (showActions && myCopy && !myCopy.archived) {
-      memberInner += `<button class="detail-action danger" onclick="detailArchive(${myCopy.id})">Archive</button>`;
     }
     // On a show that isn't mine (a group-mate's, Trending), say what the
     // chips do: they add it.

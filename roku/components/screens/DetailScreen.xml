@@ -38,6 +38,13 @@
 
         <ButtonGroup id="actions" translation="[90,760]" layoutDirection="horiz"
                      buttonHeight="60" minWidth="200" horizAlignment="left" />
+        <!-- Archive, on its own row under the list buttons: shorter, smaller
+             muted text, so it never reads as a fifth list. Down from the
+             list buttons reaches it; it asks before archiving. -->
+        <ButtonGroup id="archiveAction" translation="[90,840]" layoutDirection="horiz"
+                     buttonHeight="48" minWidth="200" horizAlignment="left"
+                     textFont="font:SmallSystemFont" focusedTextFont="font:SmallSystemFont"
+                     textColor="0xFFFFFF99" visible="false" />
         <Label id="status" translation="[90,560]" width="640" wrap="true"
                font="font:SmallSystemFont" color="0x33C773FF" visible="false" />
         <BusySpinner id="busy" translation="[930,500]" visible="true"

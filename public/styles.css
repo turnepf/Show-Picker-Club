@@ -290,6 +290,16 @@ body.admin-page {
 .detail-list-chips .list-chip { cursor: pointer; height: 32px; font-size: 11px; }
 .detail-list-chips .list-chip:hover { background: color-mix(in oklch, var(--chip-color) 14%, transparent); }
 .detail-list-chips .list-chip.selected:hover { background: var(--chip-color); }
+/* Archive, right under the chips: a small, muted link with an icon — set
+   apart from the colored list chips and the bold action rows below. */
+.detail-archive {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin: -4px auto 10px; padding: 4px 10px;
+  background: transparent; border: none; border-radius: 6px;
+  color: var(--ink-muted); font: inherit; font-size: 12px; font-weight: 500;
+  cursor: pointer;
+}
+.detail-archive:hover { color: var(--danger-deep); background: var(--danger-soft); }
 
 .detail-poster { text-align: center; margin: 6px 0 16px; }
 .detail-poster img {
