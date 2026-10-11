@@ -140,11 +140,19 @@ private struct UrlCleanupItemView: View {
             Section("Show") {
                 LabeledContent("Title", value: item.title)
                 if let m = item.members, !m.isEmpty { LabeledContent("On", value: m) }
+                // The link on file, selectable so it can be copied, edited and
+                // pasted back — the web page shows it the same way.
+                LabeledContent("Current link") {
+                    Text(item.networkUrl?.isEmpty == false ? item.networkUrl! : "None")
+                        .textSelection(.enabled)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.trailing)
+                }
             }
 
             Section {
                 Picker("Network", selection: $network) {
-                    Text("None").tag("")
+                    Text("From the link").tag("")
                     ForEach(NetworkCatalogStore.shared.names, id: \.self) { Text($0).tag($0) }
                 }
                 // Finding the deep link is the actual work — hand off the
@@ -160,10 +168,13 @@ private struct UrlCleanupItemView: View {
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)
                 Button("Save URL") { Task { await saveUrl() } }
-                    .disabled(urlText.trimmingCharacters(in: .whitespaces).isEmpty
-                              || network.isEmpty || working)
+                    .disabled(urlText.trimmingCharacters(in: .whitespaces).isEmpty || working)
             } header: {
                 Text("Fix the link")
+            } footer: {
+                if network.isEmpty {
+                    Text("The service comes from the link. An Apple TV link goes by what TMDB says streams it — pick one if it asks.")
+                }
             }
 
             Section {

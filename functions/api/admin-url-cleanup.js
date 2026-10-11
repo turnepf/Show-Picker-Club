@@ -412,7 +412,6 @@ export async function onRequestPost(context) {
     const url = normalizeHboMaxUrl(extractUrl(body.network_url || '') || (body.network_url || '').trim());
 
     if (!Number.isInteger(id)) return json({ error: 'id required' }, 400);
-    if (!submittedNetwork) return json({ error: 'network required' }, 400);
     if (!url) return json({ error: 'URL required' }, 400);
 
     const lower = url.toLowerCase();
@@ -431,21 +430,37 @@ export async function onRequestPost(context) {
       return json({ error: 'That needs to be a full http(s) URL — paste the link from the address bar.' }, 400);
     }
 
+    const titleRow = await env.DB.prepare('SELECT title, tmdb_id, tmdb_type, movie, streaming_on FROM shows_v WHERE id = ?').bind(id).first();
+    if (!titleRow) return json({ error: 'Show not found' }, 404);
+
     // URL trumps the dropdown pick. If the pasted URL is a Netflix link but
-    // the operator left the dropdown on Hulu, store Netflix.
+    // the operator left the dropdown on Hulu, store Netflix — and with the
+    // dropdown left on None, the link alone decides.
     //
     // Apple is the exception: tv.apple.com is a storefront, not a service.
     // It carries Apple TV+ originals *and* rent/buy titles that stream on
     // someone else's subscription, so an Apple link says nothing about who
     // carries the show. Letting it overrule the dropdown relabels rentals as
-    // Apple TV+ and inflates the Subscription Audit. Operator's pick wins.
+    // Apple TV+ and inflates the Subscription Audit. Operator's pick wins;
+    // with no pick, TMDB's subscription list decides (Apple TV+ when it names
+    // it, the rent-or-buy store when it was asked and names nothing else), and
+    // a title TMDB was never asked about is a question for the operator.
     const derived = networkFromUrl(url);
-    const network = (derived && derived !== 'Apple TV+')
+    let network = (derived && derived !== 'Apple TV+')
       ? derived
       : canonicalNetwork(submittedNetwork);
+    if (!network && derived === 'Apple TV+') {
+      const on = titleRow.streaming_on;
+      if (on != null) {
+        network = on.split(',').map(n => n.trim()).includes('Apple TV+') ? 'Apple TV+' : 'Apple TV Store';
+      } else {
+        return json({ error: 'Pick a network — an Apple TV link could be Apple TV+ or Apple TV (rent or buy).' }, 400);
+      }
+    }
+    if (!network) {
+      return json({ error: "Pick a network — that link doesn't say which service it's on." }, 400);
+    }
 
-    const titleRow = await env.DB.prepare('SELECT title, tmdb_id, tmdb_type, movie FROM shows_v WHERE id = ?').bind(id).first();
-    if (!titleRow) return json({ error: 'Show not found' }, 404);
     // This show's copies: the same TMDB entry (plus unmatched copies of its
     // title), never a different film that shares the name.
     const same = sameShowWhere('shows', titleRow, { forWrite: true, hasTitle: false });
@@ -485,7 +500,7 @@ export async function onRequestPost(context) {
       }, 409);
     }
 
-    return json({ ok: true, updated: result.meta.changes });
+    return json({ ok: true, updated: result.meta.changes, network });
   }
 
   if (action === 'inherit_networks') {

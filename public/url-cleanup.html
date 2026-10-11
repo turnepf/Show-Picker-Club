@@ -191,7 +191,7 @@
     }
 
     function networkOptionsHtml(currentValue) {
-      const opts = ['<option value="">Select…</option>'];
+      const opts = ['<option value="">From the link</option>'];
       networks.forEach(n => {
         const sel = (n === currentValue) ? ' selected' : '';
         opts.push(`<option value="${escapeAttr(n)}"${sel}>${escapeHtml(n)}</option>`);
@@ -252,7 +252,8 @@
         errBox.textContent = '';
         const network = (sel.value === '__other' ? other.value : sel.value).trim();
         const newUrl = url.value.trim();
-        if (!network) { errBox.textContent = 'Pick a network.'; return; }
+        // No network picked is fine: the server reads it off the link, and
+        // says so when the link can't tell.
         if (!newUrl) { errBox.textContent = 'Paste a URL.'; return; }
         btn.disabled = true;
         const oldText = btn.textContent;
@@ -275,8 +276,9 @@
             return;
           }
           // If new network, refresh networks list (cheap: append locally).
-          if (!networks.includes(network)) {
-            networks.push(network);
+          const saved = data.network || network;
+          if (saved && !networks.includes(saved)) {
+            networks.push(saved);
             networks.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
           }
           rowEl.classList.add('removing');

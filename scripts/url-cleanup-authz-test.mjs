@@ -187,5 +187,56 @@ console.log('\n== a session still has to be an admin session');
   check('an admin session still drives it by hand', ok.status === 200, `got ${ok.status}`);
 }
 
+console.log('\n== save with the network left on None: the link decides');
+{
+  const env = makeEnv();
+  const admin = addMember(env, 'patrick', { admin: true });
+  addMember(env, 'george');
+  const idOf = (title) => env._db.prepare('SELECT id FROM shows WHERE title = ?').get(title).id;
+  const save = (title, url, network = '') =>
+    post(env, 'save', { cookie: admin, body: { id: idOf(title), network, network_url: url } });
+
+  // A service's own link names the service.
+  addShow(env, { title: 'Hacks', member: 'george' });
+  let res = await save('Hacks', 'https://www.hbomax.com/show/67e940b7-aab2-46ce-a62b-c7308cde9de7');
+  let body = await res.json();
+  check('an HBO Max link saves with no network picked', res.status === 200, JSON.stringify(body));
+  check('and sets HBO Max on the row', showRows(env, 'Hacks')[0].network === 'HBO Max', JSON.stringify(showRows(env, 'Hacks')));
+  check('and says which network it chose', body.network === 'HBO Max', JSON.stringify(body));
+
+  // An Apple link is a storefront: TMDB's subscription list decides.
+  addShow(env, { title: 'Renegade Immortal', member: 'george' });
+  env._db.prepare("UPDATE titles SET streaming_on = '' WHERE name = 'Renegade Immortal'").run();
+  res = await save('Renegade Immortal', 'https://tv.apple.com/us/show/renegade-immortal/umc.cmc.45y8hcazpv44tmipianhwl9k5');
+  check('an Apple link on a title no subscription carries is the rent-or-buy store',
+    res.status === 200 && showRows(env, 'Renegade Immortal')[0].network === 'Apple TV Store',
+    JSON.stringify(showRows(env, 'Renegade Immortal')));
+
+  addShow(env, { title: 'Severance', member: 'george' });
+  env._db.prepare("UPDATE titles SET streaming_on = 'Apple TV+' WHERE name = 'Severance'").run();
+  res = await save('Severance', 'https://tv.apple.com/us/show/severance/umc.cmc.1srk2goyh2q2zdxcx605w8vtx');
+  check('an Apple link on an Apple TV+ title is Apple TV+',
+    res.status === 200 && showRows(env, 'Severance')[0].network === 'Apple TV+',
+    JSON.stringify(showRows(env, 'Severance')));
+
+  // TMDB never asked: an Apple link is a guess, so it's the operator's call.
+  addShow(env, { title: 'Pluribus', member: 'george' });
+  res = await save('Pluribus', 'https://tv.apple.com/us/show/pluribus/umc.cmc.37axgovs2yozlyh3c2cmwzlza');
+  check('an Apple link with no TMDB answer asks for a network', res.status === 400, `got ${res.status}`);
+  check('and saves nothing', showRows(env, 'Pluribus')[0].network_url === null, JSON.stringify(showRows(env, 'Pluribus')));
+
+  // A link no service claims can't decide anything.
+  addShow(env, { title: 'Mystery', member: 'george' });
+  res = await save('Mystery', 'https://example.com/watch/mystery');
+  check('an unknown link with no network picked is a 400', res.status === 400, `got ${res.status}`);
+
+  // A pick still wins over an Apple link.
+  addShow(env, { title: 'Ted Lasso', member: 'george' });
+  env._db.prepare("UPDATE titles SET streaming_on = '' WHERE name = 'Ted Lasso'").run();
+  res = await save('Ted Lasso', 'https://tv.apple.com/us/show/ted-lasso/umc.cmc.vtoh0mn0xn7t3c643xqonfzy', 'Apple TV+');
+  check('an operator pick beats TMDB on an Apple link',
+    res.status === 200 && showRows(env, 'Ted Lasso')[0].network === 'Apple TV+', JSON.stringify(showRows(env, 'Ted Lasso')));
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
