@@ -9,6 +9,7 @@
 // No network. Run: node scripts/amazon-url-test.mjs
 
 import { normalizeAmazonUrl, amazonUrlLandsOnShow } from '../functions/_shared/amazon-urls.js';
+import { normalizeHboMaxUrl } from '../functions/_shared/hbomax-urls.js';
 
 let failures = 0;
 function check(name, actual, expected) {
@@ -79,8 +80,33 @@ check('landsOnShow is false for gp/video', amazonUrlLandsOnShow(ASIN_URL), false
 check('landsOnShow is false for junk', amazonUrlLandsOnShow('nope'), false);
 check('landsOnShow is false for null', amazonUrlLandsOnShow(null), false);
 
+// HBO Max: the same repair for a different vendor. The info page on
+// www.hbomax.com / www.max.com carries the player's id, so the id moves onto
+// play.hbomax.com; a page without one is left alone.
+const POTTERY = 'https://play.hbomax.com/show/d883789c-c45e-4b1c-9145-d4d034af6f24';
+check('hbomax info page moves to the player',
+  normalizeHboMaxUrl('https://www.hbomax.com/show/d883789c-c45e-4b1c-9145-d4d034af6f24'), POTTERY);
+check('hbomax tracking params are dropped',
+  normalizeHboMaxUrl('https://www.hbomax.com/show/d883789c-c45e-4b1c-9145-d4d034af6f24?utm_source=universal_search'), POTTERY);
+check('hbomax bare host and locale prefix',
+  normalizeHboMaxUrl('https://hbomax.com/us/es/show/d883789c-c45e-4b1c-9145-d4d034af6f24/'), POTTERY);
+check('old www.hbomax.com/shows/<slug>/<id> shape',
+  normalizeHboMaxUrl('https://www.hbomax.com/shows/sex-and-the-city/2641fd06-387f-4d92-a322-accb8e180713'),
+  'https://play.hbomax.com/show/2641fd06-387f-4d92-a322-accb8e180713');
+check('old www.max.com/movies/<slug>/<id> shape is a movie',
+  normalizeHboMaxUrl('https://www.max.com/movies/alex-edelman-just-for-us/7032329c-4bff-4456-92d3-4847ec61cfc1'),
+  'https://play.hbomax.com/movie/7032329c-4bff-4456-92d3-4847ec61cfc1');
+check('a player URL is untouched', normalizeHboMaxUrl(HBO), HBO);
+const HBO_HOME = 'https://www.hbomax.com/';
+check('an hbomax page with no id is untouched', normalizeHboMaxUrl(HBO_HOME), HBO_HOME);
+const HBO_EVIL = 'https://www.hbomax.com.example.net/show/d883789c-c45e-4b1c-9145-d4d034af6f24';
+check('an hbomax lookalike host is not rewritten', normalizeHboMaxUrl(HBO_EVIL), HBO_EVIL);
+check('a non-HBO URL is untouched by the HBO rule', normalizeHboMaxUrl(NETFLIX), NETFLIX);
+check('hbomax: garbage is returned unchanged', normalizeHboMaxUrl('not a url'), 'not a url');
+check('hbomax: null is returned unchanged', normalizeHboMaxUrl(null), null);
+
 if (failures) {
   console.error(`\n${failures} failure(s)`);
   process.exit(1);
 }
-console.log('\nall amazon url checks passed');
+console.log('\nall amazon and hbo max url checks passed');

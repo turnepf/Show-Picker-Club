@@ -2,6 +2,7 @@ import { canonicalNetwork } from '../_shared/networks.js';
 import { isAdmin } from '../_shared/admin.js';
 import { cronAuthorized } from '../_shared/secrets.js';
 import { normalizeAmazonUrl } from '../_shared/amazon-urls.js';
+import { normalizeHboMaxUrl } from '../_shared/hbomax-urls.js';
 import { sameShowWhere, showKeySql } from '../_shared/same-show.js';
 
 // Read through shows_v (aliased `shows` so the filters read as before): the
@@ -224,7 +225,7 @@ export async function onRequestPost(context) {
     // Amazon's www host carries the right id but reaches nothing on tvOS.
     // Same spirit as the HBO Max rewrite above: the vendor's answer is
     // correct about the title and wrong about the address.
-    url = normalizeAmazonUrl(url);
+    url = normalizeHboMaxUrl(normalizeAmazonUrl(url));
 
     // Only write to rows on the same service. The Watchmode match we
     // picked is scoped to row.network already (canonicalNetwork(s.name) ===

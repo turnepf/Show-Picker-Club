@@ -1,5 +1,6 @@
 import { canonicalNetwork, networkFromUrl, storefrontFromUrl } from '../_shared/networks.js';
 import { extractUrl, safeNetworkUrl } from '../_shared/url-utils.js';
+import { normalizeHboMaxUrl } from '../_shared/hbomax-urls.js';
 import { isAdmin } from '../_shared/admin.js';
 import { cronAuthorized } from '../_shared/secrets.js';
 import { fetchAvailability } from '../_shared/enrichment.js';
@@ -404,7 +405,11 @@ export async function onRequestPost(context) {
     // Pull just the http(s)://... portion out — catches the case where the
     // operator pastes the whole share blob from a streamer's app, like
     // "Check out X on Hulu! https://..."
-    const url = extractUrl(body.network_url || '') || (body.network_url || '').trim();
+    //
+    // An HBO Max info-page link (www.hbomax.com/show/<id>) is moved onto the
+    // player host here. The queue counts the info host as a placeholder, so
+    // saving it as pasted reported success and left the show in the queue.
+    const url = normalizeHboMaxUrl(extractUrl(body.network_url || '') || (body.network_url || '').trim());
 
     if (!Number.isInteger(id)) return json({ error: 'id required' }, 400);
     if (!submittedNetwork) return json({ error: 'network required' }, 400);
