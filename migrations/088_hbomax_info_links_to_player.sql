@@ -22,4 +22,12 @@ UPDATE shows
    AND (r.bare LIKE '%/show/%' OR r.bare LIKE '%/shows/%'
         OR r.bare LIKE '%/movie/%' OR r.bare LIKE '%/movies/%')
    AND substr(r.bare, -37, 1) = '/'
-   AND substr(r.bare, -36) GLOB '[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]';
+   -- The id: 36 characters, dashes where a UUID has them, nothing but hex
+   -- and dashes. D1 caps a GLOB pattern's length, so this is checked piece
+   -- by piece rather than as one 36-position pattern.
+   AND substr(r.bare, -36, 1) != '-'
+   AND substr(r.bare, -28, 1) = '-'
+   AND substr(r.bare, -23, 1) = '-'
+   AND substr(r.bare, -18, 1) = '-'
+   AND substr(r.bare, -13, 1) = '-'
+   AND lower(substr(r.bare, -36)) NOT GLOB '*[^0-9a-f-]*';
