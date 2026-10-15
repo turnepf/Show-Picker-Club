@@ -188,6 +188,36 @@ console.log('\n== a machine fills, it never replaces');
   check('an unpinned row stores nothing', (await links.setWatchLink(env, { tmdb_id: null }, 'Hulu', HULU, 'admin')) === null);
 }
 
+console.log('\n== a Prime link that lands on the show replaces one that does not');
+{
+  const env = makeEnv();
+  addShow(env, { member: 'patrick', network: 'Amazon Prime Video' });
+  const row = { tmdb_id: TMDB_ID, tmdb_type: 'tv' };
+  const ASIN = 'https://www.amazon.com/gp/video/detail/B095RFRQNJ/';
+  const GTI = 'https://watch.amazon.com/detail?gti=amzn1.dv.gti.a314b20c-bc97-4fdd-8f15-fe912ab92f7d';
+  const GTI2 = 'https://watch.amazon.com/detail?gti=amzn1.dv.gti.5ea9f68d-5bf9-bb34-dc15-2f971f46c793';
+
+  await links.setWatchLink(env, row, 'Amazon Prime Video', ASIN, 'copy');
+  check('fill-only leaves the ASIN link in place',
+    (await links.setWatchLink(env, row, 'Amazon Prime Video', GTI, 'watchmode')) === null
+      && shared(env, 'Amazon Prime Video').url === ASIN);
+  check('the upgrade replaces it',
+    (await links.upgradeAmazonWatchLink(env, row, 'Amazon Prime Video', GTI)) === GTI
+      && shared(env, 'Amazon Prime Video').url === GTI);
+  check('but never replaces a link that already lands on the show',
+    (await links.upgradeAmazonWatchLink(env, row, 'Amazon Prime Video', GTI2)) === null
+      && shared(env, 'Amazon Prime Video').url === GTI);
+  check('nor upgrades to a link that does not land on the show',
+    (await links.upgradeAmazonWatchLink(env, row, 'Amazon Prime Video', ASIN)) === null);
+
+  const env2 = makeEnv();
+  addShow(env2, { member: 'patrick', network: 'Amazon Prime Video' });
+  await links.setWatchLink(env2, row, 'Amazon Prime Video', ASIN, 'admin');
+  check('and never replaces an operator\'s link',
+    (await links.upgradeAmazonWatchLink(env2, row, 'Amazon Prime Video', GTI)) === null
+      && shared(env2, 'Amazon Prime Video').url === ASIN);
+}
+
 console.log('\n== a member\'s pasted link stays on their copy (§24)');
 {
   const env = makeEnv();

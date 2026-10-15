@@ -926,6 +926,11 @@ Watch button under a real service's name.
   fix tools) overwrites, `watchmode` and `copy` (the nightly host-checked
   lift) only fill. A member's request body never writes it; their paste
   stays on their own copy as a fallback (`_shared/watch-links.js`).
+  One exception, Prime Video only: a link that lands on the show
+  (`watch.amazon.com/detail?gti=`) replaces a non-admin one that doesn't
+  (`upgradeAmazonWatchLink`), because there the shape decides whether Watch
+  opens the show at all — fill-only kept the old ASIN link and the
+  `amazon-shape` repair changed nothing a member could see.
 - **A denylist is not the control.** Excluding the demo account was correct and
   insufficient — open signup means the next untrusted row is one registration
   away.

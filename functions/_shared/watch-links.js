@@ -23,7 +23,7 @@
 
 import { networkFromUrl, storefrontFromUrl } from './networks.js';
 import { safeNetworkUrl } from './url-utils.js';
-import { normalizeAmazonUrl } from './amazon-urls.js';
+import { normalizeAmazonUrl, amazonUrlLandsOnShow } from './amazon-urls.js';
 import { normalizeHboMaxUrl } from './hbomax-urls.js';
 
 // Links that look like links and land nowhere — a service's search page, an
@@ -82,6 +82,35 @@ export async function setWatchLink(env, row, network, url, source) {
         : `INSERT OR IGNORE INTO watch_links (tmdb_type, tmdb_id, network, url, source, updated_at)
              VALUES (?, ?, ?, ?, ?, datetime('now'))`
     ).bind(type, id, network, link, source).run();
+    return res.meta.changes ? link : null;
+  } catch {
+    return null;
+  }
+}
+
+// The one case where a machine may replace a shared link: Prime Video, where
+// the shape decides whether Watch opens the show at all. Only
+// watch.amazon.com/detail?gti= lands on the title; an ASIN or primevideo.com
+// link opens Prime Video's home screen (amazon-urls.js). Fill-only kept the
+// first link any copy carried — usually one of those — so the amazon-shape
+// repair found the right link, wrote it to the copies, and members still saw
+// the old one, because shows_v reads the shared row first.
+//
+// A link that lands on the show replaces one that doesn't. Never an admin's:
+// an operator who chose a link chose it. Returns the stored URL, or null when
+// nothing changed. Never throws, like setWatchLink.
+export async function upgradeAmazonWatchLink(env, row, network, url) {
+  try {
+    const { type, id } = keyOf(row || {});
+    if (!id) return null;
+    const link = shareableUrl(url, network);
+    if (!link || !amazonUrlLandsOnShow(link)) return null;
+    const res = await env.DB.prepare(
+      `UPDATE watch_links SET url = ?, source = 'watchmode', updated_at = datetime('now')
+        WHERE tmdb_type = ? AND tmdb_id = ? AND network = ?
+          AND source != 'admin'
+          AND url NOT LIKE 'https://watch.amazon.com/%'`
+    ).bind(link, type, id, network).run();
     return res.meta.changes ? link : null;
   } catch {
     return null;
