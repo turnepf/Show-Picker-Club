@@ -3,7 +3,7 @@ import { isAdmin } from '../_shared/admin.js';
 import { cronAuthorized } from '../_shared/secrets.js';
 import { normalizeAmazonUrl } from '../_shared/amazon-urls.js';
 import { normalizeHboMaxUrl } from '../_shared/hbomax-urls.js';
-import { setWatchLink } from '../_shared/watch-links.js';
+import { setWatchLink, upgradeAmazonWatchLink } from '../_shared/watch-links.js';
 import { sameShowWhere, showKeySql } from '../_shared/same-show.js';
 
 // Read through shows_v (aliased `shows` so the filters read as before): the
@@ -241,8 +241,11 @@ export async function onRequestPost(context) {
     ).bind(url, ...same.binds, row.network).run();
 
     // And as the show's link on this service, unless one is already set.
-    // A search fallback isn't shareable and stays on the copies only.
+    // A search fallback isn't shareable and stays on the copies only. A Prime
+    // link that lands on the show also replaces a shared one that doesn't —
+    // otherwise the copies change and every member still reads the old link.
     await setWatchLink(env, row, row.network, url, 'watchmode');
+    await upgradeAmazonWatchLink(env, row, row.network, url);
 
     summary.filled += upd.meta.changes;
     summary.updated.push({
