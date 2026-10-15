@@ -126,7 +126,7 @@ public struct NetworkCatalog: Codable, Equatable, Sendable {
         NetworkOption("Netflix"), NetworkOption("Paramount+"),
         NetworkOption("PBS"), NetworkOption("Peacock"),
         NetworkOption("Pluto TV"), NetworkOption("Starz"),
-        NetworkOption("YouTube"),
+        NetworkOption("Tubi"), NetworkOption("YouTube"),
         // United Kingdom.
         NetworkOption("BBC iPlayer", section: "United Kingdom"),
         NetworkOption("Channel 4", section: "United Kingdom"),

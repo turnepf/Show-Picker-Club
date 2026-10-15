@@ -155,6 +155,13 @@ console.log('\n== prices are keyed to names the DB actually stores');
   check('free-to-air catch-up services are priced at zero, not left absent',
         notZero.length === 0, notZero.join(', '));
 
+  // The two US free, ad-supported services: known free, so zero, not absent.
+  const freeUS = ['Pluto TV', 'Tubi'].filter(n => DEFAULT_PRICE_CENTS[n] !== 0);
+  check('Pluto TV and Tubi are priced at zero', freeUS.length === 0, freeUS.join(', '));
+  check('"Tubi TV" and a tubitv.com link both land on Tubi',
+        canonicalNetwork('Tubi TV') === 'Tubi' && networkFromUrl('https://tubitv.com/movies/123') === 'Tubi',
+        `${canonicalNetwork('Tubi TV')} / ${networkFromUrl('https://tubitv.com/movies/123')}`);
+
   // Paid services billed in another currency stay unpriced on purpose — the
   // audit sums US cents, and a converted guess would be wrong in the sum.
   const foreignPaid = ['NOW', 'Stan', 'Binge', 'Foxtel'];

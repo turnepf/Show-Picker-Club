@@ -13,7 +13,6 @@ import { knownByPersonIds, rememberPeople } from './people.js';
 // member can pick, so they stay out of networks.js and the picker it feeds.
 // Anything else is dropped rather than shown under TMDB's raw provider name.
 const FREE_SERVICES = new Map([
-  ['tubi', 'Tubi'], ['tubi tv', 'Tubi'],
   ['the roku channel', 'The Roku Channel'], ['roku channel', 'The Roku Channel'],
   ['plex', 'Plex'], ['plex channel', 'Plex'],
   ['kanopy', 'Kanopy'], ['hoopla', 'Hoopla'],
@@ -26,7 +25,7 @@ const FREE_SERVICES = new Map([
 // still need a subscription. Accepting every known network put "Free on
 // Apple TV+, Prime Video" on Slow Horses (2026-10). Freevee is gone too, folded
 // into Prime Video, so it no longer maps to anything.
-const FREE_NETWORKS = new Set(['Pluto TV', 'PBS', 'YouTube']);
+const FREE_NETWORKS = new Set(['Pluto TV', 'Tubi', 'PBS', 'YouTube']);
 
 export function freeServiceName(providerName) {
   const network = knownNetwork(providerName);

@@ -48,6 +48,7 @@ the Prime Video home screen, for titles where we have a direct link to them.
 ```
 Archive now sits right under the list buttons on a show, and asks before it archives — no more archiving a show by accident.
 Sharing a show from the Prime Video app now saves a Watch link that opens Prime Video right on that show, and fills in the title when Prime's share names it.
+Tubi is in the service list now — free, so it adds nothing to your monthly total.
 ```
 
 ---
