@@ -154,6 +154,18 @@ export const NETWORKS = [
     domains: ['pluto.tv'],
     search: { base: 'https://pluto.tv/us/search' },
   },
+  {
+    // Free and ad-supported, the same shape as Pluto TV: its own app and
+    // catalogue (Fox owns it, but it's no more a Fox alias than Pluto is a
+    // Paramount+ one), a subscription-kind network priced at zero. Its search
+    // takes the query as a path segment (/search/<title>), which the template
+    // can't express, so the base opens the search page and the member types.
+    stored: 'Tubi',
+    display: 'Tubi (free, ad-supported)',
+    aliases: ['Tubi TV', 'TubiTV', 'Tubitv.com'],
+    domains: ['tubitv.com', 'tubi.tv'],
+    search: { base: 'https://tubitv.com/search' },
+  },
 
   // --- United Kingdom ---
   // BritBox already sits above: it's the BBC/ITV export service sold in the US,
@@ -574,8 +586,9 @@ export const DEFAULT_PRICE_CENTS = {
   'MGM+': 899,
   // Free, ad-supported: zero rather than absent, so the audit says "$0/mo"
   // because we know it costs nothing, not because nobody has priced it yet.
-  // A cancel verdict on Pluto TV saves exactly nothing, and the totals show it.
+  // A cancel verdict on Pluto TV or Tubi saves exactly nothing, and the totals show it.
   'Pluto TV': 0,
+  'Tubi': 0,
   // PBS Passport, the $60/year member benefit, at its monthly equivalent. Much
   // of PBS streams free without it, so this is the one default a member is
   // likeliest to zero out.
