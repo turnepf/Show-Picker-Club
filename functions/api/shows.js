@@ -9,6 +9,7 @@ import { syncWatchers, watchersForShows, attachAddedByMembers } from '../_shared
 import { sameShowWhere } from '../_shared/same-show.js';
 import { insertCopy } from '../_shared/insert-copy.js';
 import { setWatchLink } from '../_shared/watch-links.js';
+import { normalizeAmazonUrl } from '../_shared/amazon-urls.js';
 
 
 function corsHeaders() {
@@ -198,7 +199,10 @@ export async function onRequestPost(context) {
   // URL-cleanup queue.
   const goodCopy = network_url && network ? null : await findGoodCopyAcrossMembers(env, finalTitle,
     enriched.tmdbId || (Number.isInteger(tmdbId) ? tmdbId : null), enriched.tmdbId ? enriched.tmdbType : tmdbType);
-  const userUrl = network_url || null;
+  // A Prime link arrives in whatever shape the member had it — the iPhone
+  // share sheet's carries a tracking tail, older ones sit on www.amazon.com —
+  // so it is stored in the one shape that lands on the show.
+  const userUrl = normalizeAmazonUrl(network_url || null);
   const goodCopyUrl = goodCopy && goodCopy.network_url;
   // URL trumps the dropdown — if the user pasted a Netflix link but selected
   // Hulu, the URL's domain wins (and the inverse: if user picked a network

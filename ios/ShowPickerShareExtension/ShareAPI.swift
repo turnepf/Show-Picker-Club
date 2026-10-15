@@ -21,6 +21,7 @@ enum ShareAPI {
         memberSlug: String,
         title: String,
         network: String?,
+        networkURL: String? = nil,
         list: String,
         notes: String?,
         movie: Bool
@@ -34,7 +35,8 @@ enum ShareAPI {
         req.setValue(cookie,             forHTTPHeaderField: "Cookie")
 
         var body: [String: Any] = ["title": title, "list": list, "movie": movie ? 1 : 0]
-        if let network { body["network"] = network }
+        if let network    { body["network"]     = network    }
+        if let networkURL { body["network_url"] = networkURL }
         if let notes   { body["notes"]   = notes   }
 
         req.httpBody = try JSONSerialization.data(withJSONObject: body)

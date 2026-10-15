@@ -47,6 +47,7 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ```
 Archive now sits right under the list buttons on a show, and asks before it archives — no more archiving a show by accident.
+Sharing a show from the Prime Video app now saves a Watch link that opens Prime Video right on that show. Prime's share doesn't say which show it is, so type the title in.
 ```
 
 ---

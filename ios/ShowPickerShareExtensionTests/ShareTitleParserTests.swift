@@ -88,6 +88,51 @@ final class ShareTitleParserTests: XCTestCase {
         XCTAssertEqual(result.network, "Netflix")
     }
 
+    // MARK: Prime Video
+
+    // Prime's share names no show. The sentence must not become the title.
+    func testPrimeShareYieldsNoTitleButKeepsNetwork() {
+        let link = "https://watch.amazon.com/detail?gti=amzn1.dv.gti.a314b20c-bc97-4fdd-8f15-fe912ab92f7d"
+            + "&territory=US&ref_=share_ios_unknown&r=web"
+        let raw = "Hey, I\u{2019}m watching this video. Check it out now on Prime Video. " + link
+        let result = ShareTitleParser.parse(text: raw, url: URL(string: link))
+        XCTAssertNil(result.title)
+        XCTAssertEqual(result.network, "Amazon Prime Video")
+    }
+
+    func testPrimeShareLinkIsKeptWithoutTrackingTail() {
+        let url = URL(string: "https://watch.amazon.com/detail?gti=amzn1.dv.gti.a314b20c-bc97-4fdd-8f15-fe912ab92f7d"
+            + "&territory=US&ref_=share_ios_unknown&r=web")
+        XCTAssertEqual(ShareTitleParser.watchLink(from: url),
+                       "https://watch.amazon.com/detail?gti=amzn1.dv.gti.a314b20c-bc97-4fdd-8f15-fe912ab92f7d")
+    }
+
+    func testAmazonGtiOnAnotherHostIsMovedToWatchHost() {
+        let url = URL(string: "https://www.amazon.com/gp/video/detail/amzn1.dv.gti.a314b20c-bc97-4fdd-8f15-fe912ab92f7d?autoplay=0")
+        XCTAssertEqual(ShareTitleParser.watchLink(from: url),
+                       "https://watch.amazon.com/detail?gti=amzn1.dv.gti.a314b20c-bc97-4fdd-8f15-fe912ab92f7d")
+    }
+
+    // An ASIN is not a gti — keeping it would store a link that opens nothing.
+    func testAmazonLinkWithoutGtiIsNotKept() {
+        XCTAssertNil(ShareTitleParser.watchLink(from: URL(string: "https://www.amazon.com/gp/video/detail/B095RFRQNJ/")))
+        XCTAssertNil(ShareTitleParser.watchLink(from: URL(string: "https://www.primevideo.com/detail/0OB9NDUVQKFRSYRSCHT2A784TI")))
+        XCTAssertNil(ShareTitleParser.watchLink(from: URL(string: "https://watch.amazon.com/detail?asin=B095RFRQNJ")))
+    }
+
+    func testOnlyPrimeLinksAreKept() {
+        XCTAssertNil(ShareTitleParser.watchLink(from: URL(string: "https://www.netflix.com/title/81234567")))
+        XCTAssertNil(ShareTitleParser.watchLink(from: URL(string:
+            "https://amazon.com.example.net/detail/amzn1.dv.gti.a314b20c-bc97-4fdd-8f15-fe912ab92f7d")))
+        XCTAssertNil(ShareTitleParser.watchLink(from: nil))
+    }
+
+    // A real title that merely starts with "watching" is untouched.
+    func testPlainTitleIsNotMistakenForUntitledShare() {
+        XCTAssertEqual(ShareTitleParser.parse(text: "Watching the Detectives", url: nil).title,
+                       "Watching the Detectives")
+    }
+
     func testEmptyAndWhitespaceYieldNoTitle() {
         XCTAssertNil(ShareTitleParser.parse(text: "   ", url: nil).title)
         XCTAssertNil(ShareTitleParser.parse(text: nil, url: nil).title)
