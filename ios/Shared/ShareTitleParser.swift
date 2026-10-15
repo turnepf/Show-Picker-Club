@@ -63,6 +63,12 @@ enum ShareTitleParser {
                let r = s.range(of: " on ", options: [.backwards, .caseInsensitive]) {
                 s = String(s[..<r.lowerBound])
             }
+            // Prime Video: "Hey I'm watching The Night Manager. Check it out
+            // now on Prime Video!" leaves "The Night Manager. Check it out now".
+            if let r = s.range(of: "[.!]?\\s*check it out( now)?$",
+                               options: [.regularExpression, .caseInsensitive]) {
+                s = String(s[..<r.lowerBound])
+            }
         }
         s = s.trimmingCharacters(in: titleTrimSet)
         return s.nilIfEmpty
@@ -107,6 +113,7 @@ enum ShareTitleParser {
         "hey thought you'd like", "hey! i thought you'd like",
         "hey i thought you'd like", "i thought you'd like", "thought you'd like",
         "check this out:", "check this out", "check out:", "check out",
+        "hey! i'm watching", "hey, i'm watching", "hey i'm watching",
         "i'm watching", "now watching", "watching", "watch",
         "stream the", "stream:", "stream"
     ]

@@ -100,6 +100,16 @@ final class ShareTitleParserTests: XCTestCase {
         XCTAssertEqual(result.network, "Amazon Prime Video")
     }
 
+    // When Prime's share does name the show, the title comes through.
+    func testPrimeShareNamingTheShowYieldsTitle() {
+        let link = "https://watch.amazon.com/detail?gti=amzn1.dv.gti.5ea9f68d-5bf9-bb34-dc15-2f971f46c793"
+            + "&territory=US&ref_=share_ios_episode&r=web"
+        let raw = "Hey I\u{2019}m watching The Night Manager. Check it out now on Prime Video! " + link
+        let result = ShareTitleParser.parse(text: raw, url: URL(string: link))
+        XCTAssertEqual(result.title, "The Night Manager")
+        XCTAssertEqual(result.network, "Amazon Prime Video")
+    }
+
     func testPrimeShareLinkIsKeptWithoutTrackingTail() {
         let url = URL(string: "https://watch.amazon.com/detail?gti=amzn1.dv.gti.a314b20c-bc97-4fdd-8f15-fe912ab92f7d"
             + "&territory=US&ref_=share_ios_unknown&r=web")
