@@ -45,6 +45,26 @@ check('primevideo.com carrying a gti is moved too',
 // Already correct — must be left exactly alone, not re-wrapped.
 check('a watch.amazon.com URL is returned untouched', normalizeAmazonUrl(WORKING), WORKING);
 
+// What the Prime Video app's share sheet on iPhone hands out: the right host
+// and id, plus a tracking tail. Same link, one shape for every copy.
+check('a share-sheet link keeps its gti and drops the tracking tail',
+  normalizeAmazonUrl('https://watch.amazon.com/detail?gti=amzn1.dv.gti.d4bc0a58-139a-abbc-046b-d9ffcd25c463&territory=US&ref_=share_ios_unknown&r=web'),
+  WORKING);
+
+check('a gti that is not the first parameter is still found',
+  normalizeAmazonUrl('https://watch.amazon.com/detail?ref_=share_ios_unknown&gti=amzn1.dv.gti.d4bc0a58-139a-abbc-046b-d9ffcd25c463'),
+  WORKING);
+
+// On watch.amazon.com only the gti parameter counts — an id sitting in some
+// other parameter is not the page's id.
+const WATCH_NO_GTI = 'https://watch.amazon.com/detail?asin=B08WJQ3XP5';
+check('a watch.amazon.com URL with no gti parameter is left alone',
+  normalizeAmazonUrl(WATCH_NO_GTI), WATCH_NO_GTI);
+
+const WATCH_ELSEWHERE = 'https://watch.amazon.com/detail?ref_=amzn1.dv.gti.d4bc0a58-139a-abbc-046b-d9ffcd25c463';
+check('a gti outside the gti parameter is not promoted on watch.amazon.com',
+  normalizeAmazonUrl(WATCH_ELSEWHERE), WATCH_ELSEWHERE);
+
 // The important refusals. An ASIN is not a gti: Amazon rejects it in the gti
 // parameter, so rewriting one would manufacture a dead link.
 const ASIN_URL = 'https://www.amazon.com/gp/video/detail/B08WJQ3XP5/';

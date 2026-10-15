@@ -4,6 +4,9 @@ import ShowPickerCore
 struct ShareComposeView: View {
     let onComplete: () -> Void
     let onCancel:   () -> Void
+    // A Prime Video link from the share, already in the one shape that opens
+    // the show (ShareTitleParser.watchLink). Not shown — it rides along.
+    let watchLink:  String?
 
     @State private var title:   String
     @State private var network: String
@@ -13,10 +16,11 @@ struct ShareComposeView: View {
     @State private var saving = false
     @State private var errorText: String?
 
-    init(suggestedTitle: String, suggestedNetwork: String?,
+    init(suggestedTitle: String, suggestedNetwork: String?, watchLink: String? = nil,
          onComplete: @escaping () -> Void, onCancel: @escaping () -> Void) {
         self.onComplete = onComplete
         self.onCancel   = onCancel
+        self.watchLink  = watchLink
         _title   = State(initialValue: suggestedTitle)
         _network = State(initialValue: suggestedNetwork ?? "")
     }
@@ -73,8 +77,13 @@ struct ShareComposeView: View {
         let t   = title.trimmingCharacters(in: .whitespaces)
         let net = network.trimmingCharacters(in: .whitespaces).nilIfEmpty
         let n   = notes.trimmingCharacters(in: .whitespaces).nilIfEmpty
+        // The link is Prime's. If the member changed the service, it isn't
+        // theirs any more — and the server lets a link's site outrank the
+        // service field, so sending it would quietly undo their change.
+        let link = net == "Amazon Prime Video" ? watchLink : nil
         do {
             try await ShareAPI.addShow(memberSlug: slug, title: t, network: net,
+                                       networkURL: link,
                                        list: list.rawValue, notes: n, movie: movie)
             onComplete()
         } catch ShareAPI.APIError.notLoggedIn {

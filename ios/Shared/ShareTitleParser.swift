@@ -35,6 +35,12 @@ enum ShareTitleParser {
     static func cleanTitle(_ raw: String, network: String?) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        // Prime Video's share never names the show — "Hey, I'm watching this
+        // video. Check it out now on Prime Video. https://…" — and every
+        // strip below would still leave a sentence. No title beats a wrong
+        // one: the member types it, and the link carries the show.
+        if isUntitledShare(trimmed) { return nil }
+
         // A quoted span is the exact title in every Netflix-style share.
         if let quoted = firstQuoted(in: trimmed) { return quoted }
 
@@ -185,6 +191,44 @@ enum ShareTitleParser {
             return nil
         }
         return url
+    }
+
+    // Share sentences that carry no title at all, normalized like leadingVerbs.
+    private static let untitledShares = [
+        "i'm watching this video",
+        "i am watching this video",
+    ]
+
+    private static func isUntitledShare(_ text: String) -> Bool {
+        let lower = normalizedForMatch(text)
+        return untitledShares.contains { lower.hasPrefix($0) || lower.hasPrefix("hey, \($0)") || lower.hasPrefix("hey \($0)") }
+    }
+
+    // The Watch link worth keeping from a share, or nil. Only Prime Video's,
+    // and only one carrying a gti: Amazon publishes a title under several
+    // hosts, and only watch.amazon.com/detail?gti=… opens the Prime Video app
+    // on the show (functions/_shared/amazon-urls.js has the device test). The
+    // Prime share sheet hands out exactly that id, which nothing else gives
+    // us for a show whose stored link is an ASIN. Rebuilt from the id alone,
+    // so the share sheet's tracking tail never reaches the server.
+    static func watchLink(from url: URL?) -> String? {
+        guard let url else { return nil }
+        let host = (url.host ?? "").lowercased()
+        let isAmazon = host == "amazon.com" || host.hasSuffix(".amazon.com")
+            || host == "primevideo.com" || host.hasSuffix(".primevideo.com")
+        guard isAmazon else { return nil }
+        let source: String
+        if host == "watch.amazon.com" {
+            source = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "gti" })?.value ?? ""
+        } else {
+            source = url.absoluteString
+        }
+        // Hex and dashes only, so an ASIN or a primevideo.com opaque id is
+        // never mistaken for one — same bound as the server's.
+        guard let r = source.range(of: "amzn1\\.dv\\.gti\\.[0-9a-fA-F][0-9a-fA-F-]{7,63}",
+                                   options: .regularExpression) else { return nil }
+        return "https://watch.amazon.com/detail?gti=\(source[r])"
     }
 
     // Map the share URL's hostname to one of the app's canonical network names.

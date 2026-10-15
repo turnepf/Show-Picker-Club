@@ -9,11 +9,12 @@ class ShareViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        extractSharedContent { [weak self] title, network in
+        extractSharedContent { [weak self] title, network, link in
             guard let self else { return }
             let compose = ShareComposeView(
                 suggestedTitle:   title   ?? "",
                 suggestedNetwork: network,
+                watchLink:        link,
                 onComplete: { [weak self] in
                     self?.extensionContext?.completeRequest(returningItems: nil)
                 },
@@ -30,11 +31,11 @@ class ShareViewController: UIViewController {
         }
     }
 
-    // Pull title and network out of the NSExtensionItem the source app handed us,
-    // then normalize via ShareTitleParser.
-    private func extractSharedContent(completion: @escaping (String?, String?) -> Void) {
+    // Pull title, network and (Prime only) a Watch link out of the
+    // NSExtensionItem the source app handed us, normalized via ShareTitleParser.
+    private func extractSharedContent(completion: @escaping (String?, String?, String?) -> Void) {
         guard let items = extensionContext?.inputItems as? [NSExtensionItem] else {
-            DispatchQueue.main.async { completion(nil, nil) }
+            DispatchQueue.main.async { completion(nil, nil, nil) }
             return
         }
 
@@ -51,9 +52,10 @@ class ShareViewController: UIViewController {
                 $0.hasItemConformingToTypeIdentifier(UTType.url.identifier)
             }) {
                 provider.loadItem(forTypeIdentifier: UTType.url.identifier) { value, _ in
-                    let parsed = ShareTitleParser.parse(text: candidateTitle,
-                                                        url: value as? URL)
-                    DispatchQueue.main.async { completion(parsed.title, parsed.network) }
+                    let url    = value as? URL
+                    let parsed = ShareTitleParser.parse(text: candidateTitle, url: url)
+                    let link   = ShareTitleParser.watchLink(from: url)
+                    DispatchQueue.main.async { completion(parsed.title, parsed.network, link) }
                 }
                 return
             }
@@ -68,18 +70,19 @@ class ShareViewController: UIViewController {
                     let text   = (value as? String).flatMap { $0.nilIfEmpty } ?? candidateTitle
                     let url    = text.flatMap { ShareTitleParser.firstURL(in: $0) }
                     let parsed = ShareTitleParser.parse(text: text, url: url)
-                    DispatchQueue.main.async { completion(parsed.title, parsed.network) }
+                    let link   = ShareTitleParser.watchLink(from: url)
+                    DispatchQueue.main.async { completion(parsed.title, parsed.network, link) }
                 }
                 return
             }
 
             if candidateTitle != nil {
                 let parsed = ShareTitleParser.parse(text: candidateTitle, url: nil)
-                DispatchQueue.main.async { completion(parsed.title, parsed.network) }
+                DispatchQueue.main.async { completion(parsed.title, parsed.network, nil) }
                 return
             }
         }
-        DispatchQueue.main.async { completion(nil, nil) }
+        DispatchQueue.main.async { completion(nil, nil, nil) }
     }
 }
 

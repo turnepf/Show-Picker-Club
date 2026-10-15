@@ -47,9 +47,18 @@ export function normalizeAmazonUrl(url) {
 
   const host = parsed.hostname.toLowerCase();
   if (!AMAZON_HOST.test(host)) return url;
-  if (host === 'watch.amazon.com') return url;
 
-  const found = GTI.exec(url);
+  // On watch.amazon.com the id has to come from the gti parameter itself, not
+  // from anywhere in the string. The Prime Video app's share sheet hands out
+  //
+  //   https://watch.amazon.com/detail?gti=amzn1.dv.gti.…&territory=US&ref_=share_ios_unknown&r=web
+  //
+  // and the tracking tail is dropped so every copy carries one clean link. A
+  // watch.amazon.com URL with no gti parameter is some other page and is left
+  // alone.
+  const found = host === 'watch.amazon.com'
+    ? GTI.exec(parsed.searchParams.get('gti') || '')
+    : GTI.exec(url);
   if (!found) return url;
 
   return `https://watch.amazon.com/detail?gti=${found[0]}`;
