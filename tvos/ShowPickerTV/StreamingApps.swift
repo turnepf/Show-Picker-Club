@@ -229,6 +229,26 @@ enum StreamingApps {
                               url: "paramountplus://shows/lioness"),
                  ],
                  note: "Reported broken since Nov 2023"),
+        // The Apple TV app as a router, for the service whose own app accepts
+        // nothing we send it. A tv.apple.com link opens Apple's TV app on the
+        // show (the Ted Lasso control proves that leg), and Paramount+ is one
+        // of the apps the TV app hands off to — so the question is the second
+        // leg: does its page offer a Play / Open in Paramount+ that lands on
+        // the show? A green dot only proves the first leg; press through on
+        // the TV app's page to answer the second.
+        //
+        // Two titles so one show's licensing can't decide it. The umc ids are
+        // Apple's, read off tv.apple.com 10/18/2026; nothing in the club
+        // stores them yet — if this works, sourcing them per title is the
+        // follow-up.
+        ShowLink(service: "Paramount+", title: "via Apple TV app",
+                 candidates: [
+                    Candidate(label: "Lioness",
+                              url: "https://tv.apple.com/us/show/lioness/umc.cmc.2nwpw31kplbh2q575x24geppc"),
+                    Candidate(label: "Landman",
+                              url: "https://tv.apple.com/us/show/landman/umc.cmc.9gtas60fo4e05xjp1fgm9nyu"),
+                 ],
+                 note: "Green = TV app opened; then press Play — does Paramount+ land on the show?"),
     ]
 
     // The service a stored network URL belongs to, or nil when we have no
