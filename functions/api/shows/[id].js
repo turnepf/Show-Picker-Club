@@ -381,11 +381,12 @@ export async function onRequestPut(context) {
   if (mayLookUp && finalNetwork && (networkChanged || onPlaceholder)) {
     // Propagates only to copies of the same TMDB entry: a same-titled row
     // pinned to a different entry streams a different show.
-    const same = sameShowWhere('shows', enriched.tmdbId
+    const pinned = enriched.tmdbId
       ? { tmdb_id: enriched.tmdbId, tmdb_type: enriched.tmdbType }
-      : { tmdb_id: existing.tmdb_id, tmdb_type: existing.tmdb_type, movie: existing.movie }, { hasTitle: false });
+      : { tmdb_id: existing.tmdb_id, tmdb_type: existing.tmdb_type, movie: existing.movie };
+    const same = sameShowWhere('shows', pinned, { hasTitle: false });
     context.waitUntil((async () => {
-      const realUrl = await lookupWatchmodeUrl(env, title, finalNetwork, !!movie);
+      const realUrl = await lookupWatchmodeUrl(env, title, finalNetwork, !!movie, pinned);
       if (realUrl) {
         await env.DB.prepare(
           // Scoped to copies naming the SAME service, not merely the same

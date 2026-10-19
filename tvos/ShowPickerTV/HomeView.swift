@@ -44,8 +44,8 @@ struct HomeView: View {
                             signedOutPitch
                         }
 
-                        // Attribution required by the TMDB API terms.
-                        Text("Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.")
+                        // Attribution required by the TMDB and Watchmode (free plan) API terms.
+                        Text("Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming links from Watchmode.")
                             .font(.system(size: 18))
                             .foregroundColor(Theme.muted)
                             .frame(maxWidth: .infinity, alignment: .center)

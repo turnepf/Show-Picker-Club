@@ -353,9 +353,9 @@ struct IPadHomeView: View {
                         .listRowInsets(EdgeInsets())
                 }
             }
-            // Attribution required by the TMDB API terms; OMDb credited too.
+            // Attribution required by the TMDB and Watchmode (free plan) API terms.
             Section {
-                Text("Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.")
+                Text("Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming links from Watchmode.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

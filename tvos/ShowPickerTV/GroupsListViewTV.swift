@@ -23,7 +23,7 @@ struct GroupsListViewTV: View {
 
                 content
 
-                Text("Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.")
+                Text("Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming links from Watchmode.")
                     .font(.system(size: 18))
                     .foregroundColor(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .center)

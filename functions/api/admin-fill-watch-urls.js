@@ -23,7 +23,7 @@ const SHOW_KEY = showKeySql('shows');
 // placeholder URL. Each successful lookup updates every member's same-
 // titled active row so the URL propagates immediately.
 //
-// Watchmode free tier: 1000 requests/month. Each candidate uses ~2 calls
+// Watchmode free tier: 2,500 requests/month. Each candidate uses ~2 calls
 // (search + sources). Use the `limit` body field to keep test runs small.
 //
 // Gated by the operator's session — pass the session cookie (grab it from

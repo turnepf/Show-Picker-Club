@@ -311,7 +311,7 @@
       }
       /* TMDB is the sole enrichment source (OMDB retired 2026-07), so the
          credit names it alone — same wording as index.html's sidebar. */
-      html += '<p class="ios-footnote">Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>';
+      html += '<p class="ios-footnote">Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming links from Watchmode.</p>';
       side.querySelector('.shell-groups').innerHTML = html;
 
       var badge = document.getElementById('shellRateBacklogBadge');
