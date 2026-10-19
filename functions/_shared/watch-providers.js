@@ -3,7 +3,10 @@ import { normalizeAmazonUrl } from './amazon-urls.js';
 import { normalizeHboMaxUrl } from './hbomax-urls.js';
 
 // Looks up a real streaming-service deep link for a (title, network) pair
-// via Watchmode's API. Used both at insert time (so new shows land with
+// via Watchmode's API. A row pinned to a TMDB entry is looked up by that
+// entry, which Watchmode indexes; only a row TMDB never matched falls back to
+// a name search, whose first hit is a guess among every show of that name
+// (a remake and its original, say). Same rule as admin-fill-watch-urls.js. Used both at insert time (so new shows land with
 // real URLs without the member ever needing to paste one) and by the
 // admin bulk-fill endpoint.
 //
@@ -14,7 +17,7 @@ import { normalizeHboMaxUrl } from './hbomax-urls.js';
 //   - Any network error
 //
 // Never throws — callers can use it inside ctx.waitUntil without wrapping.
-// Each call burns ~2 Watchmode requests (free tier = 1000/month).
+// Each call burns ~2 Watchmode requests (free tier = 2,500/month).
 //
 // Region defaults to US but is configurable via WATCHMODE_REGION so the
 // integration can serve other countries later without code changes — the
@@ -22,19 +25,21 @@ import { normalizeHboMaxUrl } from './hbomax-urls.js';
 // Auth uses the X-API-Key header (Watchmode's recommended scheme for new
 // integrations) rather than an apiKey query param.
 
-export async function lookupWatchmodeUrl(env, title, network, isMovie) {
+export async function lookupWatchmodeUrl(env, title, network, isMovie, pin = {}) {
   if (!env.WATCHMODE_API_KEY) return null;
-  if (!title || !network) return null;
+  if (!network || (!title && !pin.tmdb_id)) return null;
   const headers = { 'X-API-Key': env.WATCHMODE_API_KEY };
   const region = env.WATCHMODE_REGION || 'US';
   const types = isMovie ? 'movie' : 'tv_series,tv_miniseries';
+  const tmdbType = pin.tmdb_type || (isMovie ? 'movie' : 'tv');
+  const searchUrl = pin.tmdb_id
+    ? `https://api.watchmode.com/v1/search/?search_field=${tmdbType === 'movie' ? 'tmdb_movie_id' : 'tmdb_tv_id'}` +
+      `&search_value=${encodeURIComponent(pin.tmdb_id)}`
+    : `https://api.watchmode.com/v1/search/?search_field=name` +
+      `&search_value=${encodeURIComponent(title)}&types=${types}`;
 
   try {
-    const searchRes = await fetch(
-      `https://api.watchmode.com/v1/search/?search_field=name` +
-      `&search_value=${encodeURIComponent(title)}&types=${types}`,
-      { headers }
-    );
+    const searchRes = await fetch(searchUrl, { headers });
     if (!searchRes.ok) return null;
     const searchData = await searchRes.json();
     const titleId = searchData.title_results?.[0]?.id;

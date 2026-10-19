@@ -18,12 +18,12 @@
                  rowItemSize="[[280,440],[280,440]]" rowItemSpacing="[[24,34],[24,34]]"
                  rowHeights="[560,560]"
                  vertFocusAnimationStyle="floatingFocus" />
-        <!-- TMDB attribution. It used to sit at the bottom of the screen, where
+        <!-- TMDB and Watchmode attribution (both APIs' terms require it). It used to sit at the bottom of the screen, where
              the second row of the RowList is drawn straight over it — the
              rows scroll, so nothing at the bottom is ever safe. Up beside the
              brand it is always legible and never collides. -->
-        <Label id="footer" text="Data from TMDB" translation="[1570,72]"
-               horizAlign="right" width="260"
+        <Label id="footer" text="Data from TMDB and Watchmode" translation="[1330,72]"
+               horizAlign="right" width="500"
                font="font:SmallestSystemFont" color="0xFFFFFF99" />
         <Label id="empty" text="Loading…" translation="[90,240]"
                font="font:MediumSystemFont" color="0xFFFFFF99" visible="false" />

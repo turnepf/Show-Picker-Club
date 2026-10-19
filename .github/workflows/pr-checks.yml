@@ -93,6 +93,8 @@ jobs:
         run: node scripts/amazon-url-test.mjs
       - name: One Watch link per show per service, written only by trusted sources
         run: node scripts/watch-links-test.mjs
+      - name: Watchmode lookups go by the TMDB entry, not the name
+        run: node scripts/watchmode-lookup-test.mjs
       - name: Favorite actors, the rating backlog, and what counts as trending
         run: node scripts/favorite-actors-test.mjs
       - name: Trending is a daily snapshot served from cache

@@ -247,7 +247,8 @@ export async function onRequestPost(context) {
     // pinned to a different entry streams a different show.
     const same = sameShowWhere('shows', { tmdb_id: enriched.tmdbId, tmdb_type: enriched.tmdbType }, { hasTitle: false });
     context.waitUntil((async () => {
-      const realUrl = await lookupWatchmodeUrl(env, finalTitle, finalNetwork, !!movie);
+      const realUrl = await lookupWatchmodeUrl(env, finalTitle, finalNetwork, !!movie,
+        { tmdb_id: enriched.tmdbId, tmdb_type: enriched.tmdbType });
       if (realUrl) {
         // Copies on the same service only: the link was looked up for
         // finalNetwork, and a copy on another service streams elsewhere
