@@ -1089,6 +1089,11 @@ member could do anyway, and nothing it does may widen what anyone can see.
     group" is a group's content (§13). The demo account and disabled members
     are left out unless the caller asks for the demo.
     Enforcer: `scripts/admin-query-test.mjs`.
+  - **Who was seen, and nothing else about their sessions (2026-10).**
+    `admin_member_activity` returns each member's latest last-seen time,
+    last sign-in and method, and platform names. It never returns a session
+    id, token, email or phone. Like `admin_query`, it leaves out the demo
+    account and disabled members. Enforcer: `scripts/mcp-test.mjs`.
 - **Only a token opens `/mcp`.** A session cookie is ignored there: the
   endpoint takes writes, and a cookie rides along from any page the member
   visits. Tokens are opaque and only their SHA-256 is stored.
