@@ -579,13 +579,47 @@ console.log('\n== an admin who opts in can act on any member');
   const op = await connect(env, 'patrick', { adminBox: true });
   check('ticked, the grant carries members:admin', op.tok.data.scope.split(' ').includes('members:admin'), op.tok.data.scope);
   const opTools = (await rpc(env, op.access, 'tools/list', {})).body.result.tools;
-  check('and the admin tools appear', ['admin_list_members', 'admin_list_member_shows', 'admin_add_show', 'admin_rate_show', 'admin_archive_show']
+  check('and the admin tools appear', ['admin_list_members', 'admin_member_activity', 'admin_list_member_shows', 'admin_add_show', 'admin_rate_show', 'admin_archive_show']
     .every((n) => opTools.some((t) => t.name === n)));
   check('admin rate and archive are marked destructive',
     ['admin_rate_show', 'admin_archive_show'].every((n) => opTools.find((t) => t.name === n).annotations.destructiveHint === true));
 
   const roster = await tool(env, op.access, 'admin_list_members');
   check('the roster includes members outside every group', roster.data.members.some((m) => m.slug === 'stacy'));
+
+  // admin_member_activity: last seen is the latest of the platform stamp,
+  // the session's /auth/check stamp and the last sign-in.
+  addMember(env, 'demo', 'Demo Account');
+  addMember(env, 'gone', 'Gone Member');
+  env._db.prepare("INSERT INTO member_emails (email, member_slug) VALUES ('demo@example.com', 'demo')").run();
+  env.DEMO_LOGIN_EMAIL = 'demo@example.com';
+  env._db.prepare("UPDATE members SET disabled = 1 WHERE slug = 'gone'").run();
+  const seen = env._db.prepare(
+    'INSERT INTO member_platforms (member_slug, platform, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?)');
+  seen.run('stacy', 'ios', '2026-01-01 00:00:00', '2026-10-10 09:00:00');
+  seen.run('stacy', 'web', '2026-01-01 00:00:00', '2026-10-12 18:30:00');
+  seen.run('demo', 'ios', '2026-01-01 00:00:00', '2026-10-12 12:00:00');
+  seen.run('gone', 'web', '2026-01-01 00:00:00', '2026-10-12 12:00:00');
+  env._db.prepare("UPDATE members SET last_login_at = '2026-10-11 08:00:00', last_login_method = 'apple' WHERE slug = 'quinn'").run();
+  env._db.prepare("UPDATE sessions SET last_seen_at = NULL").run();
+
+  const act = await tool(env, op.access, 'admin_member_activity', { since: '2026-10-01' });
+  const slugs = (act.data.members || []).map((m) => m.slug);
+  check('activity lists members seen since, most recent first', !act.isError && slugs.join() === 'stacy,quinn', act.text);
+  const st = act.data.members[0];
+  check('with the latest platform stamp, every platform, name and show count',
+    st.last_seen_at === '2026-10-12 18:30:00' && st.platforms.join() === 'ios,web' && st.name === 'Stacy' && st.shows === 2, JSON.stringify(st));
+  check('a sign-in alone counts as seen, with its method',
+    act.data.members[1].last_seen_at === '2026-10-11 08:00:00' && act.data.members[1].last_login_method === 'apple');
+  check('the demo account, disabled members and the never-seen are left out',
+    !slugs.includes('demo') && !slugs.includes('gone') && !slugs.includes('patrick'));
+  const day = await tool(env, op.access, 'admin_member_activity', { since: '2026-10-11', until: '2026-10-11' });
+  check('a date-only until includes that whole day and stops there', (day.data.members || []).map((m) => m.slug).join() === 'quinn', day.text);
+  const bad = await tool(env, op.access, 'admin_member_activity', { since: 'last tuesday' });
+  check('a date it cannot read is explained', bad.isError && bad.text.includes('YYYY-MM-DD'));
+  const backwards = await tool(env, op.access, 'admin_member_activity', { since: '2026-10-12', until: '2026-10-01' });
+  check('an until before since is refused', backwards.isError);
+  delete env.DEMO_LOGIN_EMAIL;
 
   const theirs = await tool(env, op.access, 'admin_list_member_shows', { member_slug: 'stacy' });
   check("a member's shows are listed with ids", theirs.data.shows.some((x) => x.id === stacyShow));

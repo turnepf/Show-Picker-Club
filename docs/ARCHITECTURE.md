@@ -948,7 +948,11 @@ member's session and records the change in `admin_actions` (migration 074).
 Edits carry the row's own TMDB pin unless they're re-pointing it. Without
 the pin, the edit path re-guesses the entry from the title. `admin_query` is the read-only exception. It
 runs `/api/admin-query` as the admin for club-wide counts, unique titles,
-averages and breakdowns, or the matching rows, in one call. See
+averages and breakdowns, or the matching rows, in one call.
+`admin_member_activity` is the other read: who was last seen in a window
+(`since`, optional `until`), from `member_platforms.last_seen_at`,
+`sessions.last_seen_at` and `members.last_login_at`, with names and show
+counts from `/api/members`. Those are last-seen times, not a history. See
 `docs/INVARIANTS.md` §27.
 
 Deliberately absent: invite redemption, group rename/delete, household,

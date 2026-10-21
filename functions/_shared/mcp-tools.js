@@ -46,6 +46,7 @@ import { setWatchLink } from './watch-links.js';
 import { fieldGuide, QUERY_FIELDS, GROUP_FIELDS, COLUMN_FIELDS, QUERY_OPS, MAX_GROUPS, MAX_ROWS } from './show-query.js';
 import { actingAs } from './auth.js';
 import { groupMates } from './watchers.js';
+import { demoMemberSlug } from './demo.js';
 
 // Per member per UTC day. Only changes and TMDB-backed searches are capped:
 // reads are D1-only and cost the operator nothing upstream, and a cap that
@@ -736,6 +737,65 @@ export const TOOLS = [
     },
   },
   {
+    // Who has used the app in a window. Names and show counts come from the
+    // same /api/members call as admin_list_members; the timestamps are read
+    // here because no endpoint returns them. last_seen is the latest of
+    // member_platforms.last_seen_at (stamped by getSession on every signed-in
+    // request from an app or the web), sessions.last_seen_at (/auth/check)
+    // and members.last_login_at, all in datetime('now') form. They are "last"
+    // times, not a history, so a window that ends in the past misses anyone
+    // seen again since; the description says so.
+    name: 'admin_member_activity',
+    title: 'Member activity (admin)',
+    description: 'Members last seen using Show Picker Club (any app or the web) in a window, most recent first, with their slug, display name, last_seen_at (UTC), last sign-in and method, platforms used, and show count. The demo account and disabled members are left out. Each member has one last-seen time, so with until in the past a member seen again after it is not listed. Admin connections only.',
+    scope: 'members:admin',
+    annotations: R,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        since: { type: 'string', description: 'Start, inclusive: YYYY-MM-DD or an ISO date-time (UTC).' },
+        until: { type: 'string', description: 'End: YYYY-MM-DD includes that whole day; a date-time is exclusive. Default now.' },
+      },
+      required: ['since'],
+    },
+    async run(ctx, args) {
+      const since = activityBound(strArg(args, 'since', { required: true, max: 40 }), 'since');
+      const untilArg = strArg(args, 'until', { max: 40 });
+      const until = untilArg ? activityBound(untilArg, 'until', { endOfDay: true }) : null;
+      if (until && until <= since) throw new ToolError('until must be after since.');
+
+      const demo = await demoMemberSlug(ctx.env);
+      const { results } = await ctx.env.DB.prepare(
+        `SELECT m.slug, m.last_login_at, m.last_login_method,
+                (SELECT MAX(last_seen_at) FROM member_platforms WHERE member_slug = m.slug) AS app_seen,
+                (SELECT GROUP_CONCAT(platform, ',') FROM member_platforms WHERE member_slug = m.slug) AS platforms,
+                (SELECT MAX(last_seen_at) FROM sessions WHERE member_slug = m.slug) AS session_seen
+           FROM members m
+          WHERE COALESCE(m.disabled, 0) = 0 AND m.slug <> ?`
+      ).bind(demo || '').all();
+      const { members } = await ok(ctx, membersApi.onRequestGet, { path: '/api/members' });
+      const roster = new Map((members || []).map((m) => [m.slug, m]));
+
+      const active = [];
+      for (const r of results) {
+        const seen = [r.app_seen, r.session_seen, r.last_login_at].filter(Boolean).sort().pop();
+        if (!seen || seen < since || (until && seen >= until)) continue;
+        const m = roster.get(r.slug) || {};
+        active.push({
+          slug: r.slug,
+          name: m.display_name || m.name,
+          last_seen_at: seen,
+          last_login_at: r.last_login_at || null,
+          last_login_method: r.last_login_method || null,
+          platforms: r.platforms ? r.platforms.split(',').sort() : [],
+          shows: m.show_count ?? undefined,
+        });
+      }
+      active.sort((a, b) => (a.last_seen_at < b.last_seen_at ? 1 : a.last_seen_at > b.last_seen_at ? -1 : 0));
+      return { since, until: until || null, count: active.length, members: active };
+    },
+  },
+  {
     name: 'admin_list_member_shows',
     title: "List a member's shows (admin)",
     description: "Any member's shows, archived ones included when asked, with show_id and their rating. Private notes, recommended-by and watching-with are left out. Admin connections only.",
@@ -1088,6 +1148,17 @@ async function targetMember(ctx, args) {
   ).bind(slug).first();
   if (!m || m.disabled) throw new ToolError(`No active member with the slug "${slug}". admin_list_members has them all.`);
   return m;
+}
+
+// A date or date-time as SQLite's datetime('now') text, so it compares
+// byte-wise against the stored timestamps. A bare date as an upper bound
+// means the end of that day.
+function activityBound(value, name, { endOfDay = false } = {}) {
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const d = new Date(dateOnly ? `${value}T00:00:00Z` : value);
+  if (Number.isNaN(d.getTime())) throw new ToolError(`${name} must be a date (YYYY-MM-DD) or an ISO date-time.`);
+  if (dateOnly && endOfDay) d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 19).replace('T', ' ');
 }
 
 // A ctx whose session is the target member's, so the handlers' owner checks
