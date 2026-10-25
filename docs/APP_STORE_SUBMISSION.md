@@ -345,6 +345,27 @@ Store Connect writes are blocked, so it hands him the line.
 **8. After it ships:** move the version's section in `docs/RELEASE_NOTES.md`
 under its release date and open a fresh *Unreleased*.
 
+## 6c. Custom product pages
+
+A custom product page is a second App Store page for the same app, with its own
+screenshots and promotional text, reached only by its own `?ppid=` URL (ads, or
+a link aimed at one audience). It needs no app release, but each version goes
+through App Review on its own.
+
+```bash
+node scripts/asc.mjs custom-page 'iPhone Duo' promo.txt --set APP_IPHONE_DUO open.png folded.png --set APP_IPHONE_65 a.png --replace
+```
+
+Finds the page by name or creates it, writes the en-US promotional text (170
+characters max) and fills each `--set`. A page whose last version was approved
+gets a new one. Sending it to review is done in the web UI: the page → **Add
+for Review**.
+
+Pages so far:
+
+- **iPhone Duo** (created 2026-10-25): the three live Duo screenshots,
+  unfolded first, then the regular iPhone 6.5" and iPad 13" sets.
+
 ## 7. The marketing site's App Store link
 
 The web member app was removed in 2026-08, so there is no longer a banner
