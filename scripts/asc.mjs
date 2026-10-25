@@ -17,6 +17,7 @@
 //   node scripts/asc.mjs create-version 1.6
 //   node scripts/asc.mjs submit 1.6 --confirm
 //   node scripts/asc.mjs screenshots 1.6.2 APP_IPHONE_DUO a.png b.png --replace
+//   node scripts/asc.mjs custom-page 'iPhone Duo' promo.txt --set APP_IPHONE_DUO a.png --replace
 //
 // Sending a version to review is a person's decision. `submit` exists so that
 // decision doesn't need a browser, but it only runs with --confirm, refuses a
@@ -265,10 +266,7 @@ function pngSize(file) {
   return `${b.readUInt32BE(16)}x${b.readUInt32BE(20)}`;
 }
 
-async function cmdScreenshots(versionString, displayType, files, { platform = 'IOS', replace = false } = {}) {
-  if (!versionString || !displayType || !files.length) {
-    die('usage: screenshots <version> <DISPLAY_TYPE> <file.png>... [--replace] [--platform IOS|MAC_OS|TV_OS]');
-  }
+function checkScreenshots(displayType, files) {
   if (files.length > 10) die(`Apple takes at most 10 screenshots per set (got ${files.length})`);
   const sizes = SCREENSHOT_SIZES[displayType];
   for (const f of files) {
@@ -277,20 +275,34 @@ async function cmdScreenshots(versionString, displayType, files, { platform = 'I
     if (!size) die(`${f} is not a PNG`);
     if (sizes && !sizes.includes(size)) die(`${f} is ${size}; ${displayType} takes ${sizes.join(', ')}`);
   }
+}
+
+async function cmdScreenshots(versionString, displayType, files, { platform = 'IOS', replace = false } = {}) {
+  if (!versionString || !displayType || !files.length) {
+    die('usage: screenshots <version> <DISPLAY_TYPE> <file.png>... [--replace] [--platform IOS|MAC_OS|TV_OS]');
+  }
+  checkScreenshots(displayType, files);
   const v = (await versions(versionString)).find(r => r.attributes.platform === platform);
   if (!v) die(`No ${platform} version record for ${versionString}`);
   const locs = await get(`/v1/appStoreVersions/${v.id}/appStoreVersionLocalizations?fields[appStoreVersionLocalizations]=locale`);
   const loc = (locs.data || []).find(l => l.attributes.locale === 'en-US');
   if (!loc) die(`${platform} ${versionString} has no en-US page`);
+  await fillScreenshotSet({ type: 'appStoreVersionLocalizations', id: loc.id }, displayType, files, replace);
+}
 
-  const sets = await get(`/v1/appStoreVersionLocalizations/${loc.id}/appScreenshotSets?limit=50`);
+// One display type's set on a localization — a version's en-US page, or a
+// custom product page's — created if missing, emptied first with `replace`.
+// The relationship is the localization's type in the singular.
+async function fillScreenshotSet(loc, displayType, files, replace) {
+  const rel = loc.type.replace(/s$/, '');
+  const sets = await get(`/v1/${loc.type}/${loc.id}/appScreenshotSets?limit=50`);
   let set = (sets.data || []).find(x => x.attributes.screenshotDisplayType === displayType);
   if (!set) {
     set = (await call('POST', '/v1/appScreenshotSets', {
       data: {
         type: 'appScreenshotSets',
         attributes: { screenshotDisplayType: displayType },
-        relationships: { appStoreVersionLocalization: { data: { type: 'appStoreVersionLocalizations', id: loc.id } } },
+        relationships: { [rel]: { data: { type: loc.type, id: loc.id } } },
       },
     })).data;
     console.log(`  created the ${displayType} set`);
@@ -335,6 +347,91 @@ async function cmdScreenshots(versionString, displayType, files, { platform = 'I
     }
     console.log(`  ${name} (${pngSize(f)}): ${state}`);
   }
+}
+
+// A custom product page: an alternate App Store page with its own screenshots
+// and promotional text, reached by its own URL (ads, a link on a page aimed at
+// one audience). Finds the page by name or creates it, then writes the en-US
+// promotional text and each --set's screenshots onto its editable version. A
+// page with none in progress (its last one approved) gets a new version.
+// Rerunning with --replace is safe. Sending it to review is left to the web UI
+// (App Store Connect → the page → Add for Review), like `submit` it is a
+// person's decision.
+const CPP_EDITABLE = new Set(['PREPARE_FOR_SUBMISSION', 'REJECTED']);
+
+async function cmdCustomPage(name, promoFile, sets, replace) {
+  if (!name || !promoFile || !sets.length) {
+    die('usage: custom-page <name> <promo.txt> --set <DISPLAY_TYPE> <file.png>... [--set ...] [--replace]');
+  }
+  const promo = fs.readFileSync(promoFile, 'utf8').trim();
+  if (promo.length > 170) die(`Promotional text is ${promo.length} chars, over Apple's 170 cap`);
+  for (const s of sets) {
+    if (!s.files.length) die(`--set ${s.type} names no files`);
+    checkScreenshots(s.type, s.files);
+  }
+
+  const pages = await get(`/v1/apps/${APP_ID}/appCustomProductPages?limit=200`);
+  let page = (pages.data || []).find(p => p.attributes.name === name);
+  if (!page) {
+    page = (await call('POST', '/v1/appCustomProductPages', {
+      data: {
+        type: 'appCustomProductPages',
+        attributes: { name },
+        relationships: {
+          app: { data: { type: 'apps', id: APP_ID } },
+          appCustomProductPageVersions: { data: [{ type: 'appCustomProductPageVersions', id: '${v}' }] },
+        },
+      },
+      included: [
+        {
+          type: 'appCustomProductPageVersions', id: '${v}',
+          relationships: { appCustomProductPageLocalizations: { data: [{ type: 'appCustomProductPageLocalizations', id: '${l}' }] } },
+        },
+        { type: 'appCustomProductPageLocalizations', id: '${l}', attributes: { locale: 'en-US', promotionalText: promo } },
+      ],
+    })).data;
+    console.log(`created custom product page "${name}"`);
+  } else {
+    console.log(`found custom product page "${name}"`);
+  }
+
+  const vers = await get(`/v1/appCustomProductPages/${page.id}/appCustomProductPageVersions?limit=50`);
+  let ver = (vers.data || []).find(v => CPP_EDITABLE.has(v.attributes.state));
+  if (!ver) {
+    const busy = (vers.data || []).find(v => ['READY_FOR_REVIEW', 'WAITING_FOR_REVIEW', 'IN_REVIEW'].includes(v.attributes.state));
+    if (busy) die(`"${name}" has a version ${busy.attributes.state}; wait for Apple before changing it`);
+    ver = (await call('POST', '/v1/appCustomProductPageVersions', {
+      data: {
+        type: 'appCustomProductPageVersions',
+        relationships: { appCustomProductPage: { data: { type: 'appCustomProductPages', id: page.id } } },
+      },
+    })).data;
+    console.log('  started a new version');
+  }
+
+  const locs = await get(`/v1/appCustomProductPageVersions/${ver.id}/appCustomProductPageLocalizations?limit=50`);
+  let loc = (locs.data || []).find(l => l.attributes.locale === 'en-US');
+  if (!loc) {
+    loc = (await call('POST', '/v1/appCustomProductPageLocalizations', {
+      data: {
+        type: 'appCustomProductPageLocalizations',
+        attributes: { locale: 'en-US', promotionalText: promo },
+        relationships: { appCustomProductPageVersion: { data: { type: 'appCustomProductPageVersions', id: ver.id } } },
+      },
+    })).data;
+  } else if (loc.attributes.promotionalText !== promo) {
+    await call('PATCH', `/v1/appCustomProductPageLocalizations/${loc.id}`, {
+      data: { type: 'appCustomProductPageLocalizations', id: loc.id, attributes: { promotionalText: promo } },
+    });
+  }
+  console.log(`  en-US promotional text: ${promo.length} chars`);
+
+  for (const s of sets) {
+    await fillScreenshotSet({ type: 'appCustomProductPageLocalizations', id: loc.id }, s.type, s.files, replace);
+  }
+  const fresh = await get(`/v1/appCustomProductPages/${page.id}`);
+  console.log(`\n${ver.attributes.state || 'PREPARE_FOR_SUBMISSION'} — add it for review in App Store Connect.`);
+  if (fresh.data.attributes.url) console.log(`URL once approved: ${fresh.data.attributes.url}`);
 }
 
 // The platforms the app ships on, read from its own version history rather
@@ -480,7 +577,19 @@ switch (cmd) {
     await cmdScreenshots(rest[0], rest[1], files, { platform, replace: rest.includes('--replace') });
     break;
   }
+  case 'custom-page': {
+    // --set TYPE a.png b.png --set TYPE2 c.png: each --set starts a new set.
+    const sets = [];
+    for (let j = 2; j < rest.length; j++) {
+      if (rest[j] === '--replace') continue;
+      if (rest[j] === '--set') { sets.push({ type: rest[++j], files: [] }); continue; }
+      if (!sets.length) die(`${rest[j]}: screenshots go after --set <DISPLAY_TYPE>`);
+      sets.at(-1).files.push(rest[j]);
+    }
+    await cmdCustomPage(rest[0], rest[1], sets, rest.includes('--replace'));
+    break;
+  }
   default:
-    console.log('usage: node scripts/asc.mjs <status | create-version <version> | set-notes <version> <file> | attach <version> <build> | upload <file> | submit <version> [--confirm] | screenshots <version> <TYPE> <file>... [--replace]>');
+    console.log('usage: node scripts/asc.mjs <status | create-version <version> | set-notes <version> <file> | attach <version> <build> | upload <file> | submit <version> [--confirm] | screenshots <version> <TYPE> <file>... [--replace] | custom-page <name> <promo.txt> --set <TYPE> <file>... [--replace]>');
     process.exit(cmd ? 1 : 0);
 }
