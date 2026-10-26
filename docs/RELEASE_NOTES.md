@@ -50,7 +50,19 @@ Archive now sits right under the list buttons on a show, and asks before it arch
 Sharing a show from the Prime Video app now saves a Watch link that opens Prime Video right on that show, and fills in the title when Prime's share names it.
 Tubi is in the service list now — free, so it adds nothing to your monthly total.
 A show that shares its name with another — a remake and the original, say — now gets the Watch link for the one you added, not the other.
-Apple TV: put Show Picker Club in your top row and the club's Trending shows appear across the top of the screen when you land on it. Click one to jump straight to it.
+```
+
+---
+
+## 1.6.4 (build 34) — Apple TV only, submitted for review 2026-10-26
+
+**Apple TV only.** The version record is Apple TV's alone; the iPhone/iPad
+work in *Unreleased* above stays there for the next release that includes
+those platforms. Both projects carry 1.6.4 / 34 because the repo keeps them in
+lockstep — iOS simply isn't archived from this one.
+
+```
+Put Show Picker Club in your top row and the club's Trending shows appear across the top of the screen when you land on it. Click one to jump straight to that show.
 ```
 
 ---
