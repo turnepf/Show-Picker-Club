@@ -10,6 +10,16 @@ enum Route: Hashable {
     // it silently.
     case pick(title: String, network: String?, rating: String?, posterUrl: String?, networkUrl: String?)
     case groupDetail(Int)
+
+    // showpickerclub://show/<id>?title=… — a Top Shelf poster (see
+    // ShowPickerTVTopShelf/ContentProvider.swift). "show" is the URL's host.
+    static func showLink(_ url: URL) -> Route? {
+        guard url.scheme?.lowercased() == "showpickerclub", url.host?.lowercased() == "show",
+              let id = Int(url.lastPathComponent) else { return nil }
+        let title = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "title" })?.value ?? ""
+        return .detail(id: id, title: title, network: nil, rating: nil)
+    }
 }
 
 extension View {

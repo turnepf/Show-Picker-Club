@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- Merged into the generated Info.plist (GENERATE_INFOPLIST_FILE stays on).
+     Only what the INFOPLIST_KEY_ build settings can't express lives here. -->
+<dict>
+	<!-- showpickerclub://show/<id> — how a Top Shelf poster opens its show. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>net.patrickturner.showpickerios</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>showpickerclub</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

@@ -13,17 +13,42 @@ This tvOS app ships **bundled with the iOS app as a single universal App Store l
 ```
 tvos/
 ├── ShowPickerTV.xcodeproj/       Xcode project (open this)
-└── ShowPickerTV/                 App sources (synchronized folder)
-    ├── ShowPickerTVApp.swift     App entry point
-    ├── Models.swift              Codable models matching the API JSON
-    ├── API.swift                 Async networking client (view-only endpoints)
-    ├── Theme.swift               Colors + deterministic fallback tile colors
-    ├── HomeView.swift            Popular shelf + members grid
-    ├── MemberView.swift          A member's four lists as horizontal shelves
-    ├── ShowDetailView.swift      Detail + "Watch on …" deep-link button
-    ├── ShowCard.swift            Focusable show tile
-    └── Assets.xcassets/          App icon, top shelf, accent color
+├── ShowPickerTV/                 App sources (synchronized folder)
+│   ├── ShowPickerTVApp.swift     App entry point
+│   ├── Models.swift              Codable models matching the API JSON
+│   ├── API.swift                 Async networking client (view-only endpoints)
+│   ├── Theme.swift               Colors + deterministic fallback tile colors
+│   ├── HomeView.swift            Popular shelf + members grid
+│   ├── MemberView.swift          A member's four lists as horizontal shelves
+│   ├── ShowDetailView.swift      Detail + "Watch on …" deep-link button
+│   ├── ShowCard.swift            Focusable show tile
+│   ├── Info.plist                Merged into the generated plist — the showpickerclub:// URL scheme
+│   └── Assets.xcassets/          App icon, top shelf, accent color
+└── ShowPickerTVTopShelf/         Top Shelf extension (embedded in the app)
+    ├── ContentProvider.swift     Trending posters from /api/popular
+    └── Info.plist
 ```
+
+## Top Shelf
+
+When the app sits in the top row of the Apple TV home screen, focusing it shows
+the club's Trending posters across the top (`ShowPickerTVTopShelf`). The
+extension calls the public `/api/popular` on its own, with no session and no
+`ShowPickerCore`. Clicking a poster opens `showpickerclub://show/<id>?title=…`.
+`RootTabView`'s `.onOpenURL` turns that into Home → show detail
+(`Route.showLink`). The static Top Shelf images in the asset catalog are still
+what tvOS shows before the extension's first load and whenever it returns nil
+(offline, or the request fails).
+
+The extension carries its own `MARKETING_VERSION` (bump it with the app's;
+App Store Connect flags an extension whose short version differs from its
+app's on upload). Its build number is set by the same "Set build number" script phase as
+the app, so those two always match.
+
+To try it in the simulator: run the app once, then move it into the top row
+of the simulated home screen and focus it. If the shelf stays on the static
+image, select the `ShowPickerTVTopShelf` scheme and run it with the Top Shelf
+as its host.
 
 ## Build it (on your Mac)
 
