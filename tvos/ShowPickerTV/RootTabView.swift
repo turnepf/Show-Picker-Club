@@ -68,6 +68,13 @@ struct RootTabView: View {
                 .tag(Tab.account)
         }
         .task { await auth.refresh() }
+        // A Top Shelf poster: open that show on Home, over whatever was
+        // pushed there. Same Trending → detail path a click on Home takes.
+        .onOpenURL { url in
+            guard let route = Route.showLink(url) else { return }
+            selection = .home
+            homePath = NavigationPath([route])
+        }
         // Waking the Apple TV back into the app is using it too: the check
         // stamps the session's last_seen_at, which the member roster sorts on.
         // The answer is discarded so an offline wake can't read as a sign-out.

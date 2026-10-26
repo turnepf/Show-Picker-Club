@@ -8,16 +8,70 @@
 
 /* Begin PBXBuildFile section */
 		CDE59A532FF5B38900CBD097 /* ShowPickerCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDE59A522FF5B38900CBD097 /* ShowPickerCore */; };
+		CDF0D0000000000000000001 /* ShowPickerTVTopShelf.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CDF0D0000000000000000004 /* ShowPickerTVTopShelf.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		CDF0D0000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CDB361612FC7CA68009F34F5 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CDF0D0000000000000000008;
+			remoteInfo = ShowPickerTVTopShelf;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		CDF0D0000000000000000003 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				CDF0D0000000000000000001 /* ShowPickerTVTopShelf.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		CDB361692FC7CA68009F34F5 /* ShowPickerTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShowPickerTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CDF0D0000000000000000004 /* ShowPickerTVTopShelf.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShowPickerTVTopShelf.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		CDF0D0000000000000000006 /* Exceptions for "ShowPickerTV" folder in "ShowPickerTV" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = CDB361682FC7CA68009F34F5 /* ShowPickerTV */;
+		};
+		CDF0D0000000000000000005 /* Exceptions for "ShowPickerTVTopShelf" folder in "ShowPickerTVTopShelf" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = CDF0D0000000000000000008 /* ShowPickerTVTopShelf */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		CDB3616B2FC7CA68009F34F5 /* ShowPickerTV */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CDF0D0000000000000000006 /* Exceptions for "ShowPickerTV" folder in "ShowPickerTV" target */,
+			);
 			path = ShowPickerTV;
+			sourceTree = "<group>";
+		};
+		CDF0D0000000000000000007 /* ShowPickerTVTopShelf */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CDF0D0000000000000000005 /* Exceptions for "ShowPickerTVTopShelf" folder in "ShowPickerTVTopShelf" target */,
+			);
+			path = ShowPickerTVTopShelf;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -31,6 +85,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CDF0D000000000000000000A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -38,6 +99,7 @@
 			isa = PBXGroup;
 			children = (
 				CDB3616B2FC7CA68009F34F5 /* ShowPickerTV */,
+				CDF0D0000000000000000007 /* ShowPickerTVTopShelf */,
 				CDB3616A2FC7CA68009F34F5 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -46,6 +108,7 @@
 			isa = PBXGroup;
 			children = (
 				CDB361692FC7CA68009F34F5 /* ShowPickerTV.app */,
+				CDF0D0000000000000000004 /* ShowPickerTVTopShelf.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -60,11 +123,13 @@
 				CDB361652FC7CA68009F34F5 /* Sources */,
 				CDB361662FC7CA68009F34F5 /* Frameworks */,
 				CDB361672FC7CA68009F34F5 /* Resources */,
+				CDF0D0000000000000000003 /* Embed Foundation Extensions */,
 				CDB3619900000000009F34F5 /* Set build number */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				CDF0D0000000000000000011 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				CDB3616B2FC7CA68009F34F5 /* ShowPickerTV */,
@@ -76,6 +141,29 @@
 			productName = ShowPickerTV;
 			productReference = CDB361692FC7CA68009F34F5 /* ShowPickerTV.app */;
 			productType = "com.apple.product-type.application";
+		};
+		CDF0D0000000000000000008 /* ShowPickerTVTopShelf */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CDF0D000000000000000000D /* Build configuration list for PBXNativeTarget "ShowPickerTVTopShelf" */;
+			buildPhases = (
+				CDF0D0000000000000000009 /* Sources */,
+				CDF0D000000000000000000A /* Frameworks */,
+				CDF0D000000000000000000B /* Resources */,
+				CDF0D000000000000000000C /* Set build number */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				CDF0D0000000000000000007 /* ShowPickerTVTopShelf */,
+			);
+			name = ShowPickerTVTopShelf;
+			packageProductDependencies = (
+			);
+			productName = ShowPickerTVTopShelf;
+			productReference = CDF0D0000000000000000004 /* ShowPickerTVTopShelf.appex */;
+			productType = "com.apple.product-type.tv-app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -90,6 +178,9 @@
 					CDB361682FC7CA68009F34F5 = {
 						CreatedOnToolsVersion = 26.5;
 						LastSwiftMigration = 2650;
+					};
+					CDF0D0000000000000000008 = {
+						CreatedOnToolsVersion = 26.5;
 					};
 				};
 			};
@@ -111,12 +202,20 @@
 			projectRoot = "";
 			targets = (
 				CDB361682FC7CA68009F34F5 /* ShowPickerTV */,
+				CDF0D0000000000000000008 /* ShowPickerTVTopShelf */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		CDB361672FC7CA68009F34F5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CDF0D000000000000000000B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -146,6 +245,26 @@
 			shellPath = /bin/sh;
 			shellScript = "# Automatic build number: build date + git commit count (e.g. 20260623.142).\n# It always increases (the date bumps daily, the commit count within a day),\n# so there is no manual bump before archiving. Overrides CFBundleVersion in the\n# processed (generated) Info.plist. The Info.plist is declared as an input file\n# for this phase so the build system schedules it AFTER plist generation —\n# otherwise it can run first, find no plist, and silently no-op (build stays 1).\nset -eu\nif commits=$(git -C \"$SRCROOT\" rev-list --count HEAD 2>/dev/null) && [ -n \"$commits\" ]; then\n  :\nelse\n  commits=$(date +%H%M)\nfi\nbuild_number=\"$(date +%Y%m%d).$commits\"\nplist=\"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\necho \"note: Set build number phase running (plist=$plist)\"\nif [ -f \"$plist\" ]; then\n  /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $build_number\" \"$plist\" || /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string $build_number\" \"$plist\"\n  echo \"note: set CFBundleVersion = $build_number\"\nelse\n  echo \"warning: Info.plist not found at $plist — build number NOT set\"\nfi\n";
 		};
+		CDF0D000000000000000000C /* Set build number */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			name = "Set build number";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Automatic build number: build date + git commit count (e.g. 20260623.142).\n# It always increases (the date bumps daily, the commit count within a day),\n# so there is no manual bump before archiving. Overrides CFBundleVersion in the\n# processed (generated) Info.plist. The Info.plist is declared as an input file\n# for this phase so the build system schedules it AFTER plist generation —\n# otherwise it can run first, find no plist, and silently no-op (build stays 1).\nset -eu\nif commits=$(git -C \"$SRCROOT\" rev-list --count HEAD 2>/dev/null) && [ -n \"$commits\" ]; then\n  :\nelse\n  commits=$(date +%H%M)\nfi\nbuild_number=\"$(date +%Y%m%d).$commits\"\nplist=\"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\necho \"note: Set build number phase running (plist=$plist)\"\nif [ -f \"$plist\" ]; then\n  /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $build_number\" \"$plist\" || /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string $build_number\" \"$plist\"\n  echo \"note: set CFBundleVersion = $build_number\"\nelse\n  echo \"warning: Info.plist not found at $plist — build number NOT set\"\nfi\n";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -156,7 +275,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CDF0D0000000000000000009 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		CDF0D0000000000000000011 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CDF0D0000000000000000008 /* ShowPickerTVTopShelf */;
+			targetProxy = CDF0D0000000000000000002 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		CDB361722FC7CA69009F34F5 /* Debug */ = {
@@ -294,6 +428,7 @@
 				DEVELOPMENT_TEAM = NQ6AJVVBBJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ShowPickerTV/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Show Picker Club";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -329,6 +464,7 @@
 				DEVELOPMENT_TEAM = NQ6AJVVBBJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ShowPickerTV/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Show Picker Club";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -351,6 +487,53 @@
 			};
 			name = Release;
 		};
+		CDF0D000000000000000000E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 33;
+				DEVELOPMENT_TEAM = NQ6AJVVBBJ;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShowPickerTVTopShelf/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.6.3;
+				PRODUCT_BUNDLE_IDENTIFIER = net.patrickturner.showpickerios.TopShelf;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+			};
+			name = Debug;
+		};
+		CDF0D000000000000000000F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 33;
+				DEVELOPMENT_TEAM = NQ6AJVVBBJ;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShowPickerTVTopShelf/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.6.3;
+				PRODUCT_BUNDLE_IDENTIFIER = net.patrickturner.showpickerios.TopShelf;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -368,6 +551,15 @@
 			buildConfigurations = (
 				CDB361752FC7CA69009F34F5 /* Debug */,
 				CDB361762FC7CA69009F34F5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CDF0D000000000000000000D /* Build configuration list for PBXNativeTarget "ShowPickerTVTopShelf" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CDF0D000000000000000000E /* Debug */,
+				CDF0D000000000000000000F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
