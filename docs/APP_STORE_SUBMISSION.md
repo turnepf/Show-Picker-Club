@@ -363,8 +363,14 @@ for Review**.
 
 Pages so far:
 
-- **iPhone Duo** (created 2026-10-25): the three live Duo screenshots,
-  unfolded first, then the regular iPhone 6.5" and iPad 13" sets.
+- **iPhone Duo** (created 2026-10-25, approved 2026-10-25): the three live
+  Duo screenshots, unfolded first, then the regular iPhone 6.5" and iPad 13"
+  sets. patrickturner.net's "Get it on iPhone Duo" button links it as
+  `?ppid=fd9625f4-7b77-4bd9-b078-51926bbc5350`. Apple's approval email lists
+  a different ID (`c35f0a0b-94f2-4867-acf6-ecb68b38cb07`, submission
+  `662001da-…`), which is probably the page's *version* rather than the page.
+  The `ppid` has to be the page's ID, so check it in App Store Connect if the
+  link ever opens the default listing.
 
 ## 7. The marketing site's App Store link
 
