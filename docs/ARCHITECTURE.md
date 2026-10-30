@@ -703,7 +703,7 @@ before the teardown. The marketing page moved to `public/download.html`.
 | `/groups`, `/vibe`, `/rate-backlog`, `/favorite-actors`, `/subscriptions`, `/calendar`, `/welcome` | their own pages (`/calendar` since 2026-10: the Calendar screen, carrying the webcal Subscribe) |
 | `/members`, `/reporting`, `/url-cleanup`, `/vibe-admin` | the four admin tools |
 | `/privacy`, `/terms`, `/sms` | legal pages, linked from the App Store listing |
-| `/connect`, `/connected-apps` | connecting an AI app to the MCP server, and disconnecting one |
+| `/connect`, `/connected-apps` | connecting an AI app to the MCP server (overview, plus one setup guide per app at `/connect?app=<id>` — same file, kept on the excluded `/connect` path on purpose), and disconnecting one |
 
 ### The catch-all can only point at `/index.html`
 
@@ -892,7 +892,8 @@ block the consent screen from ever handing the member back to Claude.
 Show Picker Club is a remote MCP server at `/mcp` (Streamable HTTP, stateless,
 JSON responses only), so a member can connect Claude, ChatGPT or Claude Code
 and read or change their lists by chatting. `/connect` walks members through
-it; `/connected-apps` (and **AI MCP…** in the iOS/iPad/Mac account menu, **AI MCP** in the web one, `ConnectedAppsView.swift`) lists
+it, with a guide per app (Claude and Claude Code, ChatGPT, Codex, Cursor,
+Gemini CLI, any other) at `/connect?app=<id>`; `/connected-apps` (and **AI MCP…** in the iOS/iPad/Mac account menu, **AI MCP** in the web one, `ConnectedAppsView.swift`) lists
 and revokes connections. The rules are `docs/INVARIANTS.md` §27; the tests are
 `scripts/mcp-test.mjs`. Listing it in Anthropic's Connectors Directory is
 `docs/CONNECTOR_DIRECTORY.md`, and the directory's review rules are why every
