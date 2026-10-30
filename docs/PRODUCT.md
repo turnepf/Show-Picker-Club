@@ -578,9 +578,17 @@ use Show Picker Club by chatting: "what's on my Next Up that's under an
 hour?", "add The Bear to Watching", "I finished Severance — move it to Loved
 and rate it a 9", "what are people in my groups watching that I'm not?".
 
-- **Connecting.** `showpicker.club/connect` has an **Add to Claude** button
-  (Claude's add-connector dialog, pre-filled), the server URL to copy for
-  ChatGPT, and the one-line command for Claude Code. The AI app then sends
+- **Connecting.** `showpicker.club/connect` is the overview — what it does,
+  example prompts, a FAQ, every tool — with a card per app leading to that
+  app's setup guide at `/connect?app=claude` (with a Claude Code tab;
+  `?app=claude-code` opens on it), `chatgpt`, `codex`, `cursor`, `gemini`
+  (the CLI) and `other` (any app with remote MCP + OAuth). Claude gets an
+  **Add to Claude** button (its add-connector dialog, pre-filled), Cursor an
+  install link, the CLIs a copyable command, and every guide the server URL
+  to copy. The guides live on a query string rather than `/connect/claude`
+  because the app-site-association file excludes the exact path `/connect`,
+  and a device holding an older copy of it would open a new path in the iOS
+  app instead of the browser. The AI app then sends
   the member to a Show Picker sign-in and consent screen: it names the app and
   the site it will return to, and **Make changes** can be unticked to connect
   read-only. Signing up there works too — it's the normal sign-in sheet.
