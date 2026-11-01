@@ -2,8 +2,9 @@ name: Monthly duplicate-account check
 
 # Replaces the interactive /members "Possible duplicates" panel (removed
 # 2026-09 on both web and iOS — Patrick decided not to keep worrying about
-# it there). Same two heuristics (shared first names, Apple "Hide My Email"
-# private-relay-only accounts), but run headlessly once a month and emailed
+# it there). Since 2026-11 it flags only members who share a login email
+# (the panel's shared-first-name and relay-only checks were dropped as too
+# noisy at this membership), run headlessly once a month and emailed
 # instead of surfaced as a UI to click through. A pair already recorded in
 # dupe_ignores (by a previous month's run, or by hand) never repeats — see
 # functions/api/admin-dupe-check.js.

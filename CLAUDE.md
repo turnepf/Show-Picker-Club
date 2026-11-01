@@ -661,6 +661,18 @@ account and disabled members stay out. A date filter reads both stored
 timestamp shapes, where a string comparison would drop `datetime('now')`'s.
 
 ```bash
+node scripts/dupe-check-test.mjs
+```
+
+The monthly duplicate-account email (`dupe-check.yml` →
+`/api/admin-dupe-check`). Since 2026-11 its only signal is two accounts
+holding the same login email, compared lowercased with Gmail's dots and
+`+tag` ignored. A shared first name and a Hide My Email-only signup no
+longer flag anything: at this membership both were nearly always two
+different people. A reported pair goes into `dupe_ignores` and never
+repeats.
+
+```bash
 node scripts/admin-fix-tools-test.mjs
 ```
 
