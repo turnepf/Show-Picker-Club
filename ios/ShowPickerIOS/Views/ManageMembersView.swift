@@ -9,9 +9,8 @@ import SwiftUI
 //
 // The "Possible duplicates" panel (heuristic detection + merge/ignore UI)
 // was removed here and on the web — Patrick decided not to keep worrying
-// about it. A monthly GitHub Action now emails him if it finds anything;
-// the merge and ignore endpoints (/api/admin-member-merge,
-// /api/admin-dupe-ignores) still exist server-side for manual use if a
+// about it. The monthly email that replaced it was retired 2026-11 too;
+// /api/admin-member-merge still exists server-side for manual use if a
 // real duplicate turns up, just with no UI trigger anywhere.
 struct ManageMembersView: View {
     @State private var members: [AdminMember] = []
