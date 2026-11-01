@@ -1,17 +1,17 @@
 // Monthly duplicate-account scan, run from GitHub Actions (dupe-check.yml).
 // Ports the heuristic the interactive /members "Possible duplicates" panel
 // used to run in the browser (removed 2026-09 — Patrick decided not to keep
-// worrying about it there) into a headless check: same two signals, same
-// dupe_ignores table, but surfaced as an email instead of a UI to click
-// through. Merging or permanently silencing a pair still works — via
+// worrying about it there) into a headless check: same dupe_ignores table,
+// one signal (two accounts sharing a login email, since 2026-11), surfaced
+// as an email instead of a UI to click through. Merging or permanently silencing a pair still works — via
 // POST /api/admin-member-merge / /api/admin-dupe-ignores — there's just no
 // button anywhere; curl with an admin session cookie.
 //
 //   POST { dry_run?: boolean }
 //
-// A pair (or a lone relay-only account, recorded as a self-pair) already in
-// dupe_ignores is treated as "already flagged" and never re-surfaces or
-// re-emails — that's the whole point of writing found pairs into the same
+// A pair already in dupe_ignores (self-pairs are left over from the
+// retired hidden-email-only check) is treated as "already flagged" and
+// never re-surfaces or re-emails — that's the whole point of writing found pairs into the same
 // table the old ignore button used. There's no way back short of deleting
 // the row directly; that's fine, since re-arming a specific pair is rare and
 // the table is a normal SQLite table.
@@ -22,7 +22,6 @@ import { demoMemberSlug } from '../_shared/demo.js';
 import { sendEmail } from '../_shared/email.js';
 
 const ADMIN_ALERT_EMAIL = 'patrick@patrickturner.net';
-const RELAY_RE = /@privaterelay\.appleid\.com$/i;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -47,10 +46,17 @@ function sortedPair(a, b) {
   return a <= b ? [a, b] : [b, a];
 }
 
-function isRelayOnly(m) {
-  if (m.emails.length) return m.emails.every((e) => RELAY_RE.test(e));
-  // No email at all only happens for external-identity signups.
-  return !!m.enrolled_via && m.phone_count === 0;
+// Gmail ignores dots and anything after a "+" in the local part, so
+// j.doe+tv@gmail.com and jdoe@gmail.com reach the same inbox.
+function normalizeEmail(email) {
+  const e = email.trim().toLowerCase();
+  const at = e.lastIndexOf('@');
+  if (at < 0) return e;
+  let local = e.slice(0, at);
+  let domain = e.slice(at + 1);
+  if (domain === 'googlemail.com') domain = 'gmail.com';
+  if (domain === 'gmail.com') local = local.split('+')[0].replace(/\./g, '');
+  return `${local}@${domain}`;
 }
 
 function displayName(m) {
@@ -72,9 +78,8 @@ export async function onRequestPost(context) {
   const demoSlug = await demoMemberSlug(env);
 
   const { results } = await env.DB.prepare(`
-    SELECT m.slug, m.first_name, m.last_name, m.enrolled_via,
-           (SELECT GROUP_CONCAT(email, ',') FROM member_emails WHERE member_slug = m.slug) AS emails,
-           (SELECT COUNT(*) FROM member_phones WHERE member_slug = m.slug) AS phone_count
+    SELECT m.slug, m.first_name, m.last_name,
+           (SELECT GROUP_CONCAT(email, ',') FROM member_emails WHERE member_slug = m.slug) AS emails
       FROM members m
   `).all();
 
@@ -84,9 +89,7 @@ export async function onRequestPost(context) {
       slug: m.slug,
       first_name: m.first_name,
       last_name: m.last_name,
-      enrolled_via: m.enrolled_via || null,
       emails: m.emails ? m.emails.split(',').filter(Boolean) : [],
-      phone_count: m.phone_count || 0,
     }));
 
   const { results: ignoreRows } = await env.DB.prepare(
@@ -94,42 +97,39 @@ export async function onRequestPost(context) {
   ).all();
   const known = new Set((ignoreRows || []).map((r) => sortedPair(r.slug_a, r.slug_b).join('|')));
 
-  // Group by first name, same as the old panel.
-  const byFirst = new Map();
+  // Group by login email. A shared first name (the old panel's other
+  // signal) is far too common at this size, and a hidden-email-only signup
+  // usually turned out to be a new person rather than a second account —
+  // both were dropped 2026-11. Two accounts holding the same address is the
+  // one signal that names the same person.
+  const byEmail = new Map();
   for (const m of members) {
-    const key = (m.first_name || m.slug).trim().toLowerCase();
-    if (!byFirst.has(key)) byFirst.set(key, []);
-    byFirst.get(key).push(m);
+    for (const e of new Set(m.emails.map(normalizeEmail))) {
+      if (!byEmail.has(e)) byEmail.set(e, []);
+      byEmail.get(e).push(m);
+    }
   }
-  const nameGroups = [...byFirst.values()].filter((g) => g.length > 1);
-  const grouped = new Set(nameGroups.flat().map((m) => m.slug));
 
   const newPairs = []; // every pair to write into dupe_ignores once reported
-  const newFindings = []; // one line per group / lone account, for the email
+  const newFindings = []; // one line per shared address, for the email
+  const queued = new Set();
 
-  for (const group of nameGroups) {
+  for (const [email, group] of byEmail) {
+    if (group.length < 2) continue;
     const pairs = [];
     for (let i = 0; i < group.length; i++) {
       for (let j = i + 1; j < group.length; j++) {
         pairs.push(sortedPair(group[i].slug, group[j].slug));
       }
     }
-    const unknownPairs = pairs.filter((p) => !known.has(p.join('|')));
+    const unknownPairs = pairs.filter((p) => !known.has(p.join('|')) && !queued.has(p.join('|')));
     if (!unknownPairs.length) continue;
+    for (const p of unknownPairs) queued.add(p.join('|'));
     newPairs.push(...unknownPairs);
     newFindings.push(
-      `Shared first name "${group[0].first_name || group[0].slug}": ` +
+      `Shared email ${email}: ` +
       group.map((m) => `${displayName(m)} (@${m.slug})`).join(', ')
     );
-  }
-
-  for (const m of members) {
-    if (grouped.has(m.slug)) continue; // already covered by a name group above
-    if (!isRelayOnly(m)) continue;
-    const pair = [m.slug, m.slug];
-    if (known.has(pair.join('|'))) continue;
-    newPairs.push(pair);
-    newFindings.push(`Hidden-email-only signup: ${displayName(m)} (@${m.slug}) — no other identity on file`);
   }
 
   if (!newFindings.length) {
