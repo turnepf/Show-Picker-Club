@@ -661,18 +661,6 @@ account and disabled members stay out. A date filter reads both stored
 timestamp shapes, where a string comparison would drop `datetime('now')`'s.
 
 ```bash
-node scripts/dupe-check-test.mjs
-```
-
-The monthly duplicate-account email (`dupe-check.yml` →
-`/api/admin-dupe-check`). Since 2026-11 its only signal is two accounts
-holding the same login email, compared lowercased with Gmail's dots and
-`+tag` ignored. A shared first name and a Hide My Email-only signup no
-longer flag anything: at this membership both were nearly always two
-different people. A reported pair goes into `dupe_ignores` and never
-repeats.
-
-```bash
 node scripts/admin-fix-tools-test.mjs
 ```
 
@@ -793,7 +781,7 @@ Apple builds: open `ShowPickerClub.xcworkspace` in Xcode (macOS). iOS + tvOS shi
 
 - **Push to `main` deploys production automatically** (`.github/workflows/deploy.yml`), then smoke-tests: an unknown path must serve the marketing page, `/.env` must expose no environment content, security headers must be present, and auth-gated endpoints must 401. The smoke step retries for ~2 minutes — the edge keeps answering from the previous bundle for a while after `wrangler` returns, so a first-attempt failure means "not propagated yet", not "broken".
 - **`deploy.yml` applies pending D1 migrations automatically**, in the same run, before the Pages deploy step (`scripts/apply-migrations.sh`, self-tracked via `schema_migrations`). Merging a migration in the same PR as the code that depends on it is the normal path and needs no extra operator step. The manual "Apply D1 migration" workflow (Actions tab → pick the file) is only for applying a migration *ahead of* merging its code, or running one against prod outside of a `main` push.
-- Other workflows: daily D1 backup to Google Drive (`backup.yml`), daily demo reset, scheduled enrichment/vibe/watch-URL fills, and a monthly duplicate-account check (`dupe-check.yml`, emails Patrick — see "Possible duplicates" below) — the scheduled ones call admin endpoints with an `X-Cron-Secret` header.
+- Other workflows: daily D1 backup to Google Drive (`backup.yml`), daily demo reset, scheduled enrichment/vibe/watch-URL fills — the scheduled ones call admin endpoints with an `X-Cron-Secret` header.
 
 ## Architecture essentials
 
