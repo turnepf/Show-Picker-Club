@@ -70,11 +70,11 @@ jobs:
     # job wants, given hammering TMDB is what caused the damage.
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # node:sqlite isn't needed here, but the repo's scripts assume a modern
       # Node and this one uses top-level await.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
 
