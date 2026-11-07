@@ -958,7 +958,11 @@ A few intentional omissions:
     page (new
     `?show=<id>` deep link) to rate by season instead. Surfaced as "Rate my
     backlog" alongside Subscription audit in the sidebars and the mobile
-    under-list row.
+    under-list row. A **Show rated shows** checkbox (web) / toggle
+    (iPhone/iPad), off by default and remembered per device, lists rated
+    shows too with their score filled in; rating one then changes it in
+    place rather than removing the row (2026-11, Patrick's ask). The nav
+    badge still counts unrated only.
   - **Native support (shipped in code, not yet archived/submitted):**
     iOS/iPad get full entry + display — a "Ratings" section on
     `ShowDetailView` mirroring the web (TMDB Rating, Show Picker Club Rating, owner's

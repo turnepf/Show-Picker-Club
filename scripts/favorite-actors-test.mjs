@@ -437,6 +437,18 @@ console.log('\n== Rate my backlog includes archived shows');
   const badge = await body(await rateBacklogCount.onRequestGet({ env, request: req('/api/rate-backlog-count', s) }));
   check('the badge counts what the page lists', badge.count === page.shows.length,
         `badge ${badge.count} vs page ${page.shows.length}`);
+  check('an unrated row carries no rating', page.shows.every(x => x.my_rating === null));
+
+  // "Show rated shows": the rated row joins the list with its score; the
+  // exclusions (Next Up, other members) still hold, and the badge doesn't move.
+  const all = await body(await rateBacklog.onRequestGet({ env, request: req('/api/rate-backlog?include_rated=1', s) }));
+  const rated = all.shows.find(x => x.title === 'Rated Archived');
+  check('include_rated lists a rated show', !!rated, all.shows.map(x => x.title).join(','));
+  check('…with its overall rating', rated?.my_rating === 9, `got ${rated?.my_rating}`);
+  check('…and nothing else extra', all.shows.length === page.shows.length + 1,
+        all.shows.map(x => x.title).join(','));
+  const badge2 = await body(await rateBacklogCount.onRequestGet({ env, request: req('/api/rate-backlog-count', s) }));
+  check('the badge still counts unrated only', badge2.count === page.shows.length);
 }
 
 console.log('\n== Trending counts intent, not bookmarks');
