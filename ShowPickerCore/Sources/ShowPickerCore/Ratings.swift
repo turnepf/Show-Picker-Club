@@ -98,6 +98,10 @@ public struct RateBacklogShow: Codable, Identifiable, Sendable {
     // The backlog lists archived shows too. Optional so a payload from before
     // that still decodes.
     public let archived: Int?
+    // The member's overall rating — null for an unrated row. Rated rows only
+    // arrive with ?include_rated=1 ("Show rated shows"). Optional so a payload
+    // from before it still decodes.
+    public let myRating: Int?
 
     public var isMovie: Bool { (movie ?? 0) == 1 }
     public var isArchived: Bool { (archived ?? 0) == 1 }
@@ -106,6 +110,7 @@ public struct RateBacklogShow: Codable, Identifiable, Sendable {
         case id, title, list, movie, archived
         case posterUrl = "poster_url"
         case seasonsReleased = "seasons_released"
+        case myRating = "my_rating"
     }
 }
 

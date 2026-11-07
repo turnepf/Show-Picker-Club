@@ -259,8 +259,13 @@ enum API {
     // further filters out anything with a pending offline rating (see
     // OfflineQueue.pendingRating) so an already-tapped show doesn't
     // reappear before it's actually synced.
-    static func rateBacklog(member: String) async throws -> RateBacklogResponse {
-        try await getCached("/api/rate-backlog", cacheKey: "rate_backlog_\(member)")
+    // `includeRated` is the screen's "Show rated shows" toggle: rated rows
+    // too, each with its score. Cached under its own key so flipping the
+    // toggle offline doesn't hand back the other list.
+    static func rateBacklog(member: String, includeRated: Bool = false) async throws -> RateBacklogResponse {
+        includeRated
+            ? try await getCached("/api/rate-backlog?include_rated=1", cacheKey: "rate_backlog_all_\(member)")
+            : try await getCached("/api/rate-backlog", cacheKey: "rate_backlog_\(member)")
     }
 
     // Just the unrated count, for the "Rate my backlog" nav badge — the same

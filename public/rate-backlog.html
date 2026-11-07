@@ -22,6 +22,8 @@
     .intro { font-size: 13px; color: var(--ink-muted); line-height: 1.5; margin: 0 0 18px; }
     .empty-card { background: var(--surface); border-radius: 10px; padding: 32px; text-align: center; color: var(--ink-muted); font-size: 14px; line-height: 1.6; }
     .err { color: var(--danger-deep); font-size: 13px; text-align: center; padding: 20px; }
+    .show-rated { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); margin: 0 0 16px; cursor: pointer; }
+    .show-rated input { width: 18px; height: 18px; accent-color: var(--tint); margin: 0; }
 
   </style>
 </head>
@@ -32,6 +34,7 @@
       <h1>Rate Your Shows</h1>
     </div>
     <p class="intro">Everything you haven't rated yet, one page — tap a number and it saves instantly, then the show drops off the list. Want to rate a show by season instead of just overall? Tap "Rate seasons" to open its detail page.</p>
+    <label class="show-rated"><input type="checkbox" id="show-rated" onchange="toggleRated(this.checked)"> Show rated shows</label>
     <div id="content"><div class="empty-card">Loading&hellip;</div></div>
     <div class="footer" id="footer"></div>
   </div>
@@ -41,12 +44,27 @@
   <script>
 
     let mySlug = null;
+    // "Show rated shows" — off by default, remembered per browser. With it on,
+    // rated shows are listed with their score and a rating changes in place
+    // instead of removing the row.
+    const SHOW_RATED_KEY = 'rateBacklog.showRated';
+    let showRated = false;
+    try { showRated = localStorage.getItem(SHOW_RATED_KEY) === '1'; } catch {}
+    document.getElementById('show-rated').checked = showRated;
+
+    function toggleRated(on) {
+      showRated = on;
+      try { localStorage.setItem(SHOW_RATED_KEY, on ? '1' : '0'); } catch {}
+      document.getElementById('content').innerHTML = '<div class="empty-card">Loading&hellip;</div>';
+      load();
+    }
     const LIST_LABELS = { watching: 'Watching', waiting: 'Awaiting', recommending: 'Loved' };
 
-    function ratingRowHtml(id) {
+    function ratingRowHtml(id, value) {
       let segs = '';
       for (let i = 1; i <= 10; i++) {
-        segs += `<div class="rating-seg" onclick="rate(${id}, ${i})"></div>`;
+        const filled = value && i <= value ? ' filled' : '';
+        segs += `<div class="rating-seg${filled}" onclick="rate(${id}, ${i})"></div>`;
       }
       return `<div class="rating-row" id="rating-row-${id}">${segs}</div>`;
     }
@@ -66,11 +84,12 @@
       return meta;
     }
 
-    const DONE_MESSAGE = `<div class="empty-card">You've rated everything in your backlog — nice work! Season ratings aren't tracked here; open a show's detail page for those.</div>`;
+    const DONE_MESSAGE = `<div class="empty-card">You've rated everything in your backlog — nice work! Check "Show rated shows" to change a rating. Season ratings aren't tracked here; open a show's detail page for those.</div>`;
 
-    // Only unrated shows are listed (overall rating; season ratings don't
-    // count) — once a show's rated it no longer belongs in this list, so
-    // rate() removes its row instead of just updating it in place.
+    // By default only unrated shows are listed (overall rating; season
+    // ratings don't count) — once a show's rated it no longer belongs in this
+    // list, so rate() removes its row. With "Show rated shows" on, every row
+    // stays and a rating just updates it in place.
     function render(shows, hasAny) {
       const content = document.getElementById('content');
       if (!shows.length) {
@@ -87,7 +106,7 @@
         showRating: false,
         showChevron: false,
         caption: rowMeta(show),
-        extraHtml: ratingRowHtml(show.id),
+        extraHtml: ratingRowHtml(show.id, show.my_rating),
       })).join('') + '</div>';
     }
 
@@ -100,6 +119,7 @@
           body: JSON.stringify({ rating: value }),
         });
         if (!res.ok) { load(); return; }
+        if (showRated) return;
         // Rated — it no longer belongs in this unrated-only list. A short
         // pause so the filled tap-row is visible for a beat before the row
         // leaves, rather than vanishing the instant it's tapped.
@@ -127,7 +147,7 @@
         }
         mySlug = checkData.member;
 
-        const res = await fetch('/api/rate-backlog');
+        const res = await fetch(showRated ? '/api/rate-backlog?include_rated=1' : '/api/rate-backlog');
         if (res.status === 401) {
           content.innerHTML = `<div class="empty-card">
             Log in from your member page first, then come back here to rate your backlog.

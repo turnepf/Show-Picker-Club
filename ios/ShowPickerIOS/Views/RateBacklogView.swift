@@ -7,9 +7,17 @@ import SwiftUI
 // right away or just got queued for offline replay) rather than sticking
 // around showing a score. Season ratings aren't listed here — overall
 // only, by design; "Rate seasons" opens the full detail screen instead.
+//
+// "Show rated shows" (off by default, remembered) lists rated shows too, each
+// with its score, and a rating then changes in place rather than removing the
+// row — same as the web page's checkbox.
 struct RateBacklogView: View {
     @EnvironmentObject private var auth: AuthStore
+    @AppStorage("rateBacklog.showRated") private var showRated = false
     @State private var shows: [RateBacklogShow] = []
+    // Ratings given on this screen while "Show rated shows" is on, so the
+    // tap-row reflects the new score without a reload.
+    @State private var localRatings: [Int: Int] = [:]
     @State private var hasAny = false
     @State private var loading = true
     @State private var loadFailed = false
@@ -27,21 +35,30 @@ struct RateBacklogView: View {
                     hasAny ? "All Rated!" : "Nothing to Rate Yet",
                     systemImage: hasAny ? "checkmark.circle" : "star",
                     description: Text(hasAny
-                        ? "You've rated everything in your backlog. Season ratings aren't tracked here — open a show's detail page for those."
+                        ? "You've rated everything in your backlog. Turn on Show Rated Shows to change a rating. Season ratings aren't tracked here — open a show's detail page for those."
                         : "Add some shows to Watching, Awaiting, or Loved first.")
                 )
             } else {
                 List(shows) { show in
-                    RateBacklogRow(show: show) { value in
+                    RateBacklogRow(show: show,
+                                   value: localRatings[show.id] ?? show.myRating) { value in
                         await rate(show, value: value)
                     }
                 }
                 .listStyle(.plain)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            Toggle("Show Rated Shows", isOn: $showRated)
+                .tint(.accentColor)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(.bar)
+        }
         .navigationTitle("Rate My Shows")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
+        .task(id: showRated) { await load() }
         .alert("Couldn’t Save Rating",
                isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }),
                presenting: errorMessage) { _ in
@@ -52,10 +69,19 @@ struct RateBacklogView: View {
     private func load() async {
         guard let slug = auth.memberSlug else { loading = false; return }
         do {
-            let r = try await API.rateBacklog(member: slug)
-            // Drop anything already rated offline this session so it
-            // doesn't reappear before the queue actually syncs it.
-            shows = r.shows.filter { OfflineQueue.shared.pendingRating(showId: $0.id, season: nil) == nil }
+            let r = try await API.rateBacklog(member: slug, includeRated: showRated)
+            localRatings = [:]
+            if showRated {
+                // Everything stays; a rating queued offline shows as given.
+                shows = r.shows
+                for s in r.shows {
+                    if let p = OfflineQueue.shared.pendingRating(showId: s.id, season: nil) { localRatings[s.id] = p }
+                }
+            } else {
+                // Drop anything already rated offline this session so it
+                // doesn't reappear before the queue actually syncs it.
+                shows = r.shows.filter { OfflineQueue.shared.pendingRating(showId: $0.id, season: nil) == nil }
+            }
             hasAny = r.hasAny
             loadFailed = false
         } catch {
@@ -67,7 +93,11 @@ struct RateBacklogView: View {
     private func rate(_ show: RateBacklogShow, value: Int) async {
         do {
             _ = try await API.rateShow(id: show.id, rating: value, season: nil)
-            shows.removeAll { $0.id == show.id }
+            if showRated {
+                localRatings[show.id] = value
+            } else {
+                shows.removeAll { $0.id == show.id }
+            }
         } catch let e as API.APIError where e.status == 401 {
             errorMessage = "Your session expired — sign in again from Home."
         } catch {
@@ -81,6 +111,7 @@ struct RateBacklogView: View {
 // with a known season count, plain "View" otherwise.
 private struct RateBacklogRow: View {
     let show: RateBacklogShow
+    let value: Int?
     let onRate: (Int) async -> Void
 
     private var hasSeasons: Bool {
@@ -115,7 +146,7 @@ private struct RateBacklogRow: View {
                                        initialPoster: show.posterUrl)
                     }
                     .font(.caption)
-                    RatingTapRow(value: nil) { value in
+                    RatingTapRow(value: value) { value in
                         Task { await onRate(value) }
                     }
                 }

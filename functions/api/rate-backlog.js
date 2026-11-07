@@ -13,6 +13,13 @@ function corsHeaders() {
 // season-level rating). Once everything's rated, the list is empty and
 // the page says so — `has_any` tells it apart from never having had
 // anything eligible to rate in the first place.
+//
+// `?include_rated=1` is the page's "Show rated shows" checkbox: every
+// eligible row, rated or not, each carrying `my_rating` (the member's overall
+// rating, null when unrated) so a rated row draws its score and can be
+// re-rated in place. Additive — without it the response is the unrated-only
+// list it always was, so builds that predate the checkbox are untouched.
+// The nav badge (rate-backlog-count) still counts unrated only.
 export async function onRequestGet(context) {
   const { request, env } = context;
   const session = await getSession(request, env);
@@ -20,11 +27,15 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders() });
   }
 
+  const includeRated = new URL(request.url).searchParams.get('include_rated') === '1';
   const { results } = await env.DB.prepare(
-    `SELECT s.id, s.title, s.poster_url, s.movie, s.list, s.seasons_released, s.archived
+    `SELECT s.id, s.title, s.poster_url, s.movie, s.list, s.seasons_released, s.archived,
+            (SELECT r.rating FROM show_ratings r
+              WHERE r.tmdb_id = s.tmdb_id AND r.tmdb_type = s.tmdb_type
+                AND r.season_number = 0 AND r.member_slug = s.member_slug) AS my_rating
      FROM shows_v s
      WHERE ${BACKLOG_ELIGIBLE_WHERE}
-       AND ${BACKLOG_UNRATED_WHERE}
+       ${includeRated ? '' : `AND ${BACKLOG_UNRATED_WHERE}`}
      ORDER BY s.title ASC`
   ).bind(session.member_slug).all();
 
