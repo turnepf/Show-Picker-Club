@@ -40,6 +40,13 @@ extension calls the public `/api/popular` on its own, with no session and no
 what tvOS shows before the extension's first load and whenever it returns nil
 (offline, or the request fails).
 
+The target's product type must be `com.apple.product-type.app-extension`
+(what Xcode's TV Top Shelf template makes), which links `_NSExtensionMain`.
+The legacy `tv-app-extension` type links `_TVExtensionMain` instead, and on
+tvOS 26 that process exits the moment it launches. The shelf then silently
+stays on the static image, which is how 1.6.4 shipped. If the posters ever
+vanish again, check `log show` for `ShowPickerTVTopShelf` before the Swift.
+
 The extension carries its own `MARKETING_VERSION` (bump it with the app's;
 App Store Connect flags an extension whose short version differs from its
 app's on upload). Its build number is set by the same "Set build number" script phase as
