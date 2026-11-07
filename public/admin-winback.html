@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Win-back Review</title>
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf8">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292522">
+  <link rel="stylesheet" href="/styles.css?v=7">
+  <style>
+    /* Admin-only review of the "we saved your spot" email: every message a
+       send would deliver, exactly as rendered, read from
+       POST /api/admin-winback { mode: "review" }. Nothing on this page sends. */
+    :root { --tint: #6D63EB; }
+    @media (prefers-color-scheme: dark) { :root { --tint: #8D87F5; } }
+    body { padding: 24px 16px 60px; }
+    .wrap { max-width: 960px; margin: 0 auto; }
+    .topbar { display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+    .topbar h1 { font-family: var(--font-sans); font-size: 17px; font-weight: 600; color: var(--ink); }
+    .subtitle { font-size: 13px; color: var(--ink-muted); margin-bottom: 20px; text-align: center; }
+    .err { color: var(--danger-deep); font-size: 14px; margin-top: 12px; text-align: center; }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 20px; }
+    .filters button {
+      font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+      border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink);
+    }
+    .filters button.on { background: var(--tint); border-color: var(--tint); color: #fff; }
+    .msg { background: var(--surface); border: 1px solid var(--border-soft); border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+    .msg.hidden { display: none; }
+    .head { padding: 14px 16px; display: grid; grid-template-columns: 72px 1fr; gap: 4px 10px; font-size: 14px; }
+    .head .k { color: var(--ink-muted); }
+    .head .v { color: var(--ink); overflow-wrap: anywhere; }
+    .head .subject { font-weight: 600; }
+    .tag { display: inline-block; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; padding: 2px 8px; border-radius: 999px; background: var(--border-soft); color: var(--ink-muted); margin-left: 6px; }
+    .tag.warn { background: var(--danger-deep); color: #fff; }
+    .tabs { display: flex; gap: 4px; padding: 0 16px; border-bottom: 1px solid var(--border-soft); }
+    .tabs button { font: inherit; font-size: 13px; background: none; border: 0; padding: 8px 10px; cursor: pointer; color: var(--ink-muted); border-bottom: 2px solid transparent; }
+    .tabs button.on { color: var(--tint); border-bottom-color: var(--tint); }
+    .body-html { display: block; background: #F4F1EC; }
+    pre { margin: 0; padding: 16px; white-space: pre-wrap; font-size: 13px; line-height: 1.5; color: var(--ink); overflow-wrap: anywhere; }
+    .body-text { display: none; }
+    .msg.show-text .body-html { display: none; }
+    .msg.show-text .body-text { display: block; }
+  </style>
+  <script src="/shell.js?v=5" defer></script>
+</head>
+<body>
+  <div class="wrap">
+    <nav class="admin-nav">
+      <a href="/" class="back" aria-label="Back to Show Picker Club">&#9664;<span class="back-label">Home</span></a>
+      <a href="/members">Members</a>
+      <a href="/url-cleanup">Show Cleanup</a>
+      <a href="/vibe-admin">Vibe admin</a>
+      <a href="/reporting">Reporting</a>
+    </nav>
+    <div class="topbar"><h1>Win-back email review</h1></div>
+    <div class="subtitle" id="summary">Loading…</div>
+    <div class="filters" id="filters"></div>
+    <div id="list"></div>
+    <div id="loadErr" class="err"></div>
+  </div>
+
+  <script>
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    const LABELS = { awaiting: 'Awaiting shows back', group: 'Group activity', start: 'Empty library', general: 'General' };
+
+    function render(data) {
+      const msgs = data.messages;
+      const sendable = msgs.filter(m => m.to && !m.already_sent).length;
+      document.getElementById('summary').textContent =
+        `${msgs.length} inactive members · ${sendable} would be emailed on send · nothing on this page sends`;
+
+      const filters = document.getElementById('filters');
+      const keys = ['all', ...Object.keys(LABELS).filter(k => data.by_version[k] > 0)];
+      filters.innerHTML = keys.map(k =>
+        `<button data-k="${k}" class="${k === 'all' ? 'on' : ''}">${k === 'all' ? 'All' : esc(LABELS[k])} (${k === 'all' ? msgs.length : data.by_version[k]})</button>`
+      ).join('');
+      filters.addEventListener('click', e => {
+        const b = e.target.closest('button'); if (!b) return;
+        filters.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+        document.querySelectorAll('.msg').forEach(m => m.classList.toggle('hidden', b.dataset.k !== 'all' && m.dataset.v !== b.dataset.k));
+      });
+
+      const list = document.getElementById('list');
+      list.innerHTML = msgs.map((m, i) => `
+        <div class="msg" data-v="${esc(m.version)}" data-i="${i}">
+          <div class="head">
+            <span class="k">To</span>
+            <span class="v">${m.to ? esc(m.to) : '<span class="tag warn">no email, skipped</span>'}${m.already_sent ? '<span class="tag">already sent</span>' : ''}</span>
+            <span class="k">From</span><span class="v">${esc(m.from)}</span>
+            <span class="k">Subject</span><span class="v subject">${esc(m.subject)}</span>
+            <span class="k">Version</span><span class="v">${esc(LABELS[m.version] || m.version)} <span class="tag">${esc(m.slug)}</span> <span class="tag">last seen ${esc((m.last_seen || '').slice(0, 10))}</span></span>
+          </div>
+          <div class="tabs"><button class="on" data-t="html">Email</button><button data-t="text">Plain text</button></div>
+          <div class="body-html"></div>
+          <pre class="body-text">${esc(m.text)}</pre>
+        </div>`).join('');
+
+      // Each email renders in its own shadow root, so this page's styles
+      // don't restyle it (an iframe would be cleaner, but the site CSP's
+      // frame-src blocks srcdoc frames). The HTML is the server's own
+      // template with every member-supplied value already escaped
+      // (functions/_shared/winback.js), so it is markup we wrote.
+      list.querySelectorAll('.msg').forEach(el => {
+        const m = msgs[Number(el.dataset.i)];
+        const root = el.querySelector('.body-html').attachShadow({ mode: 'open' });
+        root.innerHTML = m.html;
+        root.querySelectorAll('a').forEach(a => { a.target = '_blank'; a.rel = 'noopener'; });
+        el.querySelector('.tabs').addEventListener('click', e => {
+          const b = e.target.closest('button'); if (!b) return;
+          el.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+          el.classList.toggle('show-text', b.dataset.t === 'text');
+        });
+      });
+    }
+
+    fetch('/api/admin-winback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'review' }),
+    })
+      .then(r => {
+        if (r.status === 401 || r.status === 403) {
+          document.getElementById('summary').textContent = '';
+          document.getElementById('loadErr').innerHTML = 'Admins only. Please <a href="/">log in</a> from the homepage first.';
+          return null;
+        }
+        return r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`);
+      })
+      .then(data => { if (data) render(data); })
+      .catch(err => {
+        document.getElementById('summary').textContent = '';
+        document.getElementById('loadErr').textContent = 'Failed to load: ' + err;
+      });
+  </script>
+</body>
+</html>

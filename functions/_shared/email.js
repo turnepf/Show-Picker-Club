@@ -5,7 +5,10 @@
 const FROM = 'Show Picker Club <noreply@showpicker.club>';
 const REPLY_TO = 'patrick@patrickturner.net';
 
-export async function sendEmail(env, { to, subject, html, text }) {
+// `from`, `replyTo` and `headers` are for the personal win-back email
+// (functions/_shared/winback.js), which comes from Patrick rather than
+// noreply and carries List-Unsubscribe. Everything else uses the defaults.
+export async function sendEmail(env, { to, subject, html, text, from = FROM, replyTo = REPLY_TO, headers }) {
   if (!env.RESEND_API_KEY) {
     console.warn('[email] RESEND_API_KEY not set; would have sent:', { to, subject });
     return { ok: true, stub: true };
@@ -17,12 +20,13 @@ export async function sendEmail(env, { to, subject, html, text }) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: FROM,
+      from,
       to: Array.isArray(to) ? to : [to],
-      reply_to: REPLY_TO,
+      reply_to: replyTo,
       subject,
       html,
       text,
+      ...(headers ? { headers } : {}),
     }),
   });
   if (!res.ok) {

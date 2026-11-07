@@ -687,6 +687,20 @@ Also pins that an add stores genres and the season count from its first
 fetch, where they used to wait for the nightly job.
 
 ```bash
+node scripts/winback-test.mjs
+```
+
+The "we saved your spot" email (migration 090), its admin endpoint and the
+unsubscribe link. Pins who is never mailed — anyone seen in the last 60 days
+by sign-in *or* session ping, disabled, opted out, the demo account — that a
+member is mailed once per lapse, which of the four versions each gets, that
+`review` (which carries addresses) refuses the cron secret, that `preview`
+reaches only `patrick@showpicker.club`, that `send` needs an explicit
+confirm, and that the unsubscribe GET writes nothing while its POST (button
+or one-click) needs the member's own token. Sending is the Actions tab →
+**Win-back email**; `/admin-winback` reviews every message first.
+
+```bash
 node scripts/og-preview-test.mjs
 ```
 

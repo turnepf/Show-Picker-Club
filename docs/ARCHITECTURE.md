@@ -41,6 +41,8 @@ database_id = "..."
 | `last_login_at`| TEXT             | Migration 013. Stamped on every session issue and never cleared, so it survives logout/disable (which delete `sessions` rows). Any "last login" / "never logged in" display must read this, not `MAX(sessions.created_at)`. |
 | `enrolled_via` | TEXT             | Migration 031. How the account came to exist: `email` \| `apple` \| `google`; NULL only for rows predating self-enrollment. |
 | `enroll_ip`    | TEXT             | Migration 058. Origin IP of the signup, backing the per-IP enrollment cap. Deleted with the member. |
+| `email_opt_out` | INTEGER         | Migration 090. Set by the unsubscribe link (`/api/unsubscribe`). Honoured by marketing email (the win-back email); login codes and emails the member asked for ignore it. |
+| `winback_sent_at` | TEXT          | Migration 090. Last win-back send. A member is mailed again only once their last visit is later than this, i.e. once per lapse. See [Win-back email](#win-back-email). |
 
 ### Login identity tables
 Login is by passkey, one-time code, or Sign in with Apple — there are no stored passwords. The relevant tables are included in `schema.sql` and were introduced over time by migrations:
@@ -570,6 +572,8 @@ drained once, so it deliberately has no button in the app.
 | `POST /api/admin-member-merge`         | `functions/api/admin-member-merge.js`      | POST    | admin session — merge a duplicate member account into the kept one, then delete the duplicate. No UI button calls this (removed 2026-09); curl-only |
 | `POST /api/admin-vibe-fill`            | `functions/api/admin-vibe-fill.js`         | POST    | admin session or `CRON_SECRET` header |
 | `POST /api/admin-url-cleanup`          | `functions/api/admin-url-cleanup.js`       | POST    | admin session |
+| `POST /api/admin-winback`              | `functions/api/admin-winback.js`           | POST    | admin session or `CRON_SECRET` header; `mode: review` (carries addresses) admin session only |
+| `GET/POST /api/unsubscribe`            | `functions/api/unsubscribe.js`             | GET, POST | **public**, HMAC token in `?t=`; GET only confirms, POST (button or RFC 8058 one-click) sets `email_opt_out` |
 | `POST /api/admin-sms-test`             | `functions/api/admin-sms-test.js`          | POST    | admin session |
 | `POST /api/admin-fill-watch-urls`      | `functions/api/admin-fill-watch-urls.js`   | POST    | admin session or `CRON_SECRET` header |
 | `POST /api/admin-demo-reset`           | `functions/api/admin-demo-reset.js`        | POST    | admin session or `CRON_SECRET` header |
@@ -1178,6 +1182,37 @@ The seed is allowed to be *shorter* than the server's list — that's the point 
 The share extension has its own separate mapping: `ios/Shared/ShareTitleParser.swift` maps share text and hostnames to canonical names, offline, before any session exists. Its *text* checks are deliberately thinner than its host checks — "sky" lives inside "whisky", "stan" inside "Istanbul", and "binge" inside every "perfect binge-watch" blurb, so those three are recognized by host only.
 
 `migrations/002_consolidate_networks.sql` ran a one-shot rewrite to fold pre-existing `HBO → Max`, `NBC → Peacock`, `Showtime → Paramount+`, etc. across all member rows. `migrations/003_rename_max_to_hbo_max.sql` then renamed the canonical from `Max` back to `HBO Max`.
+
+## Win-back email
+
+"We saved your spot", from Patrick to members with no visit of any kind in 60
+days (`functions/_shared/winback.js`). "Visit" is the latest of
+`last_login_at`, any session's `last_seen_at`/`created_at`, and signup, so a
+member who stays signed in is never counted inactive. Disabled members, the
+demo account, `email_opt_out` and anyone without an email address are never
+mailed. Each candidate gets one version, the first that fits: **awaiting**
+(Awaiting shows whose season premiered since their last visit, up to three
+named and linked to `/show/<their copy>`), **group** (group-mates' new shows or
+unanswered Watch Next cards since then), **start** (empty library), or
+**general**. Every version ends with the same feature list, whose example
+show (The Diplomat) links to the member's own copy when they have one.
+
+Sent from `patrick@showpicker.club` through Resend, with `List-Unsubscribe`
+and `List-Unsubscribe-Post` headers. The domain and both sender addresses are
+registered with Apple's private email relay (Apple Developer → Service
+configuration → Sign in with Apple for Email Communication), which is what lets
+mail reach Hide My Email addresses at all — keep that list in step if the
+sender changes. Unsubscribe tokens are an HMAC of the slug keyed by
+`CRON_SECRET`; rotating that secret breaks old unsubscribe links (they then
+answer "not valid" and point the reader at replying).
+
+Nothing schedules a send. The Actions tab → **Win-back email** runs
+`scripts/winback.mjs` in `plan` (counts only — the logs are public),
+`preview` (one of each version to `patrick@showpicker.club`) or `send` (needs
+"send" typed to confirm; 10 per call, looped, stops on the first failure).
+`/admin-winback` is the admin review page: every message a send would
+deliver, with To, Subject and the rendered body. Pinned by
+`scripts/winback-test.mjs`.
 
 ## Calendar feed
 
