@@ -163,7 +163,7 @@
 			);
 			productName = ShowPickerTVTopShelf;
 			productReference = CDF0D0000000000000000004 /* ShowPickerTVTopShelf.appex */;
-			productType = "com.apple.product-type.tv-app-extension";
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 

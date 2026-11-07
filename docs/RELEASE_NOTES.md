@@ -51,6 +51,7 @@ Sharing a show from the Prime Video app now saves a Watch link that opens Prime 
 Tubi is in the service list now — free, so it adds nothing to your monthly total.
 A show that shares its name with another — a remake and the original, say — now gets the Watch link for the one you added, not the other.
 Rate My Shows has a Show Rated Shows switch, so you can go back and change a rating without hunting for the show.
+Apple TV: with Show Picker Club in your top row, the club's Trending shows now really do appear across the top of the screen. 1.6.4 promised this, but the posters never loaded.
 ```
 
 ---
