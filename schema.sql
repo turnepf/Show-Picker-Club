@@ -27,7 +27,12 @@ CREATE TABLE IF NOT EXISTS members (
   -- Calendar feed usage (migration 061): a subscribed client polls on its own
   -- schedule, so these say whether the feed is actually in use.
   calendar_fetched_at TEXT,
-  calendar_fetch_count INTEGER DEFAULT 0
+  calendar_fetch_count INTEGER DEFAULT 0,
+  -- Migration 090: set by the unsubscribe link, honoured by every marketing
+  -- email (the win-back email today). winback_sent_at is the last win-back
+  -- send, so it goes out once per lapse (functions/_shared/winback.js).
+  email_opt_out INTEGER NOT NULL DEFAULT 0,
+  winback_sent_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS member_phones (

@@ -1,0 +1,55 @@
+name: Win-back email ("we saved your spot")
+
+# The email to members who haven't visited in 60+ days
+# (functions/_shared/winback.js). Nothing schedules this: Patrick runs it.
+#
+#   plan    — counts of who's inactive and which version each gets. Sends nothing.
+#   preview — one of each version, built from real data, sent to
+#             patrick@showpicker.club only.
+#   send    — emails members. Needs "send" typed in the confirm box. Each
+#             member gets it once per lapse, so a re-run sends only to those
+#             not yet sent.
+#
+# Logs print counts only: the repository's Actions logs are public, and who's
+# inactive isn't something to publish. For names, run scripts/winback.mjs
+# locally with --details.
+#
+# Required repo secret (must equal the Pages CRON_SECRET): CRON_SECRET.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'plan = counts only, preview = one of each to Patrick, send = email members'
+        type: choice
+        required: true
+        default: 'plan'
+        options:
+          - plan
+          - preview
+          - send
+      confirm:
+        description: 'Type "send" to email members (send mode only)'
+        required: false
+        default: ''
+
+jobs:
+  winback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          MODE: ${{ github.event.inputs.mode }}
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repo secret is not set"
+            exit 1
+          fi
+          node scripts/winback.mjs --mode "$MODE" --confirm "$CONFIRM"

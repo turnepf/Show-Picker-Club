@@ -31,7 +31,11 @@ note() { echo; echo "== $1"; }
 #     the same brand names already ship in public/index.html's <select> to
 #     logged-out visitors. Public so an app that hasn't signed in yet can still
 #     warm its picker, and so the edge can cache a response that doesn't vary.
-PUBLIC_ENDPOINTS="shows/[id]/actors.js networks.js"
+#   unsubscribe.js — the link at the foot of marketing emails. The reader is
+#     usually signed out, so an HMAC token over the slug is the gate instead of
+#     a session; it writes only that member's email_opt_out, and GET writes
+#     nothing (mail scanners fetch every link).
+PUBLIC_ENDPOINTS="shows/[id]/actors.js networks.js unsubscribe.js"
 
 note "Deployed output carries the web app and the marketing page"
 

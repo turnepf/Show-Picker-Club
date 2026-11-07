@@ -704,6 +704,7 @@ This is the one exception to the "no admin screens on tvOS" rule below.
 - **Logs in** for the first time with a one-time code (text or email), or Sign in with Apple.
 - **Engages** by editing notes, moving shows between lists, adding new shows, archiving, or sharing. Any of these flips the member out of "seed-only" status and they begin showing in popular, recommendations, and vibe.
 - **Goes dormant** when 60 days pass without a session ping; the member card disappears from the home page picker until they come back. They're still reachable by direct URL.
+- **Gets one win-back email per lapse** ("We saved your spot", from Patrick), when Patrick runs it — never automatically. It leads with something of theirs (Awaiting shows that came back, or their group's activity) and ends with the features worth coming back for. Every one carries an unsubscribe link that stops all marketing email. See `docs/ARCHITECTURE.md#win-back-email`.
 
 ## Admin platform policy
 
