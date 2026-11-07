@@ -43,7 +43,19 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## Unreleased — the update after 1.6.3
+## Unreleased — the update after 1.7
+
+```
+```
+
+---
+
+## 1.7 (build 35) — iPhone, iPad, Mac and Apple TV, submitted for review 2026-11-07
+
+Every platform. The Mac last shipped 1.6.1, so its text also carries the
+1.6.2 and 1.6.3 changes that apply to it (no iPhone Duo or swipe items).
+
+iPhone and iPad:
 
 ```
 Archive now sits right under the list buttons on a show, and asks before it archives — no more archiving a show by accident.
@@ -51,7 +63,25 @@ Sharing a show from the Prime Video app now saves a Watch link that opens Prime 
 Tubi is in the service list now — free, so it adds nothing to your monthly total.
 A show that shares its name with another — a remake and the original, say — now gets the Watch link for the one you added, not the other.
 Rate My Shows has a Show Rated Shows switch, so you can go back and change a rating without hunting for the show.
-Apple TV: with Show Picker Club in your top row, the club's Trending shows now really do appear across the top of the screen. 1.6.4 promised this, but the posters never loaded.
+```
+
+Mac:
+
+```
+Archive now sits right under the list buttons on a show, and asks before it archives — no more archiving a show by accident.
+Rate My Shows has a Show Rated Shows switch, so you can go back and change a rating without hunting for the show.
+A season on the air now says which one and when it premiered, and when it ends once that's known: "Season 6 · premiered 9/16 · next 10/14 · finale 11/4".
+A next-episode date no longer lingers after the episode airs, and the season count keeps up when a new season starts.
+The Calendar only says "Premieres" for a real premiere; an episode partway through a season reads "New episode".
+Tubi is in the service list now — free, so it adds nothing to your monthly total.
+A show that shares its name with another — a remake and the original, say — now gets the Watch link for the one you added, not the other.
+Home loads faster when you're in several groups.
+```
+
+Apple TV:
+
+```
+Fixed: with Show Picker Club in your top row, the club's Trending shows now appear across the top of the screen. Click one to jump straight to that show.
 ```
 
 ---
