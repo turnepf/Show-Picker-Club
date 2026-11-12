@@ -386,9 +386,12 @@ pastes into the web UI; `set-notes` re-reads Apple and compares SHA-256
 against the local file, which is what actually enforces "byte-identical on
 all three platforms". Credentials stay out of the repo (key in
 `~/.appstoreconnect/private_keys/`, issuer in `~/.appstoreconnect/issuer_id`).
-`create-version <v>` makes the record on every platform, `set-notes
---platform` writes one platform's text, and `submit <v>` checks every platform
-(build attached, What's New set) and sends to review only with `--confirm`.
+`create-version <v>` makes the record on every platform and sets the App
+Review demo account on it, `review-account <v>` sets that account again
+(email and code read from 1Password at run time, never stored in the repo),
+`set-notes --platform` writes one platform's text, and `submit <v>` checks
+every platform (build attached, What's New set, demo account set) and sends
+to review only with `--confirm`.
 Sending to review stays a human decision: Patrick runs `submit --confirm`
 himself (Claude's App Store Connect writes are blocked), and a rerun after a
 partial failure finishes the job instead of colliding with it. Used by the run sheet in
