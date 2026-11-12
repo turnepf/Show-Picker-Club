@@ -229,6 +229,27 @@ function page(rows, args) {
 
 const R = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
 
+// The first step for a member whose lists hold nothing. Most people who
+// connect from the Connectors Directory arrive with an empty library, and a
+// model that only sees "four empty lists" has nothing to show them, so they
+// connect, see nothing and never come back (2026-11: ten such members, zero
+// tool calls between them). Descriptive, like everything the model reads
+// here: what's true and how adding works, never an instruction.
+export function emptyLibraryNote(scopes) {
+  if (scopes.includes('shows:write')) {
+    return 'This member has not added any shows yet: all four lists are empty. A show is added by finding it with search_titles and passing its tmdb_id to add_show with a list (for example, a request like "add Severance to my Watching list"). get_trending lists what the club is watching now, as a place to start.';
+  }
+  return 'This member has not added any shows yet: all four lists are empty. This connection is read-only, so shows are added in the Show Picker Club app or at showpicker.club. get_trending lists what the club is watching now.';
+}
+
+// True when the member has nothing on any list (archived rows don't count:
+// a cleared-out library is as empty to the member as a new one).
+export async function libraryIsEmpty(env, slug) {
+  const row = await env.DB.prepare('SELECT 1 AS one FROM shows WHERE member_slug = ? AND COALESCE(archived, 0) = 0 LIMIT 1')
+    .bind(slug).first();
+  return !row;
+}
+
 // ---- the tools ---------------------------------------------------------
 
 export const TOOLS = [
@@ -244,6 +265,7 @@ export const TOOLS = [
       const counts = Object.fromEntries(LIST_NAMES.map((l) => [l, 0]));
       for (const s of shows || []) if (API_TO_LIST[s.list]) counts[API_TO_LIST[s.list]]++;
       const { groups } = await ok(ctx, groupsApi.onRequestGet, { path: '/api/groups' });
+      const empty = Object.values(counts).every((n) => n === 0);
       return {
         slug: ctx.session.member_slug,
         name: ctx.session.email,
@@ -251,6 +273,7 @@ export const TOOLS = [
         list_counts: counts,
         groups: (groups || []).map((g) => ({ id: g.id, name: g.name, members: g.member_count })),
         permissions: ctx.scopes,
+        ...(empty ? { getting_started: emptyLibraryNote(ctx.scopes) } : {}),
       };
     },
   },
@@ -276,7 +299,11 @@ export const TOOLS = [
       });
       const rows = (shows || []).filter((s) => !want || s.list === want)
         .sort((a, b) => (a.sort_order ?? 1e9) - (b.sort_order ?? 1e9) || String(a.title).localeCompare(String(b.title)));
-      return page(rows, args);
+      const out = page(rows, args);
+      // Only when the whole library is empty: one empty list among full ones
+      // is not a new member.
+      if (!(shows || []).some((s) => !s.archived)) out.getting_started = emptyLibraryNote(ctx.scopes);
+      return out;
     },
   },
   {
