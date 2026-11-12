@@ -737,6 +737,21 @@ console.log('\n== leave_group on a group you created asks before deleting it');
     && row(env, 'SELECT COUNT(*) AS n FROM group_members WHERE group_id = ?', groupId).n === 0);
 }
 
+console.log('\n== leave_group can hand a group you created to another member');
+{
+  const { env, groupId } = club();
+  const pat = await connect(env, 'patrick');
+  const schema = (await rpc(env, pat.access, 'tools/list', {})).body.result.tools.find((t) => t.name === 'leave_group');
+  check('the tool schema offers transfer_to', schema && schema.inputSchema.properties.transfer_to?.type === 'string');
+
+  const outsider = await tool(env, pat.access, 'leave_group', { group_id: groupId, transfer_to: 'stacy' });
+  check('a slug outside the group is an error that points at get_group', outsider.isError && outsider.text.includes('get_group'), outsider.text);
+
+  const done = await tool(env, pat.access, 'leave_group', { group_id: groupId, transfer_to: 'quinn' });
+  check('handing it to quinn leaves and keeps the group', !done.isError && done.text.includes('"new_creator":"quinn"'), done.text);
+  check('quinn is its creator now', row(env, 'SELECT creator_slug FROM groups WHERE id = ?', groupId).creator_slug === 'quinn');
+}
+
 console.log('\n== never admin');
 {
   const { env } = club();

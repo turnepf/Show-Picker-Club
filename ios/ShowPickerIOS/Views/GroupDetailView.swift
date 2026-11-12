@@ -214,20 +214,25 @@ struct GroupDetailView: View {
                 }
             }
         }
-        // The creator leaving takes the group with them: the server deletes it,
-        // and refuses unless told the member was warned. So the creator's
-        // prompt says so and their Leave carries confirm_delete; everyone
-        // else keeps the plain prompt.
+        // The creator leaving either hands the group to another member or
+        // deletes it for everyone, and the server refuses a creator's leave
+        // that says neither. So the creator picks: one button per member to
+        // hand it to, or delete. Everyone else keeps the plain prompt.
         .confirmationDialog("Leave this group?", isPresented: $confirmingLeave, titleVisibility: .visible) {
-            if group?.isCreator ?? false {
-                Button("Leave and delete", role: .destructive) { Task { await leaveGroup(confirmDelete: true) } }
+            if let group, group.isCreator {
+                ForEach(handOffCandidates(group)) { member in
+                    Button("Hand it to \(member.displayName)") { Task { await leaveGroup(transferTo: member.slug) } }
+                }
+                Button("Delete the group", role: .destructive) { Task { await leaveGroup(confirmDelete: true) } }
             } else {
                 Button("Leave", role: .destructive) { Task { await leaveGroup(confirmDelete: false) } }
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            if group?.isCreator ?? false {
-                Text("You created this group. Leaving will delete it for everyone.")
+            if let group, group.isCreator {
+                Text(handOffCandidates(group).isEmpty
+                     ? "You created this group. Leaving will delete it for everyone."
+                     : "You created this group. Choose who takes it over, or delete it for everyone.")
             }
         }
         .confirmationDialog("Delete this group?", isPresented: $confirmingDelete, titleVisibility: .visible) {
@@ -619,10 +624,16 @@ struct GroupDetailView: View {
         }
     }
 
+    /// Everyone in the group but its creator — who, when this matters, is the
+    /// member looking at the screen.
+    private func handOffCandidates(_ group: ShowPickerCore.Group) -> [GroupMember] {
+        members.filter { $0.slug != group.creatorSlug }
+    }
+
     @MainActor
-    private func leaveGroup(confirmDelete: Bool) async {
+    private func leaveGroup(confirmDelete: Bool = false, transferTo: String? = nil) async {
         do {
-            _ = try await API.leaveGroup(id: groupId, confirmDelete: confirmDelete)
+            _ = try await API.leaveGroup(id: groupId, confirmDelete: confirmDelete, transferTo: transferTo)
             // Left, or (creator) deleted: either way this screen is done, and
             // the Groups list reloads without it.
             dismiss()

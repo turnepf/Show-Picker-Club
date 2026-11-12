@@ -12,7 +12,7 @@
 // surviving member (duplicates fold into what the target already has).
 // Children come before parents so the statements hold with or without
 // foreign-key enforcement. Groups the departing member created go with them:
-// a group doesn't outlive its creator (owner decision; see group-delete.js).
+// a deleted account can't hand a group on (see group-delete.js).
 
 export function memberReferenceStatements(env, slug, { mergeInto = null } = {}) {
   const P = (sql, ...b) => env.DB.prepare(sql).bind(...b);

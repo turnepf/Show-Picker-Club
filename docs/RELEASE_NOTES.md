@@ -47,7 +47,7 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ```
 Opening a group invite link now shows you the group and asks before you join, so a link alone never adds you to a group.
-Leaving a group you created now warns you first: it deletes the group for everyone.
+Leaving a group you created now lets you hand it to another member, so the group carries on without you. You can still delete it for everyone instead.
 Logging out works even when you're offline.
 ```
 

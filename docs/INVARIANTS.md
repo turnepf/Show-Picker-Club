@@ -1050,11 +1050,14 @@ product, and an invite token is the only credential that produces one.
   Opening an invite link shows the group's name and a Join button; the web
   page fetches `?preview=1`, which never writes, and redeems only on the
   press.
-- **A group doesn't outlive its creator.** Leaving as the creator deletes the
-  group for everyone, so `POST /api/groups/:id/leave` answers 409
-  `creator_must_confirm` until the caller sends `confirm_delete: true`, and
-  the client says so first. An older app gets the 409's message rather than a
-  silent delete. Delete and leave-as-creator both go through
+- **A creator leaving hands the group on or ends it, and says which.**
+  `POST /api/groups/:id/leave` from the creator takes `transfer_to` (a
+  current member, who becomes the creator in the same batch as the leave) or
+  `confirm_delete: true` (the group is deleted for everyone), and answers 409
+  `creator_must_confirm` to a body with neither. Only somebody already in the
+  group can be handed it, since being creator is a role a member can't turn
+  down. An older app gets the 409's message rather than a silent delete.
+  Account deletion still deletes the groups a member created (§31). Delete and leave-as-creator both go through
   `_shared/group-delete.js`, which removes responses, suggestions, invites
   and members before the group, so nothing is left pointing at it.
 

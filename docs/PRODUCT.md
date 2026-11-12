@@ -598,9 +598,10 @@ and rate it a 9", "what are people in my groups watching that I'm not?".
   and — if allowed to make changes — add, edit, move, reorder, rate, archive,
   restore and delete their own shows, name group-mates in Watching With,
   recommend to a group and answer recommendations, create a group, make an
-  invite link and leave a group.
+  invite link and leave a group (one they created goes to a member they
+  name, or is deleted if they say so).
 - **What it can't:** join a group (invite links are opened by people), rename
-  or delete a group, anything household, account settings, passkeys, import,
+  a group, delete one except by leaving it, anything household, account settings, passkeys, import,
   admin tools — even on an admin's account. It sees other people's lists only
   through shared groups, never their private notes.
 - **Limits.** 1,000 changes and 1,000 catalog searches per member per day from

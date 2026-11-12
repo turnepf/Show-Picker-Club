@@ -449,7 +449,7 @@ group id verifies membership and 403s otherwise; only the creator can delete.
 - **Joining is a link.** `POST /api/groups/[id]/invite` mints the token and the
   share URL (`/groups/join?token=…`); opening it shows the group's name and
   a Join button, and only the press joins (signed out, it asks for a login
-  first). A creator who leaves deletes the group, after a confirmation.
+  first). A creator who leaves picks a member to take the group over, or deletes it.
 - **Groups are the consent boundary for "Watching with".** Sharing a group is
   what makes someone nameable on a show — and therefore what makes it legal to
   write a row onto their list. See [`show_watchers`](#show_watchers).
@@ -545,7 +545,7 @@ drained once, so it deliberately has no button in the app.
 | `PATCH /api/groups/[id]`               | `functions/api/groups/[id].js`             | PATCH   | session + membership (any member, not just creator) — rename and/or set `icon`/`color` (curated sets; absent = keep, null = clear) |
 | `DELETE /api/groups/[id]`              | `functions/api/groups/[id].js`             | DELETE  | session + creator (still a member) — `_shared/group-delete.js` removes responses, suggestions, invites and members, then the group |
 | `POST /api/groups/[id]/invite`         | `functions/api/groups/[id]/invite.js`      | POST    | session + membership — mints a 7-day token |
-| `POST /api/groups/[id]/leave`          | `functions/api/groups/[id]/leave.js`       | POST    | session + membership. The creator leaving deletes the group: without `{confirm_delete: true}` it answers 409 `creator_must_confirm` and changes nothing; with it, returns `{ok, deleted: true}` (INVARIANTS §26) |
+| `POST /api/groups/[id]/leave`          | `functions/api/groups/[id]/leave.js`       | POST    | session + membership. The creator leaving says what happens to the group: `{transfer_to: <member slug>}` makes that current member the creator and returns `{ok, transferred_to}` (400 `not_a_member` otherwise); `{confirm_delete: true}` deletes it and returns `{ok, deleted: true}`; neither is 409 `creator_must_confirm` and changes nothing (INVARIANTS §26) |
 | `GET /api/groups/[id]/trending`        | `functions/api/groups/[id]/trending.js`    | GET     | session + membership — top 10 titles the group added in 30 days |
 | `GET /api/groups/[id]/suggestions`     | `functions/api/groups/[id]/suggestions.js` | GET     | session + membership — the group's Watch Next board, shaped for the viewer |
 | `POST /api/groups/[id]/suggestions`    | `functions/api/groups/[id]/suggestions.js` | POST    | session + membership — recommend your own copy of a show to the group (daily ceiling; duplicate titles fold) |

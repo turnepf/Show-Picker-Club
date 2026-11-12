@@ -125,7 +125,8 @@ function failure(status, data, what = 'That') {
   if (status === 404) return new ToolError(`${what} wasn't found, or isn't yours.`);
   if (status === 403) return new ToolError(typeof code === 'string' && code !== 'Forbidden' ? code : `You don't have access to ${what.toLowerCase()}.`);
   if (status === 429) return new ToolError('The app’s own daily limit for this action has been reached. Try again tomorrow.');
-  if (code === 'creator_must_confirm') return new ToolError('You created this group, so leaving it deletes it for every member. Call leave_group again with confirm_delete: true to leave and delete it.');
+  if (code === 'creator_must_confirm') return new ToolError('You created this group. Ask the member whether to hand it to another member (call leave_group again with transfer_to set to their slug) or delete it for everyone (confirm_delete: true).');
+  if (code === 'not_a_member') return new ToolError('transfer_to has to be the slug of someone already in the group. get_group lists them.');
   return new ToolError(typeof code === 'string' ? code : `Request failed (${status}).`);
 }
 
@@ -733,14 +734,15 @@ export const TOOLS = [
   {
     name: 'leave_group',
     title: 'Leave a group',
-    description: 'Leaves one of your groups. Your recommendations and invite links in it are removed, and its members lose access to your lists through it. A group you created is deleted for everyone when you leave it, which needs confirm_delete: true.',
+    description: 'Leaves one of your groups. Your recommendations and invite links in it are removed, and its members lose access to your lists through it. To leave a group you created, either hand it to another member with transfer_to (their slug, from get_group) or delete it for everyone with confirm_delete: true. Ask the member which they want.',
     scope: 'shows:write',
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     inputSchema: {
       type: 'object',
       properties: {
         group_id: { type: 'integer' },
-        confirm_delete: { type: 'boolean', description: 'Required to leave a group you created, which deletes it for every member.' },
+        transfer_to: { type: 'string', description: 'For a group you created: the slug of a current member who becomes its creator as you leave. The group stays.' },
+        confirm_delete: { type: 'boolean', description: 'For a group you created: leave and delete it for every member.' },
       },
       required: ['group_id'],
     },
@@ -748,9 +750,12 @@ export const TOOLS = [
       const gid = intArg(args, 'group_id');
       const d = await ok(ctx, groupLeaveApi.onRequestPost, {
         method: 'POST', path: `/api/groups/${gid}/leave`, params: { id: String(gid) },
-        body: args.confirm_delete === true ? { confirm_delete: true } : {},
+        body: typeof args.transfer_to === 'string' && args.transfer_to.trim()
+          ? { transfer_to: args.transfer_to.trim() }
+          : (args.confirm_delete === true ? { confirm_delete: true } : {}),
       }, 'That group');
-      return d && d.deleted ? { left: gid, deleted: true } : { left: gid };
+      if (d && d.deleted) return { left: gid, deleted: true };
+      return d && d.transferred_to ? { left: gid, new_creator: d.transferred_to } : { left: gid };
     },
   },
   // ---- admin: another member's lists (members:admin) ----

@@ -440,6 +440,46 @@ console.log('\n== the creator leaving cleans up even with foreign keys off');
   check('no orphaned rows', leftovers(env, gid, sid) === 0, `left ${leftovers(env, gid, sid)} rows`);
 }
 
+console.log('\n== the creator can hand the group on instead of deleting it');
+{
+  const { env, gid } = club();
+  const patrick = addSession(env, 'patrick');
+  const token = await tokenFor(env, patrick, gid);
+  const sid = groupWithContents(env, gid);
+  const creator = () => env._db.prepare('SELECT creator_slug FROM groups WHERE id = ?').get(gid)?.creator_slug;
+
+  let res = await leaveWith(env, patrick, gid, { transfer_to: 'stacy' });
+  check('handing it to someone outside the group is 400', res.status === 400, `got ${res.status}`);
+  check('with not_a_member', (await res.json()).error === 'not_a_member');
+  check('and nothing changed', creator() === 'patrick' && isMember(env, gid, 'patrick'));
+
+  res = await leaveWith(env, patrick, gid, { transfer_to: 'patrick' });
+  check('handing it to yourself is 400', res.status === 400, `got ${res.status}`);
+
+  res = await leaveWith(env, patrick, gid, { transfer_to: 'quinn' });
+  const body = await res.json();
+  check('handing it to a member is 200, not deleted', res.status === 200 && body.transferred_to === 'quinn' && !body.deleted, JSON.stringify(body));
+  check('the group stays, with quinn as its creator', count(env, 'SELECT COUNT(*) AS n FROM groups WHERE id = ?', gid) === 1 && creator() === 'quinn');
+  check('patrick is out', !isMember(env, gid, 'patrick') && isMember(env, gid, 'quinn'));
+  check("patrick's invite and recommendation went with him",
+    !inviteRow(env, token) && count(env, 'SELECT COUNT(*) AS n FROM group_suggestions WHERE group_id = ? AND suggested_by = ?', gid, 'patrick') === 0);
+  void sid;
+
+  const quinn = addSession(env, 'quinn');
+  const del = await deleteGroupReq(env, quinn, gid);
+  check('the new creator can delete it', del.status === 200, `got ${del.status}`);
+}
+
+console.log('\n== a hand-off from someone who is not the creator is just a leave');
+{
+  const { env, gid } = club();
+  env._db.prepare("INSERT INTO group_members (group_id, member_slug) VALUES (?, 'stacy')").run(gid);
+  const quinn = addSession(env, 'quinn');
+  const res = await leaveWith(env, quinn, gid, { transfer_to: 'stacy' });
+  check('quinn leaves', res.status === 200 && !isMember(env, gid, 'quinn'), `got ${res.status}`);
+  check('the creator is still patrick', env._db.prepare('SELECT creator_slug FROM groups WHERE id = ?').get(gid).creator_slug === 'patrick');
+}
+
 console.log('\n== a non-creator still just leaves');
 {
   const { env, gid } = club();
