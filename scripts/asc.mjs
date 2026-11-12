@@ -16,6 +16,7 @@
 //   node scripts/asc.mjs attach 1.4.1 24
 //   node scripts/asc.mjs create-version 1.6
 //   node scripts/asc.mjs submit 1.6 --confirm
+//   node scripts/asc.mjs review-account 1.6
 //   node scripts/asc.mjs screenshots 1.6.2 APP_IPHONE_DUO a.png b.png --replace
 //   node scripts/asc.mjs custom-page 'iPhone Duo' promo.txt --set APP_IPHONE_DUO a.png --replace
 //
@@ -447,6 +448,74 @@ async function appPlatforms() {
 // --platform IOS,TV_OS limits the create to those platforms: Apple refuses the
 // API create on a platform whose previous version is still in review, and the
 // others needn't wait for it.
+// The App Review demo account (Review Information → Sign-in required) is per
+// version record, so every new version needs it again. The values live only in
+// 1Password and are read at run time, never written to the repo: the code
+// was rotated in 2026-11 after it had sat in this public repo's docs. Override
+// the item with ASC_DEMO_OP_ITEM if it ever moves.
+const DEMO_OP_ITEM = process.env.ASC_DEMO_OP_ITEM || 'op://Private/wcbxi3mv6wtygfusffcjrq6ifi';
+
+function opRead(field) {
+  const r = spawnSync('op', ['read', '-n', `${DEMO_OP_ITEM}/${field}`], { encoding: 'utf8' });
+  if (r.error || r.status !== 0) {
+    die(`Couldn't read "${field}" from 1Password (${(r.stderr || r.error?.message || '').trim() || 'op failed'}). Is the 1Password app unlocked?`);
+  }
+  return r.stdout.trim();
+}
+
+function demoAccount() {
+  const name = opRead('demo account');
+  const password = opRead('demo password');
+  if (!name.includes('@') || !/^\d{6}$/.test(password)) {
+    die('The 1Password demo account fields don\'t look right (expected an email and a 6-digit code).');
+  }
+  return { name, password };
+}
+
+// A record that never had review information answers with no data (or a 404,
+// depending on the record), and call() exits on any error, so read this one
+// directly.
+async function reviewDetail(versionId) {
+  const res = await fetch(`${API}/v1/appStoreVersions/${versionId}/appStoreReviewDetail`, {
+    headers: { Authorization: `Bearer ${token()}` },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) die(`GET appStoreReviewDetail for ${versionId} -> ${res.status}\n${(await res.text()).slice(0, 600)}`);
+  return (await res.json()).data || null;
+}
+
+// Sets the demo account on every platform's record for a version, then reads
+// it back. Prints which platforms changed, never the values.
+async function cmdReviewAccount(versionString, account = demoAccount()) {
+  if (!versionString) die('usage: review-account <version>');
+  const rows = await versions(versionString);
+  if (!rows.length) die(`No version records for ${versionString}`);
+  const attributes = { demoAccountName: account.name, demoAccountPassword: account.password, demoAccountRequired: true };
+  for (const v of rows) {
+    const plat = v.attributes.platform;
+    const have = await reviewDetail(v.id);
+    if (have) {
+      await call('PATCH', `/v1/appStoreReviewDetails/${have.id}`, {
+        data: { type: 'appStoreReviewDetails', id: have.id, attributes },
+      });
+    } else {
+      await call('POST', '/v1/appStoreReviewDetails', {
+        data: {
+          type: 'appStoreReviewDetails',
+          attributes,
+          relationships: { appStoreVersion: { data: { type: 'appStoreVersions', id: v.id } } },
+        },
+      });
+    }
+    const after = (await reviewDetail(v.id))?.attributes || {};
+    const okName = after.demoAccountName === account.name && after.demoAccountRequired === true;
+    // Apple may or may not echo the password back; compare it only if it does.
+    const okCode = after.demoAccountPassword === undefined || after.demoAccountPassword === account.password;
+    console.log(`  ${plat.padEnd(7)} ${okName && okCode ? 'demo account set' : '*** demo account did not stick'}`);
+    if (!(okName && okCode)) process.exitCode = 1;
+  }
+}
+
 async function cmdCreateVersion(versionString, only) {
   if (!versionString) die('usage: create-version <version> [--platform IOS,TV_OS]');
   const have = new Set((await versions(versionString)).map(v => v.attributes.platform));
@@ -462,6 +531,13 @@ async function cmdCreateVersion(versionString, only) {
     });
     console.log(`  ${platform}: created ${versionString}`);
   }
+  // A new record starts with no review information or a copy of the last
+  // version's (which, for every record before 2026-11, is the rotated-out
+  // code), and the web form is greyed out until a record exists, so set it
+  // from 1Password now.
+  versionCache = null;
+  console.log('Demo account for App Review:');
+  await cmdReviewAccount(versionString);
 }
 
 // Send every platform's record for a version to App Review. Checks first and
@@ -502,6 +578,8 @@ async function cmdSubmit(versionString, flag) {
     if (state !== 'PREPARE_FOR_SUBMISSION') problems.push(`state is ${state}`);
     if (!build.data) problems.push('no build attached');
     if (missingNotes.length) problems.push(`no What's New for ${missingNotes.join(', ')}`);
+    const review = (await reviewDetail(v.id))?.attributes;
+    if (!review?.demoAccountRequired || !review?.demoAccountName) problems.push('no demo account (run review-account)');
     if (problems.length) ready = false; else toSend.push(v);
     console.log(`  ${plat.padEnd(7)} ${build.data ? `build ${build.data.attributes.version}` : '-'}  ${problems.length ? '*** ' + problems.join('; ') : 'ready'}`);
   }
@@ -569,6 +647,7 @@ switch (cmd) {
     break;
   }
   case 'submit': await cmdSubmit(rest[0], rest[1]); break;
+  case 'review-account': await cmdReviewAccount(rest[0]); break;
   case 'screenshots': {
     const i = rest.indexOf('--platform');
     const platform = i === -1 ? 'IOS' : rest[i + 1];
@@ -590,6 +669,6 @@ switch (cmd) {
     break;
   }
   default:
-    console.log('usage: node scripts/asc.mjs <status | create-version <version> | set-notes <version> <file> | attach <version> <build> | upload <file> | submit <version> [--confirm] | screenshots <version> <TYPE> <file>... [--replace] | custom-page <name> <promo.txt> --set <TYPE> <file>... [--replace]>');
+    console.log('usage: node scripts/asc.mjs <status | create-version <version> | set-notes <version> <file> | attach <version> <build> | upload <file> | submit <version> [--confirm] | review-account <version> | screenshots <version> <TYPE> <file>... [--replace] | custom-page <name> <promo.txt> --set <TYPE> <file>... [--replace]>');
     process.exit(cmd ? 1 : 0);
 }

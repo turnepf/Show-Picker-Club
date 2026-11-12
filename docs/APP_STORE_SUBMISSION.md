@@ -27,8 +27,13 @@ pre-populated, and it is what the Review notes point at.
 - [ ] Cloudflare Pages secrets are set on the `shows` project:
       ```bash
       printf "demo@example.com" | wrangler pages secret put DEMO_LOGIN_EMAIL   --project-name shows
-      printf "<6-digit code from 1Password>" | wrangler pages secret put DEMO_LOGIN_CODE    --project-name shows  # 6 digits; never commit the real value
+      op read -n "op://Private/wcbxi3mv6wtygfusffcjrq6ifi/demo password" | wrangler pages secret put DEMO_LOGIN_CODE --project-name shows
       ```
+      The code lives only in the 1Password item's **demo password** field
+      (rotated 2026-11-12 after the old one sat in this public repo). `op read
+      -n` adds no trailing newline, which is the same reason the email uses
+      `printf`. A secret takes effect on the next deploy, so run **Deploy**
+      from the Actions tab after changing it.
       - `DEMO_LOGIN_EMAIL` + `DEMO_LOGIN_CODE` → the email/code reviewer login
         (`functions/auth/login.js`).
       - The demo address never receives mail: `request-code` short-circuits it
@@ -296,6 +301,19 @@ in review (1.7: Mac 1.6 was in review, so
 `create-version 1.7 --platform IOS,TV_OS`), or create the record **in the web
 UI** with **＋ Version or Platform**.
 
+`create-version` also sets the App Review demo account on every record of the
+version, reading the email and code from 1Password at run time. A new record
+can inherit the previous version's review information, and every record
+before 2026-11 holds the rotated-out code. If a record was made in the web UI,
+or the code changes mid-release, set it with:
+
+```
+node scripts/asc.mjs review-account 1.6
+```
+
+It reads each record back and says per platform whether it took; it never
+prints the values.
+
 **6. Set the What's New text with the tool, not by pasting three times.**
 Extract the fenced block from the current version's section of
 `docs/RELEASE_NOTES.md` into a file, then:
@@ -338,7 +356,7 @@ node scripts/asc.mjs submit 1.6 --confirm
 ```
 
 The first only checks: every platform in `PREPARE_FOR_SUBMISSION`, a build
-attached, What's New filled in. The second sends each platform to App Review,
+attached, What's New filled in, a demo account set. The second sends each platform to App Review,
 and refuses unless all of them pass. Patrick runs it himself — Claude's App
 Store Connect writes are blocked, so it hands him the line.
 
