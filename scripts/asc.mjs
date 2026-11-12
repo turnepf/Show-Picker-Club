@@ -313,6 +313,7 @@ async function fillScreenshotSet(loc, displayType, files, replace) {
     console.log(`  emptied the ${displayType} set (${(old.data || []).length} removed)`);
   }
 
+  const stuck = [];
   for (const f of files) {
     const bytes = fs.readFileSync(f);
     const name = path.basename(f);
@@ -347,6 +348,17 @@ async function fillScreenshotSet(loc, displayType, files, replace) {
       }
     }
     console.log(`  ${name} (${pngSize(f)}): ${state}`);
+    // A screenshot left at UPLOAD_COMPLETE isn't usable: submit refuses the
+    // version with ASSET_IN_POST_PROCESSING. On 1.8 a whole batch sat there
+    // for over an hour, and this loop used to print the last state as if it
+    // were the result. Rerunning with --replace cleared it at once.
+    if (state !== 'COMPLETE') {
+      stuck.push(name);
+      process.exitCode = 1;
+    }
+  }
+  if (stuck.length) {
+    console.log(`\n*** Apple hasn't finished processing ${stuck.join(', ')}. Run this again with --replace; submit refuses the version until every screenshot is COMPLETE.`);
   }
 }
 
