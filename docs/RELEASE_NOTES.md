@@ -43,11 +43,29 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## Unreleased — the update after 1.7
+## Unreleased — the update after 1.8
+
+Nothing yet.
+
+---
+
+## 1.8 (build 36) — iPhone, iPad, Mac and Apple TV, submitted for review 2026-11-12
+
+Every platform, with new screenshots on all three listings. Mostly the app
+half of the 2026-11 security audit. Apple TV has no group editing, so its text
+carries only the sign-out fix.
+
+iPhone, iPad and Mac:
 
 ```
-Opening a group invite link now shows you the group and asks before you join, so a link alone never adds you to a group.
 Leaving a group you created now lets you hand it to another member, so the group carries on without you. You can still delete it for everyone instead.
+Opening a group invite link now shows you the group and asks before you join, so a link alone never adds you to a group.
+Logging out works even when you're offline.
+```
+
+Apple TV:
+
+```
 Logging out works even when you're offline.
 ```
 
