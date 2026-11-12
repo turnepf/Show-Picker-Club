@@ -51,6 +51,10 @@ Nothing yet.
 
 ## 1.8 (build 36) — iPhone, iPad, Mac and Apple TV, submitted for review 2026-11-12
 
+iPhone/iPad and Apple TV ship as build 37 and the Mac as build 36: Apple
+accepted the first iPhone and Apple TV uploads but never finished processing
+them, and a build number can't be reused.
+
 Every platform, with new screenshots on all three listings. Mostly the app
 half of the 2026-11 security audit. Apple TV has no group editing, so its text
 carries only the sign-out fix.
