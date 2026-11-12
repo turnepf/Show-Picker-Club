@@ -48,6 +48,9 @@ requires a session.
   our upstream quota. It requires a session now. It was found by
   `check-static.sh` on the day that check was written, which is the argument
   for the check.
+- A logged-out read of a show names the title, never whose copy it is.
+  `GET /api/shows/:id` answers `ownerSlug: null` without a session (security
+  audit run-2), the same rule the `/show/:id` link preview already follows.
 
 ## 2. Session-derived UI state dies with the session
 
@@ -280,8 +283,19 @@ existing sources of truth supply **identity**.
   for one. A model asked for an id will produce a plausible one.
 - Nothing a model produced reaches the database without passing the same
   validation a hand-typed value would: the list must be one of the four,
-  `poster_url` must be on `https://image.tmdb.org/`, `tmdb_id` must be an
-  integer, strings are trimmed and length-capped.
+  `tmdb_id` must be an integer, strings are trimmed and length-capped, and a
+  network name carrying markup is dropped.
+- **The client is not a source of identity either (security audit run-2).**
+  Commit's input is a client payload, so an id there proves nothing. An id
+  counts only if parse signed it (`identity_sig`, an HMAC over type, id,
+  title and year in `_shared/import-identity.js`), if the club already has
+  that entry, or if TMDB serves it on a by-id lookup — bounded per call and
+  metered as `lookups`. The shared row's name and details come from TMDB or
+  the signed parse result, never the posted title.
+- **No URL from the paste is stored.** Commit ignores any poster or link in
+  the payload; artwork comes from TMDB and Watch links from the normal
+  enrichment. Patrick's rule: the import reads titles, services and lists,
+  and nothing else.
 - Nothing a model produced is written without a member confirming it. Parse
   writes nothing; commit writes what the member reviewed.
 
@@ -290,7 +304,9 @@ these four points are the bar it has to clear.
 
 Enforcer: `scripts/import-list-test.mjs` (a deliberately badly-behaved fake
 Claude returns a hallucinated id and an unknown title, and asserts neither
-reaches the database), plus this file for the general rule.
+reaches the database; an unsigned id TMDB doesn't serve, a forged title on a
+real id, and a signature moved to another id are each refused), plus this file
+for the general rule.
 
 ## 9. An import is bounded, and says so when it stops
 
@@ -940,6 +956,12 @@ Watch button under a real service's name.
   (`upgradeAmazonWatchLink`), because there the shape decides whether Watch
   opens the show at all — fill-only kept the old ASIN link and the
   `amazon-shape` repair changed nothing a member could see.
+- **A new copy starts from its service, not from somebody's paste (security
+  audit run-2).** Adding a show used to copy another member's `network` and
+  `network_url` onto the new row, and a Watching With copy took the tagging
+  member's link. Both now store only what the adder chose or the service's
+  search placeholder; the real link reaches the copy through `watch_links`
+  and `shows_v`, where the provenance rules above already apply.
 - **A denylist is not the control.** Excluding the demo account was correct and
   insufficient — open signup means the next untrusted row is one registration
   away.
@@ -1020,6 +1042,18 @@ product, and an invite token is the only credential that produces one.
   being copied into each client, where the stated bound and the enforced one
   would drift apart.
 
+- **Joining is a choice the member makes on screen (security audit run-2).**
+  Opening an invite link shows the group's name and a Join button; the web
+  page fetches `?preview=1`, which never writes, and redeems only on the
+  press.
+- **A group doesn't outlive its creator.** Leaving as the creator deletes the
+  group for everyone, so `POST /api/groups/:id/leave` answers 409
+  `creator_must_confirm` until the caller sends `confirm_delete: true`, and
+  the client says so first. An older app gets the 409's message rather than a
+  silent delete. Delete and leave-as-creator both go through
+  `_shared/group-delete.js`, which removes responses, suggestions, invites
+  and members before the group, so nothing is left pointing at it.
+
 Enforcer: `scripts/group-invite-lifecycle-test.mjs`, plus the preview cases in
 `scripts/og-preview-test.mjs`.
 
@@ -1063,16 +1097,21 @@ member could do anyway, and nothing it does may widen what anyone can see.
     member's rows and only theirs: a `show_id` belonging to someone else is
     refused, Next Up still can't be rated, and a disabled member's lists
     don't change.
-  - **Memos stay private.** `admin_list_member_shows` strips notes,
-    recommended-by and watching-with even though it reads as the owner, and
-    no admin tool writes them.
+  - **Memos stay private.** Every `members:admin` tool's result passes
+    through `withoutMemos()` in `functions/mcp.js`, which strips notes,
+    recommended-by, watching-with, watchers and `added_by` at any depth,
+    even though the tools read as the owner (security audit run-2: the
+    per-tool stripping missed the add, rate and fix results). No admin tool
+    writes a memo.
   - **A fix never changes which show it is by accident.** Every edit
     re-enriches, and given no TMDB id the edit path re-guesses the entry from
     the title, which swaps a remake for its original. So `admin_update_show`
     and `admin_restore_show` always send the row's own pin unless the call is
     re-pointing it. A re-point TMDB can't serve comes back with a warning
     instead of success. `admin_refresh_show` goes through `/api/enrich`
-    (`show_id`), so it stamps `enriched_at` and never `updated_at`.
+    (`show_id`), so it stamps `enriched_at` and never `updated_at`. It sets
+    the same admin-scope flag `admin_query` does, which is what lets it past
+    the member enrich meter (§28).
     Enforcer: `scripts/admin-fix-tools-test.mjs`.
   - **Every change is recorded.** Each change goes to `admin_actions`
     (migration 074). `added_by` names the admin, not the member, and Connected
@@ -1143,6 +1182,12 @@ written.
   the member typed and skips only the re-enrichment.
 - **The meter fails open.** A ledger error must never stop a member adding a
   show; the ceilings are there for a script, not for a person.
+- **A background refresh is spend too (security audit run-2).** Member pages
+  fire `/api/enrich`, and it used to accept any mode, batch, title list or
+  other member's scope from any session. A member session now gets the
+  default pass over their own copies, charged as `enrich` (20 a day,
+  migration 091); past that it answers `skipped: 'rate_limited'` with no
+  TMDB call. The nightly job (cron secret) and admins keep every option.
 - **A club-wide sweep is not a member action.** `/api/sync-urls` costs one
   write per distinct title in the whole club. It runs nightly from
   `watch-urls-fill.yml` and for admins; a member session gets the old answer
@@ -1216,6 +1261,58 @@ edit, and `import-list-test.mjs` for the import's unmatched list. Suites that
 add shows use the stand-in TMDB in `scripts/lib/fake-tmdb.mjs`.
 `check-static.sh` fails a PR whose SQL reads a title off the raw `shows`
 table.
+
+## 30. A session is minted only for the person asking, on purpose
+
+*Security audit run-2, 2026-11.* Signup is open, so the sign-in endpoints are
+the most-reached code in the product, and every one of them sets a cookie.
+
+- **No session from another site.** `/auth/login`, `/auth/enroll`,
+  `/auth/apple`, `/auth/google` and `/auth/request-code` refuse a browser
+  request whose `Sec-Fetch-Site` or `Origin` says it came from somewhere else
+  (`_shared/cross-site.js`). Those endpoints parse JSON whatever the
+  Content-Type, so a plain cross-site form could otherwise sign a visitor into
+  an attacker's account. Native apps send neither header and are unaffected.
+- **A code is checked against the thing it was sent to.** An email login only
+  accepts a code issued on the email channel.
+- **Guessing has a per-target ceiling, not just a per-IP one.** Ten wrong
+  signup codes for one email in 15 minutes, from any number of addresses,
+  locks that email and spends its live codes (`_shared/signup-guard.js`). The
+  failure is keyed by a hash, so the log holds no address. Signup codes also
+  have a club-wide ceiling (20 an hour, 50 a day) past which nothing is sent.
+- **An identity provider's email counts only when it says it checked it.**
+  Sign in with Apple links or enrolls by email only when `email_verified` is
+  true, as Google already required. A linked Apple id still signs in.
+- **Logout sends you home, not elsewhere.** Its redirect is followed only for
+  a same-origin path.
+
+Enforcer: `scripts/auth-code-flow-test.mjs` (cross-site refusals, the per-email
+lockout, the signup ceiling, logout, and Apple's `email_verified`).
+
+## 31. A member who leaves takes every reference with them
+
+*Security audit run-2, 2026-11.* `createMember()` hands a freed slug to the
+next signup with the same first name, so a row still naming a deleted slug
+belongs to a stranger the moment that slug is reused. Account deletion and
+admin merge used to delete the member row while ratings, household links,
+group memberships, invites and groups they created still named it — and with
+foreign keys enforced, the deletion failed and the account stayed live.
+
+- **Every table that names a member is listed in one place,**
+  `_shared/member-references.js`, and both delete and merge run it in the
+  same batch as the member row. A new table with a member column is added
+  there in the same PR.
+- **Delete removes; merge moves.** Delete drops or unlinks each reference and
+  deletes the groups the member created, with everything in them (§26). Merge
+  moves them to the surviving member, folding duplicates into what the target
+  already has.
+- **Children before parents,** so the batch holds with or without foreign-key
+  enforcement.
+- **The demo account resets the same way.** Its daily reset clears groups,
+  household rows, passkeys and AI connections it made, and sessions older
+  than a day — never a fresh one, so App Review isn't signed out mid-review.
+
+Enforcer: `scripts/member-references-test.mjs` (delete with foreign keys on and off, a reused slug inheriting nothing, merge, and the demo reset).
 
 ## Adding an invariant
 

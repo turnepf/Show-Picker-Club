@@ -7,6 +7,7 @@
 // name via { needs_name: true } if it didn't send one (Apple only provides
 // the name to the client, and only on the very first authorization).
 
+import { isCrossSiteBrowserRequest, crossSiteRefusal } from '../_shared/cross-site.js';
 import { issueSession } from '../_shared/session.js';
 import { enrollmentThrottled, enrollMember } from '../_shared/enroll.js';
 
@@ -112,6 +113,8 @@ async function verifyAppleToken(token, allowedAuds) {
 
 export async function onRequestPost(context) {
   const { env, request } = context;
+  // Login CSRF: a browser request from another site never mints a session.
+  if (isCrossSiteBrowserRequest(request)) return crossSiteRefusal();
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
 
   if (await failureCount(env, ip) >= MAX_FAILS) {
@@ -145,7 +148,12 @@ export async function onRequestPost(context) {
   }
 
   const sub = payload.sub;
-  const email = (payload.email || '').trim().toLowerCase();
+  // An email links or enrolls an account only when Apple says it verified it
+  // (it sends true or "true"), as google.js requires; an organization-managed
+  // Apple account can carry an email its holder doesn't own (security audit
+  // run-2). An unverified email still signs in an already-linked Apple id.
+  const emailVerified = payload.email_verified === true || payload.email_verified === 'true';
+  const email = emailVerified ? (payload.email || '').trim().toLowerCase() : '';
 
   // 1) Already-linked Apple id wins — works even behind a relay email.
   let memberSlug = (await env.DB.prepare(

@@ -3,6 +3,8 @@
 // the code), collected the person's name, and now finishes here. The code is
 // consumed, the member is created, and a session is issued in one step.
 
+import { signupLocked, recordSignupFailure } from '../_shared/signup-guard.js';
+import { isCrossSiteBrowserRequest, crossSiteRefusal } from '../_shared/cross-site.js';
 import { issueSession } from '../_shared/session.js';
 import { enrollmentThrottled, enrollMember } from '../_shared/enroll.js';
 
@@ -19,6 +21,8 @@ const WINDOW_MIN = 15;
 
 export async function onRequestPost(context) {
   const { env, request } = context;
+  // Login CSRF: a browser request from another site never mints a session.
+  if (isCrossSiteBrowserRequest(request)) return crossSiteRefusal();
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
 
   // Same per-IP failure window as /auth/login — this endpoint also takes a
@@ -50,6 +54,9 @@ export async function onRequestPost(context) {
   ).bind(email).first();
   if (existing) return json({ error: 'already_member' }, 409);
 
+  // Per-email cap on wrong signup codes, whatever IPs they come from.
+  if (await signupLocked(env, email)) return json({ error: 'rate_limited' }, 429);
+
   const nowISO = new Date().toISOString();
   const otp = await env.DB.prepare(
     `SELECT id FROM enroll_otps
@@ -57,9 +64,7 @@ export async function onRequestPost(context) {
        ORDER BY created_at DESC LIMIT 1`
   ).bind(email, code, nowISO).first();
   if (!otp) {
-    await env.DB.prepare(
-      'INSERT INTO failed_logins (ip, member_slug, created_at) VALUES (?, NULL, ?)'
-    ).bind(ip, nowISO).run();
+    await recordSignupFailure(env, ip, email);
     return json({ error: 'invalid' }, 401);
   }
 

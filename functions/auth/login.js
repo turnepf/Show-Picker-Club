@@ -1,3 +1,5 @@
+import { signupLocked, recordSignupFailure } from '../_shared/signup-guard.js';
+import { isCrossSiteBrowserRequest, crossSiteRefusal } from '../_shared/cross-site.js';
 import { checkVerification, normalizePhone } from '../_shared/twilio-verify.js';
 import { issueSession } from '../_shared/session.js';
 import { noteDemoLogin } from '../_shared/demo.js';
@@ -45,6 +47,8 @@ async function recordFailure(env, ip, member) {
 
 export async function onRequestPost(context) {
   const { env, request } = context;
+  // Login CSRF: a browser request from another site never mints a session.
+  if (isCrossSiteBrowserRequest(request)) return crossSiteRefusal();
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
 
   if (await failureCount(env, ip) >= MAX_FAILS) {
@@ -126,7 +130,9 @@ export async function onRequestPost(context) {
       // Unknown email: the code may be a signup code (enroll_otps). If it
       // checks out, tell the client to collect a name and finish via
       // POST /auth/enroll — the code is NOT consumed here, so the two-step
-      // stays within the code's 10-minute TTL.
+      // stays within the code's 10-minute TTL. Wrong guesses count against the
+      // email as well as the IP (_shared/signup-guard.js).
+      if (await signupLocked(env, email)) return rateLimited();
       const pending = await env.DB.prepare(
         `SELECT id FROM enroll_otps
            WHERE email = ? AND code = ? AND used_at IS NULL AND expires_at > ?
@@ -135,7 +141,7 @@ export async function onRequestPost(context) {
       if (pending) {
         return new Response(JSON.stringify({ needs_name: true }), { status: 200, headers: corsHeaders() });
       }
-      await recordFailure(env, ip, null);
+      await recordSignupFailure(env, ip, email);
       return new Response(JSON.stringify({ error: 'invalid' }), { status: 401, headers: corsHeaders() });
     }
     member = row.member_slug;
@@ -146,9 +152,12 @@ export async function onRequestPost(context) {
   }
 
   const nowISO = new Date().toISOString();
+  // Login codes only: account-delete codes live in the same table under
+  // channel 'delete' and must not sign anyone in (security audit run-2).
   const otp = await env.DB.prepare(
     `SELECT id FROM login_otps
-       WHERE member_slug = ? AND code = ? AND used_at IS NULL AND expires_at > ?
+       WHERE member_slug = ? AND code = ? AND channel = 'email'
+         AND used_at IS NULL AND expires_at > ?
        ORDER BY created_at DESC LIMIT 1`
   ).bind(member, code, nowISO).first();
 

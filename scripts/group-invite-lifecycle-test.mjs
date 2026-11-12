@@ -53,6 +53,7 @@ const inviteApi = await load('api/groups/[id]/invite.js');
 const groupsApi = await load('api/groups.js');
 const joinApi = await load('api/groups/join.js');
 const leaveApi = await load('api/groups/[id]/leave.js');
+const groupApi = await load('api/groups/[id].js');
 
 const ORIGIN = 'https://showpicker.club';
 
@@ -353,6 +354,126 @@ console.log('\n== a new link reports the ceiling it enforces');
   const first = (await created.json()).invite;
   check('the group-creation invite reports it too', first.max_uses === body.max_uses,
     JSON.stringify(first));
+}
+
+
+// ---- security audit run-2 ----
+
+console.log('\n== ?preview=1 shows the group and joins nobody, even same-origin');
+{
+  const { env, gid } = club();
+  const token = await tokenFor(env, addSession(env, 'patrick'), gid);
+  const stacy = addSession(env, 'stacy');
+
+  // The web join page used to redeem on load, so a cross-site link that only
+  // opened our page became a same-origin join. It now previews first.
+  const res = await redeem(env, stacy, `${token}&preview=1`, { site: 'same-origin' });
+  check('the preview is 200', res.status === 200, `got ${res.status}`);
+  const body = await res.json();
+  check('it names the group and asks for a Join',
+    body.join_required === true && body.group && body.group.id === gid && body.group.name === 'Thursday Night', JSON.stringify(body));
+  check('no membership row was written', !isMember(env, gid, 'stacy'));
+  check('and the use was not spent', (inviteRow(env, token).use_count ?? 0) === 0);
+
+  const native = await redeem(env, stacy, `${token}&preview=1`);
+  check('a native preview writes nothing either', (await native.json()).join_required === true && !isMember(env, gid, 'stacy'));
+
+  const joined = await redeem(env, stacy, token, { site: 'same-origin' });
+  check('the explicit Join (no preview) still joins', (await joined.json()).ok === true && isMember(env, gid, 'stacy'));
+}
+
+// A group doesn't outlive its creator: the creator leaving deletes it for
+// everyone, so it needs the client to say the member saw that warning.
+const leaveWith = (env, cookie, groupId, body) =>
+  leaveApi.onRequestPost(ctx(env, req(`/api/groups/${groupId}/leave`, { cookie, method: 'POST', body }), { id: String(groupId) }));
+const deleteGroupReq = (env, cookie, groupId) =>
+  groupApi.onRequestDelete(ctx(env, req(`/api/groups/${groupId}`, { cookie, method: 'DELETE' }), { id: String(groupId) }));
+const count = (env, sql, ...b) => env._db.prepare(sql).get(...b).n;
+function groupWithContents(env, gid) {
+  env._db.prepare("INSERT INTO group_suggestions (group_id, suggested_by, title) VALUES (?, 'quinn', 'Severance')").run(gid);
+  const sid = env._db.prepare('SELECT MAX(id) AS id FROM group_suggestions').get().id;
+  env._db.prepare("INSERT INTO group_suggestion_responses (suggestion_id, member_slug, response) VALUES (?, 'patrick', 'dismissed')").run(sid);
+  return sid;
+}
+function leftovers(env, gid, sid) {
+  return count(env, 'SELECT COUNT(*) AS n FROM groups WHERE id = ?', gid)
+    + count(env, 'SELECT COUNT(*) AS n FROM group_members WHERE group_id = ?', gid)
+    + count(env, 'SELECT COUNT(*) AS n FROM group_invites WHERE group_id = ?', gid)
+    + count(env, 'SELECT COUNT(*) AS n FROM group_suggestions WHERE group_id = ?', gid)
+    + count(env, 'SELECT COUNT(*) AS n FROM group_suggestion_responses WHERE suggestion_id = ?', sid);
+}
+
+console.log('\n== the creator leaving needs confirm_delete, and then the group is gone');
+{
+  const { env, gid } = club();
+  const patrick = addSession(env, 'patrick');
+  await tokenFor(env, patrick, gid);
+  const sid = groupWithContents(env, gid);
+
+  let res = await leaveWith(env, patrick, gid, {});
+  check('without the flag it is 409', res.status === 409, `got ${res.status}`);
+  check('with creator_must_confirm', (await res.json()).error === 'creator_must_confirm');
+  check('and nothing changed', isMember(env, gid, 'patrick') && isMember(env, gid, 'quinn')
+    && count(env, 'SELECT COUNT(*) AS n FROM group_suggestions WHERE group_id = ?', gid) === 1);
+
+  res = await leaveGroup(env, patrick, gid);
+  check('an old client sending no body gets the same 409', res.status === 409, `got ${res.status}`);
+
+  res = await leaveWith(env, patrick, gid, { confirm_delete: 'yes' });
+  check('a truthy-but-not-true flag is still 409', res.status === 409, `got ${res.status}`);
+
+  res = await leaveWith(env, patrick, gid, { confirm_delete: true });
+  const body = await res.json();
+  check('with confirm_delete: true it is 200 deleted', res.status === 200 && body.deleted === true, JSON.stringify(body));
+  check('the group, members, invites, suggestions and responses are all gone', leftovers(env, gid, sid) === 0,
+    `left ${leftovers(env, gid, sid)} rows`);
+}
+
+console.log('\n== the creator leaving cleans up even with foreign keys off');
+{
+  const { env, gid } = club();
+  env._db.exec('PRAGMA foreign_keys = OFF');
+  const patrick = addSession(env, 'patrick');
+  await tokenFor(env, patrick, gid);
+  const sid = groupWithContents(env, gid);
+  await leaveWith(env, patrick, gid, { confirm_delete: true });
+  check('no orphaned rows', leftovers(env, gid, sid) === 0, `left ${leftovers(env, gid, sid)} rows`);
+}
+
+console.log('\n== a non-creator still just leaves');
+{
+  const { env, gid } = club();
+  const quinn = addSession(env, 'quinn');
+  const res = await leaveGroup(env, quinn, gid);
+  check('200 without any flag', res.status === 200, `got ${res.status}`);
+  check('quinn is out', !isMember(env, gid, 'quinn'));
+  check('the group and its creator stay', count(env, 'SELECT COUNT(*) AS n FROM groups WHERE id = ?', gid) === 1 && isMember(env, gid, 'patrick'));
+}
+
+console.log('\n== deleting a group removes its contents too');
+{
+  const { env, gid } = club();
+  env._db.exec('PRAGMA foreign_keys = OFF');
+  const patrick = addSession(env, 'patrick');
+  await tokenFor(env, patrick, gid);
+  const sid = groupWithContents(env, gid);
+
+  const notCreator = await deleteGroupReq(env, addSession(env, 'quinn'), gid);
+  check('a non-creator is 403', notCreator.status === 403, `got ${notCreator.status}`);
+
+  const res = await deleteGroupReq(env, patrick, gid);
+  check('the creator deletes it', res.status === 200, `got ${res.status}`);
+  check('nothing of it is left, foreign keys or not', leftovers(env, gid, sid) === 0, `left ${leftovers(env, gid, sid)} rows`);
+}
+
+console.log("\n== a creator who is no longer in the group can't delete it");
+{
+  const { env, gid } = club();
+  const patrick = addSession(env, 'patrick');
+  env._db.prepare("DELETE FROM group_members WHERE group_id = ? AND member_slug = 'patrick'").run(gid);
+  const res = await deleteGroupReq(env, patrick, gid);
+  check('403', res.status === 403, `got ${res.status}`);
+  check('and the group stays', count(env, 'SELECT COUNT(*) AS n FROM groups WHERE id = ?', gid) === 1);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -1,5 +1,7 @@
 import { getSession } from '../_shared/auth.js';
 import { cronAuthorized } from '../_shared/secrets.js';
+import { chargeSpend } from '../_shared/spend-meter.js';
+import { getConnectorAdminSession } from '../_shared/admin.js';
 import { fetchEnrichment, fetchEnrichmentById, extractTmdbDetailFields, fallbackNetwork, dedupeCast, castCharacter, CAST_DEPTH, pickBestMatch, titleSearchTerms } from '../_shared/enrichment.js';
 import { fillActorIdsFromKnownPeople, knownByPersonIds, rememberPeople } from '../_shared/people.js';
 import { canonicalNetwork } from '../_shared/networks.js';
@@ -229,6 +231,21 @@ export async function onRequestPost(context) {
 
   let body = {};
   try { body = await request.json(); } catch (e) {}
+
+  // Every member-triggered pass spends on the operator's TMDB key, so it is
+  // metered per member per day like add, edit and search (docs/INVARIANTS.md
+  // §28; security audit run-2). A member gets the default small pass over
+  // their own copies; modes, batch sizes, title lists, show_id and other
+  // members' scopes stay with the nightly job and admins (which includes the
+  // admin_refresh_show connector tool).
+  if (!cronOk && !(await getConnectorAdminSession(request, env))) {
+    if (!(await chargeSpend(env, session.member_slug, 'enrich'))) {
+      return new Response(JSON.stringify({ enriched: 0, tmdbUpdated: 0, skipped: 'rate_limited' }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    body = { member: session.member_slug };
+  }
 
   // `mode: 'titles'` rebuilds the shared one-row-per-show table from every
   // copy (functions/_shared/titles.js). The nightly job runs it once, after

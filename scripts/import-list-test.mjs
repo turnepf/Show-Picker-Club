@@ -40,7 +40,27 @@ writeFileSync(join(sandbox, 'package.json'), '{"type":"module"}');
 
 const load = (p) => import(join(sandbox, 'functions', p));
 const parse = await load('api/import/parse.js');
-const commit = await load('api/import/commit.js');
+const commitApi = await load('api/import/commit.js');
+const { signIdentity } = await load('_shared/import-identity.js');
+
+// Most cases below commit ids that stand in for what parse resolved, so the
+// harness signs them the way parse does. The identity cases send
+// X-Test-Unsigned to commit exactly what a tampered client would.
+const commit = {
+  async onRequestPost(ctx) {
+    const { request, env } = ctx;
+    if (request.headers.get('X-Test-Unsigned')) return commitApi.onRequestPost(ctx);
+    let body;
+    try { body = await request.clone().json(); } catch { return commitApi.onRequestPost(ctx); }
+    for (const it of Array.isArray(body?.items) ? body.items : []) {
+      if (it && it.identity_sig === undefined && Number.isInteger(it.tmdb_id) && it.tmdb_type) {
+        it.identity_sig = await signIdentity(env, { ...it, year: it.year ?? null });
+      }
+    }
+    const signed = new Request(request.url, { method: 'POST', headers: request.headers, body: JSON.stringify(body) });
+    return commitApi.onRequestPost({ ...ctx, request: signed });
+  },
+};
 
 const ORIGIN = 'https://showpicker.club';
 const SESSION_ID = 'sess-test-1';
@@ -61,7 +81,7 @@ function check(name, cond, detail = '') {
 // second. `claude.calls` records what each slice was asked, so the paging
 // tests can assert the carried section actually arrived.
 const claude = { calls: [], reply: null, status: 200 };
-const tmdb = { calls: [], known: new Map() };
+const tmdb = { calls: [], detailCalls: [], known: new Map() };
 
 globalThis.fetch = async (url, init = {}) => {
   const target = String(url);
@@ -85,6 +105,24 @@ globalThis.fetch = async (url, init = {}) => {
       stop_reason: 'end_turn',
     });
   }
+
+  // A by-id detail fetch: commit confirms an id the client sent without a
+  // signature from parse (an older app build) against TMDB itself.
+  const detail = target.match(/^https:\/\/api\.themoviedb\.org\/3\/(tv|movie)\/(\d+)(?:\?|$)/);
+  if (detail) {
+    const [, type, id] = detail;
+    tmdb.detailCalls.push({ type, id: Number(id) });
+    const hit = [...tmdb.known.values()].find((k) => k.type === type && k.id === Number(id));
+    if (!hit) return jsonRes({ success: false, status_code: 34 }, 404);
+    return jsonRes({
+      id: hit.id,
+      [type === 'movie' ? 'title' : 'name']: hit.title,
+      [type === 'movie' ? 'release_date' : 'first_air_date']: hit.date || '2020-01-01',
+      poster_path: '/abc.jpg',
+      genres: [{ id: 18, name: 'Drama' }],
+    });
+  }
+  if (target.startsWith('https://api.themoviedb.org/3/person/')) return jsonRes({}, 404);
 
   if (target.startsWith('https://api.themoviedb.org/')) {
     const q = decodeURIComponent(new URL(target).searchParams.get('query') || '');
@@ -121,6 +159,7 @@ function makeEnv(extra = {}) {
   claude.status = 200;
   claude.reply = { items: [], trailing_section: '' };
   tmdb.calls.length = 0;
+  tmdb.detailCalls.length = 0;
   tmdb.known = new Map();
 
   db.prepare('INSERT INTO members (slug, name, first_name, is_admin, disabled) VALUES (?, ?, ?, 0, 0)')
@@ -136,6 +175,7 @@ function makeEnv(extra = {}) {
     },
     ANTHROPIC_API_KEY: 'test-key',
     TMDB_TOKEN: 'test-token',
+    CRON_SECRET: 'test-cron',
     _db: db,
     ...extra,
   };
@@ -145,9 +185,10 @@ function knowTitle(title, id, type = 'tv', date = '2022-01-01', canonical = null
   tmdb.known.set(title.toLowerCase(), { id, type, date, title: canonical || title });
 }
 
-function post(path, body, { session = SESSION_ID } = {}) {
+function post(path, body, { session = SESSION_ID, unsigned = false } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (session) headers.Cookie = `session=${session}`;
+  if (unsigned) headers['X-Test-Unsigned'] = '1';
   return new Request(ORIGIN + path, { method: 'POST', headers, body: JSON.stringify(body ?? {}) });
 }
 
@@ -205,27 +246,67 @@ console.log('\n== TMDB decides what a title is, not Claude');
 console.log('\n== a hallucinated id cannot reach the database');
 {
   const env = makeEnv();
-  // Straight from a tampered-with (or model-poisoned) client payload.
+  knowTitle('The Bear', 136315, 'tv', '2022-06-23');
+  // Straight from a tampered-with (or model-poisoned) client payload, with no
+  // signature from parse: commit has to ask TMDB about every id itself.
   const res = await commit.onRequestPost(context(env, post('/api/import/commit', {
     items: [
       { title: 'Severance', list: 'watching', tmdb_id: 'not-a-number' },
+      { title: 'Breaking News', list: 'watching', tmdb_id: 999999, tmdb_type: 'tv' },
       { title: 'The Bear', list: 'watching', tmdb_id: 136315, tmdb_type: 'tv', poster_url: 'https://evil.example/x.jpg' },
     ],
-  })));
+  }, { unsigned: true })));
   check('commit still succeeds', res.status === 200, `got ${res.status}`);
   const body = await res.json();
   // Every show is a TMDB entry, so an item without a real id isn't added: it
   // comes back by name for the member to add by hand.
   check('the item with no real id is not added', !shows(env).some((r) => r.title === 'Severance'));
-  check('and comes back as unmatched, by name', body.unmatched === 1 && body.unmatched_titles[0] === 'Severance', JSON.stringify(body));
+  check('a well-formed id TMDB does not serve is not added either', !shows(env).some((r) => r.tmdb_id === 999999));
+  check('both come back as unmatched, by name',
+    body.unmatched === 2 && body.unmatched_titles.includes('Severance') && body.unmatched_titles.includes('Breaking News'),
+    JSON.stringify(body));
+  check('the unsigned ids were looked up by id', tmdb.detailCalls.length === 2, JSON.stringify(tmdb.detailCalls));
   const row = shows(env).find((r) => r.tmdb_id === 136315);
-  check('the matched one is added', !!row);
-  check('the off-domain poster is dropped', row && row.poster_url === null, String(row?.poster_url));
+  check('the one TMDB confirms is added', !!row);
+  check('named and pictured by TMDB, never by the client',
+    row && row.title === 'The Bear' && !String(row.poster_url || '').includes('evil.example'), String(row?.poster_url));
+}
+
+console.log('\n== an unsigned id cannot rename a title already in the club');
+{
+  const env = makeEnv();
+  // A forged title riding a real id: the shared row's name must not take it.
+  knowTitle('The Bear', 136315, 'tv', '2022-06-23');
+  await commit.onRequestPost(context(env, post('/api/import/commit', {
+    items: [{ title: '<img src=x onerror=alert(1)>', list: 'watching', tmdb_id: 136315, tmdb_type: 'tv' }],
+  }, { unsigned: true })));
+  check('the shared row is named by TMDB', shows(env)[0]?.title === 'The Bear', shows(env)[0]?.title);
+}
+
+console.log('\n== a signed parse result commits without a second lookup');
+{
+  const env = makeEnv();
+  knowTitle('Severance', 95396, 'tv', '2022-02-18');
+  claude.reply = { items: [{ title: 'Severance', year: '', list: 'watching', notes: '', network: '' }], trailing_section: '' };
+  const parsed = await (await parse.onRequestPost(context(env, post('/api/import/parse', { text: 'Severance' })))).json();
+  const it = parsed.items[0];
+  check('parse signs the identity it resolved', typeof it.identity_sig === 'string' && it.identity_sig.length > 20, JSON.stringify(it));
+  tmdb.detailCalls.length = 0;
+  const out = await (await commit.onRequestPost(context(env, post('/api/import/commit', { items: [it] })))).json();
+  check('it is added', out.added === 1, JSON.stringify(out));
+  check('with no by-id lookup', tmdb.detailCalls.length === 0, JSON.stringify(tmdb.detailCalls));
+
+  // The same signature on a different id is just an unsigned row.
+  const env2 = makeEnv();
+  const forged = { ...it, tmdb_id: 1399, title: 'Not Severance' };
+  const out2 = await (await commit.onRequestPost(context(env2, post('/api/import/commit', { items: [forged] }, { unsigned: true })))).json();
+  check('a signature moved to another id does not verify', out2.added === 0 && tmdb.detailCalls.length === 1, JSON.stringify(out2));
 }
 
 console.log('\n== the four lists are the only lists');
 {
   const env = makeEnv();
+  knowTitle('Severance', 95396, 'tv', '2022-02-18');
   const res = await commit.onRequestPost(context(env, post('/api/import/commit', {
     items: [
       { title: 'Severance', list: 'watching', tmdb_id: 95396, tmdb_type: 'tv' },

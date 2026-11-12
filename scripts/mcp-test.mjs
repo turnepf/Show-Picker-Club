@@ -667,6 +667,76 @@ console.log('\n== an admin who opts in can act on any member');
   check('and refuses them by name', after.error && after.error.code === -32602);
 }
 
+
+// ---- security audit run-2 ----
+
+// Admin tools run the member tools *as the target member*, so the handlers
+// answer with the owner's full row. mcp.js now strips owner-only memos from
+// every members:admin tool result, whichever tool produced it.
+console.log("\n== an admin tool never hands back the member's private memos");
+{
+  const { env } = club();
+  const stacyShow = addShow(env, { slug: 'stacy', title: 'Hacks', list: 'watching', notes: 'STACY-NOTE', tmdb: 61 });
+  const op = await connect(env, 'patrick', { adminBox: true });
+
+  const OWNER_ONLY = ['notes', 'recommended_by', 'watching_with', 'watching_with_members', 'watchers', 'added_by'];
+  const keysIn = (o, acc = new Set()) => {
+    if (Array.isArray(o)) o.forEach((x) => keysIn(x, acc));
+    else if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) { acc.add(k); keysIn(v, acc); }
+    return acc;
+  };
+  const leaks = (r) => {
+    const parsed = (() => { try { return JSON.parse(r.text); } catch { return null; } })();
+    const keys = [...keysIn(parsed)].filter((k) => OWNER_ONLY.includes(k));
+    const strs = ['STACY-NOTE', 'REC-STACY-NOTE', 'WITH-STACY-NOTE', 'stacy@example.com'].filter((x) => r.text.includes(x));
+    return [...keys, ...strs];
+  };
+
+  const calls = [
+    ['admin_rate_show', { member_slug: 'stacy', show_id: stacyShow, rating: 8 }],
+    ['admin_update_show', { member_slug: 'stacy', show_id: stacyShow, network: 'Hulu' }],
+    ['admin_move_show', { member_slug: 'stacy', show_id: stacyShow, list: 'next_up' }],
+    ['admin_archive_show', { member_slug: 'stacy', show_id: stacyShow }],
+    ['admin_restore_show', { member_slug: 'stacy', show_id: stacyShow, list: 'watching' }],
+    ['admin_refresh_show', { member_slug: 'stacy', show_id: stacyShow }],
+    ['admin_list_member_shows', { member_slug: 'stacy', include_archived: true }],
+  ];
+  for (const [name, args] of calls) {
+    const r = await tool(env, op.access, name, args);
+    check(`${name} runs`, !r.isError && !r.error, r.text || JSON.stringify(r.error));
+    const l = leaks(r);
+    check(`${name} carries no owner-only field`, l.length === 0, l.join(', '));
+  }
+  check('the memos are still on the row (stripped from the reply, not the data)',
+    row(env, 'SELECT notes FROM shows WHERE id = ?', stacyShow).notes === 'STACY-NOTE');
+
+  // The owner's own connection still reads them.
+  const own = await connect(env, 'stacy');
+  const mine = await tool(env, own.access, 'get_show', { show_id: stacyShow });
+  check("the owner's own tools still return their notes", mine.text.includes('STACY-NOTE'), mine.text);
+}
+
+console.log('\n== leave_group on a group you created asks before deleting it');
+{
+  const { env, groupId } = club();
+  const pat = await connect(env, 'patrick');
+  const groupLeft = () => row(env, 'SELECT COUNT(*) AS n FROM groups WHERE id = ?', groupId).n;
+
+  const first = await tool(env, pat.access, 'leave_group', { group_id: groupId });
+  check('without confirm_delete it is an error', first.isError, first.text);
+  check('that says how to confirm', first.text.includes('confirm_delete'), first.text);
+  check('and the group is untouched', groupLeft() === 1
+    && row(env, 'SELECT COUNT(*) AS n FROM group_members WHERE group_id = ?', groupId).n === 2);
+
+  const schema = (await rpc(env, pat.access, 'tools/list', {})).body.result.tools.find((t) => t.name === 'leave_group');
+  check('the tool schema offers confirm_delete', schema && schema.inputSchema.properties.confirm_delete?.type === 'boolean');
+
+  const done = await tool(env, pat.access, 'leave_group', { group_id: groupId, confirm_delete: true });
+  check('with confirm_delete: true it leaves and deletes', !done.isError && done.text.includes('"deleted":true'), done.text);
+  check('the group is gone for everyone', groupLeft() === 0
+    && row(env, 'SELECT COUNT(*) AS n FROM group_members WHERE group_id = ?', groupId).n === 0);
+}
+
 console.log('\n== never admin');
 {
   const { env } = club();

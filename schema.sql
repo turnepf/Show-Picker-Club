@@ -649,6 +649,7 @@ CREATE TABLE IF NOT EXISTS member_spend (
   lookups INTEGER NOT NULL DEFAULT 0,
   searches INTEGER NOT NULL DEFAULT 0,
   emails INTEGER NOT NULL DEFAULT 0,
+  enrich INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (member_slug, day)
 );
 

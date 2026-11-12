@@ -119,7 +119,7 @@ Routing is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
    that one email log in with a fixed code — no SMS/email round-trip needed:
    ```bash
    printf "demo@example.com" | wrangler pages secret put DEMO_LOGIN_EMAIL --project-name shows
-   printf "424242"           | wrangler pages secret put DEMO_LOGIN_CODE  --project-name shows  # 6 digits → iOS auto-submits
+   printf "<6-digit code from 1Password>" | wrangler pages secret put DEMO_LOGIN_CODE  --project-name shows  # 6 digits → iOS auto-submits; never commit the real value
    ```
    The bypass (in `functions/auth/login.js`) only ever unlocks the configured
    email and only when both secrets are set; leave them unset to disable it.

@@ -54,6 +54,7 @@ const searchApi = await load('api/title-search.js');
 const syncUrlsApi = await load('api/sync-urls.js');
 const householdApi = await load('api/household.js');
 const householdRemoveApi = await load('api/household/remove.js');
+const enrichApi = await load('api/enrich.js');
 
 const ORIGIN = 'https://showpicker.club';
 const CRON = 'test-cron-secret';
@@ -355,6 +356,62 @@ console.log('\n== household: nobody is added without their own invite');
   env._db.prepare("INSERT INTO household_members (member_slug, other_slug) VALUES ('ann', 'bob')").run();
   await householdRemoveApi.onRequestPost(ctx(env, req('/api/household/remove', { cookie: ann, method: 'POST', body: { member_slug: 'bob' } })));
   check('the owner can still remove from their end', rows().length === 0);
+}
+
+
+// ---- 8. background enrich (security audit run-2) ----
+//
+// /api/enrich spends on the operator's TMDB key on every member page load. A
+// member session used to pick its own mode, batch size, show_id and even
+// another member's scope; now it is metered (`enrich`, migration 091) and its
+// body is replaced with { member: <own slug> }.
+
+console.log('\n== enrich: a member pass is metered and scoped to their own copies');
+{
+  // A fresh database (schema.sql) must carry the column; production gets it
+  // from migration 091. Without it the meter fails open and the cap is gone.
+  const cols = (env) => env._db.prepare('PRAGMA table_info(member_spend)').all().map((c) => c.name);
+  check('schema.sql: member_spend has the enrich column', cols(makeEnv()).includes('enrich'),
+    `member_spend columns: ${cols(makeEnv()).join(', ')}`);
+  const seed = () => {
+    const env = makeEnv();
+    // Production's shape (migration 091), so the rest of this section tests
+    // the endpoint even while schema.sql lacks the column.
+    if (!cols(env).includes('enrich')) env._db.exec(readFileSync(join(repoRoot, 'migrations', '091_member_spend_enrich.sql'), 'utf8'));
+    const ann = addMember(env, 'ann');
+    addMember(env, 'bob');
+    const annId = addShow(env, 'ann', 'Severance', { tmdb_id: 95396, tmdb_type: 'tv' });
+    const bobId = addShow(env, 'bob', 'The Bear', { tmdb_id: 136315, tmdb_type: 'tv' });
+    return { env, ann, annId, bobId };
+  };
+  const enrich = (env, opts) => enrichApi.onRequestPost(ctx(env, req('/api/enrich', { method: 'POST', ...opts })));
+  const stamped = (env, id) => env._db.prepare('SELECT enriched_at FROM shows WHERE id = ?').get(id).enriched_at != null;
+
+  let { env, ann, annId, bobId } = seed();
+  let res = await enrich(env, { cookie: ann, body: {} });
+  check('a plain member pass answers 200', res.status === 200, `got ${res.status}`);
+  check('and is charged one enrich unit', spent(env, 'ann', 'enrich') === 1, `spent ${spent(env, 'ann', 'enrich')}`);
+  check("and refreshes the member's own copy", stamped(env, annId));
+  check("and leaves another member's copy alone", !stamped(env, bobId));
+
+  ({ env, ann, annId, bobId } = seed());
+  await enrich(env, { cookie: ann, body: { member: 'bob', show_id: bobId, mode: 'gaps', max_tmdb: 500 } });
+  check("a member naming another member's scope and show_id doesn't touch it", !stamped(env, bobId));
+  check('the pass runs over their own copies instead', stamped(env, annId));
+
+  ({ env, ann, annId, bobId } = seed());
+  spendTo(env, 'ann', 'enrich', DAILY_LIMITS.enrich);
+  upstream.calls.length = 0;
+  res = await enrich(env, { cookie: ann, body: {} });
+  const body = await res.json();
+  check('past the daily cap it answers skipped: rate_limited', body.skipped === 'rate_limited', JSON.stringify(body));
+  check('with zero TMDB calls', tmdbCalls() === 0, `made ${tmdbCalls()}`);
+  check('and nothing refreshed', !stamped(env, annId));
+
+  ({ env, ann, annId, bobId } = seed());
+  res = await enrich(env, { headers: { 'X-Cron-Secret': CRON }, body: { member: 'bob' } });
+  check('the nightly job (cron secret) still picks its scope', res.status === 200 && stamped(env, bobId) && !stamped(env, annId));
+  check('and is not charged to anyone', spent(env, 'bob', 'enrich') === 0 && spent(env, 'ann', 'enrich') === 0);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

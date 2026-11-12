@@ -22,6 +22,7 @@
 
 import { getSession } from '../../_shared/auth.js';
 import { extractItems, resolveItems, existingTitles, sliceChunk, normalizeList } from '../../_shared/list-parse.js';
+import { signIdentity } from '../../_shared/import-identity.js';
 import { showKey } from '../../_shared/same-show.js';
 import { chargeSpend } from '../../_shared/spend-meter.js';
 
@@ -90,6 +91,14 @@ export async function onRequestPost(context) {
     seen.add(key);
     return true;
   });
+
+  // Sign each TMDB match so commit can tell a row this server resolved from one
+  // a client made up (_shared/import-identity.js). The poster URL is still
+  // returned for the review screen's thumbnail, but commit never reads it.
+  for (const item of deduped) {
+    const sig = await signIdentity(env, item);
+    if (sig) item.identity_sig = sig;
+  }
 
   return json({
     items: deduped,

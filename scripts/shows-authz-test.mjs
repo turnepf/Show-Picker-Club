@@ -51,9 +51,10 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import { createContext, runInContext } from 'node:vm';
 import { Stmt } from './lib/d1.mjs';
 import { withLegacyShowColumns } from './lib/seed-titles.mjs';
-import { fakeTmdb } from './lib/fake-tmdb.mjs';
+import { fakeTmdb, tmdbIdFor } from './lib/fake-tmdb.mjs';
 
 // Every added show must be a TMDB entry, so adds go to a stand-in TMDB that
 // knows every title (scripts/lib/fake-tmdb.mjs). Nothing else goes out.
@@ -326,6 +327,113 @@ console.log('\n== propagation stops at a copy pinned to a different show');
   await syncUrls(env);
   check('a differently-pinned copy keeps its own URL',
     rowById(env, other).network_url.includes('/search'));
+}
+
+
+// ---- security audit run-2 ----
+//
+// The add path used to borrow the service and Watch link from any other
+// member's copy of the same entry ("goodCopy"), and the Watching With copy
+// carried the namer's own link onto the named member's row. Both made one
+// member's pasted link land on someone else's row without any provider
+// vouching for it. Now neither copies a link: a row with no link of its own
+// gets its service's search placeholder.
+
+console.log("\n== an add never inherits another member's link or service");
+{
+  const env = club();
+  const cookie = addSession(env, 'patrick');
+  // Stacy's copy of the same entry carries a link she pasted — a real-looking
+  // Netflix URL, which is what made the old donor query pick it.
+  const theirs = addLinkedShow(env, {
+    slug: 'stacy', title: 'Severance', network: 'Netflix', url: 'https://www.netflix.com/title/81244942',
+  });
+  env._db.prepare("UPDATE shows SET tmdb_id = ?, tmdb_type = 'tv' WHERE id = ?").run(tmdbIdFor('Severance', 'tv'), theirs);
+
+  const res = await postShow(env, cookie, { title: 'Severance', list: 'watching', network: 'Hulu' });
+  check('the add succeeds', res.status === 201, `got ${res.status}`);
+  const mine = env._db.prepare("SELECT network, network_url FROM shows WHERE member_slug = 'patrick'").get();
+  check("the member's own pick of service stands", mine.network === 'Hulu', `got ${mine.network}`);
+  check("Stacy's link is not copied onto the new row", !String(mine.network_url || '').includes('netflix.com'), `got ${mine.network_url}`);
+  check('the row gets the search placeholder for its service',
+    String(mine.network_url || '').includes('hulu.com') && /\/search|[?&]q=/.test(mine.network_url), `got ${mine.network_url}`);
+
+  const env2 = club();
+  const c2 = addSession(env2, 'patrick');
+  const t2 = addLinkedShow(env2, {
+    slug: 'stacy', title: 'Severance', network: 'Netflix', url: 'https://www.netflix.com/title/81244942',
+  });
+  env2._db.prepare("UPDATE shows SET tmdb_id = ?, tmdb_type = 'tv' WHERE id = ?").run(tmdbIdFor('Severance', 'tv'), t2);
+  await postShow(env2, c2, { title: 'Severance', list: 'watching' });
+  const bare = env2._db.prepare("SELECT network, network_url FROM shows WHERE member_slug = 'patrick'").get();
+  check("with no service picked, Stacy's service isn't borrowed either", bare.network !== 'Netflix', `got ${bare.network}`);
+  check("and neither is her link", !String(bare.network_url || '').includes('netflix.com/title'), `got ${bare.network_url}`);
+}
+
+console.log("\n== a Watching With copy gets a placeholder, not the namer's link");
+{
+  const env = club();
+  addMember(env, 'quinn', 'Quinn Rosa');
+  env._db.prepare("INSERT INTO groups (name, creator_slug) VALUES ('Household', 'patrick')").run();
+  const gid = env._db.prepare('SELECT MAX(id) AS id FROM groups').get().id;
+  env._db.prepare("INSERT INTO group_members (group_id, member_slug) VALUES (?, 'patrick'), (?, 'quinn')").run(gid, gid);
+  const cookie = addSession(env, 'patrick');
+  const src = addLinkedShow(env, {
+    slug: 'patrick', title: 'Severance', network: 'Netflix', url: 'https://www.netflix.com/title/81244942',
+  });
+  env._db.prepare("UPDATE shows SET tmdb_id = ?, tmdb_type = 'tv' WHERE id = ?").run(tmdbIdFor('Severance', 'tv'), src);
+
+  const res = await putShow(env, cookie, src, { watcher_slugs: ['quinn'] });
+  check('naming a group-mate saves', res.status === 200, `got ${res.status}`);
+  const copy = env._db.prepare("SELECT network, network_url FROM shows WHERE member_slug = 'quinn'").get();
+  check("the named member gets a copy", !!copy);
+  check('on the same service', copy && copy.network === 'Netflix', `got ${copy && copy.network}`);
+  check("without the namer's pasted link", copy && !String(copy.network_url || '').includes('/title/81244942'), `got ${copy && copy.network_url}`);
+  check('carrying the search placeholder instead', copy && String(copy.network_url || '').includes('netflix.com/search'), `got ${copy && copy.network_url}`);
+}
+
+console.log('\n== a logged-out show card does not say whose list it is on');
+{
+  const env = club();
+  const id = addLinkedShow(env, {
+    slug: 'patrick', title: 'Severance', network: 'Netflix', url: 'https://www.netflix.com/title/81244942',
+  });
+  env._db.prepare("UPDATE shows SET tmdb_id = 95396, tmdb_type = 'tv' WHERE id = ?").run(id);
+  env._db.prepare("INSERT INTO show_ratings (tmdb_id, tmdb_type, season_number, member_slug, rating) VALUES (95396, 'tv', 0, 'patrick', 9)").run();
+  const get = (cookie) => showApi.onRequestGet(ctx(env, req(`/api/shows/${id}`, { cookie }), { id: String(id) }));
+
+  const anon = await (await get(null)).json();
+  check('logged out: no owner rating', anon.ratings && anon.ratings.owner === null, JSON.stringify(anon.ratings));
+  check("logged out: no owner name", !anon.ratings || anon.ratings.ownerName === undefined);
+  check('logged out: the member is not named anywhere', !JSON.stringify(anon).includes('Patrick') && !JSON.stringify(anon).includes('"patrick"'));
+  check('logged out: the club average still shows', anon.ratings && anon.ratings.count >= 1, JSON.stringify(anon.ratings));
+
+  const viewer = addSession(env, 'stacy');
+  const seen = await (await get(viewer)).json();
+  check("logged in: another member's copy still labels the owner's rating",
+    seen.ratings && seen.ratings.owner === 9 && seen.ratings.ownerName === 'Patrick', JSON.stringify(seen.ratings));
+}
+
+
+console.log('\n== a stored URL cannot break out of the attribute the card puts it in');
+{
+  // public/show-renderer.js is a classic browser script (index.html and
+  // groups.html load it with <script src>), so it runs here in a bare VM
+  // context. safeUrl's result is interpolated into src="…" / href="…" and
+  // assigned through innerHTML; a quote in poster_url or network_url used to
+  // close the attribute and inject markup (security audit run-2).
+  const sandboxCtx = createContext({ URL, console });
+  runInContext(readFileSync(join(repoRoot, 'public', 'show-renderer.js'), 'utf8'), sandboxCtx);
+  const { safeUrl } = sandboxCtx;
+  const evil = 'https://image.tmdb.org/t/p/w500/x.jpg"><img src=x onerror=alert(1)>';
+  const out = safeUrl(evil);
+  check('a double quote is escaped', !out.includes('"') && out.includes('&quot;'), out);
+  check('angle brackets are escaped', !out.includes('<') && !out.includes('>'), out);
+  check("a single quote is escaped", !safeUrl("https://x.example/a'b").includes("'"));
+  check('an ampersand in a query string is escaped once', safeUrl('https://x.example/?a=1&b=2') === 'https://x.example/?a=1&amp;b=2');
+  check('an ordinary URL is otherwise unchanged', safeUrl('https://image.tmdb.org/t/p/w500/abc.jpg') === 'https://image.tmdb.org/t/p/w500/abc.jpg');
+  check('a javascript: URL is still dropped', safeUrl('javascript:alert(1)') === '');
+  check('and so is junk', safeUrl('not a url') === '' && safeUrl(null) === '');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

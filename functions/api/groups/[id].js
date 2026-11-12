@@ -1,3 +1,4 @@
+import { deleteGroup } from '../../_shared/group-delete.js';
 import { getSession } from '../../_shared/auth.js';
 import { GROUP_ICONS, GROUP_COLORS, readIconField } from '../../_shared/group-icons.js';
 
@@ -208,11 +209,13 @@ export async function onRequestDelete(context) {
     return new Response(JSON.stringify({ error: 'Group not found' }), { status: 404, headers: corsHeaders() });
   }
 
-  if (group.creator_slug !== session.member_slug) {
+  // The creator, and only while still in the group: a member's powers over a
+  // group end when their membership does (security audit run-2).
+  if (group.creator_slug !== session.member_slug || !(await checkGroupMembership(env, groupId, session.member_slug))) {
     return new Response(JSON.stringify({ error: 'Only the creator can delete a group' }), { status: 403, headers: corsHeaders() });
   }
 
-  await env.DB.prepare('DELETE FROM groups WHERE id = ?').bind(groupId).run();
+  await deleteGroup(env, groupId);
   return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders() });
 }
 

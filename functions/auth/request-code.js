@@ -1,3 +1,4 @@
+import { isCrossSiteBrowserRequest, crossSiteRefusal } from '../_shared/cross-site.js';
 import { sendEmail, loginCodeEmail, signupCodeEmail } from '../_shared/email.js';
 import { sendVerification, normalizePhone } from '../_shared/twilio-verify.js';
 import { turnstileOk, enrollmentThrottled } from '../_shared/enroll.js';
@@ -35,6 +36,9 @@ function makeCode() {
 
 export async function onRequestPost(context) {
   const { request, env } = context;
+  // A browser request from another site never sends a code (security audit
+  // run-2; same check as the sign-in endpoints).
+  if (isCrossSiteBrowserRequest(request)) return crossSiteRefusal();
 
   let body;
   try {
@@ -217,6 +221,12 @@ async function maybeSendSignupCode(context, email, ip) {
   // 2026-08. Enumeration is unaffected: a caller that got past the front door
   // gets the same reply for a member and a stranger.
   if (await enrollmentThrottled(env, ip)) return;
+  // Club-wide ceiling on signup codes (security audit run-2): the per-IP and
+  // per-email caps alone don't bound a sender rotating addresses, and every
+  // code is an email on the operator's Resend account, which also carries
+  // every member's login codes. Past it the caller still gets the usual
+  // success reply; nothing is sent. Real signups are a handful a day.
+  if (await signupCeilingReached(env)) return;
   // Per-email cap: 3 signup codes per hour. datetime() on BOTH sides — see
   // the note on overRateLimit below; enroll_otps.created_at is written by the
   // column default, the bound is a JavaScript ISO string, and compared raw
@@ -235,6 +245,20 @@ async function maybeSendSignupCode(context, email, ip) {
   const { subject, text, html } = signupCodeEmail(code);
   const result = await sendEmail(env, { to: [email], subject, text, html });
   return result.ok ? undefined : 'send_failed';
+}
+
+const SIGNUP_CODES_PER_HOUR = 20;
+const SIGNUP_CODES_PER_DAY = 50;
+
+async function signupCeilingReached(env) {
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const row = await env.DB.prepare(
+    `SELECT SUM(datetime(created_at) > datetime(?)) AS hour, COUNT(*) AS day
+       FROM enroll_otps WHERE datetime(created_at) > datetime(?)`
+  ).bind(hourAgo, dayAgo).first().catch(() => null);
+  if (!row) return false;
+  return (row.hour || 0) >= SIGNUP_CODES_PER_HOUR || (row.day || 0) >= SIGNUP_CODES_PER_DAY;
 }
 
 async function overRateLimit(env, memberSlug) {
