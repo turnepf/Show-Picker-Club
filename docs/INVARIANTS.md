@@ -997,7 +997,11 @@ product, and an invite token is the only credential that produces one.
   neither header and are unaffected — a header an attacker's browser cannot
   suppress is what does the work, and a client that omits it is not a browser.
   Refusing with a *preview* rather than an error keeps the refusal from
-  confirming anything.
+  confirming anything. The native clients don't lean on that fall-through:
+  since 2026-11, iPhone, iPad and Mac open an invite link by previewing it
+  (`?preview=1`, which never writes), ask "Join <group>?", and redeem only on
+  an explicit Join — including a link parked across sign-in, which asks again
+  rather than joining on its own.
 - **A credential that is never consumed is not a credential.** Redemptions are
   counted against a ceiling, and the claim is an atomic
   `UPDATE ... WHERE use_count < max_uses` — a guard evaluated in JavaScript

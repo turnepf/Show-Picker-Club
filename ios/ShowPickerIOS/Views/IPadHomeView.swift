@@ -47,6 +47,8 @@ struct IPadHomeView: View {
     @State private var session = SessionScope()
     // Universal link that arrived before the roster loaded; replayed by load().
     @State private var pendingLink: URL?
+    // A previewed group invite waiting on Join / Not now.
+    @State private var pendingInvite: GroupInviteConfirmation?
     // Pushes on the detail column's stack. Owned here (not by the
     // NavigationStack) so widget deep links can push a show card directly;
     // cleared whenever detailKey resets the stack, matching the old behavior.
@@ -198,6 +200,15 @@ struct IPadHomeView: View {
             if let path { position = path }
         }
         .sheet(isPresented: $showingLogin) { LoginView().environmentObject(auth) }
+        .alert(pendingInvite.map { "Join \($0.groupName)?" } ?? "Join this group?",
+               isPresented: Binding(get: { pendingInvite != nil },
+                                    set: { if !$0 { pendingInvite = nil } }),
+               presenting: pendingInvite) { invite in
+            Button("Join") { Task { await redeemInvite(invite) } }
+            Button("Not now", role: .cancel) { }
+        } message: { _ in
+            Text(GroupInviteConfirmation.message)
+        }
         .sheet(isPresented: $showingDeleteAccount) { DeleteAccountView().environmentObject(auth) }
         .sheet(isPresented: $showingSearch) { SearchView().environmentObject(auth) }
         // Menu-bar and hardware-keyboard commands (⌘F, ⌘R on Mac Catalyst and
@@ -701,6 +712,24 @@ struct IPadHomeView: View {
     // Back lands somewhere that makes sense rather than on a placeholder.
     // Already on that item, the push is all that's needed; otherwise it rides
     // along with the selection change, which would otherwise clear it.
+    // Join tapped on the invite confirmation: redeem for real, then open the
+    // group in the detail column.
+    @MainActor
+    private func redeemInvite(_ invite: GroupInviteConfirmation) async {
+        do {
+            switch try await API.joinGroup(token: invite.token) {
+            case .joined(let id), .alreadyMember(let id):
+                show(.groupDetail(id), under: .groups)
+            case .dead:
+                ErrorCenter.shared.explain(GroupInviteConfirmation.deadLine)
+            case .notSignedIn:
+                ErrorCenter.shared.explain("Sign in from Home, then tap the invite link again.")
+            case .failed:
+                ErrorCenter.shared.report("join the group")
+            }
+        } catch { ErrorCenter.shared.report("join the group") }
+    }
+
     @MainActor
     private func show(_ route: Route, under item: SidebarItem) {
         if selection == item {
@@ -720,9 +749,9 @@ struct IPadHomeView: View {
         // Widget taps: push the show's card onto the detail column. Needs no
         // roster, and leaves the sidebar selection alone.
         if let show = Route.showLink(url) { detailPath = [show]; return }
-        // Group invite: joining is the navigation. Selecting Groups first
-        // means a failed join (expired token, already a member) still lands
-        // somewhere useful.
+        // Group invite: previewed, then confirmed (see below). Selecting
+        // Groups first means a dead link or "Not now" still lands somewhere
+        // useful.
         // Household invite: accept it and land on the audit the household
         // actually changes. iPhone has done this since the invite flow
         // shipped; the iPad silently ignored the link.
@@ -743,21 +772,25 @@ struct IPadHomeView: View {
             selection = .groups
             if let token = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first(where: { $0.name == "token" })?.value, !token.isEmpty {
+                // Same rule as iPhone: opening the link only previews it and
+                // asks "Join <group>?"; the Join button is what redeems.
                 Task {
                     // A dead invite otherwise left you sitting on the Groups
                     // tab with no sign the link had failed.
                     do {
-                        switch try await API.joinGroup(token: token) {
-                        case .joined(let id), .alreadyMember(let id):
+                        switch try await API.previewGroupInvite(token: token) {
+                        case .joinable(let id, let name):
+                            pendingInvite = GroupInviteConfirmation(token: token, groupId: id, groupName: name, link: url)
+                        case .alreadyMember(let id):
                             detailPath = [.groupDetail(id)]
                         case .dead:
-                            ErrorCenter.shared.explain("That invite link has expired or been used up. Ask whoever sent it for a new one.")
+                            ErrorCenter.shared.explain(GroupInviteConfirmation.deadLine)
                         case .notSignedIn:
                             ErrorCenter.shared.explain("Sign in from Home, then tap the invite link again.")
                         case .failed:
-                            ErrorCenter.shared.report("join the group")
+                            ErrorCenter.shared.report("open the invite")
                         }
-                    } catch { ErrorCenter.shared.report("join the group") }
+                    } catch { ErrorCenter.shared.report("open the invite") }
                 }
             }
             return

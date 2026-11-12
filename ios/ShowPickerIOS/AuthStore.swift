@@ -23,10 +23,35 @@ final class AuthStore: ObservableObject {
 
     @MainActor
     func refresh() async {
-        let r = await API.checkAuth()
+        // Two kinds of "not signed in", and only one of them is an answer.
+        // checkAuthOrCached() returns the server's own verdict, or the cached
+        // signed-in answer when offline; it throws when the server couldn't
+        // be reached and nothing was cached. A thrown check is "don't know",
+        // so it reads as signed out for now but clears nothing.
+        let r: AuthCheckResponse
+        var serverSaidSignedOut = false
+        do {
+            r = try await API.checkAuthOrCached()
+            serverSaidSignedOut = !r.authenticated
+        } catch {
+            r = AuthCheckResponse(authenticated: false, email: nil, member: nil, isAdmin: nil)
+        }
+        // The server says this session is gone (expired, revoked, banned):
+        // drop everything it left behind — the cookie, the offline queue,
+        // cached owner memos — so none of it outlives the session or replays
+        // under whoever signs in next. Only when there is something to drop:
+        // a logged-out launch with nothing left over shouldn't wipe the
+        // artwork cache every time.
+        if serverSaidSignedOut && (memberSlug != nil || OfflineQueue.shared.hasLocalData
+                                   || AuthStore.hasSessionCookies()) {
+            clearLocalSession()
+            resolved = true
+            return
+        }
         memberSlug = r.authenticated ? r.member : nil
         email = r.authenticated ? r.email : nil
         isAdmin = r.authenticated ? (r.isAdmin ?? false) : false
+        OfflineQueue.shared.signedInMember = memberSlug
         if r.authenticated, let slug = memberSlug {
             SharedSession.sync(memberSlug: slug)
             WatchBridge.shared.send(memberSlug: slug, cookie: WatchBridge.currentCookieHeader())
@@ -130,11 +155,17 @@ final class AuthStore: ObservableObject {
     // Reset local state without hitting /auth/logout — used after account
     // deletion, where the server has already destroyed the session and
     // cleared the cookie in its response.
+    //
+    // Also the second half of every logout, which is why the session cookie
+    // is deleted here: whether or not /auth/logout got through (offline, a
+    // server error), the device stops holding a working session.
     @MainActor
     func clearLocalSession() {
         memberSlug = nil
         email = nil
         isAdmin = false
+        OfflineQueue.shared.signedInMember = nil
+        AuthStore.deleteSessionCookies()
         SharedSession.clear()
         WatchBridge.shared.clear()
         // Drop cached reads, cached artwork, the widgets' last-good snapshots,
@@ -145,6 +176,21 @@ final class AuthStore: ObservableObject {
         ImageCache.shared.clearAll()
         WidgetSnapshotCache.clearAll()
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    // Every cookie stored for the API host, whatever its path or domain form.
+    private static func apiHostCookies() -> [HTTPCookie] {
+        guard let host = URL(string: API.baseString)?.host else { return [] }
+        return (HTTPCookieStorage.shared.cookies ?? []).filter { cookie in
+            let domain = cookie.domain.hasPrefix(".") ? String(cookie.domain.dropFirst()) : cookie.domain
+            return host == domain || host.hasSuffix("." + domain)
+        }
+    }
+
+    static func hasSessionCookies() -> Bool { !apiHostCookies().isEmpty }
+
+    static func deleteSessionCookies() {
+        apiHostCookies().forEach(HTTPCookieStorage.shared.deleteCookie)
     }
 
     func isMe(_ slug: String) -> Bool { memberSlug == slug }

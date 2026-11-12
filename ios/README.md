@@ -241,10 +241,17 @@ Offline/
   are remapped to the server's real ids so a later edit/move of a
   just-created show targets the right row. A mutation the server *rejects*
   (e.g. the show was deleted on the web) is dropped so it can't wedge the queue.
+  Each mutation replays only under the member who queued it: nothing flushes
+  while nobody is signed in, and an entry belonging to anyone else is discarded
+  rather than sent under the current session.
 
 - **Lifecycle.** Logging out wipes the read cache, the artwork cache, the
   widgets' last-good snapshots, and any queued edits so the next person on the
-  device starts clean.
+  device starts clean. The session cookie is deleted locally whether or not
+  the logout request reached the server, so signing out offline still signs
+  out. The same wipe runs when `/auth/check` answers that the session is gone
+  (expired or revoked) — but not when the check merely couldn't reach the
+  server.
 
 ### Limits
 

@@ -35,6 +35,10 @@ final class OfflineQueue: ObservableObject {
 
     var pendingCount: Int { pending.count }
 
+    // Anything a session left on the device: queued writes or a cached
+    // snapshot (which carries the owner's private memos).
+    var hasLocalData: Bool { !pending.isEmpty || !base.isEmpty }
+
     func pendingCount(forMember slug: String) -> Int {
         pending.filter { $0.memberSlug == slug }.count
     }
@@ -158,8 +162,31 @@ final class OfflineQueue: ObservableObject {
 
     // MARK: - Flush
 
+    // Who is signed in right now, as AuthStore last resolved it. A queued
+    // write replays only under the session of the member who made it: the
+    // queue lives on the device, not in the account, so without this a write
+    // queued by one member would replay as whoever signs in next. nil (not
+    // signed in, or auth not resolved yet) means nothing replays.
+    var signedInMember: String?
+
+    // The member a queued write belongs to: the slug it captured, or failing
+    // that whose snapshot holds the row (the same fallback derived() uses).
+    private func owner(of m: PendingMutation) -> String? {
+        m.memberSlug ?? cachedSlug(forId: m.showId)
+    }
+
     func flush() async {
-        guard !isFlushing, !pending.isEmpty, Connectivity.shared.isOnline else { return }
+        guard !isFlushing, !pending.isEmpty, Connectivity.shared.isOnline,
+              let me = signedInMember else { return }
+        // Anything queued by someone else (or by nobody we can name) can never
+        // be replayed honestly under this session, so it's discarded rather
+        // than kept to wedge the queue.
+        if pending.contains(where: { owner(of: $0) != me }) {
+            pending.removeAll { owner(of: $0) != me }
+            persistPending()
+            rebuildAll()
+        }
+        guard !pending.isEmpty else { return }
         isFlushing = true
         defer { isFlushing = false }
 
@@ -167,6 +194,9 @@ final class OfflineQueue: ObservableObject {
         // Snapshot the queue; we mutate `pending` as each one succeeds.
         let work = pending
         for m in work {
+            // Signed out (or switched member) mid-drain: stop, and let the
+            // next flush sort out what's left.
+            guard signedInMember == me else { return }
             var resolved = m
             if let real = remap[resolved.showId] { resolved.showId = real }
             do {
