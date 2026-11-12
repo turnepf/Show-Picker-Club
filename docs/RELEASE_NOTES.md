@@ -46,6 +46,9 @@ the Prime Video home screen, for titles where we have a direct link to them.
 ## Unreleased — the update after 1.7
 
 ```
+Opening a group invite link now shows you the group and asks before you join, so a link alone never adds you to a group.
+Leaving a group you created now warns you first: it deletes the group for everyone.
+Logging out works even when you're offline.
 ```
 
 ---

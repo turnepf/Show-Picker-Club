@@ -214,9 +214,21 @@ struct GroupDetailView: View {
                 }
             }
         }
+        // The creator leaving takes the group with them: the server deletes it,
+        // and refuses unless told the member was warned. So the creator's
+        // prompt says so and their Leave carries confirm_delete; everyone
+        // else keeps the plain prompt.
         .confirmationDialog("Leave this group?", isPresented: $confirmingLeave, titleVisibility: .visible) {
-            Button("Leave", role: .destructive) { Task { await leaveGroup() } }
+            if group?.isCreator ?? false {
+                Button("Leave and delete", role: .destructive) { Task { await leaveGroup(confirmDelete: true) } }
+            } else {
+                Button("Leave", role: .destructive) { Task { await leaveGroup(confirmDelete: false) } }
+            }
             Button("Cancel", role: .cancel) { }
+        } message: {
+            if group?.isCreator ?? false {
+                Text("You created this group. Leaving will delete it for everyone.")
+            }
         }
         .confirmationDialog("Delete this group?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { Task { await deleteGroup() } }
@@ -608,10 +620,18 @@ struct GroupDetailView: View {
     }
 
     @MainActor
-    private func leaveGroup() async {
+    private func leaveGroup(confirmDelete: Bool) async {
         do {
-            _ = try await API.leaveGroup(id: groupId)
+            _ = try await API.leaveGroup(id: groupId, confirmDelete: confirmDelete)
+            // Left, or (creator) deleted: either way this screen is done, and
+            // the Groups list reloads without it.
             dismiss()
+        } catch let e as API.APIError where e.status == 409 {
+            // creator_must_confirm: the server knows this member created the
+            // group but the payload we prompted from didn't say so. Reload and
+            // ask again, this time with the delete warning.
+            await load()
+            if group?.isCreator ?? false { confirmingLeave = true }
         } catch {
             self.errorText = API.failureLine(error, action: "leave group")
         }

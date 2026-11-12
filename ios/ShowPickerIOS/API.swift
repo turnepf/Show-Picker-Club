@@ -663,11 +663,63 @@ enum API {
         }
     }
 
+    // What an invite link would do, asked before doing it. A universal link
+    // is something anyone can put in front of you, so the app no longer
+    // redeems on open: it previews (`&preview=1`, which never writes), asks
+    // "Join <name>?", and only calls joinGroup on an explicit Join.
+    enum GroupInvitePreview {
+        case joinable(groupId: Int, name: String)
+        case alreadyMember(groupId: Int)
+        case dead
+        case notSignedIn
+        case failed
+    }
+
+    // Same shape as joinGroup: a server answer is an outcome, a transport
+    // failure still throws.
+    static func previewGroupInvite(token: String) async throws -> GroupInvitePreview {
+        let encoded = token.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? token
+        guard let url = URL(string: baseString + "/api/groups/join?token=\(encoded)&preview=1") else {
+            throw APIError.badURL
+        }
+        var req = URLRequest(url: url)
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        req.setValue(currentPlatform, forHTTPHeaderField: "X-Client-Platform")
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse else { throw APIError.badResponse(-1) }
+
+        struct PreviewGroup: Decodable { let id: Int; let name: String }
+        struct PreviewBody: Decodable { let group: PreviewGroup?; let group_id: Int? }
+        let body = try? JSONDecoder().decode(PreviewBody.self, from: data)
+
+        switch http.statusCode {
+        case 200..<300:
+            guard let g = body?.group else { return .failed }
+            return .joinable(groupId: g.id, name: g.name)
+        case 409:
+            guard let id = body?.group_id else { return .failed }
+            return .alreadyMember(groupId: id)
+        case 404, 410:
+            return .dead
+        case 401:
+            return .notSignedIn
+        default:
+            return .failed
+        }
+    }
+
+    // A creator can't simply leave: the server deletes the group when its
+    // creator goes, and refuses (409 creator_must_confirm) unless the client
+    // says the member was warned. `confirmDelete` is that flag — send it only
+    // after showing the "Leaving will delete it for everyone" prompt.
+    struct LeaveGroupResult { let ok: Bool; let deleted: Bool }
+
     @discardableResult
-    static func leaveGroup(id: Int) async throws -> Bool {
-        struct Ack: Decodable { let ok: Bool? }
-        let r: Ack = try await postJSON("/api/groups/\(id)/leave", body: [:])
-        return r.ok ?? false
+    static func leaveGroup(id: Int, confirmDelete: Bool = false) async throws -> LeaveGroupResult {
+        struct Ack: Decodable { let ok: Bool?; let deleted: Bool? }
+        let body: [String: Any?] = confirmDelete ? ["confirm_delete": true] : [:]
+        let r: Ack = try await postJSON("/api/groups/\(id)/leave", body: body)
+        return LeaveGroupResult(ok: r.ok ?? false, deleted: r.deleted ?? false)
     }
 
     @discardableResult

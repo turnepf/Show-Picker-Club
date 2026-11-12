@@ -1119,9 +1119,15 @@ struct ImportItem: Codable, Identifiable {
     // default and the review screen says why.
     var existingList: String?
     var existingArchived: Bool?
+    // Opaque server signature over this row's TMDB identity, minted by
+    // /api/import/parse. Commit trusts tmdb_id/tmdb_type only when it comes
+    // back unchanged, so it is carried through untouched: never shown, never
+    // edited.
+    var identitySig: String?
 
     enum CodingKeys: String, CodingKey {
         case title, list, notes, network, movie, year, matched
+        case identitySig = "identity_sig"
         case rawTitle = "raw_title"
         case recommendedBy = "recommended_by"
         case watchingWith = "watching_with"

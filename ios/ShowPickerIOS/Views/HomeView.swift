@@ -31,6 +31,9 @@ struct HomeView: View {
     // Universal link that arrived before the roster loaded (cold launch);
     // replayed by load().
     @State private var pendingLink: URL?
+    // A group invite link that has been previewed and is waiting on the
+    // member's Join / Not now. Opening a link never joins by itself.
+    @State private var pendingInvite: GroupInviteConfirmation?
     // "NEW" beside Groups until the member opens it once. A badge that never
     // clears is just decoration — this one has a job and then goes away.
     @AppStorage("seenGroups") private var seenGroups = false
@@ -294,6 +297,15 @@ struct HomeView: View {
             } message: {
                 Text("Your shows and theirs now count together in Subscription audit.")
             }
+            .alert(pendingInvite.map { "Join \($0.groupName)?" } ?? "Join this group?",
+                   isPresented: Binding(get: { pendingInvite != nil },
+                                        set: { if !$0 { pendingInvite = nil } }),
+                   presenting: pendingInvite) { invite in
+                Button("Join") { Task { await redeemInvite(invite) } }
+                Button("Not now", role: .cancel) { }
+            } message: { _ in
+                Text(GroupInviteConfirmation.message)
+            }
             .sheet(isPresented: $showingSearch) {
                 SearchView().environmentObject(auth)
             }
@@ -374,9 +386,10 @@ struct HomeView: View {
             }
             return
         }
-        // A group invite (/groups/join?token=…) is the whole point of the
-        // share link, so joining IS the navigation: accept the token, then
-        // land on the group. Already a member (409) still opens the group.
+        // A group invite (/groups/join?token=…). A link is something anyone
+        // can put in front of you, so opening one only previews it and asks
+        // "Join <group>?"; the join happens on an explicit Join tap. Already
+        // a member (409) just opens the group.
         if first == "groups" {
             if let token = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first(where: { $0.name == "token" })?.value, !token.isEmpty {
@@ -412,11 +425,11 @@ struct HomeView: View {
         }
     }
 
-    // Accept a group invite and land on the group. Logged out, the token is
+    // Preview a group invite and ask before joining. Logged out, the link is
     // parked and replayed once the session resolves — the invite is what
     // brought them here, so losing it to the login sheet would waste the tap.
-    // A failed join (expired token, or already a member — the endpoint answers
-    // 409 without a body we read) still lands on Groups rather than nowhere.
+    // The replay comes back through here, so signing in also only previews
+    // and asks; nothing joins without the Join tap.
     @MainActor
     private func joinFromInvite(_ token: String, link: URL) async {
         guard auth.memberSlug != nil else {
@@ -429,14 +442,42 @@ struct HomeView: View {
             return
         }
         do {
-            switch try await API.joinGroup(token: token) {
+            switch try await API.previewGroupInvite(token: token) {
+            case .joinable(let id, let name):
+                pendingInvite = GroupInviteConfirmation(token: token, groupId: id, groupName: name, link: link)
+            // Already in it: the link still means "look at this group".
+            case .alreadyMember(let id):
+                path = [.groups, .groupDetail(id)]
+            case .dead:
+                path = [.groups]
+                ErrorCenter.shared.explain(GroupInviteConfirmation.deadLine)
+            case .notSignedIn:
+                pendingLink = link
+                showingLogin = true
+            case .failed:
+                path = [.groups]
+                ErrorCenter.shared.report("open the invite")
+            }
+        } catch {
+            path = [.groups]
+            ErrorCenter.shared.report("open the invite")
+        }
+    }
+
+    // The member tapped Join on the confirmation: redeem the token for real
+    // and land on the group.
+    @MainActor
+    private func redeemInvite(_ invite: GroupInviteConfirmation) async {
+        let link = invite.link
+        do {
+            switch try await API.joinGroup(token: invite.token) {
             // Already in it is not a failure: the link still means "look at
             // this group", so it still lands there.
             case .joined(let id), .alreadyMember(let id):
                 path = [.groups, .groupDetail(id)]
             case .dead:
                 path = [.groups]
-                ErrorCenter.shared.explain("That invite link has expired or been used up. Ask whoever sent it for a new one.")
+                ErrorCenter.shared.explain(GroupInviteConfirmation.deadLine)
             // The session expired between opening the link and redeeming it.
             // Park the link and replay it after signing in, the same as
             // tapping one while logged out.
@@ -737,4 +778,20 @@ enum Route: Hashable {
     case adminMembers
     case adminUrlCleanup
     case adminVibe
+}
+
+// A previewed group invite waiting on the member's answer. iPhone Home and
+// the iPad split view both hold one: opening an invite link previews it
+// (`?preview=1`, which never writes) and shows "Join <name>?"; only the Join
+// button redeems the token. Anyone can put a link in front of you, so the
+// link alone must never be what adds you to a group.
+struct GroupInviteConfirmation: Identifiable {
+    let token: String
+    let groupId: Int
+    let groupName: String
+    let link: URL
+    var id: String { token }
+
+    static let message = "Group members see each other's lists, vibe and what everyone's watching. Only join groups from people you know."
+    static let deadLine = "That invite link has expired or been used up. Ask whoever sent it for a new one."
 }

@@ -71,16 +71,30 @@ final class AuthStore: ObservableObject {
 
     func logout() async {
         await API.logout()
-        memberSlug = nil
-        email = nil
-        isAdmin = false
+        clearLocalSession()
     }
 
     // Drop local state after the server already destroyed the session
-    // (account deletion) — no logout round-trip needed.
+    // (account deletion) — no logout round-trip needed. Also the second half
+    // of every logout: the saved session cookie is deleted here whether or
+    // not /auth/logout got through, so signing out offline (or into a server
+    // error) doesn't leave a working session on the device.
     func clearLocalSession() {
         memberSlug = nil
         email = nil
         isAdmin = false
+        AuthStore.deleteSessionCookies()
+    }
+
+    // Every cookie stored for the API host, whatever its path or domain form.
+    static func deleteSessionCookies() {
+        let storage = HTTPCookieStorage.shared
+        guard let host = URL(string: API.baseString)?.host else { return }
+        for cookie in storage.cookies ?? [] {
+            let domain = cookie.domain.hasPrefix(".") ? String(cookie.domain.dropFirst()) : cookie.domain
+            if host == domain || host.hasSuffix("." + domain) {
+                storage.deleteCookie(cookie)
+            }
+        }
     }
 }
