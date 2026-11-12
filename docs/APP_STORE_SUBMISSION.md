@@ -341,6 +341,20 @@ node scripts/asc.mjs attach 1.4.1 24
 
 `attach` matches each build to its own platform and skips a platform whose
 build has not arrived yet, so it is safe to run early and again later.
+
+**Validate before uploading.** On 1.8, Apple accepted the iPhone and Apple TV
+uploads of build 36, then never processed them: no build appeared, the
+reason went only to the account email, and the number 36 could not be used
+again (build 37 went up instead). Export each archive to a file and run
+`xcrun altool --validate-app -f <file> -t ios|appletvos|macos` with the same
+API key first. It reports problems on screen, before the build number is
+spent. `upload` then sends the validated file.
+
+**Screenshots must reach COMPLETE.** `screenshots` waits about a minute per
+file and now flags any file Apple hasn't finished processing. `submit
+--confirm` refuses a version holding one (`ASSET_IN_POST_PROCESSING`). On
+1.8 a whole batch sat unprocessed for over an hour, and rerunning
+`screenshots … --replace` cleared it at once.
 Uploads are sequential and a few minutes each; a build shows up at Apple
 within a minute or two of its upload finishing, so a platform missing from
 `status` usually means still-in-flight rather than failed.
