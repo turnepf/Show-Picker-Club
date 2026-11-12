@@ -34,22 +34,36 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ error: 'Group not found' }), { status: 404, headers: corsHeaders() });
   }
 
-  // A group doesn't outlive its creator (owner decision, security audit
-  // run-2): the creator leaving deletes it for everyone. The client must say
-  // the member saw that warning; an app build from before this change sends no
-  // flag and gets told to update, rather than deleting a group on a prompt
-  // that only said "Leave group?".
+  // The creator leaving either hands the group to another member or deletes
+  // it for everyone (owner decision, security audit run-2). The client must
+  // say which: `transfer_to` names a current member to take it over, and
+  // `confirm_delete: true` says the member saw the delete warning. An app
+  // build from before the delete rule sends neither and gets told to update,
+  // rather than deleting a group on a prompt that only said "Leave group?".
+  let handTo = null;
   if (group.creator_slug === session.member_slug) {
     let body = {};
     try { body = await request.json(); } catch { body = {}; }
-    if (!body || body.confirm_delete !== true) {
+    if (body && typeof body.transfer_to === 'string' && body.transfer_to.trim()) {
+      handTo = body.transfer_to.trim();
+      // Only somebody already in the group can be handed it: an invite is how
+      // anyone else gets in, and creator is the one role a group-mate can't
+      // turn down here, so it goes only to people who chose this group.
+      if (handTo === session.member_slug || !(await checkGroupMembership(env, groupId, handTo))) {
+        return new Response(JSON.stringify({
+          error: 'not_a_member',
+          message: 'You can only hand the group to someone who is in it.',
+        }), { status: 400, headers: corsHeaders() });
+      }
+    } else if (!body || body.confirm_delete !== true) {
       return new Response(JSON.stringify({
         error: 'creator_must_confirm',
         message: 'You created this group, so leaving deletes it for everyone. Update the app to leave this group, or delete it instead.',
       }), { status: 409, headers: corsHeaders() });
+    } else {
+      await deleteGroup(env, groupId);
+      return new Response(JSON.stringify({ ok: true, deleted: true }), { headers: corsHeaders() });
     }
-    await deleteGroup(env, groupId);
-    return new Response(JSON.stringify({ ok: true, deleted: true }), { headers: corsHeaders() });
   }
 
   // Check if this would leave the group empty (reject)
@@ -81,15 +95,22 @@ export async function onRequestPost(context) {
   // it, and a link you shared last week would otherwise keep admitting
   // strangers to a group you're no longer in. join.js re-checks the issuer's
   // membership as well, so a row that predates this still stops working.
-  await env.DB.prepare(
-    'DELETE FROM group_invites WHERE group_id = ? AND created_by = ?'
-  ).bind(groupId, session.member_slug).run();
+  // The hand-over, the invites and the membership go in one batch, so a
+  // group is never left with a creator who isn't in it. The creator_slug
+  // guard means a second, racing hand-over changes nothing.
+  const statements = [];
+  if (handTo) {
+    statements.push(env.DB.prepare(
+      'UPDATE groups SET creator_slug = ? WHERE id = ? AND creator_slug = ?'
+    ).bind(handTo, groupId, session.member_slug));
+  }
+  statements.push(
+    env.DB.prepare('DELETE FROM group_invites WHERE group_id = ? AND created_by = ?').bind(groupId, session.member_slug),
+    env.DB.prepare('DELETE FROM group_members WHERE group_id = ? AND member_slug = ?').bind(groupId, session.member_slug),
+  );
+  await env.DB.batch(statements);
 
-  await env.DB.prepare(
-    'DELETE FROM group_members WHERE group_id = ? AND member_slug = ?'
-  ).bind(groupId, session.member_slug).run();
-
-  return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders() });
+  return new Response(JSON.stringify(handTo ? { ok: true, transferred_to: handTo } : { ok: true }), { headers: corsHeaders() });
 }
 
 export async function onRequestOptions() {

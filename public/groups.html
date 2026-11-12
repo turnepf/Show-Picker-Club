@@ -139,6 +139,17 @@
       box-sizing: border-box;
     }
     .modal input:focus { outline: none; border-color: var(--tint); }
+    .modal select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border-soft);
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 16px;
+      background: var(--surface);
+      color: var(--ink);
+    }
+    .modal-buttons .btn-danger { background: none; color: var(--danger, #c0392b); border: 1px solid currentColor; }
     .modal-buttons { display: flex; gap: 8px; }
     .modal-buttons button { flex: 1; padding: 10px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
     .modal-buttons .btn-cancel { background: var(--surface-2); color: var(--ink); }
@@ -431,6 +442,23 @@
       <div class="modal-buttons">
         <button class="btn-cancel" onclick="closeIconModal()">Cancel</button>
         <button class="btn-submit" id="saveIconBtn" onclick="saveIcon()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- The creator leaving: hand the group on, or delete it -->
+  <div id="handoffModal" class="modal-overlay">
+    <div class="modal">
+      <h2>Leave this group?</h2>
+      <p style="color: var(--ink-muted); font-size: 14px; margin: -6px 0 16px;">You created this group. Choose who takes it over, or delete it for everyone.</p>
+      <label for="handoffSelect" style="display: block; font-size: 13px; color: var(--ink-muted); margin-bottom: 6px;">New creator</label>
+      <select id="handoffSelect"></select>
+      <div class="modal-buttons" style="margin-bottom: 8px;">
+        <button class="btn-cancel" onclick="closeHandoffModal()">Cancel</button>
+        <button class="btn-submit" onclick="handOffAndLeave()">Hand over and leave</button>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn-danger" onclick="deleteAndLeave()">Delete the group instead</button>
       </div>
     </div>
   </div>
@@ -1152,24 +1180,62 @@
       setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
     }
 
+    // A creator leaving hands the group to another member or deletes it for
+    // everyone; the server refuses a creator's leave that says neither.
     async function leaveGroup() {
-      // A group doesn't outlive its creator: leaving it deletes it for everyone.
       const isCreator = !!currentGroupData.is_creator;
+      const others = (currentGroupData.members || []).filter(m => m.slug !== authMember);
+      toggleGroupMenu();
+      if (isCreator && others.length) {
+        const select = document.getElementById('handoffSelect');
+        select.replaceChildren(...others.map(m => {
+          const o = document.createElement('option');
+          o.value = m.slug;
+          o.textContent = [m.first_name, m.last_name].filter(Boolean).join(' ') || m.slug;
+          return o;
+        }));
+        document.getElementById('handoffModal').classList.add('open');
+        return;
+      }
       const prompt = isCreator
         ? 'You created this group. Leaving will delete it for everyone. Leave and delete it?'
         : 'Leave this group?';
       if (!confirm(prompt)) return;
+      await sendLeave(isCreator ? { confirm_delete: true } : {});
+    }
+
+    function closeHandoffModal() {
+      document.getElementById('handoffModal').classList.remove('open');
+    }
+
+    async function handOffAndLeave() {
+      const slug = document.getElementById('handoffSelect').value;
+      if (!slug) return;
+      closeHandoffModal();
+      await sendLeave({ transfer_to: slug });
+    }
+
+    async function deleteAndLeave() {
+      if (!confirm('Delete this group for everyone? This cannot be undone.')) return;
+      closeHandoffModal();
+      await sendLeave({ confirm_delete: true });
+    }
+
+    async function sendLeave(body) {
       try {
         const res = await fetch(`/api/groups/${currentGroupData.group.id}/leave`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(isCreator ? { confirm_delete: true } : {}),
+          body: JSON.stringify(body),
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          alert(err.message || 'Could not leave the group. Please try again.');
+          return;
+        }
         navStack = ['groupsList'];
         updateNav();
         loadGroupsList();
-        toggleGroupMenu();
       } catch (e) {
         console.error('Failed to leave group:', e);
       }

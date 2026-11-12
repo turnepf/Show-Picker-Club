@@ -1,7 +1,7 @@
 // Deleting a group and everything that belongs to it.
 //
 // One helper for every way a group ends: its creator deletes it, its creator
-// leaves it (a group doesn't outlive its creator: security audit run-2,
+// leaves it without handing it to another member (security audit run-2,
 // owner decision), or its creator's account is deleted. Children are removed
 // before the group row so the result is the same with or without foreign-key
 // enforcement.

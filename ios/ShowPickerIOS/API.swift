@@ -715,9 +715,12 @@ enum API {
     struct LeaveGroupResult { let ok: Bool; let deleted: Bool }
 
     @discardableResult
-    static func leaveGroup(id: Int, confirmDelete: Bool = false) async throws -> LeaveGroupResult {
+    /// A creator leaving passes `transferTo` (a current member's slug) to hand
+    /// the group on, or `confirmDelete` to delete it for everyone.
+    static func leaveGroup(id: Int, confirmDelete: Bool = false, transferTo: String? = nil) async throws -> LeaveGroupResult {
         struct Ack: Decodable { let ok: Bool?; let deleted: Bool? }
-        let body: [String: Any?] = confirmDelete ? ["confirm_delete": true] : [:]
+        let body: [String: Any?] = transferTo.map { ["transfer_to": $0] }
+            ?? (confirmDelete ? ["confirm_delete": true] : [:])
         let r: Ack = try await postJSON("/api/groups/\(id)/leave", body: body)
         return LeaveGroupResult(ok: r.ok ?? false, deleted: r.deleted ?? false)
     }
