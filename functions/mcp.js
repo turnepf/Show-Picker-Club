@@ -20,7 +20,7 @@
 
 import { authenticateBearer, issuerFor, oauthJson, preflight } from './_shared/oauth.js';
 import { recordPlatformUsage } from './_shared/platform.js';
-import { toolsFor, toolNamed, ToolError, dailyCaps } from './_shared/mcp-tools.js';
+import { toolsFor, toolNamed, ToolError, dailyCaps, emptyLibraryNote, libraryIsEmpty } from './_shared/mcp-tools.js';
 
 const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 
@@ -34,6 +34,17 @@ const SERVER_INFO = { name: 'show-picker-club', title: 'Show Picker Club', versi
 const INSTRUCTIONS = `Show Picker Club is the member's TV and movie tracker. Each member keeps four lists: watching, awaiting (finished the current season, waiting for the next), loved (finished and would recommend), and next_up (want to watch).
 Shows are identified by show_id. search_titles returns the catalog tmdb_id that add_show accepts.
 Notes, recommended_by and watching_with are the member's private memos. Group-mates are the people in the member's private groups; their lists are readable with list_member_shows, and they can be named in watching_with_members.`;
+
+// The instructions for this connection. A member with an empty library also
+// gets the first step, here rather than only in tool results: the members
+// this is for have never called a tool, and initialize is the one exchange
+// every connection makes. A lookup that fails falls back to the plain text.
+async function instructionsFor(ctx) {
+  try {
+    if (await libraryIsEmpty(ctx.env, ctx.session.member_slug)) return `${INSTRUCTIONS}\n${emptyLibraryNote(ctx.scopes)}`;
+  } catch { /* the plain instructions are always fine */ }
+  return INSTRUCTIONS;
+}
 
 function unauthorized(request, presented) {
   const meta = `${issuerFor(request)}/.well-known/oauth-protected-resource/mcp`;
@@ -105,7 +116,7 @@ async function handle(ctx, msg) {
         protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
         capabilities: { tools: { listChanged: false } },
         serverInfo: SERVER_INFO,
-        instructions: INSTRUCTIONS,
+        instructions: await instructionsFor(ctx),
       });
     }
     case 'ping':

@@ -739,6 +739,37 @@ console.log('\n== revocation, bans and caps');
   check('the env limit is the one enforced', lowered.isError && lowered.text.includes('limit of 3 changes'));
 }
 
+console.log('\n== an empty library gets a first step');
+{
+  const { env } = club();
+  const rw = await connect(env, 'stacy');
+  const ro = await connect(env, 'quinn', { write: false });
+
+  const init = (await rpc(env, rw.access, 'initialize', {})).body.result.instructions;
+  check('initialize names the first step for an empty library', /add_show/.test(init) && /search_titles/.test(init) && /Severance/.test(init), init);
+  check('and still describes rather than directs', !/confirm|prefer|you must/i.test(init));
+  const roInit = (await rpc(env, ro.access, 'initialize', {})).body.result.instructions;
+  const roNote = roInit.split('\n').find((l) => l.includes('has not added any shows')) || '';
+  check('a read-only connection is pointed at the app, not at add_show', !/add_show/.test(roNote) && /read-only/.test(roNote), roInit);
+
+  const profile = await tool(env, rw.access, 'get_profile');
+  check('get_profile carries getting_started when every list is empty', /add_show/.test(profile.data.getting_started || ''));
+  const list = await tool(env, rw.access, 'list_my_shows');
+  check('so does an empty list_my_shows', list.data.total === 0 && /add_show/.test(list.data.getting_started || ''));
+
+  // Archived-only is still empty to the member.
+  const old = addShow(env, { slug: 'stacy', title: 'Hacks', list: 'watching' });
+  env._db.prepare('UPDATE shows SET archived = 1 WHERE id = ?').run(old);
+  check('an archived-only library still counts as empty', /add_show/.test((await rpc(env, rw.access, 'initialize', {})).body.result.instructions));
+
+  addShow(env, { slug: 'stacy', title: 'Severance', list: 'next' });
+  const after = (await rpc(env, rw.access, 'initialize', {})).body.result.instructions;
+  check('one show and the note is gone from initialize', !/has not added any shows/.test(after));
+  check('and from get_profile', !('getting_started' in (await tool(env, rw.access, 'get_profile')).data));
+  const oneList = await tool(env, rw.access, 'list_my_shows', { list: 'watching' });
+  check('an empty list in a non-empty library is not a new member', oneList.data.total === 0 && !('getting_started' in oneList.data));
+}
+
 console.log('\n== reporting counts connected people, not connections');
 {
   const { env } = club();
