@@ -19,6 +19,7 @@ export const DAILY_LIMITS = {
   lookups: 300,  // enrichment fan-outs: add, edit, suggest
   searches: 1000, // /api/title-search queries (type-ahead)
   emails: 5,     // member-triggered notes to themselves (an import's unmatched titles)
+  enrich: 20,    // member-triggered /api/enrich passes (page loads, after an import); migration 091
 };
 
 // Charges one unit of `kind` to the member's day and says whether the request

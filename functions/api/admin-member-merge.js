@@ -25,6 +25,7 @@
 //   - members.last_login_at — target takes the max of the two.
 // login_otps for the source are deleted; then the source member row is.
 
+import { memberReferenceStatements } from '../_shared/member-references.js';
 import { isAdmin } from '../_shared/admin.js';
 import { demoMemberSlug } from '../_shared/demo.js';
 import { sameShowJoin } from '../_shared/same-show.js';
@@ -174,9 +175,14 @@ export async function onRequestPost(context) {
       env.DB.prepare(
         'UPDATE member_passkeys SET member_slug = ?2 WHERE member_slug = ?1'
       ).bind(source, target),
+      // Ratings, household links, groups and memberships move to the kept
+      // account; device records go (security audit run-2: left on the source
+      // slug they block the delete, or pass to whoever gets the slug next).
+      ...memberReferenceStatements(env, source, { mergeInto: target }),
       ...statements,
     ]);
   } catch (e) {
+    try { await env.DB.batch(memberReferenceStatements(env, source, { mergeInto: target })); } catch (_) { /* older database */ }
     await env.DB.batch(statements);
   }
 

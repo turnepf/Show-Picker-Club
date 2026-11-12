@@ -161,6 +161,9 @@ function makeEnv() {
     .run('sess', 'patrick@example.com', 'patrick', new Date(Date.now() + 86400000).toISOString(), new Date().toISOString());
   return {
     TMDB_TOKEN: 'test-token',
+    // The background pass under test is the nightly job's, so it runs with
+    // the cron secret; a member session gets only a metered own-copies pass.
+    CRON_SECRET: 'test-cron',
     DB: { prepare: (sql) => new Stmt(db, sql), batch: async (stmts) => { for (const s of stmts) await s.run(); } },
     _db: db,
   };
@@ -206,7 +209,7 @@ const runEnrich = async (env, body = {}) => {
   env,
   request: new Request(ORIGIN + '/api/enrich', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Cookie: 'session=sess' },
+    headers: { 'Content-Type': 'application/json', 'X-Cron-Secret': 'test-cron' },
     body: JSON.stringify(body),
   }),
   waitUntil: () => {},

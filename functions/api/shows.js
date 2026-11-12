@@ -66,29 +66,6 @@ export async function onRequestGet(context) {
   return new Response(JSON.stringify({ shows: results }), { headers: corsHeaders() });
 }
 
-async function findGoodCopyAcrossMembers(env, title, tmdbId = null, tmdbType = null) {
-  // Returns the first (any-member) active copy of this show that has a real
-  // network + deep-link URL (not a search-page placeholder). Used to inherit
-  // network/URL on insert so new shows don't land in the URL-cleanup queue.
-  // A copy pinned to a different TMDB entry is a different show sharing the
-  // title (a remake next to its original) — its URL streams the wrong show,
-  // so it is never a donor. Both columns are the copy's own, so this reads
-  // `shows` directly, where the TMDB-id index applies.
-  const same = sameShowWhere('s', { title, tmdb_id: tmdbId, tmdb_type: tmdbType }, { hasTitle: false });
-  return await env.DB.prepare(
-    `SELECT network, network_url FROM shows s
-     WHERE ${same.sql} AND archived = 0
-       AND network IS NOT NULL
-       AND network_url IS NOT NULL
-       AND network_url NOT LIKE '%/search%'
-       AND network_url NOT LIKE '%/s?%'
-       AND network_url NOT LIKE '%?q=%'
-       AND network_url NOT LIKE '%?query=%'
-     ORDER BY (s.tmdb_id IS NULL)
-     LIMIT 1`
-  ).bind(...same.binds).first();
-}
-
 export async function onRequestPost(context) {
   const { request, env } = context;
   const session = await getSession(request, env);
@@ -194,29 +171,24 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ error: 'exists_active', list: existing.list, title: finalTitle }), { status: 409, headers: corsHeaders() });
   }
 
-  // If another member already has a good (non-placeholder) URL for this title,
-  // inherit it. Beats the search-page fallback and keeps the title out of the
-  // URL-cleanup queue.
-  const goodCopy = network_url && network ? null : await findGoodCopyAcrossMembers(env, finalTitle,
-    enriched.tmdbId || (Number.isInteger(tmdbId) ? tmdbId : null), enriched.tmdbId ? enriched.tmdbType : tmdbType);
   // A Prime link arrives in whatever shape the member had it — the iPhone
   // share sheet's carries a tracking tail, older ones sit on www.amazon.com —
   // so it is stored in the one shape that lands on the show.
   const userUrl = normalizeAmazonUrl(network_url || null);
-  const goodCopyUrl = goodCopy && goodCopy.network_url;
   // URL trumps the dropdown — if the user pasted a Netflix link but selected
-  // Hulu, the URL's domain wins (and the inverse: if user picked a network
-  // but didn't paste anything, the eventual search-URL fallback won't tell us
-  // anything new). Fold aliases (HBO, NBC, FX, ...) for the dropdown path.
-  const rawNetwork = network || (goodCopy && goodCopy.network) || null;
+  // Hulu, the URL's domain wins. Fold aliases (HBO, NBC, FX, ...) for the
+  // dropdown path. With neither, TMDB's service decides.
+  // Another member's copy is never a donor for the service or the link: a
+  // link one member pasted is not evidence for anyone else's row (security
+  // audit run-2; docs/INVARIANTS.md §24). A row with no link of its own gets
+  // the search placeholder and the Watchmode lookup below, or the shared
+  // watch_links row through shows_v.
   const finalNetwork =
     networkFromUrl(userUrl) ||
-    networkFromUrl(goodCopyUrl) ||
-    (rawNetwork ? canonicalNetwork(rawNetwork) : null) ||
+    (network ? canonicalNetwork(network) : null) ||
     fallbackNetwork(enriched);
   const finalUrl =
     userUrl ||
-    goodCopyUrl ||
     networkSearchUrl(finalNetwork, finalTitle);
 
   // The member's row holds what is theirs; the show's facts and cast go to its
@@ -235,8 +207,7 @@ export async function onRequestPost(context) {
     name: enriched.canonicalTitle, fields: titleFieldsFromEnrichment(enriched), cast: enriched.actors,
   });
 
-  // If we ended up on a search-URL placeholder (no user paste, no sibling
-  // good URL), kick off a Watchmode lookup in the background. The response
+  // If we ended up on a search-URL placeholder (no user paste), kick off a Watchmode lookup in the background. The response
   // returns immediately with the placeholder; once Watchmode resolves,
   // every member's same-titled active row picks up the real deep link.
   const onPlaceholder = !finalUrl ||

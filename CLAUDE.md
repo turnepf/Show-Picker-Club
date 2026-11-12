@@ -701,6 +701,19 @@ or one-click) needs the member's own token. Sending is the Actions tab →
 **Win-back email**; `/admin-winback` reviews every message first.
 
 ```bash
+node scripts/member-references-test.mjs
+```
+
+What a member's departure leaves behind (security audit run-2). Account
+deletion and admin merge run `_shared/member-references.js` in the same batch
+as the member row, so no table still names the slug: the delete succeeds with
+foreign keys enforced, and a later signup handed the freed slug inherits no
+group, household or rating. Merge moves those references to the survivor,
+folding duplicates. Also pins the demo reset's residue cleanup, which keeps a
+fresh session so App Review isn't signed out mid-review. See
+`docs/INVARIANTS.md` §31.
+
+```bash
 node scripts/og-preview-test.mjs
 ```
 

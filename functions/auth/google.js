@@ -8,6 +8,7 @@
 // Inert unless GOOGLE_CLIENT_ID is configured (comma-separated list allowed,
 // e.g. a web client id plus a future iOS client id).
 
+import { isCrossSiteBrowserRequest, crossSiteRefusal } from '../_shared/cross-site.js';
 import { issueSession } from '../_shared/session.js';
 import { enrollmentThrottled, enrollMember } from '../_shared/enroll.js';
 
@@ -105,6 +106,8 @@ async function verifyGoogleToken(token, allowedAuds) {
 
 export async function onRequestPost(context) {
   const { env, request } = context;
+  // Login CSRF: a browser request from another site never mints a session.
+  if (isCrossSiteBrowserRequest(request)) return crossSiteRefusal();
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
 
   const clientIds = allowedClientIds(env);

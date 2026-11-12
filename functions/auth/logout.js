@@ -9,10 +9,17 @@ async function doLogout(context) {
 
   const referer = request.headers.get('Referer');
   let redirect = '/';
+  // Back to the page the member was on, but only a page on this site: a
+  // foreign referer, or a path starting '//' (which a browser resolves as a
+  // protocol-relative URL to another host), falls back to '/' (security audit
+  // run-2).
   if (referer) {
     try {
       const url = new URL(referer);
-      redirect = url.pathname + url.hash;
+      const self = new URL(request.url);
+      if (url.origin === self.origin && url.pathname.startsWith('/') && !url.pathname.startsWith('//')) {
+        redirect = url.pathname + url.hash;
+      }
     } catch {}
   }
 

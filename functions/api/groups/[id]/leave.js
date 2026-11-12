@@ -1,3 +1,4 @@
+import { deleteGroup } from '../../../_shared/group-delete.js';
 import { getSession } from '../../../_shared/auth.js';
 
 function corsHeaders() {
@@ -28,9 +29,27 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders() });
   }
 
-  const group = await env.DB.prepare('SELECT id FROM groups WHERE id = ?').bind(groupId).first();
+  const group = await env.DB.prepare('SELECT id, creator_slug FROM groups WHERE id = ?').bind(groupId).first();
   if (!group) {
     return new Response(JSON.stringify({ error: 'Group not found' }), { status: 404, headers: corsHeaders() });
+  }
+
+  // A group doesn't outlive its creator (owner decision, security audit
+  // run-2): the creator leaving deletes it for everyone. The client must say
+  // the member saw that warning; an app build from before this change sends no
+  // flag and gets told to update, rather than deleting a group on a prompt
+  // that only said "Leave group?".
+  if (group.creator_slug === session.member_slug) {
+    let body = {};
+    try { body = await request.json(); } catch { body = {}; }
+    if (!body || body.confirm_delete !== true) {
+      return new Response(JSON.stringify({
+        error: 'creator_must_confirm',
+        message: 'You created this group, so leaving deletes it for everyone. Update the app to leave this group, or delete it instead.',
+      }), { status: 409, headers: corsHeaders() });
+    }
+    await deleteGroup(env, groupId);
+    return new Response(JSON.stringify({ ok: true, deleted: true }), { headers: corsHeaders() });
   }
 
   // Check if this would leave the group empty (reject)

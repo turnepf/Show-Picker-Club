@@ -370,8 +370,8 @@
     <!-- Join Flow -->
     <div id="joinFlow">
       <div class="join-section">
-        <h2>Join a Group</h2>
-        <p>Enter the invite code to join a group</p>
+        <h2 id="joinHeading">Join a Group</h2>
+        <p id="joinPrompt">Enter the invite code to join a group</p>
         <div class="join-input-row">
           <input id="joinTokenInput" type="text" placeholder="Invite code" maxlength="24">
           <button onclick="joinGroup()">Join</button>
@@ -1153,9 +1153,18 @@
     }
 
     async function leaveGroup() {
-      if (!confirm('Leave this group?')) return;
+      // A group doesn't outlive its creator: leaving it deletes it for everyone.
+      const isCreator = !!currentGroupData.is_creator;
+      const prompt = isCreator
+        ? 'You created this group. Leaving will delete it for everyone. Leave and delete it?'
+        : 'Leave this group?';
+      if (!confirm(prompt)) return;
       try {
-        const res = await fetch(`/api/groups/${currentGroupData.group.id}/leave`, { method: 'POST' });
+        const res = await fetch(`/api/groups/${currentGroupData.group.id}/leave`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(isCreator ? { confirm_delete: true } : {}),
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         navStack = ['groupsList'];
         updateNav();
@@ -1296,24 +1305,31 @@
     function showJoinFlow() {
       navPush('joinFlow', () => {
         document.getElementById('pageTitle').textContent = 'Join a Group';
+        document.getElementById('joinHeading').textContent = 'Join a Group';
+        document.getElementById('joinPrompt').textContent = 'Enter the invite code to join a group';
         document.getElementById('joinTokenInput').focus();
       });
     }
 
+    // Preview only: opening an invite link never joins. The member sees the
+    // group's name and presses Join (joinGroup), the one redeeming call.
     async function showJoinPreview(token) {
       try {
-        const res = await fetch(`/api/groups/join?token=${encodeURIComponent(token)}`);
+        const res = await fetch(`/api/groups/join?preview=1&token=${encodeURIComponent(token)}`);
         if (!res.ok) {
           window.location.href = '/groups';
           return;
         }
         const data = await res.json();
         if (data.join_required) {
+          const name = data.group && data.group.name ? data.group.name : 'this group';
           navPush('joinFlow', () => {
             document.getElementById('pageTitle').textContent = 'Join a Group';
+            document.getElementById('joinHeading').textContent = `Join ${name}?`;
+            document.getElementById('joinPrompt').textContent = 'You were invited to this private group. Press Join to become a member.';
             document.getElementById('joinTokenInput').value = token;
           });
-        } else if (data.ok) {
+        } else {
           window.location.href = '/groups';
         }
       } catch (e) {

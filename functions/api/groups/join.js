@@ -100,7 +100,10 @@ export async function onRequestGet(context) {
   // Everything above this line is a read. The write starts here, so this is
   // where the cross-site refusal belongs: a cross-site caller still gets the
   // group's name (it is already on the link they hold) but joins nobody.
-  if (crossSite(request)) {
+  // ?preview=1 never writes: the web page and the apps show the group and
+  // redeem only on an explicit Join (security audit run-2: the web page used
+  // to redeem on load, turning a cross-site link into a same-origin join).
+  if (url.searchParams.get('preview') === '1' || crossSite(request)) {
     return new Response(JSON.stringify({
       group: { id: invite.group_id, name: invite.name },
       join_required: true

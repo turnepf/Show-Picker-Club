@@ -14,6 +14,7 @@
 // must demote themselves first, so the club can't lose its last admin to a
 // stray tap.
 
+import { memberReferenceStatements } from '../_shared/member-references.js';
 import { getSession } from '../_shared/auth.js';
 import { sendEmail, deleteCodeEmail } from '../_shared/email.js';
 import { forgetMemberAsWatcher } from '../_shared/watchers.js';
@@ -153,9 +154,15 @@ export async function onRequestPost(context) {
       // dismissed/added marks on other cards only ever shaped their own view.
       env.DB.prepare('DELETE FROM group_suggestions WHERE suggested_by = ?').bind(slug),
       env.DB.prepare('DELETE FROM group_suggestion_responses WHERE member_slug = ?').bind(slug),
+      // Ratings, household links, device records, groups they created and
+      // their memberships elsewhere (security audit run-2): left behind they
+      // either fail the members delete (foreign keys on) or pass to the next
+      // signup who gets this slug (foreign keys off).
+      ...memberReferenceStatements(env, slug),
       ...statements,
     ]);
   } catch (e) {
+    try { await env.DB.batch(memberReferenceStatements(env, slug)); } catch (_) { /* older database */ }
     await env.DB.batch(statements);
   }
 

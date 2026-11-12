@@ -123,6 +123,10 @@ export async function resetDemoIfDue(env, { force = false } = {}) {
     ...(baseline.shows || []).map((s) => insertFromRow(env, 'shows', s, { columns: showColumns })),
     ...(baseline.subscriptions || []).map((s) =>
       insertFromRow(env, 'member_subscriptions', s, { dropId: true })),
+    // Everything else a visitor can leave behind on the shared account
+    // (security audit run-2: the demo code is public, and this used to survive
+    // the reset into the next visitor's, and App Review's, session).
+    ...demoResidueCleanup(env, slug),
   ];
   await env.DB.batch(statements);
   await delState(env, 'reset_due_at');
@@ -151,4 +155,31 @@ export async function noteDemoLogin(env, slug) {
     // Swallow: demo reset is best-effort at login time; the hourly cron
     // endpoint surfaces real errors.
   }
+}
+
+// Groups, invites, household links, passkeys, connected apps and stale logins
+// made on the demo account. Children before parents, so it holds with or
+// without foreign-key enforcement. Sessions younger than a day are kept: the
+// reset lands an hour after each sign-in, and a review session must not be
+// logged out mid-review. Ratings are left alone (the baseline doesn't carry
+// them, and they're the account's own demo content).
+export function demoResidueCleanup(env, slug) {
+  const sessionCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const own = 'SELECT id FROM groups WHERE creator_slug = ?';
+  const ownSuggestions = `SELECT id FROM group_suggestions WHERE group_id IN (${own})`;
+  return [
+    env.DB.prepare(`DELETE FROM group_suggestion_responses WHERE member_slug = ? OR suggestion_id IN (${ownSuggestions})`).bind(slug, slug),
+    env.DB.prepare(`DELETE FROM group_suggestions WHERE suggested_by = ? OR group_id IN (${own})`).bind(slug, slug),
+    env.DB.prepare(`DELETE FROM group_invites WHERE created_by = ? OR group_id IN (${own})`).bind(slug, slug),
+    env.DB.prepare(`DELETE FROM group_members WHERE member_slug = ? OR group_id IN (${own})`).bind(slug, slug),
+    env.DB.prepare('UPDATE groups SET profile_changed_by = NULL WHERE profile_changed_by = ?').bind(slug),
+    env.DB.prepare('DELETE FROM groups WHERE creator_slug = ?').bind(slug),
+    env.DB.prepare('DELETE FROM household_members WHERE member_slug = ? OR other_slug = ?').bind(slug, slug),
+    env.DB.prepare('DELETE FROM household_invites WHERE inviter_slug = ?').bind(slug),
+    env.DB.prepare('DELETE FROM member_passkeys WHERE member_slug = ?').bind(slug),
+    env.DB.prepare('DELETE FROM oauth_tokens WHERE grant_id IN (SELECT id FROM oauth_grants WHERE member_slug = ?)').bind(slug),
+    env.DB.prepare('DELETE FROM oauth_codes WHERE member_slug = ?').bind(slug),
+    env.DB.prepare('DELETE FROM oauth_grants WHERE member_slug = ?').bind(slug),
+    env.DB.prepare('DELETE FROM sessions WHERE member_slug = ? AND created_at < ?').bind(slug, sessionCutoff),
+  ];
 }

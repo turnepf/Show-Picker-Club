@@ -95,7 +95,9 @@ export async function onRequestGet(context) {
     tmdbId: show.tmdb_id,
     tmdbType: show.tmdb_type,
     viewerSlug: session ? session.member_slug : null,
-    ownerSlug: show.member_slug,
+    // Whose list this is (and so their name and rating) needs a session; a
+    // logged-out visitor gets club averages only (security audit run-2).
+    ownerSlug: session ? show.member_slug : null,
   });
   // Name for the "<member>'s rating" line — only needed when there's an
   // owner rating to label. Same fallback chain as the Search-all-libraries

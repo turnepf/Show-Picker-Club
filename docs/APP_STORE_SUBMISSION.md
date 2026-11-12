@@ -27,7 +27,7 @@ pre-populated, and it is what the Review notes point at.
 - [ ] Cloudflare Pages secrets are set on the `shows` project:
       ```bash
       printf "demo@example.com" | wrangler pages secret put DEMO_LOGIN_EMAIL   --project-name shows
-      printf "424242"           | wrangler pages secret put DEMO_LOGIN_CODE    --project-name shows  # 6 digits
+      printf "<6-digit code from 1Password>" | wrangler pages secret put DEMO_LOGIN_CODE    --project-name shows  # 6 digits; never commit the real value
       ```
       - `DEMO_LOGIN_EMAIL` + `DEMO_LOGIN_CODE` → the email/code reviewer login
         (`functions/auth/login.js`).

@@ -447,8 +447,9 @@ group id verifies membership and 403s otherwise; only the creator can delete.
   ranking — but it was true of the club-wide query as well. Pinned by
   `scripts/favorite-actors-test.mjs`.
 - **Joining is a link.** `POST /api/groups/[id]/invite` mints the token and the
-  share URL (`/groups/join?token=…`); opening it signed in joins the group,
-  signed out it previews the group name and asks for a login.
+  share URL (`/groups/join?token=…`); opening it shows the group's name and
+  a Join button, and only the press joins (signed out, it asks for a login
+  first). A creator who leaves deletes the group, after a confirmation.
 - **Groups are the consent boundary for "Watching with".** Sharing a group is
   what makes someone nameable on a show — and therefore what makes it legal to
   write a row onto their list. See [`show_watchers`](#show_watchers).
@@ -542,16 +543,16 @@ drained once, so it deliberately has no button in the app.
 | `POST /api/groups`                     | `functions/api/groups.js`                  | POST    | session — creates the group, joins the caller, returns a first invite |
 | `GET /api/groups/[id]`                 | `functions/api/groups/[id].js`             | GET     | session + membership (403 otherwise) — response carries `change_notice` at most once per member per rename/icon change |
 | `PATCH /api/groups/[id]`               | `functions/api/groups/[id].js`             | PATCH   | session + membership (any member, not just creator) — rename and/or set `icon`/`color` (curated sets; absent = keep, null = clear) |
-| `DELETE /api/groups/[id]`              | `functions/api/groups/[id].js`             | DELETE  | session + creator |
+| `DELETE /api/groups/[id]`              | `functions/api/groups/[id].js`             | DELETE  | session + creator (still a member) — `_shared/group-delete.js` removes responses, suggestions, invites and members, then the group |
 | `POST /api/groups/[id]/invite`         | `functions/api/groups/[id]/invite.js`      | POST    | session + membership — mints a 7-day token |
-| `POST /api/groups/[id]/leave`          | `functions/api/groups/[id]/leave.js`       | POST    | session + membership |
+| `POST /api/groups/[id]/leave`          | `functions/api/groups/[id]/leave.js`       | POST    | session + membership. The creator leaving deletes the group: without `{confirm_delete: true}` it answers 409 `creator_must_confirm` and changes nothing; with it, returns `{ok, deleted: true}` (INVARIANTS §26) |
 | `GET /api/groups/[id]/trending`        | `functions/api/groups/[id]/trending.js`    | GET     | session + membership — top 10 titles the group added in 30 days |
 | `GET /api/groups/[id]/suggestions`     | `functions/api/groups/[id]/suggestions.js` | GET     | session + membership — the group's Watch Next board, shaped for the viewer |
 | `POST /api/groups/[id]/suggestions`    | `functions/api/groups/[id]/suggestions.js` | POST    | session + membership — recommend your own copy of a show to the group (daily ceiling; duplicate titles fold) |
 | `POST /api/groups/[id]/suggestions/[sid]` | `functions/api/groups/[id]/suggestions/[sid].js` | POST | session + membership — answer the pop-up (`dismiss` \| `add`); `add` copies onto the caller's own Next Up |
 | `DELETE /api/groups/[id]/suggestions/[sid]` | `functions/api/groups/[id]/suggestions/[sid].js` | DELETE | session + (recommender or group creator) |
-| `GET /api/groups/join?token=`          | `functions/api/groups/join.js`             | GET     | session joins; without one, returns a name-only preview |
-| `POST /api/enrich`                     | `functions/api/enrich.js`                  | POST    | session or `CRON_SECRET` header — `{show_id}` refreshes that one row regardless of list, archive state or gaps, and skips the library-wide actor backfill (the `admin_refresh_show` tool). `{mode: "titles"}` rebuilds the shared `titles` table, and accepts the cron secret only |
+| `GET /api/groups/join?token=`          | `functions/api/groups/join.js`             | GET     | session joins; without one, or with `?preview=1`, or cross-site, returns a name-only preview and writes nothing. The web page previews first and redeems on the Join press |
+| `POST /api/enrich`                     | `functions/api/enrich.js`                  | POST    | session or `CRON_SECRET` header. A plain member session gets only the default pass over its own copies (body ignored), charged as `enrich` in `member_spend` (20/day, then `{skipped: 'rate_limited'}`); the options below are for the cron secret and admins, including an admin connection's `admin_refresh_show` — `{show_id}` refreshes that one row regardless of list, archive state or gaps, and skips the library-wide actor backfill (the `admin_refresh_show` tool). `{mode: "titles"}` rebuilds the shared `titles` table, and accepts the cron secret only |
 | `POST /api/sync-urls`                  | `functions/api/sync-urls.js`               | POST    | admin session or `X-Cron-Secret` (a member session is a no-op `{synced: 0}`); demo member's rows excluded as URL sources |
 | `GET /api/reporting`                   | `functions/api/reporting.js`               | GET     | admin session |
 | `POST /api/account-delete`             | `functions/api/account-delete.js`          | POST    | session; hard-deletes the caller's account after an emailed code confirms |
@@ -1087,7 +1088,7 @@ Two endpoints and a shared module, and **no schema change**: imported rows are o
 |---|---|
 | `functions/_shared/list-parse.js` | Slice the paste at a line boundary, one Claude call per slice, then one TMDB search per extracted title. Also the dupe-check query and the four-list constants. |
 | `POST /api/import/parse` | Session-gated. Body `{ text, cursor?, section?, default_list? }` → `{ items, next_cursor, section, default_list, total_chars }`. **Writes nothing** to `shows`; charges one `claude` unit per slice to `member_spend` (100/day, then 429 `rate_limited`). |
-| `POST /api/import/commit` | Session-gated. Body `{ items }` → `{ added, skipped, titles, skipped_titles }`. Inserts into `shows`, always for the caller's own `member_slug`. |
+| `POST /api/import/commit` | Session-gated. Body `{ items }` → `{ added, skipped, titles, skipped_titles, unmatched, unmatched_titles }`. Inserts into `shows`, always for the caller's own `member_slug`. An item's `tmdb_id` counts only with parse's `identity_sig`, an existing `titles` row, or a by-id TMDB lookup (at most 20 per call, metered as `lookups`); anything else comes back unmatched. Any URL in the payload is ignored. |
 
 ### Why it pages
 
@@ -1097,7 +1098,7 @@ Slices are cut on a **line boundary**, and each response carries the section hea
 
 ### Why parse and commit are separate
 
-`/api/shows` enriches synchronously — TMDB detail, credits, person and Watchmode lookups per row. Dozens of those in one invocation blows the subrequest budget. So `commit` inserts with only what `parse` already resolved (`tmdb_id`, canonical title, `poster_url`, `release_year`) plus a `networkSearchUrl()` placeholder, and the existing background `/api/enrich` rotation fills in overview, cast, trailer and a real deep link. The client fires `/api/enrich` once after a successful import so that happens promptly rather than on the next scheduled pass.
+`/api/shows` enriches synchronously — TMDB detail, credits, person and Watchmode lookups per row. Dozens of those in one invocation blows the subrequest budget. So `commit` inserts with only what `parse` already resolved and signed (`tmdb_id`, canonical title, `release_year`; HMAC under `CRON_SECRET`, `_shared/import-identity.js`) plus a `networkSearchUrl()` placeholder — or, for an older client that drops the signature, what one by-id TMDB detail call confirms — and the existing background `/api/enrich` rotation fills in overview, cast, trailer and a real deep link. The client fires `/api/enrich` once after a successful import so that happens promptly rather than on the next scheduled pass.
 
 The split also gives the review screen for free: `parse` returns rows, the member fixes the list assignments, `commit` writes. Nothing is written without that confirmation.
 

@@ -27,6 +27,7 @@
 // first, then the linked members' names — so tvOS, watchOS and any build
 // installed before this shipped keep rendering the one field they read.
 
+import { networkSearchUrl } from './networks.js';
 import { fetchEnrichment } from './enrichment.js';
 import { syncTitle, writeTitle, titleFieldsFromEnrichment } from './titles.js';
 import { sameShowWhere } from './same-show.js';
@@ -246,9 +247,13 @@ export async function ensureCopy(env, memberSlug, source, list, taggerEmail) {
 
   // The member's row only: service, list and pin. The show's name, facts and
   // cast are the entry's shared row, which the source already has
-  // (docs/INVARIANTS.md §29), so nothing is copied but the pin.
+  // (docs/INVARIANTS.md §29), so nothing is copied but the pin. The source's
+  // link is not copied either: a link one member pasted is not evidence for
+  // anyone else's row (security audit run-2; docs/INVARIANTS.md §24). The new
+  // row gets the service's search placeholder, and shows_v shows the shared
+  // watch_links row for the entry and service when there is one.
   const result = await insertCopy(env, {
-    network: source.network || null, network_url: source.network_url || null, list,
+    network: source.network || null, network_url: networkSearchUrl(source.network || null, source.title), list,
     movie: source.movie || 0, full_series: source.full_series || 0, network_logo_url: source.network_logo_url || null,
     member_slug: memberSlug, added_by: taggerEmail || null, tmdb_id: tmdbId, tmdb_type: tmdbType,
   });

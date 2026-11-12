@@ -306,6 +306,30 @@ console.log('\n== refresh is background work, not an edit');
   check('a movie refreshes through the movie pass', !fr.err && fr.out.refreshed && row(env, film).genres === 'Comedy, Drama', fr.err?.message || row(env, film).genres);
 }
 
+
+console.log('\n== refresh is not charged to the member-page enrich ceiling');
+{
+  // /api/enrich meters a member's own passes and rewrites their body to a
+  // default pass over their own copies (security audit run-2). The admin
+  // refresh rides the same handler, so it must reach it as an admin call
+  // (adminScope) — otherwise show_id is dropped and a member at their cap
+  // can't be fixed at all.
+  const env = seed();
+  const cols = env._db.prepare('PRAGMA table_info(member_spend)').all().map((c) => c.name);
+  if (!cols.includes('enrich')) env._db.exec(readFileSync(join(repoRoot, 'migrations', '091_member_spend_enrich.sql'), 'utf8'));
+  for (const slug of ['patrick', 'eric']) {
+    env._db.prepare("INSERT INTO member_spend (member_slug, day, enrich) VALUES (?, date('now'), 1000)").run(slug);
+  }
+  const id = addShow(env, 'eric', { tmdb: REMAKE, year: 2026, archived: true, list: 'recommending' });
+  const other = addShow(env, 'eric', { title: 'Frances Ha', movie: true, tmdb: FILM, list: 'next' });
+  const { out, err } = await run(env, 'admin_refresh_show', { member_slug: 'eric', show_id: id });
+  check('a member at their enrich cap can still be refreshed by an admin', !err && out.refreshed === true, err?.message || JSON.stringify(out));
+  check('the named row is the one refreshed', row(env, id).genres === 'Drama, Western, Family', row(env, id).genres);
+  check('and only that row', !row(env, other).enriched_at, row(env, other).enriched_at);
+  const spent = env._db.prepare("SELECT member_slug, enrich FROM member_spend ORDER BY member_slug").all().map((r) => `${r.member_slug}:${r.enrich}`).join();
+  check('nobody is charged for it', spent === 'eric:1000,patrick:1000', spent);
+}
+
 console.log('\n== adds store genres and seasons');
 {
   const env = seed();

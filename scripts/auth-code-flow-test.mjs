@@ -42,6 +42,9 @@ writeFileSync(join(sandbox, 'package.json'), '{"type":"module"}');
 const load = (p) => import(join(sandbox, 'functions', p));
 const requestCode = await load('auth/request-code.js');
 const login = await load('auth/login.js');
+const enroll = await load('auth/enroll.js');
+const logout = await load('auth/logout.js');
+const apple = await load('auth/apple.js');
 
 const ORIGIN = 'https://showpicker.club';
 const DEMO_EMAIL = 'demo@example.com';
@@ -62,6 +65,27 @@ function check(name, cond, detail = '') {
 // Turnstile token is single-use, so a second verification of the same token
 // fails the way the real service does.
 const mail = { sent: [], rejected: [], turnstileChecks: 0 };
+
+// A stand-in for Apple's signing key: /auth/apple verifies the identity
+// token's RS256 signature against the JWKS at appleid.apple.com, which the
+// stub below serves with this key's public half.
+const appleKey = await (async () => {
+  const pair = await crypto.subtle.generateKey(
+    { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+    true, ['sign', 'verify']);
+  const jwk = { ...(await crypto.subtle.exportKey('jwk', pair.publicKey)), kid: 'test-kid', alg: 'RS256', use: 'sig' };
+  return { jwk, privateKey: pair.privateKey };
+})();
+const b64url = (bytes) => Buffer.from(bytes).toString('base64url');
+async function appleToken(claims) {
+  const head = b64url(JSON.stringify({ alg: 'RS256', kid: 'test-kid' }));
+  const body = b64url(JSON.stringify({
+    iss: 'https://appleid.apple.com', aud: 'net.patrickturner.showpickerios',
+    exp: Math.floor(Date.now() / 1000) + 600, ...claims,
+  }));
+  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', appleKey.privateKey, new TextEncoder().encode(`${head}.${body}`));
+  return `${head}.${body}.${b64url(new Uint8Array(sig))}`;
+}
 const spentTokens = new Set();
 
 globalThis.fetch = async (url, init = {}) => {
@@ -79,6 +103,10 @@ globalThis.fetch = async (url, init = {}) => {
     }
     mail.sent.push({ to, subject: body.subject, text: body.text });
     return jsonRes({ id: 'msg_' + mail.sent.length });
+  }
+
+  if (String(url) === 'https://appleid.apple.com/auth/keys') {
+    return jsonRes({ keys: [appleKey.jwk] });
   }
 
   if (String(url).startsWith('https://challenges.cloudflare.com/')) {
@@ -356,6 +384,214 @@ console.log('\n== the per-address signup cap fires');
   check('a fourth code to one address is not sent', mail.sent.length === 3, `sent ${mail.sent.length}`);
   check('and only three rows exist',
     rows(env, 'SELECT id FROM enroll_otps').length === 3);
+}
+
+
+// ---- security audit run-2 ----
+
+// `site` is what a browser puts in Sec-Fetch-Site; `origin` its Origin.
+function browserPost(path, body, { origin, site, ip = '203.0.113.9' } = {}) {
+  const headers = { 'Content-Type': 'text/plain', 'CF-Connecting-IP': ip };
+  if (origin) headers.Origin = origin;
+  if (site) headers['Sec-Fetch-Site'] = site;
+  return new Request(ORIGIN + path, { method: 'POST', headers, body: JSON.stringify(body ?? {}) });
+}
+
+console.log('\n== another site cannot sign a visitor into an account (login CSRF)');
+{
+  // The demo login is valid credentials anyone holds, which is exactly what a
+  // login-CSRF page would auto-submit (as an enctype=text/plain form) to swap
+  // the visitor into an account the attacker controls.
+  const env = makeEnv({ DEMO_LOGIN_EMAIL: DEMO_EMAIL, DEMO_LOGIN_CODE: DEMO_CODE });
+  addMember(env, 'demo', DEMO_EMAIL);
+  const creds = { email: DEMO_EMAIL, code: DEMO_CODE };
+
+  for (const [label, opts] of [
+    ['a foreign Origin', { origin: 'https://evil.example' }],
+    ['Sec-Fetch-Site: cross-site', { site: 'cross-site' }],
+    ['cross-site with our own Origin spoofed', { site: 'cross-site', origin: ORIGIN }],
+  ]) {
+    const res = await login.onRequestPost(context(env, browserPost('/auth/login', creds, opts)));
+    check(`/auth/login refuses ${label} with 403`, res.status === 403, `got ${res.status}`);
+    check(`  and says cross_site`, (await res.json()).error === 'cross_site');
+    check(`  and sets no cookie`, !res.headers.get('Set-Cookie'));
+  }
+  check('no session row was minted', rows(env, 'SELECT id FROM sessions').length === 0);
+
+  const same = await login.onRequestPost(context(env, browserPost('/auth/login', creds, { origin: ORIGIN, site: 'same-origin' })));
+  check('our own web page still signs in', same.status === 200 && (same.headers.get('Set-Cookie') || '').includes('session='), `got ${same.status}`);
+  const native = await login.onRequestPost(context(env, post('/auth/login', creds)));
+  check('a native client (no Origin, no Sec-Fetch-Site) still signs in', native.status === 200, `got ${native.status}`);
+
+  const env2 = makeEnv();
+  env2._db.prepare("INSERT INTO enroll_otps (email, code, expires_at) VALUES ('new@dummy-mailbox.net', '111111', ?)")
+    .run(new Date(Date.now() + 600000).toISOString());
+  const enr = await enroll.onRequestPost(context(env2, browserPost('/auth/enroll',
+    { email: 'new@dummy-mailbox.net', code: '111111', full_name: 'New Person' }, { origin: 'https://evil.example' })));
+  check('/auth/enroll refuses a foreign Origin', enr.status === 403 && (await enr.json()).error === 'cross_site', `got ${enr.status}`);
+  check('  and creates no member', rows(env2, 'SELECT slug FROM members').length === 0);
+
+  const rc = await requestCode.onRequestPost(context(env2, browserPost('/auth/request-code',
+    { email: 'victim@dummy-mailbox.net', channel: 'email' }, { site: 'cross-site' })));
+  check('/auth/request-code refuses a cross-site browser', rc.status === 403 && (await rc.json()).error === 'cross_site', `got ${rc.status}`);
+  check('  and mails nothing', mail.sent.length === 0);
+
+  const ap = await apple.onRequestPost(context(env2, browserPost('/auth/apple',
+    { identity_token: await appleToken({ sub: 'x', email: 'a@dummy-mailbox.net', email_verified: true }) }, { origin: 'https://evil.example' })));
+  check('/auth/apple refuses a foreign Origin', ap.status === 403, `got ${ap.status}`);
+}
+
+console.log('\n== an account-delete code does not sign anyone in');
+{
+  // Both live in login_otps; only channel tells them apart.
+  const env = makeEnv();
+  addMember(env, 'patrick', 'patrick@patrickturner.net');
+  env._db.prepare("INSERT INTO login_otps (member_slug, code, channel, expires_at) VALUES ('patrick', '777777', 'delete', ?)")
+    .run(new Date(Date.now() + 600000).toISOString());
+  const res = await login.onRequestPost(context(env, post('/auth/login', { email: 'patrick@patrickturner.net', code: '777777' })));
+  check('a delete code is 401 at /auth/login', res.status === 401, `got ${res.status}`);
+  check('and mints no session', !res.headers.get('Set-Cookie') && rows(env, 'SELECT id FROM sessions').length === 0);
+
+  env._db.prepare("INSERT INTO login_otps (member_slug, code, channel, expires_at) VALUES ('patrick', '888888', 'email', ?)")
+    .run(new Date(Date.now() + 600000).toISOString());
+  const ok = await login.onRequestPost(context(env, post('/auth/login', { email: 'patrick@patrickturner.net', code: '888888' }, { ip: '198.51.100.20' })));
+  check('an email login code still signs in', ok.status === 200, `got ${ok.status}`);
+}
+
+console.log('\n== ten wrong signup codes for one email lock it, whatever the IPs');
+{
+  const EMAIL = 'target@dummy-mailbox.net';
+  const seed = () => {
+    const env = makeEnv();
+    env._db.prepare('INSERT INTO enroll_otps (email, code, expires_at) VALUES (?, ?, ?)')
+      .run(EMAIL, '123456', new Date(Date.now() + 600000).toISOString());
+    return env;
+  };
+  const env = seed();
+  let statuses = [];
+  for (let i = 0; i < 10; i++) {
+    const res = await login.onRequestPost(context(env, post('/auth/login', { email: EMAIL, code: String(900000 + i) }, { ip: `192.0.2.${i + 1}` })));
+    statuses.push(res.status);
+  }
+  check('each wrong guess from a fresh IP is a 401', statuses.every((s) => s === 401), statuses.join(','));
+  const right = await login.onRequestPost(context(env, post('/auth/login', { email: EMAIL, code: '123456' }, { ip: '192.0.2.200' })));
+  check('then the right code from yet another IP is 429', right.status === 429, `got ${right.status}`);
+  check('and the live signup code was spent', rows(env, `SELECT used_at FROM enroll_otps WHERE email = '${EMAIL}'`).every((r) => r.used_at),
+    JSON.stringify(rows(env, 'SELECT used_at FROM enroll_otps')));
+  const viaEnroll = await enroll.onRequestPost(context(env, post('/auth/enroll', { email: EMAIL, code: '123456', full_name: 'Target Person' }, { ip: '192.0.2.201' })));
+  check('/auth/enroll refuses it as well', viaEnroll.status === 429, `got ${viaEnroll.status}`);
+  check('and no member was created', rows(env, 'SELECT slug FROM members').length === 0);
+  check('the failure log holds no email address', !JSON.stringify(rows(env, 'SELECT * FROM failed_logins')).includes('dummy-mailbox'));
+
+  // The same lockout through /auth/enroll's own wrong guesses.
+  const env2 = seed();
+  for (let i = 0; i < 10; i++) {
+    await enroll.onRequestPost(context(env2, post('/auth/enroll', { email: EMAIL, code: String(900000 + i), full_name: 'Target Person' }, { ip: `192.0.2.${i + 1}` })));
+  }
+  const after = await enroll.onRequestPost(context(env2, post('/auth/enroll', { email: EMAIL, code: '123456', full_name: 'Target Person' }, { ip: '192.0.2.250' })));
+  check('wrong guesses at /auth/enroll lock the email too', after.status === 429, `got ${after.status}`);
+
+  // Nine wrong guesses leave the right code working.
+  const env3 = seed();
+  for (let i = 0; i < 9; i++) {
+    await login.onRequestPost(context(env3, post('/auth/login', { email: EMAIL, code: String(900000 + i) }, { ip: `192.0.2.${i + 1}` })));
+  }
+  const ok = await login.onRequestPost(context(env3, post('/auth/login', { email: EMAIL, code: '123456' }, { ip: '192.0.2.200' })));
+  check('under the cap the right code still asks for a name', ok.status === 200 && (await ok.json()).needs_name === true, `got ${ok.status}`);
+}
+
+console.log('\n== a club-wide ceiling on signup codes sends nothing past it');
+{
+  // Hourly: 20 codes already out this hour, to other addresses from other IPs.
+  const env = makeEnv();
+  for (let i = 0; i < 20; i++) {
+    env._db.prepare('INSERT INTO enroll_otps (email, code, ip, expires_at) VALUES (?, ?, ?, ?)')
+      .run(`earlier${i}@dummy-mailbox.net`, '000000', `10.0.0.${i}`, new Date(Date.now() + 600000).toISOString());
+  }
+  const res = await requestCode.onRequestPost(context(env, post('/auth/request-code', { email: 'fresh@dummy-mailbox.net', channel: 'email' }, { ip: '198.51.100.50' })));
+  check('past 20 an hour the reply is still success', res.status === 200, `got ${res.status}`);
+  check('but nothing is mailed', mail.sent.length === 0, `sent ${mail.sent.length}`);
+  check('and no code is stored', rows(env, "SELECT id FROM enroll_otps WHERE email = 'fresh@dummy-mailbox.net'").length === 0);
+
+  // Daily: 50 in the last day, none of them this hour.
+  const env2 = makeEnv();
+  for (let i = 0; i < 50; i++) {
+    env2._db.prepare("INSERT INTO enroll_otps (email, code, ip, expires_at, created_at) VALUES (?, ?, ?, ?, datetime('now', '-3 hours'))")
+      .run(`earlier${i}@dummy-mailbox.net`, '000000', `10.0.1.${i}`, new Date(Date.now() + 600000).toISOString());
+  }
+  const day = await requestCode.onRequestPost(context(env2, post('/auth/request-code', { email: 'fresh@dummy-mailbox.net', channel: 'email' }, { ip: '198.51.100.51' })));
+  check('past 50 a day the reply is still success', day.status === 200, `got ${day.status}`);
+  check('but nothing is mailed', mail.sent.length === 0, `sent ${mail.sent.length}`);
+
+  // Under both: it goes out.
+  const env3 = makeEnv();
+  for (let i = 0; i < 19; i++) {
+    env3._db.prepare('INSERT INTO enroll_otps (email, code, ip, expires_at) VALUES (?, ?, ?, ?)')
+      .run(`earlier${i}@dummy-mailbox.net`, '000000', `10.0.2.${i}`, new Date(Date.now() + 600000).toISOString());
+  }
+  await requestCode.onRequestPost(context(env3, post('/auth/request-code', { email: 'fresh@dummy-mailbox.net', channel: 'email' }, { ip: '198.51.100.52' })));
+  check('the 20th code of the hour still goes out', mail.sent.length === 1, `sent ${mail.sent.length}`);
+  // A member's login code is not a signup code and is never held back.
+  // (env is the one already past the hourly ceiling.)
+  addMember(env, 'patrick', 'patrick@patrickturner.net');
+  const before = mail.sent.length;
+  const member = await requestCode.onRequestPost(context(env, post('/auth/request-code', { email: 'patrick@patrickturner.net', channel: 'email' }, { ip: '198.51.100.53' })));
+  check("a member's login code is not held by the signup ceiling", member.status === 200 && mail.sent.length === before + 1, `got ${member.status}, sent ${mail.sent.length - before}`);
+}
+
+console.log('\n== logout only redirects back to a page on this site');
+{
+  const env = makeEnv();
+  const out = async (referer, method = 'POST') => {
+    const headers = referer ? { Referer: referer } : {};
+    const r = new Request(ORIGIN + '/auth/logout', { method, headers });
+    const res = method === 'POST' ? await logout.onRequestPost(context(env, r)) : await logout.onRequestGet(context(env, r));
+    return res.headers.get('Location');
+  };
+  check('a same-site referer comes back', (await out(`${ORIGIN}/patrick#watching`)) === '/patrick#watching');
+  const proto = await out('https://evil.example//evil.example/phish');
+  check("a foreign referer whose path starts '//' is not followed", proto === '/', `Location ${proto}`);
+  const ownDouble = await out(`${ORIGIN}//evil.example/phish`);
+  check("our own origin with a '//' path is not followed either", ownDouble === '/', `Location ${ownDouble}`);
+  const foreign = await out('https://evil.example/patrick');
+  check('any foreign referer falls back to /', foreign === '/', `Location ${foreign}`);
+  check('GET behaves the same', (await out('https://evil.example//evil.example/x', 'GET')) === '/');
+  check('no referer goes to /', (await out(null)) === '/');
+}
+
+console.log('\n== Sign in with Apple trusts an email only when Apple verified it');
+{
+  const seed = () => {
+    const env = makeEnv();
+    addMember(env, 'patrick', 'patrick@patrickturner.net');
+    return env;
+  };
+  const signIn = async (env, claims, extra = {}) => apple.onRequestPost(context(env,
+    post('/auth/apple', { identity_token: await appleToken(claims), ...extra }, { ip: `198.51.100.${Math.floor(Math.random() * 200) + 1}` })));
+  const linked = (env) => rows(env, 'SELECT apple_sub, member_slug FROM member_apple_ids');
+
+  let env = seed();
+  let res = await signIn(env, { sub: 'apple-1', email: 'patrick@patrickturner.net', email_verified: false });
+  check('an unverified email does not sign into the member who owns it', res.status !== 200 || !(res.headers.get('Set-Cookie') || '').includes('session='), `got ${res.status}`);
+  check('and links no Apple id to them', linked(env).length === 0, JSON.stringify(linked(env)));
+
+  env = seed();
+  res = await signIn(env, { sub: 'apple-2', email: 'patrick@patrickturner.net' });
+  check('an absent email_verified is treated the same', linked(env).length === 0 && !(res.headers.get('Set-Cookie') || '').includes('session='), `got ${res.status}`);
+
+  env = seed();
+  res = await signIn(env, { sub: 'apple-3', email: 'someone@dummy-mailbox.net', email_verified: 'false' }, { full_name: 'Some One' });
+  check('an unverified email does not enroll a new member', rows(env, "SELECT slug FROM members WHERE slug != 'patrick'").length === 0, `got ${res.status}`);
+
+  env = seed();
+  res = await signIn(env, { sub: 'apple-4', email: 'patrick@patrickturner.net', email_verified: 'true' });
+  check('a verified email (Apple sends "true") still links and signs in', res.status === 200
+    && linked(env).some((r) => r.apple_sub === 'apple-4' && r.member_slug === 'patrick'), `got ${res.status}`);
+
+  env = seed();
+  env._db.prepare("INSERT INTO member_apple_ids (apple_sub, member_slug, email, created_at) VALUES ('apple-5', 'patrick', 'x', '2026-01-01')").run();
+  res = await signIn(env, { sub: 'apple-5', email: 'relay@privaterelay.appleid.com', email_verified: false });
+  check('an already-linked Apple id still signs in without a verified email', res.status === 200, `got ${res.status}`);
 }
 
 console.log(`\n${failed === 0 ? 'PASS' : 'FAILED'} — ${passed} passed, ${failed} failed\n`);

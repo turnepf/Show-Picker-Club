@@ -102,9 +102,10 @@ function strArg(args, name, { required = false, max = 2000 } = {}) {
 }
 
 // Calls a handler as the member. Nothing leaves the Worker.
-// adminScope marks the request for the one admin endpoint a members:admin
-// connection may reach (/api/admin-query); it is honoured only when the token
-// actually holds that scope.
+// adminScope marks the request for the admin paths a members:admin connection
+// may reach (/api/admin-query, and /api/enrich's unmetered single-row refresh
+// for admin_refresh_show); it is honoured only when the token actually holds
+// that scope.
 async function call(ctx, handler, { method = 'GET', path, query = {}, body, params = {}, adminScope = false }) {
   const url = new URL(path, ctx.origin);
   for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
@@ -124,6 +125,7 @@ function failure(status, data, what = 'That') {
   if (status === 404) return new ToolError(`${what} wasn't found, or isn't yours.`);
   if (status === 403) return new ToolError(typeof code === 'string' && code !== 'Forbidden' ? code : `You don't have access to ${what.toLowerCase()}.`);
   if (status === 429) return new ToolError('The app’s own daily limit for this action has been reached. Try again tomorrow.');
+  if (code === 'creator_must_confirm') return new ToolError('You created this group, so leaving it deletes it for every member. Call leave_group again with confirm_delete: true to leave and delete it.');
   return new ToolError(typeof code === 'string' ? code : `Request failed (${status}).`);
 }
 
@@ -731,14 +733,24 @@ export const TOOLS = [
   {
     name: 'leave_group',
     title: 'Leave a group',
-    description: 'Leaves one of your groups. Your recommendations and invite links in it are removed, and its members lose access to your lists through it.',
+    description: 'Leaves one of your groups. Your recommendations and invite links in it are removed, and its members lose access to your lists through it. A group you created is deleted for everyone when you leave it, which needs confirm_delete: true.',
     scope: 'shows:write',
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    inputSchema: { type: 'object', properties: { group_id: { type: 'integer' } }, required: ['group_id'] },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        group_id: { type: 'integer' },
+        confirm_delete: { type: 'boolean', description: 'Required to leave a group you created, which deletes it for every member.' },
+      },
+      required: ['group_id'],
+    },
     async run(ctx, args) {
       const gid = intArg(args, 'group_id');
-      await ok(ctx, groupLeaveApi.onRequestPost, { method: 'POST', path: `/api/groups/${gid}/leave`, params: { id: String(gid) } }, 'That group');
-      return { left: gid };
+      const d = await ok(ctx, groupLeaveApi.onRequestPost, {
+        method: 'POST', path: `/api/groups/${gid}/leave`, params: { id: String(gid) },
+        body: args.confirm_delete === true ? { confirm_delete: true } : {},
+      }, 'That group');
+      return d && d.deleted ? { left: gid, deleted: true } : { left: gid };
     },
   },
   // ---- admin: another member's lists (members:admin) ----
@@ -1099,7 +1111,7 @@ export const TOOLS = [
       // /api/enrich is the background refresh; show_id points it at this one
       // row. It writes enriched_at, never updated_at, so the refresh doesn't
       // read as the member editing the show.
-      const r = await ok(ctx, enrichApi.onRequestPost, { method: 'POST', path: '/api/enrich', body: { show_id: row.id } }, 'That show');
+      const r = await ok(ctx, enrichApi.onRequestPost, { method: 'POST', path: '/api/enrich', body: { show_id: row.id }, adminScope: true }, 'That show');
       const after = await ctx.env.DB.prepare('SELECT * FROM shows_v WHERE id = ?').bind(row.id).first();
       await logAdmin(ctx, m, 'refresh_show', { show_id: row.id, title: row.title, updated: r.tmdbUpdated || 0 });
       const out = { member: m.slug, refreshed: (r.tmdbUpdated || 0) > 0, show: await detailShow(ctx, after) };
@@ -1230,4 +1242,20 @@ export function toolsFor(scopes) {
   return TOOLS.filter((t) => scopes.includes(t.scope)).map(({ name, title, description, inputSchema, annotations }) => ({
     name, title, description, inputSchema: { ...inputSchema, additionalProperties: false }, annotations,
   }));
+}
+
+// Owner-only fields removed from everything an admin tool returns, at any
+// depth (a show, a list of shows, a { show } wrapper). See mcp.js callTool.
+const OWNER_ONLY = ['notes', 'recommended_by', 'watching_with', 'watching_with_members', 'watchers', 'added_by'];
+export function withoutMemos(o) {
+  if (Array.isArray(o)) return o.map(withoutMemos);
+  if (o && typeof o === 'object') {
+    const c = {};
+    for (const [k, v] of Object.entries(o)) {
+      if (OWNER_ONLY.includes(k)) continue;
+      c[k] = v && typeof v === 'object' ? withoutMemos(v) : v;
+    }
+    return c;
+  }
+  return o;
 }

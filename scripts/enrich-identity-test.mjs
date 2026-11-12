@@ -193,6 +193,9 @@ function makeEnv() {
   withLegacyShowColumns(db);
   return {
     TMDB_TOKEN: 'test-token',
+    // The background pass under test is the nightly job's, so it runs with
+    // the cron secret; a member session gets only a metered own-copies pass.
+    CRON_SECRET: 'test-cron',
     DB: { prepare: (sql) => new Stmt(db, sql), batch: async (stmts) => { for (const s of stmts) await s.run(); } },
     _db: db,
   };
@@ -250,7 +253,9 @@ const postShow = (env, cookie, body) =>
 const runEnrich = async (env, cookie, body = {}) => {
   liftCopiesIntoTitles(env._db);
   await rebuildTitles(env);
-  return enrichApi.onRequestPost(ctx(env, req('/api/enrich', { cookie, method: 'POST', body })));
+  const r = req('/api/enrich', { cookie, method: 'POST', body });
+  r.headers.set('X-Cron-Secret', 'test-cron');
+  return enrichApi.onRequestPost(ctx(env, r));
 };
 
 // Patrick has the 1974 original pinned, with a real deep link. Jennifer is

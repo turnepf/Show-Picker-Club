@@ -20,7 +20,9 @@
 import { getSession } from '../../_shared/auth.js';
 import { LIST_KEYS } from '../../_shared/list-parse.js';
 import { canonicalNetwork, networkSearchUrl } from '../../_shared/networks.js';
-import { writeTitle } from '../../_shared/titles.js';
+import { writeTitle, titleFieldsFromEnrichment } from '../../_shared/titles.js';
+import { verifyIdentity } from '../../_shared/import-identity.js';
+import { fetchEnrichmentById } from '../../_shared/enrichment.js';
 import { showKey } from '../../_shared/same-show.js';
 import { sendEmail, importUnmatchedEmail } from '../../_shared/email.js';
 import { chargeSpend } from '../../_shared/spend-meter.js';
@@ -43,11 +45,15 @@ const MAX_ITEMS_PER_CALL = 200;
 // bypass.
 const MAX_ROWS_PER_DAY = 300;
 
-// Posters are rendered into an <img src> in the apps. Only ever our own
-// enrichment's TMDB image host.
-function safePosterUrl(url) {
-  return typeof url === 'string' && url.startsWith('https://image.tmdb.org/') ? url : null;
-}
+// TMDB lookups commit may make in one call for rows that arrive without
+// parse's identity signature (older iOS builds drop it). Kept well inside the
+// Functions subrequest budget; rows past it come back as unmatched for the
+// member to add by hand rather than being taken on the client's word.
+const MAX_IDENTITY_LOOKUPS_PER_CALL = 20;
+
+// A network name is markup by the time anyone reads it (INVARIANTS §23), so
+// refuse it the way the add and edit writers do.
+const NETWORK_MARKUP = /[<>"'&]/;
 
 function str(v, max) {
   if (typeof v !== 'string') return null;
@@ -106,6 +112,7 @@ export async function onRequestPost(context) {
   // no title of its own), so these aren't added: they come back by name for
   // the member to add by hand, picking the right entry from search.
   const unmatched = [];
+  const lookups = { left: MAX_IDENTITY_LOOKUPS_PER_CALL };
 
   for (const item of raw) {
     const title = str(item.title, 200);
@@ -123,29 +130,34 @@ export async function onRequestPost(context) {
     const list = LIST_KEYS.includes(item.list) ? item.list : null;
     if (!list) { skipped.push(title); continue; }
 
-    const rawNetwork = str(item.network, 60);
-    const network = rawNetwork ? canonicalNetwork(rawNetwork) : null;
-    const tmdbId = Number.isInteger(item.tmdb_id) ? item.tmdb_id : null;
-    const tmdbType = item.tmdb_type === 'movie' || item.tmdb_type === 'tv' ? item.tmdb_type : null;
+    const tmdbId = item.tmdb_id;
+    const tmdbType = item.tmdb_type;
     const year = Number.isInteger(item.year) && item.year > 1870 && item.year < 2200 ? item.year : null;
 
-    inserts.push([
+    // TMDB decides which show a row is; the client's word doesn't. An entry
+    // the club already has is known. A new one needs parse's signature over
+    // this exact (type, id, name, year), or a TMDB lookup here. Anything else
+    // is set aside for the member to add by hand.
+    const verified = await verifyRow(env, slug, { title, tmdb_id: tmdbId, tmdb_type: tmdbType, year }, item.identity_sig, lookups);
+    if (!verified) { unmatched.push(title); continue; }
+
+    const rawNetwork = str(item.network, 60);
+    const network = rawNetwork && !NETWORK_MARKUP.test(rawNetwork) ? canonicalNetwork(rawNetwork) : null;
+
+    inserts.push({
       title,
       network,
-      networkSearchUrl(network, title),
-      str(item.recommended_by, 80),
+      network_url: networkSearchUrl(network, verified.name || title),
+      recommended_by: str(item.recommended_by, 80),
       list,
-      str(item.notes, 500),
-      item.movie ? 1 : 0,
-      str(item.watching_with, 80),
-      safePosterUrl(item.poster_url),
-      slug,
-      session.email,
-      tmdbId,
-      tmdbType,
-      year,
-    ]);
-    added.push(title);
+      notes: str(item.notes, 500),
+      movie: item.movie ? 1 : 0,
+      watching_with: str(item.watching_with, 80),
+      tmdb_id: tmdbId,
+      tmdb_type: tmdbType,
+      seed: verified.seed,
+    });
+    added.push(verified.name || title);
   }
 
   if (inserts.length) {
@@ -156,26 +168,25 @@ export async function onRequestPost(context) {
     // D1 batches are one round trip but not unbounded; chunk so a 200-row
     // import doesn't hand the driver a single oversized statement list.
     for (let i = 0; i < inserts.length; i += 50) {
-      // The poster and year belong to the show's shared row (below), not the
-      // member's copy.
-      await env.DB.batch(inserts.slice(i, i + 50).map(args => stmt.bind(...args.slice(1, 8), ...args.slice(9, 13))));
+      await env.DB.batch(inserts.slice(i, i + 50).map(r => stmt.bind(
+        r.network, r.network_url, r.recommended_by, r.list, r.notes, r.movie, r.watching_with,
+        slug, session.email, r.tmdb_id, r.tmdb_type,
+      )));
     }
   }
 
-  // A new entry gets its shared row now rather than at tonight's rebuild;
-  // an entry already in the club keeps the row it has.
-  // The parse step resolved each title against TMDB, so its name, poster and
-  // year are TMDB's. They seed the shared row; the nightly passes fill the
-  // rest, since a row missing cast and episode data is a gap they select.
-  const keys = new Map();
-  for (const args of inserts) {
-    if (args[11] && args[12]) keys.set(`${args[12]}:${args[11]}`, { type: args[12], id: args[11], name: args[0], poster: args[8], year: args[13] });
-  }
-  for (const k of keys.values()) {
-    const have = await env.DB.prepare('SELECT 1 FROM titles WHERE tmdb_type = ? AND tmdb_id = ?').bind(k.type, k.id).first().catch(() => null);
-    if (!have) {
-      await writeTitle(env, k.type, k.id, { name: k.name, fields: { poster_url: k.poster || null, release_year: k.year || null } });
-    }
+  // A new entry gets its shared row now rather than at tonight's rebuild, from
+  // a verified source only: parse's signed TMDB name and year, or the TMDB
+  // payload commit fetched itself. An entry already in the club keeps the row
+  // it has. No poster or other URL from the client is ever written; the
+  // background /api/enrich pass the client fires next fills the artwork.
+  const seeded = new Set();
+  for (const r of inserts) {
+    if (!r.seed) continue;
+    const k = `${r.tmdb_type}:${r.tmdb_id}`;
+    if (seeded.has(k)) continue;
+    seeded.add(k);
+    await writeTitle(env, r.tmdb_type, r.tmdb_id, r.seed);
   }
 
   // Imported rows land with the id, poster and year the parse step resolved,
@@ -269,4 +280,27 @@ async function emailUnmatched(env, session, added, titles) {
   } catch (e) {
     return false;
   }
+}
+
+// How a row's TMDB identity is established, or null when it can't be.
+// Returns { name, seed } where seed is the writeTitle() payload for a shared
+// row the club doesn't have yet (null when it already exists).
+async function verifyRow(env, slug, row, sig, lookups) {
+  const have = await env.DB.prepare('SELECT name FROM titles WHERE tmdb_type = ? AND tmdb_id = ?')
+    .bind(row.tmdb_type, row.tmdb_id).first().catch(() => null);
+  if (have) return { name: have.name || null, seed: null };
+
+  if (await verifyIdentity(env, row, sig)) {
+    return { name: row.title, seed: { name: row.title, fields: { release_year: row.year || null } } };
+  }
+
+  // No signature (an older client) or a bad one: ask TMDB, within budget and
+  // on the member's daily lookup meter like every other TMDB-backed write.
+  if (lookups.left <= 0) return null;
+  lookups.left--;
+  if (!(await chargeSpend(env, slug, 'lookups'))) { lookups.left = 0; return null; }
+  const e = await fetchEnrichmentById(row.tmdb_id, row.tmdb_type, env);
+  if (!e || e.tmdbId !== row.tmdb_id || !e.canonicalTitle) return null;
+  const fields = titleFieldsFromEnrichment(e);
+  return { name: e.canonicalTitle, seed: { name: e.canonicalTitle, fields } };
 }

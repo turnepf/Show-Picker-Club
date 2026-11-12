@@ -8,11 +8,16 @@ function escapeHtml(text) {
   return String(text || '').replace(/[&<>"']/g, c => map[c]);
 }
 
+// An http(s) URL, attribute-escaped, or '' for anything else. Every caller
+// interpolates the result into a quoted attribute assigned via innerHTML, so
+// the escape is what keeps a stored value from closing the attribute
+// (security audit run-2: a quote in poster_url injected markup on every page
+// that loads this renderer without index.html's own escaping override).
 function safeUrl(url) {
   if (!url) return '';
   try {
     const u = new URL(url);
-    return (u.protocol === 'http:' || u.protocol === 'https:') ? url : '';
+    return (u.protocol === 'http:' || u.protocol === 'https:') ? escapeHtml(url) : '';
   } catch { return ''; }
 }
 

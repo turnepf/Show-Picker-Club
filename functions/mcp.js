@@ -20,7 +20,7 @@
 
 import { authenticateBearer, issuerFor, oauthJson, preflight } from './_shared/oauth.js';
 import { recordPlatformUsage } from './_shared/platform.js';
-import { toolsFor, toolNamed, ToolError, dailyCaps, emptyLibraryNote, libraryIsEmpty } from './_shared/mcp-tools.js';
+import { toolsFor, toolNamed, ToolError, dailyCaps, emptyLibraryNote, libraryIsEmpty, withoutMemos } from './_shared/mcp-tools.js';
 
 const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 
@@ -89,7 +89,12 @@ async function callTool(ctx, params) {
   const over = await spend(ctx.env, ctx.session.member_slug, tool);
   if (over) return { result: { content: [{ type: 'text', text: over }], isError: true } };
   try {
-    const out = await tool.run(ctx, args);
+    const raw = await tool.run(ctx, args);
+    // Admin tools run member handlers as the target member, so those handlers
+    // answer with the owner's full row. Owner-only memos never leave through an
+    // admin connection, whichever tool produced them (docs/INVARIANTS.md §27;
+    // security audit run-2).
+    const out = tool.scope === 'members:admin' ? withoutMemos(raw) : raw;
     return {
       result: {
         content: [{ type: 'text', text: JSON.stringify(out) }],
