@@ -392,8 +392,9 @@ Review demo account on it, `review-account <v>` sets that account again
 `set-notes --platform` writes one platform's text, and `submit <v>` checks
 every platform (build attached, What's New set, demo account set) and sends
 to review only with `--confirm`.
-Sending to review stays a human decision: Patrick runs `submit --confirm`
-himself (Claude's App Store Connect writes are blocked), and a rerun after a
+Claude submits too (Patrick's call, 2026-11-12): when the `submit <v>` check
+passes, Claude runs `submit <v> --confirm` itself without asking, and reports
+it. A failing check is reported rather than worked around. A rerun after a
 partial failure finishes the job instead of colliding with it. Used by the run sheet in
 `docs/APP_STORE_SUBMISSION.md#6a-run-sheet-releasing-from-a-second-mac`.
 

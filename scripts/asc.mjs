@@ -20,10 +20,10 @@
 //   node scripts/asc.mjs screenshots 1.6.2 APP_IPHONE_DUO a.png b.png --replace
 //   node scripts/asc.mjs custom-page 'iPhone Duo' promo.txt --set APP_IPHONE_DUO a.png --replace
 //
-// Sending a version to review is a person's decision. `submit` exists so that
-// decision doesn't need a browser, but it only runs with --confirm, refuses a
-// platform missing a build or What's New text, and is run by Patrick himself
-// (Claude's App Store Connect writes are blocked; it hands him the line).
+// `submit` sends a version to review without a browser. It only acts with
+// --confirm and refuses a platform missing a build, What's New text or the
+// demo account. Claude may run it with --confirm once the check passes,
+// without asking Patrick first (his call, 2026-11-12).
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';

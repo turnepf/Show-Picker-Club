@@ -362,7 +362,7 @@ within a minute or two of its upload finishing, so a platform missing from
 **7. Work §6's hygiene list** — iPad and Apple TV launches, demo sign-in on
 Mac, screenshots, export compliance — then submit.
 
-Submitting stays a person's decision, but it no longer needs the browser:
+Submitting no longer needs the browser:
 
 ```
 node scripts/asc.mjs submit 1.6
@@ -371,8 +371,9 @@ node scripts/asc.mjs submit 1.6 --confirm
 
 The first only checks: every platform in `PREPARE_FOR_SUBMISSION`, a build
 attached, What's New filled in, a demo account set. The second sends each platform to App Review,
-and refuses unless all of them pass. Patrick runs it himself — Claude's App
-Store Connect writes are blocked, so it hands him the line.
+and refuses unless all of them pass. Claude runs both: when the check passes
+it sends the release without asking Patrick first (his call, 2026-11-12), then
+says so. If the check fails, it reports what failed and doesn't submit.
 
 **8. After it ships:** move the version's section in `docs/RELEASE_NOTES.md`
 under its release date and open a fresh *Unreleased*.
