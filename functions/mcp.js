@@ -20,7 +20,7 @@
 
 import { authenticateBearer, issuerFor, oauthJson, preflight } from './_shared/oauth.js';
 import { recordPlatformUsage } from './_shared/platform.js';
-import { toolsFor, toolNamed, ToolError, dailyCaps, emptyLibraryNote, libraryIsEmpty, withoutMemos } from './_shared/mcp-tools.js';
+import { toolsFor, toolNamed, ToolError, dailyCaps, emptyLibraryNote, libraryIsEmpty, noShowsNudge, withoutMemos } from './_shared/mcp-tools.js';
 
 const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 
@@ -95,12 +95,14 @@ async function callTool(ctx, params) {
     // admin connection, whichever tool produced them (docs/INVARIANTS.md §27;
     // security audit run-2).
     const out = tool.scope === 'members:admin' ? withoutMemos(raw) : raw;
-    return {
-      result: {
-        content: [{ type: 'text', text: JSON.stringify(out) }],
-        structuredContent: out,
-      },
-    };
+    const content = [{ type: 'text', text: JSON.stringify(out) }];
+    // A member with no shows gets a second block after the real result. The
+    // one place this happens: no tool knows about it, the result above is
+    // untouched, and errors and refusals (which return elsewhere) never
+    // carry it.
+    const nudge = await noShowsNudge(ctx, tool);
+    if (nudge) content.push({ type: 'text', text: nudge });
+    return { result: { content, structuredContent: out } };
   } catch (e) {
     const message = e instanceof ToolError ? e.message : 'Something went wrong on Show Picker Club’s side. Try again.';
     return { result: { content: [{ type: 'text', text: message }], isError: true } };

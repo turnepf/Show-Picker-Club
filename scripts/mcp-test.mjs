@@ -837,22 +837,94 @@ console.log('\n== an empty library gets a first step');
   const roNote = roInit.split('\n').find((l) => l.includes('has not added any shows')) || '';
   check('a read-only connection is pointed at the app, not at add_show', !/add_show/.test(roNote) && /read-only/.test(roNote), roInit);
 
-  const profile = await tool(env, rw.access, 'get_profile');
-  check('get_profile carries getting_started when every list is empty', /add_show/.test(profile.data.getting_started || ''));
-  const list = await tool(env, rw.access, 'list_my_shows');
-  check('so does an empty list_my_shows', list.data.total === 0 && /add_show/.test(list.data.getting_started || ''));
-
-  // Archived-only is still empty to the member.
-  const old = addShow(env, { slug: 'stacy', title: 'Hacks', list: 'watching' });
-  env._db.prepare('UPDATE shows SET archived = 1 WHERE id = ?').run(old);
-  check('an archived-only library still counts as empty', /add_show/.test((await rpc(env, rw.access, 'initialize', {})).body.result.instructions));
+  // One rule for "empty": no shows at all. A member who archived everything
+  // has used the product and is past the first step.
+  addShow(env, { slug: 'quinn', title: 'Hacks', list: 'watching' });
+  env._db.prepare("UPDATE shows SET archived = 1 WHERE member_slug = 'quinn'").run();
+  check('an archived-only library is not empty', !/has not added any shows/.test((await rpc(env, ro.access, 'initialize', {})).body.result.instructions));
 
   addShow(env, { slug: 'stacy', title: 'Severance', list: 'next' });
   const after = (await rpc(env, rw.access, 'initialize', {})).body.result.instructions;
   check('one show and the note is gone from initialize', !/has not added any shows/.test(after));
-  check('and from get_profile', !('getting_started' in (await tool(env, rw.access, 'get_profile')).data));
-  const oneList = await tool(env, rw.access, 'list_my_shows', { list: 'watching' });
-  check('an empty list in a non-empty library is not a new member', oneList.data.total === 0 && !('getting_started' in oneList.data));
+}
+
+console.log('\n== a member with no shows gets a nudge after the result');
+{
+  const { env } = club();
+  const NUDGE = tools.NO_SHOWS_NUDGE;
+  const result = async (access, name, args = {}) => (await rpc(env, access, 'tools/call', { name, arguments: args })).body.result;
+  const nudged = (r) => r.content.some((c) => c.text === NUDGE.write || c.text === NUDGE.readOnly);
+
+  const stacy = await connect(env, 'stacy');
+  const empty = await result(stacy.access, 'list_my_shows');
+  check('a zero-show member gets the nudge as a second text block',
+    empty.content.length === 2 && empty.content[1].type === 'text' && empty.content[1].text === NUDGE.write, JSON.stringify(empty.content));
+  check('and it is not an error', !empty.isError);
+  check('it rides on every tool, not one', nudged(await result(stacy.access, 'get_profile')) && nudged(await result(stacy.access, 'get_trending')));
+  check('the text describes rather than directs', !/note for the assistant|tell the user|you must|confirm|prefer/i.test(NUDGE.write + NUDGE.readOnly));
+
+  // The real result is the same bytes a member with shows would get.
+  const profile = await result(stacy.access, 'get_profile');
+  check('the first block is still the result itself', profile.content[0].text === JSON.stringify(profile.structuredContent));
+  check('the structured result carries no nudge and no getting_started',
+    !JSON.stringify(profile.structuredContent).includes('no shows yet') && !('getting_started' in profile.structuredContent));
+  addShow(env, { slug: 'quinn', title: 'Hacks', list: 'watching' });
+  const quinn = await connect(env, 'quinn');
+  const full = await result(quinn.access, 'get_profile');
+  check('a member with one show does not get it', full.content.length === 1 && !nudged(full));
+  check('and the two results have the same shape',
+    JSON.stringify(Object.keys(full.structuredContent)) === JSON.stringify(Object.keys(profile.structuredContent)));
+
+  // A failed call is not a result to append to.
+  const bad = await result(stacy.access, 'get_show', { show_id: 999999 });
+  check('an error result carries no nudge', bad.isError && bad.content.length === 1, JSON.stringify(bad));
+
+  // Read-only: the same note without an offer the connection can't keep.
+  addMember(env, 'ro', 'Read Only');
+  const ro = await connect(env, 'ro', { write: false });
+  const roRes = await result(ro.access, 'list_my_shows');
+  check('a read-only connection is pointed at the app, not add_show',
+    roRes.content.length === 2 && roRes.content[1].text === NUDGE.readOnly && !/add_show/.test(NUDGE.readOnly));
+
+  // Admin tools never carry it, even when the admin has no shows of their own.
+  const admin = await connect(env, 'patrick', { adminBox: true });
+  check('the admin has no shows, so their own tools do nudge', nudged(await result(admin.access, 'list_my_shows')));
+  for (const [name, args] of [['admin_list_members', {}], ['admin_list_member_shows', { member_slug: 'quinn' }], ['admin_query', { measure: 'titles' }]]) {
+    const r = await result(admin.access, name, args);
+    check(`${name} never gets it`, !!r && !r.isError && !nudged(r), JSON.stringify(r).slice(0, 200));
+  }
+  const adminAdd = await result(admin.access, 'admin_add_show', { member_slug: 'quinn', title: 'Andor', list: 'watching' });
+  check('admin_add_show never gets it', !!adminAdd && !adminAdd.isError && !nudged(adminAdd), JSON.stringify(adminAdd).slice(0, 200));
+  check('every admin tool is exempt by scope or name', tools.TOOLS.filter((t) => t.name.startsWith('admin_')).every((t) => t.scope === 'members:admin'));
+
+  // add_show never gets it, whether the add lands or not; and once it lands
+  // the next call in the same session is quiet.
+  const refused = await result(stacy.access, 'add_show', { title: 'Severance', list: 'nowhere' });
+  check('a refused add_show carries no nudge', !nudged(refused));
+  check('and the member still has no shows', nudged(await result(stacy.access, 'list_my_shows')));
+  const added = await result(stacy.access, 'add_show', { title: 'Severance', list: 'watching' });
+  check('add_show never gets it', !added.isError && added.content.length === 1, JSON.stringify(added).slice(0, 200));
+  check('a show added earlier in the session stops the nudge', !nudged(await result(stacy.access, 'list_my_shows')));
+  env._db.prepare("UPDATE shows SET archived = 1 WHERE member_slug = 'stacy'").run();
+  check('archiving it does not bring the nudge back', !nudged(await result(stacy.access, 'list_my_shows', { include_archived: true })));
+
+  // The demo account is App Review's; it is never steered.
+  addMember(env, 'demo', 'Demo Account');
+  env._db.prepare("INSERT INTO member_emails (email, member_slug) VALUES ('demo@example.com', 'demo')").run();
+  const demo = await connect(env, 'demo');
+  check('with no demo configured, that member is an ordinary empty one', nudged(await result(demo.access, 'list_my_shows')));
+  env.DEMO_LOGIN_EMAIL = 'demo@example.com';
+  check('the demo account never gets it', !nudged(await result(demo.access, 'list_my_shows')));
+  delete env.DEMO_LOGIN_EMAIL;
+
+  // A lookup that fails costs the member nothing.
+  addMember(env, 'newbie', 'New Member');
+  const newbie = await connect(env, 'newbie');
+  const realPrepare = env.DB.prepare;
+  env.DB.prepare = (sql) => { if (/SELECT 1 AS one FROM shows/.test(sql)) throw new Error('boom'); return realPrepare(sql); };
+  const survived = await result(newbie.access, 'list_my_shows');
+  env.DB.prepare = realPrepare;
+  check('a failed count lookup returns the plain result', !survived.isError && survived.content.length === 1);
 }
 
 console.log('\n== reporting counts connected people, not connections');

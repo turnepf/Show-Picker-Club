@@ -642,7 +642,11 @@ admin's token never passes an admin gate. The one exception is the opt-in
 member's lists. It is offered only to admins and dropped on demotion, the
 target's own rules still apply, and every change goes in `admin_actions`; revoke, ban and the daily caps take
 effect on the next call. Connected apps (`/api/connected-apps`) is
-cookie-session only, so an AI can't list or cut connections.
+cookie-session only, so an AI can't list or cut connections. A member with
+no shows (archived included) gets a second text block after each successful
+result, appended in one place (`callTool()`, text in `NO_SHOWS_NUDGE`): never
+on `add_show`, an admin tool, an error or the demo account, and the real
+result is unchanged.
 
 ```bash
 node scripts/admin-query-test.mjs
