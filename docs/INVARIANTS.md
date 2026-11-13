@@ -1164,6 +1164,12 @@ member could do anyway, and nothing it does may widen what anyone can see.
   is `MCP_DAILY_WRITE_LIMIT`, default 1,000), counted in SQL on the SQLite
   clock (§25), with tests that assert the refusal. Reads count toward neither.
 
+- **A nudge is appended, never mixed in.** A member with no shows gets a
+  second text block after a successful result (`NO_SHOWS_NUDGE`, added in
+  `callTool()` only). It never changes the result or `structuredContent`,
+  never marks an error, never rides on `add_show`, an admin tool or the demo
+  account, and it describes rather than directs, like all tool text.
+
 Enforcer: `scripts/mcp-test.mjs`, plus the AASA exclusions for `/oauth/*`,
 `/mcp`, `/connect` and `/connected-apps` in `check-static.sh`.
 

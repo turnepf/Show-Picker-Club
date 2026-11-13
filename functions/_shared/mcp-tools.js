@@ -46,7 +46,7 @@ import { setWatchLink } from './watch-links.js';
 import { fieldGuide, QUERY_FIELDS, GROUP_FIELDS, COLUMN_FIELDS, QUERY_OPS, MAX_GROUPS, MAX_ROWS } from './show-query.js';
 import { actingAs } from './auth.js';
 import { groupMates } from './watchers.js';
-import { demoMemberSlug } from './demo.js';
+import { demoMemberSlug, isDemoMember } from './demo.js';
 
 // Per member per UTC day. Only changes and TMDB-backed searches are capped:
 // reads are D1-only and cost the operator nothing upstream, and a cap that
@@ -245,12 +245,42 @@ export function emptyLibraryNote(scopes) {
   return 'This member has not added any shows yet: all four lists are empty. This connection is read-only, so shows are added in the Show Picker Club app or at showpicker.club. get_trending lists what the club is watching now.';
 }
 
-// True when the member has nothing on any list (archived rows don't count:
-// a cleared-out library is as empty to the member as a new one).
+// True when the member has no shows at all, archived ones included. One rule
+// for the initialize note and the per-result nudge: a member who archived
+// everything has used the product and doesn't need the first step again.
+// The cheapest lookup there is: one indexed row, no count.
 export async function libraryIsEmpty(env, slug) {
-  const row = await env.DB.prepare('SELECT 1 AS one FROM shows WHERE member_slug = ? AND COALESCE(archived, 0) = 0 LIMIT 1')
+  const row = await env.DB.prepare('SELECT 1 AS one FROM shows WHERE member_slug = ? LIMIT 1')
     .bind(slug).first();
   return !row;
+}
+
+// The note appended to tool results while the member has no shows. Reword it
+// here; nothing else holds the text. It describes and never directs, like
+// everything else the model reads from this server (the Connectors Directory
+// rejects tool text that tells the model how to behave), and a read-only
+// connection is not offered an add it can't make.
+export const NO_SHOWS_NUDGE = {
+  write: 'This Show Picker Club account has no shows yet. Show Picker Club works best once a show is on a list, and one can be added from this connection with add_show (for example, a request like "add The Bear to my Watching list"). This note is attached to every result until the first show is added.',
+  readOnly: 'This Show Picker Club account has no shows yet. Show Picker Club works best once a show is on a list. This connection is read-only, so shows are added in the Show Picker Club app or at showpicker.club. This note is attached to every result until the first show is added.',
+};
+
+// Tools whose results never carry the nudge: the add itself, and every admin
+// tool (an admin acting on someone else's lists is not being onboarded).
+const NUDGE_EXEMPT = new Set(['add_show', 'admin_add_show']);
+
+// The nudge for this call, or null. Called by /mcp after a tool has run, so
+// a show added earlier in the session, or by this very call, is seen. The
+// demo account is skipped: App Review resets it and shouldn't be steered.
+// A failed lookup is no nudge; this never costs a member their result.
+export async function noShowsNudge(ctx, tool) {
+  if (NUDGE_EXEMPT.has(tool.name) || tool.scope === 'members:admin' || tool.name.startsWith('admin_')) return null;
+  try {
+    const slug = ctx.session.member_slug;
+    if (!(await libraryIsEmpty(ctx.env, slug))) return null;
+    if (await isDemoMember(ctx.env, slug)) return null;
+    return ctx.scopes.includes('shows:write') ? NO_SHOWS_NUDGE.write : NO_SHOWS_NUDGE.readOnly;
+  } catch { return null; }
 }
 
 // ---- the tools ---------------------------------------------------------
@@ -268,7 +298,6 @@ export const TOOLS = [
       const counts = Object.fromEntries(LIST_NAMES.map((l) => [l, 0]));
       for (const s of shows || []) if (API_TO_LIST[s.list]) counts[API_TO_LIST[s.list]]++;
       const { groups } = await ok(ctx, groupsApi.onRequestGet, { path: '/api/groups' });
-      const empty = Object.values(counts).every((n) => n === 0);
       return {
         slug: ctx.session.member_slug,
         name: ctx.session.email,
@@ -276,7 +305,6 @@ export const TOOLS = [
         list_counts: counts,
         groups: (groups || []).map((g) => ({ id: g.id, name: g.name, members: g.member_count })),
         permissions: ctx.scopes,
-        ...(empty ? { getting_started: emptyLibraryNote(ctx.scopes) } : {}),
       };
     },
   },
@@ -302,11 +330,7 @@ export const TOOLS = [
       });
       const rows = (shows || []).filter((s) => !want || s.list === want)
         .sort((a, b) => (a.sort_order ?? 1e9) - (b.sort_order ?? 1e9) || String(a.title).localeCompare(String(b.title)));
-      const out = page(rows, args);
-      // Only when the whole library is empty: one empty list among full ones
-      // is not a new member.
-      if (!(shows || []).some((s) => !s.archived)) out.getting_started = emptyLibraryNote(ctx.scopes);
-      return out;
+      return page(rows, args);
     },
   },
   {

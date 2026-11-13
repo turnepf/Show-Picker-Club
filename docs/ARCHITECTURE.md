@@ -903,15 +903,23 @@ and revokes connections. The rules are `docs/INVARIANTS.md` §27; the tests are
 write tool that changes existing data is `destructiveHint: true`, tool text
 describes rather than instructs, and the list tools page.
 
-**An empty library gets a first step.** When a member has nothing on any list
-(archived rows don't count), `initialize` appends a note to the server
-instructions saying so and how adding works (`search_titles` → `add_show`, or
-the app for a read-only connection), and `get_profile` / an unfiltered
-`list_my_shows` carry the same text as `getting_started`. It lives in
-`initialize` because the members it's for — Directory visitors who connect and
-never add anything — had made no tool calls at all, and `initialize` is the
-one exchange every connection makes. Text is `emptyLibraryNote()` in
-`_shared/mcp-tools.js`; it disappears with the first show.
+**A member with no shows gets a first step.** "No shows" means none at all,
+archived included (`libraryIsEmpty()`): a member who archived everything has
+used the product. Two places say it, both in descriptive text and both gone
+with the first show:
+
+- `initialize` appends `emptyLibraryNote()` to the server instructions
+  (`search_titles` → `add_show`, or the app for a read-only connection). It
+  lives there because the members it's for, Directory visitors who connect
+  and never add anything, had made no tool calls at all, and `initialize` is
+  the one exchange every connection makes.
+- Every successful tool result gets a second text block, `NO_SHOWS_NUDGE` in
+  `_shared/mcp-tools.js`, appended by `callTool()` in `functions/mcp.js` and
+  nowhere else. The first block and `structuredContent` are the tool's own
+  result, unchanged. The check runs after the tool (one `SELECT 1 … LIMIT 1`),
+  so a show added earlier in the session stops it. Never on `add_show`, any
+  admin tool, an error result or the demo account; a read-only connection
+  gets wording that points at the app. A failed lookup means no nudge.
 
 **Auth is OAuth 2.1, and the club is its own authorization server**
 (`_shared/oauth.js`, migration 071). A client discovers everything from the
