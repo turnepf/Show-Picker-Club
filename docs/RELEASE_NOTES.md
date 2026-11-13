@@ -43,7 +43,19 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## Unreleased — the update after 1.8
+## Unreleased — the update after 1.8.1
+
+Nothing yet.
+
+---
+
+## 1.8.1 (build 38) — iPhone, iPad and Mac, not yet submitted
+
+iPhone/iPad and Mac only: nothing changed on Apple TV, so it needs no 1.8.1.
+Both projects still carry 1.8.1 / 38 because the repo keeps them in lockstep.
+Create the records with `create-version 1.8.1 --platform` for iOS and macOS
+once 1.8 has cleared review — Apple refuses a new version while one is in
+flight.
 
 iPhone, iPad and Mac:
 
