@@ -45,7 +45,11 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ## Unreleased — the update after 1.8
 
-Nothing yet.
+iPhone, iPad and Mac:
+
+```
+Archive this show is now its own full-size button on the show card, set apart from the list buttons, so it's easy to hit on purpose and hard to hit by accident.
+```
 
 ---
 

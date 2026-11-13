@@ -614,8 +614,9 @@ function renderShowDetailBody(show, options = {}) {
     ).join('');
     let memberInner = `<div class="list-chips detail-list-chips">${chips}</div>`;
     // Archive sits right under the chips — it's the fifth place a show can
-    // go — but as a quiet link rather than a fifth chip or a red action row,
-    // so it never reads as a list. detailArchive() asks before it archives.
+    // go — as its own full-width row with a divider, not a fifth chip, so a
+    // tap aimed at a chip can't land on it (the small link that used to sit
+    // here did catch those). detailArchive() asks before it archives.
     if (showActions && myCopy && !myCopy.archived) {
       memberInner += `<button class="detail-archive" onclick="detailArchive(${Number(myCopy.id)})"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M10 12h4"/></svg>Archive this show</button>`;
     }
