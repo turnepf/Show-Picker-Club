@@ -700,31 +700,32 @@ struct ShowDetailView: View {
     // restores the show to that list.
     @ViewBuilder private func listChipsRow() -> some View {
         let cur = mineActive.flatMap { ShowList(rawValue: $0.list) }
-        VStack(spacing: 8) {
-            HStack(spacing: 6) {
-                ForEach(ShowList.allCases) { l in
-                    Button { Task { await chipTap(l) } } label: {
-                        chipLabel(l, selected: cur == l)
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(addingToMine)
-                }
-            }
-            // Archive is the other place a show can go, so it sits right
-            // under the chips — but as a small, muted link rather than a
-            // fifth chip or a red row, and it asks before it archives.
-            if let m = mineActive {
-                Button { confirmingArchive = m } label: {
-                    Label("Archive this show", systemImage: "archivebox")
-                        .font(.caption).fontWeight(.medium)
-                        .foregroundStyle(.secondary)
+        HStack(spacing: 6) {
+            ForEach(ShowList.allCases) { l in
+                Button { Task { await chipTap(l) } } label: {
+                    chipLabel(l, selected: cur == l)
                 }
                 .buttonStyle(.borderless)
                 .disabled(addingToMine)
             }
         }
         .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+        // Archive is the other place a show can go, so it sits right under
+        // the chips — but as its own full-size row, divider between, so a
+        // thumb aimed at a chip can't land on it. A small caption link 8pt
+        // below the chips used to catch exactly those taps. Soft red reads
+        // as "off my lists" without looking like Delete; it still asks first.
+        if let m = mineActive {
+            Button { confirmingArchive = m } label: {
+                Label("Archive this show", systemImage: "archivebox")
+                    .foregroundStyle(Self.archiveTint)
+            }
+            .disabled(addingToMine)
+        }
     }
+
+    // Soft red (#FF6961), lighter than system red so it isn't read as Delete.
+    private static let archiveTint = Color(red: 1.0, green: 0.41, blue: 0.38)
 
     private func chipLabel(_ l: ShowList, selected: Bool) -> some View {
         Text(l.title)
