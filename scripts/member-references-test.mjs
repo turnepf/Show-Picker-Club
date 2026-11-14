@@ -119,6 +119,7 @@ function giveReferences(env, who, other) {
   run(env, "INSERT INTO household_invites (inviter_slug, code, expires_at) VALUES (?, ?, '2099-01-01')", who, `hh-${who}`);
   run(env, "INSERT INTO member_platforms (member_slug, platform, first_seen_at, last_seen_at) VALUES (?, 'ios', '2026-01-01', '2026-01-01')", who);
   run(env, "INSERT INTO member_spend (member_slug, day, lookups) VALUES (?, date('now'), 3)", who);
+  run(env, "INSERT INTO vibe_views (member_slug, day, views) VALUES (?, date('now'), 2)", who);
   run(env, "INSERT INTO import_pending (member_slug, stamp) VALUES (?, 'x')", who);
   run(env, "INSERT INTO failed_logins (ip, member_slug, created_at) VALUES ('1.2.3.4', ?, '2026-01-01')", who);
   // A show of the other member's that `who` tagged through Watching With.

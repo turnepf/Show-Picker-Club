@@ -356,5 +356,33 @@ console.log('\n== the club numbers are cached for a week');
   check('and a corrupt one is rebuilt rather than erroring', res.status === 200 && JSON.parse(cacheRow().payload).fingerprints.length === 3);
 }
 
+console.log('\nA vibe read is tallied per member per day (migration 092)');
+{
+  const env = club();
+  const cookie = addSession(env, 'patrick');
+  const tally = (slug) => env._db.prepare('SELECT views, others FROM vibe_views WHERE member_slug = ?').get(slug);
+
+  await call(env, '/api/vibe', { cookie });
+  check('the picker call is not a view', !tally('patrick'));
+
+  await call(env, '/api/vibe?member=patrick', { cookie });
+  await call(env, `/api/vibe?member=${EXCLUDED}`, { cookie });
+  const t = tally('patrick');
+  check('two reads on one day are one row counting two', !!t && t.views === 2, JSON.stringify(t));
+  check('of which the group-mate\'s profile is counted apart', !!t && t.others === 1, JSON.stringify(t));
+  check('and the tally is the viewer\'s, not the viewed member\'s', !tally(EXCLUDED));
+
+  const outsider = addSession(env, 'stranger');
+  const refused = await call(env, '/api/vibe?member=patrick', { cookie: outsider });
+  check('a refused read is not a view', refused.status === 403 && !tally('stranger'), `got ${refused.status}`);
+  await call(env, '/api/vibe?member=patrick', {});
+  check('nor is a logged-out one',
+    env._db.prepare('SELECT COUNT(*) AS n FROM vibe_views').get().n === 1);
+
+  env._db.exec('DROP TABLE vibe_views');
+  const res = await call(env, '/api/vibe?member=patrick', { cookie });
+  check('a database without the table still serves the profile', res.status === 200, `got ${res.status}`);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -653,6 +653,16 @@ CREATE TABLE IF NOT EXISTS member_spend (
   PRIMARY KEY (member_slug, day)
 );
 
+-- Who opens Vibe, per member per UTC day (migration 092). `others` counts the
+-- reads that were a group-mate's profile rather than the member's own.
+CREATE TABLE IF NOT EXISTS vibe_views (
+  member_slug TEXT NOT NULL,
+  day TEXT NOT NULL,
+  views INTEGER NOT NULL DEFAULT 0,
+  others INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (member_slug, day)
+);
+
 CREATE INDEX IF NOT EXISTS idx_oauth_clients_ip ON oauth_clients(registered_ip, created_at);
 CREATE INDEX IF NOT EXISTS idx_oauth_codes_expires ON oauth_codes(expires_at);
 CREATE INDEX IF NOT EXISTS idx_oauth_grants_member ON oauth_grants(member_slug);

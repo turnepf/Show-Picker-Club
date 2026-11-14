@@ -273,7 +273,11 @@ group-scoped, a hand-typed outside slug is 403) and what the taste exclusion in
 neighbour pools, the aligned-picks pool — and never visibility. An excluded
 member reads her own vibe and her group-mates read it too, symmetrically, and
 her titles still reach the trait-fill queue so that profile isn't computed from
-the sliver of her library someone else shares.
+the sliver of her library someone else shares. Also pins the view tally
+(`vibe_views`, migration 092): one row per viewer per day, a group-mate's
+profile counted apart, and nothing for the picker call, a refused read or a
+logged-out one. `/api/reporting` shows it as `vibe_usage`, people rather than
+views, without the demo account.
 
 ```bash
 node scripts/vibe-match-test.mjs
@@ -313,13 +317,10 @@ Drop `--dry-run` to fill them. Needed because the 2026-08-11 rate-limit bug
 stamped `enriched_at` on rows it *failed* to enrich, so they look done and
 sit at the back of the oldest-first queue — `{mode:'gaps'}` selects on missing
 data instead of age. Nothing schedules this; it's an operator tool for
-draining that backlog once, and the Actions tab → **Fill enrichment gaps** is
-the same thing with the secret already wired up (dry run by default). One-time
-repairs live in Actions rather than the admin screens on purpose — a permanent
-control for a job done once is clutter that outlives its reason. **Re-check
-Apple TV+ rentals** is the other one (`scripts/reclassify-storefronts.mjs`),
-draining the storefront rows that predate #337; its admin button was removed
-when it moved.
+draining that backlog once. `scripts/reclassify-storefronts.mjs` is the other
+one, for the storefront rows that predate #337. Both used to have a manual
+workflow in the Actions tab; those were deleted 2026-11 once the backlogs were
+drained, and the scripts stay for a laptop run.
 
 ```bash
 node scripts/tmdb-audit.mjs

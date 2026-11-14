@@ -1,5 +1,6 @@
 import { isAdmin } from '../_shared/admin.js';
 import { showKeySql } from '../_shared/same-show.js';
+import { demoMemberSlug } from '../_shared/demo.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -331,6 +332,36 @@ export async function onRequestGet(context) {
     }));
   } catch (_) { /* last_login_at / added_by not migrated yet */ }
 
+  // Vibe usage (migration 092): people who opened a vibe profile, and who
+  // they were. The demo account is left out — App Review tapping through the
+  // app isn't a member choosing to look. Admins are flagged rather than
+  // dropped, so the operator can discount their own visits by eye.
+  let vibeUsage = null;
+  try {
+    const demo = (await demoMemberSlug(env)) || '';
+    const counts = await env.DB.prepare(
+      `SELECT
+         (SELECT COUNT(DISTINCT member_slug) FROM vibe_views WHERE member_slug != ?1 AND day >= date('now', '-6 days')) AS week,
+         (SELECT COUNT(DISTINCT member_slug) FROM vibe_views WHERE member_slug != ?1 AND day >= date('now', '-29 days')) AS month,
+         (SELECT COUNT(DISTINCT member_slug) FROM vibe_views WHERE member_slug != ?1) AS ever,
+         (SELECT COALESCE(SUM(views), 0) FROM vibe_views WHERE member_slug != ?1 AND day >= date('now', '-29 days')) AS views_month,
+         (SELECT MIN(day) FROM vibe_views) AS since`
+    ).bind(demo).first();
+    const { results } = await env.DB.prepare(
+      `SELECT v.member_slug AS slug, COALESCE(m.name, v.member_slug) AS name,
+              COALESCE(m.is_admin, 0) AS is_admin,
+              COUNT(*) AS days, SUM(v.views) AS views, SUM(v.others) AS others, MAX(v.day) AS last_day
+         FROM vibe_views v LEFT JOIN members m ON m.slug = v.member_slug
+        WHERE v.member_slug != ?1 AND v.day >= date('now', '-29 days')
+        GROUP BY v.member_slug
+        ORDER BY days DESC, views DESC, name COLLATE NOCASE`
+    ).bind(demo).all();
+    vibeUsage = {
+      ...counts,
+      viewers: results.map(r => ({ ...r, is_admin: r.is_admin === 1 })),
+    };
+  } catch (_) { /* vibe_views not migrated yet */ }
+
   return json({
     generated_at: new Date().toISOString(),
     new_shows: newShows,
@@ -345,6 +376,7 @@ export async function onRequestGet(context) {
     signin_methods: signinMethods,
     mcp_connections: mcpConnections,
     calendar_usage: calendarUsage,
+    vibe_usage: vibeUsage,
     enrolled_via: enrolledVia,
     totals,
     members_login: membersLogin,

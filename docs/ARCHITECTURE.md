@@ -509,10 +509,10 @@ oldest-first rotation sends them to the back, where a plain re-run reaches them
 last. `scripts/fill-enrichment-gaps.mjs` is the runner — it loops until
 `remaining.total` is 0, sleeps between rounds, and stops after three rounds
 that attempt work and change nothing (what's left then is a genuine TMDB
-no-match, not damage). `--dry-run` reports the count and enriches nothing. **Actions → "Fill
-enrichment gaps"** runs that script with the repo's `CRON_SECRET` and defaults
-to a dry run, which is where this is meant to be driven from: the backlog is
-drained once, so it deliberately has no button in the app.
+no-match, not damage). `--dry-run` reports the count and enriches nothing. It is run from a
+laptop with `CRON_SECRET` set: the backlog is drained once, so it has no button
+in the app, and the manual Actions workflow that used to wrap it was deleted
+2026-11.
 
 | `GET /api/favorite-actors`             | `functions/api/favorite-actors.js`         | GET     | session — the caller's OWN library only; takes no `?member=`. Ranked by rating-weighted title count; also returns `rated_count`, `rating_goal`, `needs_ratings` |
 | `GET /api/networks`                    | `functions/api/networks.js`                | GET     | none — the network picker the apps fetch instead of hardcoding; constant table, no member data, edge-cached 1h |
@@ -1169,11 +1169,10 @@ Two traps this exists to avoid, both of which had already happened:
 insert time, so new rows are right — and repaired nothing already stored.
 Nothing else will either: `/api/enrich`'s rotation never touches storefront
 classification, so without a deliberate pass the legacy backlog stays wrong
-forever. **Actions → "Re-check Apple TV+ rentals"** runs
-`scripts/reclassify-storefronts.mjs` against `reclassify_storefronts` until
-`remaining` is zero (dry run by default). It lives in Actions rather than the
-admin screens because it drains a backlog *once*; the button it replaced was
-permanent UI for a one-time job.
+forever. `scripts/reclassify-storefronts.mjs` runs `reclassify_storefronts`
+until `remaining` is zero (`--dry-run` to count only), from a laptop with
+`CRON_SECRET` set. It drains a backlog *once*, so it has no admin button, and
+the manual Actions workflow that used to wrap it was deleted 2026-11.
 
 That action is also the one thing on `/api/admin-url-cleanup` that accepts
 `X-Cron-Secret` in place of an admin session, because it only re-derives a
@@ -1283,6 +1282,8 @@ Three pieces:
 
 ### Club numbers, cached weekly (migration 082)
 `/api/vibe` reads each member against the club baseline and hands out group personas from everyone's fingerprints. Both used to be rebuilt on every view by joining every member's library to `title_traits`. `vibe_cache` (one row, `key = 'club'`) now holds every member's fingerprint and scored count plus the baseline, recomputed when it's older than 7 days (Patrick's choice, 2026-10-04); a missing or corrupt row recomputes, like `trending_cache`. The viewer's own fingerprint, display traits and picks stay live. Personas are assigned from the cached numbers for everyone, the viewer included, because a live fingerprint summed in a different order differs in the last decimal and would flip a tie depending on who is looking. Pinned by `scripts/vibe-scope-test.mjs`.
+
+**Who opens it (`vibe_views`, migration 092).** Every profile read adds one to the viewer's row for that UTC day (`views`, and `others` when the profile is a group-mate's). The picker call with no `member`, a 403 and a 401 write nothing, and a failed write never fails the read. `/api/reporting` returns it as `vibe_usage`: distinct people over 7 and 30 days and ever, 30-day views, the date counting began, and a per-person list for the last 30 days. The demo account is left out and admins are flagged. It exists to decide whether Vibe and its nightly Claude scoring are worth keeping; nothing recorded a view before 2026-11.
 
 ### Fingerprint
 For each of the member's non-seed shows, look up `title_traits` by the show's key (its TMDB entry, else its title). Weight by list:

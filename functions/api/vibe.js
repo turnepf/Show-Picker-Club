@@ -63,6 +63,20 @@ async function listEligibleMembers(env, viewerSlug) {
   return named.map(m => ({ slug: m.slug, name: m.display, active_count: m.active_count }));
 }
 
+// One tally per member per UTC day (migration 092), so the reporting page can
+// say whether anyone opens Vibe at all. Counts a profile read — the picker
+// call with no `member` isn't one. Never allowed to break the read: a
+// pre-migration database or a D1 hiccup just loses the tick.
+async function recordVibeView(env, viewerSlug, viewedSlug) {
+  try {
+    await env.DB.prepare(
+      `INSERT INTO vibe_views (member_slug, day, views, others)
+       VALUES (?1, date('now'), 1, ?2)
+       ON CONFLICT(member_slug, day) DO UPDATE SET views = views + 1, others = others + ?2`
+    ).bind(viewerSlug, viewedSlug === viewerSlug ? 0 : 1).run();
+  } catch (_) { /* usage tracking only */ }
+}
+
 function avg(...xs) { return xs.reduce((a, b) => a + b, 0) / xs.length; }
 
 function displayTraits(fp) {
@@ -312,6 +326,7 @@ export async function onRequestGet(context) {
   if (!memberRow) {
     return new Response(JSON.stringify({ members, member: null, error: 'not_found' }), { status: 404, headers: corsHeaders() });
   }
+  await recordVibeView(env, session.member_slug, memberSlug);
 
   const engaged = await env.DB.prepare(
     `SELECT EXISTS(
