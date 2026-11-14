@@ -419,5 +419,37 @@ console.log('\n== AI apps (MCP): who connected what, admin-only, no secrets');
         !text.includes('HASHED-SECRET') && !text.includes('c-claude') && !text.includes('claude.ai/cb'));
 }
 
+console.log('\nVibe usage counts people, names them, and leaves out the demo account');
+{
+  const env = makeEnv();
+  env.DEMO_LOGIN_EMAIL = 'demo@example.com';
+  addMember(env, 'patrick', 'Patrick Turner', { admin: true });
+  addMember(env, 'stacy', 'Stacy Kallay');
+  addMember(env, 'demo', 'Demo Account');
+  const db = env._db;
+  db.prepare("INSERT INTO member_emails (member_slug, email) VALUES ('demo', 'demo@example.com')").run();
+  const view = (slug, ago, views, others = 0) => db.prepare(
+    "INSERT INTO vibe_views (member_slug, day, views, others) VALUES (?, date('now', ?), ?, ?)"
+  ).run(slug, `-${ago} days`, views, others);
+  view('stacy', 0, 3, 1); view('stacy', 2, 1);
+  view('patrick', 10, 5);
+  view('stacy', 45, 2);
+  view('demo', 0, 9);
+
+  const memberCookie = addSession(env, { slug: 'stacy', platform: 'iphone' });
+  check('a member cannot read who opened Vibe', (await call(env, memberCookie)).status === 403);
+
+  const v = (await (await call(env, addSession(env, { slug: 'patrick', platform: 'iphone' }))).json()).vibe_usage;
+  check('7 days counts people, not views', v.week === 1, JSON.stringify(v));
+  check('30 days counts each person once across days', v.month === 2, JSON.stringify(v));
+  check('views are summed inside the window only', v.views_month === 9, JSON.stringify(v));
+  check('the demo account is on no number', v.ever === 2 && !v.viewers.some(m => m.slug === 'demo'), JSON.stringify(v));
+  const st = v.viewers.find(m => m.slug === 'stacy');
+  check('a viewer row carries days, views and last day',
+    !!st && st.name === 'Stacy Kallay' && st.days === 2 && st.views === 4 && st.others === 1, JSON.stringify(st));
+  check('an admin is flagged rather than dropped', v.viewers.find(m => m.slug === 'patrick')?.is_admin === true);
+  check('and says when counting began', typeof v.since === 'string' && v.since.length === 10, JSON.stringify(v.since));
+}
+
 console.log(`\n${failed ? 'FAIL' : 'PASS'} — ${passed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);

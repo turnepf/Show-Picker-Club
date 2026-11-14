@@ -268,6 +268,31 @@
         <div class="footer">A subscribed calendar polls on its own schedule, so a member whose feed is being fetched has it live somewhere. Counting started when this shipped — give it a day before reading it.</div>
       </div>`;
     }
+    function vibeSection(v) {
+      if (!v) return '';
+      const who = v.viewers || [];
+      return `<div class="section">
+        <h2>Vibe</h2>
+        <table><tbody>
+          <tr><td>Members who opened Vibe (7 days)</td><td class="num">${fmt(v.week)}</td></tr>
+          <tr><td>Members who opened Vibe (30 days)</td><td class="num">${fmt(v.month)}</td></tr>
+          <tr><td>Members who ever opened it</td><td class="num">${fmt(v.ever)}</td></tr>
+          <tr><td>Profile views (30 days)</td><td class="num">${fmt(v.views_month)}</td></tr>
+        </tbody></table>
+        ${who.length === 0 ? '<div class="empty">Nobody in the last 30 days.</div>' : `
+          <table>
+            <thead><tr><th>Member (30 days)</th><th class="num">Days</th><th class="num">Views</th><th class="num">Of a group-mate</th><th class="num">Last</th></tr></thead>
+            <tbody>${who.map(m => `<tr>
+              <td>${escapeHtml(m.name)}${m.is_admin ? ' (admin)' : ''}</td>
+              <td class="num">${fmt(m.days)}</td>
+              <td class="num">${fmt(m.views)}</td>
+              <td class="num">${fmt(m.others)}</td>
+              <td class="num">${escapeHtml(m.last_day)}</td>
+            </tr>`).join('')}</tbody>
+          </table>`}
+        <div class="footer">Counts people, not taps, and leaves out the demo account. Counting started ${v.since ? escapeHtml(v.since) : 'when this shipped'} — nothing before that was recorded.</div>
+      </div>`;
+    }
     function enrolledSection(ev) {
       const rows = Object.entries(ev || {}).sort((a, b) => b[1] - a[1]);
       if (!rows.length) return '';
@@ -375,6 +400,7 @@
         ${mcpSection(d.mcp_connections)}
         ${signinSection(d.signin_methods)}
         ${calendarSection(d.calendar_usage)}
+        ${vibeSection(d.vibe_usage)}
         ${enrolledSection(d.enrolled_via)}
         ${loginsSection(d.members_login)}
 

@@ -28,6 +28,7 @@ export function memberReferenceStatements(env, slug, { mergeInto = null } = {}) 
       P('UPDATE household_invites SET inviter_slug = ? WHERE inviter_slug = ?', t, slug),
       P('DELETE FROM member_platforms WHERE member_slug = ?', slug),
       P('DELETE FROM member_spend WHERE member_slug = ?', slug),
+      P('DELETE FROM vibe_views WHERE member_slug = ?', slug),
       P('DELETE FROM import_pending WHERE member_slug = ?', slug),
       P('UPDATE failed_logins SET member_slug = NULL WHERE member_slug = ?', slug),
       P('UPDATE OR IGNORE group_members SET member_slug = ? WHERE member_slug = ?', t, slug),
@@ -45,6 +46,7 @@ export function memberReferenceStatements(env, slug, { mergeInto = null } = {}) 
     P('DELETE FROM household_invites WHERE inviter_slug = ?', slug),
     P('DELETE FROM member_platforms WHERE member_slug = ?', slug),
     P('DELETE FROM member_spend WHERE member_slug = ?', slug),
+    P('DELETE FROM vibe_views WHERE member_slug = ?', slug),
     P('DELETE FROM import_pending WHERE member_slug = ?', slug),
     P('UPDATE failed_logins SET member_slug = NULL WHERE member_slug = ?', slug),
     // Groups they created, with everything in them.
