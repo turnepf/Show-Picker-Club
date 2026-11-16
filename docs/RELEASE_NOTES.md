@@ -65,7 +65,7 @@ Archive this show is now its own full-size button on the show card, set apart fr
 
 ---
 
-## 1.8 (build 36) — iPhone, iPad, Mac and Apple TV, submitted for review 2026-11-12
+## 1.8 (build 36) — iPhone, iPad, Mac and Apple TV, released (iPhone and iPad approved 2026-11-12; Mac and Apple TV confirmed approved 2026-11-16)
 
 iPhone/iPad and Apple TV ship as build 37 and the Mac as build 36: Apple
 accepted the first iPhone and Apple TV uploads but never finished processing
