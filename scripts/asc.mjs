@@ -557,10 +557,14 @@ async function cmdCreateVersion(versionString, only) {
 // New filled in. Without --confirm it only reports what it would submit.
 //
 // Safe to run again after a partial failure. A platform already waiting for
-// or in review is skipped, not refused, and an open review submission left
+// or in review is skipped, not refused, and so is one that has already
+// cleared review (approved or on sale): platforms of one version are reviewed
+// separately, so the first can be live before the last is sent. A rejected
+// record is still a problem, never a skip. An open review submission left
 // behind (by an earlier run that died between steps, or by "Add for Review"
 // in the web UI) is reused rather than colliding with a new one.
 const IN_REVIEW = new Set(['WAITING_FOR_REVIEW', 'IN_REVIEW']);
+const PAST_REVIEW = new Set(['PENDING_DEVELOPER_RELEASE', 'PENDING_APPLE_RELEASE', 'PROCESSING_FOR_APP_STORE', 'READY_FOR_SALE']);
 
 async function openSubmission(platform) {
   const r = await get(`/v1/reviewSubmissions?filter[app]=${APP_ID}&filter[platform]=${platform}` +
@@ -583,6 +587,7 @@ async function cmdSubmit(versionString, flag) {
     const plat = v.attributes.platform;
     const state = v.attributes.appStoreState;
     if (IN_REVIEW.has(state)) { console.log(`  ${plat.padEnd(7)} already ${state}, skipped`); continue; }
+    if (PAST_REVIEW.has(state)) { console.log(`  ${plat.padEnd(7)} already ${state}, skipped`); continue; }
     const build = await get(`/v1/appStoreVersions/${v.id}/build?fields[builds]=version`);
     const locs = await get(`/v1/appStoreVersions/${v.id}/appStoreVersionLocalizations?fields[appStoreVersionLocalizations]=locale,whatsNew`);
     const missingNotes = (locs.data || []).filter(l => !(l.attributes.whatsNew || '').trim()).map(l => l.attributes.locale);
@@ -596,7 +601,7 @@ async function cmdSubmit(versionString, flag) {
     console.log(`  ${plat.padEnd(7)} ${build.data ? `build ${build.data.attributes.version}` : '-'}  ${problems.length ? '*** ' + problems.join('; ') : 'ready'}`);
   }
   if (!ready) die('Not submitted. Fix the platforms above and run it again.');
-  if (!toSend.length) return console.log(`\nNothing to send: every platform of ${versionString} is already in review.`);
+  if (!toSend.length) return console.log(`\nNothing to send: every platform of ${versionString} is already in review or past it.`);
   if (flag !== '--confirm') return console.log(`\nAll ready. Run again with --confirm to send ${versionString} to App Review.`);
 
   for (const v of toSend) {

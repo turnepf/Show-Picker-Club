@@ -49,13 +49,12 @@ Nothing yet.
 
 ---
 
-## 1.8.1 (build 38) — iPhone, iPad and Mac, not yet submitted
+## 1.8.1 (build 38) — iPhone and iPad released (confirmed 2026-11-17); Mac submitted to App Review 2026-11-18
 
 iPhone/iPad and Mac only: nothing changed on Apple TV, so it needs no 1.8.1.
 Both projects still carry 1.8.1 / 38 because the repo keeps them in lockstep.
-Create the records with `create-version 1.8.1 --platform` for iOS and macOS
-once 1.8 has cleared review — Apple refuses a new version while one is in
-flight.
+The Mac went in six days after iPhone/iPad, because Apple refuses a new
+version while one is in flight and Mac 1.8 was still waiting for review.
 
 iPhone, iPad and Mac:
 

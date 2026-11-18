@@ -371,7 +371,10 @@ node scripts/asc.mjs submit 1.6 --confirm
 
 The first only checks: every platform in `PREPARE_FOR_SUBMISSION`, a build
 attached, What's New filled in, a demo account set. The second sends each platform to App Review,
-and refuses unless all of them pass. Claude runs both: when the check passes
+and refuses unless all of them pass. A platform already in review, or already
+approved or on sale, is skipped rather than failed: platforms are reviewed
+separately, so one can be live before the last is sent (Mac 1.8.1, 2026-11).
+A rejected record still fails the check. Claude runs both: when the check passes
 it sends the release without asking Patrick first (his call, 2026-11-12), then
 says so. If the check fails, it reports what failed and doesn't submit.
 
