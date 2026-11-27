@@ -60,6 +60,7 @@ struct IPadHomeView: View {
     @State private var showingDeleteAccount = false
     @State private var showingPasskeys = false
     @State private var showingConnectedApps = false
+    @State private var showAICard = false
     @State private var showingSearch = false
     @State private var showingExport = false
     @State private var showingImport = false
@@ -189,6 +190,9 @@ struct IPadHomeView: View {
             .id(detailKey)
         }
         .task { if loading { await load() } }
+        .task(id: myMember?.slug) {
+            showAICard = myMember == nil ? false : await AIAssistantCard.shouldShow()
+        }
         // Changing what the sidebar points at empties the detail stack —
         // except when the selection change was made in order to push
         // something, in which case that push is what replaces it.
@@ -366,8 +370,8 @@ struct IPadHomeView: View {
             }
             // Same card as iPhone Home; it hides itself once dismissed or once
             // an AI app is connected.
-            if myMember != nil {
-                Section { AIAssistantCard() }
+            if myMember != nil && showAICard {
+                Section { AIAssistantCard { showAICard = false } }
             }
             // Attribution required by the TMDB and Watchmode (free plan) API terms.
             Section {
