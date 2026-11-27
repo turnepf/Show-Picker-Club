@@ -45,7 +45,11 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ## Unreleased — the update after 1.8.1
 
-Nothing yet.
+iPhone, iPad and Mac:
+
+```
+Home now tells you that Claude or ChatGPT can run Show Picker Club for you: ask what's on your Next Up, add a show, or rate one you just finished. A small card links to the setup guide, and it goes away when you dismiss it or connect an app.
+```
 
 ---
 

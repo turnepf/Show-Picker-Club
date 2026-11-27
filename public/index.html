@@ -706,6 +706,11 @@
     .import-card strong { font-size: 16px; }
     .import-card span { font-size: 14px; color: var(--ink-muted); line-height: 1.45; }
     .import-card .btn { align-self: flex-start; margin-top: 4px; }
+    /* "Connect your AI assistant" — same shape as the import card, with a dismiss X. */
+    .ai-card { position: relative; }
+    .ai-card .ai-card-kicker { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--accent, var(--ink)); }
+    .ai-card .ai-card-x { position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; border: 0; background: none; color: var(--ink-muted); font-size: 16px; line-height: 1; cursor: pointer; border-radius: 8px; }
+    .ai-card .ai-card-x:hover { background: var(--surface-2, rgba(128,128,128,.15)); }
     .watcher-picker { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; overflow: hidden; }
     .watcher-picker button {
       display: flex; justify-content: space-between; align-items: center; gap: 8px;
@@ -1293,6 +1298,17 @@
         <!-- An empty library's one useful offer: bring a list you already keep
              (iOS HomeView's card). Shown by showLanding() when signed in with
              no shows; gone as soon as there's anything. -->
+        <!-- AI assistant (MCP) pitch for signed-in members. Hidden until
+             maybeShowAiCard() has checked that it was never dismissed on this
+             browser and that no AI app is connected yet. -->
+        <div id="aiCard" class="import-card ai-card hidden">
+          <button type="button" class="ai-card-x" aria-label="Dismiss" onclick="dismissAiCard()">&#x2715;</button>
+          <span class="ai-card-kicker">INTEGRATIONS</span>
+          <strong>Connect your AI assistant</strong>
+          <span>Ask Claude or ChatGPT &ldquo;what&rsquo;s on my Next Up under an hour?&rdquo; or tell it &ldquo;I finished Severance, rate it a 9.&rdquo; It works with your lists, and you choose whether it can make changes.</span>
+          <a class="btn btn-save" href="/connect">Learn how to connect</a>
+        </div>
+
         <div id="importCard" class="import-card hidden">
           <strong>Start with a list you already have</strong>
           <span>Notes, a text file, an old spreadsheet — paste it in and we'll sort the titles onto your four lists.</span>
@@ -2119,7 +2135,7 @@
       } catch (e) {
         detailStatus.textContent = 'Failed to load trending shows.';
       }
-      checkAuth().then(loadLandingLibrary).then(maybeShowJoinCta).then(maybeResumeOAuth);
+      checkAuth().then(loadLandingLibrary).then(maybeShowAiCard).then(maybeShowJoinCta).then(maybeResumeOAuth);
 
       // A shared /show/<id> link continues here (the preview card's "Open in
       // your browser"). Back reveals Home rather than history.back(), since a
@@ -2313,6 +2329,25 @@
       fetch('/api/enrich', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ member: authMember }) }).catch(() => {});
       if (memberSlug && memberSlug === authMember) loadShows();
       else document.getElementById('importCard').classList.add('hidden');
+    }
+
+    // "Connect your AI assistant" card on Home. Shown only when signed in, never
+    // dismissed on this browser, and no AI app connected yet. A failed check
+    // leaves it hidden rather than guessing. Mirrors iOS AIAssistantCard.
+    async function maybeShowAiCard() {
+      const card = document.getElementById('aiCard');
+      if (!card || !authMember) return;
+      try { if (localStorage.getItem('dismissedAIConnectCard') === '1') return; } catch (_) {}
+      try {
+        const res = await fetch('/api/connected-apps');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!(data.apps || []).length) card.classList.remove('hidden');
+      } catch (_) {}
+    }
+    function dismissAiCard() {
+      try { localStorage.setItem('dismissedAIConnectCard', '1'); } catch (_) {}
+      document.getElementById('aiCard').classList.add('hidden');
     }
 
     // My own library on Home: the Rate my shows badge and, for an empty

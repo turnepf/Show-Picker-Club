@@ -364,6 +364,11 @@ struct IPadHomeView: View {
                         .listRowInsets(EdgeInsets())
                 }
             }
+            // Same card as iPhone Home; it hides itself once dismissed or once
+            // an AI app is connected.
+            if myMember != nil {
+                Section { AIAssistantCard() }
+            }
             // Attribution required by the TMDB and Watchmode (free plan) API terms.
             Section {
                 Text("Ratings and metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming links from Watchmode.")
