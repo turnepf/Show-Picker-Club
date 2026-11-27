@@ -22,6 +22,7 @@ struct HomeView: View {
     @State private var showingDeleteAccount = false
     @State private var showingPasskeys = false
     @State private var showingConnectedApps = false
+    @State private var showAICard = false
     @State private var showingExport = false
     @State private var showingSearch = false
     @State private var shakePick: Show?
@@ -195,8 +196,8 @@ struct HomeView: View {
                     // Signed in only: connecting is an account-level thing, and
                     // the card checks for itself whether it still has anything
                     // to say (dismissed, or an app already connected).
-                    if myMember != nil {
-                        Section { AIAssistantCard() }
+                    if myMember != nil && showAICard {
+                        Section { AIAssistantCard { showAICard = false } }
                     }
                     // Say why the shelf is bare instead of hiding it: a
                     // failed fetch and a genuinely quiet month look identical
@@ -244,6 +245,9 @@ struct HomeView: View {
                 }
                 .listStyle(.insetGrouped)
                 .refreshable { await load() }
+                .task(id: myMember?.slug) {
+                    showAICard = myMember == nil ? false : await AIAssistantCard.shouldShow()
+                }
                 .task { if loading { await load() } }
                 .overlay { if loading && members.isEmpty { ProgressView() } }
             }
