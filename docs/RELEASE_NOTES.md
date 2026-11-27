@@ -43,7 +43,16 @@ the Prime Video home screen, for titles where we have a direct link to them.
 
 ---
 
-## Unreleased — the update after 1.8.1
+## Unreleased — the update after 1.9
+
+Nothing yet.
+
+---
+
+## 1.9 (build 39) — iPhone, iPad and Mac, not yet submitted
+
+iPhone/iPad and Mac only: nothing changed on Apple TV, so it needs no 1.9.
+Both projects still carry 1.9 / 39 because the repo keeps them in lockstep.
 
 iPhone, iPad and Mac:
 
