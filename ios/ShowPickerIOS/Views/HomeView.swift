@@ -192,6 +192,12 @@ struct HomeView: View {
                             }
                         }
                     }
+                    // Signed in only: connecting is an account-level thing, and
+                    // the card checks for itself whether it still has anything
+                    // to say (dismissed, or an app already connected).
+                    if myMember != nil {
+                        Section { AIAssistantCard() }
+                    }
                     // Say why the shelf is bare instead of hiding it: a
                     // failed fetch and a genuinely quiet month look identical
                     // when the section just disappears.

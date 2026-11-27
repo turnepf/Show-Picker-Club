@@ -159,3 +159,81 @@ struct ConnectedAppsView: View {
         return date.formatted(.dateTime.month(.abbreviated).day().year())
     }
 }
+
+// The Home card that tells a member their AI app can run Show Picker Club
+// (MCP, showpicker.club/connect). The feature is otherwise two taps deep in the
+// account menu, so nobody finds it by accident.
+//
+// Gates itself, so Home and the iPad sidebar just drop it in a Section:
+//   - dismissed with the X  → gone for good on this device
+//   - an app is connected   → gone (it has nothing left to teach)
+//   - the list is still loading, or failed to load → not shown. A card that
+//     flashes in and out, or nags someone whose connection we couldn't check,
+//     is worse than a card that appears a beat late.
+// The dismissal is per device (AppStorage), on purpose: a promo isn't account
+// state worth a server column.
+struct AIAssistantCard: View {
+    @AppStorage("dismissedAIConnectCard") private var dismissed = false
+    @Environment(\.openURL) private var openURL
+    @State private var checked = false
+    @State private var hasConnected = false
+
+    private static let connectURL = URL(string: API.baseString + "/connect")!
+
+    var body: some View {
+        Group {
+            if checked && !hasConnected && !dismissed {
+                card
+            }
+        }
+        .task { await check() }
+    }
+
+    private var card: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("INTEGRATIONS")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tint)
+                Spacer()
+                Button {
+                    dismissed = true
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(6)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss")
+            }
+            Text("Connect your AI assistant")
+                .font(.headline)
+            Text("Ask Claude or ChatGPT \u{201C}what\u{2019}s on my Next Up under an hour?\u{201D} or tell it \u{201C}I finished Severance, rate it a 9.\u{201D} It works with your lists, and you choose whether it can make changes.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                openURL(Self.connectURL)
+            } label: {
+                Text("Learn how to connect")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .padding(.top, 2)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func check() async {
+        guard !dismissed else { return }
+        do {
+            hasConnected = !(try await API.connectedApps()).isEmpty
+            checked = true
+        } catch {
+            // Couldn't tell. Stay hidden; the next Home visit asks again.
+        }
+    }
+}

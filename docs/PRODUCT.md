@@ -623,6 +623,14 @@ account menu, next to Passkeys: the same list with Disconnect (swipe, or
 right-click on Mac) and a link out to `/connect`. **Apple TV, the watch and
 Roku don't** — nothing to manage from there; the web page covers everyone.
 
+**Home card (2026-11).** Signed-in members on iPhone/iPad/Mac and the web see a
+dismissible **Connect your AI assistant** card on Home (`AIAssistantCard` in
+`ConnectedAppsView.swift`; `#aiCard` in `index.html`) with a *Learn how to
+connect* button to `/connect`. It stays hidden until it has checked
+`/api/connected-apps`, and is gone for good once the member dismisses it (per
+device or browser: `dismissedAIConnectCard`) or has any app connected. A failed
+check shows nothing. Apple TV, the watch and Roku don't get it.
+
 ## Suggestions to non-members
 
 Not currently supported — the suggest button is only available to logged-in members. Outside guests would need to be added as a member first.
