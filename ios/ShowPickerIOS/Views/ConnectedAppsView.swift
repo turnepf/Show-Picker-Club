@@ -164,32 +164,38 @@ struct ConnectedAppsView: View {
 // (MCP, showpicker.club/connect). The feature is otherwise two taps deep in the
 // account menu, so nobody finds it by accident.
 //
-// Gates itself, so Home and the iPad sidebar just drop it in a Section:
-//   - dismissed with the X  → gone for good on this device
-//   - an app is connected   → gone (it has nothing left to teach)
-//   - the list is still loading, or failed to load → not shown. A card that
-//     flashes in and out, or nags someone whose connection we couldn't check,
-//     is worse than a card that appears a beat late.
-// The dismissal is per device (AppStorage), on purpose: a promo isn't account
-// state worth a server column.
+// The host (HomeView, IPadHomeView) owns the decision, because a row that
+// renders nothing is never created by a List, so a check hung on the row
+// itself would never run:
+//
+//     @State private var showAICard = false
+//     ...
+//     if showAICard { Section { AIAssistantCard { showAICard = false } } }
+//     ...
+//     .task(id: myMember?.slug) { showAICard = await AIAssistantCard.shouldShow() }
+//
+// shouldShow() is false when:
+//   - the card was dismissed with the X (gone for good on this device)
+//   - an app is connected (it has nothing left to teach)
+//   - the list couldn't be loaded. A card that nags someone whose connection
+//     we couldn't check is worse than a card that appears a beat late.
+// The dismissal is per device (UserDefaults), on purpose: a promo isn't
+// account state worth a server column.
 struct AIAssistantCard: View {
-    @AppStorage("dismissedAIConnectCard") private var dismissed = false
+    static let dismissedKey = "dismissedAIConnectCard"
+
+    let onDismiss: () -> Void
     @Environment(\.openURL) private var openURL
-    @State private var checked = false
-    @State private var hasConnected = false
 
     private static let connectURL = URL(string: API.baseString + "/connect")!
 
-    var body: some View {
-        Group {
-            if checked && !hasConnected && !dismissed {
-                card
-            }
-        }
-        .task { await check() }
+    static func shouldShow() async -> Bool {
+        if UserDefaults.standard.bool(forKey: dismissedKey) { return false }
+        guard let apps = try? await API.connectedApps() else { return false }
+        return apps.isEmpty
     }
 
-    private var card: some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Text("INTEGRATIONS")
@@ -197,7 +203,8 @@ struct AIAssistantCard: View {
                     .foregroundStyle(.tint)
                 Spacer()
                 Button {
-                    dismissed = true
+                    UserDefaults.standard.set(true, forKey: Self.dismissedKey)
+                    onDismiss()
                 } label: {
                     Image(systemName: "xmark")
                         .font(.caption.weight(.semibold))
@@ -225,15 +232,5 @@ struct AIAssistantCard: View {
             .padding(.top, 2)
         }
         .padding(.vertical, 4)
-    }
-
-    private func check() async {
-        guard !dismissed else { return }
-        do {
-            hasConnected = !(try await API.connectedApps()).isEmpty
-            checked = true
-        } catch {
-            // Couldn't tell. Stay hidden; the next Home visit asks again.
-        }
     }
 }
