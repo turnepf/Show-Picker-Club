@@ -49,7 +49,7 @@ Nothing yet.
 
 ---
 
-## 1.9 (build 39) — iPhone, iPad and Mac, not yet submitted
+## 1.9 (build 39) — iPhone, iPad and Mac, submitted to App Review 2026-11-27
 
 iPhone/iPad and Mac only: nothing changed on Apple TV, so it needs no 1.9.
 Both projects still carry 1.9 / 39 because the repo keeps them in lockstep.
